@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_201930) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_210024) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,6 +58,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_201930) do
     t.datetime "revoked_at"
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "page_hierarchies", id: false, force: :cascade do |t|
+    t.bigint "ancestor_id", null: false
+    t.bigint "descendant_id", null: false
+    t.integer "generations", null: false
+    t.index ["ancestor_id", "descendant_id", "generations"], name: "page_anc_desc_idx", unique: true
+    t.index ["descendant_id"], name: "page_desc_idx"
+  end
+
+  create_table "pages", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.jsonb "meta_description", default: {}, null: false
+    t.jsonb "meta_title", default: {}, null: false
+    t.integer "page_type", default: 0, null: false
+    t.bigint "parent_id"
+    t.integer "position"
+    t.datetime "published_at"
+    t.jsonb "slug", default: {}, null: false
+    t.jsonb "subtitle", default: {}, null: false
+    t.jsonb "title", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index "parent_id, ((slug ->> 'de'::text))", name: "index_pages_on_parent_id_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index "parent_id, ((slug ->> 'en'::text))", name: "index_pages_on_parent_id_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index "parent_id, ((slug ->> 'es'::text))", name: "index_pages_on_parent_id_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index ["parent_id"], name: "index_pages_on_parent_id"
   end
 
   create_table "post_relations", force: :cascade do |t|
@@ -129,6 +155,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_201930) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"
