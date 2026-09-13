@@ -46,6 +46,8 @@ defaults), ActionText + Active Storage, `avo` gem, minitest + fixtures
 
 **Files:**
 - Create: entire Rails app skeleton (via `rails new`)
+- Create: `docker-compose.yml`
+- Modify: `config/database.yml`
 - Create: `app/controllers/home_controller.rb`
 - Create: `app/views/home/index.html.erb`
 - Modify: `config/routes.rb`
@@ -134,7 +136,65 @@ class HealthTest < ActionDispatch::IntegrationTest
 end
 ```
 
-- [ ] **Step 5: Create the databases and run the tests**
+- [ ] **Step 5: Run Postgres locally via OrbStack + docker-compose**
+
+Local Postgres runs as a plain Docker container (via OrbStack, already
+installed) rather than Postgres.app, to avoid Postgres.app's native
+macOS "trust this connection" GUI dialog, which blocks non-interactive
+(agent) database access. This is purely a local-dev convenience — it
+has no bearing on the deploy target, which remains an open question
+per the Global Constraints above.
+
+Postgres.app may still be running on `localhost:5432` on this machine
+for unrelated reasons — rather than requiring it to be quit, the
+container is mapped to host port **5433** instead, so the two can
+coexist without conflict.
+
+`docker-compose.yml` (repo root):
+
+```yaml
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: contentspiel
+      POSTGRES_PASSWORD: contentspiel
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+Start it:
+
+```bash
+docker compose up -d
+```
+
+In the generated `config/database.yml`, find the `default: &default`
+block near the top and add explicit connection details so Rails
+doesn't rely on a local Unix socket / peer auth:
+
+```yaml
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  host: localhost
+  port: 5433
+  username: contentspiel
+  password: contentspiel
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+```
+
+(Leave the rest of the generated file — the `development:`, `test:`,
+and `production:` sections with their `<<: *default` and `database:`
+keys — as generated.)
+
+- [ ] **Step 6: Create the databases and run the tests**
 
 ```bash
 bin/rails db:create
@@ -143,7 +203,7 @@ bin/rails test
 
 Expected: both tests PASS (2 runs, 0 failures, 0 errors).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -359,15 +419,11 @@ class PostTest < ActiveSupport::TestCase
 
   test "body accepts rich text content" do
     post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    assert_equal "<p>Hi</p>", post.body.to_plain_text.present? ? post.body.body.to_html : nil rescue nil
     assert post.body.present?
+    assert_includes post.body.to_plain_text, "Hi"
   end
 end
 ```
-
-Adjust: the last assertion is simplified below in Step 4's
-implementation notes — the important behavior is `post.body.present?`
-after assigning HTML content.
 
 - [ ] **Step 4: Run tests to verify they fail**
 
