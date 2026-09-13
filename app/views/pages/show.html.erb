@@ -1,0 +1,5 @@
+<%# A page's body is its blocks in `position` order (the association is ordered),
+    each rendered by the partial named after its own block_type. %>
+<% @page.content_blocks.each do |block| %>
+  <%= render "content_blocks/#{block.block_type}", block: block %>
+<% end %>

@@ -14,4 +14,20 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   root "home#index"
+
+  # The public site: every page in the `Page` tree is served by this one route,
+  # which hands `PagesController` a locale and the rest of the path to look up.
+  #
+  # Declared last because it is a catch-all -- the named routes above (/avo,
+  # /session, /up, ...) have to win over it. The locale constraint keeps it from
+  # swallowing unrelated top-level paths entirely: only the three locales the
+  # site is published in (config.i18n.available_locales) reach the controller.
+  #
+  # The glob segment is wrapped in an optional group rather than left bare: a
+  # `defaults: { path: "" }` alone does *not* make `*path` optional -- Journey
+  # still requires at least one character for it, so "/en/" (which Rails
+  # normalizes to "/en") raises a routing error and the homepage is unreachable.
+  # `(/*path)` makes the segment genuinely optional, and the default is what
+  # then supplies the "" the controller normalizes into "/".
+  get ":locale(/*path)", to: "pages#show", constraints: { locale: /en|de|es/ }, as: :page, defaults: { path: "" }
 end
