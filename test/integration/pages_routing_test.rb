@@ -1,6 +1,14 @@
 require "test_helper"
 
 class PagesRoutingTest < ActionDispatch::IntegrationTest
+  # The site has no unprefixed public URLs: "/" exists only to send a visitor
+  # to the default locale's root page.
+  test "the bare root redirects to the default locale root" do
+    get "/"
+
+    assert_redirected_to "/en/"
+  end
+
   test "the root page renders at the locale root" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
@@ -24,6 +32,45 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
   test "an unmatched path returns 404" do
     get "/en/does-not-exist"
+
+    assert_response :not_found
+  end
+
+  # The locale prefix isn't only a lookup key for the path: it has to be the
+  # locale the page's translated content is read in for the length of the
+  # request, or a German URL renders English text.
+  test "a page renders in the locale its path was requested under" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
+    block = ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
+    Mobility.with_locale(:de) do
+      about.update!(slug: "ueber-uns")
+      block.update!(body: "<p>Ueber uns</p>")
+    end
+
+    get "/de/ueber-uns"
+
+    assert_response :success
+    assert_includes response.body, "Ueber uns"
+    assert_not_includes response.body, "About us"
+  end
+
+  # A page with no `published_at` is a draft: it has a path the moment it is
+  # saved, and must not be reachable at it until it is published.
+  test "an unpublished page returns 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
+
+    get "/en/draft"
+
+    assert_response :not_found
+  end
+
+  test "a page published in the future returns 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root, published_at: 1.day.from_now)
+
+    get "/en/scheduled"
 
     assert_response :not_found
   end

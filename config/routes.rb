@@ -12,8 +12,11 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # Defines the root path route ("/")
-  root "home#index"
+  # The site has no unprefixed public URLs -- every page lives under a locale,
+  # so "/" only exists to send a visitor to the default locale's root page.
+  # Still declared with `root` rather than `get "/"` so that `root_url` keeps
+  # resolving (Authentication#after_authentication_url falls back to it).
+  root to: redirect("/en/")
 
   # The public site: every page in the `Page` tree is served by this one route,
   # which hands `PagesController` a locale and the rest of the path to look up.

@@ -304,8 +304,8 @@ class PageTest < ActiveSupport::TestCase
   end
 
   test "find_by_full_path locates the matching page" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
 
     assert_equal page, Page.find_by_full_path(:en, "/about")
     assert_equal root, Page.find_by_full_path(:en, "/")
@@ -315,12 +315,27 @@ class PageTest < ActiveSupport::TestCase
   # The lookup is scoped to one locale's key: an English path must not resolve
   # for a German visitor just because some page holds it in English.
   test "find_by_full_path only matches the requested locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
     Mobility.with_locale(:de) { page.update!(slug: "ueber-uns") }
 
     assert_equal page, Page.find_by_full_path(:de, "/ueber-uns")
     assert_nil Page.find_by_full_path(:de, "/about")
+  end
+
+  # The lookup is what the public site routes through, so it answers for
+  # published pages only -- a draft is invisible at its own path, the same way
+  # an unpublished Post is absent from a post_list.
+  test "find_by_full_path ignores unpublished pages" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    draft = Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
+    Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root, published_at: 1.day.from_now)
+
+    assert_nil Page.find_by_full_path(:en, "/draft")
+    assert_nil Page.find_by_full_path(:en, "/scheduled")
+
+    draft.update!(published_at: 1.minute.ago)
+    assert_equal draft, Page.find_by_full_path(:en, "/draft")
   end
 
   test "updating a slug recomputes cached_paths for the page and its descendants" do

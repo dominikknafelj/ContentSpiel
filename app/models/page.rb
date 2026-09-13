@@ -27,6 +27,12 @@ class Page < ApplicationRecord
 
   enum :page_type, { standard: 0, landing: 1 }
 
+  # What the public site is allowed to serve. A beginless range compiles to
+  # `published_at <= now()`, which drops both drafts (NULL, since every SQL
+  # comparison with NULL is NULL rather than true) and pages scheduled for a
+  # future date -- the same rule a post_list block applies to its Posts.
+  scope :published, -> { where(published_at: ..Time.current) }
+
   validates :title, presence: true
   validate :only_one_root_page
   validate :slug_is_unused_among_siblings_in_every_locale
@@ -59,8 +65,13 @@ class Page < ApplicationRecord
   # The lookup the catch-all route performs on every request: one indexed
   # equality test against this locale's key in `cached_paths`, rather than
   # rebuilding every page's ancestor chain in Ruby to find the one that matches.
+  #
+  # Scoped to published pages rather than leaving that to the caller: this is
+  # the public site's entry point into the tree, and a draft page acquires its
+  # path the moment it is saved -- so an unfiltered lookup publishes every
+  # work-in-progress at a guessable URL.
   def self.find_by_full_path(locale, path)
-    where("cached_paths ->> ? = ?", locale.to_s, path).first
+    published.where("cached_paths ->> ? = ?", locale.to_s, path).first
   end
 
   protected
