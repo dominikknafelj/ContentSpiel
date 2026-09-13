@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_210024) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_211423) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -69,6 +69,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_210024) do
   end
 
   create_table "pages", force: :cascade do |t|
+    t.jsonb "cached_paths", default: {}, null: false
     t.datetime "created_at", null: false
     t.jsonb "meta_description", default: {}, null: false
     t.jsonb "meta_title", default: {}, null: false
@@ -80,6 +81,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_210024) do
     t.jsonb "subtitle", default: {}, null: false
     t.jsonb "title", default: {}, null: false
     t.datetime "updated_at", null: false
+    t.index "((cached_paths ->> 'de'::text))", name: "index_pages_on_cached_path_de"
+    t.index "((cached_paths ->> 'en'::text))", name: "index_pages_on_cached_path_en"
+    t.index "((cached_paths ->> 'es'::text))", name: "index_pages_on_cached_path_es"
     t.index "parent_id, ((slug ->> 'de'::text))", name: "index_pages_on_parent_id_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)", nulls_not_distinct: true
     t.index "parent_id, ((slug ->> 'en'::text))", name: "index_pages_on_parent_id_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)", nulls_not_distinct: true
     t.index "parent_id, ((slug ->> 'es'::text))", name: "index_pages_on_parent_id_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)", nulls_not_distinct: true

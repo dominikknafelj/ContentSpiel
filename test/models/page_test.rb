@@ -263,4 +263,122 @@ class PageTest < ActiveSupport::TestCase
 
     assert_equal "team", Page.find(other.id).slug
   end
+
+  # The root is the homepage: it contributes no path segment of its own, so it
+  # answers to "/" no matter what slug it carries.
+  test "full_path is computed from the page's own slug for a root page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+
+    assert_equal "/", root.full_path(:en)
+  end
+
+  test "full_path concatenates ancestor slugs" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+
+    # A child of the root is "/about", not "//about".
+    assert_equal "/about", section.full_path(:en)
+    assert_equal "/about/team", leaf.full_path(:en)
+  end
+
+  test "full_path differs per locale when slugs are translated" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    Mobility.with_locale(:de) { page.update!(title: "Ueber uns", slug: "ueber-uns") }
+
+    assert_equal "/about", page.full_path(:en)
+    assert_equal "/ueber-uns", page.full_path(:de)
+  end
+
+  # Spec section 6: a page missing a translation falls back to the default
+  # locale. A German path built from a literal German slug the page doesn't
+  # have would be "/ueber-uns/" -- a hole where a segment should be.
+  test "full_path falls back to the default locale for an untranslated slug" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    Mobility.with_locale(:de) { section.update!(slug: "ueber-uns") }
+    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+
+    assert_equal "/ueber-uns/team", leaf.full_path(:de)
+  end
+
+  test "find_by_full_path locates the matching page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+
+    assert_equal page, Page.find_by_full_path(:en, "/about")
+    assert_equal root, Page.find_by_full_path(:en, "/")
+    assert_nil Page.find_by_full_path(:en, "/does-not-exist")
+  end
+
+  # The lookup is scoped to one locale's key: an English path must not resolve
+  # for a German visitor just because some page holds it in English.
+  test "find_by_full_path only matches the requested locale" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    Mobility.with_locale(:de) { page.update!(slug: "ueber-uns") }
+
+    assert_equal page, Page.find_by_full_path(:de, "/ueber-uns")
+    assert_nil Page.find_by_full_path(:de, "/about")
+  end
+
+  test "updating a slug recomputes cached_paths for the page and its descendants" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+
+    section.update!(slug: "company")
+
+    assert_equal "/company", section.reload.full_path(:en)
+    assert_equal "/company/team", leaf.reload.full_path(:en)
+  end
+
+  # The cascade has to reach the whole subtree, not just the direct children:
+  # a grandchild's path is shifted by its grandparent's slug just as much.
+  test "updating a slug recomputes cached_paths for indirect descendants too" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    team = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    member = Page.create!(page_type: :standard, title: "Ada", slug: "ada", parent: team)
+
+    section.update!(slug: "company")
+
+    assert_equal "/company/team/ada", member.reload.full_path(:en)
+  end
+
+  # Every locale is recomputed, not just `Mobility.locale`: the cascade runs
+  # once, under whatever locale happened to be current for the edit.
+  test "recomputing paths covers every available locale" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+    Mobility.with_locale(:de) { section.update!(slug: "ueber-uns") }
+
+    # Sorted because jsonb does not preserve insertion order of keys.
+    assert_equal %w[de en es], leaf.reload.cached_paths.keys.sort
+    assert_equal "/ueber-uns/team", leaf.full_path(:de)
+    assert_equal "/about/team", leaf.full_path(:en)
+  end
+
+  # A page's path changes when it moves, even though none of its own slugs did.
+  test "moving a page recomputes cached_paths for it and its descendants" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    origin = Page.create!(page_type: :standard, title: "Origin", slug: "origin", parent: root)
+    destination = Page.create!(page_type: :standard, title: "Destination", slug: "destination", parent: root)
+    section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: origin)
+    leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
+
+    section.update!(parent: destination)
+
+    assert_equal "/destination/about", section.reload.full_path(:en)
+    assert_equal "/destination/about/team", leaf.reload.full_path(:en)
+  end
+
+  test "cached_paths is populated on create" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+
+    assert_equal({ "en" => "/about", "de" => "/about", "es" => "/about" }, page.reload.cached_paths)
+  end
 end
