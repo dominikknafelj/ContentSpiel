@@ -2,8 +2,8 @@
 # check=error=true
 
 # This Dockerfile is designed for production, not development. Use with Kamal or build'n'run by hand:
-# docker build -t contentspiel_foundation .
-# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name contentspiel_foundation contentspiel_foundation
+# docker build -t content_spiel .
+# docker run -d -p 80:80 -e RAILS_MASTER_KEY=<value from config/master.key> --name content_spiel content_spiel
 
 # For a containerized dev environment, see Dev Containers: https://guides.rubyonrails.org/getting_started_with_devcontainer.html
 

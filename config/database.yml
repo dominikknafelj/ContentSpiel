@@ -24,13 +24,13 @@ default: &default
 
 development:
   <<: *default
-  database: contentspiel_foundation_development
+  database: content_spiel_development
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
   # When left blank, PostgreSQL will use the default role. This is
   # the same name as the operating system user running Rails.
-  #username: contentspiel_foundation
+  #username: content_spiel
 
   # The password associated with the PostgreSQL role (username).
   #password:
@@ -58,7 +58,7 @@ development:
 # Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: contentspiel_foundation_test
+  database: content_spiel_test
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is
@@ -89,18 +89,18 @@ test:
 production:
   primary: &primary_production
     <<: *default
-    database: contentspiel_foundation_production
-    username: contentspiel_foundation
-    password: <%= ENV["CONTENTSPIEL_FOUNDATION_DATABASE_PASSWORD"] %>
+    database: content_spiel_production
+    username: content_spiel
+    password: <%= ENV["CONTENT_SPIEL_DATABASE_PASSWORD"] %>
   cache:
     <<: *primary_production
-    database: contentspiel_foundation_production_cache
+    database: content_spiel_production_cache
     migrations_paths: db/cache_migrate
   queue:
     <<: *primary_production
-    database: contentspiel_foundation_production_queue
+    database: content_spiel_production_queue
     migrations_paths: db/queue_migrate
   cable:
     <<: *primary_production
-    database: contentspiel_foundation_production_cable
+    database: content_spiel_production_cable
     migrations_paths: db/cable_migrate
