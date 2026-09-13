@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_175114) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_175353) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -50,6 +50,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175114) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "post_relations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "post_id", null: false
+    t.bigint "related_post_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["post_id", "related_post_id"], name: "index_post_relations_on_post_id_and_related_post_id", unique: true
+    t.index ["post_id"], name: "index_post_relations_on_post_id"
+    t.index ["related_post_id"], name: "index_post_relations_on_related_post_id"
   end
 
   create_table "post_tags", force: :cascade do |t|
@@ -100,6 +110,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175114) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "post_relations", "posts"
+  add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"
   add_foreign_key "post_tags", "tags"
   add_foreign_key "sessions", "users"
