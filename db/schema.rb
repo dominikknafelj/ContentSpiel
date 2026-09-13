@@ -10,18 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_201930) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
+    t.string "locale", null: false
     t.string "name", null: false
     t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.datetime "updated_at", null: false
-    t.index ["record_type", "record_id", "name"], name: "index_action_text_rich_texts_uniqueness", unique: true
+    t.index ["record_type", "record_id", "name", "locale"], name: "index_action_text_rich_texts_uniqueness", unique: true
   end
 
   create_table "active_storage_attachments", force: :cascade do |t|
@@ -82,13 +83,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
   create_table "posts", force: :cascade do |t|
     t.integer "content_type", default: 0, null: false
     t.datetime "created_at", null: false
-    t.string "excerpt"
+    t.jsonb "excerpt", default: {}, null: false
     t.jsonb "metadata", default: {}, null: false
     t.datetime "published_at"
-    t.string "slug", null: false
-    t.string "title", null: false
+    t.jsonb "slug", default: {}, null: false
+    t.jsonb "title", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.index ["content_type", "slug"], name: "index_posts_on_content_type_and_slug", unique: true
+    t.index "content_type, ((slug ->> 'de'::text))", name: "index_posts_on_content_type_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)"
+    t.index "content_type, ((slug ->> 'en'::text))", name: "index_posts_on_content_type_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)"
+    t.index "content_type, ((slug ->> 'es'::text))", name: "index_posts_on_content_type_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)"
   end
 
   create_table "sessions", force: :cascade do |t|

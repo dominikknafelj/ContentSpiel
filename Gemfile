@@ -74,3 +74,9 @@ group :test do
 end
 
 gem "avo", "~> 4.2"
+
+# Translates model content per locale [https://github.com/shioyama/mobility].
+# `mobility-actiontext` is a separate gem -- the ActionText backend is not
+# bundled with Mobility itself.
+gem "mobility", "~> 1.3"
+gem "mobility-actiontext", "~> 1.1"
