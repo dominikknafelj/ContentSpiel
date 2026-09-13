@@ -36,6 +36,107 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "a page's meta_title and meta_description render in the head" do
+    Page.create!(
+      page_type: :standard,
+      title: "Home",
+      slug: "",
+      meta_title: "ContentSpiel — Home",
+      meta_description: "The personal site of a software developer.",
+      published_at: Time.current
+    )
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, "<title>ContentSpiel — Home</title>"
+    assert_includes response.body, %(<meta name="description" content="The personal site of a software developer.")
+  end
+
+  # `meta_title` is the optional override: a page that doesn't set one is still
+  # entitled to a title, and the one it has is its own.
+  test "meta_title falls back to the page's title when blank" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+      meta_title: "", published_at: Time.current)
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, "<title>Home</title>"
+
+    # Not only an absent override: one the admin typed and then cleared is just
+    # as blank, and must fall back the same way rather than emptying the title.
+    get "/en/about"
+
+    assert_response :success
+    assert_includes response.body, "<title>About</title>"
+  end
+
+  # A page with neither a meta_description nor (below) a post to describe emits
+  # no description tag at all -- an empty one is worse than none.
+  test "a page without a meta_description renders no description tag" do
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    get "/en/"
+
+    assert_response :success
+    assert_not_includes response.body, %(<meta name="description")
+  end
+
+  test "a page renders Open Graph tags for the URL it was requested at" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+      meta_description: "Who I am.", published_at: Time.current)
+
+    get "/en/about"
+
+    assert_response :success
+    assert_includes response.body, %(<meta property="og:title" content="About")
+    assert_includes response.body, %(<meta property="og:description" content="Who I am.")
+    assert_includes response.body, %(<meta property="og:type" content="website")
+    assert_includes response.body, %(<meta property="og:url" content="http://www.example.com/en/about")
+    assert_includes response.body, %(<meta property="og:locale" content="en")
+  end
+
+  # The SEO tags describe what the response actually shows. A post permalink
+  # renders one post inside its listing page, so every post under a listing
+  # would otherwise share that page's title and description.
+  test "a post detail view's meta tags describe the post, not its listing page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root,
+      meta_description: "Everything I've written.", published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", excerpt: "A short summary.",
+      body: "<p>Full post content</p>", published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :success
+    assert_includes response.body, "<title>My First Post</title>"
+    assert_includes response.body, %(<meta name="description" content="A short summary.")
+    assert_includes response.body, %(<meta property="og:type" content="article")
+    assert_not_includes response.body, "Everything I&#39;ve written."
+  end
+
+  # The page is read in the requested locale, so the tags describing it have to
+  # be too.
+  test "meta tags render in the locale the page was requested under" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+      meta_title: "About me", meta_description: "Who I am.", published_at: Time.current)
+    Mobility.with_locale(:de) do
+      about.update!(slug: "ueber-uns", meta_title: "Ueber mich", meta_description: "Wer ich bin.")
+    end
+
+    get "/de/ueber-uns"
+
+    assert_response :success
+    assert_includes response.body, "<title>Ueber mich</title>"
+    assert_includes response.body, %(<meta name="description" content="Wer ich bin.")
+    assert_includes response.body, %(<meta property="og:locale" content="de")
+  end
+
   # The locale prefix isn't only a lookup key for the path: it has to be the
   # locale the page's translated content is read in for the length of the
   # request, or a German URL renders English text.

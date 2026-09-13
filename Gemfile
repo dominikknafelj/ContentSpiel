@@ -85,3 +85,8 @@ gem "mobility-actiontext", "~> 1.1"
 # the navigation are one join deep regardless of nesting
 # [https://github.com/closuretree/closure_tree].
 gem "closure_tree", "~> 9.8"
+
+# Builds public/sitemap.xml from the published page tree. The sitemap itself is
+# defined in config/sitemap.rb and written by `rake sitemap:create`
+# [https://github.com/kjvarga/sitemap_generator].
+gem "sitemap_generator", "~> 7.1"

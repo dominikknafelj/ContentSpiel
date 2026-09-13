@@ -1,0 +1,25 @@
+<%# The head tags describing this response: the document title, the meta
+    description and the Open Graph card (page-tree design spec section 7).
+
+    Rendered from the body template rather than written into the layout because
+    this is where the `Page` -- and, at a post permalink, the `Post` -- it has
+    to describe is in scope. The layout picks both halves up through
+    `content_for(:title)` and its `yield :head`. %>
+<% title = seo_title(page, post: post) %>
+<% description = seo_description(page, post: post) %>
+
+<% content_for :title, title %>
+
+<% content_for :head do %>
+  <%= tag.meta(name: "description", content: description) if description %>
+  <%= tag.meta property: "og:title", content: title %>
+  <%= tag.meta(property: "og:description", content: description) if description %>
+  <%# A post permalink is one piece of writing; every other response is a page
+      of the site. %>
+  <%= tag.meta property: "og:type", content: post ? "article" : "website" %>
+  <%# The URL this response was actually served at, which for a page in a
+      non-default locale is its localized path -- the canonical address of what
+      is being shared. %>
+  <%= tag.meta property: "og:url", content: request.original_url %>
+  <%= tag.meta property: "og:locale", content: I18n.locale %>
+<% end %>
