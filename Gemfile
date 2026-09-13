@@ -20,7 +20,13 @@ gem "tailwindcss-rails"
 gem "jbuilder"
 
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
-# gem "bcrypt", "~> 3.1.7"
+gem "bcrypt", "~> 3.1.7"
+
+# Pin below json 3.x: its JSON.parse(source, options) no longer accepts a
+# positional options hash, which breaks ActiveSupport::JSON.decode (used by
+# signed/encrypted cookies, e.g. the session cookie in Authentication#find_session_by_cookie)
+# under activesupport 8.1.3.1 on Ruby 3.4.9.
+gem "json", "< 3.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
