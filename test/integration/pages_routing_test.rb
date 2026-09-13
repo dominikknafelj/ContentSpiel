@@ -146,4 +146,172 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "A Blog Entry"
     assert_not_includes response.body, "A Resume Entry"
   end
+
+  # No Page node exists per Post (page-tree design spec section 4): a post's
+  # permalink is served by the very page whose post_list block lists it, with
+  # the trailing segment read as the post's slug.
+  test "a trailing slug that matches a post under a post_list block renders that post's detail view" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :success
+    assert_includes response.body, "Full post content"
+    assert_not_includes response.body, "<ul>" # the list markup shouldn't also render
+  end
+
+  # The detail view replaces the block that matched, not the whole page: the
+  # rest of the listing page's blocks are its chrome and still belong there.
+  test "a post detail view still renders the page's other blocks" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :rich_text, position: 0, body: "<p>Blog intro</p>")
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 1, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :success
+    assert_includes response.body, "Blog intro"
+    assert_includes response.body, "Full post content"
+  end
+
+  test "a trailing segment that matches no post under a post_list block, and no Page, is 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+
+    get "/en/blog/no-such-post"
+
+    assert_response :not_found
+  end
+
+  # A page that lists nothing serves no permalinks: without a post_list block
+  # there is no criteria by which a trailing segment could name a post.
+  test "a trailing slug under a page with no post_list block is 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
+    post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
+
+    get "/en/about/#{post.slug}"
+
+    assert_response :not_found
+  end
+
+  test "a trailing slug under a path with no page at all is 404" do
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
+
+    get "/en/nowhere/#{post.slug}"
+
+    assert_response :not_found
+  end
+
+  # The listing page's own draft status governs the permalinks it serves, or a
+  # post detail URL becomes a back door into an unpublished page's content.
+  test "a post detail under an unpublished page is 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    draft_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: nil)
+    ContentBlock.create!(page: draft_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :not_found
+  end
+
+  # A draft post is kept out of the listing; its permalink has to be just as
+  # closed, or the post is public to anyone who guesses the slug.
+  test "an unpublished post's detail view is 404" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    draft = Post.create!(content_type: :blog, title: "Draft Post", body: "<p>Secret draft</p>", published_at: nil)
+    scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", body: "<p>Not yet</p>",
+      published_at: 1.day.from_now)
+
+    get "/en/blog/#{draft.slug}"
+    assert_response :not_found
+
+    get "/en/blog/#{scheduled.slug}"
+    assert_response :not_found
+  end
+
+  # The block's own criteria decide which posts it serves: a resume entry is
+  # not reachable under a page listing blog posts.
+  test "a post of another content type is not reachable under a post_list block" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
+
+    get "/en/blog/#{resume_entry.slug}"
+
+    assert_response :not_found
+  end
+
+  # The fallback resolves inside the requested locale, like the exact-match
+  # path does: a German URL has to find the post by its German slug and render
+  # its German body.
+  test "a post detail resolves and renders in the locale it was requested under" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+    Mobility.with_locale(:de) do
+      blog_page.update!(slug: "blogeintraege")
+      post.update!(slug: "mein-erster-beitrag", title: "Mein erster Beitrag", body: "<p>Ganzer Beitrag</p>")
+    end
+
+    get "/de/blogeintraege/mein-erster-beitrag"
+
+    assert_response :success
+    assert_includes response.body, "Ganzer Beitrag"
+    assert_not_includes response.body, "Full post content"
+  end
+
+  # Slugs fall back the same way `Page#full_path` builds its paths: a post left
+  # untranslated in the requested locale keeps the default locale's slug, so
+  # that is the URL it has to answer to there.
+  test "a post untranslated in the requested locale is reachable at its default-locale slug" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+    Mobility.with_locale(:de) { post.update!(body: "<p>Ganzer Beitrag</p>") }
+
+    get "/de/blog/#{post.slug}"
+
+    assert_response :success
+    assert_includes response.body, "Ganzer Beitrag"
+  end
+
+  # An exact match in the requested locale wins over another post that is only
+  # reachable there by fallback -- otherwise the fallback would shadow the very
+  # post whose German URL this is.
+  test "a post's own localized slug wins over another post's fallback slug" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    Post.create!(content_type: :blog, title: "Shared Slug", slug: "geteilt", body: "<p>English only</p>",
+      published_at: Time.current)
+    german = Post.create!(content_type: :blog, title: "Another Post", slug: "another-post",
+      body: "<p>English body</p>", published_at: Time.current)
+    Mobility.with_locale(:de) { german.update!(slug: "geteilt", body: "<p>Deutscher Beitrag</p>") }
+
+    get "/de/blog/geteilt"
+
+    assert_response :success
+    assert_includes response.body, "Deutscher Beitrag"
+    assert_not_includes response.body, "English only"
+  end
 end

@@ -1,10 +1,11 @@
 <div class="content-block content-block--post-list">
-  <%# The block's `settings` are the listing's query criteria. `published_at` in
-      the past is what makes a post public: NULL (never published) and a future
-      date (scheduled) both fail the comparison, so drafts stay out of the
-      listing while remaining visible in the admin. %>
-  <% posts = Post.where(content_type: block.settings["content_type"]) %>
-  <% posts = posts.where(published_at: ..Time.current).order(published_at: :desc) %>
+  <%# The block's `settings` are the listing's query criteria. `Post.published`
+      is what keeps drafts (never published) and scheduled posts (a future
+      date) out of the listing while leaving them visible in the admin -- the
+      same scope the single-post detail view resolves through, so a page lists
+      and serves permalinks for exactly the same posts. %>
+  <% posts = Post.published.where(content_type: block.settings["content_type"]) %>
+  <% posts = posts.order(published_at: :desc) %>
   <% posts = posts.limit(block.settings["limit"]) if block.settings["limit"].present? %>
   <ul>
     <% posts.each do |post| %>

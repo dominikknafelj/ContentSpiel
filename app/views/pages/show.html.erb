@@ -1,5 +1,16 @@
 <%# A page's body is its blocks in `position` order (the association is ordered),
-    each rendered by the partial named after its own block_type. %>
+    each rendered by the partial named after its own block_type.
+
+    The one exception is a post detail request (`/en/blog/my-post`): the block
+    the controller matched the post under renders that single post in place of
+    its listing, while the page's other blocks -- its intro text, its image --
+    still render around it. Compared against `@post_list_block` -- the block the
+    controller resolved the post under -- rather than `block.post_list?`, so
+    that a page carrying more than one listing swaps out only that block. %>
 <% @page.content_blocks.each do |block| %>
-  <%= render "content_blocks/#{block.block_type}", block: block %>
+  <% if @post && block == @post_list_block %>
+    <%= render "content_blocks/post_list_detail", post: @post %>
+  <% else %>
+    <%= render "content_blocks/#{block.block_type}", block: block %>
+  <% end %>
 <% end %>
