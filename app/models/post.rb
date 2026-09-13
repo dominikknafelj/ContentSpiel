@@ -7,6 +7,12 @@ class Post < ApplicationRecord
   has_many :post_relations, dependent: :destroy
   has_many :related_posts, through: :post_relations
 
+  # PostRelation holds two FKs into posts. `post_relations` only covers the
+  # `post_id` side; without this the `related_post_id` side is left dangling
+  # and destroying the post raises ActiveRecord::InvalidForeignKey.
+  has_many :inverse_post_relations, class_name: "PostRelation",
+    foreign_key: :related_post_id, dependent: :destroy, inverse_of: :related_post
+
   enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }
 
   validates :title, presence: true

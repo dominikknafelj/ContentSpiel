@@ -24,6 +24,26 @@ class PostRelationTest < ActiveSupport::TestCase
     assert_includes reverse.errors[:base], "relation already exists in the opposite direction"
   end
 
+  test "destroying the post on the forward side removes the relation" do
+    PostRelation.create!(post: @post_a, related_post: @post_b)
+
+    assert_difference -> { PostRelation.count }, -1 do
+      @post_a.destroy!
+    end
+  end
+
+  # A PostRelation has two FKs into posts. Without the inverse association the
+  # `related_post_id` side is left dangling and destroy raises InvalidForeignKey.
+  test "destroying the post on the related_post side removes the relation" do
+    relation = PostRelation.create!(post: @post_a, related_post: @post_b)
+
+    assert_difference -> { PostRelation.count }, -1 do
+      @post_b.destroy!
+    end
+
+    assert_not PostRelation.exists?(relation.id)
+  end
+
   test "all_related_posts returns posts related in either direction" do
     PostRelation.create!(post: @post_a, related_post: @post_b)
 
