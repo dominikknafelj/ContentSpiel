@@ -23,6 +23,18 @@ class Page < ApplicationRecord
   # `position` order and dispatches on each one's `block_type`.
   has_many :content_blocks, -> { order(:position) }, dependent: :destroy
 
+  # The admin edits a page's blocks inside the page's own form (page-tree design
+  # spec section 5), which is Rails' nested attributes underneath:
+  # `allow_destroy` is what each row's "Remove" checkbox writes to.
+  #
+  # `reject_if` is what lets that form carry a permanently-present blank row to
+  # add a block with: without it, every save of a page would store one more
+  # empty block. A row is "not filled in" when no block type was picked -- and
+  # only for a new row, since an existing block always submits its own type and
+  # must still be updatable (or destroyable) through the same call.
+  accepts_nested_attributes_for :content_blocks, allow_destroy: true,
+    reject_if: ->(attributes) { attributes["id"].blank? && attributes["block_type"].blank? }
+
   has_one_attached :hero_image
 
   enum :page_type, { standard: 0, landing: 1 }

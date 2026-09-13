@@ -28,13 +28,32 @@ class ContentBlock < ApplicationRecord
 
   validates :block_type, presence: true
 
+  # `position` is NOT NULL with a database default, which covers a block
+  # created in code but not one whose position input the admin cleared: that
+  # submits an empty string, which casts to nil and reaches Postgres as a raw
+  # not-null violation rendered into the form. Validated so it comes back as a
+  # form error instead.
+  validates :position, presence: true
+
   # `settings` holds a post_list's query criteria (`content_type`, `tag`,
   # `limit`). Only `content_type` is checked, and only for post_list blocks: it
   # names a Post enum value, so a typo would silently return no posts at render
   # time instead of failing in the admin.
   validate :post_list_settings_reference_a_real_content_type, if: :post_list?
 
+  # Every row of the admin's nested block form carries the same `settings`
+  # inputs, whatever the block's type, so a rich_text block would otherwise be
+  # saved holding `{"content_type" => "", "tag" => "", "limit" => ""}`. Those
+  # blanks are not the same as "unset": the post_list partial asks
+  # `settings["limit"].present?` and hands `settings["content_type"]` straight
+  # to a `where` on an enum column.
+  before_validation :discard_blank_settings
+
   private
+
+  def discard_blank_settings
+    self.settings = settings.to_h.compact_blank
+  end
 
   def post_list_settings_reference_a_real_content_type
     content_type = settings["content_type"]

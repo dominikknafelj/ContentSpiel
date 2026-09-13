@@ -1,0 +1,71 @@
+<%# One row of the Page form's inline content-block editor.
+
+    Locals: `f` (a fields_for builder over one ContentBlock), `tool`, `title`,
+    and `removable` (false for the blank "add" row, which has nothing to
+    remove yet).
+
+    Which fields matter depends on the block's type -- body for rich_text,
+    image + caption for image, settings for post_list -- but all of them are
+    rendered on every row: the type is routinely changed while drafting, and
+    Avo 4.2.3 Community has no client-side conditional fields to swap them
+    with. Each group says which type it belongs to instead. %>
+<%= render ui.card(title: title, padded: true) do %>
+  <div class="space-y-4">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div>
+        <%= f.label :block_type, "Type", class: "font-semibold" %>
+        <%= f.select :block_type,
+              ContentBlock.block_types.keys.map { |type| [ type.humanize, type ] },
+              { include_blank: "—" },
+              class: input_classes %>
+      </div>
+
+      <div>
+        <%= f.label :position, "Position", class: "font-semibold" %>
+        <%= f.number_field :position, class: input_classes %>
+      </div>
+
+      <% if removable %>
+        <div class="flex items-center gap-2 pb-2">
+          <%= f.check_box :_destroy %>
+          <%= f.label :_destroy, "Remove", class: "font-semibold" %>
+        </div>
+      <% end %>
+    </div>
+
+    <div>
+      <%= f.label :image, "Image (image blocks)", class: "font-semibold" %>
+      <%= f.file_field :image, class: input_classes %>
+    </div>
+
+    <div class="flex flex-wrap gap-4">
+      <% tool.setting_keys.each do |key| %>
+        <div>
+          <%= label_tag "#{f.object_name}[settings][#{key}]", "#{key.humanize} (post list blocks)", class: "font-semibold" %>
+          <%= text_field_tag "#{f.object_name}[settings][#{key}]",
+                f.object.settings.to_h[key], class: input_classes, id: nil %>
+        </div>
+      <% end %>
+    </div>
+
+    <% tool.locale_accessors(:caption).each do |locale, accessor| %>
+      <div>
+        <%= f.label accessor, "Caption (#{locale.to_s.upcase}) (image blocks)", class: "font-semibold" %>
+        <%= f.text_field accessor, class: input_classes %>
+      </div>
+    <% end %>
+
+    <%# Deliberately a plain HTML textarea rather than a rich editor: the
+        block's own Avo form (reachable from the Content blocks panel on the
+        page's Show view) is where `body` gets the full Trix editor with
+        attachments. Mobility's action_text backend accepts an HTML string
+        through these accessors, so what is typed here is the same value. %>
+    <% tool.locale_accessors(:body).each do |locale, accessor| %>
+      <div>
+        <%= f.label accessor, "Body HTML (#{locale.to_s.upcase}) (rich text blocks)", class: "font-semibold" %>
+        <%= f.text_area accessor, value: f.object.public_send(accessor)&.to_trix_html,
+              rows: 4, class: input_classes("w-full") %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

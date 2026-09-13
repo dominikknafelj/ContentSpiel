@@ -31,7 +31,7 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
   test "an authenticated user can reach every registered resource index" do
     sign_in
 
-    %w[posts tags site_settings api_tokens].each do |resource|
+    %w[posts tags site_settings api_tokens pages content_blocks].each do |resource|
       get "/avo/resources/#{resource}"
 
       assert_response :success, "expected /avo/resources/#{resource} to render"
@@ -78,7 +78,7 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
   test "an authenticated user can reach the new page of every resource that allows creation" do
     sign_in
 
-    %w[posts tags site_settings users].each do |resource|
+    %w[posts tags site_settings users pages content_blocks].each do |resource|
       get "/avo/resources/#{resource}/new"
 
       assert_response :success, "expected /avo/resources/#{resource}/new to render"
@@ -104,6 +104,41 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
 
     assert_response :redirect
     assert User.find_by(email_address: "second-admin@example.com").authenticate("another-password")
+  end
+
+  # The page tree is the site's whole structure, so its New form has to work
+  # end to end rather than merely render: the translated fields are per-locale
+  # accessors, the parent picker is what attaches the page to the tree, and the
+  # inline block editor rides along on the same submission. What each of those
+  # does in detail is AvoPageEditingTest's business.
+  test "an authenticated user can view and create a Page" do
+    sign_in
+    root = Page.create!(title: "Home")
+
+    get "/avo/resources/pages"
+    assert_response :success
+
+    get "/avo/resources/pages/new"
+    assert_response :success
+
+    assert_difference -> { Page.count }, 1 do
+      post "/avo/resources/pages", params: { page: {
+        parent_id: root.id,
+        page_type: "standard",
+        title_en: "About",
+        slug_en: "about",
+        content_blocks_attributes: {
+          "0" => { block_type: "rich_text", position: "0", body_en: "<p>Hi</p>" }
+        }
+      } }
+    end
+
+    assert_response :redirect
+
+    created = Page.find_by!(parent_id: root.id)
+    assert_equal "About", created.title_en
+    assert_equal "/about", created.full_path(:en)
+    assert_equal [ "rich_text" ], created.content_blocks.map(&:block_type)
   end
 
   # The password fields render on Edit too, so leaving them blank there must not
@@ -199,12 +234,18 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
       post.tags << Tag.create!(name: "shown-tag")
       PostRelation.create!(post: post, related_post: Post.create!(title: "A related post", content_type: :blog))
 
+      root = Page.create!(title: "A shown page")
+      page = Page.create!(title: "A shown child page", slug: "child", parent: root)
+      block = page.content_blocks.create!(block_type: :rich_text, position: 0)
+
       {
         "posts" => post,
         "tags" => post.tags.first,
         "site_settings" => SiteSetting.instance,
         "api_tokens" => ApiToken.generate!.first,
-        "users" => @user
+        "users" => @user,
+        "pages" => page,
+        "content_blocks" => block
       }
     end
 
