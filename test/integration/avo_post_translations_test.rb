@@ -101,6 +101,32 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     assert_equal "shared-slug", Mobility.with_locale(:de) { Post.find(@post.id).slug }
   end
 
+  # The form writes all three locales at once while the request itself runs
+  # under :en. A German slug that is already taken has to come back as a form
+  # error -- if only the current locale is validated it sails through to the
+  # per-locale unique index and 500s instead.
+  test "a slug already taken in a non-current locale comes back as a form error" do
+    taken = Post.create!(content_type: :blog, title: "Unrelated", slug: "unrelated")
+    Mobility.with_locale(:de) { taken.update!(slug: "belegt") }
+
+    put "/avo/resources/posts/#{@post.id}", params: { post: {
+      content_type: "blog", slug_en: "hello-world", slug_de: "belegt"
+    } }
+
+    assert_response :unprocessable_entity
+
+    # Without a per-locale validation the collision is caught by the database
+    # instead, and Avo renders Postgres' own message into the page.
+    assert_no_match(/duplicate key value violates unique constraint/, response.body,
+      "a taken slug must surface as a validation error, not a raw Postgres error")
+    assert_includes response.body, "has already been taken"
+
+    # `slug_de` reads the literal German value; plain `slug` would fall back to
+    # the English one and pass no matter what.
+    assert_nil Post.find(@post.id).slug_de,
+      "the duplicate German slug must not have been written"
+  end
+
   private
     def title_input_for(locale)
       response.body[/<input[^>]*name="post\[title_#{locale}\]"[^>]*>/].tap do |input|

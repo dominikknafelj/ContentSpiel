@@ -29,10 +29,13 @@ class Avo::Resources::Post < Avo::BaseResource
     tabs do
       ::Mobility.available_locales.each do |locale|
         tab title: locale.to_s.upcase do
-          field :"title_#{locale}", as: :text, name: "Title"
-          field :"slug_#{locale}", as: :text, name: "Slug"
-          field :"excerpt_#{locale}", as: :textarea, name: "Excerpt"
-          field :"body_#{locale}", as: :trix, name: "Body"
+          # `normalize_locale_accessor` is what Mobility itself uses to name
+          # these methods, so it stays correct for a region-qualified locale
+          # like :"pt-BR" (whose accessor is `title_pt_br`, not `title_pt-BR`).
+          field ::Mobility.normalize_locale_accessor(:title, locale).to_sym, as: :text, name: "Title"
+          field ::Mobility.normalize_locale_accessor(:slug, locale).to_sym, as: :text, name: "Slug"
+          field ::Mobility.normalize_locale_accessor(:excerpt, locale).to_sym, as: :textarea, name: "Excerpt"
+          field ::Mobility.normalize_locale_accessor(:body, locale).to_sym, as: :trix, name: "Body"
         end
       end
     end

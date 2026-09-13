@@ -7,6 +7,20 @@ class PostTest < ActiveSupport::TestCase
     assert_includes post.errors[:title], "can't be blank"
   end
 
+  # `title` presence means "this post is titled in some locale", not "titled in
+  # the default locale" -- a post may legitimately exist in German before it is
+  # written in English, and the reader falls back so nothing renders untitled.
+  # Pinned explicitly because requiring the default locale here is a tempting
+  # change that would make a post like this one invalid.
+  test "a title in a non-default locale satisfies the presence requirement" do
+    post = Mobility.with_locale(:de) do
+      Post.new(content_type: :blog, title: "Hallo Welt", slug: "hallo-welt")
+    end
+
+    assert_nil post.title_en, "this post deliberately has no English title"
+    assert Mobility.with_locale(:de) { post.valid? }, post.errors.full_messages.inspect
+  end
+
   test "slug is auto-generated from title when blank" do
     post = Post.create!(content_type: :blog, title: "Hello World")
     assert_equal "hello-world", post.slug
@@ -17,7 +31,9 @@ class PostTest < ActiveSupport::TestCase
     duplicate = Post.new(content_type: :blog, title: "Hello World")
 
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug], "has already been taken"
+    # Attributed to the locale that actually collides, so the admin form can
+    # mark that locale's tab.
+    assert_includes duplicate.errors[:slug_en], "has already been taken"
   end
 
   test "the same slug is allowed across different content_types" do
@@ -109,7 +125,7 @@ class PostTest < ActiveSupport::TestCase
       duplicate = Post.new(content_type: :blog, title: "Etwas Anderes", slug: "hallo-welt")
 
       assert_not duplicate.valid?
-      assert_includes duplicate.errors[:slug], "has already been taken"
+      assert_includes duplicate.errors[:slug_de], "has already been taken"
     end
   end
 
@@ -150,6 +166,79 @@ class PostTest < ActiveSupport::TestCase
       # No Spanish body was ever written, so this is the English fallback.
       assert_includes reloaded.body.to_plain_text, "Hi"
     end
+  end
+
+  # The admin form submits every locale's slug in one request, under one
+  # ambient locale. Validating only `Mobility.locale` lets the other locales'
+  # slugs through to the database, where the per-locale unique indexes turn a
+  # would-be form error into an unhandled RecordNotUnique.
+  test "a slug duplicated in a locale other than the current one is rejected" do
+    existing = Post.create!(content_type: :blog, title: "Hello World")
+    Mobility.with_locale(:de) { existing.update!(slug: "hallo-welt") }
+
+    duplicate = Post.new(content_type: :blog, title: "Something Else", slug: "something-else")
+    duplicate.slug_de = "hallo-welt"
+
+    assert_not duplicate.valid?
+    assert_includes duplicate.errors[:slug_de], "has already been taken"
+  end
+
+  test "each locale's slug collision is reported against that locale's field" do
+    existing = Post.create!(content_type: :blog, title: "Hello World")
+    Mobility.with_locale(:es) { existing.update!(slug: "hola-mundo") }
+
+    duplicate = Post.new(content_type: :blog, title: "Other", slug: "hello-world")
+    duplicate.slug_es = "hola-mundo"
+
+    assert_not duplicate.valid?
+    assert_includes duplicate.errors[:slug_en], "has already been taken"
+    assert_includes duplicate.errors[:slug_es], "has already been taken"
+    assert_empty duplicate.errors[:slug_de]
+  end
+
+  # Reading `slug` in a locale the post has no slug for returns the English one
+  # via fallback. Validating *that* string as if it were the German slug makes
+  # a post collide with a German slug it does not actually have.
+  test "a post with no slug in the current locale is not blocked by another post's slug there" do
+    english_only = Post.create!(content_type: :blog, title: "Hello World")
+    german = Post.create!(content_type: :blog, title: "Etwas Anderes", slug: "etwas-anderes")
+    Mobility.with_locale(:de) { german.update!(slug: "hello-world") }
+
+    Mobility.with_locale(:de) do
+      assert english_only.valid?,
+        "a post without a German slug must not collide on another post's German slug"
+    end
+  end
+
+  # The validation is the first line of defense; these indexes are the second,
+  # and later models copy their shape, so pin it directly.
+  test "the database rejects a same-locale duplicate slug when validation is bypassed" do
+    Post.create!(content_type: :blog, title: "Hello World")
+    sneaky = Post.create!(content_type: :blog, title: "Something Else")
+
+    assert_raises ActiveRecord::RecordNotUnique do
+      Post.transaction(requires_new: true) do
+        sneaky.update_column(:slug, { "en" => "hello-world" })
+      end
+    end
+  end
+
+  test "the database allows the same slug in two different locales" do
+    Post.create!(content_type: :blog, title: "Hello World")
+    other = Post.create!(content_type: :blog, title: "Something Else")
+
+    other.update_column(:slug, { "en" => "something-else", "de" => "hello-world" })
+
+    assert_equal "hello-world", Mobility.with_locale(:de) { Post.find(other.id).slug }
+  end
+
+  test "the database allows the same slug under a different content_type" do
+    Post.create!(content_type: :blog, title: "Hello World")
+    other = Post.create!(content_type: :resume_entry, title: "Something Else")
+
+    other.update_column(:slug, { "en" => "hello-world" })
+
+    assert_equal "hello-world", Post.find(other.id).slug
   end
 
   test "the translated locales are the site's configured locales" do
