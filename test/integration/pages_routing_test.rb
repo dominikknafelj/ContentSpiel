@@ -147,6 +147,41 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "A Resume Entry"
   end
 
+  # An empty "Content type" in the admin's block form means "every content
+  # type" -- the reading ContentBlock's own settings validation is written
+  # against. `posts.content_type` is NOT NULL, so handing that blank straight
+  # to `where` would compile to `content_type IS NULL` and list nothing.
+  test "a post_list block with no content type lists posts of every type" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    everything = Page.create!(page_type: :standard, title: "Everything", slug: "everything", parent: root,
+      published_at: Time.current)
+    ContentBlock.create!(page: everything, block_type: :post_list, position: 0, settings: {})
+    Post.create!(content_type: :blog, title: "A Blog Entry", published_at: 1.day.ago)
+    Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
+
+    get "/en/everything"
+
+    assert_response :success
+    assert_includes response.body, "A Blog Entry"
+    assert_includes response.body, "A Resume Entry"
+  end
+
+  # The permalinks such a page serves have to match what it lists, or a post is
+  # on the page but its detail URL 404s.
+  test "a post_list block with no content type serves permalinks for every type" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    everything = Page.create!(page_type: :standard, title: "Everything", slug: "everything", parent: root,
+      published_at: Time.current)
+    ContentBlock.create!(page: everything, block_type: :post_list, position: 0, settings: {})
+    resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry",
+      body: "<p>Where I worked</p>", published_at: 1.day.ago)
+
+    get "/en/everything/#{resume_entry.slug}"
+
+    assert_response :success
+    assert_includes response.body, "Where I worked"
+  end
+
   # No Page node exists per Post (page-tree design spec section 4): a post's
   # permalink is served by the very page whose post_list block lists it, with
   # the trailing segment read as the post's slug.

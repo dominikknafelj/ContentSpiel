@@ -49,6 +49,23 @@ class ContentBlock < ApplicationRecord
   # to a `where` on an enum column.
   before_validation :discard_blank_settings
 
+  # The published posts this block is responsible for: its listing renders them
+  # (newest first, trimmed to `settings["limit"]`) and its page serves a
+  # permalink for each of them.
+  #
+  # An absent `content_type` means "every content type" -- the same reading
+  # `post_list_settings_reference_a_real_content_type` below is written
+  # against, and the one an editor gets by leaving the field empty in the
+  # admin. It must therefore never reach `where`: `posts.content_type` is NOT
+  # NULL, so `where(content_type: nil)` compiles to `content_type IS NULL` and
+  # the block silently lists nothing at all.
+  def listed_posts
+    scope = Post.published
+    content_type = settings["content_type"]
+
+    content_type.present? ? scope.where(content_type: content_type) : scope
+  end
+
   private
 
   def discard_blank_settings

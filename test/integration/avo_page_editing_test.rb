@@ -55,6 +55,40 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_equal @root.id, @about.parent_id
   end
 
+  # -- sibling order ---------------------------------------------------------
+
+  # There is no drag-and-drop (page-tree design spec section 5), so the
+  # `position` input is the only way to reorder a branch -- which makes it
+  # worth checking that editing it actually moves the page among its siblings
+  # rather than just writing a number nothing reads.
+  test "a page is moved up among its siblings through the page form" do
+    contact = Page.create!(title: "Contact", slug: "contact", parent: @root)
+    news = Page.create!(title: "News", slug: "news", parent: @root)
+    assert_equal [ @about.id, contact.id, news.id ], @root.children.reload.map(&:id)
+
+    put "/avo/resources/pages/#{news.id}", params: { page: {
+      parent_id: @root.id, position: 0
+    } }
+
+    assert_response :redirect
+    assert_equal [ news.id, @about.id, contact.id ], @root.children.reload.map(&:id)
+    assert_equal [ 0, 1, 2 ], @root.children.map(&:position),
+      "siblings must be left densely numbered from 0"
+  end
+
+  test "a page is moved down among its siblings through the page form" do
+    contact = Page.create!(title: "Contact", slug: "contact", parent: @root)
+    news = Page.create!(title: "News", slug: "news", parent: @root)
+
+    put "/avo/resources/pages/#{@about.id}", params: { page: {
+      parent_id: @root.id, position: 2
+    } }
+
+    assert_response :redirect
+    assert_equal [ contact.id, news.id, @about.id ], @root.children.reload.map(&:id)
+    assert_equal [ 0, 1, 2 ], @root.children.map(&:position)
+  end
+
   # -- conditional hero fields ----------------------------------------------
 
   # The hero image is a top-level field, so unlike the subtitle (which lives

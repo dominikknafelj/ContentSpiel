@@ -45,6 +45,13 @@ class Avo::Resources::Page < Avo::BaseResource
       parent&.persisted? ? query.where.not(id: parent.id) : query
     }
 
+    # The page's rank among its siblings -- the column `has_closure_tree
+    # order: "position", numeric_order: true` maintains, and the order the
+    # navigation walks the tree in. Editing it here is how a page is moved up
+    # or down within its branch; there is no drag-and-drop (page-tree design
+    # spec section 5), so this number *is* the reordering UI.
+    field :position, as: :number
+
     field :page_type, as: :select, enum: ::Page.page_types
 
     # The index is a list, not an editor, so it shows one column of titles --

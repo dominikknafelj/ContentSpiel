@@ -57,13 +57,12 @@ class PagesController < ApplicationController
     @post_list_block = @page&.content_blocks&.find_by(block_type: :post_list)
     return if @post_list_block.nil?
 
-    # The same criteria the block's listing applies, so a page serves detail
-    # views for exactly the posts it lists: the block's content type, and only
-    # posts whose publication date has arrived. (`limit` deliberately isn't
+    # Literally the same criteria the block's listing applies, so a page serves
+    # detail views for exactly the posts it lists. (`limit` deliberately isn't
     # applied -- it trims how much of the list is shown, not which posts the
-    # page is responsible for.)
-    @post = Post.published
-      .where(content_type: @post_list_block.settings["content_type"])
+    # page is responsible for, which is why it lives in the partial rather than
+    # in `listed_posts`.)
+    @post = @post_list_block.listed_posts
       .find_by_localized_slug(params[:locale], candidate_slug)
   end
 
