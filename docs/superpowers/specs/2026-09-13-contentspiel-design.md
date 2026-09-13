@@ -226,10 +226,15 @@ when a translation is missing for the current locale.
 - `title`, `slug`, `excerpt`, and `body` on `Post` are translatable
   via the `mobility` gem, using its jsonb backend (a natural fit given
   the Postgres choice in [§3](#3-tech-stack)).
-- Initial supported locales: **English (default) + Spanish**. Adding
-  a third locale later is a content-entry task (translate existing
-  posts) plus a one-line config change (`available_locales`), not a
-  code change to the translation infrastructure itself.
+- Initial supported locales: **English (default), German, Spanish**.
+  Adding a further locale later is a content-entry task (translate
+  existing posts) plus a one-line config change
+  (`available_locales`), not a code change to the translation
+  infrastructure itself.
+- UI chrome (nav, buttons, labels — anything that isn't `Post`
+  content) is also translated, via standard Rails I18n locale files
+  (`config/locales/en.yml`, `de.yml`, `es.yml`), so the site doesn't
+  mix English chrome with translated content.
 - `slug` uniqueness is scoped per `(locale, content_type)` — the same
   slug string can exist in different locales or across different
   content types without conflict.
@@ -245,7 +250,7 @@ Rails default minitest + fixtures:
   `SiteSetting` (singleton enforcement), `ApiToken` (hashing,
   regeneration).
 - Request tests: each public route (`/resume`, `/blog`,
-  `/blog/:slug`, `/now`) for both supported locales, and for the
+  `/blog/:slug`, `/now`) for all three supported locales, and for the
   default-locale-fallback behavior when a translation is missing.
 - Request tests for the MCP endpoint: rejects unauthenticated/invalid
   tokens, accepts valid tool calls, rejects malformed tool input.
