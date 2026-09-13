@@ -359,15 +359,11 @@ class PostTest < ActiveSupport::TestCase
 
   test "body accepts rich text content" do
     post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    assert_equal "<p>Hi</p>", post.body.to_plain_text.present? ? post.body.body.to_html : nil rescue nil
     assert post.body.present?
+    assert_includes post.body.to_plain_text, "Hi"
   end
 end
 ```
-
-Adjust: the last assertion is simplified below in Step 4's
-implementation notes — the important behavior is `post.body.present?`
-after assigning HTML content.
 
 - [ ] **Step 4: Run tests to verify they fail**
 
