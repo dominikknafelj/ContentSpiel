@@ -89,6 +89,22 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_equal [ 0, 1, 2 ], @root.children.map(&:position)
   end
 
+  # `pages.position` is nullable (closure_tree fills it in after the first
+  # save), so a cleared input reaches closure_tree's own `_ct_after_save`,
+  # which takes `.min` of the old and new values and raises
+  # `ArgumentError: comparison of Integer with nil failed`.
+  test "a cleared position comes back as a form error rather than an ArgumentError" do
+    put "/avo/resources/pages/#{@about.id}", params: { page: {
+      parent_id: @root.id, position: ""
+    } }
+
+    assert_response :unprocessable_entity
+    assert_no_match(/comparison of Integer with nil/, response.body,
+      "a blank position must surface as a validation error, not a raw ArgumentError")
+    assert_includes response.body, "Position can&#39;t be blank"
+    assert_not_nil @about.reload.position
+  end
+
   # -- conditional hero fields ----------------------------------------------
 
   # The hero image is a top-level field, so unlike the subtitle (which lives

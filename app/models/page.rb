@@ -46,6 +46,16 @@ class Page < ApplicationRecord
   scope :published, -> { where(published_at: ..Time.current) }
 
   validates :title, presence: true
+
+  # `pages.position` is nullable because closure_tree is what fills it in,
+  # after the first save -- so this cannot be a plain presence validation or no
+  # page could ever be created. On an existing page the column is always set,
+  # and a blank is only ever the admin clearing the input: without this,
+  # closure_tree's `_ct_after_save` takes `.min` of the old and new values and
+  # raises `ArgumentError: comparison of Integer with nil failed`, which
+  # reaches the editor as a raw 422 instead of a form error.
+  validates :position, presence: true, on: :update
+
   validate :only_one_root_page
   validate :slug_is_unused_among_siblings_in_every_locale
 
