@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_211423) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_213940) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -58,6 +58,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_211423) do
     t.datetime "revoked_at"
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "content_blocks", force: :cascade do |t|
+    t.integer "block_type", null: false
+    t.jsonb "caption", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.bigint "page_id", null: false
+    t.integer "position", default: 0, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["page_id", "position"], name: "index_content_blocks_on_page_id_and_position"
+    t.index ["page_id"], name: "index_content_blocks_on_page_id"
   end
 
   create_table "page_hierarchies", id: false, force: :cascade do |t|
@@ -159,6 +171,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_211423) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "content_blocks", "pages"
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"

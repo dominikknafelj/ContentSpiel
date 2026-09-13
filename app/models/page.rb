@@ -19,6 +19,10 @@ class Page < ApplicationRecord
   # through the current Mobility.locale.
   translates :title, :slug, :subtitle, :meta_title, :meta_description
 
+  # A page's body is an ordered list of blocks; the renderer walks them in
+  # `position` order and dispatches on each one's `block_type`.
+  has_many :content_blocks, -> { order(:position) }, dependent: :destroy
+
   has_one_attached :hero_image
 
   enum :page_type, { standard: 0, landing: 1 }
