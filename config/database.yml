@@ -12,19 +12,23 @@
 # Configure Using Gemfile
 # gem "pg"
 #
+# Connection details (host/port/username/password) deliberately live in the
+# per-environment sections rather than here: `production:` merges this block,
+# so anything added here would silently follow the app into production.
 default: &default
   adapter: postgresql
   encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+
+# Points at the Postgres container from docker-compose.yml (host port 5433).
+development:
+  <<: *default
+  database: content_spiel_development
   host: localhost
   port: 5433
   username: contentspiel
   password: contentspiel
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-
-
-development:
-  <<: *default
-  database: content_spiel_development
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
@@ -59,6 +63,10 @@ development:
 test:
   <<: *default
   database: content_spiel_test
+  host: localhost
+  port: 5433
+  username: contentspiel
+  password: contentspiel
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is
