@@ -145,6 +145,11 @@ macOS "trust this connection" GUI dialog, which blocks non-interactive
 has no bearing on the deploy target, which remains an open question
 per the Global Constraints above.
 
+Postgres.app may still be running on `localhost:5432` on this machine
+for unrelated reasons — rather than requiring it to be quit, the
+container is mapped to host port **5433** instead, so the two can
+coexist without conflict.
+
 `docker-compose.yml` (repo root):
 
 ```yaml
@@ -156,7 +161,7 @@ services:
       POSTGRES_USER: contentspiel
       POSTGRES_PASSWORD: contentspiel
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -179,7 +184,7 @@ default: &default
   adapter: postgresql
   encoding: unicode
   host: localhost
-  port: 5432
+  port: 5433
   username: contentspiel
   password: contentspiel
   pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
