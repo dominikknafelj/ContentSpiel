@@ -38,6 +38,138 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Index pages render no association panels and no form, so they exercise
+  # almost none of a resource's field list. Show and New are where a field
+  # pointing at an unregistered resource, or a non-nullable disabled column,
+  # actually blows up -- so both get their own coverage below.
+  test "an authenticated user can reach the show page of every registered resource" do
+    sign_in
+
+    show_records.each do |resource, record|
+      get "/avo/resources/#{resource}/#{record.to_param}"
+
+      assert_response :success, "expected /avo/resources/#{resource}/#{record.to_param} to render"
+    end
+  end
+
+  # `has_many` panels are lazy turbo frames: the show page only renders the
+  # frame tag, and the panel body is fetched separately from the associations
+  # controller. A field naming a model with no Avo resource renders a perfectly
+  # fine frame tag and only blows up when that frame is fetched -- so follow
+  # every frame the show pages actually advertise rather than a hardcoded list.
+  test "every has_many panel advertised by a show page loads" do
+    sign_in
+
+    frames = show_records.flat_map do |resource, record|
+      get "/avo/resources/#{resource}/#{record.to_param}"
+      assert_response :success
+      lazy_frame_sources(response.body)
+    end
+
+    assert_not_empty frames, "expected the show pages to advertise at least one association panel"
+
+    frames.each do |src|
+      get src
+
+      assert_response :success, "expected the association panel at #{src} to render"
+    end
+  end
+
+  test "an authenticated user can reach the new page of every resource that allows creation" do
+    sign_in
+
+    %w[posts tags site_settings users].each do |resource|
+      get "/avo/resources/#{resource}/new"
+
+      assert_response :success, "expected /avo/resources/#{resource}/new to render"
+    end
+  end
+
+  # The User resource is the only in-product way to add an admin (db/seeds.rb
+  # is development-only), so its New form has to actually work -- with only
+  # email_address exposed, has_secure_password would reject every submission.
+  test "a new user can be created through the Avo form" do
+    sign_in
+
+    get "/avo/resources/users/new"
+    assert_response :success
+
+    assert_difference -> { User.count }, 1 do
+      post "/avo/resources/users", params: { user: {
+        email_address: "second-admin@example.com",
+        password: "another-password",
+        password_confirmation: "another-password"
+      } }
+    end
+
+    assert_response :redirect
+    assert User.find_by(email_address: "second-admin@example.com").authenticate("another-password")
+  end
+
+  # The password fields render on Edit too, so leaving them blank there must not
+  # wipe the existing digest and lock the user out.
+  test "editing a user without retyping the password leaves the password intact" do
+    sign_in
+
+    put "/avo/resources/users/#{@user.id}", params: { user: {
+      email_address: "renamed@example.com", password: "", password_confirmation: ""
+    } }
+
+    assert_response :redirect
+    assert_equal "renamed@example.com", @user.reload.email_address
+    assert @user.authenticate("password123")
+  end
+
+  # ApiTokens are minted by ApiToken.generate! (the bcrypt digest is never
+  # hand-entered), so the resource has no usable New form. The route must turn
+  # the request away rather than 500 on the NOT NULL token_digest column.
+  test "creating an api token through Avo is turned away instead of crashing" do
+    sign_in
+
+    get "/avo/resources/api_tokens/new"
+    assert_redirected_to_avo_path "/avo/resources/api_tokens"
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/avo/resources/api_tokens", params: { api_token: { revoked_at: "" } }
+    end
+    assert_redirected_to_avo_path "/avo/resources/api_tokens"
+  end
+
+  test "the api token index does not offer a New button" do
+    sign_in
+    ApiToken.generate!
+
+    get "/avo/resources/api_tokens"
+
+    assert_response :success
+    assert_not_includes response.body, "/avo/resources/api_tokens/new"
+  end
+
+  # Deleting the last User from the admin would lock everyone out of the app
+  # (the only other way to create one is the development-only seed).
+  test "destroying a user through Avo is turned away instead of locking everyone out" do
+    sign_in
+
+    assert_no_difference -> { User.count } do
+      delete "/avo/resources/users/#{@user.id}"
+    end
+
+    assert_redirected_to_avo_path "/avo/resources/users"
+    assert User.exists?(@user.id)
+  end
+
+  test "the user pages do not offer a Delete button" do
+    sign_in
+
+    [ "/avo/resources/users", "/avo/resources/users/#{@user.id}", "/avo/resources/users/#{@user.id}/edit" ].each do |path|
+      get path
+
+      assert_response :success
+      assert_no_match(/turbo-method=("|&quot;)delete/, response.body,
+        "expected no delete control on #{path}")
+    end
+  end
+
   test "the post index can be filtered down to a single content type" do
     sign_in
     blog = Post.create!(title: "A blog post", content_type: :blog)
@@ -61,6 +193,33 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
   end
 
   private
+    # One persisted record per registered resource, for the Show coverage.
+    def show_records
+      post = Post.create!(title: "A shown post", content_type: :blog)
+      post.tags << Tag.create!(name: "shown-tag")
+      PostRelation.create!(post: post, related_post: Post.create!(title: "A related post", content_type: :blog))
+
+      {
+        "posts" => post,
+        "tags" => post.tags.first,
+        "site_settings" => SiteSetting.instance,
+        "api_tokens" => ApiToken.generate!.first,
+        "users" => @user
+      }
+    end
+
+    # The `src` of every lazily-loaded association turbo frame on a show page.
+    def lazy_frame_sources(body)
+      body.scan(/<turbo-frame\b[^>]*\bloading="lazy"[^>]*>/)
+        .filter_map { |tag| tag[/\bsrc="([^"]+)"/, 1] }
+        .map { |src| CGI.unescapeHTML(src) }
+    end
+
+    def assert_redirected_to_avo_path(path)
+      assert_response :redirect
+      assert_equal path, URI.parse(response.location).path
+    end
+
     def sign_in
       post session_url, params: { email_address: @user.email_address, password: "password123" }
       assert_response :redirect

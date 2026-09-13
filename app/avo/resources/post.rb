@@ -18,7 +18,7 @@ class Avo::Resources::Post < Avo::BaseResource
     field :excerpt, as: :text
     field :published_at, as: :date_time
     field :metadata, as: :code
-    field :post_relations, as: :has_many
+    field :tags, as: :has_many, through: :post_tags
     field :related_posts, as: :has_many, through: :post_relations
     field :body, as: :trix
   end
