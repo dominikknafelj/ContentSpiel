@@ -1,11 +1,11 @@
-# devsite — Personal Software Development Site with Avo CMS
+# ContentSpiel — Personal Software Development Site with Avo CMS
 
 Date: 2026-09-13
 Status: Draft for review
 
 ## 1. Overview
 
-A Rails 8 application, working name `devsite`, that serves the owner's
+A Rails 8 application, named `ContentSpiel`, that serves the owner's
 personal software-development site — a resume/experience timeline, a
 blog, and a "now" update log — authored through an Avo-powered admin
 CMS. Content is also manageable programmatically through an embedded
