@@ -3,10 +3,15 @@ require "test_helper"
 class PagesRoutingTest < ActionDispatch::IntegrationTest
   # The site has no unprefixed public URLs: "/" exists only to send a visitor
   # to the default locale's root page.
+  #
+  # Temporarily (302), not permanently: a 301 is cached by browsers for good
+  # and cannot be taken back, so it is not something to ship before the
+  # mapping is final.
   test "the bare root redirects to the default locale root" do
     get "/"
 
     assert_redirected_to "/en/"
+    assert_response :found
   end
 
   test "the root page renders at the locale root" do
@@ -34,6 +39,54 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/en/does-not-exist"
 
     assert_response :not_found
+  end
+
+  # The catch-all is declared with `format: false`, so Rails appends no
+  # implicit `(.:format)` group to it. Without that, a dot anywhere in the last
+  # segment of a URL is read as a format separator, which breaks the route in
+  # two directions -- the two tests below are one for each.
+  #
+  # Direction one: a crawler appending an extension to a real page. The path
+  # still matches the page, so the controller renders `show` -- in a format
+  # that has no template. `ActionView::MissingTemplate` is not in
+  # `ActionDispatch::ExceptionWrapper.rescue_responses`, so it is not mapped to
+  # a status at all and surfaces as an uncaught 500 on a public URL.
+  test "an extension appended to a real page's path does not reach the page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
+
+    get "/en/about.json"
+
+    assert_response :not_found
+  end
+
+  # Direction two: a page whose own slug contains a dot. `Page#full_path` (and
+  # so config/sitemap.rb, which emits those paths verbatim) advertises
+  # "/en/v1.0" -- with an implicit format group the trailing ".0" is sliced off
+  # into `params[:format]`, the controller looks up "/v1", and the page 404s at
+  # the very URL the sitemap hands to search engines.
+  test "a page whose slug contains a dot is reachable at its real path" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    release = Page.create!(page_type: :standard, title: "Release v1.0", slug: "v1.0", parent: root,
+      published_at: Time.current)
+    ContentBlock.create!(page: release, block_type: :rich_text, position: 0, body: "<p>Release notes</p>")
+
+    assert_equal "/v1.0", release.full_path(:en)
+
+    get "/en/v1.0"
+
+    assert_response :success
+    assert_includes response.body, "Release notes"
+  end
+
+  # `format: false` must not narrow what the route otherwise matches: the
+  # locale root, a single segment and a deep glob all still dispatch to
+  # `pages#show` with the same parameters as before.
+  test "the catch-all still recognizes the locale root and nested paths" do
+    assert_recognizes({ controller: "pages", action: "show", locale: "en", path: "" }, "/en")
+    assert_recognizes({ controller: "pages", action: "show", locale: "en", path: "about" }, "/en/about")
+    assert_recognizes({ controller: "pages", action: "show", locale: "de", path: "a/b/c" }, "/de/a/b/c")
+    assert_recognizes({ controller: "pages", action: "show", locale: "es", path: "v1.0" }, "/es/v1.0")
   end
 
   test "a page's meta_title and meta_description render in the head" do
