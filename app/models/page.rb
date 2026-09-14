@@ -47,6 +47,24 @@ class Page < ApplicationRecord
 
   validates :title, presence: true
 
+  # A page's path is its ancestors' slugs plus its own, and `build_path` drops
+  # blank segments -- so a non-root page without a slug contributes nothing and
+  # lands on its parent's path exactly. A slugless child of the root gets
+  # `cached_paths` of {"en" => "/", ...}: the homepage's own paths.
+  #
+  # Two pages then answer to one URL, and `find_by_full_path` can only return
+  # one of them: the other is unreachable at any address at all, while still
+  # being listed in the sitemap. Which one loses is decided by nothing the
+  # admin can see -- it is whichever has the higher `id`, so blanking the slug
+  # of a page that happens to predate its new neighbour takes that neighbour's
+  # URL away from it. All of this from a single missed field on the page form,
+  # which reported no error anywhere.
+  #
+  # The root is exempt because its slug is `""` by design (see
+  # `path_segment_pages`, which drops it): the homepage contributes no segment
+  # and its path is "/".
+  validates :slug, presence: true, unless: -> { parent_id.nil? }
+
   # `pages.position` is nullable because closure_tree is what fills it in,
   # after the first save -- so this cannot be a plain presence validation or no
   # page could ever be created. On an existing page the column is always set,
@@ -110,8 +128,21 @@ class Page < ApplicationRecord
   # the public site's entry point into the tree, and a draft page acquires its
   # path the moment it is saved -- so an unfiltered lookup publishes every
   # work-in-progress at a guessable URL.
+  #
+  # Ordered by `id` before taking the first row: two published pages mapped to
+  # the same path have to resolve to one of them, and to the same one every
+  # time. Oldest-first means the incumbent keeps the URL rather than a page
+  # created later taking it over.
+  #
+  # Explicit rather than implied: `.first` on an unordered relation already
+  # appends `ORDER BY id ASC` itself, so this emits the same SQL today. It is
+  # written out because the guarantee above is one this lookup makes on
+  # purpose, not one to inherit from an ActiveRecord internal -- `.take`, or a
+  # later `.order` added for some other reason, would quietly withdraw it.
+  # (The slug presence validation above is what actually keeps two pages off
+  # one path; this is the tiebreak for a collision arriving some other way.)
   def self.find_by_full_path(locale, path)
-    published.where("cached_paths ->> ? = ?", locale.to_s, path).first
+    published.where("cached_paths ->> ? = ?", locale.to_s, path).order(:id).first
   end
 
   protected

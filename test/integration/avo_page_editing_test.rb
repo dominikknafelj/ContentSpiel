@@ -55,6 +55,26 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_equal @root.id, @about.parent_id
   end
 
+  # -- required slug ---------------------------------------------------------
+
+  # Leaving the slug blank is a single missed field on a form with a dozen of
+  # them, and it used to save happily: the page contributed no path segment and
+  # landed on its parent's path, so a slugless child of the root claimed "/"
+  # and could start answering for the homepage. The form has to turn that away
+  # and say why, rather than accept it and quietly mis-route the site.
+  test "a page submitted without a slug is refused, with the reason on the form" do
+    assert_no_difference -> { Page.count } do
+      post "/avo/resources/pages", params: { page: {
+        parent_id: @root.id, page_type: "standard", title_en: "Oops",
+        slug_en: "", slug_de: "", slug_es: ""
+      } }
+    end
+
+    assert_response :unprocessable_entity
+    assert_match(/Slug can.{0,6}t be blank/, response.body,
+      "the admin has to be told which field is missing, not just refused")
+  end
+
   # -- sibling order ---------------------------------------------------------
 
   # There is no drag-and-drop (page-tree design spec section 5), so the

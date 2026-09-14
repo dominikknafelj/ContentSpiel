@@ -79,6 +79,78 @@ class PageTest < ActiveSupport::TestCase
     assert_includes child.errors[:base], "a root page already exists"
   end
 
+  # A blank slug on a non-root page is not a harmless omission: `build_path`
+  # drops blank segments, so the page's cached_paths come out identical to its
+  # parent's and two pages end up claiming one URL -- for a child of the root,
+  # the homepage's "/". Only one of the two can ever be served.
+  test "a non-root page requires a slug" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    slugless = Page.new(page_type: :standard, title: "Oops", parent: root)
+
+    assert_not slugless.valid?
+    assert_includes slugless.errors[:slug], "can't be blank"
+  end
+
+  # The failure the validation exists to prevent, stated as the outcome rather
+  # than as the error message: no second page may end up holding the
+  # homepage's path, and `/` must still belong to the homepage.
+  test "a slugless child cannot be saved onto its parent's path" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    assert_raises(ActiveRecord::RecordInvalid) do
+      Page.create!(page_type: :standard, title: "Oops", parent: root, published_at: Time.current)
+    end
+
+    assert_equal [ root ], Page.where("cached_paths ->> 'en' = '/'").to_a
+    assert_equal root, Page.find_by_full_path(:en, "/")
+  end
+
+  # The root is the one page allowed a blank slug: it contributes no segment
+  # and its path is "/" by design.
+  test "the root page may have a blank slug" do
+    root = Page.new(page_type: :standard, title: "Home", slug: "")
+
+    assert root.valid?, root.errors.full_messages.inspect
+    assert root.save
+    assert_equal "/", root.full_path(:en)
+  end
+
+  # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
+  # so it has to be blank here too -- otherwise " " passes validation and
+  # produces the very collision above.
+  test "a whitespace-only slug does not satisfy the requirement" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "")
+    blank = Page.new(page_type: :standard, title: "Oops", slug: "   ", parent: root)
+
+    assert_not blank.valid?
+    assert_includes blank.errors[:slug], "can't be blank"
+  end
+
+  # The slug validation above closes the route by which two pages could come to
+  # share a path from the admin. Should it ever happen some other way, the
+  # lookup still has to name one winner, and the same one every time -- and the
+  # winner is the older page, so a URL already in use is not taken over by a
+  # page created later.
+  #
+  # This holds because `find_by_full_path` orders by `id`. (ActiveRecord's
+  # `.first` already appends an implicit `ORDER BY id ASC` to an unordered
+  # relation, so the emitted SQL is identical either way -- the explicit
+  # `.order(:id)` states the guarantee this test depends on locally, instead of
+  # resting it on that implementation detail.)
+  test "a path claimed by two pages resolves to the older one" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    incumbent = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+      published_at: Time.current)
+    latecomer = Page.create!(page_type: :standard, title: "Also About", slug: "also-about", parent: root,
+      published_at: Time.current)
+
+    # Written past the validations on purpose: this is the state the lookup has
+    # to survive, not a state the admin can now produce.
+    latecomer.update_columns(cached_paths: incumbent.cached_paths)
+
+    assert_equal incumbent, Page.find_by_full_path(:en, "/about")
+  end
+
   test "slug is unique among siblings, scoped to locale" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
