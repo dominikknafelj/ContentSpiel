@@ -1,5 +1,14 @@
 Rails.application.routes.draw do
-  mount_avo
+  mount_avo do
+    get "pages_tree", to: "tools#pages_tree", as: :pages_tree
+    # PATCH rather than the tool's own GET verb -- this is what the tree's
+    # Stimulus controller calls on every drop, inside `mount_avo` so it
+    # inherits the same session gate as the page itself. The moved page's id
+    # travels in the body alongside `parent_id`/`position` rather than the
+    # path, so the view can hand the controller one fixed URL up front
+    # instead of building one per node.
+    patch "pages_tree/reorder", to: "tools#reorder_page", as: :reorder_page
+  end
   resource :session
   resources :passwords, param: :token
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
