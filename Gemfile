@@ -26,7 +26,7 @@ gem "bcrypt", "~> 3.1.7"
 # positional options hash, which breaks ActiveSupport::JSON.decode (used by
 # signed/encrypted cookies, e.g. the session cookie in Authentication#find_session_by_cookie)
 # under activesupport 8.1.3.1 on Ruby 3.4.9.
-gem "json", "< 4.0"
+gem "json", "< 3.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
@@ -46,7 +46,11 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
+#
+# image_processing 2.x no longer bundles a backend gem -- Rails' default
+# variant processor is vips, so that backend has to be declared explicitly.
 gem "image_processing", "~> 2.1"
+gem "ruby-vips", "~> 2.2"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
