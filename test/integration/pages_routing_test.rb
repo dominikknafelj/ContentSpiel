@@ -503,4 +503,121 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Deutscher Beitrag"
     assert_not_includes response.body, "English only"
   end
+
+  # `format: false` on the route (added earlier) only stops a URL segment like
+  # ".json" from being read as a format -- it says nothing about a request that
+  # names a format through its `Accept` header instead. Without pinning the
+  # format, `render :show` still negotiates against the header, finds no
+  # `show.json.erb`, and raises `ActionView::MissingTemplate` -- a class Rails'
+  # own rescue table doesn't map to a 404, so it reaches a requester as a raw
+  # 500.
+  test "a request with a non-HTML Accept header still renders the page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
+
+    get "/en/", headers: { "Accept" => "application/json" }
+
+    assert_response :success
+    assert_includes response.body, "Welcome"
+  end
+
+  # A landing page's title/subtitle/hero image are the reason `page_type`
+  # exists at all (page-tree design spec section 3) -- Avo has always been able
+  # to edit them, but nothing on the public side ever read them back.
+  test "a landing page renders its title, subtitle, and hero image" do
+    root = Page.create!(page_type: :landing, title: "Welcome", subtitle: "A warm welcome", slug: "",
+      published_at: Time.current)
+    root.hero_image.attach(io: StringIO.new("fake image data"), filename: "hero.jpg", content_type: "image/jpeg")
+    root.save!
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, "<h1>Welcome</h1>"
+    assert_includes response.body, "A warm welcome"
+    assert_match(/<img[^>]*src="[^"]*hero/, response.body)
+  end
+
+  # `page_type` gates the hero fields defensively rather than trusting that a
+  # `standard` page's `subtitle`/`hero_image` are blank: the columns aren't
+  # otherwise enforced empty outside `landing`, and the view is the last place
+  # that distinction can still be honored.
+  test "a standard page does not render subtitle or hero image even if set" do
+    root = Page.create!(page_type: :standard, title: "Home", subtitle: "Should not appear", slug: "",
+      published_at: Time.current)
+
+    get "/en/"
+
+    assert_response :success
+    assert_not_includes response.body, "Should not appear"
+  end
+
+  # A post's detail view already renders its own <h1> (the post's title) --
+  # showing the listing page's title above it too would put two <h1>s on one
+  # response for no reader's benefit.
+  test "a post's detail view does not also render its listing page's title" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
+      published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :success
+    assert_not_includes response.body, "<h1>Blog</h1>"
+    assert_includes response.body, "<h1>My First Post</h1>"
+  end
+
+  # Before this, the page tree and every post permalink existed only for a
+  # visitor who already knew the exact URL -- nothing rendered anywhere linked
+  # to them.
+  test "a post_list block links each post's title to its permalink" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
+
+    get "/en/blog"
+
+    assert_response :success
+    assert_includes response.body, %(href="/en/blog/#{post.slug}")
+    assert_includes response.body, "My First Post</a>"
+  end
+
+  # Same fix, the root-hosted case: a post_list block living directly on the
+  # homepage has no page path segment to join against, so the permalink is
+  # "/en/<slug>" rather than "/en//<slug>".
+  test "a post_list block on the root page links to a root-level permalink" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    ContentBlock.create!(page: root, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, %(href="/en/#{post.slug}")
+  end
+
+  test "a page lists its published child pages as links" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, %(href="/en/about")
+    assert_includes response.body, "About</a>"
+  end
+
+  test "a page does not list an unpublished child page" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title: "Draft Child", slug: "draft-child", parent: root, published_at: nil)
+
+    get "/en/"
+
+    assert_response :success
+    assert_not_includes response.body, "draft-child"
+    assert_not_includes response.body, "Draft Child"
+  end
 end

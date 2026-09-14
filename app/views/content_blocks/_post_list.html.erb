@@ -10,7 +10,7 @@
   <% posts = posts.limit(block.settings["limit"]) if block.settings["limit"].present? %>
   <ul>
     <% posts.each do |post| %>
-      <li><%= post.title %></li>
+      <li><%= link_to post.title, post_url_path(page, post) %></li>
     <% end %>
   </ul>
 </div>
