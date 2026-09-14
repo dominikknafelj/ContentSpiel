@@ -9,6 +9,15 @@ class PagesController < ApplicationController
   # one place that has to be readable without signing in.
   allow_unauthenticated_access
 
+  # The route's `format: false` only stops a URL segment like ".json" from
+  # being read as a format -- a request naming one through its `Accept` header
+  # instead reaches `render :show` exactly as before, negotiates against that
+  # header, finds no `show.json.erb`, and raises `ActionView::MissingTemplate`.
+  # That class isn't in Rails' own `rescue_responses` table, so it would reach
+  # the requester as a raw 500 rather than a 404. Pinning the format here closes
+  # both the URL-segment and the header route to the same failure.
+  before_action { request.format = :html }
+
   # The locale prefix is not only the key the path is looked up under: it is
   # the locale the page's translated content has to be *read* in, or /de/...
   # resolves a German path and then renders English text.

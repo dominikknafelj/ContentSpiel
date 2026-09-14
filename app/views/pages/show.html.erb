@@ -1,4 +1,16 @@
 <%= render "pages/seo_meta", page: @page, post: @post %>
+<%# The page's own heading and, for a landing page, its hero fields -- skipped
+    at a post's own detail view, since content_blocks/_post_list_detail
+    already renders that post's title as the response's one <h1>. %>
+<% if @post.nil? %>
+  <h1><%= @page.title %></h1>
+  <% if @page.landing? %>
+    <% if @page.subtitle.present? %>
+      <p class="subtitle"><%= @page.subtitle %></p>
+    <% end %>
+    <%= image_tag @page.hero_image if @page.hero_image.attached? %>
+  <% end %>
+<% end %>
 <%# A page's body is its blocks in `position` order (the association is ordered),
     each rendered by the partial named after its own block_type.
 
@@ -12,6 +24,18 @@
   <% if @post && block == @post_list_block %>
     <%= render "content_blocks/post_list_detail", post: @post %>
   <% else %>
-    <%= render "content_blocks/#{block.block_type}", block: block %>
+    <%= render "content_blocks/#{block.block_type}", block: block, page: @page %>
   <% end %>
+<% end %>
+<%# The tree is otherwise reachable only by typing an exact URL -- this is what
+    makes clicking from a page down into its children possible at all.
+    Published only, matching every other public listing on this site. %>
+<% if @page.children.published.any? %>
+  <nav class="page-children">
+    <ul>
+      <% @page.children.published.each do |child| %>
+        <li><%= link_to child.title, page_url_path(child) %></li>
+      <% end %>
+    </ul>
+  </nav>
 <% end %>

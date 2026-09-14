@@ -20,4 +20,25 @@ module PagesHelper
   def seo_description(page, post: nil)
     post&.excerpt.presence || page.meta_description.presence
   end
+
+  # The URL `page` resolves at in `locale` -- the locale segment
+  # `PagesController` reads back off the path, joined with `Page#full_path`.
+  # Every public link goes through this rather than interpolating the two
+  # itself, so a link always agrees with what the controller would parse the
+  # same path back into.
+  def page_url_path(page, locale = I18n.locale)
+    "/#{locale}#{page.full_path(locale)}"
+  end
+
+  # A post's permalink (page-tree design spec section 4): there is no `Page`
+  # node per `Post`, so its URL is the listing page's own path plus its slug.
+  # `full_path` is "/" for the root page and contributes no segment there --
+  # `page_url_path` already puts a trailing slash on that case, so the blank
+  # path is dropped here rather than joined, or a root-hosted post would link
+  # to "/en//my-post".
+  def post_url_path(page, post, locale = I18n.locale)
+    path = page.full_path(locale)
+    path = "" if path == "/"
+    "/#{locale}#{path}/#{post.slug}"
+  end
 end
