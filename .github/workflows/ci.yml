@@ -28,6 +28,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # `bin/importmap audit` boots the full Rails app, which requires
+      # ActiveStorage's vips variant processor at initialization -- same
+      # native dependency the test jobs below install.
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips
+
       - name: Checkout code
         uses: actions/checkout@v6
 
