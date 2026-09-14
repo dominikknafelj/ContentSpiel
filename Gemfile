@@ -74,3 +74,19 @@ group :test do
 end
 
 gem "avo", "~> 4.2"
+
+# Translates model content per locale [https://github.com/shioyama/mobility].
+# `mobility-actiontext` is a separate gem -- the ActionText backend is not
+# bundled with Mobility itself.
+gem "mobility", "~> 1.3"
+gem "mobility-actiontext", "~> 1.1"
+
+# Stores the page tree in a closure table, so ancestor/descendant lookups for
+# the navigation are one join deep regardless of nesting
+# [https://github.com/closuretree/closure_tree].
+gem "closure_tree", "~> 9.8"
+
+# Builds public/sitemap.xml from the published page tree. The sitemap itself is
+# defined in config/sitemap.rb and written by `rake sitemap:create`
+# [https://github.com/kjvarga/sitemap_generator].
+gem "sitemap_generator", "~> 7.1"

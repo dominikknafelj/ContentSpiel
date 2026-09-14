@@ -1,0 +1,16 @@
+<div class="content-block content-block--post-list">
+  <%# The block's `settings` are the listing's query criteria, applied by
+      `ContentBlock#listed_posts`: `Post.published` is what keeps drafts (never
+      published) and scheduled posts (a future date) out of the listing while
+      leaving them visible in the admin, and a blank `content_type` means every
+      content type. The single-post detail view resolves through the same
+      method, so a page lists and serves permalinks for exactly the same
+      posts. %>
+  <% posts = block.listed_posts.order(published_at: :desc) %>
+  <% posts = posts.limit(block.settings["limit"]) if block.settings["limit"].present? %>
+  <ul>
+    <% posts.each do |post| %>
+      <li><%= post.title %></li>
+    <% end %>
+  </ul>
+</div>

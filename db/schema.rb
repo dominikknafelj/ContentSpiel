@@ -10,18 +10,19 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_13_213940) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
+    t.string "locale", null: false
     t.string "name", null: false
     t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.datetime "updated_at", null: false
-    t.index ["record_type", "record_id", "name"], name: "index_action_text_rich_texts_uniqueness", unique: true
+    t.index ["record_type", "record_id", "name", "locale"], name: "index_action_text_rich_texts_uniqueness", unique: true
   end
 
   create_table "active_storage_attachments", force: :cascade do |t|
@@ -59,6 +60,48 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
     t.datetime "updated_at", null: false
   end
 
+  create_table "content_blocks", force: :cascade do |t|
+    t.integer "block_type", null: false
+    t.jsonb "caption", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.bigint "page_id", null: false
+    t.integer "position", default: 0, null: false
+    t.jsonb "settings", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["page_id", "position"], name: "index_content_blocks_on_page_id_and_position"
+    t.index ["page_id"], name: "index_content_blocks_on_page_id"
+  end
+
+  create_table "page_hierarchies", id: false, force: :cascade do |t|
+    t.bigint "ancestor_id", null: false
+    t.bigint "descendant_id", null: false
+    t.integer "generations", null: false
+    t.index ["ancestor_id", "descendant_id", "generations"], name: "page_anc_desc_idx", unique: true
+    t.index ["descendant_id"], name: "page_desc_idx"
+  end
+
+  create_table "pages", force: :cascade do |t|
+    t.jsonb "cached_paths", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.jsonb "meta_description", default: {}, null: false
+    t.jsonb "meta_title", default: {}, null: false
+    t.integer "page_type", default: 0, null: false
+    t.bigint "parent_id"
+    t.integer "position"
+    t.datetime "published_at"
+    t.jsonb "slug", default: {}, null: false
+    t.jsonb "subtitle", default: {}, null: false
+    t.jsonb "title", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index "((cached_paths ->> 'de'::text))", name: "index_pages_on_cached_path_de"
+    t.index "((cached_paths ->> 'en'::text))", name: "index_pages_on_cached_path_en"
+    t.index "((cached_paths ->> 'es'::text))", name: "index_pages_on_cached_path_es"
+    t.index "parent_id, ((slug ->> 'de'::text))", name: "index_pages_on_parent_id_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index "parent_id, ((slug ->> 'en'::text))", name: "index_pages_on_parent_id_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index "parent_id, ((slug ->> 'es'::text))", name: "index_pages_on_parent_id_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)", nulls_not_distinct: true
+    t.index ["parent_id"], name: "index_pages_on_parent_id"
+  end
+
   create_table "post_relations", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "post_id", null: false
@@ -82,13 +125,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
   create_table "posts", force: :cascade do |t|
     t.integer "content_type", default: 0, null: false
     t.datetime "created_at", null: false
-    t.string "excerpt"
+    t.jsonb "excerpt", default: {}, null: false
     t.jsonb "metadata", default: {}, null: false
     t.datetime "published_at"
-    t.string "slug", null: false
-    t.string "title", null: false
+    t.jsonb "slug", default: {}, null: false
+    t.jsonb "title", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.index ["content_type", "slug"], name: "index_posts_on_content_type_and_slug", unique: true
+    t.index "content_type, ((slug ->> 'de'::text))", name: "index_posts_on_content_type_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)"
+    t.index "content_type, ((slug ->> 'en'::text))", name: "index_posts_on_content_type_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)"
+    t.index "content_type, ((slug ->> 'es'::text))", name: "index_posts_on_content_type_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)"
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -126,6 +171,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_13_175859) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "content_blocks", "pages"
+  add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"

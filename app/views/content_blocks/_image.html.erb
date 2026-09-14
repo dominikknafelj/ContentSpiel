@@ -1,0 +1,6 @@
+<div class="content-block content-block--image">
+  <% if block.image.attached? %>
+    <%= image_tag block.image %>
+    <p><%= block.caption %></p>
+  <% end %>
+</div>

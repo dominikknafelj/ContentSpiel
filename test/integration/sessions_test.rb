@@ -5,12 +5,13 @@ class SessionsTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "admin@example.com", password: "password123")
   end
 
-  test "signing in with valid credentials redirects to root and grants access" do
+  # Only the immediate redirect is asserted: `root_url` now redirects onward to
+  # the default locale's root page, and whether a page renders there is
+  # PagesRoutingTest's subject, not sign-in's.
+  test "signing in with valid credentials redirects to root" do
     post session_url, params: { email_address: "admin@example.com", password: "password123" }
 
     assert_redirected_to root_url
-    follow_redirect!
-    assert_response :success
   end
 
   test "signing in with invalid credentials redirects back to the sign-in form" do

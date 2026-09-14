@@ -1,0 +1,7 @@
+<%# One post, rendered where its listing would otherwise be. `title` and `body`
+    read through the request's locale (PagesController sets it for the whole
+    request), so a German URL renders the German translation. %>
+<article class="content-block content-block--post-list-detail">
+  <h1><%= post.title %></h1>
+  <%= post.body %>
+</article>
