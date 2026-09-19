@@ -620,4 +620,38 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "draft-child"
     assert_not_includes response.body, "Draft Child"
   end
+
+  # A YoutubeEmbed pasted into a rich_text block's body (design spec section 8)
+  # is stored as an <action-text-attachment sgid="..."> node, exactly like any
+  # other ActionText::Attachable -- resolving it and rendering the embed is
+  # ActionText's own machinery, not this app's.
+  test "a rich_text block renders an embedded YouTube video pasted into its body" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    embed = YoutubeEmbed.create!(video_id: "dQw4w9WgXcQ")
+    body = %(<p>Check this out</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
+    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: body)
+
+    get "/en/"
+
+    assert_response :success
+    assert_includes response.body, "Check this out"
+    assert_includes response.body, "youtube-nocookie.com/embed/dQw4w9WgXcQ"
+  end
+
+  # The same attachable resolves through a post's own body too -- the post
+  # detail view is a different partial (_post_list_detail.html.erb) from a
+  # page's rich_text block, so this is real, distinct render coverage.
+  test "a post detail view renders an embedded YouTube video pasted into its body" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    embed = YoutubeEmbed.create!(video_id: "dQw4w9WgXcQ")
+    body = %(<p>Full post content</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
+    post = Post.create!(content_type: :blog, title: "My First Post", body: body, published_at: Time.current)
+
+    get "/en/blog/#{post.slug}"
+
+    assert_response :success
+    assert_includes response.body, "youtube-nocookie.com/embed/dQw4w9WgXcQ"
+  end
 end
