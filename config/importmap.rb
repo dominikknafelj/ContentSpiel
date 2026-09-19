@@ -11,4 +11,5 @@ pin "@rails/actiontext", to: "actiontext.esm.js"
 # Avo custom JS entrypoint
 pin "avo.custom"
 pin "sortablejs" # @1.15.7
+pin "d3-force" # @3.0.0
 pin "youtube_embed_paste"

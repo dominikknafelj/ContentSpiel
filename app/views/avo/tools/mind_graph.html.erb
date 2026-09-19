@@ -1,0 +1,25 @@
+<%# Post nodes + PostRelation edges (design spec section 9), laid out client
+    side by the mind-graph Stimulus controller: d3-force computes the
+    physics, the controller draws the result as an SVG and wires up dragging.
+    Read-only -- edges are created via the Post form's related_posts field
+    (design spec section 9), not from here. %>
+<div class="flex flex-col">
+  <%= render ui.panel(title: "Mind graph", description: "How your posts relate to each other. Drag a node to reposition it; click a node to open that post.") do |panel| %>
+    <% panel.with_card(padded: @nodes.empty?) do %>
+      <% if @nodes.empty? %>
+        <p class="text-content-secondary">No posts yet.</p>
+      <% else %>
+        <svg
+          data-controller="mind-graph"
+          data-mind-graph-nodes-value="<%= @nodes.to_json %>"
+          data-mind-graph-edges-value="<%= @edges.to_json %>"
+          data-mind-graph-target="svg"
+          class="w-full"
+          style="height: 600px;"
+          role="img"
+          aria-label="Post relationship graph"
+        ></svg>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>
