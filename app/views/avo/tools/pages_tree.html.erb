@@ -1,0 +1,25 @@
+<%# The whole Page tree, dragged client-side via the pages-tree Stimulus
+    controller + vendored SortableJS -- Avo's own drag-and-drop reordering is
+    an avo-record_reordering add-on gem (paid), so this is the hand-built
+    Community-tier equivalent (page-tree design spec section 5's "no
+    drag-and-drop in v1" waiver, revisited). %>
+<div
+  class="flex flex-col"
+  data-controller="pages-tree"
+  data-pages-tree-reorder-url-value="<%= avo.reorder_page_path %>"
+>
+  <%= render ui.panel(title: "Pages tree", description: "Drag a page by its handle to reorder it or move it under a different page.") do |panel| %>
+    <% panel.with_card(padded: true) do %>
+      <% if @root %>
+        <%# Plain wrapper, not a Sortable target: there is exactly one root,
+            nothing to reorder at this level -- only its own children <ul>
+            (rendered inside the partial) is a real drop list. %>
+        <ul>
+          <%= render "page_node", page: @root, root: true %>
+        </ul>
+      <% else %>
+        <p class="text-content-secondary">No pages yet.</p>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

@@ -46,7 +46,11 @@ gem "kamal", require: false
 gem "thruster", require: false
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
-gem "image_processing", "~> 1.2"
+#
+# image_processing 2.x no longer bundles a backend gem -- Rails' default
+# variant processor is vips, so that backend has to be declared explicitly.
+gem "image_processing", "~> 2.1"
+gem "ruby-vips", "~> 2.2"
 
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
