@@ -32,4 +32,32 @@ class Avo::ToolsController < Avo::ApplicationController
       render json: { ok: false, errors: page.errors.full_messages }, status: :unprocessable_entity
     end
   end
+
+  # Post nodes + PostRelation edges (design spec section 9), handed to the
+  # client as JSON on the container element -- the mind-graph Stimulus
+  # controller owns everything about how they're drawn and dragged. Nodes and
+  # edges are computed here rather than left to the view for the same reason
+  # #pages_tree's @root query is: what data the page needs is a controller
+  # concern, not something a template should be querying for itself.
+  def mind_graph
+    @page_title = "Mind graph"
+    add_breadcrumb title: "Mind graph"
+
+    @nodes = Post.find_each.map do |post|
+      {
+        id: post.id,
+        title: post.title,
+        contentType: post.content_type,
+        editUrl: avo.edit_resources_post_path(post)
+      }
+    end
+
+    # One PostRelation row is one edge: rows are stored directionally but
+    # read as undirected everywhere (page-tree design spec section 4), and
+    # PostRelation's own validation already keeps the reverse pair from ever
+    # existing alongside it -- nothing here needs to de-duplicate.
+    @edges = PostRelation.pluck(:post_id, :related_post_id).map do |post_id, related_post_id|
+      { source: post_id, target: related_post_id }
+    end
+  end
 end
