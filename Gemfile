@@ -106,3 +106,5 @@ gem "opentelemetry-instrumentation-all", "~> 0.96"
 # The official Ruby SDK for MCP servers (design spec section 10) --
 # [https://github.com/modelcontextprotocol/ruby-sdk].
 gem "mcp", "~> 1.6"
+
+gem "rack-attack", "~> 6.8"
