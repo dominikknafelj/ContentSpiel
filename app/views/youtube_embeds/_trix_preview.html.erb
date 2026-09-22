@@ -1,0 +1,9 @@
+<%# What Avo's editor shows in place of the real embed (YoutubeEmbed#to_trix_content_attachment_partial_path)
+    -- Trix's own vendored HTML sanitizer strips <iframe> (and <script>/<form>/<noscript>)
+    from attachment content unconditionally, with no config to widen it, so the real
+    partial (_youtube_embed.html.erb) would render as an empty box here. YouTube serves
+    this thumbnail for any public video with no API key. %>
+<figure class="content-block content-block--youtube-embed-preview">
+  <img src="https://img.youtube.com/vi/<%= youtube_embed.video_id %>/hqdefault.jpg" alt="YouTube video thumbnail">
+  <figcaption>YouTube video</figcaption>
+</figure>

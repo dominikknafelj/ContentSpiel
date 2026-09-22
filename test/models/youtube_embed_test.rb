@@ -114,4 +114,16 @@ class YoutubeEmbedTest < ActiveSupport::TestCase
 
     assert_equal "youtube_embeds/youtube_embed", embed.to_partial_path
   end
+
+  # Trix's own HTML sanitizer (vendored, not Rails' ActionText::ContentHelper
+  # one -- a separate pass with no public config for this) unconditionally
+  # strips <iframe>, <script>, <form>, and <noscript> from any attachment
+  # content shown in the editable area, no matter what config_action_text.rb
+  # allows server-side. The real embed is exactly what the public page (and
+  # to_partial_path above) renders; Trix only ever sees this thumbnail.
+  test "renders a thumbnail, not the iframe, inside Trix's own editor preview" do
+    embed = YoutubeEmbed.new(video_id: "dQw4w9WgXcQ")
+
+    assert_equal "youtube_embeds/trix_preview", embed.to_trix_content_attachment_partial_path
+  end
 end

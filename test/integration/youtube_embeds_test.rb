@@ -55,4 +55,23 @@ class YoutubeEmbedsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert response.parsed_body["error"].present?
   end
+
+  # Trix's own vendored HTML sanitizer strips <iframe> from attachment
+  # content shown in the editable area unconditionally -- there is no public
+  # config to widen it, unlike ActionText::ContentHelper's server-side one
+  # (config/initializers/action_text.rb). The real embed renders correctly on
+  # the public page (PagesRoutingTest covers that); this is what Avo's own
+  # Post edit form has to render instead.
+  test "a post's edit form shows a thumbnail for an attached embed, not a stripped iframe" do
+    sign_in_as(@user)
+    embed = YoutubeEmbed.create!(video_id: "dQw4w9WgXcQ")
+    body = %(<p>Intro</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
+    post_record = Post.create!(content_type: :blog, title: "Has An Embed", body: body)
+
+    get "/avo/resources/posts/#{post_record.id}/edit"
+
+    assert_response :success
+    assert_includes response.body, "img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+    assert_not_includes response.body, "<iframe"
+  end
 end
