@@ -94,3 +94,11 @@ gem "closure_tree", "~> 9.8"
 # defined in config/sitemap.rb and written by `rake sitemap:create`
 # [https://github.com/kjvarga/sitemap_generator].
 gem "sitemap_generator", "~> 7.1"
+
+# OpenTelemetry tracing (config/initializers/opentelemetry.rb). The otlp
+# exporter is bundled now, dormant, so switching from the console exporter
+# used in dev/test to a real backend later is an env var
+# (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
+gem "opentelemetry-sdk", "~> 1.13"
+gem "opentelemetry-exporter-otlp", "~> 0.36"
+gem "opentelemetry-instrumentation-all", "~> 0.96"
