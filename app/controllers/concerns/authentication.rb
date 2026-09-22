@@ -34,8 +34,14 @@ module Authentication
       redirect_to new_session_path
     end
 
+    # The public site needs no authentication of its own (PagesController
+    # opts out via allow_unauthenticated_access), so the only way anyone
+    # reaches here at all is by signing in to manage content -- a session
+    # cookie recorded a page to return to only when `request_authentication`
+    # redirected here from one; without that, `root_url` would send a fresh
+    # admin login back out to the public site instead of into Avo.
     def after_authentication_url
-      session.delete(:return_to_after_authenticating) || root_url
+      session.delete(:return_to_after_authenticating) || Avo.configuration.root_path
     end
 
     def start_new_session_for(user)
