@@ -1,7 +1,14 @@
 require "test_helper"
 
 class SeedsTest < ActiveSupport::TestCase
-  test "seeding is idempotent and creates exactly one dev admin" do
+  # find_or_create_post!/find_or_create_page! (db/seeds.rb) exist specifically
+  # because a plain find_or_create_by!(title: ...) or (slug: ...) against a
+  # Mobility jsonb column never finds what it just created -- silently, not
+  # an error -- so re-running the seed would otherwise try to recreate every
+  # Post and Page on each load and fail their own uniqueness validations.
+  # Asserting zero difference on the second run is what would catch that
+  # regression.
+  test "seeding is idempotent and creates the demo content exactly once" do
     original_env = Rails.env
 
     begin
@@ -13,8 +20,12 @@ class SeedsTest < ActiveSupport::TestCase
       assert_difference "User.count", 1 do
         load Rails.root.join("db/seeds.rb")
       end
+      assert_equal 5, Page.count
+      assert_equal 5, Post.count
+      assert_equal 1, PostRelation.count
+      assert_equal 1, YoutubeEmbed.count
 
-      assert_no_difference "User.count" do
+      assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count", "YoutubeEmbed.count" ] do
         load Rails.root.join("db/seeds.rb")
       end
     ensure
