@@ -43,12 +43,20 @@ class YoutubeEmbed < ApplicationRecord
     find_or_create_by!(video_id: video_id)
   end
 
-  # The partial rendering the embed itself. Not overridden per-context: the
-  # same responsive iframe is correct in both Avo's editor preview and the
-  # public page (design spec section 8), which is what leaving
-  # `to_trix_content_attachment_partial_path` at its `to_partial_path` default
-  # gets for free.
+  # The partial rendering the real embed -- used for the public page, and for
+  # Avo's editor preview too, except that Trix's own vendored HTML sanitizer
+  # (a separate pass from ActionText::ContentHelper's, with no public config
+  # to widen it) unconditionally strips <iframe>/<script>/<form>/<noscript>
+  # from attachment content shown in the editable area, so it never actually
+  # reaches the DOM there -- see #to_trix_content_attachment_partial_path.
   def to_partial_path
     "youtube_embeds/youtube_embed"
+  end
+
+  # A static thumbnail instead of the real iframe (see #to_partial_path):
+  # Trix would silently strip the iframe out and leave a blank box. YouTube
+  # serves a thumbnail for every public video at this URL with no API key.
+  def to_trix_content_attachment_partial_path
+    "youtube_embeds/trix_preview"
   end
 end
