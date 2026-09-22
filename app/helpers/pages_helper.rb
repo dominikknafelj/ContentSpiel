@@ -27,7 +27,7 @@ module PagesHelper
   # itself, so a link always agrees with what the controller would parse the
   # same path back into.
   def page_url_path(page, locale = I18n.locale)
-    "/#{locale}#{page.full_path(locale)}"
+    "#{locale_prefix(locale)}#{page.full_path(locale)}"
   end
 
   # A post's permalink (page-tree design spec section 4): there is no `Page`
@@ -35,10 +35,21 @@ module PagesHelper
   # `full_path` is "/" for the root page and contributes no segment there --
   # `page_url_path` already puts a trailing slash on that case, so the blank
   # path is dropped here rather than joined, or a root-hosted post would link
-  # to "/en//my-post".
+  # to "//my-post".
   def post_url_path(page, post, locale = I18n.locale)
     path = page.full_path(locale)
     path = "" if path == "/"
-    "/#{locale}#{path}/#{post.slug}"
+    "#{locale_prefix(locale)}#{path}/#{post.slug}"
+  end
+
+  private
+
+  # "" for the site's current default locale -- PagesController's own
+  # redirect_default_locale_prefix is what makes the unprefixed URL the
+  # canonical one for it, so a link has to agree and skip the prefix too, or
+  # every generated link would immediately bounce through a redirect.
+  # "/xx" for every other configured locale, unchanged from before.
+  def locale_prefix(locale)
+    locale.to_s == SiteSetting.instance.default_locale ? "" : "/#{locale}"
   end
 end

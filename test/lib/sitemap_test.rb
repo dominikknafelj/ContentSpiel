@@ -16,10 +16,14 @@ class SitemapTest < ActiveSupport::TestCase
 
     paths = sitemap_paths
 
-    assert_includes paths, "/en/"
+    # The site's default locale (en) gets no prefix at all -- the root page's
+    # own entry comes back as "" rather than "/": sitemap_generator joins an
+    # unprefixed "/" straight onto the bare host with no trailing slash, and
+    # URI#path on a URL with no path component at all reads back as "".
+    assert_includes paths, ""
     assert_includes paths, "/de/"
     assert_includes paths, "/es/"
-    assert_includes paths, "/en/about"
+    assert_includes paths, "/about"
     assert_includes paths, "/de/ueber-uns"
     # Untranslated in Spanish, so its path there falls back to the English
     # slug -- exactly the URL the site serves it at under /es.
@@ -37,18 +41,18 @@ class SitemapTest < ActiveSupport::TestCase
 
     paths = sitemap_paths
 
-    assert_includes paths, "/en/"
-    %w[/en/draft /de/draft /es/draft /en/scheduled /de/scheduled /es/scheduled].each do |path|
+    assert_includes paths, ""
+    %w[/draft /de/draft /es/draft /scheduled /de/scheduled /es/scheduled].each do |path|
       assert_not_includes paths, path
     end
   end
 
-  # The site has no unprefixed public URLs: "/" only redirects to the default
-  # locale, and sitemap_generator adds it by default unless told not to.
-  test "the unprefixed root is not listed" do
+  # `include_root: false` stops sitemap_generator adding "/" a second time on
+  # top of the root Page's own entry above (which is exactly what "/" means).
+  test "the root page's entry is not duplicated by sitemap_generator's own include_root" do
     Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
 
-    assert_not_includes sitemap_paths, "/"
+    assert_equal 1, sitemap_paths.count("")
   end
 
   test "every listed URL is absolute" do
