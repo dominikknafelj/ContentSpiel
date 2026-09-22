@@ -13,10 +13,14 @@
 # quietly pointing at localhost.
 SitemapGenerator::Sitemap.default_host = ENV.fetch("SITEMAP_HOST", "https://www.example.com")
 
-# `include_root` would add "/" -- the one public URL that isn't a page: it only
-# redirects to the default locale (config/routes.rb), and a sitemap is meant to
-# list the destinations, not the redirect.
+# `include_root` would add "/" unconditionally -- the loop below already adds
+# it itself (as the root Page's own entry in the current default locale, which
+# is exactly the page "/" resolves to), so leaving this on would list it twice.
 SitemapGenerator::Sitemap.create(include_root: false) do
+  # Read once rather than inside the loop below: SiteSetting.instance issues
+  # a fresh query every call, and nothing changes it mid-run here.
+  default_locale = SiteSetting.instance.default_locale
+
   # Published only: a draft (or a page scheduled for a future date) has a
   # cached path the moment it is saved, but PagesController 404s it, so listing
   # it would point search engines at a URL that doesn't resolve.
@@ -31,10 +35,13 @@ SitemapGenerator::Sitemap.create(include_root: false) do
     #
     # The locale prefix is prepended rather than built with a route helper
     # because `page_path` would re-escape the slashes inside the path glob.
-    # `full_path` is "/" for the root page, giving "/en/", and "/about" for a
-    # child, giving "/en/about" -- both of which the route accepts.
+    # `full_path` is "/" for the root page and "/about" for a child. The
+    # site's current default locale gets no prefix at all (config/routes.rb,
+    # PagesHelper#locale_prefix) -- every other configured locale keeps one,
+    # e.g. "/de/about".
     I18n.available_locales.each do |locale|
-      add "/#{locale}#{page.full_path(locale)}", lastmod: page.updated_at
+      prefix = locale.to_s == default_locale ? "" : "/#{locale}"
+      add "#{prefix}#{page.full_path(locale)}", lastmod: page.updated_at
     end
   end
 end

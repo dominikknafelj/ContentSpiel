@@ -31,32 +31,16 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
-  # The site has no unprefixed public URLs -- every page lives under a locale,
-  # so "/" only exists to send a visitor to the default locale's root page.
-  # Still declared with `root` rather than `get "/"` so that `root_url` keeps
-  # resolving (Authentication#after_authentication_url falls back to it).
-  # 302 rather than the `redirect` helper's default 301: a permanent redirect
-  # is cached by browsers indefinitely and cannot be withdrawn from the client
-  # side, so it is only safe once the mapping is genuinely permanent. Nothing
-  # has launched publicly yet, and "/" may well come to serve a locale
-  # negotiated from the request instead of always /en/ -- a 301 shipped now
-  # would be stuck in the cache of everyone who ever hit it.
-  root to: redirect("/en/", status: :found)
-
-  # The public site: every page in the `Page` tree is served by this one route,
-  # which hands `PagesController` a locale and the rest of the path to look up.
+  # Every locale is reachable under its own prefix (e.g. /de/about), including
+  # whichever one is currently the site's default -- but a default-locale
+  # prefix isn't the *canonical* URL for that content; PagesController
+  # redirects it to the unprefixed route below, since SiteSetting's own
+  # default_locale is a runtime setting this route can't see.
   #
-  # Declared last because it is a catch-all -- the named routes above (/avo,
-  # /session, /up, ...) have to win over it. The locale constraint keeps it from
-  # swallowing unrelated top-level paths entirely: only the three locales the
-  # site is published in (config.i18n.available_locales) reach the controller.
-  #
-  # The glob segment is wrapped in an optional group rather than left bare: a
-  # `defaults: { path: "" }` alone does *not* make `*path` optional -- Journey
-  # still requires at least one character for it, so "/en/" (which Rails
-  # normalizes to "/en") raises a routing error and the homepage is unreachable.
-  # `(/*path)` makes the segment genuinely optional, and the default is what
-  # then supplies the "" the controller normalizes into "/".
+  # Declared before the unprefixed routes below so an explicit "/de/..."
+  # always matches here first: Rails tries routes in declaration order, and
+  # "de" satisfies this route's locale constraint before the catch-all ever
+  # gets a chance to read it as a page path instead.
   #
   # `format: false` suppresses the `(.:format)` group Rails otherwise appends
   # to every route. The site serves exactly one representation of a page, so
@@ -64,7 +48,7 @@ Rails.application.routes.draw do
   # this route in both directions, because a dot in the final segment is what
   # triggers it:
   #
-  #   - "/en/about.json" on a real page still matches, so the controller finds
+  #   - "/de/about.json" on a real page still matches, so the controller finds
   #     the page and renders `show` in a format that has no template.
   #     `ActionView::MissingTemplate` is absent from
   #     `ActionDispatch::ExceptionWrapper.rescue_responses`, so it is mapped to
@@ -75,8 +59,28 @@ Rails.application.routes.draw do
   #     the exact path `Page#full_path` publishes and config/sitemap.rb hands
   #     to search engines.
   #
-  # With the group gone, the whole remainder of the URL is the glob, and both
-  # cases are simply a path that either names a page or doesn't.
-  get ":locale(/*path)", to: "pages#show", constraints: { locale: /en|de|es/ }, as: :page,
+  # The glob segment is wrapped in an optional group rather than left bare: a
+  # `defaults: { path: "" }` alone does *not* make `*path` optional -- Journey
+  # still requires at least one character for it, so "/de/" (which Rails
+  # normalizes to "/de") would raise a routing error and that locale's root
+  # would be unreachable. `(/*path)` makes the segment genuinely optional.
+  get ":locale(/*path)", to: "pages#show", constraints: { locale: /en|de|es/ }, as: :localized_page,
     defaults: { path: "" }, format: false
+
+  # No locale prefix at all: served in the site's current default locale
+  # (SiteSetting#default_locale, read per request by PagesController). Two
+  # routes rather than one optional-locale route, deliberately -- a single
+  # `"(/:locale)(/*path)"` pattern leaves Rails to decide for itself whether
+  # a first segment like "de" is a locale or a page slug, which is exactly
+  # the kind of routing ambiguity `format: false` above was already added to
+  # close off one instance of; two separate, explicitly-ordered routes have
+  # no such ambiguity to resolve.
+  #
+  # `root` on its own (rather than folding "/" into the `*path` glob below)
+  # because an unwrapped `get "*path"` requires at least one character, the
+  # same Journey behavior the locale route above works around with `(/*path)`
+  # -- but here there's no static segment ahead of the glob to wrap it against,
+  # so the homepage gets its own route instead.
+  root to: "pages#show", format: false
+  get "*path", to: "pages#show", as: :page, format: false
 end

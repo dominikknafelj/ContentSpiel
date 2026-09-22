@@ -1,0 +1,67 @@
+require "test_helper"
+
+# SiteSetting#default_locale is a runtime setting (editable in Avo, no deploy
+# required) that decides which of the site's locales is served with no
+# prefix at all. Every other test in this suite exercises the *default*
+# default_locale ("en") -- this file is what actually proves the setting is
+# live, not just stored: changing it has to change routing, redirects, and
+# the sitemap on the very next request.
+class DefaultLocaleTest < ActionDispatch::IntegrationTest
+  setup do
+    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: @root,
+      published_at: Time.current)
+    Mobility.with_locale(:de) { @about.update!(title: "Über uns", slug: "ueber-uns") }
+
+    SiteSetting.instance.update!(default_locale: "de")
+  end
+
+  test "the unprefixed root and paths serve the new default locale" do
+    get "/"
+    assert_response :success
+    assert_includes response.body, "Home"
+
+    get "/ueber-uns"
+    assert_response :success
+    assert_includes response.body, "Über uns"
+  end
+
+  test "the new default locale's own prefix redirects to the unprefixed URL" do
+    get "/de/ueber-uns"
+
+    assert_redirected_to "/ueber-uns"
+  end
+
+  # The locale that used to be default is just another configured locale now
+  # -- reachable at its own prefix, rendered directly, no redirect.
+  test "the locale that stopped being default renders directly at its own prefix" do
+    get "/en/about"
+
+    assert_response :success
+    assert_includes response.body, "About"
+  end
+
+  test "page_url_path omits the prefix for the new default and adds one for the old" do
+    view = ApplicationController.new.view_context
+
+    assert_equal "/ueber-uns", view.page_url_path(@about, :de)
+    assert_equal "/en/about", view.page_url_path(@about, :en)
+  end
+
+  test "the sitemap swaps which locale is unprefixed" do
+    require "sitemap_generator"
+    require "tmpdir"
+
+    paths = Dir.mktmpdir do |dir|
+      SitemapGenerator::Interpreter.run(config_file: Rails.root.join("config/sitemap.rb"), public_path: dir,
+        compress: false, verbose: false)
+      xml = Nokogiri::XML(File.read(File.join(dir, "sitemap.xml")))
+      xml.remove_namespaces!.css("url > loc").map { |loc| URI.parse(loc.text).path }
+    end
+
+    assert_includes paths, "/ueber-uns"
+    assert_includes paths, "/en/about"
+    assert_not_includes paths, "/about"
+    assert_not_includes paths, "/de/ueber-uns"
+  end
+end

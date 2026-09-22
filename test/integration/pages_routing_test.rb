@@ -1,24 +1,44 @@
 require "test_helper"
 
 class PagesRoutingTest < ActionDispatch::IntegrationTest
-  # The site has no unprefixed public URLs: "/" exists only to send a visitor
-  # to the default locale's root page.
+  # An explicit prefix naming the site's *current* default locale isn't the
+  # canonical URL for that content -- the unprefixed route is (config/routes.rb,
+  # PagesController#redirect_default_locale_prefix) -- so it redirects there
+  # instead of rendering directly.
   #
   # Temporarily (302), not permanently: a 301 is cached by browsers for good
   # and cannot be taken back, so it is not something to ship before the
-  # mapping is final.
-  test "the bare root redirects to the default locale root" do
-    get "/"
-
-    assert_redirected_to "/en/"
+  # mapping is final -- SiteSetting#default_locale can change at any time.
+  test "an explicit default-locale prefix redirects to the unprefixed URL" do
+    get "/en/"
+    assert_redirected_to "/"
     assert_response :found
+
+    get "/en/about"
+    assert_redirected_to "/about"
   end
 
-  test "the root page renders at the locale root" do
+  test "a default-locale prefix redirect preserves the query string" do
+    get "/en/about?ref=newsletter"
+
+    assert_redirected_to "/about?ref=newsletter"
+  end
+
+  # The whole point of the redirect above: the same content is reachable at
+  # exactly one canonical URL, not two.
+  test "a non-default locale's own prefix is not redirected" do
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    get "/de/"
+
+    assert_response :success
+  end
+
+  test "the root page renders at the unprefixed root" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_includes response.body, "Welcome"
@@ -29,14 +49,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
     ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
 
-    get "/en/about"
+    get "/about"
 
     assert_response :success
     assert_includes response.body, "About us"
   end
 
   test "an unmatched path returns 404" do
-    get "/en/does-not-exist"
+    get "/does-not-exist"
 
     assert_response :not_found
   end
@@ -55,14 +75,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
 
-    get "/en/about.json"
+    get "/about.json"
 
     assert_response :not_found
   end
 
   # Direction two: a page whose own slug contains a dot. `Page#full_path` (and
   # so config/sitemap.rb, which emits those paths verbatim) advertises
-  # "/en/v1.0" -- with an implicit format group the trailing ".0" is sliced off
+  # "/v1.0" -- with an implicit format group the trailing ".0" is sliced off
   # into `params[:format]`, the controller looks up "/v1", and the page 404s at
   # the very URL the sitemap hands to search engines.
   test "a page whose slug contains a dot is reachable at its real path" do
@@ -73,18 +93,21 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
     assert_equal "/v1.0", release.full_path(:en)
 
-    get "/en/v1.0"
+    get "/v1.0"
 
     assert_response :success
     assert_includes response.body, "Release notes"
   end
 
-  # `format: false` must not narrow what the route otherwise matches: the
-  # locale root, a single segment and a deep glob all still dispatch to
-  # `pages#show` with the same parameters as before.
-  test "the catch-all still recognizes the locale root and nested paths" do
-    assert_recognizes({ controller: "pages", action: "show", locale: "en", path: "" }, "/en")
-    assert_recognizes({ controller: "pages", action: "show", locale: "en", path: "about" }, "/en/about")
+  # `format: false` must not narrow what either route otherwise matches: the
+  # unprefixed root and a nested path, and an explicit locale prefix with its
+  # own nested/deep path, all still dispatch to `pages#show`. The unprefixed
+  # routes carry no `locale` key at all (PagesController's own
+  # `effective_locale` is what supplies one) -- only the explicit-prefix route
+  # does.
+  test "the catch-all still recognizes the unprefixed root, nested paths, and locale prefixes" do
+    assert_recognizes({ controller: "pages", action: "show" }, "/")
+    assert_recognizes({ controller: "pages", action: "show", path: "about" }, "/about")
     assert_recognizes({ controller: "pages", action: "show", locale: "de", path: "a/b/c" }, "/de/a/b/c")
     assert_recognizes({ controller: "pages", action: "show", locale: "es", path: "v1.0" }, "/es/v1.0")
   end
@@ -99,7 +122,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
       published_at: Time.current
     )
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_includes response.body, "<title>ContentSpiel — Home</title>"
@@ -113,14 +136,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
       meta_title: "", published_at: Time.current)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_includes response.body, "<title>Home</title>"
 
     # Not only an absent override: one the admin typed and then cleared is just
     # as blank, and must fall back the same way rather than emptying the title.
-    get "/en/about"
+    get "/about"
 
     assert_response :success
     assert_includes response.body, "<title>About</title>"
@@ -131,7 +154,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a page without a meta_description renders no description tag" do
     Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_not_includes response.body, %(<meta name="description")
@@ -142,13 +165,13 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
       meta_description: "Who I am.", published_at: Time.current)
 
-    get "/en/about"
+    get "/about"
 
     assert_response :success
     assert_includes response.body, %(<meta property="og:title" content="About")
     assert_includes response.body, %(<meta property="og:description" content="Who I am.")
     assert_includes response.body, %(<meta property="og:type" content="website")
-    assert_includes response.body, %(<meta property="og:url" content="http://www.example.com/en/about")
+    assert_includes response.body, %(<meta property="og:url" content="http://www.example.com/about")
     assert_includes response.body, %(<meta property="og:locale" content="en")
   end
 
@@ -163,7 +186,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "My First Post", excerpt: "A short summary.",
       body: "<p>Full post content</p>", published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :success
     assert_includes response.body, "<title>My First Post</title>"
@@ -215,7 +238,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
 
-    get "/en/draft"
+    get "/draft"
 
     assert_response :not_found
   end
@@ -224,7 +247,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root, published_at: 1.day.from_now)
 
-    get "/en/scheduled"
+    get "/scheduled"
 
     assert_response :not_found
   end
@@ -234,7 +257,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     ContentBlock.create!(page: root, block_type: :rich_text, position: 1, body: "<p>Second</p>")
     ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>First</p>")
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_operator response.body.index("First"), :<, response.body.index("Second")
@@ -246,7 +269,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
-    get "/en/blog"
+    get "/blog"
 
     assert_response :success
     assert_includes response.body, "My First Post"
@@ -262,7 +285,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Post.create!(content_type: :blog, title: "Draft Post", published_at: nil)
     Post.create!(content_type: :blog, title: "Scheduled Post", published_at: 1.day.from_now)
 
-    get "/en/blog"
+    get "/blog"
 
     assert_response :success
     assert_includes response.body, "Published Post"
@@ -279,7 +302,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Post.create!(content_type: :blog, title: "Middle Post", published_at: 1.day.ago)
     Post.create!(content_type: :blog, title: "Oldest Post", published_at: 1.week.ago)
 
-    get "/en/blog"
+    get "/blog"
 
     assert_response :success
     assert_includes response.body, "Newest Post"
@@ -294,7 +317,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Post.create!(content_type: :blog, title: "A Blog Entry", published_at: 1.day.ago)
     Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
-    get "/en/blog"
+    get "/blog"
 
     assert_response :success
     assert_includes response.body, "A Blog Entry"
@@ -313,7 +336,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Post.create!(content_type: :blog, title: "A Blog Entry", published_at: 1.day.ago)
     Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
-    get "/en/everything"
+    get "/everything"
 
     assert_response :success
     assert_includes response.body, "A Blog Entry"
@@ -330,7 +353,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry",
       body: "<p>Where I worked</p>", published_at: 1.day.ago)
 
-    get "/en/everything/#{resume_entry.slug}"
+    get "/everything/#{resume_entry.slug}"
 
     assert_response :success
     assert_includes response.body, "Where I worked"
@@ -346,7 +369,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :success
     assert_includes response.body, "Full post content"
@@ -363,7 +386,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :success
     assert_includes response.body, "Blog intro"
@@ -375,7 +398,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
 
-    get "/en/blog/no-such-post"
+    get "/blog/no-such-post"
 
     assert_response :not_found
   end
@@ -388,7 +411,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
-    get "/en/about/#{post.slug}"
+    get "/about/#{post.slug}"
 
     assert_response :not_found
   end
@@ -397,7 +420,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
-    get "/en/nowhere/#{post.slug}"
+    get "/nowhere/#{post.slug}"
 
     assert_response :not_found
   end
@@ -411,7 +434,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :not_found
   end
@@ -426,10 +449,10 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", body: "<p>Not yet</p>",
       published_at: 1.day.from_now)
 
-    get "/en/blog/#{draft.slug}"
+    get "/blog/#{draft.slug}"
     assert_response :not_found
 
-    get "/en/blog/#{scheduled.slug}"
+    get "/blog/#{scheduled.slug}"
     assert_response :not_found
   end
 
@@ -441,7 +464,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
-    get "/en/blog/#{resume_entry.slug}"
+    get "/blog/#{resume_entry.slug}"
 
     assert_response :not_found
   end
@@ -515,7 +538,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
 
-    get "/en/", headers: { "Accept" => "application/json" }
+    get "/", headers: { "Accept" => "application/json" }
 
     assert_response :success
     assert_includes response.body, "Welcome"
@@ -530,7 +553,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root.hero_image.attach(io: StringIO.new("fake image data"), filename: "hero.jpg", content_type: "image/jpeg")
     root.save!
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_includes response.body, "<h1>Welcome</h1>"
@@ -546,7 +569,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", subtitle: "Should not appear", slug: "",
       published_at: Time.current)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_not_includes response.body, "Should not appear"
@@ -562,7 +585,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :success
     assert_not_includes response.body, "<h1>Blog</h1>"
@@ -578,35 +601,35 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
-    get "/en/blog"
+    get "/blog"
 
     assert_response :success
-    assert_includes response.body, %(href="/en/blog/#{post.slug}")
+    assert_includes response.body, %(href="/blog/#{post.slug}")
     assert_includes response.body, "My First Post</a>"
   end
 
   # Same fix, the root-hosted case: a post_list block living directly on the
   # homepage has no page path segment to join against, so the permalink is
-  # "/en/<slug>" rather than "/en//<slug>".
+  # "/<slug>" rather than "//<slug>".
   test "a post_list block on the root page links to a root-level permalink" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     ContentBlock.create!(page: root, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
-    assert_includes response.body, %(href="/en/#{post.slug}")
+    assert_includes response.body, %(href="/#{post.slug}")
   end
 
   test "a page lists its published child pages as links" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
-    assert_includes response.body, %(href="/en/about")
+    assert_includes response.body, %(href="/about")
     assert_includes response.body, "About</a>"
   end
 
@@ -614,7 +637,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(page_type: :standard, title: "Draft Child", slug: "draft-child", parent: root, published_at: nil)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_not_includes response.body, "draft-child"
@@ -631,7 +654,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     body = %(<p>Check this out</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
     ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: body)
 
-    get "/en/"
+    get "/"
 
     assert_response :success
     assert_includes response.body, "Check this out"
@@ -649,7 +672,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     body = %(<p>Full post content</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
     post = Post.create!(content_type: :blog, title: "My First Post", body: body, published_at: Time.current)
 
-    get "/en/blog/#{post.slug}"
+    get "/blog/#{post.slug}"
 
     assert_response :success
     assert_includes response.body, "youtube-nocookie.com/embed/dQw4w9WgXcQ"
