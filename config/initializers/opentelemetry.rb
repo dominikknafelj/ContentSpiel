@@ -42,7 +42,25 @@ processor_class =
 OpenTelemetry::SDK.configure do |c|
   c.service_name = ENV.fetch("OTEL_SERVICE_NAME", "contentspiel")
   c.add_span_processor(processor_class.new(exporter))
-  c.use_all
+
+  c.use_all(
+    # Rake instrumentation traces every task invocation, including `bin/rails
+    # db:migrate`/`sitemap:create`/the test runner's own setup tasks -- with
+    # the console exporter this is hundreds of SpanData structs dumped to the
+    # terminal for one ordinary CLI command, not a request this app actually
+    # wants visibility into.
+    "OpenTelemetry::Instrumentation::Rake" => { enabled: false },
+
+    # Segfaults `bin/rails test`'s parallel workers: `parallelize` forks the
+    # test process, and this instrumentation's wrapping of PG::Connection
+    # doesn't survive the fork cleanly -- a *child* process crashes inside
+    # libpq's connect_start with a SIGSEGV the moment it opens its own new
+    # connection, reproduced consistently across multiple runs. ActiveRecord
+    # instrumentation (still on) already covers every query made through
+    # ActiveRecord, which is the entire app; this only adds coverage for a
+    # raw PG::Connection used outside ActiveRecord, which nothing here does.
+    "OpenTelemetry::Instrumentation::PG" => { enabled: false }
+  )
 end
 
 # So a test can retrieve the very exporter the SDK is actually using --

@@ -28,10 +28,23 @@ class OpenTelemetryTest < ActionDispatch::IntegrationTest
     assert @exporter.finished_spans.any?, "expected at least one span to be recorded for the request"
   end
 
-  test "a database query produces its own span, not just the request's" do
-    Page.count
+  # ActiveRecord instrumentation only emits a span when there's already an
+  # active trace to nest it under -- a bare model call from a script (no
+  # request, no parent span) produces none at all, so this has to run inside
+  # a real request rather than just calling `Page.count` directly.
+  #
+  # PG instrumentation (opentelemetry-instrumentation-pg) is deliberately
+  # disabled (config/initializers/opentelemetry.rb) -- it segfaulted
+  # `bin/rails test`'s forked parallel workers. ActiveRecord instrumentation
+  # is a separate gem/code path and unaffected; this is what proves that.
+  test "a database query within a request produces its own span" do
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    @exporter.reset
 
-    db_spans = @exporter.finished_spans.select { |span| span.attributes["db.statement"]&.include?("pages") }
-    assert db_spans.any?, "expected a span for the query against the pages table"
+    get "/"
+
+    assert_response :success
+    query_spans = @exporter.finished_spans.select { |span| span.name.start_with?("Page ", "Page.") }
+    assert query_spans.any?, "expected a span for the query against Page, got: #{@exporter.finished_spans.map(&:name)}"
   end
 end
