@@ -1,9 +1,16 @@
 class ApiToken < ApplicationRecord
   has_secure_password :token, validations: false
 
-  def self.generate!
+  # Bound to the admin it authenticates as for MCP purposes (design spec
+  # section 10 revisited): v1 shipped one global token with no user at all.
+  # An MCP client holding this token inherits that user's full authoring
+  # identity, so attributing and independently revoking it is worth the FK
+  # even with a single admin today.
+  belongs_to :user
+
+  def self.generate!(user)
     raw_token = SecureRandom.hex(32)
-    token = create!(token: raw_token)
+    token = create!(user: user, token: raw_token)
     [ token, raw_token ]
   end
 
@@ -17,5 +24,12 @@ class ApiToken < ApplicationRecord
 
   def revoke!
     update!(revoked_at: Time.current)
+  end
+
+  # Mirrors Session's own ip_address tracking (Authentication#start_new_session_for)
+  # -- visibility into a bearer credential used unattended by an MCP client,
+  # not just at creation.
+  def record_usage!(ip_address)
+    update!(last_used_at: Time.current, last_used_ip: ip_address)
   end
 end

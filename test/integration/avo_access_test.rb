@@ -172,7 +172,7 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
 
   test "the api token index does not offer a New button" do
     sign_in
-    ApiToken.generate!
+    ApiToken.generate!(@user)
 
     get "/avo/resources/api_tokens"
 
@@ -242,7 +242,7 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
         "posts" => post,
         "tags" => post.tags.first,
         "site_settings" => SiteSetting.instance,
-        "api_tokens" => ApiToken.generate!.first,
+        "api_tokens" => ApiToken.generate!(@user).first,
         "users" => @user,
         "pages" => page,
         "content_blocks" => block
