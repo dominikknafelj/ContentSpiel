@@ -75,6 +75,10 @@ export default class extends Controller {
   buildNodeElement(node) {
     const group = document.createElementNS(SVG_NS, "g")
     group.style.cursor = "pointer"
+    // SVG <text> is natively selectable -- without this, a drag that starts
+    // over a node's label (labels sit right next to their circle, an easy
+    // target to land on) selects the text instead of moving the node.
+    group.style.userSelect = "none"
 
     const circle = document.createElementNS(SVG_NS, "circle")
     circle.setAttribute("r", 8)
