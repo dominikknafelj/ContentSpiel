@@ -12,10 +12,17 @@ class Avo::Resources::ApiToken < Avo::BaseResource
   def fields
     field :id, as: :id
     # field :avatar, as: :avatar
+    field :user, as: :belongs_to
     # `disabled:` (not `readonly:`) so the bcrypt digest is ignored on save --
     # editing it by hand would silently invalidate the token.
     field :token_digest, as: :text, disabled: true
     field :revoked_at, as: :date_time
+    field :last_used_at, as: :date_time, readonly: true
+    field :last_used_ip, as: :text, readonly: true
+  end
+
+  def actions
+    action Avo::Actions::RegenerateApiToken
   end
 
   # Tokens are minted by ApiToken.generate!, which is what hashes the raw token

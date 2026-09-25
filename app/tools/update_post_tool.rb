@@ -1,0 +1,37 @@
+# Updates an existing post (design spec section 10). Only the fields given
+# are changed -- an absent keyword leaves that attribute alone, so a caller
+# updating just the body doesn't have to first fetch and resend the title.
+class UpdatePostTool < MCP::Tool
+  description "Update an existing post. Only the fields given are changed; everything else is left alone. " \
+    "Translated fields (title/body/excerpt) are written in the given locale " \
+    "(default: the site's current default locale)."
+  input_schema(
+    properties: {
+      id: { type: "integer" },
+      title: { type: "string" },
+      body: { type: "string", description: "HTML." },
+      excerpt: { type: "string" },
+      locale: { type: "string", enum: Mobility.available_locales.map(&:to_s) },
+      published: { type: "boolean", description: "Omit to leave the current publish state alone." }
+    },
+    required: [ "id" ]
+  )
+  annotations(read_only_hint: false, destructive_hint: false, idempotent_hint: true, open_world_hint: false,
+    title: "Update post")
+
+  def self.call(id:, title: nil, body: nil, excerpt: nil, locale: nil, published: nil, server_context:)
+    post = Post.find_by(id: id)
+    return MCP::Tool::Response.new([ { type: "text", text: "Post #{id} not found" } ], error: true) unless post
+
+    locale ||= SiteSetting.instance.default_locale
+    translated_attrs = { title: title, body: body, excerpt: excerpt }.compact
+
+    Mobility.with_locale(locale) { post.update!(translated_attrs) } if translated_attrs.any?
+    post.update!(published_at: published ? Time.current : nil) unless published.nil?
+
+    data = Mobility.with_locale(locale) { PostSerializer.call(post, locale) }
+    MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
+  rescue ActiveRecord::RecordInvalid => e
+    MCP::Tool::Response.new([ { type: "text", text: e.message } ], error: true)
+  end
+end
