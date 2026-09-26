@@ -191,6 +191,18 @@ construction. Enforcing it for non-admin users waits for roles (§7).
   per-resource authorization needs the separate `avo-authorization` plugin
   (paid tier, as far as known); per-user sidebar hiding needs `avo-menu`.
   Decide plugin vs. self-enforced when this is picked up.
+- **Image processing and asset management** (media library). Needed, but
+  its own design. Today images are attached per record
+  (`SiteSetting#logo`, `ContentBlock#image`, `Page#hero_image`) and each
+  upload is a separate blob — nothing can be browsed or reused. Only
+  images inside rich text get resized variants
+  (`active_storage/blobs/_blob.html.erb`); content-block and hero images
+  are served at original size (`content_blocks/_image.html.erb`,
+  `pages/show.html.erb`). The later design should cover a reusable media
+  library in Avo (the Claude Design backend already has a "Media" entry),
+  responsive variants/formats for every image, and metadata such as alt
+  text. The system check's image-processing check (§4) is the only
+  overlap with this work.
 - **Production mail configuration** (SMTP settings, real
   `default_url_options` host) — the console is the accepted fallback for
   password resets; the system check only reports it.
