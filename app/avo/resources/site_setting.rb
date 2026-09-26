@@ -14,7 +14,7 @@ class Avo::Resources::SiteSetting < Avo::BaseResource
     # field :avatar, as: :avatar
     field :title, as: :text
     field :tagline, as: :text
-    field :social_links, as: :code
+    field :social_links, as: :key_value, key_label: "Network", value_label: "URL"
     # The locale served with no prefix at all (e.g. plain "/about") --
     # PagesController#redirect_default_locale_prefix reads this per request,
     # so changing it here takes effect immediately, no deploy required.

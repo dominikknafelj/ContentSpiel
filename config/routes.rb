@@ -27,6 +27,10 @@ Rails.application.routes.draw do
     # Admin-only mind graph (design spec section 9): Post nodes + PostRelation
     # edges, rendered client-side as a force-directed graph.
     get "mind_graph", to: "tools#mind_graph", as: :mind_graph
+
+    # The setup wizard's system check, re-runnable later (design spec
+    # 2026-09-26 §5).
+    get "system_status", to: "tools#system_status", as: :system_status
   end
   resource :session
   resources :passwords, param: :token
