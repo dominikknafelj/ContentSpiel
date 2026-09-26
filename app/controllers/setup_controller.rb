@@ -42,6 +42,9 @@ class SetupController < ApplicationController
     when "system_check" then @results = Setup::SystemCheck.run
     when "admin" then @user = User.new
     when "site", "languages" then @site_setting = SiteSetting.instance
+    when "review"
+      @site_setting = SiteSetting.instance
+      @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
     end
 
     render @step
@@ -55,6 +58,7 @@ class SetupController < ApplicationController
     when "languages" then update_languages
     when "mcp_token" then update_mcp_token
     when "starter_content" then update_starter_content
+    when "review" then update_review
     else head :not_found
     end
   end
@@ -176,5 +180,10 @@ class SetupController < ApplicationController
     def update_starter_content
       StarterContent.create_pages_and_posts!(locale: SiteSetting.instance.default_locale)
       redirect_to setup_step_path("review"), notice: "Starter content added."
+    end
+
+    def update_review
+      Setup.complete!
+      redirect_to Avo.configuration.root_path, notice: "Setup complete."
     end
 end

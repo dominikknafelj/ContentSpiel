@@ -1,0 +1,27 @@
+<% content_for :title, "Review" %>
+<h1 class="text-h1 font-semibold">Review</h1>
+<p class="mt-2 text-dim">Check your choices. Everything here can also be changed later in the admin.</p>
+
+<dl class="mt-6 divide-y divide-line border-y border-line">
+  <% rows = [
+       [ "Site title", @site_setting.title, "site" ],
+       [ "Tagline", @site_setting.tagline.presence || "—", "site" ],
+       [ "Social links", @site_setting.social_links.keys.to_sentence.presence || "None", "site" ],
+       [ "Default language", language_name(@site_setting.default_locale), "languages" ],
+       [ "Home page", "Always created", nil ],
+       [ "Starter content", @starter_added ? "Blog, Resume and Now pages, one sample post each" : "Skipped — Home page only", "starter_content" ]
+     ] %>
+  <% rows.each do |label, value, step| %>
+    <div class="flex items-baseline gap-4 py-3">
+      <dt class="w-40 shrink-0 font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
+      <dd class="flex-1"><%= value %></dd>
+      <% if step %>
+        <dd><%= link_to "Edit", setup_step_path(step), class: "text-accent underline hover:no-underline" %></dd>
+      <% end %>
+    </div>
+  <% end %>
+</dl>
+
+<div class="mt-6">
+  <%= button_to "Finish setup", setup_step_path("review"), method: :patch, class: setup_primary_button_class %>
+</div>
