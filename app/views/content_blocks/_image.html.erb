@@ -1,6 +1,8 @@
-<div class="content-block content-block--image">
-  <% if block.image.attached? %>
-    <%= image_tag block.image %>
-    <p><%= block.caption %></p>
-  <% end %>
-</div>
+<% if block.image.attached? %>
+  <figure class="content-block content-block--image my-10">
+    <%= image_tag block.image, alt: block.alt.to_s, class: "w-full rounded-cs" %>
+    <% if block.caption.present? %>
+      <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= block.caption %></figcaption>
+    <% end %>
+  </figure>
+<% end %>

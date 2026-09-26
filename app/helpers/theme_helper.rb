@@ -43,6 +43,17 @@ module ThemeHelper
   # The current page -- or, at a permalink, the current post -- in each
   # locale. A post's slug is read inside that locale, falling back to the
   # default-locale slug exactly as the router does.
+  def post_date(post)
+    post.published_at&.strftime("%-d %b %Y")
+  end
+
+  # Resume periods show years only; an empty end date is the current role.
+  def resume_period(post)
+    start_year = post.start_date.to_s[0, 4].presence
+    end_year = post.end_date.to_s[0, 4].presence || "now"
+    start_year ? "#{start_year} – #{end_year}" : end_year
+  end
+
   def language_links(page, post = nil)
     return [] if page.nil?
 

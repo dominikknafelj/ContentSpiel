@@ -558,7 +558,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_response :success
-    assert_includes response.body, "<h1>Welcome</h1>"
+    assert_includes response.body, ">Welcome</h1>"
     assert_includes response.body, "A warm welcome"
     assert_match(/<img[^>]*src="[^"]*hero/, response.body)
   end
@@ -591,7 +591,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_not_includes response.body, "<h1>Blog</h1>"
-    assert_includes response.body, "<h1>My First Post</h1>"
+    assert_includes response.body, ">My First Post</h1>"
   end
 
   # Before this, the page tree and every post permalink existed only for a
