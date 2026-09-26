@@ -41,6 +41,7 @@ class SetupController < ApplicationController
     case @step
     when "system_check" then @results = Setup::SystemCheck.run
     when "admin" then @user = User.new
+    when "site", "languages" then @site_setting = SiteSetting.instance
     end
 
     render @step
@@ -50,6 +51,8 @@ class SetupController < ApplicationController
     case @step
     when "token" then update_token
     when "admin" then update_admin
+    when "site" then update_site
+    when "languages" then update_languages
     else head :not_found
     end
   end
@@ -118,6 +121,38 @@ class SetupController < ApplicationController
         redirect_to new_session_path, alert: "An admin account already exists. Sign in to continue setup."
       else
         render :admin, status: :unprocessable_entity
+      end
+    end
+
+    def update_site
+      @site_setting = SiteSetting.instance
+
+      if @site_setting.update(site_params)
+        redirect_to setup_step_path("languages")
+      else
+        render :site, status: :unprocessable_entity
+      end
+    end
+
+    # The form always renders a few name/URL rows; a row missing either half
+    # is dropped rather than saved as a broken link.
+    def site_params
+      permitted = params.expect(site_setting: [ :title, :tagline, :logo, social_links: [ [ :name, :url ] ] ])
+      rows = Array(permitted.delete(:social_links))
+      links = rows.filter_map do |row|
+        name, url = row[:name].to_s.strip, row[:url].to_s.strip
+        [ name, url ] if name.present? && url.present?
+      end
+      permitted.merge(social_links: links.to_h)
+    end
+
+    def update_languages
+      @site_setting = SiteSetting.instance
+
+      if @site_setting.update(default_locale: params.dig(:site_setting, :default_locale))
+        redirect_to setup_step_path("mcp_token")
+      else
+        render :languages, status: :unprocessable_entity
       end
     end
 end
