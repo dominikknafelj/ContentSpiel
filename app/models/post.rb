@@ -1,6 +1,7 @@
 class Post < ApplicationRecord
   extend Mobility
   include SlugGeneration
+  include Publishable
 
   # `title`, `slug` and `excerpt` are jsonb columns holding one value per
   # locale; reading or writing them goes through the current Mobility.locale.
@@ -24,13 +25,6 @@ class Post < ApplicationRecord
     foreign_key: :related_post_id, dependent: :destroy, inverse_of: :related_post
 
   enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }
-
-  # What the public site is allowed to serve, in a listing or at a permalink.
-  # A beginless range compiles to `published_at <= now()`, which drops both
-  # drafts (NULL, since every SQL comparison with NULL is NULL rather than
-  # true) and posts scheduled for a future date -- the same rule `Page` applies
-  # to itself.
-  scope :published, -> { where(published_at: ..Time.current) }
 
   validates :title, presence: true
   validates :slug, presence: true

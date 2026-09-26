@@ -1,6 +1,7 @@
 class Page < ApplicationRecord
   extend Mobility
   include SlugGeneration
+  include Publishable
 
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
@@ -39,12 +40,6 @@ class Page < ApplicationRecord
   has_one_attached :hero_image
 
   enum :page_type, { standard: 0, landing: 1 }
-
-  # What the public site is allowed to serve. A beginless range compiles to
-  # `published_at <= now()`, which drops both drafts (NULL, since every SQL
-  # comparison with NULL is NULL rather than true) and pages scheduled for a
-  # future date -- the same rule a post_list block applies to its Posts.
-  scope :published, -> { where(published_at: ..Time.current) }
 
   validates :title, presence: true
 
@@ -142,8 +137,11 @@ class Page < ApplicationRecord
   # later `.order` added for some other reason, would quietly withdraw it.
   # (The slug presence validation above is what actually keeps two pages off
   # one path; this is the tiebreak for a collision arriving some other way.)
-  def self.find_by_full_path(locale, path)
-    published.where("cached_paths ->> ? = ?", locale.to_s, path).order(:id).first
+  #
+  # Preview (signed-in editors) passes `include_unpublished: true`.
+  def self.find_by_full_path(locale, path, include_unpublished: false)
+    scope = include_unpublished ? all : published
+    scope.where("cached_paths ->> ? = ?", locale.to_s, path).order(:id).first
   end
 
   protected

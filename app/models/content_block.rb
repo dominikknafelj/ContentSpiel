@@ -59,8 +59,8 @@ class ContentBlock < ApplicationRecord
   # admin. It must therefore never reach `where`: `posts.content_type` is NOT
   # NULL, so `where(content_type: nil)` compiles to `content_type IS NULL` and
   # the block silently lists nothing at all.
-  def listed_posts
-    scope = Post.published
+  def listed_posts(include_unpublished: false)
+    scope = include_unpublished ? Post.all : Post.published
     content_type = settings["content_type"]
     scope = scope.where(content_type: content_type) if content_type.present?
 
