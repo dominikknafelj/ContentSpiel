@@ -1,5 +1,6 @@
 class Page < ApplicationRecord
   extend Mobility
+  include SlugGeneration
 
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
@@ -190,6 +191,11 @@ class Page < ApplicationRecord
   end
 
   private
+
+  # The homepage's slug is "" by design (see `path_segment_pages`).
+  def generates_slugs?
+    parent_id.present?
+  end
 
   # closure_tree's own `after_save` reloads this record as part of renumbering,
   # which is what takes the requested number back out of reach of the callback

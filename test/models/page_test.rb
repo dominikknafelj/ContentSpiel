@@ -83,9 +83,12 @@ class PageTest < ActiveSupport::TestCase
   # drops blank segments, so the page's cached_paths come out identical to its
   # parent's and two pages end up claiming one URL -- for a child of the root,
   # the homepage's "/". Only one of the two can ever be served.
+  # No title, since a title present in any locale would now have its slug
+  # filled in automatically by `SlugGeneration` -- this has to be a page with
+  # no title at all to still exercise the blank-slug case.
   test "a non-root page requires a slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    slugless = Page.new(page_type: :standard, title: "Oops", parent: root)
+    slugless = Page.new(page_type: :standard, parent: root)
 
     assert_not slugless.valid?
     assert_includes slugless.errors[:slug], "can't be blank"
@@ -94,11 +97,14 @@ class PageTest < ActiveSupport::TestCase
   # The failure the validation exists to prevent, stated as the outcome rather
   # than as the error message: no second page may end up holding the
   # homepage's path, and `/` must still belong to the homepage.
+  #
+  # No title, for the same reason as above: a title would get this page an
+  # auto-generated slug and the create would succeed.
   test "a slugless child cannot be saved onto its parent's path" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
 
     assert_raises(ActiveRecord::RecordInvalid) do
-      Page.create!(page_type: :standard, title: "Oops", parent: root, published_at: Time.current)
+      Page.create!(page_type: :standard, parent: root, published_at: Time.current)
     end
 
     assert_equal [ root ], Page.where("cached_paths ->> 'en' = '/'").to_a
@@ -117,10 +123,12 @@ class PageTest < ActiveSupport::TestCase
 
   # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
   # so it has to be blank here too -- otherwise " " passes validation and
-  # produces the very collision above.
+  # produces the very collision above. No title: with one present,
+  # `SlugGeneration` would treat "   " as not-yet-set (it's blank) and
+  # overwrite it with a title-derived slug before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    blank = Page.new(page_type: :standard, title: "Oops", slug: "   ", parent: root)
+    blank = Page.new(page_type: :standard, slug: "   ", parent: root)
 
     assert_not blank.valid?
     assert_includes blank.errors[:slug], "can't be blank"

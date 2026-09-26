@@ -1,5 +1,6 @@
 class Post < ApplicationRecord
   extend Mobility
+  include SlugGeneration
 
   # `title`, `slug` and `excerpt` are jsonb columns holding one value per
   # locale; reading or writing them goes through the current Mobility.locale.
@@ -34,8 +35,6 @@ class Post < ApplicationRecord
   validates :title, presence: true
   validates :slug, presence: true
   validate :slug_is_unused_in_every_locale
-
-  before_validation :generate_slug_from_title, on: :create
 
   # The post whose slug in `locale` is `slug` -- as a visitor reading the site
   # in that locale sees it, meaning *through* Mobility's fallbacks, exactly the
@@ -72,10 +71,6 @@ class Post < ApplicationRecord
   end
 
   private
-
-  def generate_slug_from_title
-    self.slug = title.to_s.parameterize if slug.blank? && title.present?
-  end
 
   # `validates :slug, uniqueness:` would emit `WHERE posts.slug = 'hello'`,
   # comparing a jsonb column to a string -- which Postgres rejects outright.
