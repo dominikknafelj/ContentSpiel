@@ -1,0 +1,20 @@
+<% content_for :title, "Admin account" %>
+<h1 class="text-h1 font-semibold">Create the admin account</h1>
+<p class="mt-2 text-dim">You'll use this account to sign in to the admin.</p>
+
+<%= form_with model: @user, url: setup_step_path("admin"), method: :patch, class: "mt-6 space-y-4" do |form| %>
+  <%= render "setup/errors", record: @user %>
+  <div>
+    <%= form.label :email_address, "Email address", class: setup_label_class %>
+    <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", class: setup_input_class %>
+  </div>
+  <div>
+    <%= form.label :password, class: setup_label_class %>
+    <%= form.password_field :password, required: true, autocomplete: "new-password", maxlength: 72, class: setup_input_class %>
+  </div>
+  <div>
+    <%= form.label :password_confirmation, "Confirm password", class: setup_label_class %>
+    <%= form.password_field :password_confirmation, required: true, autocomplete: "new-password", maxlength: 72, class: setup_input_class %>
+  </div>
+  <%= form.submit "Create account", class: setup_primary_button_class %>
+<% end %>

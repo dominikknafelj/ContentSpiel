@@ -1,0 +1,13 @@
+<% content_for :title, "System check" %>
+<h1 class="text-h1 font-semibold">System check</h1>
+<p class="mt-2 text-dim">
+  These checks don't change anything. A warning tells you what won't work yet —
+  you can continue now and fix it later.
+</p>
+
+<%= render "setup/system_check_results", results: @results %>
+
+<div class="mt-6 flex gap-3">
+  <%= link_to "Continue", setup_step_path(next_step), class: setup_primary_button_class %>
+  <%= link_to "Re-run checks", setup_step_path("system_check"), class: setup_secondary_link_class %>
+</div>

@@ -38,12 +38,18 @@ class SetupController < ApplicationController
   end
 
   def show
+    case @step
+    when "system_check" then @results = Setup::SystemCheck.run
+    when "admin" then @user = User.new
+    end
+
     render @step
   end
 
   def update
     case @step
     when "token" then update_token
+    when "admin" then update_admin
     else head :not_found
     end
   end
@@ -90,6 +96,28 @@ class SetupController < ApplicationController
       else
         flash.now[:alert] = "That setup token doesn't match. Copy it from the server log."
         render :token, status: :unprocessable_entity
+      end
+    end
+
+    # The lock closes the window between two browsers submitting this step at
+    # the same moment: only the first sees `User.none?` and becomes the admin;
+    # the second is sent to sign in.
+    def update_admin
+      @user = User.new(params.expect(user: [ :email_address, :password, :password_confirmation ]))
+
+      created = User.transaction do
+        User.connection.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
+        User.none? && @user.save
+      end
+
+      if created
+        start_new_session_for(@user)
+        session.delete(:setup_token_verified)
+        redirect_to setup_step_path("site")
+      elsif User.exists?
+        redirect_to new_session_path, alert: "An admin account already exists. Sign in to continue setup."
+      else
+        render :admin, status: :unprocessable_entity
       end
     end
 end

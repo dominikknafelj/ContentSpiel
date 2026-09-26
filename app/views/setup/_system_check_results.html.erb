@@ -1,0 +1,13 @@
+<ul class="mt-6 divide-y divide-line border-y border-line">
+  <% results.each do |result| %>
+    <li class="flex gap-4 py-3">
+      <span class="w-20 shrink-0 font-cs-mono text-label uppercase tracking-mono <%= result.ok? ? "text-ok-ink" : "text-warn-ink" %>">
+        <%= result.ok? ? "OK" : "Warning" %>
+      </span>
+      <div>
+        <p class="font-semibold"><%= result.label %></p>
+        <p class="text-dim"><%= result.message %></p>
+      </div>
+    </li>
+  <% end %>
+</ul>
