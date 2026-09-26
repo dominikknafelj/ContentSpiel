@@ -2,7 +2,6 @@ require "test_helper"
 
 class SiteSettingTest < ActiveSupport::TestCase
   test "a second record cannot be created" do
-    SiteSetting.create!(title: "First")
     second = SiteSetting.new(title: "Second")
 
     assert_not second.valid?
@@ -10,15 +9,23 @@ class SiteSettingTest < ActiveSupport::TestCase
   end
 
   test "instance creates the record on first access" do
+    SiteSetting.delete_all
+
     assert_difference "SiteSetting.count", 1 do
       SiteSetting.instance
     end
   end
 
   test "instance returns the existing record on subsequent access" do
-    existing = SiteSetting.create!(title: "Existing")
+    assert_equal site_settings(:default), SiteSetting.instance
+  end
 
-    assert_equal existing, SiteSetting.instance
+  test "title is required" do
+    setting = SiteSetting.instance
+    setting.title = " "
+
+    assert_not setting.valid?
+    assert_includes setting.errors[:title], "can't be blank"
   end
 
   test "default_locale defaults to en" do

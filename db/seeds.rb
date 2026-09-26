@@ -39,6 +39,8 @@ end
 
 SiteSetting.instance.tap do |settings|
   settings.update!(title: "ContentSpiel", tagline: "Notes from building a personal CMS") if settings.title.blank?
+  # A seeded dev database is fully set up; never send it into /setup.
+  settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end
 
 rails_tag = Tag.find_or_create_by!(name: "rails")
