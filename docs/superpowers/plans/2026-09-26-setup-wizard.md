@@ -346,7 +346,7 @@ end
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `bin/rails test test/integration/design_tokens_test.rb && bin/rails test:system TEST=test/system/theme_toggle_test.rb`
+Run: `bin/rails test test/integration/design_tokens_test.rb && bin/rails test test/system/theme_toggle_test.rb`
 Expected: FAIL — script not in body; `current_theme` is `nil`; no "Dark mode" button.
 
 - [ ] **Step 3: Implement**
@@ -426,7 +426,7 @@ In `app/views/sessions/new.html.erb`, add as the first child inside `<div class=
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `bin/rails tailwindcss:build && bin/rails test test/integration/design_tokens_test.rb && bin/rails test:system TEST=test/system/theme_toggle_test.rb`
+Run: `bin/rails tailwindcss:build && bin/rails test test/integration/design_tokens_test.rb && bin/rails test test/system/theme_toggle_test.rb`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -2715,7 +2715,7 @@ end
 
 - [ ] **Step 2: Run it**
 
-Run: `bin/rails test:system TEST=test/system/setup_wizard_test.rb`
+Run: `bin/rails test test/system/setup_wizard_test.rb`
 Expected: PASS. If it fails, fix the product code (not the test) unless the failure is a genuine selector mismatch with the approved views.
 
 - [ ] **Step 3: Full verification**
