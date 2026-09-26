@@ -5,7 +5,7 @@
     content type. The single-post detail view resolves through the same
     method, so a page lists and serves permalinks for exactly the same
     posts. %>
-<% posts = block.listed_posts.order(published_at: :desc) %>
+<% posts = block.listed_posts.order(published_at: :desc).includes(:tags) %>
 <% posts = posts.limit(block.settings["limit"]) if block.settings["limit"].present? %>
 <section class="content-block content-block--post-list my-12 border-t border-line pt-6">
   <% case block.settings["content_type"] %>

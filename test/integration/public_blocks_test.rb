@@ -35,6 +35,41 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "li", text: /rails/
   end
 
+  test "blog post listing does not N+1 on tags" do
+    @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+
+    # Create 2 tagged posts and count queries
+    2.times do |i|
+      post = Post.create!(content_type: :blog, title: "Post #{i}", published_at: Time.current - i.days)
+      post.tags << Tag.create!(name: "tag#{i}")
+    end
+
+    tag_queries_2_posts = 0
+    ActiveSupport::Notifications.subscribed(lambda { |name, started, finished, unique_id, payload|
+      tag_queries_2_posts += 1 if payload[:sql].include?("tags")
+    }, "sql.active_record") do
+      get "/"
+    end
+
+    # Create 2 more tagged posts (4 total)
+    2.times do |i|
+      post = Post.create!(content_type: :blog, title: "Post #{i+2}", published_at: Time.current - (i+2).days)
+      post.tags << Tag.create!(name: "tag#{i+2}")
+    end
+
+    tag_queries_4_posts = 0
+    ActiveSupport::Notifications.subscribed(lambda { |name, started, finished, unique_id, payload|
+      tag_queries_4_posts += 1 if payload[:sql].include?("tags")
+    }, "sql.active_record") do
+      get "/"
+    end
+
+    # Query count should be the same regardless of post count (with includes, we get
+    # one query for posts + one for all tags, not one per post)
+    assert_equal tag_queries_2_posts, tag_queries_4_posts,
+      "Adding more posts should not increase tag query count (N+1 issue). 2 posts: #{tag_queries_2_posts} queries, 4 posts: #{tag_queries_4_posts} queries"
+  end
+
   test "resume rows show company, role type and period" do
     Post.create!(content_type: :resume_entry, title: "Staff Engineer", company: "Acme", role_type: "lead",
       start_date: "2023-01-01", end_date: "", published_at: 1.day.ago)
