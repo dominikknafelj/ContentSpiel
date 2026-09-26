@@ -1,0 +1,15 @@
+<% content_for :title, "Setup token" %>
+<h1 class="text-h1 font-semibold">Enter your setup token</h1>
+<p class="mt-2 text-dim">
+  To make sure you're the person who deployed this site, copy the setup token from the server log.
+  Look for the line starting with <code class="font-cs-mono">[ContentSpiel] Setup is not complete</code>.
+</p>
+
+<%= form_with url: setup_step_path("token"), method: :patch, class: "mt-6 space-y-4" do |form| %>
+  <div>
+    <%= form.label :token, "Setup token", class: setup_label_class %>
+    <%= form.text_field :token, required: true, autofocus: true, autocomplete: "off", spellcheck: false,
+      class: "#{setup_input_class} font-cs-mono" %>
+  </div>
+  <%= form.submit "Continue", class: setup_primary_button_class %>
+<% end %>

@@ -1,0 +1,95 @@
+# The first-run setup wizard (design spec 2026-09-26 §3-§4). Every step
+# persists as soon as it's submitted, so an admin who closes the browser can
+# sign in again and resume. Access:
+#   - no user yet: anyone who entered the setup token this session, and only
+#     the steps up to creating the admin;
+#   - admin exists: only a signed-in user;
+#   - setup completed: 404.
+class SetupController < ApplicationController
+  STEPS = %w[token system_check admin site languages mcp_token starter_content review].freeze
+  PRE_ADMIN_STEPS = %w[token system_check admin].freeze
+  OPTIONAL_STEPS = %w[system_check mcp_token starter_content].freeze
+  LABELS = {
+    "token" => "Setup token", "system_check" => "System check", "admin" => "Admin account",
+    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "MCP token",
+    "starter_content" => "Starter content", "review" => "Review"
+  }.freeze
+
+  # The rate limit needs a real store, and Rails.cache is :null_store in test
+  # (every write a no-op, so the limit would never trip there). Per-process
+  # memory is enough: setup runs once, against one server.
+  RATE_LIMIT_STORE = ActiveSupport::Cache::MemoryStore.new
+
+  allow_unauthenticated_access
+  layout "setup"
+
+  before_action :require_setup_pending
+  before_action :load_step, only: %i[show update]
+  before_action :require_step_access, only: %i[show update]
+
+  rate_limit to: 10, within: 3.minutes, only: :update, store: RATE_LIMIT_STORE,
+    if: -> { params[:step] == "token" },
+    with: -> { redirect_to setup_step_path("token"), alert: "Too many attempts. Try again in a few minutes." }
+
+  helper_method :step_label, :optional_step?, :next_step
+
+  def index
+    redirect_to setup_step_path(first_step)
+  end
+
+  def show
+    render @step
+  end
+
+  def update
+    case @step
+    when "token" then update_token
+    else head :not_found
+    end
+  end
+
+  private
+    def require_setup_pending
+      head :not_found unless Setup.required?
+    end
+
+    def load_step
+      @step = params[:step]
+      head :not_found unless STEPS.include?(@step)
+    end
+
+    def require_step_access
+      if User.none?
+        return if @step == "token"
+        return redirect_to(setup_step_path("token")) unless session[:setup_token_verified]
+        redirect_to(setup_step_path("admin")) unless PRE_ADMIN_STEPS.include?(@step)
+      else
+        return request_authentication unless authenticated?
+        redirect_to(setup_step_path("site")) if %w[token admin].include?(@step)
+      end
+    end
+
+    def first_step
+      return "site" if User.exists?
+
+      session[:setup_token_verified] ? "system_check" : "token"
+    end
+
+    def next_step
+      STEPS[STEPS.index(@step) + 1]
+    end
+
+    def step_label(step) = LABELS.fetch(step)
+
+    def optional_step?(step) = OPTIONAL_STEPS.include?(step)
+
+    def update_token
+      if Setup::Token.valid?(params[:token])
+        session[:setup_token_verified] = true
+        redirect_to setup_step_path("system_check")
+      else
+        flash.now[:alert] = "That setup token doesn't match. Copy it from the server log."
+        render :token, status: :unprocessable_entity
+      end
+    end
+end

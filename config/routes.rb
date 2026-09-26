@@ -32,6 +32,12 @@ Rails.application.routes.draw do
   resources :passwords, param: :token
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
+  # First-run setup wizard (design spec 2026-09-26 §4). SetupController
+  # itself 404s once setup is complete.
+  get "setup", to: "setup#index", as: :setup
+  get "setup/:step", to: "setup#show", as: :setup_step
+  patch "setup/:step", to: "setup#update"
+
   # The MCP server (design spec section 10), bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site
   # catch-all below, or "/mcp" would be swallowed as a page path instead.

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= content_for(:title) || "Set up ContentSpiel" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= render "shared/theme_head" %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <%# scheme-light/dark:scheme-dark: native controls and the canvas follow
+      the token theme. Scoped to this product layout on purpose -- a global
+      color-scheme would restyle the public site for dark-OS visitors. %>
+  <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <div class="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-10 md:flex-row">
+      <nav aria-label="Setup steps" class="shrink-0 md:w-56">
+        <p class="font-cs-mono text-label uppercase tracking-mono text-meta">ContentSpiel setup</p>
+        <ol class="mt-4 space-y-2">
+          <% SetupController::STEPS.each_with_index do |step, index| %>
+            <%= tag.li class: (step == @step ? "font-semibold text-ink" : "text-dim"), aria: { current: ("step" if step == @step) } do %>
+              <span class="font-cs-mono text-meta"><%= index + 1 %></span>
+              <%= step_label(step) %>
+              <% if optional_step?(step) %>
+                <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span>
+              <% end %>
+            <% end %>
+          <% end %>
+        </ol>
+        <div class="mt-6"><%= render "shared/theme_toggle" %></div>
+      </nav>
+
+      <main class="flex-1 rounded-cs border border-line bg-surface p-6">
+        <%= render "setup/flash" %>
+        <%= yield %>
+      </main>
+    </div>
+  </body>
+</html>
