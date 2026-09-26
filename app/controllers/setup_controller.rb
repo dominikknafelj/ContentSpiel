@@ -135,9 +135,14 @@ class SetupController < ApplicationController
     end
 
     # The form always renders a few name/URL rows; a row missing either half
-    # is dropped rather than saved as a broken link.
+    # is dropped rather than saved as a broken link. A request that omits the
+    # social_links key entirely (no rows submitted at all, e.g. a crafted or
+    # partial PATCH) leaves the previously saved links alone rather than
+    # wiping them out.
     def site_params
       permitted = params.expect(site_setting: [ :title, :tagline, :logo, social_links: [ [ :name, :url ] ] ])
+      return permitted unless permitted.key?(:social_links)
+
       rows = Array(permitted.delete(:social_links))
       links = rows.filter_map do |row|
         name, url = row[:name].to_s.strip, row[:url].to_s.strip

@@ -32,6 +32,15 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
     assert_equal({ "GitHub" => "https://github.com/dana" }, setting.social_links)
   end
 
+  test "saving the site step without a social_links key leaves existing links untouched" do
+    SiteSetting.instance.update!(social_links: { "GitHub" => "https://github.com/dana" })
+
+    patch setup_step_path("site"), params: { site_setting: { title: "New Title" } }
+
+    assert_redirected_to setup_step_path("languages")
+    assert_equal({ "GitHub" => "https://github.com/dana" }, SiteSetting.instance.social_links)
+  end
+
   test "a blank title is rejected" do
     patch setup_step_path("site"), params: { site_setting: { title: " ", social_links: [ { name: "", url: "" } ] } }
 
