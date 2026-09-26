@@ -65,8 +65,8 @@ class ContentBlock < ApplicationRecord
     scope = scope.where(content_type: content_type) if content_type.present?
 
     # Tag names are matched case-insensitively: editors type "Rails" for a tag
-    # stored as "rails".
-    tag = settings["tag"]
+    # stored as "rails". Trim to handle pasted tags with surrounding whitespace.
+    tag = settings["tag"].to_s.strip
     if tag.present?
       scope = scope.where(id: PostTag.joins(:tag).where("LOWER(tags.name) = ?", tag.downcase).select(:post_id))
     end

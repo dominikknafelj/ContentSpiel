@@ -154,4 +154,23 @@ class ContentBlockTest < ActiveSupport::TestCase
 
     assert_equal [ tagged ], block.listed_posts.to_a
   end
+
+  test "a post list filtered by tag with surrounding whitespace lists the post" do
+    @page.update!(published_at: Time.current)
+    rails = Tag.create!(name: "rails")
+    tagged = Post.create!(content_type: :blog, title: "Tagged", published_at: 1.day.ago)
+    tagged.tags << rails
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "tag" => "  Rails " })
+
+    assert_equal [ tagged ], block.listed_posts.to_a
+  end
+
+  test "a post list filtered by a tag name matching no tag lists nothing" do
+    @page.update!(published_at: Time.current)
+    Tag.create!(name: "rails")
+    Post.create!(content_type: :blog, title: "Post", published_at: 1.day.ago)
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "tag" => "nonexistent" })
+
+    assert_equal [], block.listed_posts.to_a
+  end
 end
