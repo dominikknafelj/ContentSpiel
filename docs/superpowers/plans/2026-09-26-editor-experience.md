@@ -1320,6 +1320,8 @@ end
 
 # Part C — Admin (Avo)
 
+> **Dropped (2026-09-26, user decision):** ContentSpiel will replace Avo with its own admin. Tasks 9–16 below are not executed; their designs (type-dependent fields, typed resume fields, status badges and publish actions, inline block editor, dashboard, "Connect an AI assistant", translation helpers) carry over into the own-admin spec. Task 17 (final verification) still runs, directly after Task 8.
+
 ### Task 9: Type-dependent fields, page form cleanup, fixed landing create
 
 **Files:**
