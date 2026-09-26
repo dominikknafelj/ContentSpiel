@@ -43,7 +43,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 |
 | "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 |
 | Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
-| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP | Must | §7.1 |
+| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 |
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 |
 | Trash / soft delete + restore | Must | #43 |
 | Media library (`MediaAsset`, alt text, reuse, responsive variants) | Must | #46 |
@@ -62,6 +62,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Plugin API v1 (Rails engines, registries, event hooks, routes hook, MCP tool registry, versioned API) | Should | §8 |
 | Publishing workflow: review/approval, draft comments, edit lock, scheduled unpublish | Should | Pending revisions + policies |
 | Release management: bundle changes to several pages/posts into a release, preview the whole site with the release applied, shareable preview links (no account needed), schedule/publish a release atomically | Should | Needs pending revisions (versioning) + `PublicSite::Resolver` preview scope; releases are sets of pending revisions |
+| Approval chains for releases: configurable steps where specific user groups must approve (e.g. editor submits → Legal approves → Publishers publish); approvals/rejections recorded in the audit log | Should | Needs user **groups** in the permission model (not only fixed roles) + releases + audit log |
 | Security basics: 2FA, password policy, session list/revoke, login history | Should | Login history = audit events |
 | Legal / GDPR: imprint & privacy pages, consent hook, user export/delete | Should | Cookie-less public site first (Phase 1) |
 | RSS / Atom feeds | Should | Cheap once URLs are canonical |
