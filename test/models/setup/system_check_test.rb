@@ -10,7 +10,9 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
   end
 
   test "the real storage probe works against the test disk service" do
-    assert result("File storage", Setup::SystemCheck.run).ok?
+    assert_no_difference "ActiveStorage::Blob.count" do
+      assert result("File storage", Setup::SystemCheck.run).ok?
+    end
   end
 
   test "a storage failure is a warning, not an exception" do

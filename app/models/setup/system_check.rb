@@ -9,13 +9,19 @@ module Setup
       def ok? = status == :ok
     end
 
+    # Talks to the storage service directly rather than through
+    # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
+    # uploading -- if the upload fails (the case this probe exists to catch),
+    # the row would be orphaned since there'd be nothing left to purge it.
     STORAGE_PROBE = -> {
       payload = "contentspiel system check"
-      blob = ActiveStorage::Blob.create_and_upload!(io: StringIO.new(payload), filename: "system-check.txt")
+      key = "system-check-#{SecureRandom.hex(8)}"
+      service = ActiveStorage::Blob.service
+      service.upload(key, StringIO.new(payload))
       begin
-        blob.download == payload
+        service.download(key) == payload
       ensure
-        blob.purge
+        service.delete(key)
       end
     }
 

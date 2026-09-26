@@ -28,7 +28,9 @@ class SetupWizardTest < ApplicationSystemTestCase
     choose "Deutsch"
     click_on "Save and continue"
 
-    click_on "Skip"                  # MCP token
+    click_on "Generate token"        # MCP token
+    assert_selector "#mcp-token", text: /\A.+\z/
+    click_on "Continue"
     click_on "Add starter content"
 
     assert_text "Blog, Resume and Now pages"
