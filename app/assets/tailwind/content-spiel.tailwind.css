@@ -27,8 +27,12 @@
   --color-danger: var(--cs-danger);
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
-  --font-sans: var(--cs-font);
-  --font-mono: var(--cs-mono);
+  /* font-cs / font-cs-mono, not --font-sans / --font-mono: Tailwind preflight
+     wires --font-sans into --default-font-family on <html>, so mapping the
+     token fonts there would restyle every existing page (public site, auth
+     views) -- this PR is tokens-only, no restyle. */
+  --font-cs: var(--cs-font);
+  --font-cs-mono: var(--cs-mono);
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);

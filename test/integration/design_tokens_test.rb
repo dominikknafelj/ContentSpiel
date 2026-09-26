@@ -14,6 +14,12 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "--cs-paper"
     assert_includes response.body, "--cs-accent"
     assert_match(/data-theme=["']?dark/, response.body)
+    # Regression: the token fonts must NOT override Tailwind's default font
+    # stack (--font-sans / preflight's --default-font-family), or every
+    # existing page (public site, auth views) restyles to Archivo -- this PR
+    # is tokens-only, no restyle. Token fonts get their own font-cs/font-cs-mono
+    # utilities instead (see content-spiel.tailwind.css).
+    assert_no_match(/--default-font-family:\s*var\(--cs-font\)/, response.body)
   end
 
   test "the stylesheet points at the digested font files, which are served" do
