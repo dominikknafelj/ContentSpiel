@@ -1,4 +1,13 @@
 Rails.application.routes.draw do
+  # While setup is required, every route below is unreachable (design spec
+  # 2026-09-26 §3): these two catch-alls are declared first, so they win over
+  # Avo and the public page routes. A lambda, so the constant is only
+  # resolved per request (never while routes load during boot).
+  constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
+    match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
+    match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+  end
+
   mount_avo do
     get "pages_tree", to: "tools#pages_tree", as: :pages_tree
     # PATCH rather than the tool's own GET verb -- this is what the tree's
