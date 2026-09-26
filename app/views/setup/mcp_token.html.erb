@@ -1,0 +1,12 @@
+<% content_for :title, "MCP token" %>
+<h1 class="text-h1 font-semibold">MCP token <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<p class="mt-2 text-dim">
+  AI agents (for example Claude) can manage your posts through this site's MCP server at
+  <code class="font-cs-mono">/mcp</code>. They need a token to connect. You can also create one later
+  in the admin under API tokens.
+</p>
+
+<div class="mt-6 flex gap-3">
+  <%= button_to "Generate token", setup_step_path("mcp_token"), method: :patch, class: setup_primary_button_class %>
+  <%= link_to "Skip", setup_step_path("starter_content"), class: setup_secondary_link_class %>
+</div>

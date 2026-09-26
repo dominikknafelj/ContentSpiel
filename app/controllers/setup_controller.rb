@@ -53,6 +53,8 @@ class SetupController < ApplicationController
     when "admin" then update_admin
     when "site" then update_site
     when "languages" then update_languages
+    when "mcp_token" then update_mcp_token
+    when "starter_content" then update_starter_content
     else head :not_found
     end
   end
@@ -159,5 +161,17 @@ class SetupController < ApplicationController
       else
         render :languages, status: :unprocessable_entity
       end
+    end
+
+    # Rendered, not redirected: the raw token exists only in this response and
+    # must never pass through the session or flash.
+    def update_mcp_token
+      _token, @raw_token = ApiToken.generate!(Current.user)
+      render :mcp_token_created
+    end
+
+    def update_starter_content
+      StarterContent.create_pages_and_posts!(locale: SiteSetting.instance.default_locale)
+      redirect_to setup_step_path("review"), notice: "Starter content added."
     end
 end

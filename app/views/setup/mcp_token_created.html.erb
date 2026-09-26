@@ -1,0 +1,9 @@
+<% content_for :title, "MCP token" %>
+<h1 class="text-h1 font-semibold">Your MCP token</h1>
+<p class="mt-2 text-dim">Copy it now — it's only shown once. If you lose it, generate a new one in the admin.</p>
+
+<pre id="mcp-token" class="mt-4 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
+
+<div class="mt-6">
+  <%= link_to "Continue", setup_step_path("starter_content"), class: setup_primary_button_class %>
+</div>
