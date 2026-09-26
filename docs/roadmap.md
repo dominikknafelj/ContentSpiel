@@ -61,6 +61,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Navigation / menu management | Should | `Navigation.for` (#52) |
 | Plugin API v1 (Rails engines, registries, event hooks, routes hook, MCP tool registry, versioned API) | Should | §8 |
 | Publishing workflow: review/approval, draft comments, edit lock, scheduled unpublish | Should | Pending revisions + policies |
+| Release management: bundle changes to several pages/posts into a release, preview the whole site with the release applied, shareable preview links (no account needed), schedule/publish a release atomically | Should | Needs pending revisions (versioning) + `PublicSite::Resolver` preview scope; releases are sets of pending revisions |
 | Security basics: 2FA, password policy, session list/revoke, login history | Should | Login history = audit events |
 | Legal / GDPR: imprint & privacy pages, consent hook, user export/delete | Should | Cookie-less public site first (Phase 1) |
 | RSS / Atom feeds | Should | Cheap once URLs are canonical |
