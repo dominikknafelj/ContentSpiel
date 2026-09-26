@@ -1,0 +1,86 @@
+/* The public default theme's own tokens (spec §9). Deliberately a copy of
+   the product tokens with a `--th-` prefix, not an import: the public site and
+   the product UI must be restylable independently. */
+@font-face{font-family:"Archivo";font-weight:400;font-display:swap;src:url("archivo-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:500;font-display:swap;src:url("archivo-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:600;font-display:swap;src:url("archivo-latin-600-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:700;font-display:swap;src:url("archivo-latin-700-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;font-display:swap;src:url("ibm-plex-mono-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:500;font-display:swap;src:url("ibm-plex-mono-latin-500-normal.woff2") format("woff2")}
+
+/* color-scheme is intentionally NOT set here. shared/theme_head puts
+   data-theme="dark"/"light" on <html> for every page (public site, sign-in,
+   and product UI alike) so the inline script can beat first paint -- but
+   the theme boundary (design spec §1) means only product UI actually opts
+   into these tokens. A color-scheme declared globally against [data-theme]
+   would still flip the OS-level chrome (scrollbars, form controls, native
+   canvas colour) on public/auth pages that never asked for it. Apply
+   color-scheme per product layout instead, with Tailwind's built-in
+   utilities, e.g. `scheme-light dark:scheme-dark` on that layout's root
+   element -- never globally here. */
+:root, [data-theme="light"] {
+  --th-paper: #f5f4f0;
+  --th-surface: #ffffff;
+  --th-sunken: #ecebe6;
+  --th-ink: #141417;
+  --th-dim: #55565b;
+  --th-meta: #6c6d72;
+  --th-line: rgba(20,20,23,0.10);
+  --th-line-strong: rgba(20,20,23,0.20);
+  --th-accent: oklch(0.50 0.12 250);
+  --th-accent-hover: oklch(0.45 0.12 250);
+  --th-accent-tint: oklch(0.95 0.025 250);
+  --th-on-accent: #ffffff;
+  --th-ok: oklch(0.52 0.12 150);
+  --th-ok-ink: oklch(0.42 0.11 150);
+  --th-ok-tint: oklch(0.95 0.04 150);
+  --th-warn: oklch(0.55 0.12 70);
+  --th-warn-ink: oklch(0.45 0.11 70);
+  --th-warn-tint: oklch(0.95 0.05 80);
+  --th-danger: oklch(0.53 0.19 25);
+  --th-danger-ink: oklch(0.42 0.15 25);
+  --th-danger-tint: oklch(0.96 0.03 25);
+  --th-ph-a: #dddbd3;
+  --th-ph-b: #c9c7bd;
+  --th-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
+}
+
+[data-theme="dark"] {
+  --th-paper: #0f1012;
+  --th-surface: #17181b;
+  --th-sunken: #212226;
+  --th-ink: #ededee;
+  --th-dim: #a9aaaf;
+  --th-meta: #8e8f95;
+  --th-line: rgba(237,237,238,0.09);
+  --th-line-strong: rgba(237,237,238,0.18);
+  --th-accent: oklch(0.74 0.10 250);
+  --th-accent-hover: oklch(0.80 0.09 250);
+  --th-accent-tint: oklch(0.28 0.05 250);
+  --th-on-accent: #0f1012;
+  --th-ok: oklch(0.70 0.13 150);
+  --th-ok-ink: oklch(0.80 0.12 150);
+  --th-ok-tint: oklch(0.28 0.05 150);
+  --th-warn: oklch(0.76 0.13 70);
+  --th-warn-ink: oklch(0.84 0.11 75);
+  --th-warn-tint: oklch(0.30 0.05 70);
+  --th-danger: oklch(0.68 0.17 25);
+  --th-danger-ink: oklch(0.80 0.12 25);
+  --th-danger-tint: oklch(0.29 0.06 25);
+  --th-ph-a: #2a2b2f;
+  --th-ph-b: #1c1d20;
+  --th-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
+}
+
+:root {
+  --th-font: "Archivo", system-ui, sans-serif;
+  --th-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --th-t-display: clamp(34px, 5vw, 60px);
+  --th-t-h1: 28px; --th-t-h2: 20px; --th-t-h3: 15px;
+  --th-t-body: 15px; --th-t-small: 13px; --th-t-label: 11px;
+  --th-track-mono: 0.14em; --th-track-wide: 0.18em;
+  --th-sp-1: 4px; --th-sp-2: 8px; --th-sp-3: 14px; --th-sp-4: 22px;
+  --th-sp-5: 34px; --th-sp-6: 54px; --th-sp-7: 80px;
+  --th-radius: 2px; --th-radius-pill: 999px;
+  --th-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}

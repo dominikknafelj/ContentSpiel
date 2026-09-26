@@ -1,0 +1,49 @@
+/* Public default theme (Claude Design "Demo Site"). Scans only the public
+   views; see app/assets/tailwind/application.css for the product side. */
+@import "tailwindcss" source(none);
+@source "../../../../views/pages";
+@source "../../../../views/content_blocks";
+@source "../../../../views/layouts/application.html.erb";
+@source "../../../../views/layouts/public";
+@source "../../../../views/shared";
+@source "../../../../helpers/theme_helper.rb";
+@import "./tokens.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --color-paper: var(--th-paper);
+  --color-surface: var(--th-surface);
+  --color-sunken: var(--th-sunken);
+  --color-ink: var(--th-ink);
+  --color-dim: var(--th-dim);
+  --color-meta: var(--th-meta);
+  --color-line: var(--th-line);
+  --color-line-strong: var(--th-line-strong);
+  --color-accent: var(--th-accent);
+  --color-accent-hover: var(--th-accent-hover);
+  --color-accent-tint: var(--th-accent-tint);
+  --color-on-accent: var(--th-on-accent);
+  --color-ok: var(--th-ok);
+  --color-ok-ink: var(--th-ok-ink);
+  --color-ok-tint: var(--th-ok-tint);
+  --color-warn: var(--th-warn);
+  --color-warn-ink: var(--th-warn-ink);
+  --color-warn-tint: var(--th-warn-tint);
+  --color-danger: var(--th-danger);
+  --color-danger-ink: var(--th-danger-ink);
+  --color-danger-tint: var(--th-danger-tint);
+  --font-cs: var(--th-font);
+  --font-cs-mono: var(--th-mono);
+  --text-display: var(--th-t-display);
+  --text-h1: var(--th-t-h1);
+  --text-h2: var(--th-t-h2);
+  --text-label: var(--th-t-label);
+  --tracking-mono: var(--th-track-mono);
+  --tracking-wide: var(--th-track-wide);
+  --radius-cs: var(--th-radius);
+  --shadow-menu: var(--th-shadow-menu);
+  --ease-cs: var(--th-ease);
+}
+
+@import "./prose.css";

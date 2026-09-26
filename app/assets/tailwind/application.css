@@ -1,2 +1,12 @@
-@import "tailwindcss";
+/* Product UI (setup wizard, sign-in, password reset). `source(none)` +
+   explicit @source paths keep this build blind to the public theme's views,
+   so the two stylesheets stay independent (spec §9). */
+@import "tailwindcss" source(none);
+@source "../../views/setup";
+@source "../../views/sessions";
+@source "../../views/passwords";
+@source "../../views/shared";
+@source "../../views/layouts/setup.html.erb";
+@source "../../views/layouts/product.html.erb";
+@source "../../helpers/setup_helper.rb";
 @import "./content-spiel.tailwind.css";
