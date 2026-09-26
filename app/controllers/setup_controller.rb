@@ -164,9 +164,12 @@ class SetupController < ApplicationController
     end
 
     # Rendered, not redirected: the raw token exists only in this response and
-    # must never pass through the session or flash.
+    # must never pass through the session or flash. no-store keeps it out of
+    # the back/forward cache too, so navigating away doesn't leave the still-
+    # valid raw token one "back" button press away from resurfacing.
     def update_mcp_token
       _token, @raw_token = ApiToken.generate!(Current.user)
+      response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end
 

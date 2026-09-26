@@ -23,6 +23,7 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     raw = css_select("#mcp-token").first.text.strip
     assert_equal User.find_by(email_address: "owner@example.com"), ApiToken.authenticate(raw).user
     assert_empty flash.to_h
+    assert_includes response.headers["Cache-Control"], "no-store"
   end
 
   test "the starter content step can be skipped" do
