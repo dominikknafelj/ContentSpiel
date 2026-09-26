@@ -46,6 +46,24 @@ class SetupTest < ActiveSupport::TestCase
     assert Setup.required?
   end
 
+  test "complete! creates the homepage and ends setup" do
+    site_settings(:default).update!(setup_completed_at: nil)
+
+    Setup.complete!
+
+    assert_not Setup.required?
+    assert Page.exists?(parent_id: nil)
+  end
+
+  test "complete! is idempotent" do
+    site_settings(:default).update!(setup_completed_at: nil)
+    Setup.complete!
+
+    assert_no_difference "Page.count" do
+      Setup.complete!
+    end
+  end
+
   private
     def run_backfill
       ActiveRecord::Migration.suppress_messages { AddSetupCompletedAtToSiteSettings.new.backfill }

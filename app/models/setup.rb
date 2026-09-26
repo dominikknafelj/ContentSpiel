@@ -6,4 +6,14 @@ module Setup
   def self.required?
     !SiteSetting.where.not(setup_completed_at: nil).exists?
   end
+
+  # Finishing the wizard: the homepage always exists afterwards, and setup
+  # stops being required. Safe to call twice.
+  def self.complete!
+    SiteSetting.transaction do
+      setting = SiteSetting.instance
+      StarterContent.ensure_home!(locale: setting.default_locale)
+      setting.update!(setup_completed_at: Time.current) if setting.setup_completed_at.nil?
+    end
+  end
 end
