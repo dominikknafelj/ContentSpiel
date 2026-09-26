@@ -60,4 +60,11 @@ class Avo::ToolsController < Avo::ApplicationController
       { source: post_id, target: related_post_id }
     end
   end
+
+  # The same read-only checks the setup wizard runs (Setup::SystemCheck).
+  def system_status
+    @page_title = "System status"
+    add_breadcrumb title: "System status"
+    @results = Setup::SystemCheck.run
+  end
 end

@@ -100,6 +100,10 @@ class Avo::Resources::Page < Avo::BaseResource
     tool Avo::ResourceTools::NestedContentBlocks, show_on: :forms
   end
 
+  def actions
+    action Avo::Actions::CreateStarterPages
+  end
+
   private
     # `normalize_locale_accessor` is what Mobility itself uses to name these
     # methods, so it stays correct for a region-qualified locale like :"pt-BR"

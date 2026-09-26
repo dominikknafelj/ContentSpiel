@@ -1,0 +1,37 @@
+<% content_for :title, "Site identity" %>
+<h1 class="text-h1 font-semibold">Site identity</h1>
+<p class="mt-2 text-dim">How your site introduces itself. You can change all of this later in the admin under Site settings.</p>
+
+<%= form_with model: @site_setting, url: setup_step_path("site"), method: :patch, class: "mt-6 space-y-4" do |form| %>
+  <%= render "setup/errors", record: @site_setting %>
+  <div>
+    <%= form.label :title, "Site title", class: setup_label_class %>
+    <%= form.text_field :title, required: true, class: setup_input_class %>
+  </div>
+  <div>
+    <%= form.label :tagline, class: setup_label_class %>
+    <%= form.text_field :tagline, class: setup_input_class %>
+  </div>
+  <div>
+    <%= form.label :logo, class: setup_label_class %>
+    <%= form.file_field :logo, accept: "image/*", class: "mt-1 block text-dim" %>
+  </div>
+
+  <fieldset>
+    <legend class="<%= setup_label_class %>">Social links</legend>
+    <% links = @site_setting.social_links.to_a %>
+    <% rows = links + Array.new([ 4 - links.size, 1 ].max) { [ "", "" ] } %>
+    <div class="mt-1 space-y-2">
+      <% rows.each do |name, url| %>
+        <div class="grid grid-cols-2 gap-2">
+          <%= text_field_tag "site_setting[social_links][][name]", name, placeholder: "e.g. GitHub",
+            aria: { label: "Network" }, class: setup_input_class %>
+          <%= url_field_tag "site_setting[social_links][][url]", url, placeholder: "https://…",
+            aria: { label: "URL" }, class: setup_input_class %>
+        </div>
+      <% end %>
+    </div>
+  </fieldset>
+
+  <%= form.submit "Save and continue", class: setup_primary_button_class %>
+<% end %>

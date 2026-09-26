@@ -1,4 +1,13 @@
 Rails.application.routes.draw do
+  # While setup is required, every route below is unreachable (design spec
+  # 2026-09-26 §3): these two catch-alls are declared first, so they win over
+  # Avo and the public page routes. A lambda, so the constant is only
+  # resolved per request (never while routes load during boot).
+  constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
+    match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
+    match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
+  end
+
   mount_avo do
     get "pages_tree", to: "tools#pages_tree", as: :pages_tree
     # PATCH rather than the tool's own GET verb -- this is what the tree's
@@ -18,10 +27,20 @@ Rails.application.routes.draw do
     # Admin-only mind graph (design spec section 9): Post nodes + PostRelation
     # edges, rendered client-side as a force-directed graph.
     get "mind_graph", to: "tools#mind_graph", as: :mind_graph
+
+    # The setup wizard's system check, re-runnable later (design spec
+    # 2026-09-26 §5).
+    get "system_status", to: "tools#system_status", as: :system_status
   end
   resource :session
   resources :passwords, param: :token
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
+
+  # First-run setup wizard (design spec 2026-09-26 §4). SetupController
+  # itself 404s once setup is complete.
+  get "setup", to: "setup#index", as: :setup
+  get "setup/:step", to: "setup#show", as: :setup_step
+  patch "setup/:step", to: "setup#update"
 
   # The MCP server (design spec section 10), bearer-token authenticated
   # (McpController#authenticate) -- declared here, before the public-site

@@ -2,6 +2,7 @@ class SiteSetting < ApplicationRecord
   has_one_attached :logo
 
   validate :only_one_record_exists, on: :create
+  validates :title, presence: true
 
   # PagesController and config/sitemap.rb both use this value directly as a
   # locale to render/link pages in, with no fallback -- an admin typing

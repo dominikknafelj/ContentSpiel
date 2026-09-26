@@ -1,0 +1,88 @@
+/* Content·Spiel product tokens (Claude Design project "Content Spiel design
+   system"). Theme switches on [data-theme] on <html>; see
+   app/views/shared/_theme_head.html.erb. Font URLs are bare filenames on
+   purpose: Propshaft resolves them against app/assets/fonts and rewrites
+   them to digested /assets/... paths. */
+@font-face{font-family:"Archivo";font-weight:400;font-display:swap;src:url("archivo-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:500;font-display:swap;src:url("archivo-latin-500-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:600;font-display:swap;src:url("archivo-latin-600-normal.woff2") format("woff2")}
+@font-face{font-family:"Archivo";font-weight:700;font-display:swap;src:url("archivo-latin-700-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;font-display:swap;src:url("ibm-plex-mono-latin-400-normal.woff2") format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-weight:500;font-display:swap;src:url("ibm-plex-mono-latin-500-normal.woff2") format("woff2")}
+
+/* color-scheme is intentionally NOT set here. shared/theme_head puts
+   data-theme="dark"/"light" on <html> for every page (public site, sign-in,
+   and product UI alike) so the inline script can beat first paint -- but
+   the theme boundary (design spec §1) means only product UI actually opts
+   into these tokens. A color-scheme declared globally against [data-theme]
+   would still flip the OS-level chrome (scrollbars, form controls, native
+   canvas colour) on public/auth pages that never asked for it. Apply
+   color-scheme per product layout instead, with Tailwind's built-in
+   utilities, e.g. `scheme-light dark:scheme-dark` on that layout's root
+   element -- never globally here. */
+:root, [data-theme="light"] {
+  --cs-paper: #f5f4f0;
+  --cs-surface: #ffffff;
+  --cs-sunken: #ecebe6;
+  --cs-ink: #141417;
+  --cs-dim: #55565b;
+  --cs-meta: #6c6d72;
+  --cs-line: rgba(20,20,23,0.10);
+  --cs-line-strong: rgba(20,20,23,0.20);
+  --cs-accent: oklch(0.50 0.12 250);
+  --cs-accent-hover: oklch(0.45 0.12 250);
+  --cs-accent-tint: oklch(0.95 0.025 250);
+  --cs-on-accent: #ffffff;
+  --cs-ok: oklch(0.52 0.12 150);
+  --cs-ok-ink: oklch(0.42 0.11 150);
+  --cs-ok-tint: oklch(0.95 0.04 150);
+  --cs-warn: oklch(0.55 0.12 70);
+  --cs-warn-ink: oklch(0.45 0.11 70);
+  --cs-warn-tint: oklch(0.95 0.05 80);
+  --cs-danger: oklch(0.53 0.19 25);
+  --cs-danger-ink: oklch(0.42 0.15 25);
+  --cs-danger-tint: oklch(0.96 0.03 25);
+  --cs-ph-a: #dddbd3;
+  --cs-ph-b: #c9c7bd;
+  --cs-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
+}
+
+[data-theme="dark"] {
+  --cs-paper: #0f1012;
+  --cs-surface: #17181b;
+  --cs-sunken: #212226;
+  --cs-ink: #ededee;
+  --cs-dim: #a9aaaf;
+  --cs-meta: #8e8f95;
+  --cs-line: rgba(237,237,238,0.09);
+  --cs-line-strong: rgba(237,237,238,0.18);
+  --cs-accent: oklch(0.74 0.10 250);
+  --cs-accent-hover: oklch(0.80 0.09 250);
+  --cs-accent-tint: oklch(0.28 0.05 250);
+  --cs-on-accent: #0f1012;
+  --cs-ok: oklch(0.70 0.13 150);
+  --cs-ok-ink: oklch(0.80 0.12 150);
+  --cs-ok-tint: oklch(0.28 0.05 150);
+  --cs-warn: oklch(0.76 0.13 70);
+  --cs-warn-ink: oklch(0.84 0.11 75);
+  --cs-warn-tint: oklch(0.30 0.05 70);
+  --cs-danger: oklch(0.68 0.17 25);
+  --cs-danger-ink: oklch(0.80 0.12 25);
+  --cs-danger-tint: oklch(0.29 0.06 25);
+  --cs-ph-a: #2a2b2f;
+  --cs-ph-b: #1c1d20;
+  --cs-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
+}
+
+:root {
+  --cs-font: "Archivo", system-ui, sans-serif;
+  --cs-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --cs-t-display: clamp(34px, 5vw, 60px);
+  --cs-t-h1: 28px; --cs-t-h2: 20px; --cs-t-h3: 15px;
+  --cs-t-body: 15px; --cs-t-small: 13px; --cs-t-label: 11px;
+  --cs-track-mono: 0.14em; --cs-track-wide: 0.18em;
+  --cs-sp-1: 4px; --cs-sp-2: 8px; --cs-sp-3: 14px; --cs-sp-4: 22px;
+  --cs-sp-5: 34px; --cs-sp-6: 54px; --cs-sp-7: 80px;
+  --cs-radius: 2px; --cs-radius-pill: 999px;
+  --cs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}

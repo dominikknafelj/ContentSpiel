@@ -1,0 +1,14 @@
+<% content_for :title, "Starter content" %>
+<h1 class="text-h1 font-semibold">Starter content <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<p class="mt-2 text-dim">
+  Finishing setup always creates your Home page at <code class="font-cs-mono">/</code>. You can also add:
+</p>
+<ul class="mt-4 list-disc space-y-1 pl-5 text-dim">
+  <li><strong class="text-ink">Blog</strong>, <strong class="text-ink">Resume</strong> and <strong class="text-ink">Now</strong> pages, each listing posts of that type</li>
+  <li>one sample post for each, in your default language</li>
+</ul>
+
+<div class="mt-6 flex gap-3">
+  <%= button_to "Add starter content", setup_step_path("starter_content"), method: :patch, class: setup_primary_button_class %>
+  <%= link_to "Skip", setup_step_path("review"), class: setup_secondary_link_class %>
+</div>

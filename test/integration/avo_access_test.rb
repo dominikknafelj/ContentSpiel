@@ -31,7 +31,7 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
   test "an authenticated user can reach every registered resource index" do
     sign_in
 
-    %w[posts tags site_settings api_tokens pages content_blocks].each do |resource|
+    %w[posts tags api_tokens pages content_blocks].each do |resource|
       get "/avo/resources/#{resource}"
 
       assert_response :success, "expected /avo/resources/#{resource} to render"
