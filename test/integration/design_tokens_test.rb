@@ -32,6 +32,13 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "pages set the theme before first paint" do
+    get new_session_path
+
+    assert_includes response.body, 'localStorage.getItem("cs-theme")'
+    assert_includes response.body, 'data-controller="theme"'
+  end
+
   private
     def helpers = ActionController::Base.helpers
 end
