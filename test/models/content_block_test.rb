@@ -143,4 +143,15 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert @page.destroy
     assert_not ContentBlock.exists?(block.id)
   end
+
+  test "a post list filtered by tag lists only posts with that tag, ignoring case" do
+    @page.update!(published_at: Time.current)
+    rails = Tag.create!(name: "rails")
+    tagged = Post.create!(content_type: :blog, title: "Tagged", published_at: 1.day.ago)
+    tagged.tags << rails
+    Post.create!(content_type: :blog, title: "Untagged", published_at: 1.day.ago)
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "tag" => "Rails" })
+
+    assert_equal [ tagged ], block.listed_posts.to_a
+  end
 end
