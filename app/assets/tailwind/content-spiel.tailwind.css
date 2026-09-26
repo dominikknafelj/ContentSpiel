@@ -1,0 +1,41 @@
+/* Maps the --cs-* tokens into Tailwind v4. `inline` makes utilities
+   reference the runtime variables directly, so every utility flips with
+   [data-theme] on <html> alone -- no dark: classes needed for colours. */
+@import "./content-spiel.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --color-paper: var(--cs-paper);
+  --color-surface: var(--cs-surface);
+  --color-sunken: var(--cs-sunken);
+  --color-ink: var(--cs-ink);
+  --color-dim: var(--cs-dim);
+  --color-meta: var(--cs-meta);
+  --color-line: var(--cs-line);
+  --color-line-strong: var(--cs-line-strong);
+  --color-accent: var(--cs-accent);
+  --color-accent-hover: var(--cs-accent-hover);
+  --color-accent-tint: var(--cs-accent-tint);
+  --color-on-accent: var(--cs-on-accent);
+  --color-ok: var(--cs-ok);
+  --color-ok-ink: var(--cs-ok-ink);
+  --color-ok-tint: var(--cs-ok-tint);
+  --color-warn: var(--cs-warn);
+  --color-warn-ink: var(--cs-warn-ink);
+  --color-warn-tint: var(--cs-warn-tint);
+  --color-danger: var(--cs-danger);
+  --color-danger-ink: var(--cs-danger-ink);
+  --color-danger-tint: var(--cs-danger-tint);
+  --font-sans: var(--cs-font);
+  --font-mono: var(--cs-mono);
+  --text-display: var(--cs-t-display);
+  --text-h1: var(--cs-t-h1);
+  --text-h2: var(--cs-t-h2);
+  --text-label: var(--cs-t-label);
+  --tracking-mono: var(--cs-track-mono);
+  --tracking-wide: var(--cs-track-wide);
+  --radius-cs: var(--cs-radius);
+  --shadow-menu: var(--cs-shadow-menu);
+  --ease-cs: var(--cs-ease);
+}
