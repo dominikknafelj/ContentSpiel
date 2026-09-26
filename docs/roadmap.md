@@ -1,0 +1,83 @@
+# ContentSpiel roadmap
+
+Living document (started 2026-09-26). ContentSpiel is a **generic, self-hosted CMS** that non-technical editors enjoy using and developers can extend without forking. Priorities: **Must** (needed before we'd call it a usable generic CMS), **Should**, **Could**. Refactors are judged against this list: they must open the seams these items need and never make one more expensive.
+
+Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), code-structure review (`docs/architecture/2026-09-26-code-structure-review.md`, findings referenced as `#N`, sections as `§N`), product decisions from the 2026-09-26 sessions.
+
+## Decisions already made
+
+| Decision | Detail |
+|---|---|
+| Replace Avo with our own admin | Rails + Hotwire, product design tokens (`--cs-*`), Claude Design backend screens. Avo stays mounted only during the switch. Forking Avo rejected (LGPL-3.0; wanted features are closed add-ons). |
+| Admin layout | TYPO3-style three columns: **modules \| page tree \| content**. |
+| Rich text | **Tiptap**: store a Tiptap/ProseMirror JSON document per locale (replacing ActionText/Trix HTML), render HTML server-side, Markdown view for AI/MCP (custom nodes as directives). Node types come from a registry (plugin seam). Markdown as storage rejected. |
+| Independent CSS | Product UI and public theme are separate Tailwind builds with separate tokens (`--cs-*` vs `--th-*`); the demo look is only the default public theme. |
+| One branch per round of work | Bugfixes and features of a round ship together; no production exists yet. |
+
+## Phase 0 — in flight: `editor-experience` branch
+
+Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag filter, publish status + signed-in preview, resume fields, alt texts (spec §10.1–10.4, model side). Added from the structure review: MCP re-publish keeps `published_at` (#24), iframe scrubber + CSP `frame-src` (#37), slugs filled from the default locale for untitled locales (#2). The Avo-specific parts of spec §10 were dropped and move to Phase 2.
+
+## Phase 1 — foundations (refactor before the own admin)
+
+| Item | Why (roadmap it unblocks) | Priority | Ref |
+|---|---|---|---|
+| Locale model decision: supported vs enabled locales, how slugs/indexes scale | Runtime languages, admin i18n; decides admin form shape | Must | #44, #17 |
+| `PublicUrls` (one URL builder, absolute URLs) + `Current.site` | SEO/hreflang, feeds, API, navigation, CDN purge, "view on site" | Must | #27, #51, #12, §4.1, §4.7 |
+| `PublicSite::Resolver` (published vs preview scope) + cookie-less public controller | Preview, workflow, caching/CDN, GDPR | Must | #19, #48, §4.2 |
+| Path-change events + automatic redirects | SEO redirects, CDN purge, content quality | Must | #45 |
+| Open types: string `content_type`/`block_type` + registries | Custom content types, plugin API, reusable content | Must | #50, #6, #47, §8 |
+| Canonical post URL + posts in the sitemap | SEO, feeds | Should | #8 |
+| Service layer: `Posts::Save`, `Pages::Save/Move/Destroy`, `ContentBlocks::Save/Reorder`, `ApiToken.issue!` | The single write path roles, audit, versioning, webhooks, search and plugins attach to; MCP switches first | Must | §4.3–4.6, #25 |
+| Test helpers for content setup | Makes everything after cheaper | Should | #39, #41 |
+
+## Phase 2 — own admin (replaces Avo)
+
+| Item | Priority | Notes |
+|---|---|---|
+| Three-column shell: modules \| page tree \| content | Must | Tree: drag reorder, status per node, add child, open page |
+| Tiptap editor + JSON storage + ActionText migration | Must | Markdown view for MCP; node registry |
+| Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 |
+| Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 |
+| Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry |
+| Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 |
+| "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 |
+| Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
+| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP | Must | §7.1 |
+| Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 |
+| Trash / soft delete + restore | Must | #43 |
+| Media library (`MediaAsset`, alt text, reuse, responsive variants) | Must | #46 |
+| Invites (one-time set-password link without mail) | Should | `Users::Invite` |
+| Admin UI in German (admin i18n) | Should | #49 |
+| Port Avo-only invariants, then remove Avo | Must | #40 |
+
+## Phase 3 — after the admin MVP
+
+| Item | Priority | Notes |
+|---|---|---|
+| Versioning: revisions + restore (in-house snapshots, pending revisions) | Must | §7.3 |
+| SEO: hreflang, OG image, noindex, snippet preview, auto sitemap | Must | Built on `PublicUrls` |
+| Custom content types & fields defined in the admin | Should | Registry with DB-backed definitions |
+| Navigation / menu management | Should | `Navigation.for` (#52) |
+| Plugin API v1 (Rails engines, registries, event hooks, routes hook, MCP tool registry, versioned API) | Should | §8 |
+| Publishing workflow: review/approval, draft comments, edit lock, scheduled unpublish | Should | Pending revisions + policies |
+| Security basics: 2FA, password policy, session list/revoke, login history | Should | Login history = audit events |
+| Legal / GDPR: imprint & privacy pages, consent hook, user export/delete | Should | Cookie-less public site first (Phase 1) |
+| RSS / Atom feeds | Should | Cheap once URLs are canonical |
+| Site search + admin global search (Postgres FTS) | Should | Fed by service events |
+| Reusable content: global snippets, page templates, block presets | Could | Needs block owner (#47) |
+| Forms with submissions and spam protection | Could | Routes hook before catch-alls |
+| Headless read API + webhooks on publish | Could | Generalised serializers + events |
+| Caching / CDN purge | Could | Needs cookie-less public controller |
+| Import / export / backups | Could | Revision snapshot = export format |
+| Content quality checks (broken links, required alt) | Could | Event subscribers / job |
+| Runtime-configurable languages (define N in setup, add later) | Should | Locale decision in Phase 1 |
+| In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Provider/API key + opt-in; audit AI edits |
+
+## Out of scope (for now)
+
+Multi-site, e-commerce, memberships/paywall, built-in comments.
+
+## Guardrails while the roadmap is pending
+
+From the structure review: no new integer enums, no new `has_one_attached` on content models, no new `after_save` side effects on `Page`/`Post` (use services and events), no hand-built URLs outside `PublicUrls`, no new per-locale columns/indexes without the locale decision. Respect the "don't touch" list in §6 of the structure review.
