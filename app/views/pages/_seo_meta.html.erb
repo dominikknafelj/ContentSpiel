@@ -8,7 +8,7 @@
 <% title = seo_title(page, post: post) %>
 <% description = seo_description(page, post: post) %>
 
-<% content_for :title, title %>
+<% content_for :title, document_title(page, post: post) %>
 
 <% content_for :head do %>
   <%= tag.meta(name: "description", content: description) if description %>

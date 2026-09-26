@@ -42,6 +42,16 @@ module PagesHelper
     "#{locale_prefix(locale)}#{path}/#{post.slug}"
   end
 
+  # "<page or post> – <site>" in the browser tab; the homepage is the site
+  # name alone, and an explicit meta title is taken as written.
+  def document_title(page, post: nil)
+    site_title = SiteSetting.instance.title
+    return page.meta_title if post.nil? && page.meta_title.present?
+    return site_title if post.nil? && page.root?
+
+    "#{seo_title(page, post: post)} – #{site_title}"
+  end
+
   private
 
   # "" for the site's current default locale -- PagesController's own
