@@ -75,6 +75,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Content quality checks (broken links, required alt) | Could | Event subscribers / job |
 | Runtime-configurable languages (define N in setup, add later) | Should | Locale decision in Phase 1 |
 | In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Provider/API key + opt-in; audit AI edits |
+| Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
 
 ## Out of scope (for now)
 
