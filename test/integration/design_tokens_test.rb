@@ -20,6 +20,14 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     # is tokens-only, no restyle. Token fonts get their own font-cs/font-cs-mono
     # utilities instead (see content-spiel.tailwind.css).
     assert_no_match(/--default-font-family:\s*var\(--cs-font\)/, response.body)
+    # Regression: color-scheme must never be set inside the token blocks.
+    # shared/theme_head puts data-theme="dark" on <html> for every dark-OS
+    # visitor on every page (public site, sign-in), so a global
+    # `color-scheme: dark` there would render the whole site -- not just the
+    # product UI that opts into tokens -- on a dark canvas. See spec §2:
+    # this PR is tokens-only, no restyle of existing public/auth views.
+    assert_no_match(/\[data-theme=["']?dark["']?\]\s*\{[^}]*color-scheme/, response.body)
+    assert_no_match(/:root[^{]*\{[^}]*color-scheme/, response.body)
   end
 
   test "the stylesheet points at the digested font files, which are served" do
@@ -36,7 +44,6 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     get new_session_path
 
     assert_includes response.body, 'localStorage.getItem("cs-theme")'
-    assert_includes response.body, 'data-controller="theme"'
   end
 
   private
