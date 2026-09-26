@@ -3,6 +3,14 @@
 # time. Every method is idempotent: it looks records up first, through
 # Mobility's `.i18n` scope, because translated columns are jsonb and a plain
 # `where(slug: ...)` would never match (see db/seeds.rb).
+#
+# That lookup spans every configured locale (`find_in_any_locale`), not just
+# the one being written: an admin who ran this in one locale and later
+# changes the site's default locale, or clicks "Create starter pages" again
+# after that, must not get duplicate section pages/posts/blocks just because
+# this locale's slug/title translation happens to be blank -- a page or post
+# that already exists in *any* locale still counts. Creation itself still
+# happens in the given locale only.
 module StarterContent
   WELCOME_HTML = "<p>Welcome to your new site. Sign in to the admin to edit this page.</p>".freeze
 
@@ -40,17 +48,18 @@ module StarterContent
     end
   end
 
+  # `locale:` is kept for interface compatibility with the other methods
+  # (callers pass it), but the lookup below already checks every locale, so
+  # it goes unused here.
   def added?(locale:)
     home = Page.find_by(parent_id: nil)
     return false unless home
 
-    Mobility.with_locale(locale) do
-      SECTIONS.all? { |section| Page.i18n.where(slug: section[:slug]).where(parent_id: home.id).exists? }
-    end
+    SECTIONS.all? { |section| find_section_page(home, section).present? }
   end
 
   def find_or_create_section_page!(home, section)
-    Page.i18n.where(slug: section[:slug]).where(parent_id: home.id).first ||
+    find_section_page(home, section) ||
       Page.create!(parent: home, page_type: :standard, title: section[:title], slug: section[:slug],
         published_at: Time.current).tap do |page|
         page.content_blocks.create!(block_type: :post_list, position: 0,
@@ -60,7 +69,28 @@ module StarterContent
 
   def find_or_create_sample_post!(section)
     attributes = section[:post]
-    Post.i18n.where(title: attributes[:title]).where(content_type: section[:content_type]).first ||
+    find_sample_post(section) ||
       Post.create!(content_type: section[:content_type], published_at: Time.current, **attributes)
+  end
+
+  def find_section_page(home, section)
+    find_in_any_locale { Page.i18n.where(slug: section[:slug]).where(parent_id: home.id).first }
+  end
+
+  def find_sample_post(section)
+    title = section[:post][:title]
+    find_in_any_locale { Post.i18n.where(title: title).where(content_type: section[:content_type]).first }
+  end
+
+  # Runs `block` once per configured locale, inside that locale, and returns
+  # the first match -- so a record found by its translation in any locale is
+  # treated as "already exists", the same record `create_pages_and_posts!`
+  # would otherwise create a duplicate of under the locale it's writing.
+  def find_in_any_locale
+    Mobility.available_locales.each do |locale|
+      match = Mobility.with_locale(locale) { yield }
+      return match if match
+    end
+    nil
   end
 end

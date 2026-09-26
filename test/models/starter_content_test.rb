@@ -46,4 +46,13 @@ class StarterContentTest < ActiveSupport::TestCase
   test "added? is false before starter content exists" do
     assert_not StarterContent.added?(locale: "en")
   end
+
+  test "running it again in another locale creates nothing new" do
+    StarterContent.create_pages_and_posts!(locale: "de")
+
+    assert_no_difference [ "Page.count", "Post.count", "ContentBlock.count" ] do
+      StarterContent.create_pages_and_posts!(locale: "en")
+    end
+    assert StarterContent.added?(locale: "en")
+  end
 end
