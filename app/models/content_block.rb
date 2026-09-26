@@ -6,11 +6,13 @@
 class ContentBlock < ApplicationRecord
   extend Mobility
 
-  # A jsonb column holding one caption per locale; reading or writing it goes
-  # through the current Mobility.locale. (`backend: :jsonb` is the app-wide
-  # default set in config/initializers/mobility.rb, so it isn't repeated here --
-  # same as Post's and Page's translated plain-text attributes.)
-  translates :caption
+  # jsonb columns holding one caption/alt text per locale; reading or writing
+  # them goes through the current Mobility.locale. (`backend: :jsonb` is the
+  # app-wide default set in config/initializers/mobility.rb, so it isn't
+  # repeated here -- same as Post's and Page's translated plain-text
+  # attributes.) `alt` only makes sense for `image` blocks, but it's declared
+  # unconditionally since Mobility attributes are defined at class-load time.
+  translates :caption, :alt
 
   # Rich text can't live in a jsonb column -- it has attachments and its own
   # table -- so `body` uses mobility-actiontext, which keeps one

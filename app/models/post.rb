@@ -26,8 +26,20 @@ class Post < ApplicationRecord
 
   enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }
 
+  # Resume entries' structured fields (spec §10.3), kept in the existing
+  # `metadata` jsonb so no migration is needed and other content types ignore
+  # them. Dates stay ISO strings ("2023-01-01"); an empty end date means
+  # "current role".
+  ROLE_TYPES = {
+    "ic" => "Individual contributor", "lead" => "Lead",
+    "manager" => "Manager", "freelance" => "Freelance"
+  }.freeze
+
+  store_accessor :metadata, :company, :role, :start_date, :end_date, :role_type
+
   validates :title, presence: true
   validates :slug, presence: true
+  validates :role_type, inclusion: { in: ROLE_TYPES.keys }, allow_blank: true
   validate :slug_is_unused_in_every_locale
 
   # The post whose slug in `locale` is `slug` -- as a visitor reading the site

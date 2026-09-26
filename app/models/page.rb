@@ -18,8 +18,10 @@ class Page < ApplicationRecord
   has_closure_tree order: "position", numeric_order: true, dependent: :restrict_with_error
 
   # jsonb columns holding one value per locale; reading or writing them goes
-  # through the current Mobility.locale.
-  translates :title, :slug, :subtitle, :meta_title, :meta_description
+  # through the current Mobility.locale. `hero_alt` is the alt text for
+  # whichever hero image the page's theme renders, translated for the same
+  # reason every other piece of editor-facing copy here is.
+  translates :title, :slug, :subtitle, :meta_title, :meta_description, :hero_alt
 
   # A page's body is an ordered list of blocks; the renderer walks them in
   # `position` order and dispatches on each one's `block_type`.
