@@ -81,7 +81,7 @@ Start from an up-to-date `main`: `git checkout main && git pull --ff-only && git
 - Test: `test/integration/design_tokens_test.rb`
 
 **Interfaces:**
-- Produces: Tailwind utilities `bg-paper bg-surface bg-sunken text-ink text-dim text-meta border-line border-line-strong bg-accent hover:bg-accent-hover bg-accent-tint text-on-accent {bg,text,border}-{ok,warn,danger}[-ink|-tint] font-sans font-mono text-display text-h1 text-h2 text-label tracking-mono tracking-wide rounded-cs shadow-menu ease-cs`, and a `dark:` variant keyed on `[data-theme=dark]`.
+- Produces: Tailwind utilities `bg-paper bg-surface bg-sunken text-ink text-dim text-meta border-line border-line-strong bg-accent hover:bg-accent-hover bg-accent-tint text-on-accent {bg,text,border}-{ok,warn,danger}[-ink|-tint] font-cs font-cs-mono text-display text-h1 text-h2 text-label tracking-mono tracking-wide rounded-cs shadow-menu ease-cs`, and a `dark:` variant keyed on `[data-theme=dark]`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -258,8 +258,8 @@ ls -la app/assets/fonts   # expect 6 non-empty .woff2 files
   --color-danger: var(--cs-danger);
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
-  --font-sans: var(--cs-font);
-  --font-mono: var(--cs-mono);
+  --font-cs: var(--cs-font);
+  --font-cs-mono: var(--cs-mono);
   --text-display: var(--cs-t-display);
   --text-h1: var(--cs-t-h1);
   --text-h2: var(--cs-t-h2);
@@ -279,7 +279,7 @@ ls -la app/assets/fonts   # expect 6 non-empty .woff2 files
 @import "./content-spiel.tailwind.css";
 ```
 
-Note: overriding `--font-sans` changes Tailwind preflight's default font, so the public site renders in Archivo from now on. That is the only visible change to existing pages and is expected.
+Note: the fonts deliberately get their own keys (`font-cs`, `font-cs-mono`) instead of overriding Tailwind's `--font-sans`/`--font-mono`. Overriding those would change Preflight's `--default-font-family` and restyle every public page, which spec §2 ("no restyle") and the theme boundary forbid. Product UI opts in with `font-cs` / `font-cs-mono`.
 
 - [ ] **Step 5: Rebuild and run the test**
 
@@ -373,7 +373,7 @@ Expected: FAIL — script not in body; `current_theme` is `nil`; no "Dark mode" 
 
 ```erb
 <button type="button" data-controller="theme" data-action="theme#toggle"
-  class="rounded-cs border border-line-strong px-3 py-1 font-mono text-label uppercase tracking-mono text-dim hover:bg-sunken">
+  class="rounded-cs border border-line-strong px-3 py-1 font-cs-mono text-label uppercase tracking-mono text-dim hover:bg-sunken">
   <span data-theme-target="label">Dark mode</span>
 </button>
 ```
@@ -1612,7 +1612,7 @@ module SetupHelper
   end
 
   def setup_label_class
-    "block font-mono text-label uppercase tracking-mono text-meta"
+    "block font-cs-mono text-label uppercase tracking-mono text-meta"
   end
 
   def setup_primary_button_class
@@ -1644,17 +1644,17 @@ end
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="min-h-screen bg-paper font-sans text-ink">
+  <body class="min-h-screen bg-paper font-cs text-ink">
     <div class="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-10 md:flex-row">
       <nav aria-label="Setup steps" class="shrink-0 md:w-56">
-        <p class="font-mono text-label uppercase tracking-mono text-meta">ContentSpiel setup</p>
+        <p class="font-cs-mono text-label uppercase tracking-mono text-meta">ContentSpiel setup</p>
         <ol class="mt-4 space-y-2">
           <% SetupController::STEPS.each_with_index do |step, index| %>
             <%= tag.li class: (step == @step ? "font-semibold text-ink" : "text-dim"), aria: { current: ("step" if step == @step) } do %>
-              <span class="font-mono text-meta"><%= index + 1 %></span>
+              <span class="font-cs-mono text-meta"><%= index + 1 %></span>
               <%= step_label(step) %>
               <% if optional_step?(step) %>
-                <span class="font-mono text-label uppercase tracking-mono text-meta">optional</span>
+                <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span>
               <% end %>
             <% end %>
           <% end %>
@@ -1703,14 +1703,14 @@ end
 <h1 class="text-h1 font-semibold">Enter your setup token</h1>
 <p class="mt-2 text-dim">
   To make sure you're the person who deployed this site, copy the setup token from the server log.
-  Look for the line starting with <code class="font-mono">[ContentSpiel] Setup is not complete</code>.
+  Look for the line starting with <code class="font-cs-mono">[ContentSpiel] Setup is not complete</code>.
 </p>
 
 <%= form_with url: setup_step_path("token"), method: :patch, class: "mt-6 space-y-4" do |form| %>
   <div>
     <%= form.label :token, "Setup token", class: setup_label_class %>
     <%= form.text_field :token, required: true, autofocus: true, autocomplete: "off", spellcheck: false,
-      class: "#{setup_input_class} font-mono" %>
+      class: "#{setup_input_class} font-cs-mono" %>
   </div>
   <%= form.submit "Continue", class: setup_primary_button_class %>
 <% end %>
@@ -1885,7 +1885,7 @@ Add private method:
 <ul class="mt-6 divide-y divide-line border-y border-line">
   <% results.each do |result| %>
     <li class="flex gap-4 py-3">
-      <span class="w-20 shrink-0 font-mono text-label uppercase tracking-mono <%= result.ok? ? "text-ok-ink" : "text-warn-ink" %>">
+      <span class="w-20 shrink-0 font-cs-mono text-label uppercase tracking-mono <%= result.ok? ? "text-ok-ink" : "text-warn-ink" %>">
         <%= result.ok? ? "OK" : "Warning" %>
       </span>
       <div>
@@ -2136,8 +2136,8 @@ Add private methods:
 <h1 class="text-h1 font-semibold">Languages</h1>
 <p class="mt-2 text-dim">
   Your site is available in the languages below. Pick the default: it's served without a
-  language prefix in the URL (for example <code class="font-mono">/about</code> instead of
-  <code class="font-mono">/de/about</code>).
+  language prefix in the URL (for example <code class="font-cs-mono">/about</code> instead of
+  <code class="font-cs-mono">/de/about</code>).
 </p>
 
 <%= form_with model: @site_setting, url: setup_step_path("languages"), method: :patch, class: "mt-6 space-y-4" do |form| %>
@@ -2148,7 +2148,7 @@ Add private methods:
       <label class="flex items-center gap-3">
         <%= form.radio_button :default_locale, code %>
         <span><%= language_name(code) %></span>
-        <span class="font-mono text-label uppercase tracking-mono text-meta"><%= code %></span>
+        <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= code %></span>
       </label>
     <% end %>
   </fieldset>
@@ -2265,10 +2265,10 @@ Add private methods:
 
 ```erb
 <% content_for :title, "MCP token" %>
-<h1 class="text-h1 font-semibold">MCP token <span class="font-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<h1 class="text-h1 font-semibold">MCP token <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
 <p class="mt-2 text-dim">
   AI agents (for example Claude) can manage your posts through this site's MCP server at
-  <code class="font-mono">/mcp</code>. They need a token to connect. You can also create one later
+  <code class="font-cs-mono">/mcp</code>. They need a token to connect. You can also create one later
   in the admin under API tokens.
 </p>
 
@@ -2285,7 +2285,7 @@ Add private methods:
 <h1 class="text-h1 font-semibold">Your MCP token</h1>
 <p class="mt-2 text-dim">Copy it now — it's only shown once. If you lose it, generate a new one in the admin.</p>
 
-<pre id="mcp-token" class="mt-4 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-mono"><%= @raw_token %></pre>
+<pre id="mcp-token" class="mt-4 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
 
 <div class="mt-6">
   <%= link_to "Continue", setup_step_path("starter_content"), class: setup_primary_button_class %>
@@ -2296,9 +2296,9 @@ Add private methods:
 
 ```erb
 <% content_for :title, "Starter content" %>
-<h1 class="text-h1 font-semibold">Starter content <span class="font-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
+<h1 class="text-h1 font-semibold">Starter content <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span></h1>
 <p class="mt-2 text-dim">
-  Finishing setup always creates your Home page at <code class="font-mono">/</code>. You can also add:
+  Finishing setup always creates your Home page at <code class="font-cs-mono">/</code>. You can also add:
 </p>
 <ul class="mt-4 list-disc space-y-1 pl-5 text-dim">
   <li><strong class="text-ink">Blog</strong>, <strong class="text-ink">Resume</strong> and <strong class="text-ink">Now</strong> pages, each listing posts of that type</li>
@@ -2426,7 +2426,7 @@ Add private method:
      ] %>
   <% rows.each do |label, value, step| %>
     <div class="flex items-baseline gap-4 py-3">
-      <dt class="w-40 shrink-0 font-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
+      <dt class="w-40 shrink-0 font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
       <dd class="flex-1"><%= value %></dd>
       <% if step %>
         <dd><%= link_to "Edit", setup_step_path(step), class: "text-accent underline hover:no-underline" %></dd>
