@@ -1644,7 +1644,10 @@ end
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="min-h-screen bg-paper font-cs text-ink">
+  <%# scheme-light/dark:scheme-dark: native controls and the canvas follow
+      the token theme. Scoped to this product layout on purpose -- a global
+      color-scheme would restyle the public site for dark-OS visitors. %>
+  <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <div class="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-10 md:flex-row">
       <nav aria-label="Setup steps" class="shrink-0 md:w-56">
         <p class="font-cs-mono text-label uppercase tracking-mono text-meta">ContentSpiel setup</p>
@@ -1721,10 +1724,47 @@ end
 Run: `bin/rails tailwindcss:build && bin/rails test test/integration/setup_access_test.rb`
 Expected: PASS (11 runs).
 
+- [ ] **Step 4b: Theme toggle system test** (moved here from PR 1: the setup layout is the first page that actually uses the tokens)
+
+```ruby
+# test/system/theme_toggle_test.rb
+require "application_system_test_case"
+
+# Independent of the machine's colour-scheme preference: reads what the OS
+# prefers, checks the page followed it, then flips and reloads.
+class ThemeToggleTest < ApplicationSystemTestCase
+  setup do
+    User.destroy_all
+    site_settings(:default).update!(setup_completed_at: nil)
+  end
+
+  test "the wizard's toggle flips the theme, scopes color-scheme, and survives a reload" do
+    visit setup_step_path("token")
+    prefers_dark = page.evaluate_script("window.matchMedia('(prefers-color-scheme: dark)').matches")
+    initial = prefers_dark ? "dark" : "light"
+    assert_equal initial, current_theme
+
+    other = initial == "dark" ? "light" : "dark"
+    click_on(initial == "dark" ? "Light mode" : "Dark mode")
+    assert_equal other, current_theme
+    assert_equal other, page.evaluate_script("getComputedStyle(document.body).colorScheme")
+
+    visit setup_step_path("token")
+    assert_equal other, current_theme
+  end
+
+  private
+    def current_theme = page.evaluate_script("document.documentElement.dataset.theme")
+end
+```
+
+Run: `bin/rails test test/system/theme_toggle_test.rb`
+Expected: PASS.
+
 - [ ] **Step 5: Commit**
 
 ```bash
-git add config/routes.rb app/controllers/setup_controller.rb app/helpers/setup_helper.rb app/views/layouts/setup.html.erb app/views/setup test/test_helpers/setup_test_helper.rb test/integration/setup_access_test.rb
+git add config/routes.rb app/controllers/setup_controller.rb app/helpers/setup_helper.rb app/views/layouts/setup.html.erb app/views/setup test/test_helpers/setup_test_helper.rb test/integration/setup_access_test.rb test/system/theme_toggle_test.rb
 git commit -m "$(cat <<'EOF'
 feat: add token-gated setup wizard skeleton
 
