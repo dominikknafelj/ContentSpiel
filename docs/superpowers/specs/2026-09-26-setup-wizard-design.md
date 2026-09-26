@@ -211,5 +211,69 @@ construction. Enforcing it for non-admin users waits for roles (§7).
 
 ## 8. Delivery
 
-1. **PR 1 — Design tokens & light/dark** (§2).
-2. **PR 2 — Setup wizard + backend settings** (§3–§6).
+Everything ships in one PR (#21), per the user's decision during
+execution: tokens & light/dark (§2), setup wizard + backend settings
+(§3–§6), and the public demo theme (§9).
+
+## 9. Public demo theme and independent stylesheets (added 2026-09-26)
+
+The public site gets Claude Design's "Demo Site" look as its **default
+theme**, and the backend (product UI) and frontend (public theme) CSS
+become fully independent: changing one can never restyle the other.
+
+### Two stylesheets
+
+| | Product UI (backend) | Public default theme (frontend) |
+|---|---|---|
+| Serves | setup wizard, sign-in, password reset (Avo keeps its own build) | public pages, content blocks, posts |
+| Entry | `app/assets/tailwind/application.css` → `builds/tailwind.css` | `app/assets/tailwind/themes/default/theme.css` → `builds/theme-default.css` |
+| Tokens | `content-spiel.css` (product tokens, unchanged) | its **own** token file under `themes/default/`, initially a copy of the Claude Design values |
+| Sources scanned | product views/layouts/helpers only | public views/layouts/partials only |
+| Theme-only CSS | — | `.cs-prose` element styles for ActionText rich text |
+
+- Each entry uses Tailwind v4 `@import "tailwindcss" source(none)` plus
+  explicit `@source` paths, so neither build picks up the other's classes.
+  Shared: the font files (assets) and the `shared/theme_head` +
+  `shared/theme_toggle` partials, which both builds scan and style with
+  their own tokens. `color-scheme` stays scoped to each layout's `<body>`.
+- `tailwindcss-rails` 4.6 builds only one entry, so a small rake task runs
+  the Tailwind executable (from `tailwindcss-ruby`) on the theme entry and
+  enhances `tailwindcss:build` (so `assets:precompile`, `test:prepare`, CI
+  and the Docker build produce both). `Procfile.dev` gets a watcher for it.
+- Layouts link their stylesheet explicitly instead of `stylesheet_link_tag
+  :app`: the public layout links `theme-default` (+ ActionText's CSS); the
+  setup layout and a new small `product` layout link `tailwind`. Sign-in
+  and password reset move to the `product` layout (no public header/footer,
+  product styles).
+
+### The default theme (public views)
+
+- **Layout**: paper background, ink text, token font, light/dark following
+  the OS with the toggle; narrow centred column.
+- **Header**: site title (`SiteSetting`) linking to `/`; navigation = the
+  root page's published children in the current locale (`page_url_path`);
+  **language switcher** linking to the *current* page — or post — in each
+  available locale (inline codes for ≤ 3 locales, a compact dropdown
+  above that).
+- **Footer**: social links from `SiteSetting` — the first place they
+  become `href`s, so only `http`, `https` and `mailto` URLs render (others
+  are dropped); © year + site title; the theme toggle.
+- **Page**: monospace eyebrow, page title as heading (display size on the
+  homepage, where the eyebrow is the site tagline), subtitle as lead.
+- **Blocks**: rich text in `.cs-prose` (paragraphs, headings, links,
+  lists, quotes, code, attachments/YouTube embeds); image full-width with a
+  monospace caption; post lists by content type — blog rows (date | title +
+  excerpt | first tag), "now" (label + updated date | body), resume rows
+  (dates | role + company | role type), unfiltered lists use the blog row.
+- **Single post**: monospace date, title, excerpt as lead, `.cs-prose` body.
+
+### Tests
+
+- Build isolation: each compiled stylesheet contains its own tokens and
+  none of the other side's source-only classes; the public layout links
+  only `theme-default`, product layouts only `tailwind`.
+- Public views: header nav links, one switcher link per locale pointing at
+  the same page/post, footer social links with a `javascript:` URL
+  dropped, toggle present, blog/now/resume rows render their fields;
+  existing routing/SEO tests stay green.
+- System: the theme-toggle test also covers a public page.
