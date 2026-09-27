@@ -77,8 +77,8 @@ Spec: §3.
   - **`ContentModel::Definition` DSL:**
     - `label(str)`, `field(name, type, **opts)`, `uses(*columns)`, `capability(*syms)`;
     - readers `name`, `label`, `fields` (Array of `ContentModel::Definition::Field`), `uses_columns`, `capability?(sym)`, `field_set` (the built class).
-  - **`ContentModel::BlockContentModel::Definition`:** `component(klass)` → `#component`.
-  - **`ContentModel::ContentContentModel::Definition`:**
+  - **`ContentModel::BlockTypeDefinition`:** `component(klass)` → `#component`.
+  - **`ContentModel::ContentTypeDefinition`:**
     - `color(hex)`, `list_component(klass)`, `detail_component(klass)`, `starter(section:, sample:)`;
     - the matching readers.
   - **`ContentModel::FieldGroupDefinition`:** `component(klass)` for rendering a field group.
@@ -141,7 +141,7 @@ require "test_helper"
 
 class ContentModel::FieldSetTest < ActiveSupport::TestCase
   setup do
-    @definition = ContentModel::ContentContentModel::Definition.new("event").tap do |t|
+    @definition = ContentModel::ContentTypeDefinition.new("event").tap do |t|
       t.field :venue, :string, required: true
       t.field :seats, :integer, min: 1
       t.field :starts_on, :date
@@ -151,7 +151,7 @@ class ContentModel::FieldSetTest < ActiveSupport::TestCase
       t.field :headline, :string, translated: true
     end
     FieldGroups.register(:speaker) { |c| c.field :name, :string, required: true; c.field :url, :url }
-    @with_components = ContentModel::ContentContentModel::Definition.new("conference").tap do |t|
+    @with_components = ContentModel::ContentTypeDefinition.new("conference").tap do |t|
       t.field :speakers, :groups, of: :speaker
       t.field :lead, :group, of: :speaker, translated: true
     end
@@ -269,7 +269,7 @@ end
 module BlockTypes
   extend ContentModel::Registry
 
-  def self.definition_class = ContentModel::BlockContentModel::Definition
+  def self.definition_class = ContentModel::BlockTypeDefinition
   def self.kind_label = "block type"
 
   def self.with_capability(capability)
@@ -278,7 +278,7 @@ module BlockTypes
 end
 ```
 
-`ContentTypes` has the same shape (`ContentModel::ContentContentModel::Definition`, `"content type"`, plus `def self.default = all.first`). `FieldGroups` also has the same shape (`ContentModel::FieldGroupDefinition`, `"component"`). The `definition_class` / `kind_label` singleton methods are called from `ContentModel::Registry` as `self.class`-free module methods: inside `register`, `definition_class` resolves on the extended module.
+`ContentTypes` has the same shape (`ContentModel::ContentTypeDefinition`, `"content type"`, plus `def self.default = all.first`). `FieldGroups` also has the same shape (`ContentModel::FieldGroupDefinition`, `"component"`). The `definition_class` / `kind_label` singleton methods are called from `ContentModel::Registry` as `self.class`-free module methods: inside `register`, `definition_class` resolves on the extended module.
 
 `app/models/type_definition.rb`:
 
@@ -336,9 +336,9 @@ end
 - `finalize!` raises `ArgumentError, "components can't contain other components (one level only)"` if any field is a group;
 - adds `component(klass)` / `#component` (reader when called without an argument, as with `label`).
 
-`ContentModel::BlockContentModel::Definition < ContentModel::Definition` adds `component(klass)` with the same reader/writer pattern.
+`ContentModel::BlockTypeDefinition < ContentModel::Definition` adds `component(klass)` with the same reader/writer pattern.
 
-`ContentModel::ContentContentModel::Definition < ContentModel::Definition` adds `color`, `list_component`, `detail_component` (reader/writer pattern) and `starter(section:, sample:)` / `#starter_data`.
+`ContentModel::ContentTypeDefinition < ContentModel::Definition` adds `color`, `list_component`, `detail_component` (reader/writer pattern) and `starter(section:, sample:)` / `#starter_data`.
 
 `app/models/field_set.rb`:
 
@@ -547,7 +547,7 @@ Spec: §3.1, §4, §6 (back-end rows), §7.
 - **Produces:**
   - **`ContentBlock`:**
     - `belongs_to :owner, polymorphic: true`;
-    - `#definition` (the `ContentModel::BlockContentModel::Definition` or nil);
+    - `#definition` (the `ContentModel::BlockTypeDefinition` or nil);
     - `#settings_object(locale: I18n.locale, fallback: false)`;
     - `#assign_settings(hash, locale:)`;
     - `#listed_posts(include_unpublished: false)` and `#lists?(post)`, both delegating to the definition's `lists_posts` behaviour;
@@ -557,7 +557,7 @@ Spec: §3.1, §4, §6 (back-end rows), §7.
     - `#definition`;
     - `#fields(locale: I18n.locale, fallback: false)`;
     - `#assign_fields(hash, locale:)`.
-  - **`ResumeEntry`** (constant namespace for the built-in): `ContentContentModel::ResumeEntry::ROLE_TYPES`.
+  - **`ResumeEntry`** (constant namespace for the built-in): `ContentTypes::ResumeEntry::ROLE_TYPES`.
   - **Services** accept `attributes: { settings: {...} }` / `attributes: { fields: {...} }` for untranslated values, and `translations: { locale => { settings: {...} } }` / `{ fields: {...} }` for translated ones.
 
 - [ ] **Step 1: Write the failing tests**
@@ -659,13 +659,13 @@ Check the real current columns in `db/schema.rb` first: the foreign key and inde
 Rails.application.config.to_prepare do
   [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
-  BlockContentModel::RichText.register
-  BlockContentModel::Image.register
-  BlockContentModel::PostList.register
+  BlockTypes::RichText.register
+  BlockTypes::Image.register
+  BlockTypes::PostList.register
 
-  ContentContentModel::Blog.register
-  ContentContentModel::ResumeEntry.register
-  ContentContentModel::NowUpdate.register
+  ContentTypes::Blog.register
+  ContentTypes::ResumeEntry.register
+  ContentTypes::NowUpdate.register
 end
 ```
 
@@ -736,15 +736,15 @@ scope :listing, -> { where(block_type: BlockTypes.with_capability(:lists_posts).
 def listed_posts(include_unpublished: false)
   return Post.none unless definition&.capability?(:lists_posts)
 
-  BlockContentModel::PostList.listed_posts(settings_object, include_unpublished:)
+  BlockTypes::PostList.listed_posts(settings_object, include_unpublished:)
 end
 
 def lists?(post)
-  definition&.capability?(:lists_posts) ? BlockContentModel::PostList.lists?(settings_object, post) : false
+  definition&.capability?(:lists_posts) ? BlockTypes::PostList.lists?(settings_object, post) : false
 end
 ```
 
-`listed_posts`/`lists?` delegate to `BlockContentModel::PostList` directly. With a single listing type this is fine; comment that a second listing type would move the behaviour onto the definition (`t.lists_posts_with …`). `sync_listed_post_paths` keeps working, but reads `definition&.capability?(:lists_posts)` and `settings_object&.content_type` instead of `post_list?` / `settings["content_type"]`. For the "before last save" half, read `settings_before_last_save["content_type"]` and `block_type_before_last_save`, checking the old type through `BlockTypes.find(...)&.capability?(:lists_posts)`.
+`listed_posts`/`lists?` delegate to `BlockTypes::PostList` directly. With a single listing type this is fine; comment that a second listing type would move the behaviour onto the definition (`t.lists_posts_with …`). `sync_listed_post_paths` keeps working, but reads `definition&.capability?(:lists_posts)` and `settings_object&.content_type` instead of `post_list?` / `settings["content_type"]`. For the "before last save" half, read `settings_before_last_save["content_type"]` and `block_type_before_last_save`, checking the old type through `BlockTypes.find(...)&.capability?(:lists_posts)`.
 
 `Page`:
 - `has_many :content_blocks, -> { order(:position) }, as: :owner, dependent: :destroy`;
@@ -776,7 +776,7 @@ Other call sites:
   The sample post's typed values go through `Posts::Save` `attributes: { fields: … }`.
 - `db/seeds.rb`: string types, typed fields via the services.
 - `ThemeHelper#resume_period(post)` reads `post.fields.start_date` / `end_date`. They are now `Date` or nil: use `.year`.
-- `_resume.html.erb` reads `post.fields.company` and `ContentContentModel::ResumeEntry::ROLE_TYPES[post.fields.role_type]`. It's replaced by a component in Task 4; this keeps it working until then.
+- `_resume.html.erb` reads `post.fields.company` and `ContentTypes::ResumeEntry::ROLE_TYPES[post.fields.role_type]`. It's replaced by a component in Task 4; this keeps it working until then.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
@@ -892,11 +892,11 @@ Spec: §5, §6 (rendering rows).
 **Interfaces:**
 - **Consumes:** definitions (Task 2), `ThemeHelper` helpers (`translated`, `post_date`, `resume_period`, `post_url_path` via `helpers.`).
 - **Produces:**
-  - **`ContentModel::BlockContentModel::Definition#component`:** a component class with `initialize(block:, page:)`.
-  - **`ContentModel::ContentContentModel::Definition#list_component`:** a class with `initialize(posts:, page:)`, rendering a whole list.
+  - **`ContentModel::BlockTypeDefinition#component`:** a component class with `initialize(block:, page:)`.
+  - **`ContentModel::ContentTypeDefinition#list_component`:** a class with `initialize(posts:, page:)`, rendering a whole list.
 
     Note: the spec says `list_item_component`. The plan uses a whole-list component because the `now` listing shows only the latest post. It's recorded as a ruling in the ledger, and a list component still renders its items through its own template.
-  - **`ContentModel::ContentContentModel::Definition#detail_component`:** `initialize(post:)`.
+  - **`ContentModel::ContentTypeDefinition#detail_component`:** `initialize(post:)`.
   - **`ContentModel::FieldGroupDefinition#component`:** `initialize(value:)` (a `ContentModel::FieldSet` instance).
   - **`ContentTypes.default.list_component`:** used for a list with a blank `content_type`.
   - **`Theme.current.component_for(definition, role = :component)`:** returns the definition's class for now (the default theme). This is the hook alternate themes will override.
@@ -930,8 +930,8 @@ Expected: FAIL (no components).
    - `Posts::DetailComponent(post:)`
    - `Fields::GroupComponent(value:)`: renders a field group generically as a definition list of label → value. No built-in uses it yet; it's exercised by the Task 5 test type and a preview.
 5. **Definitions:**
-   - `BlockContentModel::RichText` / `Image` / `PostList` get `t.component Blocks::…Component`;
-   - `ContentContentModel::Blog` gets `t.list_component Posts::BlogListComponent` and `t.detail_component Posts::DetailComponent`; the same pattern applies for resume and now (both use `Posts::DetailComponent` for detail).
+   - `BlockTypes::RichText` / `Image` / `PostList` get `t.component Blocks::…Component`;
+   - `ContentTypes::Blog` gets `t.list_component Posts::BlogListComponent` and `t.detail_component Posts::DetailComponent`; the same pattern applies for resume and now (both use `Posts::DetailComponent` for detail).
 6. **`pages/show.html.erb`.** The block loop becomes:
 
 ```erb
@@ -1049,7 +1049,7 @@ Adjust the MCP schema access to however the tool exposes its schema (Task 3 made
   - `bin/importmap audit`
   - `bin/rails zeitwerk:check`
   - `bin/rails db:reset`, then check that seeded posts sit under their section pages
-  - `grep -rnE "Post\.content_types|ContentBlock\.block_types|ROLE_TYPES" app config lib db/seeds.rb`, which may only show `ContentContentModel::ResumeEntry::ROLE_TYPES`
+  - `grep -rnE "Post\.content_types|ContentBlock\.block_types|ROLE_TYPES" app config lib db/seeds.rb`, which may only show `ContentTypes::ResumeEntry::ROLE_TYPES`
 
   Expected: all clean.
 - [ ] **Step 4: Commit**
