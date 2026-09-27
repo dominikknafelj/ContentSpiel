@@ -22,6 +22,19 @@ class Locales::EnableDisableTest < ActiveSupport::TestCase
     assert_equal "/ueber-uns", @about.full_path("de")
   end
 
+  # Enabling a language only *adds* URLs (spec §9.2): the old address of a
+  # renamed page must keep 301ing afterwards.
+  test "a redirect survives enabling a language" do
+    Mobility.with_locale(:en) { @about.update!(slug: "about-me") }
+    assert PublicPath.redirects.exists?(record: @about, locale: "en", path: "/about")
+
+    assert Locales::Enable.call("fr", actor: nil).ok?
+
+    assert PublicPath.redirects.exists?(record: @about, locale: "en", path: "/about")
+    assert_equal "/about-me", @about.full_path("en")
+    assert @about.full_path("fr").present?
+  end
+
   test "the default language can't be disabled and unknown codes fail" do
     assert_not Locales::Disable.call(Locales.default, actor: nil).ok?
     assert_not Locales::Enable.call("xx", actor: nil).ok?

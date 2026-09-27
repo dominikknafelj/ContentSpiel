@@ -2,7 +2,7 @@ module Locales
   # Turns a supported language on (spec §4.4): it joins site_settings.locales,
   # every page and post gets a slug in it (from the fallback chain -- existing
   # slugs are never touched, so re-enabling a language restores its old
-  # URLs), and public_paths is rebuilt so the new URLs exist immediately.
+  # URLs), and public_paths is synced so the new URLs exist immediately.
   #
   # An unknown/unsupported code isn't checked explicitly here -- `site.save`
   # below fails on it the same way any other malformed `locales` entry would
@@ -32,14 +32,18 @@ module Locales
           end
         end
 
-        # `rebuild!` truncates `public_paths` before recomputing it (spec
-        # §5.4), so any redirect rows (old URLs from a previous slug/move)
-        # are lost the moment a language is enabled -- accepted for now,
-        # greenfield, no production traffic depends on those redirects
-        # surviving yet. If that turns out to matter, the fix is a
-        # `sync_all` that walks every record with `sync`/`sync_posts`
-        # instead of truncating first, keeping existing redirect rows intact.
-        PublicSite::Paths.rebuild!
+        # A full sync, not `rebuild!`: `rebuild!` truncates `public_paths`
+        # first (spec §5.4), which threw away every redirect row -- the old
+        # URLs of renamed or moved pages and posts, in *every* language --
+        # the moment any language was enabled (spec §9.2 promises old URLs
+        # keep 301ing). Syncing the tree top-down and then every post only
+        # adds the new language's rows (and corrects any other stale ones
+        # the same way a save would), leaving existing redirects in place.
+        # Pages before posts, since a post's path is read off its canonical
+        # page's freshly written row.
+        root = Page.find_by(parent_id: nil)
+        PublicSite::Paths.sync_subtree(root) if root
+        PublicSite::Paths.sync_posts(nil)
       end
 
       return failure(site) if site.errors.any?
