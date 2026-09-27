@@ -28,8 +28,19 @@ module BlockTypes
     # `where`: `posts.content_type` is NOT NULL, so `where(content_type: nil)`
     # compiles to `content_type IS NULL` and the block silently lists nothing
     # at all.
+    #
+    # "Every content type" still means "every *registered* content type"
+    # (spec §4.2: "a post of an unknown type has no public URL") -- a post
+    # whose stored `content_type` names a removed plugin or a typo has no
+    # `definition` and so no schema to render its listing row against, let
+    # alone a canonical URL for `post_url_path` to link to. Always scoping to
+    # `ContentTypes.names`, not just when `settings.content_type` is blank,
+    # is what keeps a *filtered* listing consistent with the same rule: a
+    # filter naming a real type can never accidentally let a stale-typed post
+    # through some other path.
     def self.listed_posts(settings, include_unpublished: false)
       scope = include_unpublished ? Post.all : Post.published
+      scope = scope.where(content_type: ContentTypes.names)
       content_type = settings.content_type
       scope = scope.where(content_type: content_type) if content_type.present?
 
@@ -63,6 +74,7 @@ module BlockTypes
     # itself (`t.lists_posts_with ...`) instead of a capability-wide
     # dispatch.
     def self.lists?(settings, post)
+      return false if post.definition.nil?
       return false if settings.content_type.present? && settings.content_type != post.content_type
 
       tag = settings.tag.to_s.strip

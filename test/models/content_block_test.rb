@@ -227,4 +227,29 @@ class ContentBlockTest < ActiveSupport::TestCase
     post.tags << Tag.create!(name: "rails")
     assert block.lists?(post.reload)
   end
+
+  # A post's content_type can go stale the same way a block's block_type can
+  # (a removed plugin, a typo fixed by hand in the database) -- spec §4.2
+  # says such a post "has no public URL", which only holds if an unfiltered
+  # ("every content type") listing skips it too; otherwise it shows up
+  # linked to a path that was never computed for it (see
+  # `PublicSite::Paths.sync`, which likewise skips a post whose `definition`
+  # is nil).
+  test "an unfiltered post list omits a post whose content_type isn't registered" do
+    @page.update!(published_at: Time.current)
+    known = Post.create!(content_type: :blog, title: "Known", published_at: 1.day.ago)
+    orphan = Post.create!(content_type: :blog, title: "Orphan", published_at: 1.day.ago)
+    orphan.update_column(:content_type, "gone/thing")
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0)
+
+    assert_equal [ known ], block.listed_posts.to_a
+  end
+
+  test "lists? is false for a post whose content_type isn't registered" do
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0)
+    post = Post.create!(content_type: :blog, title: "Hi")
+    post.update_column(:content_type, "gone/thing")
+
+    assert_not block.lists?(post)
+  end
 end
