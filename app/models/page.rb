@@ -149,26 +149,30 @@ class Page < ApplicationRecord
     resync_listed_posts
   end
 
-  # A page's own save can hand a post_list block a new position in the tree
-  # without the block itself changing at all -- `sync_subtree` above already
-  # rewrote this page's (and its descendants') paths for that, but every post
-  # any of *their* post_list blocks list also needs its canonical page
-  # re-derived, since tree order -- not just this page's own path -- is what
+  # A page's own save can hand a post_list block a new position in the tree,
+  # or a newly (un)published page chain, without the block itself changing at
+  # all -- `sync_subtree` above already rewrote this page's (and its
+  # descendants') paths for that, but every post any of *their* post_list
+  # blocks list also needs its canonical page re-derived, since chain
+  # publication and tree order -- not just this page's own path -- are what
   # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
   #
-  # Scoped to this subtree's own post_list blocks on an ordinary content save
-  # (title, slug, publish state, ...): those are the only blocks whose
-  # candidate set could possibly have changed just because *this* page
-  # changed. A parent change or a reorder is different -- it can shift this
-  # page's rank relative to post_list blocks *outside* its own subtree too
-  # (a page moved past a sibling that hosts one), so those resync every type
-  # any post_list block anywhere names, via `sync_posts(nil)`.
+  # Scoped to this subtree's own post_list blocks, for every kind of save --
+  # content, publish state, a move or a reorder alike. Those are the only
+  # candidates whose rank could have changed: a move or reorder shifts this
+  # subtree relative to every other page, but leaves the relative order (and
+  # publication) of all the pages *outside* it exactly as it was, so a post
+  # none of this subtree's blocks list keeps the same winner. The posts they
+  # *do* list are re-derived from scratch against every candidate in the
+  # tree, which covers both "moved ahead of another listing, now canonical"
+  # and "moved behind it, gave the posts back".
+  #
+  # (There used to be a `saved_change_to_parent_id? || saved_change_to_position?`
+  # branch here resyncing every post for moves. It never ran: closure_tree's
+  # own `after_save` reloads the record, clearing those dirty flags before
+  # this callback reads them -- and the subtree-scoped resync already covers
+  # moves, per the above.)
   def resync_listed_posts
-    if saved_change_to_parent_id? || saved_change_to_position?
-      PublicSite::Paths.sync_posts(nil)
-      return
-    end
-
     types = ContentBlock.post_list.where(page_id: self_and_descendant_ids).map { |block| block.settings["content_type"].presence }
     types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
   end

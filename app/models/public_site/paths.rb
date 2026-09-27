@@ -38,14 +38,14 @@ module PublicSite
 
     # Every post, or every post of one content type, re-derives its canonical
     # page and current path from scratch (spec §5.4): a `post_list` block's
-    # own save/destroy, and a page move or reorder, both call this rather than
-    # `sync`ing one post at a time, because either can hand a post its first
-    # canonical page, take it away, or move it to a *different* page than the
-    # one that just changed -- something a single record's own callback has
-    # no way to know about.
+    # own save/destroy, and a page save (including a move, reorder or publish
+    # -- `Page#resync_listed_posts`, for the types its subtree's blocks list),
+    # both call this rather than `sync`ing one post at a time, because either
+    # can hand a post its first canonical page, take it away, or move it to a
+    # *different* page than the one that just changed -- something a single
+    # record's own callback has no way to know about.
     #
-    # `content_type` is `nil` for "every post" (a page move/reorder can shift
-    # tree order under listings of any type, and a content-type-less
+    # `content_type` is `nil` for "every post" (a content-type-less
     # post_list block matches every type itself) -- `Post.all`, not a
     # `where(content_type: nil)` that would compile to a no-op the way
     # `ContentBlock#listed_posts` warns against.

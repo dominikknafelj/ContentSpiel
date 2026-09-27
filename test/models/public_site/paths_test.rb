@@ -296,4 +296,16 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_nil current(update)
     assert_equal "/blog/hello", current(post)
   end
+
+  test "moving a listing page into an earlier branch makes it canonical" do
+    section = Page.create!(parent: @root, title: "Section", published_at: 1.day.ago)
+    listing(@root, "Blog", "blog")
+    archive = listing(@root, "Archive", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post)
+
+    archive.update!(parent: section)
+
+    assert_equal "/section/archive/hello", current(post)
+  end
 end
