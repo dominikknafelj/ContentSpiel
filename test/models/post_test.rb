@@ -297,16 +297,22 @@ class PostTest < ActiveSupport::TestCase
     end
   end
 
-  # The validation is the first line of defense; these indexes are the second,
-  # and later models copy their shape, so pin it directly.
-  test "the database rejects a same-locale duplicate slug when validation is bypassed" do
+  # Foundations task 4 (spec §5.2) drops the per-language unique slug indexes
+  # on posts outright: a post's literal slug is no longer required to be
+  # unique at the database layer, only by `LocalizedSlug`'s own validation
+  # above -- neither post here has a listing page, so neither has a public
+  # path to clash on either (spec §5.3's "a post without a listing page has
+  # no path to clash on"). The database-level safety net this test used to
+  # pin now lives one level up, on the *address* two records would actually
+  # collide at: see `HasPublicPaths#public_paths_are_available` and
+  # `PublicSite::PathsTest#"a post cannot take a path a child page already
+  # holds"`.
+  test "bypassing the slug validation no longer collides at the database layer" do
     Post.create!(content_type: :blog, title: "Hello World")
     sneaky = Post.create!(content_type: :blog, title: "Something Else")
 
-    assert_raises ActiveRecord::RecordNotUnique do
-      Post.transaction(requires_new: true) do
-        sneaky.update_column(:slug, { "en" => "hello-world" })
-      end
+    assert_nothing_raised do
+      sneaky.update_column(:slug, { "en" => "hello-world" })
     end
   end
 

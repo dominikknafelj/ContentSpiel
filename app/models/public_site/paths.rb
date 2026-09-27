@@ -36,18 +36,76 @@ module PublicSite
       Page.where(parent_id: page.id).find_each { |child| sync_subtree(child) }
     end
 
+    # Every post, or every post of one content type, re-derives its canonical
+    # page and current path from scratch (spec §5.4): a `post_list` block's
+    # own save/destroy, and a page move or reorder, both call this rather than
+    # `sync`ing one post at a time, because either can hand a post its first
+    # canonical page, take it away, or move it to a *different* page than the
+    # one that just changed -- something a single record's own callback has
+    # no way to know about.
+    #
+    # `content_type` is `nil` for "every post" (a page move/reorder can shift
+    # tree order under listings of any type, and a content-type-less
+    # post_list block matches every type itself) -- `Post.all`, not a
+    # `where(content_type: nil)` that would compile to a no-op the way
+    # `ContentBlock#listed_posts` warns against.
+    #
+    # `includes(:tags)` avoids an N+1 in `ContentBlock#lists?`'s tag check
+    # across every post_list block `canonical_page` walks per post.
+    def sync_posts(content_type)
+      scope = content_type ? Post.where(content_type: content_type) : Post.all
+      scope.includes(:tags).find_each { |post| sync(post) }
+    end
+
     def rebuild!
       PublicPath.transaction do
         PublicPath.delete_all
         root = Page.find_by(parent_id: nil)
         sync_subtree(root) if root
+        sync_posts(nil)
       end
     end
 
     def compute_path(record, locale)
       case record
       when Page then page_path(record, locale)
+      when Post then post_path(record, locale)
       end
+    end
+
+    # The first page, in tree order (depth-first by sibling position), with a
+    # post_list block that lists `post` (spec §5.3) -- "first" meaning the
+    # one whose own position, then its parent's, then its parent's parent's
+    # and so on up to the root, sorts lowest, which is exactly a depth-first
+    # walk from the root without actually performing one: `self_and_ancestors`
+    # (closure_tree, root last) reversed puts the root's position first and
+    # this page's own last, so comparing those arrays lexicographically ranks
+    # an earlier branch ahead of a later one at whichever ancestor they
+    # diverge, and only falls through to a deeper `position` when every
+    # shallower one ties -- which happens only between a page and its own
+    # descendant, never between two different pages, since sibling `position`
+    # values are unique (closure_tree's own invariant).
+    #
+    # Every post_list block is checked, not just the ones on already-synced
+    # pages: this is also what a block's own save/destroy calls (via
+    # `sync_posts`), where nothing about the page tree changed at all.
+    def canonical_page(post)
+      pages = ContentBlock.post_list.includes(:page).select { |block| block.lists?(post) }.map(&:page).uniq
+      pages.min_by { |page| page.self_and_ancestors.reverse.map { |p| p.position.to_i } }
+    end
+
+    # A post's path is its canonical listing page's current path, then `/`,
+    # then its own slug -- nil (no URL) when it has no canonical page, or that
+    # page itself currently has no path (mid-move, or a draft-chain gap the
+    # resolver's publication check handles, not this one -- §5.3 is explicit
+    # that publication is ignored here).
+    def post_path(post, locale)
+      page = canonical_page(post)
+      segment = post.public_send(Mobility.normalize_locale_accessor(:slug, locale))
+      parent_path = page && current_path(page, locale)
+      return nil if parent_path.nil? || segment.blank?
+
+      parent_path == "/" ? "/#{segment}" : "#{parent_path}/#{segment}"
     end
 
     # The root is exempt from needing a slug of its own: it contributes no

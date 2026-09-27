@@ -159,6 +159,31 @@ class Page < ApplicationRecord
 
   def sync_public_paths
     PublicSite::Paths.sync_subtree(self)
+    resync_listed_posts
+  end
+
+  # A page's own save can hand a post_list block a new position in the tree
+  # without the block itself changing at all -- `sync_subtree` above already
+  # rewrote this page's (and its descendants') paths for that, but every post
+  # any of *their* post_list blocks list also needs its canonical page
+  # re-derived, since tree order -- not just this page's own path -- is what
+  # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
+  #
+  # Scoped to this subtree's own post_list blocks on an ordinary content save
+  # (title, slug, publish state, ...): those are the only blocks whose
+  # candidate set could possibly have changed just because *this* page
+  # changed. A parent change or a reorder is different -- it can shift this
+  # page's rank relative to post_list blocks *outside* its own subtree too
+  # (a page moved past a sibling that hosts one), so those resync every type
+  # any post_list block anywhere names, via `sync_posts(nil)`.
+  def resync_listed_posts
+    if saved_change_to_parent_id? || saved_change_to_position?
+      PublicSite::Paths.sync_posts(nil)
+      return
+    end
+
+    types = ContentBlock.post_list.where(page_id: self_and_descendant_ids).map { |block| block.settings["content_type"].presence }
+    types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
   end
 
   # closure_tree's own `after_save` reloads this record as part of renumbering,

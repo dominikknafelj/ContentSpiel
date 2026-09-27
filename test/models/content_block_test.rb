@@ -178,4 +178,17 @@ class ContentBlockTest < ActiveSupport::TestCase
 
     assert_equal [], block.listed_posts.to_a
   end
+
+  # Uses `@page` (setup's own homepage) rather than the brief's literal
+  # `Page.create!(title: "Home", slug: "", ...)` -- creating a *second*
+  # slug-less, parentless page collides with `@page` on both `only_one_root_page`
+  # and the "/" path itself, and this test's own point (`lists?`) doesn't
+  # depend on which page hosts the block.
+  test "lists? matches content type and tag like listed_posts" do
+    block = @page.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog", "tag" => " Rails " })
+    post = Post.create!(content_type: :blog, title: "Hi")
+    assert_not block.lists?(post)
+    post.tags << Tag.create!(name: "rails")
+    assert block.lists?(post.reload)
+  end
 end

@@ -2,6 +2,7 @@ class Post < ApplicationRecord
   extend Mobility
   include LocalizedSlug
   include Publishable
+  include HasPublicPaths
 
   localized_slug scope: :content_type
 
@@ -56,33 +57,21 @@ class Post < ApplicationRecord
   validates :slug, presence: true
   validates :role_type, inclusion: { in: ROLE_TYPES.keys }, allow_blank: true
 
-  # The post whose slug in `locale` is `slug` -- as a visitor reading the site
-  # in that locale sees it, meaning *through* Mobility's fallbacks, exactly the
-  # way `Page` builds its cached paths (spec section 6). A post translated into
-  # German but left with only its English slug is linked as ".../my-post" on
-  # the German listing, so that is the URL its detail view has to answer to.
+  # Keeps `public_paths` in step with this post's canonical listing page and
+  # slug (spec §5.4) -- the same duty `Page#sync_public_paths` performs for
+  # pages, just without a subtree to cascade into: a post has no descendants
+  # of its own, so `PublicSite::Paths.sync` (not `sync_subtree`) is enough.
+  # Unconditional for the same reason `Page`'s callback is: `slug` is a
+  # Mobility jsonb attribute, so there's no per-locale `saved_change_to?` to
+  # narrow this with, and guessing wrong leaves a post unreachable at its own
+  # URL.
   #
-  # Meant to be called on a scope that has already narrowed the candidates to
-  # the ones a listing would show, e.g.
-  # `Post.published.where(content_type: "blog").find_by_localized_slug(...)`.
-  #
-  # Two queries rather than one OR-ed condition so that the requested locale's
-  # own slug always wins: otherwise a post reachable here only by fallback
-  # could shadow the post whose localized URL this actually is. Each is an
-  # equality test the per-locale unique indexes on
-  # `(content_type, slug ->> '<locale>')` already cover.
-  def self.find_by_localized_slug(locale, slug)
-    return nil if slug.blank?
-
-    exact = where("slug ->> ? = ?", locale.to_s, slug).first
-    return exact if exact
-    return nil if locale.to_s == I18n.default_locale.to_s
-
-    # The fallback half, and why it tests for NULL: only a post with no slug of
-    # its own in this locale falls back, so a post that has one is not *also*
-    # reachable at its default-locale slug -- one post, one URL per locale.
-    where("slug ->> ? IS NULL AND slug ->> ? = ?", locale.to_s, I18n.default_locale.to_s, slug).first
-  end
+  # A tag gained or lost through `post.tags << tag`/`tag.destroy` doesn't
+  # touch this row at all -- `has_many :through` writes `PostTag` directly --
+  # so `PostTag`'s own `after_commit` callback is what re-syncs a post whose
+  # *tag-filtered* canonical page depends on a change this callback never
+  # sees.
+  after_save { PublicSite::Paths.sync(self) }
 
   def all_related_posts
     forward_ids = PostRelation.where(post_id: id).select(:related_post_id)

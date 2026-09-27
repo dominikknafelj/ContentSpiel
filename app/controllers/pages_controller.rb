@@ -85,8 +85,14 @@ class PagesController < ApplicationController
   # filters to published pages, so a draft listing page serves no permalinks
   # either, and its post detail URLs don't become a way to reach a page that
   # isn't public yet.
+  #
+  # Temporary bridge, like `Page.find_by_public_path` above: this only finds
+  # a post at its *canonical* URL (spec §5.3), the one `public_paths` stores.
+  # A post also reachable under some other listing page -- the "other listing
+  # pages" case §5.3 hands to the resolver as a 301 -- 404s here instead until
+  # `PublicSite::Resolver` (Task 6) takes over this whole method.
   def resolve_post_detail
-    parent_path, _, candidate_slug = requested_path.rpartition("/")
+    parent_path, = requested_path.rpartition("/")
 
     @page = Page.find_by_public_path(effective_locale, parent_path.presence || "/", include_unpublished: preview_allowed?)
 
@@ -95,13 +101,22 @@ class PagesController < ApplicationController
     @post_list_block = @page&.content_blocks&.find_by(block_type: :post_list)
     return if @post_list_block.nil?
 
-    # Literally the same criteria the block's listing applies, so a page serves
-    # detail views for exactly the posts it lists. (`limit` deliberately isn't
-    # applied -- it trims how much of the list is shown, not which posts the
-    # page is responsible for, which is why it lives in the partial rather than
-    # in `listed_posts`.)
-    @post = @post_list_block.listed_posts(include_unpublished: preview_allowed?)
-      .find_by_localized_slug(effective_locale, candidate_slug)
+    # `requested_path` in full (not "parent path + a bare slug", the way this
+    # used to look a post up via `find_by_localized_slug`) has to be a post's
+    # *canonical* URL -- `public_paths.path` never carries a locale prefix, so
+    # this is exactly the row `PublicSite::Paths` would have written for it.
+    # A post also reachable under some other, non-canonical listing page (spec
+    # §5.3's "other listing pages" case) has no row here at all and 404s,
+    # until `PublicSite::Resolver` (Task 6) turns that into a 301.
+    candidate = PublicPath.current.find_by(record_type: "Post", locale: effective_locale.to_s, path: requested_path)&.record
+    return if candidate.nil?
+
+    # Still checked against this block's own criteria, not taken on trust: a
+    # post's canonical page is exactly one page (spec §5.3), so a path that
+    # happens to name *this* page's prefix only actually belongs to it if this
+    # block is the one that lists the post -- and only a published one, in
+    # line with `listed_posts`' own scope, unless previewing.
+    @post = candidate if @post_list_block.listed_posts(include_unpublished: preview_allowed?).exists?(id: candidate.id)
   end
 
   def redirect_default_locale_prefix

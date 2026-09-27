@@ -71,4 +71,57 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     PublicSite::Paths.rebuild!
     assert_equal "/about", current(about)
   end
+
+  def listing(parent, title, content_type, tag: nil)
+    Page.create!(parent: parent, title: title, published_at: 1.day.ago).tap do |page|
+      settings = { "content_type" => content_type }
+      settings["tag"] = tag if tag
+      page.content_blocks.create!(block_type: :post_list, position: 0, settings: settings)
+    end
+  end
+
+  test "a post lives under the first listing page in tree order" do
+    blog = listing(@root, "Blog", "blog")
+    listing(@root, "Archive", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "a post nothing lists has no URL" do
+    post = Post.create!(content_type: :now_update, title: "Now", published_at: 1.day.ago)
+    assert_nil current(post)
+  end
+
+  test "adding a listing block gives existing posts a URL" do
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    listing(@root, "Blog", "blog")
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "renaming a listing page moves its posts and redirects the old post URL" do
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    Mobility.with_locale(:en) { blog.update!(slug: "journal") }
+
+    assert_equal "/journal/hello", current(post)
+    assert_equal post, PublicPath.redirects.find_by(locale: "en", path: "/blog/hello").record
+  end
+
+  test "a post cannot take a path a child page already holds" do
+    blog = listing(@root, "Blog", "blog")
+    Page.create!(parent: blog, title: "Team", published_at: 1.day.ago)
+    post = Post.new(content_type: :blog, title: "Team")
+
+    assert_not post.valid?
+    assert post.errors[Mobility.normalize_locale_accessor(:slug, :en)].any? { |m| m.include?("/blog/team") }
+  end
+
+  test "tag-filtered listings only host matching posts" do
+    listing(@root, "Rails", "blog", tag: "rails")
+    post = Post.create!(content_type: :blog, title: "Other", published_at: 1.day.ago)
+    assert_nil current(post)
+  end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_27_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_27_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -130,9 +130,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_110000) do
     t.jsonb "slug", default: {}, null: false
     t.jsonb "title", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.index "content_type, ((slug ->> 'de'::text))", name: "index_posts_on_content_type_and_slug_de", unique: true, where: "((slug ->> 'de'::text) IS NOT NULL)"
-    t.index "content_type, ((slug ->> 'en'::text))", name: "index_posts_on_content_type_and_slug_en", unique: true, where: "((slug ->> 'en'::text) IS NOT NULL)"
-    t.index "content_type, ((slug ->> 'es'::text))", name: "index_posts_on_content_type_and_slug_es", unique: true, where: "((slug ->> 'es'::text) IS NOT NULL)"
   end
 
   create_table "public_paths", force: :cascade do |t|
