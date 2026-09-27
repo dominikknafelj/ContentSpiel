@@ -8,15 +8,6 @@ module Admin
   # trustworthy afterward. See `app/javascript/controllers/admin/
   # tree_controller.js` for the client side this answers.
   class TreeController < BaseController
-    # A GET for the tree frame on its own -- most navigation gets the tree
-    # for free via `content_for :tree` on whichever Pages view is showing,
-    # but this exists too (routed `resource :tree, only: %i[show update]`)
-    # for anything that wants to (re)fetch just this column, e.g. a
-    # lazily-loaded `<turbo-frame src="...">` in a later task.
-    def show
-      render turbo_stream: tree_stream(selected: Page.find_by(id: params[:page_id]))
-    end
-
     def update
       page = Page.find(params[:page_id])
       parent = Page.find(params[:parent_id])

@@ -86,8 +86,15 @@ Rails.application.routes.draw do
     # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`
     # (singular) rather than nested under `pages` -- a move names the page
     # being dragged in its own params (`page_id`), not the URL, since the
-    # same one PATCH target serves every node in the tree.
-    resource :tree, only: %i[show update], controller: :tree
+    # same one PATCH target serves every node in the tree. `update` only
+    # (final-fixes round, finding 11): the tree's own GET is already free on
+    # every Pages view via `content_for :tree` -- a bare `:show` here
+    # answered a plain GET with a Turbo Stream body, which nothing in this
+    # app ever actually requests (no `<turbo-frame src="...">` points at
+    # it) and no browser navigating here directly could even render (a
+    # `<turbo-stream>` response isn't valid, renderable HTML for a
+    # top-level GET).
+    resource :tree, only: %i[update], controller: :tree
 
     # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
     # (no tree column of its own -- a post has no parent/child structure the

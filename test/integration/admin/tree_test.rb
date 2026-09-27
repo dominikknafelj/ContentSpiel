@@ -9,6 +9,16 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     @child = create_page(title: "Child", parent: @a)
   end
 
+  # Fix (final-fixes round, finding 11): the tree's own bare GET answered a
+  # plain browser request with a Turbo Stream body -- unusable outside a
+  # frame fetch, and nothing in the app ever actually made one. Removed
+  # (route and action) rather than turned into real HTML, since every real
+  # navigation already gets the tree for free via `content_for :tree`.
+  test "the tree's own GET route no longer exists" do
+    get "/cs-studio/tree"
+    assert_response :not_found
+  end
+
   test "the pages home shows the tree with status and child counts" do
     get "/cs-studio"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
