@@ -181,9 +181,13 @@ module PublicSite
     # from inside a save's `after_save`, and re-entering callbacks or
     # validations on a row nobody edited would be both wasted work and a risk
     # of failing a save that was never actually invalid.
+    #
+    # A `path` another record's *current* row already holds is skipped rather
+    # than written: see `yield_to_holder`.
     def write(record, locale, path)
       current = PublicPath.current.find_by(record: record, locale: locale)
       return if current&.path == path
+      return yield_to_holder(record, locale, path, current) if path && held_by_another?(record, locale, path)
 
       if path.nil?
         PublicPath.where(record: record, locale: locale).delete_all
@@ -193,6 +197,44 @@ module PublicSite
         PublicPath.create!(record: record, locale: locale, path: path, current: true)
       end
       announce(record, locale, current&.path, path)
+    end
+
+    # Whether `path` is some *other* record's live address in `locale`. The
+    # record's own save never gets this far with such a path --
+    # `HasPublicPaths#public_paths_are_available` turns it into a validation
+    # error first (spec §5.2) -- so a hit here means the sync was triggered
+    # by a *different* record's write: a post_list block saved or destroyed
+    # (`ContentBlock#sync_listed_post_paths`), a page saved, moved or
+    # reordered (`Page#sync_public_paths`, including a cascade into its
+    # descendants), a tag added or removed (`PostTag#sync_post_paths`), or a
+    # language enabled. E.g. page /blog/team plus post "team" living at /team
+    # via a homepage listing: removing that homepage block moves the post
+    # onto /blog/team, which the page holds.
+    def held_by_another?(record, locale, path)
+      PublicPath.current.where(locale: locale, path: path)
+        .where.not(record_type: record.class.polymorphic_name, record_id: record.id).exists?
+    end
+
+    # The record that did not ask for this sync goes without a URL in this
+    # locale rather than raising: the unique index would otherwise throw
+    # `RecordNotUnique` out of somebody else's save -- a 500 on a block
+    # removal the editor can't get past, or, from `PostTag`'s `after_commit`,
+    # an exception after the data is already committed. Its current row (if
+    # it had one) is deleted, not demoted: nothing else may claim that old
+    # address as a redirect *to* a record with no address. Its existing
+    # redirect rows are kept; they resolve to a 404 while it has no current
+    # row (`Resolver#from_row` finds no target) and start 301ing again once a
+    # later sync gives it one -- after the clash is removed, the next sync
+    # that reaches the record (its own save, or any of the triggers above,
+    # or `rebuild!`) restores the URL. Logged, since nothing on screen says
+    # why the record vanished from that address.
+    def yield_to_holder(record, locale, path, current)
+      Rails.logger.warn("[public_paths] #{record.class.polymorphic_name}##{record.id} gets no #{locale} URL: " \
+        "#{path} is already another record's current path")
+      return if current.nil?
+
+      current.delete
+      announce(record, locale, current.path, nil)
     end
 
     # Deferred to after the whole transaction commits (spec §5.4): a sync runs

@@ -218,4 +218,82 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
     assert_equal "/archive/hello", current(post)
   end
+
+  # -- clashes from another record's write (spec §5.4) ------------------------
+
+  # The post's own save reports a clash as a validation error, but a sync
+  # triggered by *another* record's write (here: a block destroy moving the
+  # post onto a path a page already holds) has nobody to report it to -- it
+  # must not raise, and the post goes without a URL in that locale instead.
+  test "a sync that would clash with another record leaves the post without a URL" do
+    block = add_listing_block(@root, "blog")
+    blog = listing(@root, "Blog", "blog")
+    team = Page.create!(parent: blog, title: "Team", published_at: 1.day.ago)
+    post = Post.create!(content_type: :blog, title: "Team", published_at: 1.day.ago)
+    assert_equal "/team", current(post)
+
+    assert_nothing_raised { block.destroy! }
+
+    assert_nil current(post)
+    assert_equal team, PublicPath.current.find_by(locale: "en", path: "/blog/team").record
+
+    Locales.enabled.each { |locale| Mobility.with_locale(locale) { team.update!(slug: "crew") } }
+    PublicSite::Paths.sync(post)
+    assert_equal "/blog/team", current(post)
+  end
+
+  test "a clash is logged with the record, locale and path" do
+    block = add_listing_block(@root, "blog")
+    blog = listing(@root, "Blog", "blog")
+    Page.create!(parent: blog, title: "Team", published_at: 1.day.ago)
+    post = Post.create!(content_type: :blog, title: "Team", published_at: 1.day.ago)
+
+    log = StringIO.new
+    original = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(log)
+    begin
+      block.destroy!
+    ensure
+      Rails.logger = original
+    end
+
+    assert_match(%r{Post##{post.id}.*en.*/blog/team}, log.string)
+  end
+
+  test "a tag change that would clash does not raise after commit" do
+    listing(@root, "Blog", "blog")
+    rails = listing(@root, "Rails", "blog", tag: "rails")
+    Page.create!(parent: rails, title: "Team", published_at: 1.day.ago)
+    post = Post.create!(content_type: :blog, title: "Team", published_at: 1.day.ago)
+    assert_equal "/blog/team", current(post)
+
+    assert_nothing_raised { post.tags << Tag.create!(name: "rails") }
+
+    assert_nil current(post)
+  end
+
+  test "editing a listing block's content type in place re-points posts of the old type" do
+    block = add_listing_block(@root, "blog")
+    listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/hello", current(post)
+
+    block.update!(settings: { "content_type" => "now_update" })
+
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "destroying a listing block takes its posts' URLs away, or moves them" do
+    only = listing(@root, "News", "now_update").content_blocks.first
+    blog_block = add_listing_block(@root, "blog")
+    listing(@root, "Blog", "blog")
+    update = Post.create!(content_type: :now_update, title: "Now", published_at: 1.day.ago)
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    only.destroy!
+    blog_block.destroy!
+
+    assert_nil current(update)
+    assert_equal "/blog/hello", current(post)
+  end
 end
