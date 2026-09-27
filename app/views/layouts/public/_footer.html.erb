@@ -8,15 +8,9 @@
       <% end %>
     </ul>
   <% end %>
-  <%# Only a signed-in editor gets this link (spec §10.4) -- the public site
-      has no accounts of its own, so its mere presence already tells a
-      visitor whether they're signed in, which is fine: it names no content
-      the anonymous response above it didn't already render. %>
-  <% if authenticated? && @page %>
-    <% record = @post || @page %>
-    <%= link_to (@post ? "Edit this post" : "Edit this page"),
-          (@post ? avo.edit_resources_post_path(record) : avo.edit_resources_page_path(record)),
-          class: "hover:text-ink" %>
-  <% end %>
+  <%# The "Edit this page" link is gone (spec §6.4): PublicController has no
+      session, so there is no signed-in visitor to show it to -- the edit
+      link comes back in Task 7's preview banner, rendered by
+      PreviewController instead. %>
   <%= render "shared/theme_toggle" %>
 </footer>

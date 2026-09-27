@@ -137,19 +137,6 @@ class Page < ApplicationRecord
   before_save :remember_requested_position
   after_save :place_among_siblings
 
-  # Temporary bridge for PagesController until PublicSite::Resolver (Task 6).
-  #
-  # Scoped to published pages rather than leaving that to the caller: this is
-  # the public site's entry point into the tree, and a draft page acquires its
-  # path the moment it is saved -- so an unfiltered lookup publishes every
-  # work-in-progress at a guessable URL.
-  #
-  # Preview (signed-in editors) passes `include_unpublished: true`.
-  def self.find_by_public_path(locale, path, include_unpublished: false)
-    scope = include_unpublished ? all : published
-    scope.where(id: PublicPath.current.where(record_type: "Page", locale: locale.to_s, path: path).select(:record_id)).first
-  end
-
   private
 
   # The homepage's slug is "" by design (see `PublicSite::Paths.page_path`).

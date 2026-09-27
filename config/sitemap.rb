@@ -20,18 +20,13 @@ SitemapGenerator::Sitemap.default_host = PublicSite::Urls.default_host
 # computes its `alternates` once rather than once per locale entry below.
 urls = PublicSite::Urls.new(host: SitemapGenerator::Sitemap.default_host)
 
-# A page's own visibility; a post's is its own plus its canonical page's --
-# both published, not merely a `public_paths` row existing (that row is
-# written the moment a draft is saved, spec §5.4). The full ancestor rule
-# (a page published under an unpublished parent) is `PublicSite::Resolver`
-# (Task 6); until then this matches what `PagesController#show` itself is
-# able to serve today.
-visible = lambda do |record|
-  case record
-  when Page then record.live?
-  when Post then record.live? && PublicSite::Paths.canonical_page(record)&.live?
-  end
-end
+# A record's own visibility, plus every ancestor page's: the same
+# `:published` rule `PagesController` resolves requests against (spec §6.3),
+# not merely a `public_paths` row existing (that row is written the moment
+# a draft is saved, spec §5.4). A page published under an unpublished parent
+# must not appear here either, so the sitemap never advertises a URL the
+# resolver would 404.
+visible = PublicSite::Resolver.method(:visible?)
 
 # `include_root` would add "/" unconditionally -- the loop below already adds
 # it itself (as the root Page's own entry in the current default locale, which

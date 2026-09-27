@@ -109,7 +109,6 @@ class PageTest < ActiveSupport::TestCase
     end
 
     assert_equal [ root ], Page.where(id: PublicPath.current.where(locale: "en", path: "/").select(:record_id)).to_a
-    assert_equal root, Page.find_by_public_path(:en, "/")
   end
 
   # The root is the one page allowed a blank slug: it contributes no segment
@@ -456,41 +455,6 @@ class PageTest < ActiveSupport::TestCase
     leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
 
     assert_equal "/ueber-uns/team", leaf.full_path(:de)
-  end
-
-  test "find_by_public_path locates the matching page" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-
-    assert_equal page, Page.find_by_public_path(:en, "/about")
-    assert_equal root, Page.find_by_public_path(:en, "/")
-    assert_nil Page.find_by_public_path(:en, "/does-not-exist")
-  end
-
-  # The lookup is scoped to one locale's key: an English path must not resolve
-  # for a German visitor just because some page holds it in English.
-  test "find_by_public_path only matches the requested locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    Mobility.with_locale(:de) { page.update!(slug: "ueber-uns") }
-
-    assert_equal page, Page.find_by_public_path(:de, "/ueber-uns")
-    assert_nil Page.find_by_public_path(:de, "/about")
-  end
-
-  # The lookup is what the public site routes through, so it answers for
-  # published pages only -- a draft is invisible at its own path, the same way
-  # an unpublished Post is absent from a post_list.
-  test "find_by_public_path ignores unpublished pages" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    draft = Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
-    Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root, published_at: 1.day.from_now)
-
-    assert_nil Page.find_by_public_path(:en, "/draft")
-    assert_nil Page.find_by_public_path(:en, "/scheduled")
-
-    draft.update!(published_at: 1.minute.ago)
-    assert_equal draft, Page.find_by_public_path(:en, "/draft")
   end
 
   test "updating a slug recomputes public_paths for the page and its descendants" do
