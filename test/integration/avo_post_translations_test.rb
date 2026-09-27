@@ -17,12 +17,12 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     Mobility.with_locale(:de) { @post.update!(title: "Hallo Welt", body: "<p>Hallo</p>") }
   end
 
-  test "the post form renders one tab per available locale" do
+  test "the post form renders one tab per enabled locale" do
     get "/avo/resources/posts/#{@post.id}/edit"
 
     assert_response :success
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       # Avo renders each tab as a `tabs__item` link plus a panel div carrying
       # `data-tab-id`; the tab titles are the locale codes, upper-cased.
       assert_match(/data-tabs-tab-name-param="#{locale.to_s.upcase}"/, response.body,
@@ -37,7 +37,7 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       %w[title slug excerpt body].each do |attribute|
         assert_includes response.body, %(name="post[#{attribute}_#{locale}]"),
           "expected an input for #{attribute} in #{locale}"

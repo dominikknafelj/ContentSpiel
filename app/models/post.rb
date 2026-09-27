@@ -59,7 +59,20 @@ class Post < ApplicationRecord
   # this reads the raw jsonb hash directly rather than through Mobility,
   # sidestepping the ambient locale entirely.
   validate :title_present_in_any_locale
-  validates :slug, presence: true
+
+  # The same ambient-locale trap `title_present_in_any_locale` documents
+  # above, and the same fix -- but it took until languages became runtime
+  # data (spec §4.1) to actually surface here: `validates :slug, presence:
+  # true` used to work by accident because the ambient locale a request
+  # saves under (I18n's fixed default, `:en`) was *always* one of the site's
+  # enabled languages -- `site_settings.locales` had no way to turn "en" off.
+  # Once setup can enable/disable languages freely, a post titled and
+  # slugged only in "de" -- ambient "en" never touched -- would fail this
+  # plain `slug` presence check for a locale that isn't even served, even
+  # though `LocalizedSlug#fill_blank_slugs` already gave it a slug in every
+  # locale that *is* enabled. Reading the raw jsonb hash sidesteps the
+  # ambient locale the same way the title check does.
+  validate :slug_present_in_any_locale
   validates :role_type, inclusion: { in: ROLE_TYPES.keys }, allow_blank: true
 
   # Keeps `public_paths` in step with this post's canonical listing page and
@@ -90,5 +103,11 @@ class Post < ApplicationRecord
   # `validate :title_present_in_any_locale`.
   def title_present_in_any_locale
     errors.add(:title, :blank) if read_attribute(:title).to_h.values.all?(&:blank?)
+  end
+
+  # Raw jsonb hash, not the Mobility reader: see the comment above
+  # `validate :slug_present_in_any_locale`.
+  def slug_present_in_any_locale
+    errors.add(:slug, :blank) if read_attribute(:slug).to_h.values.all?(&:blank?)
   end
 end

@@ -96,7 +96,15 @@ Rails.application.routes.draw do
   # still requires at least one character for it, so "/de/" (which Rails
   # normalizes to "/de") would raise a routing error and that locale's root
   # would be unreachable. `(/*path)` makes the segment genuinely optional.
-  get ":locale(/*path)", to: "pages#show", constraints: { locale: /en|de|es/ }, as: :localized_page,
+  # `constraints: LocaleRouteConstraint` (not a fixed regex): which locales
+  # this route actually matches is a runtime setting (site_settings.locales,
+  # spec §4.4), so it can't be hard-coded here the way `:path`'s absence of a
+  # constraint can. `LocaleRouteConstraint#matches?` calls `Locales.enabled?`
+  # per request; a locale that fails it is not an error -- the router simply
+  # tries the next route, which is exactly what lets "/fr/about" fall through
+  # to the unprefixed catch-all below (and then 404 there, since "fr/about"
+  # is not itself a page) the moment "fr" is disabled, with no deploy needed.
+  get ":locale(/*path)", to: "pages#show", constraints: LocaleRouteConstraint, as: :localized_page,
     defaults: { path: "" }, format: false
 
   # No locale prefix at all: served in the site's current default locale

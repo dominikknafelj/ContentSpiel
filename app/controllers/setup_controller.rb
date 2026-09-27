@@ -163,10 +163,20 @@ class SetupController < ApplicationController
       permitted.merge(social_links: links.to_h)
     end
 
+    # Writes the chosen default plus any additional languages as
+    # `site_settings.locales` (spec §4.4) -- unlike every other step, this one
+    # can change what `Locales.enabled` returns, so every page and post needs
+    # a URL recomputed in whichever languages just became enabled (or lost
+    # one that just left) before the next step renders. `extra_locales` has
+    # no backing column -- it only exists as a form field -- so it's read
+    # straight off `params` rather than assigned to `@site_setting` directly.
     def update_languages
       @site_setting = Current.site
+      permitted = params.expect(site_setting: [ :default_locale, extra_locales: [] ])
+      codes = ([ permitted[:default_locale] ] + Array(permitted[:extra_locales])).uniq.compact_blank
 
-      if @site_setting.update(default_locale: params.dig(:site_setting, :default_locale))
+      if @site_setting.update(default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } })
+        PublicSite::Paths.rebuild!
         redirect_to setup_step_path("mcp_token")
       else
         render :languages, status: :unprocessable_entity

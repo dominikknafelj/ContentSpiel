@@ -56,11 +56,37 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
     patch setup_step_path("languages"), params: { site_setting: { default_locale: "de" } }
 
     assert_redirected_to setup_step_path("mcp_token")
-    assert_equal "de", SiteSetting.instance.default_locale
+    setting = SiteSetting.instance
+    assert_equal "de", setting.default_locale
+    # No `extra_locales` submitted alongside it -- the endpoint writes
+    # exactly the codes it was given, so the default becomes the site's only
+    # enabled language rather than silently keeping whichever ones were
+    # enabled before.
+    assert_equal [ "de" ], setting.locale_codes
+  end
+
+  # Covers the endpoint actually enabling every submitted language (spec
+  # §4.4), not just recording the choice of default: setup runs before any
+  # page or post exists, so unlike `Locales::Enable` (which also backfills
+  # slugs for *existing* content -- there is none yet here), all
+  # `update_languages` needs to do is make `Locales.enabled` return the new
+  # list and rebuild `public_paths` so it's not left stale for whatever gets
+  # created next. A page created right after this step, still within the
+  # wizard, proves the newly-enabled language is already live.
+  test "additional languages are enabled alongside the default" do
+    patch setup_step_path("languages"), params: { site_setting: {
+      default_locale: "de", extra_locales: [ "en", "fr" ]
+    } }
+
+    assert_redirected_to setup_step_path("mcp_token")
+    assert_equal %w[de en fr], SiteSetting.instance.locale_codes
+
+    about = create_page(title: "About")
+    assert_equal "/about", about.full_path("fr")
   end
 
   test "an unsupported language is rejected" do
-    patch setup_step_path("languages"), params: { site_setting: { default_locale: "fr" } }
+    patch setup_step_path("languages"), params: { site_setting: { default_locale: "xx" } }
 
     assert_response :unprocessable_entity
   end

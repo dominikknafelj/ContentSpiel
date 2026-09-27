@@ -44,11 +44,11 @@ class SiteSettingTest < ActiveSupport::TestCase
     assert_includes setting.errors[:default_locale], "must be one of the enabled languages"
   end
 
-  test "default_locale accepts any configured locale" do
+  test "default_locale accepts any of the site's own enabled locales" do
     setting = SiteSetting.instance
 
-    I18n.available_locales.each do |locale|
-      setting.default_locale = locale.to_s
+    setting.locale_codes.each do |locale|
+      setting.default_locale = locale
       assert setting.valid?, "expected #{locale} to be a valid default_locale"
     end
   end

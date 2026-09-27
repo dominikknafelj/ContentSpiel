@@ -193,7 +193,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, %(name="page[hero_image]"),
       "a standard page has no hero image"
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_not_includes response.body, %(name="page[subtitle_#{locale}]"),
         "a standard page has no subtitle in #{locale}"
     end
@@ -208,7 +208,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(name="page[hero_image]"),
       "a landing page has a hero image"
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_includes response.body, %(name="page[subtitle_#{locale}]"),
         "a landing page has a subtitle in #{locale}"
     end
@@ -235,7 +235,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       %w[title slug meta_title meta_description].each do |attribute|
         assert_includes response.body, %(name="page[#{attribute}_#{locale}]"),
           "expected an input for #{attribute} in #{locale}"
@@ -269,7 +269,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(name="page[content_blocks_attributes][0][settings][content_type]")
     assert_includes response.body, %(name="page[content_blocks_attributes][0][_destroy]")
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_includes response.body, %(name="page[content_blocks_attributes][0][caption_#{locale}]")
       assert_includes response.body, %(name="page[content_blocks_attributes][0][body_#{locale}]")
     end

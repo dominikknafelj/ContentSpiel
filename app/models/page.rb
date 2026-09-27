@@ -103,7 +103,19 @@ class Page < ApplicationRecord
   # The root is exempt because its slug is `""` by design (see
   # `PublicSite::Paths.page_path`): the homepage contributes no segment and its
   # path is "/".
-  validates :slug, presence: true, unless: -> { parent_id.nil? }
+  #
+  # A raw jsonb-hash check, not `validates :slug, presence: true` (which
+  # reads the plain Mobility reader, i.e. whichever locale happens to be
+  # ambient when this save runs) -- the same ambient-locale trap
+  # `title_present_in_any_locale` above already sidesteps, and for the same
+  # reason it now matters here too: languages are runtime data (spec §4.1),
+  # so the request's ambient locale (I18n's fixed default, `:en`) is no
+  # longer guaranteed to be one of the site's enabled languages. A page
+  # titled and slugged only in "de" -- with "en" never touched and possibly
+  # not even enabled -- would otherwise fail this check for a locale nobody
+  # is serving, even though `LocalizedSlug#fill_blank_slugs` already gave it
+  # a slug in every locale that *is* enabled.
+  validate :slug_present_in_any_locale, unless: -> { parent_id.nil? }
 
   # `pages.position` is nullable because closure_tree is what fills it in,
   # after the first save -- so this cannot be a plain presence validation or no
@@ -174,6 +186,12 @@ class Page < ApplicationRecord
   # `validate :title_present_in_any_locale`.
   def title_present_in_any_locale
     errors.add(:title, :blank) if read_attribute(:title).to_h.values.all?(&:blank?)
+  end
+
+  # Raw jsonb hash, not the Mobility reader: see the comment above
+  # `validate :slug_present_in_any_locale`.
+  def slug_present_in_any_locale
+    errors.add(:slug, :blank) if read_attribute(:slug).to_h.values.all?(&:blank?)
   end
 
   # The tree has exactly one root: the homepage. Checked on update as well as

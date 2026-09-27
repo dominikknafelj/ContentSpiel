@@ -337,7 +337,11 @@ class PostTest < ActiveSupport::TestCase
     assert_equal "hello-world", Post.find(other.id).slug
   end
 
-  test "the translated locales are the site's configured locales" do
-    assert_equal %i[en de es], Mobility.available_locales
+  # Mobility's available locales are every *supported* language (spec §4.1),
+  # not the site's own enabled subset -- that's `Locales.enabled`, a runtime
+  # setting Mobility can't see. Widening this list needs no migration and no
+  # per-locale accessor to be added by hand.
+  test "the translated locales are every supported language" do
+    assert_equal ::SUPPORTED_LOCALES.keys.map(&:to_sym), Mobility.available_locales
   end
 end
