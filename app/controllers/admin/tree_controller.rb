@@ -25,6 +25,15 @@ module Admin
       status = result.ok? ? :ok : :unprocessable_entity
       message = result.ok? ? nil : result.errors.to_sentence
       render turbo_stream: tree_stream(selected: page, message: message), status: status
+    rescue ActiveRecord::RecordNotFound
+      # The dragged page or its drop target was deleted elsewhere (another
+      # tab, another editor) between SortableJS's optimistic DOM move and
+      # this PATCH landing -- not a bug in the drag itself, just a stale
+      # client. The tree as the database has it right now is still a
+      # perfectly good answer; `selected: nil` since whichever id went
+      # missing can no longer be looked up to highlight.
+      render turbo_stream: tree_stream(selected: nil, message: "That page no longer exists — the tree was refreshed"),
+        status: :not_found
     end
 
     private

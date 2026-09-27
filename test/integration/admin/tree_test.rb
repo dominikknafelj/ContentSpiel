@@ -28,6 +28,29 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: @child.id, position: 0 }, as: :turbo_stream
     assert_response :unprocessable_entity
     assert_equal root_page, @a.reload.parent
-    assert_includes response.body, "can't be moved under itself"
+    # The status partial renders this message auto-escaped like any other
+    # admin text (no `raw`), so a plain apostrophe comes back as `&#39;` --
+    # decode before asserting on the human-readable text.
+    assert_includes CGI.unescapeHTML(response.body), "can't be moved under itself"
+  end
+
+  test "moving a page that was deleted elsewhere re-renders the current tree with an error, not a 500" do
+    stale_id = @child.id
+    @child.destroy!
+
+    patch "/cs-studio/tree", params: { page_id: stale_id, parent_id: @b.id, position: 0 }, as: :turbo_stream
+    assert_response :not_found
+    assert_includes response.body, "no longer exists"
+    assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+  end
+
+  test "moving a page onto a target that was deleted elsewhere re-renders the current tree with an error" do
+    stale_parent_id = @b.id
+    @b.destroy!
+
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: stale_parent_id, position: 0 }, as: :turbo_stream
+    assert_response :not_found
+    assert_includes response.body, "no longer exists"
+    assert_equal @a, @child.reload.parent
   end
 end
