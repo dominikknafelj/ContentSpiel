@@ -9,7 +9,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
 
   test "preview requires sign-in" do
     get "/preview/draft"
-    assert_redirected_to new_session_path
+    assert_redirected_to admin_sign_in_path
   end
 
   test "signed-in editors preview drafts with a banner, no-store and noindex" do

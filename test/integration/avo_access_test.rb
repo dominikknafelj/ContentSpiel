@@ -262,17 +262,17 @@ class AvoAccessTest < ActionDispatch::IntegrationTest
     end
 
     def sign_in
-      post session_url, params: { email_address: @user.email_address, password: "password123" }
+      post admin_sign_in_url, params: { email_address: @user.email_address, password: "password123" }
       assert_response :redirect
     end
 
-    # Compare paths rather than using `assert_redirected_to new_session_path`:
+    # Compare paths rather than using `assert_redirected_to admin_sign_in_path`:
     # after a request to an Avo controller the integration test's `url_options`
     # carry the engine's `script_name` ("/avo"), so the helper would expect
-    # "/avo/session/new" instead of the app's real sign-in route.
+    # "/avo/cs-studio/sign-in" instead of the app's real sign-in route.
     def assert_redirected_to_sign_in
       assert_response :redirect
-      assert_equal Rails.application.routes.url_helpers.new_session_path,
+      assert_equal Rails.application.routes.url_helpers.admin_sign_in_path,
         URI.parse(response.location).path
     end
 end

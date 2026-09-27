@@ -24,7 +24,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     get "/up"
     assert_response :success
 
-    get new_session_path
+    get admin_sign_in_path
     assert_response :success
 
     post "/mcp"
@@ -32,7 +32,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
   end
 
   test "nothing is redirected once setup is complete" do
-    get new_session_path
+    get admin_sign_in_path
     assert_response :success
 
     get "/avo"

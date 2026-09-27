@@ -43,8 +43,19 @@ Rails.application.routes.draw do
   # path.
   mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
 
-  resource :session
-  resources :passwords, param: :token
+  # CS Studio, the admin (cs-studio spec §3). Its path is configurable
+  # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
+  # advertises no login page. Declared before /preview and the public
+  # catch-alls, which would otherwise swallow it as a page path.
+  scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
+    get "sign-in", to: "sessions#new", as: :sign_in
+    post "sign-in", to: "sessions#create"
+    delete "sign-out", to: "sessions#destroy", as: :sign_out
+    resource :password, only: %i[new create]
+    get "password/:token/edit", to: "passwords#edit", as: :edit_password
+    patch "password/:token", to: "passwords#update", as: :update_password
+    root to: "home#show"
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # First-run setup wizard (design spec 2026-09-26 §4). SetupController

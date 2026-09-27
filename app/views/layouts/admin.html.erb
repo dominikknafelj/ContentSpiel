@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="<%= admin_locale %>">
+  <head>
+    <title><%= content_for(:title) || "CS Studio" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= render "shared/theme_head" %>
+    <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <%# CS Studio's shell (cs-studio spec §4.2): a grid of up to three columns --
+      modules, an optional page tree, and the main content frame.
+      `data-admin-locale` carries the editing language onto <body> (rather
+      than one data attribute per component) so any Stimulus controller can
+      read it via `closest` without a server round trip. Only the modules
+      column is real yet -- the tree column (`content_for :tree`) and the
+      resource controllers that fill `content` arrive in Tasks 3-7; until
+      then this grid quietly collapses to two columns. %>
+  <body data-admin-locale="<%= admin_locale %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <div class="grid min-h-screen grid-cols-[auto_1fr] md:grid-cols-[16rem_1fr]<%= " lg:grid-cols-[16rem_18rem_1fr]" if content_for?(:tree) %>">
+      <nav aria-label="Modules" class="flex flex-col gap-6 border-r border-line bg-surface p-4">
+        <ul class="flex flex-col gap-2">
+          <li><%= link_to "Pages", admin_root_path %></li>
+          <%# Posts and Tags have no module of their own yet (Tasks 6-7) --
+              rendered as real, discoverable <a> elements (not stub routes,
+              which Tasks 6-7 would only have to tear back down) so the
+              modules column's shape is already right; `aria-disabled` plus
+              `pointer-events-none` keep them inert until then. %>
+          <li><%= link_to "Posts", "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "pointer-events-none opacity-50" %></li>
+          <li><%= link_to "Tags", "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "pointer-events-none opacity-50" %></li>
+        </ul>
+
+        <div>
+          <p class="font-cs-mono text-label uppercase tracking-mono text-meta">(old admin)</p>
+          <ul class="mt-2 flex flex-col gap-2">
+            <li><%= link_to "Settings", "/avo/resources/site_settings" %></li>
+            <li><%= link_to "Users", "/avo/resources/users" %></li>
+            <li><%= link_to "API tokens", "/avo/resources/api_tokens" %></li>
+            <li><%= link_to "System status", "/avo/system_status" %></li>
+          </ul>
+        </div>
+
+        <div class="mt-auto flex flex-col gap-2">
+          <%= render "shared/theme_toggle" %>
+          <%= button_to "Sign out", admin_sign_out_path, method: :delete %>
+        </div>
+      </nav>
+
+      <% if content_for?(:tree) %>
+        <aside id="tree-column" class="border-r border-line bg-surface p-4">
+          <%= yield :tree %>
+        </aside>
+      <% end %>
+
+      <main class="p-6">
+        <turbo-frame id="content" data-turbo-action="advance">
+          <%= yield %>
+        </turbo-frame>
+      </main>
+    </div>
+  </body>
+</html>

@@ -8,7 +8,7 @@ module Avo
     # Avo's controllers do not inherit from the app's ApplicationController, so
     # the sign-in route the Authentication concern redirects to has to be
     # delegated to the main app's route set.
-    delegate :new_session_path, to: :main_app
+    delegate :admin_sign_in_path, to: :main_app
 
     # Prepended so authentication runs before any of Avo's own before_actions.
     prepend_before_action :require_authentication

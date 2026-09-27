@@ -130,7 +130,7 @@ class SetupController < ApplicationController
         session.delete(:setup_token_verified)
         redirect_to setup_step_path("site")
       elsif User.exists?
-        redirect_to new_session_path, alert: "An admin account already exists. Sign in to continue setup."
+        redirect_to admin_sign_in_path, alert: "An admin account already exists. Sign in to continue setup."
       else
         render :admin, status: :unprocessable_entity
       end

@@ -3,10 +3,11 @@
    so the two stylesheets stay independent (spec §9). */
 @import "tailwindcss" source(none);
 @source "../../views/setup";
-@source "../../views/sessions";
-@source "../../views/passwords";
+@source "../../views/admin";
 @source "../../views/shared";
 @source "../../views/layouts/setup.html.erb";
 @source "../../views/layouts/product.html.erb";
+@source "../../views/layouts/admin.html.erb";
 @source "../../helpers/setup_helper.rb";
+@source "../../components/admin";
 @import "./content-spiel.tailwind.css";
