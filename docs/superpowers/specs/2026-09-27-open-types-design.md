@@ -7,7 +7,7 @@ Sub-project 2 of 7 on the way to ContentSpiel's own admin (`docs/roadmap.md`, Ph
 Block types (`rich_text`, `image`, `post_list`) and content types (`blog`, `resume_entry`, `now_update`) are currently closed integer enums. Their knowledge is scattered across views, the canonical-URL logic, MCP schemas, starter content, Avo and the mind graph. This sub-project makes types **open**:
 - string columns checked against registries;
 - one declarative field schema per type;
-- reusable field groups ("components");
+- reusable field groups (`FieldGroups`, called "components" in Storyblok/Strapi);
 - rendering through view components that the registry points to.
 
 The admin forms in sub-project 3 are then generated from the schema. Plugins, and later admin-defined types, add types through the same seams.
@@ -25,15 +25,15 @@ The admin forms in sub-project 3 are then generated from the schema. Plugins, an
 |---|---|---|
 | Where types come from | Code now (built-ins, later plugins). The field schema is declarative, so admin-defined types (roadmap Phase 3) can feed the same format later. | Both sources now (no admin shell yet). Plain ActiveModel classes per type (admin-defined types would need a second mechanism). |
 | Block owner | Polymorphic `owner` now; only `Page` uses it. | Keep `page_id` (a second migration of the table later). A `snippet` block type only (snippets couldn't hold blocks). |
-| Type system shape | A registry of definitions + a declarative field schema → `FieldSet` (ActiveModel), with values in jsonb. Existing columns (body, caption, alt, image, title, slug, excerpt) stay as columns that a type opts into. | STI subclasses (admin-defined types can't be classes). Everything in jsonb now (rewrites rich text right before Tiptap replaces it). |
-| Field groups | "Components" (Storyblok/Strapi style): a named, reusable field group, embedded once or as a repeatable list. | — |
+| Type system shape | A registry of definitions + a declarative field schema → `Types::FieldSet` (ActiveModel), with values in jsonb. Existing columns (body, caption, alt, image, title, slug, excerpt) stay as columns that a type opts into. | STI subclasses (admin-defined types can't be classes). Everything in jsonb now (rewrites rich text right before Tiptap replaces it). |
+| Field groups | `FieldGroups` (Storyblok/Strapi call them "components"): a named, reusable field group, embedded once (`group`) or as a repeatable list (`groups`). Named FieldGroups so they never get confused with view components. | — |
 | View layer | **ViewComponent**. The registry references component classes; Lookbook for previews (dev only). | Partials by naming convention (hidden ivars, no isolated tests). Phlex (a different style from the ERB codebase). |
 
 ## 3. Registries and field schema
 
 ### 3.1 Definitions and registration
 
-- **Files:** one small definition per built-in type in `app/models/block_types/`, `app/models/content_types/` and `app/models/components/`.
+- **Files:** one small definition per built-in type in `app/models/block_types/`, `app/models/content_types/` and `app/models/field_groups/`; the shared machinery (registry, definitions, `FieldSet`) lives under `app/models/types/` in the `Types::` namespace.
 - **Registration:** in `config/initializers/types.rb` inside `Rails.application.config.to_prepare`, so reloading in development re-registers cleanly. The registry is cleared at the start of each `to_prepare` run.
 - **Plugins:** they will register through the same calls (the DSL itself is out of scope).
 
@@ -66,7 +66,7 @@ ContentTypes.register :resume_entry do |t|
             sample: { title: "Your first role", body: "…", fields: { company: "Example Co", … } }
 end
 
-Components.register :cta do |c|
+FieldGroups.register :cta do |c|
   c.label "Call to action"
   c.field :label, :string, required: true
   c.field :url, :url, required: true
@@ -75,9 +75,9 @@ end
 
 ### 3.2 Registry API
 
-- `BlockTypes` / `ContentTypes` / `Components`:
+- `BlockTypes` / `ContentTypes` / `FieldGroups`:
   - `.register(name, &block)`;
-  - `.fetch(name)`, which raises `UnknownType` for a name that isn't registered;
+  - `.fetch(name)`, which raises `Types::UnknownType` for a name that isn't registered;
   - `.find(name)`, which returns nil;
   - `.names` and `.all`;
   - `BlockTypes.with_capability(:lists_posts)`.
@@ -90,27 +90,34 @@ end
   - the `field_set` class;
   - for content types, also `color` and `starter`.
 
+### 3.2a Type names and plugins
+
+- Built-in types use bare names (`image`, `blog`); those names are reserved.
+- Every other type (plugins now, admin-defined types later) must be prefixed with its owner: `gallery/album`, `events/event`. Stored type strings carry the prefix.
+- `register` raises `Types::DuplicateType` for a name that is already registered. The only exception is the `to_prepare` reload, which resets the registries before re-registering.
+- Plugins isolate their own Ruby constants, tables, routes, views, i18n keys and JS behind their engine namespace (`isolate_namespace`); the host app stays idiomatic top-level Rails. The public plugin API goes under `ContentSpiel::` when the plugin DSL arrives (Phase 3).
+
 ### 3.3 Field types and options
 
 - **Scalar types:** `string`, `text`, `integer`, `boolean`, `date`, `url`, `select` (`options:` a Hash or Array), `content_type` (must be registered), `tag` (a tag name).
 - **Group types:**
-  - `component` (`of:` a registered component; one nested object);
-  - `components` (`of:`; an ordered list of objects).
+  - `group` (`of:` a registered field group; one nested object);
+  - `groups` (`of:`; an ordered list of objects).
 - **Options:** `required`, `default`, `min`/`max` (integer), `translated`.
 - **Limits:**
-  - A component's own fields may not be `component`/`components`, so there is one level of nesting.
+  - A component's own fields may not be `group`/`groups`, so there is one level of nesting.
   - There are no "dynamic zones" (mixed-type lists). For pages the block list plays that role, and polymorphic owners let other records own blocks later.
 
-### 3.4 `FieldSet`
+### 3.4 `Types::FieldSet`
 
-- **What it builds:** `FieldSet.for(definition)` builds, and caches per definition, an ActiveModel class. It uses `ActiveModel::Attributes` for casting and `ActiveModel::Validations` for `required`, `select` inclusion, `min`/`max`, parseable dates and URLs, registered content types, and nested component validation.
+- **What it builds:** `Types::FieldSet.for(definition)` builds, and caches per definition, an ActiveModel class. It uses `ActiveModel::Attributes` for casting and `ActiveModel::Validations` for `required`, `select` inclusion, `min`/`max`, parseable dates and URLs, registered content types, and nested component validation.
 - **Blanks:** blank strings cast to nil and stay nil. This replaces `discard_blank_settings`.
 - **Errors:** keyed by path so a form can mark the exact input, e.g. `limit` or `speakers.1.name`. On the owning record they appear as `settings.limit` / `fields.speakers.1.name`.
 - **Translated fields:**
   - A `translated: true` field's value is stored per locale.
-  - A translated `component`/`components` field is translated **as a whole**: each locale stores its own copy. Fields inside a component are never translated individually.
+  - A translated `group`/`groups` field is translated **as a whole**: each locale stores its own copy. Fields inside a component are never translated individually.
   - Public reads fall back along `Locales.fallback_chain`, like `Locales.read`; admin and MCP read the literal locale.
-- **Serialization:** `to_h` produces plain JSON (string keys; dates as ISO strings; components as hashes/arrays).
+- **Serialization:** `to_h` produces plain JSON (string keys; dates as ISO strings; groups as hashes/arrays).
 
 ## 4. Data model
 
@@ -132,14 +139,14 @@ end
 - **`ContentBlock`:**
   - `belongs_to :owner, polymorphic: true`;
   - validates that `block_type` is registered, checked at validation time;
-  - `settings_object` returns the type's `FieldSet` instance over `settings` + `translated_settings`, and assignment writes back;
+  - `settings_object` returns the type's `Types::FieldSet` instance over `settings` + `translated_settings`, and assignment writes back;
   - validation delegates to it.
   - `listed_posts` and `lists?(post)` move onto the `post_list` definition's `lists_posts` capability. `ContentBlock` delegates for blocks whose type has it; other blocks list nothing.
   - `discard_blank_settings` and the enum-specific `settings` validation go away.
 - **`Page`:** `has_many :content_blocks, -> { order(:position) }, as: :owner, dependent: :destroy`. `page_type` stays an integer enum: it is layout, not content, and there are no new enums.
 - **`Post`:**
   - validates that `content_type` is registered;
-  - `fields` returns the content type's `FieldSet` over `metadata` + `translated_metadata`, with writes going back through it;
+  - `fields` returns the content type's `Types::FieldSet` over `metadata` + `translated_metadata`, with writes going back through it;
   - the resume `store_accessor`s and `Post::ROLE_TYPES` move into the `resume_entry` definition;
   - resume helpers (`resume_period`) read `post.fields`.
 - **Unknown stored types** (for example, a removed plugin):
@@ -154,7 +161,7 @@ end
 - **Components** live in `app/components/`:
   - `Blocks::RichTextComponent`, `Blocks::ImageComponent`, `Blocks::PostListComponent`;
   - `Posts::BlogRowComponent`, `Posts::ResumeRowComponent`, `Posts::NowComponent`, `Posts::DetailComponent`;
-  - a generic `Fields::ComponentValueComponent` for rendering a field group.
+  - a generic `Fields::GroupComponent` for rendering a field group.
 - **Inputs:** each component receives explicit, typed inputs, e.g. `block:`, `settings:`, `posts:`, `page:`, `urls:`. Components read no controller instance variables.
 - **Behaviour:** the current partials' markup and theme classes move over unchanged; this is a behaviour-preserving port.
 - **Dispatch:** `pages/show.html.erb` renders `BlockTypes.fetch(block.block_type).component.new(...)` per block; unknown types render nothing. The post list renders each post through its content type's `list_item_component`. The post detail uses `detail_component`.
@@ -176,21 +183,21 @@ end
 | `StarterContent::SECTIONS` | built from each content type's `starter` declaration |
 | Mind graph colours (`mind_graph_controller.js`) | per-type `color`, passed from the view as data |
 | Avo: content-type filter, post and block resources, `nested_content_blocks` + `_content_block_row` | options from the registries; block settings inputs rendered from the schema by a small generic field renderer (throwaway until the admin) |
-| `ContentBlocks::Save`, `Posts::Save`, `Pages::Save` | string types; `settings`/`fields` assigned through the `FieldSet`; invalid values come back as error Results with per-field keys |
+| `ContentBlocks::Save`, `Posts::Save`, `Pages::Save` | string types; `settings`/`fields` assigned through the `Types::FieldSet`; invalid values come back as error Results with per-field keys |
 | `db/seeds.rb` | string types, typed fields |
 
 ## 7. Error handling
 
 - **Unregistered type on save:** a validation error (`"isn't a registered block type"` / `"… content type"`), which services return as an error Result.
 - **Invalid field values:** per-field validation errors keyed by path.
-- **`fetch` of an unknown type:** raises `UnknownType`. Rendering and path-sync boundaries use `find` and skip, logging a warning, so a stale record never 500s the public site.
-- **Components:** a component registered with nested component fields raises at registration (a developer error, caught at boot).
+- **`fetch` of an unknown type:** raises `Types::UnknownType`. Rendering and path-sync boundaries use `find` and skip, logging a warning, so a stale record never 500s the public site.
+- **Field groups:** a field group registered with nested `group`/`groups` fields raises at registration (a developer error, caught at boot). Registering a taken name raises `Types::DuplicateType` (§3.2a).
 
 ## 8. Testing
 
 - **Unit:**
   - registries: register, fetch/find, names, capabilities, reset on reload, duplicate registration replaces;
-  - `FieldSet` for every field type: casting, blanks → nil, required, select, min/max, dates, URLs, `content_type`, components (single and list), nested error paths, translated fields and fallback reads, `to_h` round trip;
+  - `Types::FieldSet` for every field type: casting, blanks → nil, required, select, min/max, dates, URLs, `content_type`, components (single and list), nested error paths, translated fields and fallback reads, `to_h` round trip;
   - each built-in definition;
   - each view component rendered in isolation (`render_inline`).
 - **Open-type proof:** a test-only block type and content type (plus a component) registered inside the test. They need no migration, render through their components, get canonical URLs when their block lists posts, appear in MCP schemas, and validate typed fields through services.

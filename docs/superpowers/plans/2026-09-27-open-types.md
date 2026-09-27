@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the closed block-type and content-type enums with string types backed by code registries (`BlockTypes`, `ContentTypes`, `Components`) that carry a declarative field schema, give blocks a polymorphic owner, and render blocks and post lists through view components the registry points to.
+**Goal:** Replace the closed block-type and content-type enums with string types backed by code registries (`BlockTypes`, `ContentTypes`, `FieldGroups`) that carry a declarative field schema, give blocks a polymorphic owner, and render blocks and post lists through view components the registry points to.
 
-**Architecture:** Definitions are plain Ruby objects registered from `config/initializers/types.rb` (`to_prepare`). A `FieldSet` builder turns a definition's field schema into an ActiveModel class that casts, validates and serializes values stored in jsonb (`settings`/`translated_settings` on blocks, `metadata`/`translated_metadata` on posts). Everything that knows about a specific type asks the registry instead: rendering, canonical URLs, MCP, starter content, Avo and the mind graph. ViewComponent replaces the block and post-list partials.
+**Architecture:** Definitions are plain Ruby objects registered from `config/initializers/types.rb` (`to_prepare`). A `Types::FieldSet` builder turns a definition's field schema into an ActiveModel class that casts, validates and serializes values stored in jsonb (`settings`/`translated_settings` on blocks, `metadata`/`translated_metadata` on posts). Everything that knows about a specific type asks the registry instead: rendering, canonical URLs, MCP, starter content, Avo and the mind graph. ViewComponent replaces the block and post-list partials.
 
 **Tech Stack:** Rails 8.1, Ruby 3.4, Postgres jsonb, Mobility 1.3, ActiveModel::Attributes, `view_component` (new gem), `lookbook` (new gem, development/test only), Minitest + fixtures, Avo 4 (transitional).
 
@@ -16,13 +16,13 @@
 - **Registration.** Built-ins register from `config/initializers/types.rb` inside `Rails.application.config.to_prepare`, and the registries reset at the start of each run. Plugins will use the same `register` calls; the DSL is out of scope.
 - **Field types:** exactly `string text integer boolean date url select content_type tag component components`.
   - Options: `required default min max translated options of`.
-  - A component's own fields may not be `component`/`components` (one level).
+  - A component's own fields may not be `group`/`groups` (one level).
   - No dynamic zones.
-- **Translated field storage.** Values live in `translated_settings` / `translated_metadata` as `{ locale => { key => value } }`. A translated `component`/`components` field is translated as a whole.
+- **Translated field storage.** Values live in `translated_settings` / `translated_metadata` as `{ locale => { key => value } }`. A translated `group`/`groups` field is translated as a whole.
 - **Reads.** Public reads fall back along `Locales.fallback_chain`; admin and MCP read the literal locale.
 - **Existing columns stay columns** (block `body`/`caption`/`alt`/`image`; post `title`/`slug`/`excerpt`/`body`). A type opts into them with `uses`. ActionText is untouched (Tiptap is sub-project 4).
 - **Enums.** `page_type` stays an integer enum. No new integer enums anywhere.
-- **Unknown stored types never 500 the public site.** Render boundaries and path sync use `find` and skip with a logged warning; `fetch` raises `TypeRegistry::UnknownType`.
+- **Unknown stored types never 500 the public site.** Render boundaries and path sync use `find` and skip with a logged warning; `fetch` raises `Types::UnknownType`.
 - **Components.** View components live in `app/components/`, take explicit keyword inputs, and read no controller instance variables. Lookbook is mounted only in development at `/lookbook`.
 - **Patterns from the foundations sub-project apply:**
   - services return `ApplicationService::Result`;
@@ -42,11 +42,11 @@
 2. **A stored block or post whose type is no longer registered.** The public page must still render (skipping that block), post path sync must skip that post, and neither may raise. Pinned in Task 2, step 1: `test "an unregistered stored block type is skipped on render and sync"`.
 3. **Blank form values for typed fields** (`limit: ""`, `start_date: ""`). They must be stored as absent, not `""` or `0`, so "blank = no limit / current role" keeps working. Pinned in Task 1, step 1: `test "blank strings cast to nil for every scalar type"`.
 4. **A translated field written in one locale and read in another on the public site.** It must fall back along the site's chain; admin and MCP must see the literal (blank) value. Pinned in Task 1, step 1: `test "translated field reads fall back publicly and stay literal otherwise"`.
-5. **Registries after code reload in development.** Types must still be registered exactly once (no duplicates, no "unknown type" after an edit). Pinned in Task 1, step 1: `test "re-registering replaces the definition and reset! clears"`, plus the `to_prepare` reset in Task 2.
+5. **Registries after code reload in development.** Types must still be registered exactly once (no duplicates, no "unknown type" after an edit); registering a taken name outside a reset raises `Types::DuplicateType`. Pinned in Task 1, step 1: `test "re-registering replaces the definition and reset! clears"`, plus the `to_prepare` reset in Task 2.
 
 ---
 
-### Task 1: Field schema, `FieldSet` and the registries
+### Task 1: Field schema, `Types::FieldSet` and the registries
 
 Spec: §3.
 
@@ -67,23 +67,23 @@ Spec: §3.
 
 **Interfaces:**
 - **Produces:**
-  - `BlockTypes` / `ContentTypes` / `Components` (modules extending `TypeRegistry`), with:
+  - `BlockTypes` / `ContentTypes` / `FieldGroups` (modules extending `Types::Registry`), with:
     - `.register(name) { |t| … }`, which returns the definition;
-    - `.fetch(name)`, which raises `TypeRegistry::UnknownType`;
+    - `.fetch(name)`, which raises `Types::UnknownType`;
     - `.find(name)`, which returns nil for an unknown name;
     - `.names` (Array of String), `.all`, `.reset!`;
     - `BlockTypes.with_capability(sym)`;
     - `ContentTypes.default`, the first registered content type definition.
-  - **`TypeDefinition` DSL:**
+  - **`Types::Definition` DSL:**
     - `label(str)`, `field(name, type, **opts)`, `uses(*columns)`, `capability(*syms)`;
-    - readers `name`, `label`, `fields` (Array of `TypeDefinition::Field`), `uses_columns`, `capability?(sym)`, `field_set` (the built class).
-  - **`BlockTypeDefinition`:** `component(klass)` → `#component`.
-  - **`ContentTypeDefinition`:**
+    - readers `name`, `label`, `fields` (Array of `Types::Definition::Field`), `uses_columns`, `capability?(sym)`, `field_set` (the built class).
+  - **`Types::BlockTypes::Definition`:** `component(klass)` → `#component`.
+  - **`Types::ContentTypes::Definition`:**
     - `color(hex)`, `list_component(klass)`, `detail_component(klass)`, `starter(section:, sample:)`;
     - the matching readers.
-  - **`ComponentDefinition`:** `component(klass)` for rendering a field group.
-  - **`TypeDefinition::Field`** = `Data.define(:name, :type, :options)` with `#translated?`, `#required?`, `#group?`.
-  - **`FieldSet.for(definition)`** returns an ActiveModel class. Instances are built with `new(values = {}, translations = {}, locale: nil, fallback: false)`, where `values` holds untranslated keys and `translations` is `{ locale => hash }`. They offer:
+  - **`Types::FieldGroupDefinition`:** `component(klass)` for rendering a field group.
+  - **`Types::Definition::Field`** = `Data.define(:name, :type, :options)` with `#translated?`, `#required?`, `#group?`.
+  - **`Types::FieldSet.for(definition)`** returns an ActiveModel class. Instances are built with `new(values = {}, translations = {}, locale: nil, fallback: false)`, where `values` holds untranslated keys and `translations` is `{ locale => hash }`. They offer:
     - a reader per field;
     - `#valid?` / `#errors`, keyed by path like `limit`, `speakers.1.name`;
     - `#untranslated_hash` and `#translated_hash`, the JSON-ready hashes of each group;
@@ -97,7 +97,7 @@ Spec: §3.
 ```ruby
 require "test_helper"
 
-class TypeRegistryTest < ActiveSupport::TestCase
+class Types::RegistryTest < ActiveSupport::TestCase
   setup do
     @saved = BlockTypes.all.dup
     BlockTypes.reset!
@@ -113,7 +113,7 @@ class TypeRegistryTest < ActiveSupport::TestCase
     assert_equal %w[quote], BlockTypes.names
     assert_equal "Quote", BlockTypes.fetch(:quote).label
     assert_nil BlockTypes.find("nope")
-    assert_raises(TypeRegistry::UnknownType) { BlockTypes.fetch("nope") }
+    assert_raises(Types::UnknownType) { BlockTypes.fetch("nope") }
     assert_equal %w[quote], BlockTypes.with_capability(:lists_posts).map(&:name)
   end
 
@@ -127,21 +127,21 @@ class TypeRegistryTest < ActiveSupport::TestCase
 
   test "unknown field types and nested components are rejected at registration" do
     assert_raises(ArgumentError) { BlockTypes.register(:x) { |t| t.field :a, :colour } }
-    assert_raises(ArgumentError) { Components.register(:bad) { |c| c.field :inner, :component, of: :cta } }
+    assert_raises(ArgumentError) { FieldGroups.register(:bad) { |c| c.field :inner, :group, of: :cta } }
   end
 end
 ```
 
-`registry_put` is a small test seam that puts a definition back unchanged. Define it in `TypeRegistry` as a public method named exactly `registry_put`, with a comment saying it's for tests restoring state.
+`registry_put` is a small test seam that puts a definition back unchanged. Define it in `Types::Registry` as a public method named exactly `registry_put`, with a comment saying it's for tests restoring state.
 
 `test/models/field_set_test.rb`:
 
 ```ruby
 require "test_helper"
 
-class FieldSetTest < ActiveSupport::TestCase
+class Types::FieldSetTest < ActiveSupport::TestCase
   setup do
-    @definition = ContentTypeDefinition.new("event").tap do |t|
+    @definition = Types::ContentTypes::Definition.new("event").tap do |t|
       t.field :venue, :string, required: true
       t.field :seats, :integer, min: 1
       t.field :starts_on, :date
@@ -150,17 +150,17 @@ class FieldSetTest < ActiveSupport::TestCase
       t.field :listed, :boolean, default: true
       t.field :headline, :string, translated: true
     end
-    Components.register(:speaker) { |c| c.field :name, :string, required: true; c.field :url, :url }
-    @with_components = ContentTypeDefinition.new("conference").tap do |t|
-      t.field :speakers, :components, of: :speaker
-      t.field :lead, :component, of: :speaker, translated: true
+    FieldGroups.register(:speaker) { |c| c.field :name, :string, required: true; c.field :url, :url }
+    @with_components = Types::ContentTypes::Definition.new("conference").tap do |t|
+      t.field :speakers, :groups, of: :speaker
+      t.field :lead, :group, of: :speaker, translated: true
     end
   end
 
-  teardown { Components.reset! ; Rails.application.reloader.prepare! }
+  teardown { FieldGroups.reset! ; Rails.application.reloader.prepare! }
 
   test "casts, defaults and validates scalar fields" do
-    fields = FieldSet.for(@definition).new({ "venue" => "Hall", "seats" => "12", "starts_on" => "2026-10-01", "kind" => "talk" })
+    fields = Types::FieldSet.for(@definition).new({ "venue" => "Hall", "seats" => "12", "starts_on" => "2026-10-01", "kind" => "talk" })
     assert fields.valid?, fields.errors.full_messages.to_sentence
     assert_equal 12, fields.seats
     assert_equal Date.new(2026, 10, 1), fields.starts_on
@@ -168,7 +168,7 @@ class FieldSetTest < ActiveSupport::TestCase
   end
 
   test "blank strings cast to nil for every scalar type" do
-    fields = FieldSet.for(@definition).new({ "venue" => "Hall", "seats" => "", "starts_on" => "", "website" => "", "kind" => "" })
+    fields = Types::FieldSet.for(@definition).new({ "venue" => "Hall", "seats" => "", "starts_on" => "", "website" => "", "kind" => "" })
     assert_nil fields.seats
     assert_nil fields.starts_on
     assert_nil fields.website
@@ -178,7 +178,7 @@ class FieldSetTest < ActiveSupport::TestCase
   end
 
   test "required, min, select, date and url errors are keyed by field" do
-    fields = FieldSet.for(@definition).new({ "seats" => "0", "starts_on" => "not a date", "website" => "javascript:alert(1)", "kind" => "party" })
+    fields = Types::FieldSet.for(@definition).new({ "seats" => "0", "starts_on" => "not a date", "website" => "javascript:alert(1)", "kind" => "party" })
     assert_not fields.valid?
     %w[venue seats starts_on website kind].each { |key| assert fields.errors[key].any?, "expected an error on #{key}" }
   end
@@ -186,14 +186,14 @@ class FieldSetTest < ActiveSupport::TestCase
   test "translated field reads fall back publicly and stay literal otherwise" do
     site_settings(:default).update!(default_locale: "de")
     translations = { "de" => { "headline" => "Hallo" } }
-    literal = FieldSet.for(@definition).new({ "venue" => "Hall" }, translations, locale: "en")
-    public_read = FieldSet.for(@definition).new({ "venue" => "Hall" }, translations, locale: "en", fallback: true)
+    literal = Types::FieldSet.for(@definition).new({ "venue" => "Hall" }, translations, locale: "en")
+    public_read = Types::FieldSet.for(@definition).new({ "venue" => "Hall" }, translations, locale: "en", fallback: true)
     assert_nil literal.headline
     assert_equal "Hallo", public_read.headline
   end
 
   test "components: nested validation with path keys and whole-component translation" do
-    fields = FieldSet.for(@with_components).new(
+    fields = Types::FieldSet.for(@with_components).new(
       { "speakers" => [ { "name" => "Ada" }, { "name" => "" } ] },
       { "en" => { "lead" => { "name" => "Grace" } } }, locale: "en")
     assert_not fields.valid?
@@ -204,7 +204,7 @@ class FieldSetTest < ActiveSupport::TestCase
   end
 
   test "assign writes translated keys for the instance locale only" do
-    fields = FieldSet.for(@definition).new({}, {}, locale: "de")
+    fields = Types::FieldSet.for(@definition).new({}, {}, locale: "de")
     fields.assign("venue" => "Saal", "headline" => "Hallo")
     assert_equal({ "venue" => "Saal" }, fields.untranslated_hash.slice("venue"))
     assert_equal({ "headline" => "Hallo" }, fields.translated_hash)
@@ -212,7 +212,7 @@ class FieldSetTest < ActiveSupport::TestCase
 end
 ```
 
-The `teardown` in FieldSetTest restores the real registrations. Task 2 adds them; until then `prepare!` just runs the to_prepare hooks. If `Rails.application.reloader.prepare!` isn't the right call on this Rails version, use whatever re-runs `to_prepare` blocks (check `ActiveSupport::Reloader`) and note it in the report.
+The `teardown` in Types::FieldSetTest restores the real registrations. Task 2 adds them; until then `prepare!` just runs the to_prepare hooks. If `Rails.application.reloader.prepare!` isn't the right call on this Rails version, use whatever re-runs `to_prepare` blocks (check `ActiveSupport::Reloader`) and note it in the report.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 
@@ -224,13 +224,13 @@ Expected: FAIL (`uninitialized constant BlockTypes`).
 `app/models/type_registry.rb`:
 
 ```ruby
-# The shared shape of BlockTypes, ContentTypes and Components (open-types spec
+# The shared shape of BlockTypes, ContentTypes and FieldGroups (open-types spec
 # §3.2): a name => definition map filled from code at boot (and, later, by
 # plugins through the same calls). Reset at the start of every `to_prepare`
 # run (config/initializers/types.rb) so a code reload in development
 # re-registers cleanly instead of keeping definitions that point at stale,
 # unloaded classes.
-module TypeRegistry
+module Types::Registry
   class UnknownType < KeyError; end
 
   def register(name, &block)
@@ -267,9 +267,9 @@ end
 
 ```ruby
 module BlockTypes
-  extend TypeRegistry
+  extend Types::Registry
 
-  def self.definition_class = BlockTypeDefinition
+  def self.definition_class = Types::BlockTypes::Definition
   def self.kind_label = "block type"
 
   def self.with_capability(capability)
@@ -278,7 +278,7 @@ module BlockTypes
 end
 ```
 
-`ContentTypes` has the same shape (`ContentTypeDefinition`, `"content type"`, plus `def self.default = all.first`). `Components` also has the same shape (`ComponentDefinition`, `"component"`). The `definition_class` / `kind_label` singleton methods are called from `TypeRegistry` as `self.class`-free module methods: inside `register`, `definition_class` resolves on the extended module.
+`ContentTypes` has the same shape (`Types::ContentTypes::Definition`, `"content type"`, plus `def self.default = all.first`). `FieldGroups` also has the same shape (`Types::FieldGroupDefinition`, `"component"`). The `definition_class` / `kind_label` singleton methods are called from `Types::Registry` as `self.class`-free module methods: inside `register`, `definition_class` resolves on the extended module.
 
 `app/models/type_definition.rb`:
 
@@ -286,8 +286,8 @@ end
 # One registered type (spec §3.1): its label, its declarative field schema,
 # which existing columns it edits, and what it's capable of. The schema is
 # data, not a class, so admin-defined types (roadmap Phase 3) can feed the
-# same format later; FieldSet turns it into an ActiveModel class.
-class TypeDefinition
+# same format later; Types::FieldSet turns it into an ActiveModel class.
+class Types::Definition
   SCALAR_TYPES = %i[string text integer boolean date url select content_type tag].freeze
   GROUP_TYPES = %i[component components].freeze
   OPTIONS = %i[required default min max translated options of].freeze
@@ -325,20 +325,20 @@ class TypeDefinition
   def capability(*names) = @capabilities.concat(names)
   def capability?(name) = @capabilities.include?(name)
 
-  def field_set = FieldSet.for(self)
+  def field_set = Types::FieldSet.for(self)
 
   # Hook for subclasses to check the finished definition at registration.
   def finalize!; end
 end
 ```
 
-`ComponentDefinition < TypeDefinition`:
+`Types::FieldGroupDefinition < Types::Definition`:
 - `finalize!` raises `ArgumentError, "components can't contain other components (one level only)"` if any field is a group;
 - adds `component(klass)` / `#component` (reader when called without an argument, as with `label`).
 
-`BlockTypeDefinition < TypeDefinition` adds `component(klass)` with the same reader/writer pattern.
+`Types::BlockTypes::Definition < Types::Definition` adds `component(klass)` with the same reader/writer pattern.
 
-`ContentTypeDefinition < TypeDefinition` adds `color`, `list_component`, `detail_component` (reader/writer pattern) and `starter(section:, sample:)` / `#starter_data`.
+`Types::ContentTypes::Definition < Types::Definition` adds `color`, `list_component`, `detail_component` (reader/writer pattern) and `starter(section:, sample:)` / `#starter_data`.
 
 `app/models/field_set.rb`:
 
@@ -348,7 +348,7 @@ end
 # halves a record stores: `values` (untranslated keys) and `translations`
 # ({ locale => { key => value } }) -- read for `locale:`, literally unless
 # `fallback: true`, which walks Locales.fallback_chain like Locales.read.
-class FieldSet
+class Types::FieldSet
   URL_SCHEMES = %w[http https mailto].freeze
 
   def self.for(definition)
@@ -415,7 +415,7 @@ class FieldSet
     def component(name)
       field = definition.fields.find { |f| f.name == name.to_s }
       raw = raw_value(field)
-      klass = Components.fetch(field.options[:of]).field_set
+      klass = FieldGroups.fetch(field.options[:of]).field_set
       if field.type == :components
         Array(raw).map { |item| klass.new(item, {}, locale: @locale) }
       else
@@ -543,11 +543,11 @@ Spec: §3.1, §4, §6 (back-end rows), §7.
   - tests that reference `page_id`, integer enums, `Post::ROLE_TYPES`, `post.company`/`role_type`/`start_date`/`end_date`, `ContentBlock.post_list`, `ContentBlock.block_types`, `Post.content_types`
 
 **Interfaces:**
-- **Consumes:** Task 1 registries and `FieldSet`.
+- **Consumes:** Task 1 registries and `Types::FieldSet`.
 - **Produces:**
   - **`ContentBlock`:**
     - `belongs_to :owner, polymorphic: true`;
-    - `#definition` (the `BlockTypeDefinition` or nil);
+    - `#definition` (the `Types::BlockTypes::Definition` or nil);
     - `#settings_object(locale: I18n.locale, fallback: false)`;
     - `#assign_settings(hash, locale:)`;
     - `#listed_posts(include_unpublished: false)` and `#lists?(post)`, both delegating to the definition's `lists_posts` behaviour;
@@ -652,12 +652,12 @@ Check the real current columns in `db/schema.rb` first: the foreign key and inde
 `config/initializers/types.rb`:
 
 ```ruby
-# Built-in block types, content types and components (open-types spec §3.1),
+# Built-in block types, content types and field groups (open-types spec §3.1),
 # registered through the same calls plugins will use. Inside `to_prepare` so
 # a code reload in development re-registers against the freshly loaded
 # classes; the registries are reset first, so nothing is registered twice.
 Rails.application.config.to_prepare do
-  [ BlockTypes, ContentTypes, Components ].each(&:reset!)
+  [ BlockTypes, ContentTypes, FieldGroups ].each(&:reset!)
 
   BlockTypes::RichText.register
   BlockTypes::Image.register
@@ -880,7 +880,7 @@ Spec: §5, §6 (rendering rows).
   - `app/components/posts/resume_list_component.rb` + `.html.erb`
   - `app/components/posts/now_list_component.rb` + `.html.erb`
   - `app/components/posts/detail_component.rb` + `.html.erb`
-  - `app/components/fields/component_value_component.rb` + `.html.erb`
+  - `app/components/fields/group_component.rb` + `.html.erb`
   - `app/components/application_component.rb`
   - `app/models/theme.rb` (`Theme.current.component_for(definition)` lookup hook)
   - `test/components/previews/**` (Lookbook previews)
@@ -892,12 +892,12 @@ Spec: §5, §6 (rendering rows).
 **Interfaces:**
 - **Consumes:** definitions (Task 2), `ThemeHelper` helpers (`translated`, `post_date`, `resume_period`, `post_url_path` via `helpers.`).
 - **Produces:**
-  - **`BlockTypeDefinition#component`:** a component class with `initialize(block:, page:)`.
-  - **`ContentTypeDefinition#list_component`:** a class with `initialize(posts:, page:)`, rendering a whole list.
+  - **`Types::BlockTypes::Definition#component`:** a component class with `initialize(block:, page:)`.
+  - **`Types::ContentTypes::Definition#list_component`:** a class with `initialize(posts:, page:)`, rendering a whole list.
 
     Note: the spec says `list_item_component`. The plan uses a whole-list component because the `now` listing shows only the latest post. It's recorded as a ruling in the ledger, and a list component still renders its items through its own template.
-  - **`ContentTypeDefinition#detail_component`:** `initialize(post:)`.
-  - **`ComponentDefinition#component`:** `initialize(value:)` (a `FieldSet` instance).
+  - **`Types::ContentTypes::Definition#detail_component`:** `initialize(post:)`.
+  - **`Types::FieldGroupDefinition#component`:** `initialize(value:)` (a `Types::FieldSet` instance).
   - **`ContentTypes.default.list_component`:** used for a list with a blank `content_type`.
   - **`Theme.current.component_for(definition, role = :component)`:** returns the definition's class for now (the default theme). This is the hook alternate themes will override.
 
@@ -928,7 +928,7 @@ Expected: FAIL (no components).
    - `Blocks::PostListComponent(block:, page:)`. It computes `posts = block.listed_posts.order(published_at: :desc).includes(:tags)`, applies `settings_object.limit`, then renders `Theme.current.component_for(list_definition, :list_component).new(posts:, page:)`, where `list_definition = ContentTypes.find(settings_object.content_type) || ContentTypes.default`.
    - `Posts::BlogListComponent`, `Posts::ResumeListComponent`, `Posts::NowListComponent` (`posts:, page:`)
    - `Posts::DetailComponent(post:)`
-   - `Fields::ComponentValueComponent(value:)`: renders a field group generically as a definition list of label → value. No built-in uses it yet; it's exercised by the Task 5 test type and a preview.
+   - `Fields::GroupComponent(value:)`: renders a field group generically as a definition list of label → value. No built-in uses it yet; it's exercised by the Task 5 test type and a preview.
 5. **Definitions:**
    - `BlockTypes::RichText` / `Image` / `PostList` get `t.component Blocks::…Component`;
    - `ContentTypes::Blog` gets `t.list_component Posts::BlogListComponent` and `t.detail_component Posts::DetailComponent`; the same pattern applies for resume and now (both use `Posts::DetailComponent` for detail).
@@ -992,8 +992,8 @@ Spec: §1 (success), §8 ("open-type proof").
 - **Consumes:** everything above.
 - **Produces:** `with_test_types { … }` test helper. It registers:
   - block type `quote` (field `text :string, required: true, translated: true`, field `cite :url`, component `TestQuoteComponent`, defined in the support file with an inline template via `erb_template`);
-  - content type `event` (fields `venue :string`, `speakers :components, of: :speaker`, list and detail components reusing `Posts::BlogListComponent` / `Posts::DetailComponent`);
-  - component `speaker` (`name :string, required: true`).
+  - content type `event` (fields `venue :string`, `speakers :groups, of: :speaker`, list and detail components reusing `Posts::BlogListComponent` / `Posts::DetailComponent`);
+  - field group `speaker` (`name :string, required: true`).
 
   It yields, and in `ensure` restores the registries with `Rails.application.reloader.prepare!` (or the call Task 1 settled on).
 
