@@ -11,6 +11,18 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert_not block.valid?
   end
 
+  # `block_type_is_registered` used to run unconditionally, so a blank
+  # `block_type` failed it too -- reporting "isn't a registered block type"
+  # on top of `presence`'s own "can't be blank", the same double-error
+  # `Post#content_type_is_registered` guards against with its own
+  # `content_type.present? &&` check. This mirrors that guard.
+  test "a blank block_type gets only the presence error, not also 'isn't registered'" do
+    block = ContentBlock.new(owner: @page, position: 0, block_type: "")
+
+    assert_not block.valid?
+    assert_equal [ "can't be blank" ], block.errors[:block_type]
+  end
+
   test "block_type is a string checked against the BlockTypes registry" do
     assert_equal %w[rich_text image post_list], BlockTypes.names
   end
@@ -132,6 +144,29 @@ class ContentBlockTest < ActiveSupport::TestCase
       assert_equal({ "content_type" => "blog", "tag" => "ruby", "limit" => 5 },
         ContentBlock.find(block.id).settings)
     end
+  end
+
+  # `normalize_settings` re-derives `settings` from the raw hash every nested
+  # form submission writes it as (see the comment on `ContentBlock
+  # #normalize_settings`) -- but it used to do that through
+  # `untranslated_hash` alone, which *drops* a translated field found in that
+  # raw hash instead of routing it to `translated_settings`, since nothing
+  # ever wrote `translated_settings` from the raw path. A test-only block
+  # type with a translated setting (open-types spec §8's "open-type proof")
+  # is what exercises this, since none of the built-ins have one.
+  test "normalize_settings moves a translated key found in raw settings into translated_settings, in the default locale" do
+    saved = BlockTypes.all.dup
+    BlockTypes.register(:test_translated) { |t| t.label "Test translated"; t.field :headline, :string, translated: true }
+
+    block = ContentBlock.new(owner: @page, block_type: :test_translated, position: 0,
+      settings: { "headline" => "Hello" })
+
+    assert block.valid?, block.errors.full_messages.inspect
+    assert_equal({}, block.settings)
+    assert_equal({ Locales.default => { "headline" => "Hello" } }, block.translated_settings)
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
   test "Page#content_blocks are ordered by position" do

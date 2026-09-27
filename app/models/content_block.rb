@@ -142,14 +142,40 @@ class ContentBlock < ApplicationRecord
 
   private
 
+  # `object.assign(settings)` (not just building `settings_object` and
+  # reading `untranslated_hash` off it) is what makes this actually replace
+  # `discard_blank_settings`: `settings_object` alone reads the raw hash as
+  # *already* split into untranslated/translated by column, but the raw
+  # `settings` this runs against is whatever Rails' nested attributes wrote
+  # straight onto the column (see the class comment above `before_validation
+  # :normalize_settings`) -- untranslated *and* translated keys mixed
+  # together, since that write path knows nothing about the type's schema.
+  # `FieldSet#assign` is what actually sorts a key by `field.translated?`;
+  # skipping it (the previous version of this method) silently dropped every
+  # translated key the raw form ever wrote, because `untranslated_hash`
+  # only ever reads `@values`, never `@translations`. It lands in the site's
+  # default locale specifically -- neither the standalone
+  # `Avo::Resources::ContentBlock` form nor the page form's nested rows have
+  # a locale switcher for `settings` (unlike `caption`/`body`, which get one
+  # via Mobility's tabs), so that's the only locale this path can write to
+  # until the admin (sub-project 3) gives it one.
   def normalize_settings
-    object = settings_object or return
+    # `locale: Locales.default` explicitly, not `settings_object`'s own
+    # ambient-`I18n.locale` default: `object.assign` and `#translated_hash`
+    # below both key off this same `@locale`, so building against a locale
+    # that might not be `Locales.default` would both assign and read back
+    # under the wrong key -- and then `all_translations.merge(Locales.default
+    # => ...)` would stamp the *right* key with the *wrong* locale's value
+    # while leaving a stray, never-cleaned entry under the ambient one.
+    object = settings_object(locale: Locales.default) or return
 
+    object.assign(settings)
     self.settings = object.untranslated_hash
+    self.translated_settings = object.all_translations.merge(Locales.default => object.translated_hash).compact_blank
   end
 
   def block_type_is_registered
-    errors.add(:block_type, "isn't a registered block type") if BlockTypes.find(block_type).nil?
+    errors.add(:block_type, "isn't a registered block type") if block_type.present? && BlockTypes.find(block_type).nil?
   end
 
   def settings_are_valid
