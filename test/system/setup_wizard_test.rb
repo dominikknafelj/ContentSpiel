@@ -52,17 +52,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_text "Welcome to your new site"
   end
 
-  private
-
-  # Clicks through JavaScript (`element.click()`) instead of a native
-  # WebDriver click. On a loaded machine headless Chrome intermittently drops
-  # native clicks made right after a page load -- no event reaches the
-  # document and no request is sent (investigated at length on the
-  # editor-experience branch: not overlays, fonts, paint holding or timer
-  # throttling). A scripted click still goes through Turbo's link and form
-  # handling, so this test keeps covering what it's for, e.g. that the MCP
-  # token form opts out of Turbo and actually submits.
-  def press(label)
-    find(:link_or_button, label).execute_script("this.click()")
-  end
+  # `press` (a scripted click -- see its own comment) moved to
+  # `ApplicationSystemTestCase` in cs-studio Task 9, shared by every system
+  # test that needs it, this one included.
 end
