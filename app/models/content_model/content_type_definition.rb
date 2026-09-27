@@ -1,7 +1,7 @@
 # A registered content type (spec §3.1 example: `blog`, `resume_entry`,
 # `now_update`): adds the mind-graph colour, the two ViewComponents a `Post`
-# of this type renders through (a listing row and its own detail page,
-# sub-project 5) and its starter content (what `db/seeds.rb` /
+# of this type renders through (a whole listing and its own detail page,
+# this sub-project's Task 4) and its starter content (what `db/seeds.rb` /
 # `StarterContent` creates for a fresh install).
 module ContentModel
   class ContentTypeDefinition < Definition

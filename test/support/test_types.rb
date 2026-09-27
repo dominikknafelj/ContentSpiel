@@ -43,8 +43,8 @@ class TestQuoteComponent < ApplicationComponent
 end
 
 # `with_test_types` registers `test/quote` (a block type), `test/event` (a
-# content type with a translated `groups` field) and `test/speaker` (the
-# field group `test/event#speakers` embeds), yields, then restores the
+# content type with a `groups` field) and `test/speaker` (the field group
+# `test/event#speakers` embeds), yields, then restores the
 # registries via `Rails.application.reloader.prepare!` -- the same call
 # `config/initializers/types.rb`'s own `to_prepare` block runs from, which
 # resets every registry (`ContentModel::Registry#reset!`) before re-running

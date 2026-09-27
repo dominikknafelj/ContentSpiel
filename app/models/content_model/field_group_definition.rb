@@ -2,7 +2,7 @@
 # a `ContentModel::Definition` whose own fields may not nest another
 # `group`/`groups` field (one level of nesting only -- no dynamic zones),
 # plus the ViewComponent that renders one value of the group
-# (`Fields::GroupComponent`, sub-project 5).
+# (`Fields::GroupComponent`, this sub-project's Task 4).
 module ContentModel
   class FieldGroupDefinition < Definition
     dsl_attribute :component

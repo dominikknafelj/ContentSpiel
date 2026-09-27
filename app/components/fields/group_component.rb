@@ -2,10 +2,13 @@ module Fields
   # Renders any field group generically, as a definition list of label =>
   # value (`FieldGroupDefinition#component`). No built-in block or content
   # type declares a `group`/`groups` field yet, so nothing renders through
-  # this today -- it exists so a type that does (the roadmap's Task 5 test
-  # type, and its own Lookbook preview) has a reasonable default without
-  # writing its own component, the same way `Avo`'s generic settings
-  # renderer (spec §6) gives every type a form for free.
+  # this today -- not even `test/support/test_types.rb`'s own `test/event`,
+  # whose `speakers` group renders through the plain `Posts::DetailComponent`
+  # it shares with the built-ins instead. This exists so a type that *does*
+  # want a group rendered has a reasonable default without writing its own
+  # component (exercised only by its own Lookbook preview, for now), the same
+  # way `Avo`'s generic settings renderer (spec §6) gives every type a form
+  # for free.
   class GroupComponent < ApplicationComponent
     def initialize(value:)
       @value = value
