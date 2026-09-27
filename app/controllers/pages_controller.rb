@@ -9,6 +9,14 @@ class PagesController < ApplicationController
   # one place that has to be readable without signing in.
   allow_unauthenticated_access
 
+  # One `PublicSite::Urls` per request: every nav link, permalink and
+  # hreflang alternate the response renders reads its host and preview state
+  # off this same instance, and its per-record path memoization is only
+  # worth having across the several links a single response renders, not
+  # across requests.
+  helper_method :public_urls
+  def public_urls = @public_urls ||= PublicSite::Urls.new(host: request.base_url)
+
   # The route's `format: false` only stops a URL segment like ".json" from
   # being read as a format -- a request naming one through its `Accept` header
   # instead reaches `render :show` exactly as before, negotiates against that
@@ -120,7 +128,7 @@ class PagesController < ApplicationController
   end
 
   def redirect_default_locale_prefix
-    return unless params[:locale].present? && params[:locale] == Current.site.default_locale
+    return unless public_urls.redundant_prefix?(params[:locale])
 
     path = "/#{params[:path]}".sub(%r{/+$}, "").presence || "/"
     path += "?#{request.query_string}" if request.query_string.present?

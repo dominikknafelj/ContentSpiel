@@ -51,14 +51,16 @@ module ThemeHelper
     start_year ? "#{start_year} – #{end_year}" : end_year
   end
 
-  # The current page -- or, at a permalink, the current post -- in each
-  # enabled locale. A post's slug is read inside that locale, falling back to
-  # the default-locale slug exactly as the router does.
-  def language_links(page, post = nil)
-    return [] if page.nil?
+  # The record currently shown -- a page, or at a permalink the post itself
+  # -- in each enabled locale that has a path for it. Callers pass
+  # `@post || @page`: a post's own path already carries its canonical page's
+  # segments (`PublicSite::Paths#post_path`), so nothing here needs to know
+  # which kind of record it has.
+  def language_links(record)
+    return [] if record.nil?
 
-    ::Locales.enabled.map do |code|
-      path = I18n.with_locale(code) { post ? post_url_path(page, post, code) : page_url_path(page, code) }
+    ::Locales.enabled.filter_map do |code|
+      path = public_urls.path_for(record, code) or next
       LanguageLink.new(code:, name: ::Locales.name(code, native: true), path:, current: code == I18n.locale.to_s)
     end
   end

@@ -26,6 +26,9 @@ class PostSerializerTest < ActiveSupport::TestCase
     assert_equal "live", data[:status]
     assert_equal post.published_at.iso8601, data[:published_at]
     assert_equal({ "company" => "Acme", "role_type" => "lead" }, data[:metadata])
+    # Nothing lists this post, so it has no canonical URL (spec §5.3) -- the
+    # serializer says so rather than guessing one from the post's own fields.
+    assert_nil data[:url]
   end
 
   test "published is false and status is draft with no published_at" do
@@ -36,6 +39,20 @@ class PostSerializerTest < ActiveSupport::TestCase
     assert_equal false, data[:published]
     assert_equal "draft", data[:status]
     assert_nil data[:published_at]
+  end
+
+  # `url` is the post's canonical permalink (spec §6.2), through the one
+  # place a public URL is built -- `PublicSite::Urls` -- not assembled here
+  # by hand from the page and slug.
+  test "url is the canonical listing page's path plus the post's slug" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
+    blog.content_blocks.create!(block_type: :post_list, position: 0)
+    post = Post.create!(content_type: :blog, title: "Hello World", published_at: Time.current)
+
+    data = PostSerializer.call(post, :en)
+
+    assert_equal "https://www.example.com/blog/hello-world", data[:url]
   end
 
   # A future published_at is `published: true` (kept for compatibility --

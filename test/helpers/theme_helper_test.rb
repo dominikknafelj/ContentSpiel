@@ -1,10 +1,18 @@
 require "test_helper"
 
 class ThemeHelperTest < ActionView::TestCase
-  # `language_links` calls `page_url_path`/`post_url_path`, defined on
-  # PagesHelper, not ThemeHelper -- ActionView::TestCase only auto-includes
-  # the helper matching this test's own name.
+  # `language_links` calls `public_urls`, defined on PagesController (not a
+  # helper module) via `helper_method` -- ActionView::TestCase's view context
+  # never gets a controller's helper_method delegates, only app/helpers
+  # modules, so this test stands in with its own instance, the same
+  # `PublicSite::Urls.new` PagesController's own definition builds, just
+  # without a request to read a host from (nothing here asserts on an
+  # absolute URL).
   include PagesHelper
+
+  def public_urls
+    @public_urls ||= PublicSite::Urls.new
+  end
 
   # Fix round 1 (review of 221fba9): `language_links` regressed to English
   # names ("German") when it switched from `SetupHelper::LANGUAGE_NAMES`

@@ -29,6 +29,15 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
     assert_select "footer [data-controller=theme]"
   end
 
+  test "the page head carries hreflang alternates for every enabled language, plus x-default" do
+    get "/about"
+
+    assert_select "head link[rel=alternate][hreflang=en][href='http://www.example.com/about']"
+    assert_select "head link[rel=alternate][hreflang=de][href='http://www.example.com/de/uber']"
+    assert_select "head link[rel=alternate][hreflang=es][href='http://www.example.com/es/about']"
+    assert_select "head link[rel=alternate][hreflang=x-default][href='http://www.example.com/about']"
+  end
+
   test "the language switcher links the current page in every locale" do
     get "/about"
 

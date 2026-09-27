@@ -30,7 +30,11 @@ module PostSerializer
       # reading it.
       status: post.status,
       published_at: post.published_at&.iso8601,
-      metadata: post.metadata
+      metadata: post.metadata,
+      # nil for a post nothing currently lists (spec §6.2) -- a client asking
+      # for a post's URL is told there isn't one yet, rather than being handed
+      # a guess built from the post's own attributes.
+      url: PublicSite::Urls.new.url_for(post, locale)
     }
   end
 end
