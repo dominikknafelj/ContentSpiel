@@ -14,9 +14,9 @@
 
 - **Greenfield, no production.** Migrations drop and rebuild; no backfill, no compatibility shims. `bin/rails db:reset` must succeed afterwards, and seeds rebuild `public_paths`.
 - **Registration.** Built-ins register from `config/initializers/types.rb` inside `Rails.application.config.to_prepare`, and the registries reset at the start of each run. Plugins will use the same `register` calls; the DSL is out of scope.
-- **Field types:** exactly `string text integer boolean date url select content_type tag component components`.
+- **Field types:** exactly `string text integer boolean date url select content_type tag group groups`.
   - Options: `required default min max translated options of`.
-  - A component's own fields may not be `group`/`groups` (one level).
+  - A field group's own fields may not be `group`/`groups` (one level).
   - No dynamic zones.
 - **Translated field storage.** Values live in `translated_settings` / `translated_metadata` as `{ locale => { key => value } }`. A translated `group`/`groups` field is translated as a whole.
 - **Reads.** Public reads fall back along `Locales.fallback_chain`; admin and MCP read the literal locale.
@@ -64,6 +64,8 @@ Spec: §3.
 - Test:
   - `test/models/type_registry_test.rb`
   - `test/models/field_set_test.rb`
+
+**Landed as:** the shared registry/definition/field-set machinery ended up living under the `ContentModel::` namespace (`app/models/content_model/registry.rb`, `definition.rb`, `block_type_definition.rb`, `content_type_definition.rb`, `field_group_definition.rb`, `field_set.rb`, plus `duplicate_type.rb`/`unknown_type.rb`), not the flat `type_registry.rb`/`type_definition.rb`/`component_definition.rb` file names sketched below -- and, once "components" were renamed to "field groups" (commit `b45009d`) to avoid colliding with the ViewComponent sense of the word, `components.rb` became `field_groups.rb` (`FieldGroups`, next to `BlockTypes`/`ContentTypes` at `app/models/`). Test files landed as `test/models/content_model/registry_test.rb` and `test/models/content_model/field_set_test.rb`.
 
 **Interfaces:**
 - **Produces:**

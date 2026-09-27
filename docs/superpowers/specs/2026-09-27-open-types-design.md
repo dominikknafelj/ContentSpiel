@@ -60,7 +60,7 @@ ContentTypes.register :resume_entry do |t|
   t.field :role_type, :select, options: ROLE_TYPES
   t.field :start_date, :date
   t.field :end_date, :date                        # blank = current role
-  t.list_item_component Posts::ResumeRowComponent
+  t.list_component Posts::ResumeListComponent
   t.detail_component Posts::DetailComponent
   t.starter section: { title: "Resume", slug: "resume" },
             sample: { title: "Your first role", body: "…", fields: { company: "Example Co", … } }
@@ -160,11 +160,11 @@ end
 - **Gems:** add `view_component`. Lookbook is dev and test only, mounted at `/lookbook` in development only.
 - **Components** live in `app/components/`:
   - `Blocks::RichTextComponent`, `Blocks::ImageComponent`, `Blocks::PostListComponent`;
-  - `Posts::BlogRowComponent`, `Posts::ResumeRowComponent`, `Posts::NowComponent`, `Posts::DetailComponent`;
+  - `Posts::BlogListComponent`, `Posts::ResumeListComponent`, `Posts::NowListComponent`, `Posts::DetailComponent`;
   - a generic `Fields::GroupComponent` for rendering a field group.
 - **Inputs:** each component receives explicit, typed inputs, e.g. `block:`, `settings:`, `posts:`, `page:`, `urls:`. Components read no controller instance variables.
 - **Behaviour:** the current partials' markup and theme classes move over unchanged; this is a behaviour-preserving port.
-- **Dispatch:** `pages/show.html.erb` renders `BlockTypes.fetch(block.block_type).component.new(...)` per block; unknown types render nothing. The post list renders each post through its content type's `list_item_component`. The post detail uses `detail_component`.
+- **Dispatch:** `pages/show.html.erb` renders `BlockTypes.fetch(block.block_type).component.new(...)` per block; unknown types render nothing. The post list renders the whole listing through its content type's `list_component` (each item still rendered by that same component's own template), not a per-item component -- the `now` listing shows only its single latest post, which no per-item component could express on its own. The post detail uses `detail_component`.
 - **Themes:** themes replace components through the registry, not the view path (`theme.component_for(:post_list)`, falling back to the default). Only the lookup hook is built now; there are no alternate themes yet.
 - **Tailwind:** both builds must scan `app/components`:
   - the public theme build scans the public components (`app/components/blocks`, `app/components/posts`, `app/components/fields`);
@@ -176,7 +176,7 @@ end
 | Place | Change |
 |---|---|
 | `pages/show.html.erb` block dispatch | `BlockTypes` component lookup |
-| `_post_list.html.erb` + `post_list/_blog/_resume/_now` | `Blocks::PostListComponent` + each content type's `list_item_component` |
+| `_post_list.html.erb` + `post_list/_blog/_resume/_now` | `Blocks::PostListComponent` + each content type's `list_component` |
 | `_post_list_detail.html.erb` | `Posts::DetailComponent` via the content type |
 | `PublicSite::Paths.canonical_page`, the resolver's listing fallback, `PublicPageRendering#assign_record` | blocks whose type has `lists_posts`; `lists?` via the capability |
 | MCP tools (content_type enum) + `Mcp::PostSerializer` | enum from `ContentTypes.names` (resolved after boot); the serializer emits `fields` (untranslated + the requested locale's translated values) in place of raw `metadata` |
@@ -196,7 +196,7 @@ end
 ## 8. Testing
 
 - **Unit:**
-  - registries: register, fetch/find, names, capabilities, reset on reload, duplicate registration replaces;
+  - registries: register, fetch/find, names, capabilities, reset on reload; registering a taken name raises `ContentModel::DuplicateType` (`reset!` re-registers);
   - `ContentModel::FieldSet` for every field type: casting, blanks → nil, required, select, min/max, dates, URLs, `content_type`, components (single and list), nested error paths, translated fields and fallback reads, `to_h` round trip;
   - each built-in definition;
   - each view component rendered in isolation (`render_inline`).
