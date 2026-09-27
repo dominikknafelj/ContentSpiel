@@ -17,24 +17,53 @@
       read it via `closest` without a server round trip. Only the modules
       column is real yet -- the tree column (`content_for :tree`) and the
       resource controllers that fill `content` arrive in Tasks 3-7; until
-      then this grid quietly collapses to two columns. %>
+      then this grid quietly collapses to two columns.
+
+      The modules column itself collapses to icons below `md` (spec §4.2):
+      the grid's own first track narrows from a fixed 16rem to `auto`, and
+      `nav_link_classes` below centers each row's icon once its text label
+      (kept in the DOM as `sr-only`, so the link's accessible name is
+      unchanged -- just not painted) has nowhere to go. %>
   <body data-admin-locale="<%= admin_locale %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <% nav_link_classes = "flex items-center justify-center gap-3 rounded-cs px-2 py-1.5 hover:bg-sunken md:justify-start" %>
     <div class="grid min-h-screen grid-cols-[auto_1fr] md:grid-cols-[16rem_1fr]<%= " lg:grid-cols-[16rem_18rem_1fr]" if content_for?(:tree) %>">
       <nav aria-label="Modules" class="flex flex-col gap-6 border-r border-line bg-surface p-4">
         <ul class="flex flex-col gap-2">
-          <li><%= link_to "Pages", admin_root_path %></li>
+          <li>
+            <%= link_to admin_root_path, class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :pages %><span class="sr-only md:not-sr-only">Pages</span>
+            <% end %>
+          </li>
           <%# Posts and Tags have no module of their own yet (Tasks 6-7) --
               rendered as real, discoverable <a> elements (not stub routes,
               which Tasks 6-7 would only have to tear back down) so the
               modules column's shape is already right; `aria-disabled` plus
               `pointer-events-none` keep them inert until then. %>
-          <li><%= link_to "Posts", "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "pointer-events-none opacity-50" %></li>
-          <li><%= link_to "Tags", "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "pointer-events-none opacity-50" %></li>
+          <li>
+            <%= link_to "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "#{nav_link_classes} pointer-events-none opacity-50" do %>
+              <%= render "admin/shared/icon", name: :posts %><span class="sr-only md:not-sr-only">Posts</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "#{nav_link_classes} pointer-events-none opacity-50" do %>
+              <%= render "admin/shared/icon", name: :tags %><span class="sr-only md:not-sr-only">Tags</span>
+            <% end %>
+          </li>
         </ul>
 
         <div>
-          <p class="font-cs-mono text-label uppercase tracking-mono text-meta">(old admin)</p>
-          <ul class="mt-2 flex flex-col gap-2">
+          <%# One shared icon marks the whole "old admin" group (rather than
+              one per Avo link): it's a temporary section (design spec
+              2026-09-26, "Replace Avo") that goes away once Tasks 4-7 give
+              Pages/Posts/Tags/Settings their own CS Studio screens, so it
+              isn't worth a bespoke icon per link. Its own sub-links stay
+              text-only and `hidden` below `md`, rather than also collapsing
+              to icons, since four indistinguishable icon-only rows would be
+              no more usable than no row at all. %>
+          <p class="flex items-center justify-center gap-2 font-cs-mono text-label uppercase tracking-mono text-meta md:justify-start">
+            <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">(old admin)</span>
+          </p>
+          <ul class="mt-2 hidden flex-col gap-2 md:flex">
             <li><%= link_to "Settings", "/avo/resources/site_settings" %></li>
             <li><%= link_to "Users", "/avo/resources/users" %></li>
             <li><%= link_to "API tokens", "/avo/resources/api_tokens" %></li>
@@ -44,7 +73,9 @@
 
         <div class="mt-auto flex flex-col gap-2">
           <%= render "shared/theme_toggle" %>
-          <%= button_to "Sign out", admin_sign_out_path, method: :delete %>
+          <%= button_to admin_sign_out_path, method: :delete, class: nav_link_classes do %>
+            <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">Sign out</span>
+          <% end %>
         </div>
       </nav>
 

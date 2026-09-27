@@ -47,7 +47,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     assert_text "Blog, Resume and Now pages"
     press "Finish setup"
 
-    assert_current_path %r{\A/avo}
+    assert_current_path %r{\A/cs-studio}
     visit "/"
     assert_text "Welcome to your new site"
   end
