@@ -63,4 +63,42 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert Page.exists?(parent.id)
   end
+
+  # Fix round 1: `new FormData(form)` (`admin--autosave`) resends *every*
+  # field on *every* save, including a `<input type="file">` nobody
+  # touched -- which Rack parses as a blank string, exactly like the empty
+  # `hero_image:` param below simulates. Before `drop_blank_file_params`,
+  # that blank rode along into `Pages::Save`'s `attributes:` and
+  # `has_one_attached`'s writer read it as "detach the current file".
+  test "autosaving another field doesn't clear an already-attached hero image" do
+    landing = landing_page_with_hero_image
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { title: "Landing v2", hero_image: "" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+
+    landing.reload
+    assert_equal "Landing v2", landing.title(locale: :en)
+    assert landing.hero_image.attached?
+  end
+
+  test "the explicit remove-image checkbox detaches the hero image" do
+    landing = landing_page_with_hero_image
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+
+    assert_not landing.reload.hero_image.attached?
+  end
+
+  private
+
+  def landing_page_with_hero_image
+    landing = Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true },
+      translations: { Locales.default => { title: "Landing" } }).record
+    landing.hero_image.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    assert landing.hero_image.attached?
+    landing
+  end
 end

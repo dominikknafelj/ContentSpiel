@@ -13,6 +13,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include FileParams
 
     # Which of `params[:page]`'s keys are translated columns (`Pages::Save`'s
     # own `TRANSLATED`, kept in sync by hand rather than referencing that
@@ -82,6 +83,20 @@ module Admin
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
+
+      # `drop_blank_file_params` (Task 4 fix round 1, see its own doc
+      # comment) is what keeps this same PATCH -- resent in full on *every*
+      # autosave, whichever field an editor actually touched -- from
+      # silently detaching an already-attached hero image the moment a
+      # blank `hero_image` file input rides along with it. Removing one on
+      # purpose is a separate, explicit signal (`remove_hero_image`, read
+      # straight off `params` rather than the permitted/translated split
+      # above -- it's a flag this controller consumes itself, never a
+      # column `Pages::Save` assigns) that overrides the drop outright, so
+      # "leave the field blank" and "tick Remove image" stay two different
+      # things even though both arrive as part of the same form.
+      attributes = drop_blank_file_params(attributes, fields: %w[hero_image])
+      attributes["hero_image"] = nil if ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
 
       result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 

@@ -52,6 +52,23 @@
             value: page.hero_image
           ) %>
 
+      <%# Removing the hero image is its own explicit signal (Task 4 fix
+          round 1), not just leaving the file input blank -- an untouched
+          file input is *also* blank on every other autosave of this same
+          form, and `Admin::PagesController#update`'s own
+          `drop_blank_file_params` is what keeps that from reading as "take
+          it away" every time. Only shown once there's something to remove:
+          an unattached page has no image to explain a checkbox about. %>
+      <% if page.hero_image.attached? %>
+        <div class="mb-4 -mt-2">
+          <label class="inline-flex items-center gap-2 text-sm text-meta">
+            <%= check_box_tag field_html_name("remove_hero_image"), "1", false, id: field_id("remove_hero_image"),
+                  class: "size-4 rounded-cs border-line-strong text-accent focus:outline-2 focus:outline-accent" %>
+            Remove image
+          </label>
+        </div>
+      <% end %>
+
       <%= render Admin::Columns::PlainColumnComponent.new(
             name: "hero_alt", id: field_id("hero_alt"), html_name: field_html_name("hero_alt"),
             value: value(:hero_alt), original: original(:hero_alt), locale: locale
