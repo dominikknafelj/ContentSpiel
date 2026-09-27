@@ -40,9 +40,6 @@ module ThemeHelper
     theme_root_page ? page_url_path(theme_root_page) : "/"
   end
 
-  # The current page -- or, at a permalink, the current post -- in each
-  # locale. A post's slug is read inside that locale, falling back to the
-  # default-locale slug exactly as the router does.
   def post_date(post)
     post.published_at&.strftime("%-d %b %Y")
   end
@@ -54,6 +51,9 @@ module ThemeHelper
     start_year ? "#{start_year} – #{end_year}" : end_year
   end
 
+  # The current page -- or, at a permalink, the current post -- in each
+  # locale. A post's slug is read inside that locale, falling back to the
+  # default-locale slug exactly as the router does.
   def language_links(page, post = nil)
     return [] if page.nil?
 
@@ -62,5 +62,40 @@ module ThemeHelper
       LanguageLink.new(code:, name: SetupHelper::LANGUAGE_NAMES.fetch(code, code.upcase), path:,
         current: code == I18n.locale.to_s)
     end
+  end
+
+  # Reads a Mobility-translated attribute for the public theme, falling back
+  # (when the current locale's own value is blank) to the *site's* runtime
+  # default locale, then to the first present locale walking
+  # Mobility.available_locales -- the exact order SlugGeneration already uses
+  # to fill a blank slug (see its comment for why: a site set up in German
+  # titles its pages only in German, and every other locale has to show
+  # *something* rather than nothing).
+  #
+  # Mobility's own `fallbacks` plugin (config/initializers/mobility.rb) falls
+  # back to a fixed I18n.default_locale (:en) -- correct for `config.i18n
+  # .fallbacks`, wrong here: a `de`-default site has nothing in :en to fall
+  # back to, and the plain reader would render blank. Passing an explicit
+  # `fallback:` list (Mobility 1.3's per-read override, see
+  # Mobility::Plugins::Fallbacks) bypasses the fixed default for this one
+  # read without touching that global config.
+  #
+  # Every public view that shows a translated title/subtitle/excerpt/caption/
+  # alt/meta field should read it through here rather than the plain Mobility
+  # accessor. Does not apply to ActionText bodies (`Page`/`Post`/
+  # `ContentBlock#body`) -- out of scope for this fix, see the fix's report.
+  def translated(record, attribute)
+    return nil if record.nil?
+
+    record.public_send(attribute, fallback: translated_fallback_locales)
+  end
+
+  private
+
+  def translated_fallback_locales
+    default_locale = theme_site.default_locale.to_sym
+    current_locale = I18n.locale.to_sym
+
+    ([ default_locale ] + ::Mobility.available_locales.map(&:to_sym)).uniq - [ current_locale ]
   end
 end

@@ -8,7 +8,7 @@
 
   <nav aria-label="Main" class="flex flex-wrap items-center gap-5 text-sm">
     <% navigation_pages.each do |nav_page| %>
-      <%= link_to nav_page.title, page_url_path(nav_page), class: "text-dim hover:text-ink",
+      <%= link_to translated(nav_page, :title), page_url_path(nav_page), class: "text-dim hover:text-ink",
             aria: { current: ("page" if nav_page == @page) } %>
     <% end %>
     <%= render "layouts/public/language_switcher" %>

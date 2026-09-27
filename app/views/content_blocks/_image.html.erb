@@ -1,8 +1,9 @@
 <% if block.image.attached? %>
   <figure class="content-block content-block--image my-10">
-    <%= image_tag block.image, alt: block.alt.to_s, class: "w-full rounded-cs" %>
-    <% if block.caption.present? %>
-      <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= block.caption %></figcaption>
+    <%= image_tag block.image, alt: translated(block, :alt).to_s, class: "w-full rounded-cs" %>
+    <% caption = translated(block, :caption) %>
+    <% if caption.present? %>
+      <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= caption %></figcaption>
     <% end %>
   </figure>
 <% end %>

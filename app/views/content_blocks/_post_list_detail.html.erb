@@ -3,8 +3,9 @@
     request), so a German URL renders the German translation. %>
 <article class="content-block content-block--post-list-detail">
   <p class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= post_date(post) %></p>
-  <h1 class="mt-3 text-h1 font-semibold leading-tight tracking-tight"><%= post.title %></h1>
-  <% if post.excerpt.present? %><p class="mt-4 text-lg text-dim"><%= post.excerpt %></p><% end %>
+  <h1 class="mt-3 text-h1 font-semibold leading-tight tracking-tight"><%= translated(post, :title) %></h1>
+  <% excerpt = translated(post, :excerpt) %>
+  <% if excerpt.present? %><p class="mt-4 text-lg text-dim"><%= excerpt %></p><% end %>
   <div class="cs-prose mt-8"><%= post.body %></div>
   <% if post.tags.any? %>
     <ul class="mt-10 flex flex-wrap gap-3 font-cs-mono text-label uppercase tracking-mono text-meta">
