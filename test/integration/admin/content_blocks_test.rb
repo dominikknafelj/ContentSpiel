@@ -119,6 +119,36 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert copy.image.blob.download.present?, "the copy's own blob must still be downloadable"
   end
 
+  # Fix (final-fixes round, finding 3): duplicating a rich_text block used
+  # to store `value.to_s` -- the *rendered* Trix layout, `trix-content`
+  # wrapper and all -- instead of the raw body, so duplicating twice nested
+  # a second wrapper inside the first, and an attachment's own canonical
+  # node (its `sgid`) was replaced by whatever the display renderer turned
+  # it into. `copy_translations` now copies `value.body` (the raw
+  # `ActionText::Content`) instead.
+  test "duplicating a rich_text block preserves its raw body (attachment sgid included), even duplicated twice" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    sgid = blob.attachable_sgid
+    body_html = %(<div>Hi</div><action-text-attachment sgid="#{sgid}" content-type="image/png" url="/rails/active_storage/blobs/redirect/x/tiny.png" width="1" height="1"></action-text-attachment>)
+    block.update!(body: body_html)
+    original_html = block.body.body.to_html
+
+    post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy = @page.content_blocks.order(:position).last
+
+    assert_equal original_html, copy.body.body.to_html
+    assert_not_includes copy.body.body.to_html, "trix-content"
+    assert_includes copy.body.body.to_html, sgid
+
+    post "#{blocks_path}/#{copy.id}/duplicate", as: :turbo_stream
+    assert_response :success
+    copy2 = @page.content_blocks.order(:position).last
+
+    assert_equal original_html, copy2.body.body.to_html
+  end
+
   # Fix round 2 (this task's own label bug, spotted alongside round 1's
   # review): the shared `admin/shared/_hero_image_field` partial used to
   # hard-code `name: "hero_image"`, so a block's own image column's label

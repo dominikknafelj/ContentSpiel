@@ -278,6 +278,27 @@ module Admin
     # it's an ActionText association, not a jsonb value, so copying a blank
     # one over would create an empty `ActionText::RichText` row for a
     # locale that never had one.
+    #
+    # Fix (final-fixes round, finding 3): `column == :body` used to copy
+    # `value.to_s` -- `value` here is the mobility-actiontext backend's own
+    # `RichTextTranslation` record (`Mobility::Backends::ActionText#read`
+    # returns the record, not a String), and *its* `to_s` renders the body
+    # through `action_text/contents/content`'s own layout
+    # (`ActionText::Content#to_rendered_html_with_layout`) -- the same
+    # wrapping `<div class="trix-content">...</div>` Trix itself expects to
+    # generate, not to receive back as more body content. Assigning that
+    # rendered HTML straight back as the *copy's* body nested it inside a
+    # second `trix-content` wrapper every time `duplicate` ran, and ran any
+    # attachment through the *display* renderer first (`to_trix_html` ->
+    # `render_attachments`), which drops the `sgid` an attachment's own
+    # canonical node needs to stay editable in Trix (see `ActionText::
+    # Content#render_attachments`) in favour of a plain `<img>`.
+    # `value.body` is the raw `ActionText::Content` underneath that record
+    # (`ActionText::RichText#body`) -- assigning it back re-canonicalizes
+    # the exact same fragment (attachments' own `sgid`s included) rather
+    # than re-rendering it, so a duplicate's body is byte-for-byte the
+    # source's, and duplicating a duplicate stays that way indefinitely
+    # instead of accumulating another wrapper layer every time.
     def copy_translations(source, copy)
       Locales.enabled.each do |code|
         Mobility.with_locale(code) do
@@ -285,7 +306,7 @@ module Admin
             value = source.public_send(column)
             next if column == :body && value.blank?
 
-            copy.public_send("#{column}=", column == :body ? value.to_s : value)
+            copy.public_send("#{column}=", column == :body ? value.body : value)
           end
         end
       end
