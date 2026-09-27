@@ -1,0 +1,53 @@
+require "test_helper"
+
+class Admin::LanguagesTest < ActionDispatch::IntegrationTest
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_as(users(:one))
+    @page = create_page(title: "About")
+  end
+
+  test "the switcher lists enabled languages and marks missing ones" do
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "nav[aria-label='Languages'] a", Locales.enabled.size - 1
+    assert_select "nav[aria-label='Languages'] [title='Missing required fields']"
+  end
+
+  test "in another language the primary original is shown read-only with a translate slot" do
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_select "[data-original-for='title']", text: "About"
+    assert_select "[data-translate-slot='title']"
+  end
+
+  test "saving in de leaves en untouched" do
+    patch "/cs-studio/pages/#{@page.id}", params: { locale: "de", page: { title: "Über uns" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_equal "Über uns", @page.reload.title(locale: :de)
+    assert_equal "About", @page.title(locale: :en)
+  end
+
+  # `limit` is a post_list block's own untranslated schema field (`t.field
+  # :limit, :integer, min: 1` -- no `translated: true`) -- rendering it in a
+  # non-default locale must show the "Same in all languages" hint (spec §6.2)
+  # instead of a read-only original/translate-slot pair, and saving it must
+  # never write a `translated_settings["de"]` entry the way a *translated*
+  # field's own save would.
+  test "a block's untranslated field shows Same in all languages, and saving it in a non-default locale never creates a translated entry" do
+    result = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "post_list", settings: { limit: 3 } })
+    assert result.ok?, result.errors.to_sentence
+    block = result.record
+
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_select "[data-field-name='limit']" do
+      assert_select "p", text: "Same in all languages"
+      assert_select "[data-original-for='limit']", count: 0
+    end
+
+    patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+      params: { locale: "de", block: { settings: { limit: 5 } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+
+    block.reload
+    assert_equal 5, block.settings["limit"]
+    assert_not block.translated_settings.key?("de")
+  end
+end

@@ -64,6 +64,22 @@ module Admin
       (page.status == "scheduled" ? page.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
+    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # §6.2) -- computed here, not handed in, since every caller of this
+    # component already has the one `page` it's for and nothing else this
+    # check would need.
+    def missing_locales = Admin::TranslationStatus.missing_locales(page)
+
+    # Per-code URL for the switcher: this same page's editor, with `locale:`
+    # omitted for the site's default language -- the same "the default
+    # language's own URL never carries a `?locale=`" rule `Admin::
+    # BaseController#admin_url_options` already applies to the *current*
+    # locale, just rebuilt here once per candidate code rather than the one
+    # this component was itself rendered with.
+    def language_url
+      ->(code) { helpers.admin_page_path(page, **(code.to_s == ::Locales.default ? {} : { locale: code })) }
+    end
+
     private
 
     attr_reader :page, :locale, :url_options, :notice, :alert

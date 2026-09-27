@@ -82,8 +82,18 @@ module Admin
     # read-only once the editing locale isn't the default one (spec §6.2) --
     # same `nil`-means-"nothing to compare against" contract
     # `Admin::FieldComponent#show_original?` already reads off this.
+    #
+    # `field.translated?` gates this first: an *untranslated* schema field
+    # (e.g. a post_list block's own `limit`) has exactly one value across
+    # every locale, so its default-locale value is never "the original to
+    # translate from" -- returning it here regardless of `translated?` (the
+    # bug this guard fixes) would make `FieldComponent#show_original?` show
+    # a read-only original/translate-slot pair for a field that should
+    # instead render its "Same in all languages" hint
+    # (`FieldComponent#show_untranslated_hint?`, which itself only fires
+    # once this method hands back nil).
     def original_for(field)
-      return nil if locale.to_s == ::Locales.default
+      return nil if !field.translated? || locale.to_s == ::Locales.default
 
       default_settings_object&.public_send(field.name)
     end

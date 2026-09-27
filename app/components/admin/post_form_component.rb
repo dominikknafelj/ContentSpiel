@@ -68,6 +68,18 @@ module Admin
       (post.status == "scheduled" ? post.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
+    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
+    # gives for its own page.
+    def missing_locales = Admin::TranslationStatus.missing_locales(post)
+
+    # Per-code URL for the switcher: same "omit `locale:` for the site's
+    # default language" rule `Admin::RecordHeaderComponent#language_url`
+    # applies to a page, rebuilt here against this post's own editor path.
+    def language_url
+      ->(code) { helpers.admin_post_path(post, **(code.to_s == ::Locales.default ? {} : { locale: code })) }
+    end
+
     def field_id(name) = "#{ID_PREFIX}-#{name}"
 
     def field_html_name(name) = "post[#{name}]"
@@ -110,8 +122,15 @@ module Admin
     # is built around for a block's own schema fields.
     def field_value(field) = fields_object&.public_send(field.name)
 
+    # `field.translated?` gates this first -- same fix, same reasoning,
+    # `Admin::BlockCardComponent#original_for`'s own comment gives: an
+    # untranslated typed field (e.g. `test/event`'s own `venue`) has one
+    # value across every locale, so it must fall through to `FieldComponent
+    # #show_untranslated_hint?`'s "Same in all languages" line, not a
+    # read-only original that would otherwise show up here regardless of
+    # `translated?`.
     def field_original(field)
-      return nil if locale.to_s == ::Locales.default
+      return nil if !field.translated? || locale.to_s == ::Locales.default
 
       default_fields_object&.public_send(field.name)
     end
