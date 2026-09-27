@@ -54,4 +54,38 @@ class SlugGenerationTest < ActiveSupport::TestCase
     assert_equal "hello-world", post.slug_en
     assert_equal "hallo-welt", post.slug_de
   end
+
+  # `blank_slug_fallback_title` reads `SiteSetting.instance`, a database row --
+  # not worth fetching on every save of a page that has no blank slug to fill
+  # in the first place. Counting queries, rather than stubbing (no mocking
+  # library, per project constraints), so this exercises the real callback.
+  test "saving a page with every locale already slugged does not query SiteSetting" do
+    page = Page.create!(parent: @root, page_type: :standard, title_en: "About", slug_en: "about",
+      title_de: "Über uns", slug_de: "uber-uns", title_es: "Sobre Nosotros", slug_es: "sobre-nosotros")
+
+    site_setting_queries = 0
+    ActiveSupport::Notifications.subscribed(lambda { |_name, _started, _finished, _unique_id, payload|
+      site_setting_queries += 1 if payload[:sql]&.include?("site_settings")
+    }, "sql.active_record") do
+      page.update!(title_en: "About the team")
+    end
+
+    assert_equal 0, site_setting_queries,
+      "no locale's slug was blank, so the default-locale fallback should never be looked up"
+  end
+
+  test "saving a post with every locale already slugged does not query SiteSetting" do
+    post = Post.create!(content_type: :blog, title_en: "Hello World", slug_en: "hello-world",
+      title_de: "Hallo Welt", slug_de: "hallo-welt", title_es: "Hola Mundo", slug_es: "hola-mundo")
+
+    site_setting_queries = 0
+    ActiveSupport::Notifications.subscribed(lambda { |_name, _started, _finished, _unique_id, payload|
+      site_setting_queries += 1 if payload[:sql]&.include?("site_settings")
+    }, "sql.active_record") do
+      post.update!(title_en: "Hello There")
+    end
+
+    assert_equal 0, site_setting_queries,
+      "no locale's slug was blank, so the default-locale fallback should never be looked up"
+  end
 end

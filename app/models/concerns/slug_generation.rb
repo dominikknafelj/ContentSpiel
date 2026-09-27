@@ -35,17 +35,23 @@ module SlugGeneration
   def fill_blank_slugs_from_titles
     return unless generates_slugs?
 
+    blank_locales = ::Mobility.available_locales.reject do |locale|
+      public_send(::Mobility.normalize_locale_accessor(:slug, locale)).present?
+    end
+    return if blank_locales.empty?
+
     titles = read_attribute(:title).to_h
+
+    # Only computed when there's at least one blank slug to fill: it reads
+    # `SiteSetting.instance`, a database row, and most saves (an edit to an
+    # already-fully-slugged record) have nothing for it to do.
     fallback_title = blank_slug_fallback_title(titles)
 
-    ::Mobility.available_locales.each do |locale|
-      accessor = ::Mobility.normalize_locale_accessor(:slug, locale)
-      next if public_send(accessor).present?
-
+    blank_locales.each do |locale|
       title = titles[locale.to_s].presence || fallback_title
       next if title.blank?
 
-      public_send("#{accessor}=", title.parameterize)
+      public_send("#{::Mobility.normalize_locale_accessor(:slug, locale)}=", title.parameterize)
     end
   end
 

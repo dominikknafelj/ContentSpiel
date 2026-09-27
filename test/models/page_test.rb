@@ -178,6 +178,32 @@ class PageTest < ActiveSupport::TestCase
     assert_equal "who-we-are", child.slug_en
   end
 
+  # The fallback can produce a genuine collision, not just a hypothetical one:
+  # two siblings can each want the same borrowed slug in a locale neither of
+  # them was actually titled in. `slug_is_unused_among_siblings_in_every_locale`
+  # (above) still catches it -- reported against `slug_en`, the locale that
+  # actually clashes, with a message that names it so an editor filling in a
+  # default-locale-only page knows which tab to open.
+  test "a fallback-filled slug can produce a real collision, reported against the locale it clashes in" do
+    SiteSetting.instance.update!(default_locale: "de")
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title_en: "Team", slug_en: "team", title_de: "Mannschaft", parent: root)
+
+    clashing = Mobility.with_locale(:de) { Page.new(page_type: :standard, title: "Team", parent: root) }
+
+    # Ambient :de throughout: `clashing` is only titled in German, so title
+    # presence (a separate, unrelated validation) would otherwise fail under
+    # the default :en and mask the assertions this test actually cares about.
+    Mobility.with_locale(:de) do
+      assert_not clashing.valid?
+      assert_includes clashing.errors[:slug_en], "has already been taken in EN"
+      assert_empty clashing.errors[:slug_de], "the pages only clash in English, not German"
+
+      clashing.slug_en = "team-2"
+      assert clashing.valid?, clashing.errors.full_messages.inspect
+    end
+  end
+
   # The slug validation above closes the route by which two pages could come to
   # share a path from the admin. Should it ever happen some other way, the
   # lookup still has to name one winner, and the same one every time -- and the
@@ -211,7 +237,7 @@ class PageTest < ActiveSupport::TestCase
     assert_not duplicate.valid?
     # Attributed to the locale that actually collides, so the admin form can
     # mark that locale's tab.
-    assert_includes duplicate.errors[:slug_en], "has already been taken"
+    assert_includes duplicate.errors[:slug_en], "has already been taken in EN"
   end
 
   test "the same slug is allowed under a different parent" do
@@ -252,7 +278,7 @@ class PageTest < ActiveSupport::TestCase
     duplicate.slug_de = "ueber-uns"
 
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug_de], "has already been taken"
+    assert_includes duplicate.errors[:slug_de], "has already been taken in DE"
     assert_empty duplicate.errors[:slug_en]
   end
 

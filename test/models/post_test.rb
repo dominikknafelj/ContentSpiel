@@ -66,6 +66,31 @@ class PostTest < ActiveSupport::TestCase
     assert_equal "hello-world", post.slug_en
   end
 
+  # The fallback can produce a genuine collision, not just a hypothetical one:
+  # two posts can each want the same borrowed slug in a locale neither of them
+  # was actually titled in. `slug_is_unused_in_every_locale` (below) still
+  # catches it -- reported against `slug_en`, the locale that actually
+  # clashes, with a message that names it so an editor filling in a
+  # default-locale-only post knows which tab to open.
+  test "a fallback-filled slug can produce a real collision, reported against the locale it clashes in" do
+    SiteSetting.instance.update!(default_locale: "de")
+    Post.create!(content_type: :blog, title_en: "Team", slug_en: "team", title_de: "Mannschaft")
+
+    clashing = Mobility.with_locale(:de) { Post.new(content_type: :blog, title: "Team") }
+
+    # Ambient :de throughout: `clashing` is only titled in German, so title
+    # presence (a separate, unrelated validation) would otherwise fail under
+    # the default :en and mask the assertions this test actually cares about.
+    Mobility.with_locale(:de) do
+      assert_not clashing.valid?
+      assert_includes clashing.errors[:slug_en], "has already been taken in EN"
+      assert_empty clashing.errors[:slug_de], "the posts only clash in English, not German"
+
+      clashing.slug_en = "team-2"
+      assert clashing.valid?, clashing.errors.full_messages.inspect
+    end
+  end
+
   test "slug must be unique within the same content_type" do
     Post.create!(content_type: :blog, title: "Hello World")
     duplicate = Post.new(content_type: :blog, title: "Hello World")
@@ -73,7 +98,7 @@ class PostTest < ActiveSupport::TestCase
     assert_not duplicate.valid?
     # Attributed to the locale that actually collides, so the admin form can
     # mark that locale's tab.
-    assert_includes duplicate.errors[:slug_en], "has already been taken"
+    assert_includes duplicate.errors[:slug_en], "has already been taken in EN"
   end
 
   test "the same slug is allowed across different content_types" do
@@ -168,7 +193,7 @@ class PostTest < ActiveSupport::TestCase
       duplicate = Post.new(content_type: :blog, title: "Etwas Anderes", slug: "hallo-welt")
 
       assert_not duplicate.valid?
-      assert_includes duplicate.errors[:slug_de], "has already been taken"
+      assert_includes duplicate.errors[:slug_de], "has already been taken in DE"
     end
   end
 
@@ -223,7 +248,7 @@ class PostTest < ActiveSupport::TestCase
     duplicate.slug_de = "hallo-welt"
 
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug_de], "has already been taken"
+    assert_includes duplicate.errors[:slug_de], "has already been taken in DE"
   end
 
   test "each locale's slug collision is reported against that locale's field" do
@@ -234,8 +259,8 @@ class PostTest < ActiveSupport::TestCase
     duplicate.slug_es = "hola-mundo"
 
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug_en], "has already been taken"
-    assert_includes duplicate.errors[:slug_es], "has already been taken"
+    assert_includes duplicate.errors[:slug_en], "has already been taken in EN"
+    assert_includes duplicate.errors[:slug_es], "has already been taken in ES"
     assert_empty duplicate.errors[:slug_de]
   end
 

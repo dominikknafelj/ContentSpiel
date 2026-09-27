@@ -302,7 +302,12 @@ class Page < ApplicationRecord
 
       # Reported against `slug_de` rather than `slug`, so the admin form marks
       # the offending locale's tab instead of an ambient field nobody edits.
-      errors.add(accessor, :taken) if taken
+      #
+      # The message itself names the locale too, not just the field: a slug
+      # here can arrive via `SlugGeneration`'s default-locale fallback rather
+      # than anything the editor typed into this tab (Task 8c), so "has
+      # already been taken" alone would send them looking at the wrong one.
+      errors.add(accessor, :taken, message: "has already been taken in #{locale.to_s.upcase}") if taken
     end
   end
 
