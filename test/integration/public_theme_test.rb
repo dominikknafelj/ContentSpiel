@@ -40,7 +40,13 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
   test "the switcher link for a post without a German slug still resolves" do
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
-    Post.create!(content_type: :blog, title_en: "Hello", published_at: 1.day.ago)
+    post = Post.create!(content_type: :blog, title_en: "Hello", published_at: 1.day.ago)
+    # Since Task 8c every post gets a German slug by SlugGeneration's
+    # fallback the moment it has a title anywhere, so this scenario can no
+    # longer arise through a validated save -- `update_columns` forces the
+    # pre-fallback, no-German-slug state directly, the same way
+    # test/models/post_test.rb does to test the fallback itself.
+    post.update_columns(slug: post.read_attribute(:slug).except("de"))
 
     get "/blog/hello"
     german = css_select("[aria-label=Language] a[hreflang=de]").first["href"]
@@ -53,6 +59,9 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
   test "the document title includes the site name" do
     get "/about"
     assert_includes response.body, "<title>About – Dana&#39;s Notes</title>"
+    # I18n.locale at render time is the locale the URL was requested in, not
+    # a fixed default -- application.html.erb's <html lang> has to agree.
+    assert_select "html[lang=en]"
 
     get "/"
     assert_includes response.body, "<title>Dana&#39;s Notes</title>"
