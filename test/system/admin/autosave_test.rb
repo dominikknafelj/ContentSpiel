@@ -130,15 +130,20 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # happened, but the status line never moved off "Saving…" either. `fetch`
   # is stubbed here (the same technique the "second edit wins" test above
   # already uses) rather than the server actually 500ing, since nothing in
-  # this app can be made to fail on demand; `window.setTimeout` is stubbed
-  # alongside it purely to collapse this controller's own 1s/3s/9s retry
-  # backoff so the test doesn't have to sit through 13 real seconds of it.
+  # this app can be made to fail on demand.
+  #
+  # Deliberately *not* also stubbing `window.setTimeout` to collapse this
+  # controller's own 1s/3s/9s retry backoff, tempting as that is to shave
+  # ~13 seconds off this one test: overriding it wholesale affects every
+  # other `setTimeout` call already running on the page too (this page has
+  # at least one of its own, unrelated to autosave), and that turned out to
+  # make the real retry chain's own timing (and this assertion's polling)
+  # noticeably flakier in practice than just sitting out the real backoff --
+  # `wait:` below is generous specifically because the real one is real.
   test "a response that isn't a real answer (a 500, not a turbo-stream) retries, then shows check your connection" do
     visit "/cs-studio/pages/#{@page.id}"
 
     page.execute_script(<<~JS)
-      const originalSetTimeout = window.setTimeout
-      window.setTimeout = (fn, _delay) => originalSetTimeout(fn, 0)
       window.fetch = () => Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
     JS
 
@@ -146,7 +151,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     title_field.set("This will never actually save")
     title_field.send_keys(:tab)
 
-    assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 5
+    assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 20
   end
 
   # Fix (final-fixes round, finding 7): a Trix editor's own toolbar
