@@ -89,6 +89,13 @@ Rails.application.routes.draw do
     # same one PATCH target serves every node in the tree.
     resource :tree, only: %i[show update], controller: :tree
 
+    # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
+    # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
+    # an inline rename (`:update`) and a delete (`:destroy`) from the list
+    # itself; new tags are only ever created in passing, through a post's own
+    # `tag_names` (`Posts::Save`).
+    resources :tags, only: %i[index update destroy]
+
     # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
     # the placeholder `home#show` this task's brief removes.
     root to: "pages#index"

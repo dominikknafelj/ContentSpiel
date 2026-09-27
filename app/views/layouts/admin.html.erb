@@ -34,18 +34,18 @@
               <%= render "admin/shared/icon", name: :pages %><span class="sr-only md:not-sr-only">Pages</span>
             <% end %>
           </li>
-          <%# Posts and Tags have no module of their own yet (Tasks 6-7) --
-              rendered as real, discoverable <a> elements (not stub routes,
-              which Tasks 6-7 would only have to tear back down) so the
-              modules column's shape is already right; `aria-disabled` plus
-              `pointer-events-none` keep them inert until then. %>
+          <%# Posts has no module of its own yet (Task 7) -- rendered as a
+              real, discoverable <a> element (not a stub route, which Task 7
+              would only have to tear back down) so the modules column's
+              shape is already right; `aria-disabled` plus
+              `pointer-events-none` keep it inert until then. %>
           <li>
             <%= link_to "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "#{nav_link_classes} pointer-events-none opacity-50" do %>
               <%= render "admin/shared/icon", name: :posts %><span class="sr-only md:not-sr-only">Posts</span>
             <% end %>
           </li>
           <li>
-            <%= link_to "#", aria: { disabled: true }, tabindex: "-1", title: "Coming soon", class: "#{nav_link_classes} pointer-events-none opacity-50" do %>
+            <%= link_to admin_tags_path, class: nav_link_classes do %>
               <%= render "admin/shared/icon", name: :tags %><span class="sr-only md:not-sr-only">Tags</span>
             <% end %>
           </li>

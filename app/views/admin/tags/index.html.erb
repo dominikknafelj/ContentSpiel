@@ -1,0 +1,73 @@
+<%# The Tags module (cs-studio spec §4.1/§5.3): a flat list, no tree column
+    (that's the Pages module's own, spec §4.2) -- just the modules column
+    plus this content frame. Each row is its own inline rename form (the
+    same autosave shape every other editor uses) and a delete gated behind
+    `Admin::ConfirmDialogComponent`; there is nothing here to switch a
+    `?locale=` for, since a tag's name is a plain, untranslated column. %>
+<h1 class="mb-4 text-h1 text-ink">Tags</h1>
+
+<% if @tags.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+<% else %>
+  <table class="admin-tags-table w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <th class="py-2 pr-4">Name</th>
+        <th class="py-2 pr-4">Posts</th>
+        <th class="py-2 pr-4"><span class="sr-only">Save status</span></th>
+        <th class="py-2"><span class="sr-only">Delete</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @tags.each do |tag| %>
+        <% dialog_id = "delete-tag-#{tag.id}" %>
+        <tr id="<%= dom_id(tag) %>" class="border-b border-line align-top">
+          <td class="py-2 pr-4">
+            <%# `data-controller="admin--autosave"` sits directly on this
+                row's own form, same as every other autosaving form in CS
+                Studio (`Admin::PageSettingsFormComponent`'s own comment
+                explains why the save-status cell, a sibling `<td>` rather
+                than a nested element, needs no Stimulus target here to
+                reach it). %>
+            <%= form_with url: admin_tag_path(tag), method: :patch, class: "flex flex-col gap-1",
+                  data: {
+                    controller: "admin--autosave",
+                    action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+                    "admin--autosave-status-id-value": "tag-#{tag.id}-save-status"
+                  } do %>
+              <%= render partial: "admin/shared/base_updated_at_field",
+                    locals: { id: "tag-#{tag.id}-base-updated-at", value: tag.updated_at.iso8601(6) } %>
+              <%= label_tag "tag-#{tag.id}-name", "Name", class: "sr-only" %>
+              <%= text_field_tag "tag[name]", tag.name, id: "tag-#{tag.id}-name", class: setup_input_class %>
+              <div id="tag-<%= tag.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
+            <% end %>
+          </td>
+
+          <td class="py-2 pr-4 text-ink"><%= tag.posts_count %></td>
+
+          <td class="py-2 pr-4"><%= render Admin::SaveStatusComponent.new(id: "tag-#{tag.id}-save-status", state: :idle) %></td>
+
+          <td class="py-2 text-right">
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+                  onclick: "document.getElementById('#{dialog_id}').showModal()") %>
+
+            <%# "Removes the tag from N posts" (spec §5.3) -- shown for every
+                tag, unused ones included (`pluralize` reads "0 posts" then),
+                since an editor deleting a tag that turns out to be unused
+                still benefits from the same one confirmation step as any
+                other permanent delete (spec §7's "No trash" interim
+                state). %>
+            <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: "Delete this tag?",
+                  body: "Removes the tag from #{pluralize(tag.posts_count, 'post')}. This can't be undone.") do |dialog| %>
+              <% dialog.with_confirm_action do %>
+                <%= form_with url: admin_tag_path(tag), method: :delete do %>
+                  <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+                <% end %>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

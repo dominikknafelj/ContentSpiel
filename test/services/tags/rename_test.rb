@@ -1,0 +1,56 @@
+require "test_helper"
+
+class Tags::RenameTest < ActiveSupport::TestCase
+  test "renaming a tag moves posts listed through a tag-filtered block" do
+    listing = create_page(title: "Rails posts")
+    ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "rails" } })
+    post = create_post(title: "Hi", tags: [ "rails" ])
+    assert_equal "/rails-posts/hi", post.full_path("en")
+
+    result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")
+    assert result.ok?
+    assert_nil post.reload.full_path("en")
+  end
+
+  test "renaming to a taken name fails" do
+    Tag.create!(name: "a"); b = Tag.create!(name: "b")
+    assert_not Tags::Rename.call(b, name: " A ").ok?
+  end
+
+  test "strips and downcases the new name" do
+    tag = Tag.create!(name: "rails")
+    result = Tags::Rename.call(tag, name: "  Ruby On Rails  ")
+    assert result.ok?
+    assert_equal "ruby on rails", tag.reload.name
+  end
+
+  # A block with no content type filter (only a tag) is "every content
+  # type" (BlockTypes::PostList's own reading, mirrored by
+  # `PublicSite::Paths.sync_posts`'s `nil` argument) -- renaming the tag it
+  # filters by has to resync every post, not just one type, since the block
+  # itself never named one to narrow that down to.
+  test "renaming a tag filtered by an untyped listing resyncs every content type" do
+    listing = create_page(title: "Rails posts")
+    ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { tag: "rails" } })
+    post = create_post(title: "Hi", content_type: "blog", tags: [ "rails" ])
+    assert_equal "/rails-posts/hi", post.full_path("en")
+
+    result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")
+    assert result.ok?
+    assert_nil post.reload.full_path("en")
+  end
+
+  # The new name can also be the one a block already filters by (a rename
+  # that merges two tags' listing exposure) -- resync has to consider both
+  # the old and the new name, not just the one being vacated.
+  test "renaming a tag onto a name a listing already filters by resyncs those posts too" do
+    listing = create_page(title: "Ruby posts")
+    ContentBlocks::Save.call(listing.content_blocks.build, attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "ruby" } })
+    post = create_post(title: "Hi", tags: [ "rails" ])
+    assert_nil post.full_path("en")
+
+    result = Tags::Rename.call(Tag.find_by!(name: "rails"), name: "ruby")
+    assert result.ok?
+    assert_equal "/ruby-posts/hi", post.reload.full_path("en")
+  end
+end
