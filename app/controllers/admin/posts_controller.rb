@@ -157,7 +157,18 @@ module Admin
       scope = Post.all
       scope = scope.where(content_type: params[:type]) if params[:type].present?
       scope = filter_by_status(scope, params[:status]) if params[:status].present?
-      scope = scope.joins(:tags).where(tags: { name: params[:tag] }) if params[:tag].present?
+      # A subquery, not `scope.joins(:tags).where(tags: { name: ... })`
+      # directly (final-fixes round, finding 6): `index`'s own `.includes
+      # (:tags)` right after this, combined with a `where` that references
+      # the same `tags` table, is exactly what makes Rails silently upgrade
+      # that `includes` into an `eager_load` (a single LEFT OUTER JOIN) --
+      # and once the *listing* query's own join is filtered down to just the
+      # matching tag, that's also all `post.tags` sees for the rest of that
+      # row, not every tag the post actually has. Filtering by a subquery's
+      # `id`s instead leaves the outer scope with no `tags` reference of its
+      # own, so `includes` stays a real `includes` (a separate query,
+      # preloading every tag) no matter which tag this list was filtered by.
+      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].present?
       scope = filter_by_title(scope, params[:q]) if params[:q].present?
       scope
     end

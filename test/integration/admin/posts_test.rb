@@ -21,6 +21,19 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "tbody tr", /Blog one/
   end
 
+  # Fix (final-fixes round, finding 6): filtering by tag used to combine
+  # `joins(:tags).where(tags: { name: ... })` with `index`'s own
+  # `.includes(:tags)`, which Rails silently upgrades into a single
+  # `eager_load` once both reference the same table -- so a post matching
+  # the filter by having *one* of several tags showed only that one tag in
+  # the list, not every tag it actually has.
+  test "filtering by tag still shows every tag on a matching row, not just the one it matched by" do
+    create_post(title: "Multi-tagged", tags: [ "rails", "ruby" ])
+    get "/cs-studio/posts", params: { tag: "rails" }
+    assert_select "tbody tr", 1
+    assert_select "tbody tr", /rails, ruby/
+  end
+
   test "new asks for the type, then opens the editor" do
     post "/cs-studio/posts", params: { post: { content_type: "resume_entry", title: "Engineer" } }
     created = Post.order(:id).last
