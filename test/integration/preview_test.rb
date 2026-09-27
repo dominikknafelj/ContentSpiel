@@ -38,6 +38,23 @@ class PreviewTest < ActionDispatch::IntegrationTest
   # block removed without callbacks, a sync that hasn't run yet): preview
   # doesn't gate on `Resolver.visible?`, so it finds the row -- and must
   # render the 404 rather than a NoMethodError on a nil page.
+  # `Posts::BlogListComponent` builds its item links through `post_url_path`,
+  # which reads the request's own `PublicSite::Urls` (`preview: true` here) --
+  # pinned so a listing rendered inside preview can never leak a public-site
+  # link for one of its items, the same guarantee "links inside a preview
+  # stay in preview" already pins for nav/hreflang links.
+  test "post-list item links inside a preview stay under /preview" do
+    blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    sign_in_as(users(:one))
+    get "/preview/blog"
+
+    assert_response :success
+    assert_select "a[href^='/preview/']", /Hello/
+  end
+
   test "a post whose listing page is gone 404s in preview instead of raising" do
     blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
     block = blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
