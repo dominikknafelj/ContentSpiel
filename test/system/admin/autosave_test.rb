@@ -149,6 +149,28 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 5
   end
 
+  # Fix (final-fixes round, finding 7): a Trix editor's own toolbar
+  # formatting, or a finished attachment upload, updates the editor's
+  # content without ever firing a plain `input` event on the form -- only
+  # its own `trix-change` custom event. Dispatched synthetically here
+  # (rather than driving the real Trix widget's toolbar through Selenium,
+  # which would make this test depend on Trix's own CDN-hosted JS actually
+  # loading) the same way `test/system/admin/groups_test.rb` already
+  # dispatches a synthetic `input` for `admin--groups`'s own add/remove --
+  # this is a test of the *wiring* (`trix-change->admin--autosave#queue` on
+  # the form), not of Trix itself.
+  test "a trix-change event autosaves the post form too, not just input" do
+    post_record = create_post(title: "Engineer")
+    visit "/cs-studio/posts/#{post_record.id}"
+
+    page.execute_script(<<~JS)
+      document.querySelector('[data-controller~="admin--autosave"]')
+        .dispatchEvent(new Event("trix-change", { bubbles: true }))
+    JS
+
+    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+  end
+
   private
 
   # See this test's own comment for why the status line's text alone isn't

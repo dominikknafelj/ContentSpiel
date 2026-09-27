@@ -37,7 +37,7 @@
       <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
             data: {
               controller: "admin--autosave",
-              action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+              action: "input->admin--autosave#queue change->admin--autosave#queue trix-change->admin--autosave#queue focusout->admin--autosave#saveNow",
               "admin--autosave-status-id-value": status_id
             } do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
