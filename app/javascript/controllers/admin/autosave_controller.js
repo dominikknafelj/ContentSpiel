@@ -107,7 +107,33 @@ export default class extends Controller {
     // real answer -- the server-rendered stream already turns that into the
     // "Couldn't save" status and the per-field errors, so it counts as
     // success from *this* controller's point of view (nothing to retry).
-    Turbo.renderStreamMessage(await response.text())
+    const text = await response.text()
+
+    // Fix (discovered by this task's own autosave-queue system test):
+    // `Turbo.renderStreamMessage` doesn't patch the DOM synchronously --
+    // confirmed empirically, its `<turbo-stream>` elements apply on the
+    // *next animation frame*, not on this line, not even after a
+    // microtask/macrotask -- so a `pending` retrigger just below used to
+    // build its own `FormData` from the *stale* `base_updated_at` hidden
+    // field this very response is about to refresh, making a client's own
+    // very next save spuriously report "Changed elsewhere — reload to see
+    // the latest" against nothing but itself (spec §6.1's staleness check
+    // is meant to catch an edit from *elsewhere*, not this). Reading the
+    // field's fresh value straight out of the response text and writing it
+    // onto the form ourselves, synchronously, right now, is what keeps that
+    // race from ever mattering -- Turbo's own (later) replace of the same
+    // element just re-applies the identical value once it catches up.
+    // `template.content` (not a plain `querySelector` on the parsed
+    // document) is what a `<turbo-stream>`'s own hidden field actually
+    // lives in -- a `<template>`'s content is its own document fragment,
+    // invisible to a query against the document around it.
+    const freshBase = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
+      .map((template) => template.content.querySelector('[name="base_updated_at"]'))
+      .find((field) => field)
+    const ownBase = this.element.querySelector('[name="base_updated_at"]')
+    if (freshBase && ownBase) ownBase.value = freshBase.value
+
+    Turbo.renderStreamMessage(text)
     this.retryCount = 0
     this.busy = false
 
