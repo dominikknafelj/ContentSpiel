@@ -3,9 +3,9 @@
 # `config/initializers/types.rb`; nothing but that initializer and tests
 # should call `register`/`reset!` directly.
 module BlockTypes
-  extend TypeRegistry
+  extend ContentModel::Registry
 
-  def self.definition_class = BlockTypeDefinition
+  def self.definition_class = ContentModel::BlockTypeDefinition
   def self.kind_label = "block type"
 
   # Blocks whose type can list posts (spec §6: `PublicSite::Paths`, the
