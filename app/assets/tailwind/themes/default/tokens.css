@@ -10,14 +10,16 @@
 
 /* color-scheme is intentionally NOT set here. shared/theme_head puts
    data-theme="dark"/"light" on <html> for every page (public site, sign-in,
-   and product UI alike) so the inline script can beat first paint -- but
-   the theme boundary (design spec §1) means only product UI actually opts
-   into these tokens. A color-scheme declared globally against [data-theme]
-   would still flip the OS-level chrome (scrollbars, form controls, native
-   canvas colour) on public/auth pages that never asked for it. Apply
-   color-scheme per product layout instead, with Tailwind's built-in
-   utilities, e.g. `scheme-light dark:scheme-dark` on that layout's root
-   element -- never globally here. */
+   and product UI alike) so the inline script can beat first paint -- but a
+   color-scheme declared globally against [data-theme] would still flip the
+   OS-level chrome (scrollbars, form controls, native canvas colour) on any
+   layout that never asked for it, including ones that don't use these
+   `--th-` tokens at all. The public layout is the one that opts into this
+   file, and it already declares color-scheme itself with Tailwind's
+   built-in utilities (`scheme-light dark:scheme-dark` on
+   application.html.erb's <body>) rather than here -- keep that declaration
+   on the layout, not global, so this file stays reusable by any future
+   public layout without forcing the choice on it. */
 :root, [data-theme="light"] {
   --th-paper: #f5f4f0;
   --th-surface: #ffffff;
