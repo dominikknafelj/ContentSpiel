@@ -1,0 +1,13 @@
+<%# locals: message (optional) -- Admin::TreeController's flash-style status
+    for the tree's last move (cs-studio spec §4.2), replaced on its own so a
+    move's outcome doesn't have to wait on (or get lost inside) the tree's
+    own re-render. Empty and unstyled when there's nothing to report, e.g.
+    the plain frame this same markup starts out as on every page load
+    (Admin::TreeComponent).
+
+    `raw`, not the usual auto-escaped `<%=`: every message that reaches here
+    is one of `Pages::Move`'s own fixed strings (or, on an unhandled
+    failure, `ActiveRecord`'s field-name-derived ones) -- never user input --
+    and auto-escaping would otherwise turn a plain "can't" into "can&#39;t"
+    for no benefit, since there is nothing here to guard against. %>
+<p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm <%= "text-danger-ink" if message.present? %>"><%= raw(message) %></p>

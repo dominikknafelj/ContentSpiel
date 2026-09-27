@@ -54,7 +54,22 @@ Rails.application.routes.draw do
     resource :password, only: %i[new create]
     get "password/:token/edit", to: "passwords#edit", as: :edit_password
     patch "password/:token", to: "passwords#update", as: :update_password
-    root to: "home#show"
+
+    # The Pages module (cs-studio spec §4.1/§5.1): `show`/`update`/`destroy`
+    # are routed now but land in Task 4 -- `new`/`create` (this task) already
+    # redirect to `admin_page_path`, so the helper has to exist even before
+    # its controller action does.
+    resources :pages, only: %i[index new create show update destroy]
+
+    # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`
+    # (singular) rather than nested under `pages` -- a move names the page
+    # being dragged in its own params (`page_id`), not the URL, since the
+    # same one PATCH target serves every node in the tree.
+    resource :tree, only: %i[show update], controller: :tree
+
+    # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
+    # the placeholder `home#show` this task's brief removes.
+    root to: "pages#index"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
