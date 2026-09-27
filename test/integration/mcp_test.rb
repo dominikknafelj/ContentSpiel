@@ -75,11 +75,11 @@ class McpTest < ActionDispatch::IntegrationTest
 
     saved = ContentTypes.all.dup
     begin
-      ContentTypes.register(:test_type) { |t| t.label "Test type" }
+      ContentTypes.register("test/type") { |t| t.label "Test type" }
 
       mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
       tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "create_post_tool" }
-      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test_type"
+      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test/type"
     ensure
       ContentTypes.reset!
       saved.each { |definition| ContentTypes.registry_put(definition) }
@@ -96,11 +96,11 @@ class McpTest < ActionDispatch::IntegrationTest
 
     saved = ContentTypes.all.dup
     begin
-      ContentTypes.register(:test_type) { |t| t.label "Test type" }
+      ContentTypes.register("test/type") { |t| t.label "Test type" }
 
       mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
       tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "list_posts_tool" }
-      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test_type"
+      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test/type"
     ensure
       ContentTypes.reset!
       saved.each { |definition| ContentTypes.registry_put(definition) }

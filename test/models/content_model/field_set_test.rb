@@ -11,10 +11,10 @@ class ContentModel::FieldSetTest < ActiveSupport::TestCase
       t.field :listed, :boolean, default: true
       t.field :headline, :string, translated: true
     end
-    FieldGroups.register(:speaker) { |c| c.field :name, :string, required: true; c.field :url, :url }
+    FieldGroups.register("test/speaker") { |c| c.field :name, :string, required: true; c.field :url, :url }
     @with_groups = ContentModel::ContentTypeDefinition.new("conference").tap do |t|
-      t.field :speakers, :groups, of: :speaker
-      t.field :lead, :group, of: :speaker, translated: true
+      t.field :speakers, :groups, of: "test/speaker"
+      t.field :lead, :group, of: "test/speaker", translated: true
     end
   end
 
@@ -73,7 +73,7 @@ class ContentModel::FieldSetTest < ActiveSupport::TestCase
 
   test "group fields can't declare a default" do
     assert_raises(ArgumentError) do
-      ContentModel::ContentTypeDefinition.new("thing").tap { |t| t.field :speakers, :groups, of: :speaker, default: [] }
+      ContentModel::ContentTypeDefinition.new("thing").tap { |t| t.field :speakers, :groups, of: "test/speaker", default: [] }
     end
   end
 end
