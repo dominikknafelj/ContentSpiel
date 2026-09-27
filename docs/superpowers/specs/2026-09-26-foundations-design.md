@@ -147,7 +147,7 @@ No index or column exists per language.
 - **When a path changes:**
   - The previous current row becomes `current: false` (a redirect).
   - If the new path is held by a non-current row, that row is deleted and the path reused.
-  - A path held by another record's current row is a validation error (§5.2).
+  - A path held by another record's current row is a validation error (§5.2) on that record's own save. When the sync was triggered by a *different* record's write (a block, page, tag or language change), it never raises: the record goes without a URL in that language (its current row is deleted), and the clash is logged. The next sync after the clash is gone restores it.
 - **Deleting a page or post** deletes its rows. Trash will change this later.
 - **`PublicSite::Paths.rebuild!`** truncates the table and syncs everything. It is exposed as `bin/rails public_paths:rebuild` and runs from seeds.
 - **After commit**, the model emits `ActiveSupport::Notifications.instrument("public_paths.changed", record:, locale:, from:, to:)` for each changed path. This is the hook for CDN purge, webhooks and link checks. Nothing subscribes yet except tests.
