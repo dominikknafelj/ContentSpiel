@@ -1,7 +1,10 @@
 # Gets a single post by id, including its full body (design spec section 10).
 class GetPostTool < MCP::Tool
   description "Get a single post by id, including its full body. Read in the given locale " \
-    "(default: the site's current default locale)."
+    "(default: the site's current default locale). The response includes both `published` " \
+    "(boolean, kept for compatibility) and `status` (\"draft\", \"scheduled\", or \"live\") -- " \
+    "a scheduled post (a future published_at) has published: true but status: \"scheduled\", " \
+    "and is not yet visible on the public site."
   input_schema(
     properties: {
       id: { type: "integer" },

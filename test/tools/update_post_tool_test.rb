@@ -83,12 +83,13 @@ class UpdatePostToolTest < ActiveSupport::TestCase
     assert_equal "scheduled", @post.status
 
     # Publish by setting published: true
-    call_tool(id: @post.id, published: true)
+    response = call_tool(id: @post.id, published: true)
 
     @post.reload
     assert @post.live?, "Post should be live after publishing"
     # Published_at should be approximately now (within 1 second)
     assert_in_delta Time.current, @post.published_at, 1.second
+    assert_equal "live", JSON.parse(response.content.first[:text])["status"]
   end
 
   test "atomicity: failed save rolls back title and published_at changes" do

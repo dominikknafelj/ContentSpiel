@@ -5,8 +5,11 @@ class UpdatePostTool < MCP::Tool
   description "Update an existing post. Only the fields given are changed; everything else is left alone. " \
     "Translated fields (title/body/excerpt) are written in the given locale " \
     "(default: the site's current default locale). " \
-    "When published: true on an already-live post, its publish date is kept; " \
-    "when re-publishing a draft or scheduled post, it is set to now."
+    "published: true always results in status: \"live\" -- on an already-live post its publish " \
+    "date is kept, but on a draft *or a scheduled* post (a future published_at) it is set to now, " \
+    "publishing it immediately rather than leaving it scheduled. published: false unpublishes " \
+    "back to a draft. The response's `status` field (\"draft\"/\"scheduled\"/\"live\") reflects " \
+    "the result; `published` is kept as a boolean for compatibility."
   input_schema(
     properties: {
       id: { type: "integer" },

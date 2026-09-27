@@ -23,6 +23,12 @@ module PostSerializer
       # the raw stored fragment, with neither.
       body: post.body.body&.to_html,
       published: post.published_at.present?,
+      # `status` (draft/scheduled/live, from Publishable) spells out what
+      # `published`/`published_at` alone leave a client to infer -- in
+      # particular that a `published_at` in the future is not yet live.
+      # `published` stays as-is for compatibility with clients already
+      # reading it.
+      status: post.status,
       published_at: post.published_at&.iso8601,
       metadata: post.metadata
     }
