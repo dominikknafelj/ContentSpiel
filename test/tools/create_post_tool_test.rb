@@ -57,6 +57,16 @@ class CreatePostToolTest < ActiveSupport::TestCase
     assert_equal "Deutscher Titel", Mobility.with_locale(:de) { post.title }
   end
 
+  test "a locale outside the site's enabled languages returns an error response" do
+    response = nil
+
+    assert_no_difference "Post.count" do
+      response = call_tool(content_type: "blog", title: "Bonjour", locale: "fr")
+    end
+
+    assert response.error?
+  end
+
   test "returns an error response, not a crash, for an invalid content_type" do
     response = nil
 

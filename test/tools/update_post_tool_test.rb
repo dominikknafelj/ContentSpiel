@@ -56,6 +56,35 @@ class UpdatePostToolTest < ActiveSupport::TestCase
     assert_equal "Original Title", Mobility.with_locale(:en) { @post.title }
   end
 
+  test "a locale outside the site's enabled languages returns an error response" do
+    response = call_tool(id: @post.id, title: "Titre", locale: "fr")
+
+    assert response.error?
+  end
+
+  test "a clashing slug returns an MCP error response naming the language" do
+    # LocalizedSlug fills *every* enabled locale's blank slug from whatever
+    # title is available via that locale's fallback chain (not just the
+    # locale actually being written), so @post already got a German slug
+    # ("original-title", via its English title) the moment it was first
+    # saved in `setup` -- there's no update through this tool that leaves a
+    # locale's slug blank for a later save to fill. To exercise the
+    # "already taken" validation any update runs across every enabled
+    # locale, this plants another blog post with that same German slug
+    # directly (`save(validate: false)`, skipping `fill_blank_slugs` too,
+    # since it's a before_validation callback) rather than through a title
+    # this tool could ever legitimately write.
+    other = Post.new(content_type: :blog)
+    other.write_attribute(:title, { "en" => "Other Post" })
+    other.write_attribute(:slug, { "de" => "original-title" })
+    other.save(validate: false)
+
+    response = call_tool(id: @post.id, title: "New Title")
+
+    assert response.error?
+    assert_match(/DE/, response.content.first[:text])
+  end
+
   test "returns an error response, not a crash, for a missing id" do
     response = call_tool(id: 999_999, title: "New Title")
 
@@ -93,20 +122,22 @@ class UpdatePostToolTest < ActiveSupport::TestCase
   end
 
   # `title: ""` alone already fails the presence validation, so it doesn't
-  # tell apart the current single `assign_attributes` + `save!` from the old
-  # two-step `update!(translated_attrs)` then `update!(published_at:)`: the
-  # old code's *first* call would already raise on the empty title, before
-  # its second call -- the one this test is actually about -- ever ran.
+  # tell apart a single combined save from two separate ones: whichever call
+  # assigns the (now-invalid) title would already fail on its own, before a
+  # second call -- the one this test is actually about -- ever ran.
   #
   # Nothing in this app's validations legitimately couples title and
   # published_at, so to force a save that fails only when *both* are dirty
   # together (this app has no mocking gem), this temporarily overrides
-  # Post#save! for the duration of the test and restores the original
-  # afterwards. Under the old two-step code, the first `update!` call has
-  # only the title dirty and the second only published_at, so the override
-  # never trips and both changes go through -- which is exactly why the old
-  # code isn't atomic. Under the current code, both are assigned before the
-  # one `save!` call, so the override trips and neither change is persisted.
+  # Post#save (not #save! -- Posts::Save calls the non-raising form and
+  # branches on its boolean return, per spec §7.1's "validation and rule
+  # failures come back as a Result, never an exception") for the duration of
+  # the test and restores the original afterwards. Posts::Save assigns the
+  # translated title and the publish-rule's published_at before making its
+  # one `@post.save` call, so if title and published_at are ever assigned
+  # across two separate saves instead, the override never trips and both
+  # changes go through -- which is exactly what this test is checking isn't
+  # happening.
   test "atomicity: failed save rolls back title and published_at changes" do
     # A live post with a concrete (non-nil) published_at, so both assertions
     # below can be unconditional `assert_equal` -- the original test's
@@ -117,11 +148,17 @@ class UpdatePostToolTest < ActiveSupport::TestCase
     @post.update!(published_at: original_published_at)
 
     Post.class_eval do
-      alias_method :__original_save_bang_for_atomicity_test, :save!
-      define_method(:save!) do |*args, **kwargs|
-        raise ActiveRecord::RecordInvalid.new(self) if title_changed? && published_at_changed?
+      alias_method :__original_save_for_atomicity_test, :save
+      define_method(:save) do |*args, **kwargs|
+        if title_changed? && published_at_changed?
+          # A real failed `save` populates `errors` before returning false --
+          # `ApplicationService::Result#ok?` is just `errors.empty?`, so a
+          # `false` return with no errors added would read as success.
+          errors.add(:base, "combined save intentionally blocked for the atomicity test")
+          next false
+        end
 
-        __original_save_bang_for_atomicity_test(*args, **kwargs)
+        __original_save_for_atomicity_test(*args, **kwargs)
       end
     end
 
@@ -141,8 +178,8 @@ class UpdatePostToolTest < ActiveSupport::TestCase
         "Published_at should not have changed when the combined save fails"
     ensure
       Post.class_eval do
-        alias_method :save!, :__original_save_bang_for_atomicity_test
-        remove_method :__original_save_bang_for_atomicity_test
+        alias_method :save, :__original_save_for_atomicity_test
+        remove_method :__original_save_for_atomicity_test
       end
     end
   end

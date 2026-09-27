@@ -56,6 +56,12 @@ class ListPostsToolTest < ActiveSupport::TestCase
     assert_equal [ "Deutscher Titel" ], titles
   end
 
+  test "a locale outside the site's enabled languages returns an error response" do
+    response = call_tool(locale: "fr")
+
+    assert response.error?
+  end
+
   # List responses are a summary, not the full record -- a body-per-post
   # dump would bloat every listing for content an agent has to ask for by
   # id anyway (GetPostTool).

@@ -40,6 +40,14 @@ class GetPostToolTest < ActiveSupport::TestCase
     assert_includes data["body"], "Deutscher Text"
   end
 
+  test "a locale outside the site's enabled languages returns an error response" do
+    post = Post.create!(content_type: :blog, title: "A Blog Post")
+
+    response = call_tool(id: post.id, locale: "fr")
+
+    assert response.error?
+  end
+
   test "returns an error response, not a crash, for a missing id" do
     response = call_tool(id: 999_999)
 

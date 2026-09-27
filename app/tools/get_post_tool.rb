@@ -1,5 +1,7 @@
 # Gets a single post by id, including its full body (design spec section 10).
 class GetPostTool < MCP::Tool
+  extend McpErrorResponse
+
   description "Get a single post by id, including its full body. Read in the given locale " \
     "(default: the site's current default locale). The response includes both `published` " \
     "(boolean, kept for compatibility) and `status` (\"draft\", \"scheduled\", or \"live\") -- " \
@@ -8,7 +10,7 @@ class GetPostTool < MCP::Tool
   input_schema(
     properties: {
       id: { type: "integer" },
-      locale: { type: "string", enum: Mobility.available_locales.map(&:to_s) }
+      locale: { type: "string", enum: Locales::SUPPORTED.keys }
     },
     required: [ "id" ]
   )
@@ -17,9 +19,12 @@ class GetPostTool < MCP::Tool
 
   def self.call(id:, locale: nil, server_context:)
     post = Post.find_by(id: id)
-    return MCP::Tool::Response.new([ { type: "text", text: "Post #{id} not found" } ], error: true) unless post
+    return error_response("Post #{id} not found") unless post
 
-    locale ||= Current.site.default_locale
+    locale ||= Locales.default
+    invalid_locale = reject_unless_enabled(locale)
+    return invalid_locale if invalid_locale
+
     data = Mobility.with_locale(locale) { PostSerializer.call(post, locale) }
 
     MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)

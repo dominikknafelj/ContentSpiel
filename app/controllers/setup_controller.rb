@@ -23,6 +23,12 @@ class SetupController < ApplicationController
   allow_unauthenticated_access
   layout "setup"
 
+  # Overrides ApplicationController's `:admin` default (spec §7.1) -- setup
+  # writes (the site, languages, MCP token, starter content) run before an
+  # admin session necessarily exists, so they're attributed to their own
+  # channel rather than misreported as `:admin`.
+  before_action { Current.channel = :setup }
+
   before_action :require_setup_pending
   before_action :load_step, only: %i[show update]
   before_action :require_step_access, only: %i[show update]

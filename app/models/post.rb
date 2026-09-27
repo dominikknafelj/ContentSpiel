@@ -27,7 +27,12 @@ class Post < ApplicationRecord
   has_many :inverse_post_relations, class_name: "PostRelation",
     foreign_key: :related_post_id, dependent: :destroy, inverse_of: :related_post
 
-  enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }
+  # `validate: true` turns an unrecognised content_type (e.g. "nope" arriving
+  # from Posts::Save's untrusted `attributes:`) into a validation error --
+  # and so an ApplicationService::Result#failure -- instead of the
+  # ArgumentError Rails enums raise by default, which would otherwise crash
+  # the request rather than come back through the normal error path.
+  enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }, validate: true
 
   # Resume entries' structured fields (spec §10.3), kept in the existing
   # `metadata` jsonb so no migration is needed and other content types ignore

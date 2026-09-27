@@ -1,7 +1,10 @@
-# Updates an existing post (design spec section 10). Only the fields given
-# are changed -- an absent keyword leaves that attribute alone, so a caller
-# updating just the body doesn't have to first fetch and resend the title.
+# Updates an existing post (design spec section 10), as a thin wrapper
+# around Posts::Save (spec §7.3). Only the fields given are changed -- an
+# absent keyword leaves that attribute alone, so a caller updating just the
+# body doesn't have to first fetch and resend the title.
 class UpdatePostTool < MCP::Tool
+  extend McpErrorResponse
+
   description "Update an existing post. Only the fields given are changed; everything else is left alone. " \
     "Translated fields (title/body/excerpt) are written in the given locale " \
     "(default: the site's current default locale). " \
@@ -16,7 +19,7 @@ class UpdatePostTool < MCP::Tool
       title: { type: "string" },
       body: { type: "string", description: "HTML." },
       excerpt: { type: "string" },
-      locale: { type: "string", enum: Mobility.available_locales.map(&:to_s) },
+      locale: { type: "string", enum: Locales::SUPPORTED.keys },
       published: { type: "boolean", description: "Omit to leave the current publish state alone." }
     },
     required: [ "id" ]
@@ -26,35 +29,23 @@ class UpdatePostTool < MCP::Tool
 
   def self.call(id:, title: nil, body: nil, excerpt: nil, locale: nil, published: nil, server_context:)
     post = Post.find_by(id: id)
-    return MCP::Tool::Response.new([ { type: "text", text: "Post #{id} not found" } ], error: true) unless post
+    return error_response("Post #{id} not found") unless post
 
-    locale ||= Current.site.default_locale
-    translated_attrs = { title: title, body: body, excerpt: excerpt }.compact
+    locale ||= Locales.default
+    invalid_locale = reject_unless_enabled(locale)
+    return invalid_locale if invalid_locale
 
-    # Build all attributes to assign, handling published_at carefully:
-    # - If published is omitted (nil), leave published_at alone
-    # - If published: false, set published_at to nil
-    # - If published: true on a live post, keep existing published_at
-    # - If published: true on a draft/scheduled post, set to now
-    attrs_to_assign = translated_attrs.dup
-    unless published.nil?
-      attrs_to_assign[:published_at] = if published
-        post.live? ? post.published_at : Time.current
-      else
-        nil
-      end
-    end
+    # `published:` is only added to `attributes:` when given at all --
+    # `Posts::Save`'s own publish rule treats `nil` there as "leave alone",
+    # `false` as "unpublish", the same three-way distinction this tool has
+    # always made, just delegated now instead of hand-rolled per call.
+    attributes = published.nil? ? {} : { published: published }
+    translations = { locale => { title: title, body: body, excerpt: excerpt }.compact }
 
-    # Assign all attributes and save atomically within the locale context,
-    # so if any validation fails, nothing is written to the database.
-    Mobility.with_locale(locale) do
-      post.assign_attributes(attrs_to_assign)
-      post.save!
-    end
+    result = Posts::Save.call(post, attributes: attributes, translations: translations)
+    return error_response(result.errors.to_sentence) unless result.ok?
 
-    data = Mobility.with_locale(locale) { PostSerializer.call(post, locale) }
+    data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
     MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
-  rescue ActiveRecord::RecordInvalid => e
-    MCP::Tool::Response.new([ { type: "text", text: e.message } ], error: true)
   end
 end
