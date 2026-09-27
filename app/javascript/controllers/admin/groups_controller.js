@@ -64,11 +64,44 @@ export default class extends Controller {
   // since neither a block's `settings` nor a post's `fields` form_name ever
   // contains a bare digit segment of its own (spec §4.3: field names are
   // schema-declared identifiers, not numeric).
+  //
+  // `id`/`for` need the same fix (cs-studio Task 7, carried in from Task 2's
+  // review): `Admin::FieldComponent`'s default `dom_id_prefix(form_name)`
+  // bakes a row's index into every subfield's own input `id`, `<label
+  // for>` and error-slot `id` too -- just without brackets (e.g.
+  // "post_fields_speakers_0-name", not "...[0]-name") -- so a stale id left
+  // behind after a remove/reorder would silently break the *next* PATCH's
+  // Turbo Stream error-slot replace for that row (a `getElementById` that
+  // no longer matches). The row's *old* index is read from one of its own
+  // `name` attributes (any subfield's -- they all agree) before that
+  // attribute gets rewritten below, then every literal `_<oldIndex>-`
+  // substring in the row's own `id`/`for` values -- always exactly the
+  // fragment `dom_id_prefix` produced for this row's index, immediately
+  // before the subfield name's own leading dash -- is swapped for
+  // `_<newIndex>-`. Skipped when the index hasn't actually moved, so a
+  // remove/reorder that leaves an untouched row alone doesn't churn its ids
+  // for no reason.
   renumber() {
-    this.rowTargets.forEach((row, index) => {
+    this.rowTargets.forEach((row, newIndex) => {
+      const sample = row.querySelector("[name]")
+      const match = sample?.getAttribute("name")?.match(/\[(\d+)\]/)
+      const oldIndex = match ? match[1] : null
+
       row.querySelectorAll("[name]").forEach((field) => {
-        field.name = field.name.replace(/\[\d+\]/, `[${index}]`)
+        field.name = field.name.replace(/\[\d+\]/, `[${newIndex}]`)
       })
+
+      if (oldIndex !== null && oldIndex !== String(newIndex)) {
+        const oldFragment = `_${oldIndex}-`
+        const newFragment = `_${newIndex}-`
+
+        row.querySelectorAll("[id]").forEach((el) => {
+          el.id = el.id.replace(oldFragment, newFragment)
+        })
+        row.querySelectorAll("[for]").forEach((el) => {
+          el.setAttribute("for", el.getAttribute("for").replace(oldFragment, newFragment))
+        })
+      }
     })
     this.dispatchInput()
   }

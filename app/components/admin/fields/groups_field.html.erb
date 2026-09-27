@@ -5,7 +5,7 @@
         <button type="button" class="admin-groups-field__handle cursor-grab px-1 text-meta" aria-hidden="true">⠿</button>
         <div class="flex-1">
           <% subfields.each do |subfield| %>
-            <%= render Admin::FieldComponent.new(field: subfield, form_name: row_form_name(index), value: subfield_value(row_value, subfield), locale: locale) %>
+            <%= render Admin::FieldComponent.new(field: subfield, form_name: row_form_name(index), value: subfield_value(row_value, subfield), original: subfield_original(index, subfield), locale: locale) %>
           <% end %>
         </div>
         <%= render Admin::ButtonComponent.new(label: "Remove", variant: :secondary, type: "button", data: { action: "click->admin--groups#remove" }) %>
