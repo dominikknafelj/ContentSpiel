@@ -1,0 +1,15 @@
+<div class="admin-column mb-4" data-field-name="<%= name %>">
+  <label class="<%= setup_label_class %> mb-1" for="<%= name %>">Slug</label>
+
+  <%= tag.input type: "text", name: name, id: name, value: value, class: setup_input_class, data: { "slug-preview-target": "input" } %>
+
+  <p class="mt-1 text-sm text-meta">
+    <span data-slug-preview-base><%= base_url %>/</span><span data-slug-preview-value><%= value %></span>
+  </p>
+
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
+    <% errors.each do |message| %>
+      <p><%= message %></p>
+    <% end %>
+  </div>
+</div>

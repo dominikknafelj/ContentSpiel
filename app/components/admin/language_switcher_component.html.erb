@@ -1,0 +1,14 @@
+<nav class="admin-language-switcher flex items-center gap-3 font-cs-mono text-label uppercase tracking-mono" aria-label="Language">
+  <% locales.each do |code| %>
+    <span class="inline-flex items-center gap-1">
+      <% if current?(code) %>
+        <span class="text-ink" aria-current="true"><%= native_name(code) %></span>
+      <% else %>
+        <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink" %>
+      <% end %>
+      <% if missing?(code) %>
+        <%= tag.span "", class: "h-1.5 w-1.5 rounded-full bg-danger", title: "Missing required fields", aria: { hidden: true } %>
+      <% end %>
+    </span>
+  <% end %>
+</nav>

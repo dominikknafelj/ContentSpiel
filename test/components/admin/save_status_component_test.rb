@@ -1,0 +1,39 @@
+require "test_helper"
+
+class Admin::SaveStatusComponentTest < ViewComponent::TestCase
+  test "renders a status element with the given id and role status" do
+    render_inline Admin::SaveStatusComponent.new(id: "save-status-42", state: :saving)
+
+    assert_selector "p#save-status-42[role='status']"
+  end
+
+  test "idle renders an empty element" do
+    render_inline Admin::SaveStatusComponent.new(id: "save-status", state: :idle)
+
+    assert_selector "p#save-status[role='status']", text: ""
+  end
+
+  test "each state renders its exact text (Global Constraints)" do
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saving)
+    assert_text "Saving…"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 14:05"))
+    assert_text "Saved 14:05"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :error, count: 3)
+    assert_text "Couldn't save — 3 problems"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :retrying)
+    assert_text "Not saved — retrying"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :offline)
+    assert_text "Not saved — check your connection"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :stale)
+    assert_text "Changed elsewhere — reload to see the latest"
+  end
+
+  test "rejects an unknown state" do
+    assert_raises(ArgumentError) { Admin::SaveStatusComponent.new(id: "s", state: :bogus) }
+  end
+end
