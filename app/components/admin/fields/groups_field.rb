@@ -36,6 +36,17 @@ module Admin
 
       def row_form_name(index) = "#{input_name}[#{index}]"
 
+      # The root of this whole form's own param namespace ("post" or
+      # "block", never anything nested) -- see the hidden marker rendered in
+      # this component's own template for what this feeds (cs-studio
+      # final-fixes round, finding 2). Derived from `form_name` rather than
+      # threaded through as its own keyword: every caller today only ever
+      # hands this component a bracketed name whose *first* segment already
+      # is that root ("post[fields]", "block[settings]"), so there is
+      # nothing a new keyword would let a caller say that this can't already
+      # read off the one it's given.
+      def root_form_name = form_name.to_s[/\A[^\[]+/]
+
       def subfield_value(row_value, subfield) = read_field(row_value, subfield.name)
 
       def original_rows = Array(original)

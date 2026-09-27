@@ -59,6 +59,12 @@ module TestTypes
       t.label "Quote"
       t.field :text, :string, required: true, translated: true
       t.field :cite, :url
+      # A `groups` schema field on a *block* type (final-fixes round, Task
+      # 10/finding 2): no built-in block type declares one, so this is the
+      # only fixture that lets `Admin::ContentBlocksController`'s own
+      # groups-removal handling be exercised the same way `test/event
+      # #speakers` already exercises it for a post's typed `fields`.
+      t.field :speakers, :groups, of: "test/speaker"
       t.component TestQuoteComponent
     end
 

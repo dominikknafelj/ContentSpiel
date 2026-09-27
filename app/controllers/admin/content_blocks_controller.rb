@@ -159,8 +159,9 @@ module Admin
       attributes = {}
       translations = {}
 
-      if definition && block_params.key?(:settings)
-        settings = block_params[:settings].to_unsafe_h
+      if definition && (block_params.key?(:settings) || block_params[:groups_present].present?)
+        settings = block_params.key?(:settings) ? block_params[:settings].to_unsafe_h : {}
+        apply_missing_groups(settings, definition, block_params[:groups_present])
         normalize_group_fields(settings, definition)
 
         plain, translated = split_settings(settings, definition)
@@ -184,6 +185,26 @@ module Admin
       definition.fields.select { |field| field.type == :groups }.each do |field|
         key = field.name
         settings[key] = Admin::FieldParams.normalize(settings[key]) if settings.key?(key)
+      end
+    end
+
+    # A `groups` field with every row removed sends no key of its own at all
+    # -- there's nothing left to name (finding 2, final-fixes round) -- which
+    # would otherwise read identically to "this form never touched this
+    # field," leaving whatever was last saved untouched instead of emptied.
+    # `Admin::Fields::GroupsField`'s own hidden `groups_present` marker
+    # (rendered once per groups field, regardless of row count) is what
+    # tells the two apart: every name listed there is a groups field this
+    # form *did* render, so a missing key for it means "saved as empty," not
+    # "not part of this request." Mirrors `Admin::PostsController`'s own
+    # `apply_missing_groups` exactly; duplicated rather than shared for the
+    # same reason `normalize_group_fields` already is on both controllers
+    # (see that method's own comment on `Admin::PostsController`).
+    def apply_missing_groups(hash, definition, groups_present)
+      present = Array(groups_present).map(&:to_s)
+
+      definition.fields.select { |field| field.type == :groups && present.include?(field.name) }.each do |field|
+        hash[field.name] = [] unless hash.key?(field.name)
       end
     end
 

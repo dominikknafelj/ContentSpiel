@@ -8,6 +8,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   # shared) blob un-purged and the very bug this test exists to catch would
   # pass by accident.
   include ActiveJob::TestHelper
+  include TestTypes
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -60,6 +61,24 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       as: :turbo_stream
     assert_response :success
     assert_includes block.reload.body(locale: :en).to_s, "Hello there"
+  end
+
+  # Fix (final-fixes round, finding 2): the block-card counterpart to
+  # `Admin::PostsTest`'s own "removing every speaker" case -- no built-in
+  # block type declares a `groups` field, so `test/quote` (`test/support/
+  # test_types.rb`) is the one fixture that exercises this for a block's own
+  # settings at all.
+  test "removing every row of a block's own groups field saves it as empty" do
+    with_test_types do
+      block = @page.content_blocks.create!(block_type: "test/quote", position: 0,
+        settings: { "speakers" => [ { "name" => "Ada" } ] }, translated_settings: { "en" => { "text" => "Hello" } })
+      assert_equal %w[Ada], block.settings_object.group(:speakers).map(&:name)
+
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { groups_present: [ "speakers" ] }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      assert_response :success
+      assert_equal [], block.reload.settings_object.group(:speakers).map(&:name)
+    end
   end
 
   test "updating a deleted block answers gone" do

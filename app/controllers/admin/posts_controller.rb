@@ -89,8 +89,9 @@ module Admin
       fields_hash = nil
       definition = @post.definition
 
-      if post_params.key?(:fields) && definition
-        fields_hash = post_params[:fields].to_unsafe_h
+      if definition && (post_params.key?(:fields) || post_params[:groups_present].present?)
+        fields_hash = post_params.key?(:fields) ? post_params[:fields].to_unsafe_h : {}
+        apply_missing_groups(fields_hash, definition, post_params[:groups_present])
         normalize_group_fields(fields_hash, definition)
         plain, translated_fields = split_fields(fields_hash, definition)
         attributes[:fields] = plain
@@ -201,6 +202,18 @@ module Admin
       definition.fields.select { |field| field.type == :groups }.each do |field|
         key = field.name
         hash[key] = Admin::FieldParams.normalize(hash[key]) if hash.key?(key)
+      end
+    end
+
+    # A `groups` field with every row removed sends no key of its own at all
+    # (finding 2, final-fixes round) -- see `Admin::ContentBlocksController
+    # #apply_missing_groups`'s own comment, which this mirrors exactly for a
+    # post's typed `fields` instead of a block's `settings`.
+    def apply_missing_groups(hash, definition, groups_present)
+      present = Array(groups_present).map(&:to_s)
+
+      definition.fields.select { |field| field.type == :groups && present.include?(field.name) }.each do |field|
+        hash[field.name] = [] unless hash.key?(field.name)
       end
     end
 

@@ -1,4 +1,21 @@
 <div data-controller="admin--groups" class="admin-groups-field">
+  <%# Rendered whether or not any row survives to be submitted (cs-studio
+      final-fixes round, finding 2): a `groups` field with every row removed
+      sends no `<%= input_name %>` key at all -- there's nothing left to
+      name -- which the controller's own split (`Admin::PostsController
+      #update`/`Admin::ContentBlocksController#split_block_params`) would
+      otherwise read as "this form never touched this field," leaving
+      whatever was last saved untouched instead of emptied. This marker is
+      the one thing that's *always* present for a groups field this form
+      renders at all, so the controller can tell "saved as empty" apart from
+      "not part of this request." Named off `root_form_name`, not
+      `input_name`, deliberately: it has to sit at the top of this whole
+      form's own param namespace ("post[groups_present][]", not nested under
+      "post[fields][groups_present][]"), since the controller reads it
+      before it ever splits `fields`/`settings` out of the rest of the
+      params at all. %>
+  <input type="hidden" name="<%= root_form_name %>[groups_present][]" value="<%= field.name %>">
+
   <div data-admin--groups-target="list" class="flex flex-col gap-3">
     <% rows.each do |index, row_value| %>
       <div data-admin--groups-target="row" class="flex items-start gap-2 rounded-cs border border-line p-3">

@@ -77,4 +77,24 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
       assert_equal %w[Ada Grace], post_record.reload.fields.group(:speakers).map(&:name)
     end
   end
+
+  # Fix (final-fixes round, finding 2): removing every row leaves the
+  # browser with no `speakers` key to submit at all -- `Admin::Fields::
+  # GroupsField`'s own hidden `groups_present` marker is what's supposed to
+  # tell the controller "this field was on the form, just with nothing left
+  # in it" apart from "this form never touched this field." Without it, the
+  # PATCH below would leave the two speakers saved just above untouched.
+  test "removing every speaker saves it as empty, not left unchanged" do
+    with_test_types do
+      post_record = Posts::Save.call(attributes: { content_type: "test/event" }, translations: { "en" => { title: "Launch" } }).record
+      Posts::Save.call(post_record, attributes: { fields: { speakers: [ { name: "Ada" } ] } })
+      assert_equal %w[Ada], post_record.reload.fields.group(:speakers).map(&:name)
+
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { groups_present: [ "speakers" ] }, base_updated_at: post_record.updated_at.iso8601(6) },
+        as: :turbo_stream
+      assert_response :success
+      assert_equal [], post_record.reload.fields.group(:speakers).map(&:name)
+    end
+  end
 end
