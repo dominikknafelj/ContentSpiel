@@ -111,4 +111,4 @@ gem "rack-attack", "~> 6.8"
 
 gem "view_component", "~> 4.15"
 
-gem "lookbook", "~> 2.3", groups: [:development, :test]
+gem "lookbook", "~> 2.3", groups: [ :development, :test ]
