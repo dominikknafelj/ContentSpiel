@@ -1,9 +1,9 @@
 <%# locals: section_id, image_id, image_html_name, image_value, checkbox_id,
-    checkbox_html_name, show_checkbox -- the page settings form's hero
-    image preview plus its "Remove image" checkbox (cs-studio spec §5.1),
-    wrapped in one `id="<%= section_id %>"` element so a single Turbo
-    Stream `replace` can bring both back in sync with the record after a
-    save that touched the attachment (`Admin::PagesController
+    checkbox_html_name, show_checkbox, name: "hero_image" -- the page
+    settings form's hero image preview plus its "Remove image" checkbox
+    (cs-studio spec §5.1), wrapped in one `id="<%= section_id %>"` element
+    so a single Turbo Stream `replace` can bring both back in sync with the
+    record after a save that touched the attachment (`Admin::PagesController
     #hero_image_stream`, Task 4 fix round 2) -- rendered from this one
     partial on the initial GET (`Admin::PageSettingsFormComponent`) and
     again from that stream, so there is exactly one "what does the hero
@@ -11,9 +11,21 @@
     `Admin::TreeComponent` already applies to the tree.
     `show_checkbox` is always the record's *current* `attached?`, not
     "was this section just touched" -- an unattached page has nothing to
-    remove either way. %>
+    remove either way.
+    `name:` (fix round 1) is what this partial's own label reads --
+    defaulting to "hero_image" keeps every existing caller (the page
+    settings form, which never passes it) unchanged, while a block's own
+    image column (`Admin::BlockCardComponent`,
+    `Admin::ContentBlocksController#image_field_stream`) passes "image" so
+    its label reads "Image", not a hard-coded "Hero image" that never
+    matched what the field actually is. %>
+<%# `local_assigns.fetch`, not a bare `name ||=` -- an ERB partial raises
+    `NameError` for a local nobody passed at all (as every existing caller
+    but the two block-image ones still doesn't), it doesn't just read as
+    nil the way a real Ruby method's optional keyword argument would. %>
+<% name = local_assigns.fetch(:name, "hero_image") %>
 <div id="<%= section_id %>">
-  <%= render Admin::Columns::ImageColumnComponent.new(name: "hero_image", id: image_id, html_name: image_html_name, value: image_value) %>
+  <%= render Admin::Columns::ImageColumnComponent.new(name: name, id: image_id, html_name: image_html_name, value: image_value) %>
 
   <% if show_checkbox %>
     <div class="mb-4 -mt-2">

@@ -21,7 +21,13 @@ module Admin
     # at all are translated (Mobility/ActionText) versus a plain attribute
     # (the attachment) -- `block.definition.uses_columns` still gates which
     # of these a given type's own params are actually read from.
-    TRANSLATED_COLUMNS = %w[caption alt body].freeze
+    #
+    # `TRANSLATED_COLUMNS` is derived from `ContentBlocks::Save::TRANSLATED`
+    # (fix round 1) rather than a second, hand-kept `%w[caption alt body]`
+    # literal -- that service is the one place a translated column actually
+    # gets assigned, so this controller's own idea of "which columns are
+    # translated" can never drift out of sync with it.
+    TRANSLATED_COLUMNS = ContentBlocks::Save::TRANSLATED.map(&:to_s).freeze
     ATTRIBUTE_COLUMNS = %w[image].freeze
 
     GONE_MESSAGE = "This block was deleted"
@@ -108,11 +114,12 @@ module Admin
 
     # Duplicate (spec §5.1): copies the type, its settings (both halves --
     # untranslated and every locale's translations), every locale's
-    # caption/alt/body and the image attachment (reusing the same blob
-    # rather than re-uploading it), then inserts the copy directly after the
-    # source the same way `create`'s own `after_id` does -- `after_id:
-    # source.id` here is always present, unlike `create`'s (which is only
-    # sometimes given), so this never falls back to appending at the end.
+    # caption/alt/body and the image attachment (as an independent blob,
+    # not a shared one -- see `attach_duplicate_image`'s own comment), then
+    # inserts the copy directly after the source the same way `create`'s
+    # own `after_id` does -- `after_id: source.id` here is always present,
+    # unlike `create`'s (which is only sometimes given), so this never
+    # falls back to appending at the end.
     def duplicate
       source = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless source
@@ -121,9 +128,9 @@ module Admin
       copy_translations(source, copy)
 
       result = ContentBlocks::Save.call(copy, attributes: {})
-      return render(turbo_stream: [], status: :unprocessable_entity) unless result.ok?
+      return render(turbo_stream: picker_error_stream(result.errors), status: :unprocessable_entity) unless result.ok?
 
-      copy.image.attach(source.image.blob) if source.image.attached?
+      attach_duplicate_image(copy, source) if source.image.attached?
       reposition_after(copy, source.id)
       render turbo_stream: turbo_stream.after(ActionView::RecordIdentifier.dom_id(source), block_card_component(copy.reload)), status: :created
     end
@@ -240,19 +247,41 @@ module Admin
       turbo_stream.replace("content-blocks-alert", partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: errors })
     end
 
-    # Every locale's caption/alt/body, copied literally (no fallback) from
-    # `source` onto `copy` -- `Mobility.with_locale` is what both the
-    # reader and the writer need for a translated column (Locales.default
-    # note in `ContentBlocks::Save` explains why the writer side can't take
-    # a `locale:` keyword directly the way a jsonb reader can).
+    # Every locale's translated columns (`ContentBlocks::Save::TRANSLATED`
+    # -- fix round 1, same one source `TRANSLATED_COLUMNS` above derives
+    # from), copied literally (no fallback) from `source` onto `copy` --
+    # `Mobility.with_locale` is what both the reader and the writer need for
+    # a translated column (Locales.default note in `ContentBlocks::Save`
+    # explains why the writer side can't take a `locale:` keyword directly
+    # the way a jsonb reader can). `body` alone gets its own `blank?` guard:
+    # it's an ActionText association, not a jsonb value, so copying a blank
+    # one over would create an empty `ActionText::RichText` row for a
+    # locale that never had one.
     def copy_translations(source, copy)
       Locales.enabled.each do |code|
         Mobility.with_locale(code) do
-          copy.caption = source.caption
-          copy.alt = source.alt
-          copy.body = source.body.to_s if source.body.present?
+          ContentBlocks::Save::TRANSLATED.each do |column|
+            value = source.public_send(column)
+            next if column == :body && value.blank?
+
+            copy.public_send("#{column}=", column == :body ? value.to_s : value)
+          end
         end
       end
+    end
+
+    # `attach(source.image.blob)` would point the copy at the very same
+    # `ActiveStorage::Blob` row the source uses -- fine to read, but
+    # `has_one_attached`'s default `dependent: :purge_later` means
+    # destroying *either* block later purges that shared blob out from
+    # under whichever one is left, silently breaking its image (fix round
+    # 1, flagged in review of the original commit). Re-attaching from the
+    # blob's own bytes (`blob.download`) gives the copy a brand new blob --
+    # its own row, its own file on the storage service -- so the two blocks'
+    # lifecycles are fully independent from the moment they're created.
+    def attach_duplicate_image(copy, source)
+      blob = source.image.blob
+      copy.image.attach(io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type)
     end
 
     # The Turbo Stream `update`/`destroy`/`duplicate` answer with for a
@@ -271,7 +300,7 @@ module Admin
       prefix = Admin::BlockCardComponent.error_prefix(block)
 
       turbo_stream.replace("#{prefix}-image-section", partial: "admin/shared/hero_image_field", locals: {
-        section_id: "#{prefix}-image-section",
+        section_id: "#{prefix}-image-section", name: "image",
         image_id: "#{prefix}-image", image_html_name: "block[image]",
         image_value: block.image,
         checkbox_id: "#{prefix}-remove_image", checkbox_html_name: "block[remove_image]",

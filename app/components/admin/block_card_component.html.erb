@@ -73,9 +73,13 @@
                 section, Task 4 fix rounds 1/2 -- re-rendered here on a
                 normal GET and again by
                 `Admin::ContentBlocksController#image_field_stream` after
-                any save that touches the attachment. %>
+                any save that touches the attachment. `name: "image"` (fix
+                round 1) is what keeps this column's label reading "Image"
+                rather than the partial's own default "hero_image" ->
+                "Hero image", which never described a block's own image
+                column. %>
             <%= render partial: "admin/shared/hero_image_field", locals: {
-                  section_id: image_section_id,
+                  section_id: image_section_id, name: "image",
                   image_id: field_id("image"), image_html_name: field_html_name("image"), image_value: column_value("image"),
                   checkbox_id: field_id("remove_image"), checkbox_html_name: field_html_name("remove_image"),
                   show_checkbox: block.image.attached?
