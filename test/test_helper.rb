@@ -5,6 +5,7 @@ require_relative "test_helpers/session_test_helper"
 require_relative "test_helpers/setup_test_helper"
 require_relative "support/content_helper"
 require_relative "support/component_test_helper"
+require_relative "support/test_types"
 
 module ActiveSupport
   class TestCase
