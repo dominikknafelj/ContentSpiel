@@ -122,11 +122,12 @@ class PageTest < ActiveSupport::TestCase
     assert_equal "/", root.full_path(:en)
   end
 
-  # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
-  # so it has to be blank here too -- otherwise " " passes validation and
-  # produces the very collision above. No title: with one present,
-  # `LocalizedSlug` would treat "   " as not-yet-set (it's blank) and
-  # overwrite it with a title-derived slug before this validation ever ran.
+  # Whitespace is blank as far as `PublicSite::Paths.page_path` is concerned
+  # (it checks `segment.blank?`), so it has to be blank here too -- otherwise
+  # " " passes this validation and produces the very no-URL-at-all case
+  # above. No title: with one present, `LocalizedSlug` would treat "   " as
+  # not-yet-set (it's blank) and overwrite it with a title-derived slug
+  # before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     blank = Page.new(page_type: :standard, slug: "   ", parent: root)

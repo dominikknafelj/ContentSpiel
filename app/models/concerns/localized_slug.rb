@@ -8,11 +8,12 @@
 #
 # (2) exists because a site set up in, say, German titles its early pages only
 # in German, leaving every other locale's title -- and, before this, slug --
-# blank. A blank slug on a non-root page is not a harmless gap: `build_path`
-# drops it and the page's path collapses onto its parent's (see `page.rb`'s
-# own comment above `validates :slug` for the two-pages-one-URL collision that
-# produces -- for a child of Home, the parent's path is "/", the homepage's
-# own).
+# blank. A blank slug on a non-root page is not a harmless gap:
+# `PublicSite::Paths.page_path` returns nil for it rather than a path, so the
+# page would have no URL at all in that locale (see `page.rb`'s own comment
+# above `validates :slug`, which is what actually keeps a blank segment from
+# ever reaching `PublicSite::Paths` in the first place -- this fill is what
+# keeps an untranslated locale from ever needing that validation to fire).
 #
 # Reads the raw jsonb title hash rather than the Mobility reader, which would
 # fall back to a fixed :en regardless of the site's actual default locale (and
