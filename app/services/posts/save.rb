@@ -9,6 +9,8 @@ module Posts
       @post = post
       @attributes = attributes.to_h.symbolize_keys
       @translations = translations.to_h
+      # Not read anywhere yet -- the attachment point for `authorize!`/
+      # `record_event` once those grow teeth (sub-project 5).
       @actor = actor
     end
 

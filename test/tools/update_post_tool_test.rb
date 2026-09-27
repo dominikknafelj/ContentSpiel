@@ -147,16 +147,15 @@ class UpdatePostToolTest < ActiveSupport::TestCase
     original_published_at = 2.days.ago.change(usec: 0)
     @post.update!(published_at: original_published_at)
 
+    # No need to populate `errors` before returning `false` here:
+    # `ApplicationService::Result.failure` (hardened in the same change that
+    # added this test) supplies a generic message itself whenever the
+    # record's own `errors` come back empty, so `result.ok?` is still false
+    # below even though this override never touches `@post.errors` at all.
     Post.class_eval do
       alias_method :__original_save_for_atomicity_test, :save
       define_method(:save) do |*args, **kwargs|
-        if title_changed? && published_at_changed?
-          # A real failed `save` populates `errors` before returning false --
-          # `ApplicationService::Result#ok?` is just `errors.empty?`, so a
-          # `false` return with no errors added would read as success.
-          errors.add(:base, "combined save intentionally blocked for the atomicity test")
-          next false
-        end
+        next false if title_changed? && published_at_changed?
 
         __original_save_for_atomicity_test(*args, **kwargs)
       end

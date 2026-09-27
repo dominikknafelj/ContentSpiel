@@ -45,4 +45,23 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert result.errors.any? { |message| message.match?(/content type/i) }
     assert_equal 0, Post.count
   end
+
+  # `@post.tags =` on an already-persisted post (unlike a new, unsaved one)
+  # writes the join rows immediately rather than waiting for `save` to
+  # autosave them -- so a failed save on an *update* needs its own coverage
+  # to prove that write still lands inside `call`'s transaction and rolls
+  # back with everything else, rather than quietly surviving a failed
+  # Result.
+  test "tag assignment on a persisted post rolls back when the save fails" do
+    created = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "a" ] },
+      translations: { "en" => { title: "Tagged Post" } })
+    assert created.ok?
+    post = created.record
+
+    result = Posts::Save.call(post, attributes: { tag_names: [ "b" ] }, translations: { "en" => { title: "" } })
+
+    assert_not result.ok?
+    assert_equal [ "a" ], post.reload.tags.map(&:name)
+    assert_not Tag.exists?(name: "b")
+  end
 end
