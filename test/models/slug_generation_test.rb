@@ -10,7 +10,12 @@ class SlugGenerationTest < ActiveSupport::TestCase
 
     assert_equal "about-us", page.slug_en
     assert_equal "uber-uns", page.slug_de
-    assert_nil page.slug_es
+
+    # Spanish has no title of its own, so it falls back to the site's
+    # default-locale (English) title rather than staying blank -- a blank
+    # non-root slug collapses onto the parent's path (Task 8c / see page.rb's
+    # comment on the two-pages-one-URL bug that produces).
+    assert_equal "about-us", page.slug_es
   end
 
   test "an existing slug is never overwritten when the title changes" do
@@ -20,11 +25,19 @@ class SlugGenerationTest < ActiveSupport::TestCase
     assert_equal "who-we-are", page.reload.slug_en
   end
 
-  test "a translation added later gets its slug on update" do
+  # Before Task 8c, German had no slug at all until a German title arrived,
+  # so this proved a later translation still got one. Now German is filled
+  # from the English title the moment the page is created -- "never
+  # overwrite" (above) applies to that fallback-derived slug exactly as it
+  # does to a hand-typed one, so a real German title arriving afterwards must
+  # not retroactively replace it.
+  test "a fallback-filled slug is not retroactively replaced once a real translation arrives" do
     page = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    assert_equal "about", page.slug_de, "German has no title yet, so it falls back to the English one"
+
     page.update!(title_de: "Über")
 
-    assert_equal "uber", page.reload.slug_de
+    assert_equal "about", page.reload.slug_de
   end
 
   # Mobility's `presence` plugin (config/initializers/mobility.rb) turns a

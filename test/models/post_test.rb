@@ -26,6 +26,46 @@ class PostTest < ActiveSupport::TestCase
     assert_equal "hello-world", post.slug
   end
 
+  # Task 8c / code-structure review finding #2: the same bug Page has -- a
+  # post titled in only one locale used to leave every other locale's slug
+  # blank, and `validates :slug, presence: true` reads through Mobility's
+  # fallback, so the post still saved even without one. SlugGeneration now
+  # fills an untitled locale's slug from the site's default-locale title
+  # instead of leaving it blank.
+  test "slugs for untitled locales fall back to the site's default-locale title" do
+    SiteSetting.instance.update!(default_locale: "de")
+
+    post = Mobility.with_locale(:de) { Post.create!(content_type: :blog, title: "Hallo Welt") }
+
+    assert_equal "hallo-welt", post.slug_en
+    assert_equal "hallo-welt", post.slug_es
+  end
+
+  # When even the default locale has no title, the fallback walks
+  # Mobility.available_locales and takes the first title it finds, rather
+  # than leaving the slug blank.
+  test "slugs fall back to the first present title when the default locale has none" do
+    SiteSetting.instance.update!(default_locale: "de")
+
+    post = Mobility.with_locale(:es) { Post.create!(content_type: :blog, title: "Hola Mundo") }
+
+    assert_equal "hola-mundo", post.slug_en
+    assert_equal "hola-mundo", post.slug_de
+  end
+
+  # The fallback only ever fills a *blank* slug -- an explicit one is left
+  # alone even when the default-locale fallback would have produced something
+  # different.
+  test "an explicitly set slug is kept even when the default-locale fallback would differ" do
+    SiteSetting.instance.update!(default_locale: "de")
+
+    post = Mobility.with_locale(:de) do
+      Post.create!(content_type: :blog, title: "Hallo Welt", slug_en: "hello-world")
+    end
+
+    assert_equal "hello-world", post.slug_en
+  end
+
   test "slug must be unique within the same content_type" do
     Post.create!(content_type: :blog, title: "Hello World")
     duplicate = Post.new(content_type: :blog, title: "Hello World")
@@ -108,7 +148,10 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "slug uniqueness is scoped to content_type and locale, not shared across locales" do
-    Post.create!(content_type: :blog, title: "Hello World")
+    # A German title of its own, so "hello-world" isn't also this post's real
+    # German slug (Task 8c's default-locale fallback would otherwise put it
+    # there) -- the point here is the *other* post's German slug.
+    Post.create!(content_type: :blog, title_en: "Hello World", slug_en: "hello-world", title_de: "Hallo Welt")
 
     Mobility.with_locale(:de) do
       other = Post.new(content_type: :blog, title: "Something Else", slug: "hello-world")
@@ -197,16 +240,28 @@ class PostTest < ActiveSupport::TestCase
   end
 
   # Reading `slug` in a locale the post has no slug for returns the English one
-  # via fallback. Validating *that* string as if it were the German slug makes
-  # a post collide with a German slug it does not actually have.
-  test "a post with no slug in the current locale is not blocked by another post's slug there" do
-    english_only = Post.create!(content_type: :blog, title: "Hello World")
+  # via fallback. Validating that borrowed string as if it were the post's
+  # real German slug would collide it with a German slug it does not actually
+  # have -- which is exactly why the validation below reads the literal
+  # per-locale accessor and skips a genuinely blank one, rather than reading
+  # through Mobility's fallback.
+  #
+  # Task 8c means a *titled* post can no longer reach this validation with a
+  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # title the moment any title exists anywhere on the post. `update_columns`
+  # forces the untitled, pre-fill state a row predating that feature (or a
+  # bulk import) could still be in, the same way the "bypassed" tests further
+  # down force other pre/post-validation states.
+  test "a post with no slug anywhere is not blocked by another post's slug in the current locale" do
+    untitled = Post.create!(content_type: :blog, title: "Placeholder")
+    untitled.update_columns(title: {}, slug: {})
     german = Post.create!(content_type: :blog, title: "Etwas Anderes", slug: "etwas-anderes")
     Mobility.with_locale(:de) { german.update!(slug: "hello-world") }
 
     Mobility.with_locale(:de) do
-      assert english_only.valid?,
-        "a post without a German slug must not collide on another post's German slug"
+      untitled.valid?
+      assert_empty untitled.errors[:slug_de],
+        "a post without a German slug of its own must not collide on another post's German slug"
     end
   end
 
@@ -224,7 +279,10 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "the database allows the same slug in two different locales" do
-    Post.create!(content_type: :blog, title: "Hello World")
+    # A German title of its own, so "hello-world" isn't also this post's real
+    # German slug (Task 8c's default-locale fallback would otherwise put it
+    # there) -- the point here is the *other* post's German slug.
+    Post.create!(content_type: :blog, title_en: "Hello World", slug_en: "hello-world", title_de: "Hallo Welt")
     other = Post.create!(content_type: :blog, title: "Something Else")
 
     other.update_column(:slug, { "en" => "something-else", "de" => "hello-world" })
