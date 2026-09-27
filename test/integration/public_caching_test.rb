@@ -46,6 +46,24 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     get "/"
     assert_select "a", text: /Edit this page/, count: 0
+    assert_nil response.headers["Set-Cookie"]
+  end
+
+  # `maximum(:updated_at)` alone never notices a deletion unless the deleted
+  # row happened to be the newest one -- the listing would lose a post while
+  # conditional GETs kept answering 304 with the stale page.
+  test "etag changes when an older post is deleted" do
+    @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    older = travel_to(2.days.ago) { Post.create!(content_type: :blog, title: "Older", published_at: 2.days.ago) }
+    Post.create!(content_type: :blog, title: "Newer", published_at: 1.day.ago)
+    get "/"
+    etag = response.headers["ETag"]
+
+    older.destroy!
+
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_not_includes response.body, "Older"
   end
 
   test "unknown paths render the theme 404" do
