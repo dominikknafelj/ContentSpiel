@@ -23,6 +23,39 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_match(/Saved \d\d:\d\d/, response.body)
   end
 
+  # Fix (final-fixes round, finding 1): the tree lives outside this form
+  # entirely (the layout's own `<aside>`), so a title autosave has to
+  # explicitly stream a tree replace for the tree's own node to ever pick up
+  # the new title -- nothing about a normal Turbo Stream response targeting
+  # this form's own elements would touch it otherwise.
+  test "autosaving the title also refreshes the tree with the new title" do
+    patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+    assert_includes response.body, "About us"
+  end
+
+  # Fix (final-fixes round, finding 1): each of these redirects after a
+  # plain (non-Turbo-Stream) POST/DELETE -- left to this form/button's own
+  # default frame targeting (the enclosing `<turbo-frame id="content">"),
+  # that redirect would only ever refresh the content frame, leaving a
+  # stale status dot in the tree. `data-turbo-frame="_top"` on each one is
+  # what makes it an ordinary full-page visit instead.
+  test "publish, unpublish, schedule, delete and new-page all target the top level, not just the content frame" do
+    get "/cs-studio/pages/#{@page.id}"
+
+    assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{@page.id}/unpublish"
+    assert_select "details form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{@page.id}/schedule"
+    assert_select "form[action=?][data-turbo-frame='_top'] input[name='_method'][value='delete']", "/cs-studio/pages/#{@page.id}"
+
+    draft = create_page(title: "Draft", published: false)
+    get "/cs-studio/pages/#{draft.id}"
+    assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/publish"
+
+    get "/cs-studio/pages/new"
+    assert_select "form[action='/cs-studio/pages'][data-turbo-frame='_top']"
+  end
+
   test "validation errors come back per field" do
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "" }, base_updated_at: @page.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity

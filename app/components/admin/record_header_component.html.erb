@@ -39,17 +39,33 @@
   <div class="flex flex-wrap items-center gap-2">
     <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
 
+    <%# `form: { data: { turbo_frame: "_top" } }` / `data: { turbo_frame:
+        "_top" }` on every action below (final-fixes round, finding 1):
+        each one redirects (`Admin::PagesController#redirect_after`/
+        `#destroy`), and every one of these forms/buttons submits from
+        inside the layout's own `<turbo-frame id="content">` -- left to its
+        own default frame targeting, that redirect's response would only
+        ever replace *this* frame, leaving the tree column (outside it,
+        cs-studio spec §4.2's "re-rendered after structural changes") still
+        showing whatever status dot/child-count it had before a publish,
+        unpublish, schedule or delete. Navigating `_top` instead makes each
+        of these an ordinary full-page visit, which re-renders the tree
+        (via `content_for :tree`) for free, the same way loading the editor
+        fresh already does. %>
     <% if can_publish? %>
-      <%= button_to "Publish now", helpers.publish_admin_page_path(page, **url_options), method: :post, class: setup_primary_button_class %>
+      <%= button_to "Publish now", helpers.publish_admin_page_path(page, **url_options), method: :post,
+            class: setup_primary_button_class, form: { data: { turbo_frame: "_top" } } %>
     <% end %>
 
     <% if can_unpublish? %>
-      <%= button_to "Unpublish", helpers.unpublish_admin_page_path(page, **url_options), method: :post, class: setup_secondary_link_class %>
+      <%= button_to "Unpublish", helpers.unpublish_admin_page_path(page, **url_options), method: :post,
+            class: setup_secondary_link_class, form: { data: { turbo_frame: "_top" } } %>
     <% end %>
 
     <details class="admin-record-header__schedule">
       <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
-      <%= form_with url: helpers.schedule_admin_page_path(page, **url_options), method: :post, class: "mt-2 flex items-center gap-2" do %>
+      <%= form_with url: helpers.schedule_admin_page_path(page, **url_options), method: :post, class: "mt-2 flex items-center gap-2",
+            data: { turbo_frame: "_top" } do %>
         <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
         <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
       <% end %>
@@ -61,7 +77,7 @@
 
       <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this page?", body: "This can't be undone.") do |dialog| %>
         <% dialog.with_confirm_action do %>
-          <%= form_with url: helpers.admin_page_path(page, **url_options), method: :delete do %>
+          <%= form_with url: helpers.admin_page_path(page, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
             <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
           <% end %>
         <% end %>

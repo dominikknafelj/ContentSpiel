@@ -132,6 +132,21 @@ module Admin
       # failed save never reaches `Pages::Save`'s attachment writer at all.
       streams << hero_image_stream(result.record) if result.ok? && hero_image_changing
 
+      # The tree column lives outside this form entirely (the layout's own
+      # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream
+      # response targeting *this* form's own elements would ever touch it
+      # on its own (final-fixes round, finding 1) -- left alone, a title
+      # edit saved here left the tree showing the page's stale title (and,
+      # since `Admin::TreeNodeComponent#status` reads straight off the same
+      # `@page`, would go stale the same way for any other autosaved
+      # attribute a later field ever changes what the tree itself renders).
+      # Re-rendered on every successful save here, not just when `title`
+      # itself was actually in this particular PATCH's own params: the tree
+      # render is one query (`Admin::TreeComponent`'s own comment), and
+      # there's no cheaper way to know from here whether *this* save
+      # happened to be the one that mattered to it.
+      streams << tree_replace_stream if result.ok?
+
       render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
     end
 
@@ -227,6 +242,19 @@ module Admin
         checkbox_html_name: "#{prefix}[remove_hero_image]",
         show_checkbox: record.hero_image.attached?
       })
+    end
+
+    # See `update`'s own comment for why every successful settings-form
+    # save re-renders the tree, not just a title change specifically.
+    # `Admin::TreeController#tree_stream`'s own private method builds the
+    # identical stream (down to the same `root_page` lookup, `BaseController
+    # #root_page`, final-fixes round finding 12) for the drag-to-move
+    # endpoint -- not shared as-is, since that one also replaces
+    # `tree-status` (the move-specific flash line this controller has no
+    # equivalent of), but kept in exact sync with it by hand for the one
+    # line the two do share.
+    def tree_replace_stream
+      turbo_stream.replace("tree", Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options))
     end
 
     def redirect_after(result, success:)

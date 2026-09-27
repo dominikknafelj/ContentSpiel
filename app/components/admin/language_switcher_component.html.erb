@@ -4,7 +4,17 @@
       <% if current?(code) %>
         <span class="text-ink" aria-current="true"><%= native_name(code) %></span>
       <% else %>
-        <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink" %>
+        <%# `data-turbo-frame="_top"` (final-fixes round, finding 1): this
+            component lives inside the layout's own `<turbo-frame
+            id="content">`, so left to its own default frame target a click
+            here would only ever replace *that* frame -- the page tree
+            outside it (spec §4.2) never re-renders with the new locale's
+            own titles (`Admin::TreeNodeComponent#title` reads `locale`), so
+            switching language while looking at the tree left every node's
+            title showing whichever language was selected before the
+            switch. A full top-level visit re-renders the tree along with
+            the content it was already reloading. %>
+        <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
       <% end %>
       <% if missing?(code) %>
         <%= tag.span "", class: "h-1.5 w-1.5 rounded-full bg-danger", title: "Missing required fields", aria: { hidden: true } %>
