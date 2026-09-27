@@ -128,6 +128,47 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_not_nil @about.reload.position
   end
 
+  # `Page::TreeRanking#remember_requested_position` treats a parent change as
+  # a fresh rank request even when the submitted `position` is numerically
+  # unchanged from the page's rank under its *old* parent (see the comment on
+  # that method) -- ruling: the form shows the number, so rank = the number
+  # in the form, whichever parent it ends up under. The sibling-order tests
+  # above never change `parent_id`, so they can't exercise this: the whole
+  # point here is that the same submitted number means something different
+  # once the parent changes.
+  test "reparenting through the page form ranks by the submitted position under the new parent" do
+    a = Page.create!(title: "A", parent: @root)
+    b = Page.create!(title: "B", parent: @root)
+
+    a_first = Page.create!(title: "A First", parent: a)
+    moved = Page.create!(title: "Moved", parent: a)
+    a_third = Page.create!(title: "A Third", parent: a)
+    assert_equal [ a_first.id, moved.id, a_third.id ], a.children.reload.map(&:id)
+
+    b0 = Page.create!(title: "B0", parent: b)
+    b1 = Page.create!(title: "B1", parent: b)
+    b2 = Page.create!(title: "B2", parent: b)
+    assert_equal [ b0.id, b1.id, b2.id ], b.children.reload.map(&:id)
+
+    # `position: 1` is `moved`'s own rank under `a` -- unchanged from what the
+    # form was already showing before this submit.
+    put "/avo/resources/pages/#{moved.id}", params: { page: {
+      parent_id: b.id, position: 1
+    } }
+
+    assert_response :redirect
+
+    assert_equal [ b0.id, moved.id, b1.id, b2.id ], b.children.reload.map(&:id)
+    assert_equal [ 0, 1, 2, 3 ], b.children.map(&:position)
+
+    assert_equal [ a_first.id, a_third.id ], a.children.reload.map(&:id),
+      "a's remaining children must close the gap moved left behind"
+    assert_equal [ 0, 1 ], a.children.map(&:position),
+      "siblings must be left densely numbered from 0"
+
+    assert_equal "/b/moved", moved.reload.full_path("en")
+  end
+
   # -- conditional hero fields ----------------------------------------------
 
   # The hero image is a top-level field, so unlike the subtitle (which lives
