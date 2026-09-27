@@ -24,7 +24,7 @@ module Admin
       case state
       when :idle then ""
       when :saving then "Saving…"
-      when :saved then "Saved #{at&.strftime('%H:%M')}"
+      when :saved then [ "Saved", at&.strftime("%H:%M") ].compact.join(" ")
       when :error then "Couldn't save — #{count} problems"
       when :retrying then "Not saved — retrying"
       when :offline then "Not saved — check your connection"

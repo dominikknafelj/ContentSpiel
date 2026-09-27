@@ -34,11 +34,19 @@ module Admin
       # shape `value`/`original` happens to be without needing a real
       # `FieldSet` in hand (test-only definitions in Lookbook previews never
       # register one).
+      #
+      # The Hash branch is checked *before* `respond_to?` -- a subfield can
+      # legitimately be named `count`, `size`, `key`, `select`, `first`,
+      # `type`, ... any of `Hash`'s own method names -- so checking
+      # `respond_to?` first would silently call that method instead of
+      # reading the key for exactly those names. `FieldSet` instances are
+      # never `Hash`es, so this doesn't change how those are read.
       def read_field(container, name)
         return nil if container.nil?
+        return container[name] || container[name.to_s] if container.is_a?(Hash)
         return container.public_send(name) if container.respond_to?(name)
 
-        container.is_a?(Hash) ? container[name] || container[name.to_s] : nil
+        nil
       end
     end
   end

@@ -36,4 +36,10 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
   test "rejects an unknown state" do
     assert_raises(ArgumentError) { Admin::SaveStatusComponent.new(id: "s", state: :bogus) }
   end
+
+  test "saved with no at renders 'Saved' with no trailing space" do
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved)
+
+    assert_equal "Saved", page.find("p").text
+  end
 end

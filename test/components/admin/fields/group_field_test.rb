@@ -21,4 +21,19 @@ class Admin::Fields::GroupFieldTest < ViewComponent::TestCase
       assert_selector "[data-original-for='name']", text: "Ada"
     end
   end
+
+  # `read_field` (Base) has to check the Hash branch before `respond_to?`:
+  # `count` is also a `Hash` instance method (returns the number of
+  # key/value pairs), so a naive `respond_to?`-first read would silently
+  # call that instead of reading the "count" key.
+  test "reads a Hash subfield named like a Hash method (count)" do
+    FieldGroups.register("test/tally") { |g| g.field :count, :integer }
+
+    field = Field.new(name: "tally", type: :group, options: { of: "test/tally" })
+    render_inline Admin::Fields::GroupField.new(field:, form_name: "post[fields]", value: { "count" => 7 }, locale: "en")
+
+    assert_selector "input[name='post[fields][tally][count]'][value='7']"
+  ensure
+    Rails.application.reloader.prepare!
+  end
 end

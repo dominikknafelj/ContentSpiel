@@ -21,10 +21,4 @@ class Admin::Columns::ImageColumnComponentTest < ViewComponent::TestCase
 
     refute_selector "img"
   end
-
-  private
-
-  def root_page
-    Page.find_by(parent_id: nil) || Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-  end
 end
