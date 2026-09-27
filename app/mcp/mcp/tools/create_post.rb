@@ -10,6 +10,7 @@ module Mcp
   module Tools
     class CreatePost < MCP::Tool
       extend Mcp::ErrorResponse
+      extend Mcp::FieldsSplitting
 
       # Pinned explicitly: the mcp gem derives a tool's default name from its
       # *demodulized* class name (MCP::StringUtils.handle_from_class_name --
@@ -80,18 +81,6 @@ module Mcp
         data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
         MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
       end
-
-      # `content_type` may not be registered at all (an unknown type is
-      # Posts::Save's own validation error to report, not this tool's), in
-      # which case every key is treated as untranslated -- there is no
-      # schema to say otherwise, and `fields` will be a no-op on the
-      # unregistered type regardless (`Post#assign_fields`).
-      def self.split_fields(content_type, fields)
-        fields = fields.to_h.symbolize_keys
-        translated_names = ContentTypes.find(content_type)&.fields&.select(&:translated?)&.map { |field| field.name.to_sym } || []
-        [ fields.except(*translated_names), fields.slice(*translated_names) ]
-      end
-      private_class_method :split_fields
     end
   end
 end

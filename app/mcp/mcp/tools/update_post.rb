@@ -10,6 +10,7 @@ module Mcp
   module Tools
     class UpdatePost < MCP::Tool
       extend Mcp::ErrorResponse
+      extend Mcp::FieldsSplitting
 
       # Pinned explicitly -- see the comment on CreatePost#tool_name for why
       # the mcp gem's class-name-derived default ("update_post") would
@@ -71,16 +72,6 @@ module Mcp
         data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
         MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
       end
-
-      # See the identical helper on CreatePost -- kept as its own copy rather
-      # than called cross-class since `private_class_method` (there and here)
-      # can't be invoked with an explicit receiver from outside its own class.
-      def self.split_fields(content_type, fields)
-        fields = fields.to_h.symbolize_keys
-        translated_names = ContentTypes.find(content_type)&.fields&.select(&:translated?)&.map { |field| field.name.to_sym } || []
-        [ fields.except(*translated_names), fields.slice(*translated_names) ]
-      end
-      private_class_method :split_fields
     end
   end
 end

@@ -86,6 +86,27 @@ class McpTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Mirrors the create_post_tool test above -- ListPosts overrides its own
+  # `input_schema_value` too (see the comment there), so it needs the same
+  # end-to-end proof.
+  test "the list_posts_tool content_type enum reflects the registry, including a type registered at runtime" do
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
+    tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "list_posts_tool" }
+    assert_equal %w[blog resume_entry now_update].sort, tool["inputSchema"]["properties"]["content_type"]["enum"].sort
+
+    saved = ContentTypes.all.dup
+    begin
+      ContentTypes.register(:test_type) { |t| t.label "Test type" }
+
+      mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
+      tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "list_posts_tool" }
+      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test_type"
+    ensure
+      ContentTypes.reset!
+      saved.each { |definition| ContentTypes.registry_put(definition) }
+    end
+  end
+
   test "a valid tool call creates a post, scoped to the token's user" do
     assert_difference "Post.count", 1 do
       mcp_post(

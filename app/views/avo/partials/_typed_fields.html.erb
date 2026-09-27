@@ -34,7 +34,13 @@
                   class: input_classes, id: nil %>
           <% elsif field.type == :select %>
             <% raw_options = field.options[:options] %>
-            <% choices = raw_options.is_a?(Hash) ? raw_options.to_a : Array(raw_options).map { |value| [ value.to_s.humanize, value ] } %>
+            <%# A Hash `options:` is `{value => label}` (the schema convention --
+                e.g. ResumeEntry::ROLE_TYPES), the opposite of what
+                `options_for_select`/`select_tag` want ([text, value] pairs, i.e.
+                {label => value}) -- `.to_a` alone would yield [value, label]
+                pairs and show the raw stored value as the visible option while
+                submitting the label as the value, so the pair is flipped here. %>
+            <% choices = raw_options.is_a?(Hash) ? raw_options.map { |value, label| [ label, value ] } : Array(raw_options).map { |value| [ value.to_s.humanize, value ] } %>
             <%= select_tag input_name,
                   options_for_select([ [ "—", "" ] ] + choices, current_value.to_s),
                   class: input_classes, id: nil %>

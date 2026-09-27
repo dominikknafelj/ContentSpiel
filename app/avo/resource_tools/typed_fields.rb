@@ -26,6 +26,14 @@ class Avo::ResourceTools::TypedFields < Avo::BaseResourceTool
 
   # The type's `ContentModel::FieldSet` instance to read each field's
   # current value from, or nil when the record's own type isn't registered
-  # (nothing to render).
-  def current_values(record) = record.is_a?(::ContentBlock) ? record.settings_object : record.fields
+  # (nothing to render). `locale: Locales.default` explicitly, matching the
+  # locale the write side (`ContentBlock#normalize_settings`, `Post#fields=`)
+  # actually writes a translated field to -- without it, this would default
+  # to the ambient `I18n.locale` instead, and a translated field would read
+  # back empty on any request where those two locales differ (e.g. the site's
+  # default locale isn't `:en`, since Avo's own admin locale doesn't follow
+  # it) even though the write just landed at `Locales.default`.
+  def current_values(record)
+    record.is_a?(::ContentBlock) ? record.settings_object(locale: Locales.default) : record.fields(locale: Locales.default)
+  end
 end
