@@ -1,0 +1,89 @@
+<%# The Posts module's list (cs-studio spec §4.1/§5.2): filters as query
+    params (`type`/`status`/`tag`/`q`, `Admin::PostsController#index`) and a
+    flat table -- no tree column, a post has no parent/child structure of
+    its own the way a page does. %>
+<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+  <h1 class="text-h1 text-ink">Posts</h1>
+  <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+</div>
+
+<%= form_with url: admin_posts_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
+  <% if admin_locale != Locales.default %>
+    <%= hidden_field_tag :locale, admin_locale %>
+  <% end %>
+
+  <div>
+    <%= label_tag :type, "Type", class: setup_label_class %>
+    <%= select_tag :type, options_for_select(@content_types.map { |type| [ type.label, type.name ] }, params[:type]),
+          include_blank: "All types", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :status, "Status", class: setup_label_class %>
+    <%= select_tag :status, options_for_select(Publishable::STATUSES.map { |status| [ status.humanize, status ] }, params[:status]),
+          include_blank: "All statuses", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :tag, "Tag", class: setup_label_class %>
+    <%= select_tag :tag, options_for_select(@tags.map(&:name), params[:tag]), include_blank: "All tags", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :q, "Title", class: setup_label_class %>
+    <%= text_field_tag :q, params[:q], placeholder: "Search titles…", class: setup_input_class %>
+  </div>
+
+  <%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %>
+<% end %>
+
+<% if @posts.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Choose a content type to create your first post.") do |empty_state| %>
+    <% empty_state.with_action do %>
+      <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+    <% end %>
+  <% end %>
+<% else %>
+  <table class="admin-posts-table w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <th class="py-2 pr-4">Title</th>
+        <th class="py-2 pr-4">Type</th>
+        <th class="py-2 pr-4">Status</th>
+        <th class="py-2 pr-4">Published</th>
+        <th class="py-2 pr-4">Tags</th>
+        <th class="py-2">Languages</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @posts.each do |post| %>
+        <% definition = post.definition %>
+        <tr id="<%= dom_id(post) %>" class="border-b border-line align-top">
+          <td class="py-2 pr-4">
+            <%= link_to (post.title(locale: admin_locale).presence || "(untitled)"), admin_post_path(post, **admin_url_options),
+                  class: "font-semibold text-ink hover:underline" %>
+          </td>
+          <td class="py-2 pr-4">
+            <% if definition %>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-full" style="background-color: <%= definition.color %>" aria-hidden="true"></span>
+                <%= definition.label %>
+              </span>
+            <% else %>
+              <span class="text-danger-ink"><%= post.content_type %></span>
+            <% end %>
+          </td>
+          <td class="py-2 pr-4"><%= render Admin::StatusBadgeComponent.new(status: post.status, at: post.published_at) %></td>
+          <td class="py-2 pr-4 text-meta"><%= post.published_at&.strftime("%b %-d, %Y") %></td>
+          <td class="py-2 pr-4 text-meta"><%= post.tags.map(&:name).join(", ") %></td>
+          <td class="py-2">
+            <% Locales.enabled.each do |code| %>
+              <span class="mr-1 inline-block h-2 w-2 rounded-full <%= post.title(locale: code).present? ? "bg-ok" : "bg-line-strong" %>"
+                    title="<%= Locales.name(code, native: true) %>" aria-hidden="true"></span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

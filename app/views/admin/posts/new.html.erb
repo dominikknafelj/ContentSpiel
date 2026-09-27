@@ -1,0 +1,32 @@
+<%# "New post" (cs-studio spec §5.2): asks for the content type first, in
+    the same form as the title -- the content type is fixed for good the
+    moment `Admin::PostsController#create` saves it, so this is the only
+    screen that ever gets to choose it. Mirrors `admin/pages/new.html.erb`'s
+    own shape (a title-only form submitted into the enclosing `<turbo-frame
+    id="content">`, no `data-turbo-frame` needed) plus the one extra field. %>
+<div class="mx-auto max-w-md">
+  <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New post</h1>
+
+  <% if @post.errors.any? %>
+    <p class="mb-4 text-danger-ink" role="alert"><%= @post.errors.full_messages.to_sentence %></p>
+  <% end %>
+
+  <%= form_with url: admin_posts_path(**admin_url_options), method: :post do %>
+    <div class="mb-4">
+      <%= label_tag "post_content_type", "Content type", class: setup_label_class %>
+      <%= select_tag "post[content_type]",
+            options_for_select(@content_types.map { |type| [ type.label, type.name ] }, @post.content_type),
+            id: "post_content_type", include_blank: "Choose a type…", required: true, class: setup_input_class %>
+    </div>
+
+    <div class="mb-4">
+      <%= label_tag "post_title", "Title", class: setup_label_class %>
+      <%= text_field_tag "post[title]", @post.title, id: "post_title", autofocus: true, class: setup_input_class %>
+    </div>
+
+    <div class="flex gap-2">
+      <%= render Admin::ButtonComponent.new(label: "Create post", variant: :primary, type: "submit") %>
+      <%= link_to "Cancel", admin_posts_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+    </div>
+  <% end %>
+</div>

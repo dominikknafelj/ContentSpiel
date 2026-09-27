@@ -1,0 +1,142 @@
+<header class="admin-record-header mb-6 flex flex-col gap-3 rounded-cs border border-line bg-surface p-4">
+  <% if notice.present? %>
+    <p role="status" class="text-sm text-ok-ink"><%= notice %></p>
+  <% end %>
+  <% if alert.present? %>
+    <p role="alert" class="text-sm text-danger-ink"><%= alert %></p>
+  <% end %>
+
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h1 class="truncate text-h1 text-ink"><%= Locales.read(post, :title, locale: locale) %></h1>
+
+      <div class="mt-1 flex items-center gap-2 text-sm text-meta">
+        <span class="inline-flex items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5">
+          <span class="h-2 w-2 rounded-full" style="background-color: <%= content_type_color %>" aria-hidden="true"></span>
+          <%= content_type_label %>
+        </span>
+      </div>
+
+      <% if public_path.present? %>
+        <div class="mt-1 flex items-center gap-2 text-sm text-meta">
+          <span class="truncate"><%= public_path %></span>
+          <button type="button" data-controller="admin--clipboard" data-admin--clipboard-url-value="<%= public_url %>"
+            data-action="click->admin--clipboard#copy" class="shrink-0 rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
+          <% if live? %>
+            <%= link_to "View on site", public_url, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="mt-1 text-sm text-meta">Not listed on any page yet — add a post list block for this type</p>
+      <% end %>
+    </div>
+
+    <span data-status="<%= status %>" class="shrink-0">
+      <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
+    </span>
+  </div>
+
+  <% if live? %>
+    <p role="status" class="text-sm text-warn-ink">Live — changes appear on the site as you edit</p>
+  <% end %>
+
+  <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle) %>
+
+  <div class="flex flex-wrap items-center gap-2">
+    <%# Unlike a page (always somewhere in the tree, so it always has a
+        would-be path even as a draft), a post with no canonical listing
+        page yet has no path at all -- `preview_path` would be nil, and
+        `link_to` a nil URL raises rather than rendering a dead link, so
+        there's simply nothing to preview until some page lists it. %>
+    <% if preview_path.present? %>
+      <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
+    <% end %>
+
+    <% if can_publish? %>
+      <%= button_to "Publish now", helpers.publish_admin_post_path(post, **url_options), method: :post, class: setup_primary_button_class %>
+    <% end %>
+
+    <% if can_unpublish? %>
+      <%= button_to "Unpublish", helpers.unpublish_admin_post_path(post, **url_options), method: :post, class: setup_secondary_link_class %>
+    <% end %>
+
+    <details class="admin-record-header__schedule">
+      <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
+      <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "mt-2 flex items-center gap-2" do %>
+        <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
+        <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
+      <% end %>
+    </details>
+
+    <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+          onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+
+    <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this post?", body: "This can't be undone.") do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
+          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+</header>
+
+<%# `data-controller="admin--autosave"` sits on this form directly, same as
+    `Admin::PageSettingsFormComponent`'s own (see that component's own
+    comment for why the save-status line, up in the header above rather
+    than nested inside this form, needs no Stimulus target here to reach
+    it). %>
+<%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4 rounded-cs border border-line bg-surface p-4",
+      data: {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": save_status_id
+      } do %>
+
+  <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+  <%# Wraps title + slug only, for `admin--slug-preview` -- same pairing
+      `Admin::PageSettingsFormComponent` already uses. %>
+  <div data-controller="admin--slug-preview" data-action="input->admin--slug-preview#update">
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "title", id: field_id("title"), html_name: field_html_name("title"),
+          value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"),
+          data: { "admin--slug-preview-target": "title" }
+        ) %>
+
+    <%= render Admin::Columns::SlugColumnComponent.new(
+          name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
+          value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale, errors: field_errors("slug"),
+          data: { "admin--slug-preview-target": "slug" }
+        ) %>
+  </div>
+
+  <%= render Admin::Columns::PlainColumnComponent.new(
+        name: "excerpt", id: field_id("excerpt"), html_name: field_html_name("excerpt"),
+        value: value(:excerpt), original: original(:excerpt), locale: locale, multiline: true, errors: field_errors("excerpt")
+      ) %>
+
+  <%# The content type's own typed fields (spec §5.2): a `group` field
+      renders as a nested fieldset, `groups` as an add/remove/reorder list
+      (`Admin::Fields::GroupField`/`GroupsField`) -- every one of them, plus
+      every scalar field, dispatched through the one `Admin::FieldComponent`
+      `Admin::BlockCardComponent`'s own schema fields already go through.
+      `id_prefix: ID_PREFIX` (the bare "post") is passed explicitly rather
+      than left to default from `form_name` ("post[fields]" ->
+      "post_fields") -- see `Admin::PostsController#post_error_fields`'s own
+      comment for why every id here has to agree with that bare prefix. %>
+  <% schema_fields.each do |field| %>
+    <%= render Admin::FieldComponent.new(
+          field: field, form_name: "post[fields]",
+          value: field_value(field), original: field_original(field), locale: locale,
+          errors: field_errors_for(field), id_prefix: ID_PREFIX
+        ) %>
+  <% end %>
+
+  <%= render Admin::Columns::RichTextColumnComponent.new(
+        name: "body", id: field_id("body"), html_name: field_html_name("body"),
+        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body")
+      ) %>
+
+  <%= render Admin::TagInputComponent.new(value: tag_names_value, name: field_html_name("tag_names"), id: field_id("tag_names")) %>
+<% end %>

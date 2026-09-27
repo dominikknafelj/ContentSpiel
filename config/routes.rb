@@ -89,6 +89,21 @@ Rails.application.routes.draw do
     # same one PATCH target serves every node in the tree.
     resource :tree, only: %i[show update], controller: :tree
 
+    # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
+    # (no tree column of its own -- a post has no parent/child structure the
+    # way a page does) plus the post editor. `member` adds the same three
+    # publish-state actions the page editor's own record header posts to
+    # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
+    # comment explains why each is a one-shot POST kept deliberately outside
+    # the post form's own autosave, not folded into `update`).
+    resources :posts, only: %i[index new create show update destroy] do
+      member do
+        post :publish
+        post :unpublish
+        post :schedule
+      end
+    end
+
     # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
     # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
     # an inline rename (`:update`) and a delete (`:destroy`) from the list
