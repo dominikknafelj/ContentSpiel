@@ -18,7 +18,7 @@ module Mcp
         "(default: the site's current default locale)."
       input_schema(
         properties: {
-          content_type: { type: "string", enum: Post.content_types.keys, description: "Only list posts of this type." },
+          content_type: { type: "string", enum: ContentTypes.names, description: "Only list posts of this type." },
           locale: { type: "string", enum: Locales::SUPPORTED.keys }
         }
       )

@@ -12,7 +12,7 @@ class Avo::Resources::Post < Avo::BaseResource
   def fields
     field :id, as: :id
     # field :avatar, as: :avatar
-    field :content_type, as: :select, enum: ::Post.content_types
+    field :content_type, as: :select, options: ::ContentTypes.names.index_by(&:humanize)
 
     # The index is a list, not an editor, so it shows one column of titles --
     # in whichever locale the admin is currently browsing. Editing happens in

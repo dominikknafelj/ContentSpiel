@@ -25,7 +25,7 @@ module Mcp
         "published: true is given."
       input_schema(
         properties: {
-          content_type: { type: "string", enum: Post.content_types.keys },
+          content_type: { type: "string", enum: ContentTypes.names },
           title: { type: "string" },
           body: { type: "string", description: "HTML." },
           excerpt: { type: "string" },

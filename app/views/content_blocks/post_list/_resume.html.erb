@@ -4,9 +4,9 @@
       <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= resume_period(post) %></span>
       <div>
         <%= link_to translated(post, :title), post_url_path(post), class: "font-semibold text-ink hover:text-accent" %>
-        <% if post.company.present? %><p class="mt-1 text-sm text-dim"><%= post.company %></p><% end %>
+        <% if post.fields.company.present? %><p class="mt-1 text-sm text-dim"><%= post.fields.company %></p><% end %>
       </div>
-      <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= Post::ROLE_TYPES[post.role_type] %></span>
+      <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= ContentTypes::ResumeEntry::ROLE_TYPES[post.fields.role_type] %></span>
     </li>
   <% end %>
 </ul>

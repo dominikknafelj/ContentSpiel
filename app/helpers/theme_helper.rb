@@ -45,9 +45,13 @@ module ThemeHelper
   end
 
   # Resume periods show years only; an empty end date is the current role.
+  # `post.fields` casts `start_date`/`end_date` to `Date` (or nil) now that
+  # they live in the `resume_entry` content type's own field schema rather
+  # than as plain ISO-string `store_accessor`s.
   def resume_period(post)
-    start_year = post.start_date.to_s[0, 4].presence
-    end_year = post.end_date.to_s[0, 4].presence || "now"
+    fields = post.fields
+    start_year = fields.start_date&.year
+    end_year = fields.end_date&.year || "now"
     start_year ? "#{start_year} – #{end_year}" : end_year
   end
 

@@ -17,19 +17,14 @@
 # not plain ActiveRecord -- but the input here is fixed, not user-typed, so a
 # failed Result can only mean this module itself is broken. `raise!` turns
 # that into a loud failure instead of a silently half-built starter site.
+#
+# The sections themselves are no longer a hardcoded table here (open-types
+# spec §6): each registered content type declares its own section/sample via
+# `starter` (`ContentTypeDefinition#starter_data`), so a plugin's content
+# type gets starter content the same way a built-in does, with nothing to
+# edit in this module.
 module StarterContent
   WELCOME_HTML = "<p>Welcome to your new site. Sign in to the admin to edit this page.</p>".freeze
-
-  SECTIONS = [
-    { slug: "blog", title: "Blog", content_type: "blog",
-      post: { title: "Hello, world", excerpt: "The first post on this site.",
-              body: "<p>This is a sample blog post. Edit or delete it in the admin.</p>" } },
-    { slug: "resume", title: "Resume", content_type: "resume_entry",
-      post: { title: "Your first role", body: "<p>Describe what you did in this role.</p>",
-              metadata: { "company" => "Example Co", "role_type" => "ic", "start_date" => "2024-01-01", "end_date" => "" } } },
-    { slug: "now", title: "Now", content_type: "now_update",
-      post: { title: "What I'm doing now", body: "<p>Share what you're focused on at the moment.</p>" } }
-  ].freeze
 
   module_function
 
@@ -39,7 +34,7 @@ module StarterContent
       raise!(Pages::Save.call(attributes: { published: true }, translations: { locale => { title: "Home", slug: "" } }))
 
     if home.content_blocks.none?
-      raise!(ContentBlocks::Save.call(ContentBlock.new(page: home), attributes: { block_type: "rich_text" },
+      raise!(ContentBlocks::Save.call(ContentBlock.new(owner: home), attributes: { block_type: "rich_text" },
         translations: { locale => { body: WELCOME_HTML } }))
     end
 
@@ -49,7 +44,7 @@ module StarterContent
   def create_pages_and_posts!(locale:)
     home = ensure_home!(locale: locale)
 
-    SECTIONS.each do |section|
+    sections.each do |section|
       find_or_create_section_page!(home, section, locale)
       find_or_create_sample_post!(section, locale)
     end
@@ -62,15 +57,24 @@ module StarterContent
     home = Page.find_by(parent_id: nil)
     return false unless home
 
-    SECTIONS.all? { |section| find_section_page(home, section).present? }
+    sections.all? { |section| find_section_page(home, section).present? }
+  end
+
+  # Every registered content type's starter declaration, tagged with the
+  # type's own registered name -- `find_or_create_sample_post!` needs it to
+  # save the sample post as that type, and it isn't part of `starter_data`
+  # itself (a content type already knows its own name; nothing else reading
+  # `starter_data` needs it repeated).
+  def sections
+    ContentTypes.all.filter_map { |type| type.starter_data&.merge(content_type: type.name) }
   end
 
   def find_or_create_section_page!(home, section, locale)
     find_section_page(home, section) || begin
       page = raise!(Pages::Save.call(attributes: { parent: home, published: true },
-        translations: { locale => { title: section[:title], slug: section[:slug] } }))
+        translations: { locale => section[:section].slice(:title, :slug) }))
 
-      raise!(ContentBlocks::Save.call(ContentBlock.new(page: page), attributes: { block_type: "post_list",
+      raise!(ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list",
         settings: { "content_type" => section[:content_type] } }))
 
       page
@@ -79,20 +83,20 @@ module StarterContent
 
   def find_or_create_sample_post!(section, locale)
     find_sample_post(section) || begin
-      post = section[:post]
-      translated = post.slice(:title, :excerpt, :body)
-      attributes = post.except(:title, :excerpt, :body).merge(content_type: section[:content_type], published: true)
+      sample = section[:sample]
+      translated = sample.slice(:title, :excerpt, :body)
+      attributes = sample.except(:title, :excerpt, :body).merge(content_type: section[:content_type], published: true)
 
       raise!(Posts::Save.call(attributes: attributes, translations: { locale => translated }))
     end
   end
 
   def find_section_page(home, section)
-    find_in_any_locale { Page.i18n.where(slug: section[:slug]).where(parent_id: home.id).first }
+    find_in_any_locale { Page.i18n.where(slug: section[:section][:slug]).where(parent_id: home.id).first }
   end
 
   def find_sample_post(section)
-    title = section[:post][:title]
+    title = section[:sample][:title]
     find_in_any_locale { Post.i18n.where(title: title).where(content_type: section[:content_type]).first }
   end
 

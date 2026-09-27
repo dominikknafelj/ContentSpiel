@@ -31,10 +31,18 @@ module Posts
     private
 
     def assign
+      # `content_type` is assigned first: `fields`/`assign_fields` below both
+      # need it to know which type's schema they're casting against.
+      @post.assign_attributes(@attributes.except(:published, :published_at, :tag_names, :fields))
+
+      @post.assign_fields(@attributes[:fields], locale: Locales.default) if @attributes.key?(:fields)
+
       @translations.each do |locale, values|
-        Mobility.with_locale(locale) { @post.assign_attributes(values.to_h.symbolize_keys.slice(*TRANSLATED)) }
+        values = values.to_h.symbolize_keys
+        Mobility.with_locale(locale) { @post.assign_attributes(values.slice(*TRANSLATED)) }
+        @post.assign_fields(values[:fields], locale: locale) if values.key?(:fields)
       end
-      @post.assign_attributes(@attributes.except(:published, :published_at, :tag_names))
+
       assign_publishing
       assign_tags if @attributes.key?(:tag_names)
     end

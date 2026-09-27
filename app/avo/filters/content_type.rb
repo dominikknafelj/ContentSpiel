@@ -8,6 +8,6 @@ class Avo::Filters::ContentType < Avo::Filters::SelectFilter
   end
 
   def options
-    ::Post.content_types.keys.index_with { |key| key.humanize }.symbolize_keys
+    ::ContentTypes.names.index_with { |name| name.humanize }.symbolize_keys
   end
 end

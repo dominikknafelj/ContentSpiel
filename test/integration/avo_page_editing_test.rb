@@ -291,7 +291,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_response :redirect
 
     block = @about.content_blocks.reload.first
-    assert block.rich_text?
+    assert_equal "rich_text", block.block_type
     assert_equal "Hello", block.body_en.to_plain_text.strip
   end
 
@@ -374,8 +374,13 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_response :redirect
 
     block = @about.content_blocks.reload.first
-    assert block.post_list?
-    assert_equal({ "content_type" => "blog", "tag" => "rails", "limit" => "5" }, block.settings)
+    assert_equal "post_list", block.block_type
+    # `limit` comes back cast to an Integer, not the submitted string: the
+    # nested form's raw `settings` write is now normalized through the
+    # post_list type's own field schema before every validation
+    # (`ContentBlock#normalize_settings`), the same schema `assign_settings`
+    # would cast it through.
+    assert_equal({ "content_type" => "blog", "tag" => "rails", "limit" => 5 }, block.settings)
   end
 
   # Every block's row carries the same settings inputs, so a rich_text block

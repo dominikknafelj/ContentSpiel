@@ -71,8 +71,9 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "resume rows show company, role type and period" do
-    Post.create!(content_type: :resume_entry, title: "Staff Engineer", company: "Acme", role_type: "lead",
-      start_date: "2023-01-01", end_date: "", published_at: 1.day.ago)
+    post = Post.new(content_type: "resume_entry", title: "Staff Engineer", published_at: 1.day.ago)
+    post.assign_fields({ "company" => "Acme", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" }, locale: "en")
+    post.save!
     @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
     get "/"
 

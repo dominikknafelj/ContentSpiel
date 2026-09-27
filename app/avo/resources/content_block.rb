@@ -8,9 +8,9 @@ class Avo::Resources::ContentBlock < Avo::BaseResource
 
   def fields
     field :id, as: :id
-    field :page, as: :belongs_to
+    field :owner, as: :belongs_to, polymorphic_as: :owner, types: [ ::Page ]
     field :position, as: :number
-    field :block_type, as: :select, enum: ::ContentBlock.block_types
+    field :block_type, as: :select, options: ::BlockTypes.names.index_by(&:humanize)
 
     # Which of these matters depends on `block_type` (rich_text -> body,
     # image -> image + caption, post_list -> settings). They are all shown

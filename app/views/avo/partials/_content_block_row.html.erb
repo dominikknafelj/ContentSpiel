@@ -15,7 +15,7 @@
       <div>
         <%= f.label :block_type, "Type", class: "font-semibold" %>
         <%= f.select :block_type,
-              ContentBlock.block_types.keys.map { |type| [ type.humanize, type ] },
+              BlockTypes.names.map { |type| [ type.humanize, type ] },
               { include_blank: "—" },
               class: input_classes %>
       </div>
