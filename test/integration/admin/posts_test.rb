@@ -38,6 +38,29 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal %w[rails ruby], post_record.tags.map(&:name).sort
   end
 
+  # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
+  # RichTextColumnComponent` fix (`name` -> `html_name`) -- before it, this
+  # form's Trix editor submitted a top-level `body` param instead of
+  # `post[body]`, so `post_params.permit(*TRANSLATED_COLUMNS)` never saw it
+  # and the save silently no-opped on the body itself.
+  test "the body autosaves" do
+    post_record = create_post(title: "Engineer")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { body: "<p>Hello there</p>" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_includes post_record.reload.body(locale: :en).to_s, "Hello there"
+  end
+
+  # Fix round 1 (minor): a stray double/trailing comma while typing a
+  # comma-separated tag list must not create a blank-named `Tag`.
+  test "blank segments in the tag input are dropped" do
+    post_record = create_post(title: "Engineer")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: "a, , b" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal %w[a b], post_record.reload.tags.map(&:name).sort
+  end
+
   test "the editor says when a post is not listed anywhere" do
     post_record = create_post(title: "Orphan", content_type: "now_update")
     get "/cs-studio/posts/#{post_record.id}"

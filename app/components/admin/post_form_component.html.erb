@@ -138,5 +138,7 @@
         value: value(:body), original: original(:body), locale: locale, errors: field_errors("body")
       ) %>
 
-  <%= render Admin::TagInputComponent.new(value: tag_names_value, name: field_html_name("tag_names"), id: field_id("tag_names")) %>
+  <%= render Admin::TagInputComponent.new(
+        value: tag_names_value, name: field_html_name("tag_names"), id: field_id("tag_names"), errors: field_errors("tag_names")
+      ) %>
 <% end %>

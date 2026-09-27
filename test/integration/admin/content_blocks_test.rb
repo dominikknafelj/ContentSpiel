@@ -49,6 +49,19 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not ContentBlock.exists?(first.id)
   end
 
+  # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
+  # RichTextColumnComponent` fix (`name` -> `html_name`) -- before it, this
+  # card's Trix editor submitted a top-level `body` param instead of
+  # `block[body]`, so `split_block_params`'s own `block_params.key?(:body)`
+  # check never saw it and the save silently no-opped on the body itself.
+  test "a rich_text block's body autosaves" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: "<p>Hello there</p>" }, base_updated_at: block.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :success
+    assert_includes block.reload.body(locale: :en).to_s, "Hello there"
+  end
+
   test "updating a deleted block answers gone" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     block.destroy!

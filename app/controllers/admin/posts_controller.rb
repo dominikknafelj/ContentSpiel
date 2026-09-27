@@ -180,8 +180,14 @@ module Admin
     # several) -- the comma-separated input is this controller's own UI
     # concern (spec §5.2), so the split happens here, once, rather than
     # teaching the service two different shapes for the same attribute.
+    # Blanks are dropped here too (fix round 1 review) rather than left for
+    # `Posts::Save#assign_tags`'s own `compact_blank`: a stray double comma
+    # or trailing comma while typing (e.g. "a, , b") is exactly the kind of
+    # input a comma-separated field invites, and this is the one place that
+    # already knows the raw string is comma-separated at all -- `assign_tags`
+    # only ever sees a plain Array by the time it runs.
     def split_tag_names(raw)
-      raw.to_s.split(",").map(&:strip)
+      raw.to_s.split(",").map(&:strip).reject(&:blank?)
     end
 
     # A `groups` field's raw params need straightening into an ordered Array
@@ -239,7 +245,16 @@ module Admin
         title: [ "title" ],
         slug: [ Mobility.normalize_locale_accessor(:slug, admin_locale) ],
         excerpt: [ "excerpt" ],
-        body: [ "body" ]
+        body: [ "body" ],
+        # No validation reports against `:tag_names` today (`Posts::Save
+        # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
+        # duplicate name is already filtered out before it ever reaches
+        # that point) -- wired up anyway so `Admin::TagInputComponent`'s own
+        # error slot (fix round 1 review) is always cleared/replaced like
+        # every other field's, and a later validation on this attribute
+        # (e.g. rejecting a tag name that's too long) has somewhere to land
+        # without a second wiring pass.
+        tag_names: [ "tag_names" ]
       }
 
       @post.definition&.fields&.each { |field| fields[field.name] = [ "fields.#{field.name}" ] }
