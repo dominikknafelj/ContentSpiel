@@ -17,12 +17,12 @@ class PublishableTest < ActiveSupport::TestCase
     assert_equal "draft", post.reload.status
   end
 
-  test "find_by_full_path only includes unpublished pages when asked" do
+  test "find_by_public_path only includes unpublished pages when asked" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     Page.create!(parent: root, page_type: :standard, title: "Draft")
 
-    assert_nil Page.find_by_full_path("en", "/draft")
-    assert_equal "Draft", Page.find_by_full_path("en", "/draft", include_unpublished: true).title
+    assert_nil Page.find_by_public_path("en", "/draft")
+    assert_equal "Draft", Page.find_by_public_path("en", "/draft", include_unpublished: true).title
   end
 
   test "listed_posts includes unpublished posts only when asked" do

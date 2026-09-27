@@ -53,7 +53,7 @@ class PostSerializerTest < ActiveSupport::TestCase
   # The serializer trusts the caller to have already set the locale it's
   # asked to read in (Mobility.with_locale) -- it reads through the post's
   # plain attribute accessors rather than accepting an override, matching
-  # every other locale-aware reader in this app (e.g. Page#slug_in).
+  # every other locale-aware reader in this app (e.g. PublicSite::Paths#page_path).
   test "reads translated fields through whatever locale is currently active" do
     post = Post.create!(content_type: :blog, title: "English Title")
     Mobility.with_locale(:de) { post.update!(title: "Deutscher Titel") }

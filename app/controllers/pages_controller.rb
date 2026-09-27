@@ -44,7 +44,7 @@ class PagesController < ApplicationController
   around_action :render_in_requested_locale
 
   def show
-    @page = Page.find_by_full_path(effective_locale, requested_path, include_unpublished: preview_allowed?)
+    @page = Page.find_by_public_path(effective_locale, requested_path, include_unpublished: preview_allowed?)
     if @page
       mark_preview
       return render :show
@@ -81,14 +81,14 @@ class PagesController < ApplicationController
   # re-read the path as "a page, then a post slug" and see whether the page
   # that turns up actually lists posts, and one of them has that slug.
   #
-  # `find_by_full_path` is what looks the parent up, exactly as above -- it
+  # `find_by_public_path` is what looks the parent up, exactly as above -- it
   # filters to published pages, so a draft listing page serves no permalinks
   # either, and its post detail URLs don't become a way to reach a page that
   # isn't public yet.
   def resolve_post_detail
     parent_path, _, candidate_slug = requested_path.rpartition("/")
 
-    @page = Page.find_by_full_path(effective_locale, parent_path.presence || "/", include_unpublished: preview_allowed?)
+    @page = Page.find_by_public_path(effective_locale, parent_path.presence || "/", include_unpublished: preview_allowed?)
 
     # The page's first listing block in `position` order (the association is
     # ordered), which for every page the spec describes is its only one.

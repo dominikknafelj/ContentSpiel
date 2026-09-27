@@ -2,7 +2,7 @@
 # client. Reads through whatever locale is currently active (Mobility's
 # ambient locale) rather than accepting one to switch to -- the caller sets
 # that with Mobility.with_locale, the same contract every other
-# locale-aware reader in this app follows (e.g. Page#slug_in).
+# locale-aware reader in this app follows (e.g. PublicSite::Paths#page_path).
 module PostSerializer
   module_function
 

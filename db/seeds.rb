@@ -158,3 +158,5 @@ end.tap do |now_page|
     block.settings = { "content_type" => "now_update" }
   end
 end
+
+PublicSite::Paths.rebuild!
