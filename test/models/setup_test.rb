@@ -64,6 +64,15 @@ class SetupTest < ActiveSupport::TestCase
     end
   end
 
+  test "required? stops querying once setup is complete and resets when it is undone" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    assert_not Setup.required?
+    assert_no_queries { assert_not Setup.required? }
+
+    site_settings(:default).update!(setup_completed_at: nil)
+    assert Setup.required?
+  end
+
   private
     def run_backfill
       ActiveRecord::Migration.suppress_messages { AddSetupCompletedAtToSiteSettings.new.backfill }

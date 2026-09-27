@@ -45,7 +45,7 @@ module PagesHelper
   # "<page or post> – <site>" in the browser tab; the homepage is the site
   # name alone, and an explicit meta title is taken as written.
   def document_title(page, post: nil)
-    site_title = SiteSetting.instance.title
+    site_title = Current.site.title
     meta_title = translated(page, :meta_title)
     return meta_title if post.nil? && meta_title.present?
     return site_title if post.nil? && page.root?
@@ -61,6 +61,6 @@ module PagesHelper
   # every generated link would immediately bounce through a redirect.
   # "/xx" for every other configured locale, unchanged from before.
   def locale_prefix(locale)
-    locale.to_s == SiteSetting.instance.default_locale ? "" : "/#{locale}"
+    locale.to_s == Current.site.default_locale ? "" : "/#{locale}"
   end
 end

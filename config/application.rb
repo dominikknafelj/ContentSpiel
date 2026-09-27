@@ -1,4 +1,5 @@
 require_relative "boot"
+require_relative "supported_locales"
 
 require "rails/all"
 
@@ -20,6 +21,12 @@ module ContentSpiel
     # this config (not out of I18n directly), and uses them to decide which
     # per-locale accessors and rich-text associations to define -- so this has
     # to be set here, before any model is loaded, rather than in an initializer.
+    #
+    # Still pinned to the three shipping locales rather than widened to
+    # SUPPORTED_LOCALES.keys -- every loop that iterates "available" locales
+    # (Mobility accessors, the sitemap, the locale route constraint) has to
+    # read `Locales.enabled` first, which happens in a later task. Until then
+    # this stays the actual bound on what a site can enable.
     config.i18n.available_locales = %i[en de es]
     config.i18n.default_locale = :en
 

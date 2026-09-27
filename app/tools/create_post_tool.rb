@@ -21,7 +21,7 @@ class CreatePostTool < MCP::Tool
     title: "Create post")
 
   def self.call(content_type:, title:, body: nil, excerpt: nil, locale: nil, published: false, server_context:)
-    locale ||= SiteSetting.instance.default_locale
+    locale ||= Current.site.default_locale
 
     post = Mobility.with_locale(locale) do
       Post.create!(

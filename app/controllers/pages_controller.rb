@@ -105,7 +105,7 @@ class PagesController < ApplicationController
   end
 
   def redirect_default_locale_prefix
-    return unless params[:locale].present? && params[:locale] == SiteSetting.instance.default_locale
+    return unless params[:locale].present? && params[:locale] == Current.site.default_locale
 
     path = "/#{params[:path]}".sub(%r{/+$}, "").presence || "/"
     path += "?#{request.query_string}" if request.query_string.present?
@@ -122,7 +122,7 @@ class PagesController < ApplicationController
   # explicit-but-redundant prefix away from, so by the time this is read, an
   # absent `params[:locale]` and the default locale mean the same thing.
   def effective_locale
-    params[:locale] || SiteSetting.instance.default_locale
+    params[:locale] || Current.site.default_locale
   end
 
   # The path as `Page#full_path` writes it: leading slash, no trailing one, and

@@ -19,7 +19,7 @@ class GetPostTool < MCP::Tool
     post = Post.find_by(id: id)
     return MCP::Tool::Response.new([ { type: "text", text: "Post #{id} not found" } ], error: true) unless post
 
-    locale ||= SiteSetting.instance.default_locale
+    locale ||= Current.site.default_locale
     data = Mobility.with_locale(locale) { PostSerializer.call(post, locale) }
 
     MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)

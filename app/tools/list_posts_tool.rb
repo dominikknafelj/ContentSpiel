@@ -13,7 +13,7 @@ class ListPostsTool < MCP::Tool
     title: "List posts")
 
   def self.call(content_type: nil, locale: nil, server_context:)
-    locale ||= SiteSetting.instance.default_locale
+    locale ||= Current.site.default_locale
     scope = content_type.present? ? Post.where(content_type: content_type) : Post.all
 
     # A summary, not the full record: a body-per-post dump would bloat every

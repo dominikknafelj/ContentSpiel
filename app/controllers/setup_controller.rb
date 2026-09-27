@@ -41,9 +41,9 @@ class SetupController < ApplicationController
     case @step
     when "system_check" then @results = Setup::SystemCheck.run
     when "admin" then @user = User.new
-    when "site", "languages" then @site_setting = SiteSetting.instance
+    when "site", "languages" then @site_setting = Current.site
     when "review"
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
       @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
     end
 
@@ -131,7 +131,7 @@ class SetupController < ApplicationController
     end
 
     def update_site
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
 
       if @site_setting.update(site_params)
         redirect_to setup_step_path("languages")
@@ -158,7 +158,7 @@ class SetupController < ApplicationController
     end
 
     def update_languages
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
 
       if @site_setting.update(default_locale: params.dig(:site_setting, :default_locale))
         redirect_to setup_step_path("mcp_token")
@@ -178,7 +178,7 @@ class SetupController < ApplicationController
     end
 
     def update_starter_content
-      StarterContent.create_pages_and_posts!(locale: SiteSetting.instance.default_locale)
+      StarterContent.create_pages_and_posts!(locale: Current.site.default_locale)
       redirect_to setup_step_path("review"), notice: "Starter content added."
     end
 

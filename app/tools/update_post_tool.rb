@@ -28,7 +28,7 @@ class UpdatePostTool < MCP::Tool
     post = Post.find_by(id: id)
     return MCP::Tool::Response.new([ { type: "text", text: "Post #{id} not found" } ], error: true) unless post
 
-    locale ||= SiteSetting.instance.default_locale
+    locale ||= Current.site.default_locale
     translated_attrs = { title: title, body: body, excerpt: excerpt }.compact
 
     # Build all attributes to assign, handling published_at carefully:

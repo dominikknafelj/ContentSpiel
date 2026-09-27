@@ -17,9 +17,9 @@ SitemapGenerator::Sitemap.default_host = ENV.fetch("SITEMAP_HOST", "https://www.
 # it itself (as the root Page's own entry in the current default locale, which
 # is exactly the page "/" resolves to), so leaving this on would list it twice.
 SitemapGenerator::Sitemap.create(include_root: false) do
-  # Read once rather than inside the loop below: SiteSetting.instance issues
-  # a fresh query every call, and nothing changes it mid-run here.
-  default_locale = SiteSetting.instance.default_locale
+  # Read once rather than inside the loop below: Current.site memoizes within
+  # a process, but nothing here needs to touch it more than once anyway.
+  default_locale = Current.site.default_locale
 
   # Published only: a draft (or a page scheduled for a future date) has a
   # cached path the moment it is saved, but PagesController 404s it, so listing

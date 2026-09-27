@@ -43,8 +43,8 @@ module SlugGeneration
     titles = read_attribute(:title).to_h
 
     # Only computed when there's at least one blank slug to fill: it reads
-    # `SiteSetting.instance`, a database row, and most saves (an edit to an
-    # already-fully-slugged record) have nothing for it to do.
+    # `Current.site`, a database row on first access, and most saves (an edit
+    # to an already-fully-slugged record) have nothing for it to do.
     fallback_title = blank_slug_fallback_title(titles)
 
     blank_locales.each do |locale|
@@ -59,7 +59,7 @@ module SlugGeneration
   # locale -- neither step depends on which locale is currently being filled,
   # only on the titles hash and the site's default locale.
   def blank_slug_fallback_title(titles)
-    default_locale = ::SiteSetting.instance.default_locale
+    default_locale = ::Current.site.default_locale
     titles[default_locale].presence ||
       ::Mobility.available_locales.map { |locale| titles[locale.to_s] }.compact_blank.first
   end

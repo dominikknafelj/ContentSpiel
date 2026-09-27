@@ -6,10 +6,10 @@ module ThemeHelper
 
   LanguageLink = Data.define(:code, :name, :path, :current)
 
-  # Memoized under a theme-specific ivar: controllers (e.g. SetupController)
-  # use @site_setting themselves.
+  # Current.site memoizes itself for the process/request; no ivar of our own
+  # needed the way SetupController's @site_setting is.
   def theme_site
-    @theme_site ||= SiteSetting.instance
+    Current.site
   end
 
   # Social links become real hrefs here for the first time, so only
