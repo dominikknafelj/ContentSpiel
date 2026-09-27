@@ -1,5 +1,5 @@
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: Page.find_by(parent_id: nil), selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, notice: flash[:notice], alert: flash[:alert]) %>

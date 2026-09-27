@@ -31,7 +31,7 @@ module Admin
 
     def tree_stream(selected:, message: nil)
       [
-        turbo_stream.replace("tree", Admin::TreeComponent.new(root: Page.find_by(parent_id: nil), selected: selected, locale: admin_locale, url_options: admin_url_options)),
+        turbo_stream.replace("tree", Admin::TreeComponent.new(root: root_page, selected: selected, locale: admin_locale, url_options: admin_url_options)),
         turbo_stream.replace("tree-status", partial: "admin/tree/status", locals: { message: message })
       ]
     end

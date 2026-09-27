@@ -1,5 +1,5 @@
 <% content_for :tree do %>
-  <%= render Admin::TreeComponent.new(root: Page.find_by(parent_id: nil), selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
 <%= render Admin::EmptyStateComponent.new(title: "Pages", description: "Choose a page in the tree, or add one.") do |empty_state| %>

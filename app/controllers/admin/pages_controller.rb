@@ -244,7 +244,7 @@ module Admin
     # blank `parent:` there just means "make a new root," which `Page`'s own
     # `only_one_root_page` validation already refuses whenever one exists.
     def requested_parent
-      Page.find_by(id: params.dig(:page, :parent_id)) || Page.find_by(parent_id: nil)
+      Page.find_by(id: params.dig(:page, :parent_id)) || root_page
     end
   end
 end

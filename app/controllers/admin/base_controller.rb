@@ -5,9 +5,23 @@ module Admin
   class BaseController < ApplicationController
     layout "admin"
     before_action { Current.channel = :admin }
-    helper_method :admin_locale, :admin_url_options
+    helper_method :admin_locale, :admin_url_options, :root_page
 
     private
+
+    # The homepage (final-fixes round, finding 12) -- one place for what
+    # every Pages view and both of its controllers (`PagesController`'s own
+    # tree replace/"no parent given" fallback, `TreeController`'s own tree
+    # replace) otherwise each re-derived by hand as a bare `Page.find_by
+    # (parent_id: nil)`, several times over, with nothing tying them
+    # together as "the same lookup" beyond a shared literal -- `Page#
+    # only_one_root_page` is what actually guarantees there's ever at most
+    # one row this can match. A `helper_method` so every Pages view can call
+    # it exactly like a controller action already can, the same way
+    # `admin_locale`/`admin_url_options` already are.
+    def root_page
+      Page.find_by(parent_id: nil)
+    end
 
     # The language being edited: ?locale= when it's enabled, else the site's
     # default. Invalid or disabled codes fall back silently (spec §8).
