@@ -30,6 +30,14 @@ module Admin
 
     def base_updated_at_value = page.updated_at.iso8601(6)
 
+    # The one `id` `Admin::PagesController#hero_image_stream` (Task 4 fix
+    # round 2) needs to know ahead of time, since it re-renders this
+    # section from a plain controller method rather than this component --
+    # `ID_PREFIX` is public for exactly that: the two builders of this id
+    # (this component's normal GET render, that controller's post-save
+    # stream) share the one constant rather than each hand-keeping "page".
+    def hero_image_section_id = "#{ID_PREFIX}-hero-image-section"
+
     def field_id(field) = "#{ID_PREFIX}-#{field}"
 
     def field_html_name(field) = "page[#{field}]"

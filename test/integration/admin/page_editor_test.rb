@@ -92,6 +92,57 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_not landing.reload.hero_image.attached?
   end
 
+  # Fix round 2: the "Remove image" checkbox stays checked in the DOM after
+  # a removal (nothing else re-renders it) unless the success stream itself
+  # brings the hero section back in sync -- checked here directly, since a
+  # stale checked box left unfixed is exactly what the next two tests guard
+  # against in practice (a later save that still carries `remove_hero_image
+  # =1` alongside a freshly picked file).
+  test "removing the hero image re-renders the hero section without the checkbox" do
+    landing = landing_page_with_hero_image
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+
+    assert_includes response.body, "page-hero-image-section"
+    assert_not_includes response.body, "page[remove_hero_image]"
+  end
+
+  test "removing then uploading a new hero image in a later save keeps the new image" do
+    landing = landing_page_with_hero_image
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    landing.reload
+    assert_not landing.hero_image.attached?
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { hero_image: fixture_file_upload("tiny.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :success
+
+    assert landing.reload.hero_image.attached?
+  end
+
+  # The scenario the coordinator's review actually named: an editor ticks
+  # Remove, then picks a new file before the (only just-added) re-render
+  # lands, so both `hero_image` and a still-stale `remove_hero_image=1`
+  # arrive in the same request.
+  test "a new upload wins over a stale remove flag in the same save" do
+    landing = landing_page_with_hero_image
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: {
+        page: { hero_image: fixture_file_upload("tiny.png", "image/png"), remove_hero_image: "1" },
+        base_updated_at: landing.updated_at.iso8601(6)
+      }, as: :turbo_stream
+    assert_response :success
+
+    assert landing.reload.hero_image.attached?
+  end
+
   private
 
   def landing_page_with_hero_image

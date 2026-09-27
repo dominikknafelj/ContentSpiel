@@ -1,0 +1,27 @@
+<%# locals: section_id, image_id, image_html_name, image_value, checkbox_id,
+    checkbox_html_name, show_checkbox -- the page settings form's hero
+    image preview plus its "Remove image" checkbox (cs-studio spec §5.1),
+    wrapped in one `id="<%= section_id %>"` element so a single Turbo
+    Stream `replace` can bring both back in sync with the record after a
+    save that touched the attachment (`Admin::PagesController
+    #hero_image_stream`, Task 4 fix round 2) -- rendered from this one
+    partial on the initial GET (`Admin::PageSettingsFormComponent`) and
+    again from that stream, so there is exactly one "what does the hero
+    section look like right now" template, the same reasoning
+    `Admin::TreeComponent` already applies to the tree.
+    `show_checkbox` is always the record's *current* `attached?`, not
+    "was this section just touched" -- an unattached page has nothing to
+    remove either way. %>
+<div id="<%= section_id %>">
+  <%= render Admin::Columns::ImageColumnComponent.new(name: "hero_image", id: image_id, html_name: image_html_name, value: image_value) %>
+
+  <% if show_checkbox %>
+    <div class="mb-4 -mt-2">
+      <label class="inline-flex items-center gap-2 text-sm text-meta">
+        <%= check_box_tag checkbox_html_name, "1", false, id: checkbox_id,
+              class: "size-4 rounded-cs border-line-strong text-accent focus:outline-2 focus:outline-accent" %>
+        Remove image
+      </label>
+    </div>
+  <% end %>
+</div>

@@ -92,22 +92,47 @@ module Admin
       # purpose is a separate, explicit signal (`remove_hero_image`, read
       # straight off `params` rather than the permitted/translated split
       # above -- it's a flag this controller consumes itself, never a
-      # column `Pages::Save` assigns) that overrides the drop outright, so
-      # "leave the field blank" and "tick Remove image" stay two different
-      # things even though both arrive as part of the same form.
+      # column `Pages::Save` assigns).
+      #
+      # A real upload always wins over that flag (fix round 2): the
+      # checkbox stays checked in the DOM until this same response
+      # re-renders the hero section further down (nothing else in this
+      # form's markup gets rebuilt on autosave), so an editor who ticks
+      # Remove, then picks a new file *before* that re-render lands, would
+      # otherwise resend both in one request -- and without this guard, the
+      # stale `remove_hero_image=1` would win and silently drop the very
+      # upload they just made. `attributes.key?("hero_image")` here is
+      # exactly "a non-blank file survived the drop above", since a blank
+      # one never reaches this hash at all.
       attributes = drop_blank_file_params(attributes, fields: %w[hero_image])
-      attributes["hero_image"] = nil if ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
+      hero_image_changing = attributes.key?("hero_image")
+      attributes["hero_image"] = nil if !hero_image_changing && ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
+      hero_image_changing ||= attributes.key?("hero_image")
 
       result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 
-      render turbo_stream: autosave_stream(
+      streams = autosave_stream(
         record: result.record,
         result: result,
         status_id: "page-save-status",
         error_prefix: "page",
         base_updated_at: params[:base_updated_at],
         fields: page_error_fields
-      ), status: (result.ok? ? :ok : :unprocessable_entity)
+      )
+
+      # The hero section (the image preview and the "Remove image"
+      # checkbox, `admin/shared/_hero_image_field`) is the one part of this
+      # form autosave doesn't otherwise touch on success -- every other
+      # field's own value already sits correctly in the input the editor
+      # just typed into, but a removed or replaced image has nothing
+      # equivalent: the checkbox would stay checked (or the file input
+      # would still show the just-picked file) with nothing in the DOM
+      # reflecting what actually got saved. Only re-rendered when this
+      # save actually touched the attachment, and only on success -- a
+      # failed save never reaches `Pages::Save`'s attachment writer at all.
+      streams << hero_image_stream(result.record) if result.ok? && hero_image_changing
+
+      render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
     end
 
     # Deleting is permanent (spec §7's own "No trash" interim state) and
@@ -183,6 +208,25 @@ module Admin
         page_type: [ :page_type ],
         hero_image: [ :hero_image ]
       }
+    end
+
+    # The Turbo Stream that brings the hero section's DOM back in sync with
+    # what `update` just saved (fix round 2) -- same partial, same ids
+    # `Admin::PageSettingsFormComponent` renders on a normal GET, built off
+    # `Admin::PageSettingsFormComponent::ID_PREFIX` rather than a second,
+    # hand-kept copy of "page", so the two can never drift apart.
+    def hero_image_stream(record)
+      prefix = Admin::PageSettingsFormComponent::ID_PREFIX
+
+      turbo_stream.replace("#{prefix}-hero-image-section", partial: "admin/shared/hero_image_field", locals: {
+        section_id: "#{prefix}-hero-image-section",
+        image_id: "#{prefix}-hero_image",
+        image_html_name: "#{prefix}[hero_image]",
+        image_value: record.hero_image,
+        checkbox_id: "#{prefix}-remove_hero_image",
+        checkbox_html_name: "#{prefix}[remove_hero_image]",
+        show_checkbox: record.hero_image.attached?
+      })
     end
 
     def redirect_after(result, success:)
