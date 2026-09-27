@@ -1,12 +1,12 @@
 require "test_helper"
 
-class PostSerializerTest < ActiveSupport::TestCase
+class Mcp::PostSerializerTest < ActiveSupport::TestCase
   test "serializes a post's translated and structural fields together" do
     post = Post.create!(content_type: :resume_entry, title: "Senior Engineer", excerpt: "Led the team",
       body: "<p>Details</p>", published_at: Time.current,
       metadata: { "company" => "Acme", "role_type" => "lead" })
 
-    data = PostSerializer.call(post, :en)
+    data = Mcp::PostSerializer.call(post, :en)
 
     assert_equal post.id, data[:id]
     assert_equal "resume_entry", data[:content_type]
@@ -34,7 +34,7 @@ class PostSerializerTest < ActiveSupport::TestCase
   test "published is false and status is draft with no published_at" do
     post = Post.create!(content_type: :blog, title: "Draft")
 
-    data = PostSerializer.call(post, :en)
+    data = Mcp::PostSerializer.call(post, :en)
 
     assert_equal false, data[:published]
     assert_equal "draft", data[:status]
@@ -50,7 +50,7 @@ class PostSerializerTest < ActiveSupport::TestCase
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title: "Hello World", published_at: Time.current)
 
-    data = PostSerializer.call(post, :en)
+    data = Mcp::PostSerializer.call(post, :en)
 
     assert_equal "https://www.example.com/blog/hello-world", data[:url]
   end
@@ -61,7 +61,7 @@ class PostSerializerTest < ActiveSupport::TestCase
   test "a scheduled post is published: true but status: scheduled" do
     post = Post.create!(content_type: :blog, title: "Future Post", published_at: 3.days.from_now)
 
-    data = PostSerializer.call(post, :en)
+    data = Mcp::PostSerializer.call(post, :en)
 
     assert_equal true, data[:published]
     assert_equal "scheduled", data[:status]
@@ -75,7 +75,7 @@ class PostSerializerTest < ActiveSupport::TestCase
     post = Post.create!(content_type: :blog, title: "English Title")
     Mobility.with_locale(:de) { post.update!(title: "Deutscher Titel") }
 
-    data = Mobility.with_locale(:de) { PostSerializer.call(post, :de) }
+    data = Mobility.with_locale(:de) { Mcp::PostSerializer.call(post, :de) }
 
     assert_equal "Deutscher Titel", data[:title]
   end

@@ -1,9 +1,9 @@
 require "test_helper"
 
-class GetPostToolTest < ActiveSupport::TestCase
+class Mcp::Tools::GetPostTest < ActiveSupport::TestCase
   def call_tool(**arguments)
     delivered = JSON.parse(JSON.generate(arguments), symbolize_names: true)
-    GetPostTool.call(**delivered, server_context: { user: @user })
+    Mcp::Tools::GetPost.call(**delivered, server_context: { user: @user })
   end
 
   setup do

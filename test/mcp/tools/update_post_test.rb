@@ -1,9 +1,9 @@
 require "test_helper"
 
-class UpdatePostToolTest < ActiveSupport::TestCase
+class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
   def call_tool(**arguments)
     delivered = JSON.parse(JSON.generate(arguments), symbolize_names: true)
-    UpdatePostTool.call(**delivered, server_context: { user: @user })
+    Mcp::Tools::UpdatePost.call(**delivered, server_context: { user: @user })
   end
 
   setup do

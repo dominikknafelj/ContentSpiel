@@ -18,7 +18,7 @@ class McpController < ActionController::API
       title: "ContentSpiel",
       version: "1.0.0",
       instructions: "Manage ContentSpiel's blog/resume/now-update posts across locales.",
-      tools: [ ListPostsTool, GetPostTool, CreatePostTool, UpdatePostTool ],
+      tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost ],
       server_context: { user: @current_api_user }
     )
 

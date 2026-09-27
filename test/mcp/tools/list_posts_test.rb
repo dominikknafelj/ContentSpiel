@@ -5,10 +5,10 @@ require "test_helper"
 # string keys a Ruby literal would use directly (see the mcp gem's own
 # "Tool argument keys" docs: a tool that only passes tests with string-keyed
 # args can still fail against a real client).
-class ListPostsToolTest < ActiveSupport::TestCase
+class Mcp::Tools::ListPostsTest < ActiveSupport::TestCase
   def call_tool(**arguments)
     delivered = JSON.parse(JSON.generate(arguments), symbolize_names: true)
-    ListPostsTool.call(**delivered, server_context: { user: @user })
+    Mcp::Tools::ListPosts.call(**delivered, server_context: { user: @user })
   end
 
   setup do
@@ -64,7 +64,7 @@ class ListPostsToolTest < ActiveSupport::TestCase
 
   # List responses are a summary, not the full record -- a body-per-post
   # dump would bloat every listing for content an agent has to ask for by
-  # id anyway (GetPostTool).
+  # id anyway (Mcp::Tools::GetPost).
   test "list entries omit the full body" do
     Post.create!(content_type: :blog, title: "A Blog Post", body: "<p>Full content</p>")
 
