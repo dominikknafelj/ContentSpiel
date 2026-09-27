@@ -34,6 +34,7 @@ module LocalizedSlug
     def localized_slug(scope:)
       class_attribute :localized_slug_scope, instance_writer: false, default: scope
       before_validation :fill_blank_slugs
+      validate :slug_present_in_every_enabled_locale
       validate :slug_is_unused_in_every_locale
     end
   end
@@ -59,11 +60,74 @@ module LocalizedSlug
         ::Locales.fallback_chain(locale).map { |code| titles[code.to_s] }.compact_blank.first
       next if title.blank?
 
-      public_send("#{::Mobility.normalize_locale_accessor(:slug, locale)}=", title.parameterize)
+      public_send("#{::Mobility.normalize_locale_accessor(:slug, locale)}=", slugify(title))
     end
   end
 
   private
+
+  # `String#parameterize` transliterates through ASCII (`I18n.transliterate`)
+  # and then drops anything left that isn't `[a-z0-9-]` -- fine for a title
+  # with Latin letters and diacritics ("Über uns" -> "uber-uns"), but a
+  # no-op-to-empty for one that has none at all: transliteration has nothing
+  # to map Japanese, Korean, Thai, Hebrew, Arabic, etc. onto, so every
+  # character is dropped and the result is "". A CMS offering ~37 languages
+  # (spec §4.1) can't require every title to contain a Latin letter just to
+  # get a URL, so a blank `parameterize` result falls back to a
+  # Unicode-preserving slug instead: downcase, keep letters and digits in any
+  # script (`\p{L}`/`\p{N}`), collapse every other run of characters to a
+  # single "-", and trim leading/trailing "-".
+  #
+  # The result can contain raw Unicode ("日本語のタイトル") rather than only
+  # ASCII -- that is fine on the wire: a URL's path segment is percent-encoded
+  # by whatever sends the request (a browser, a link, `curl`), and Rails'
+  # router decodes it straight back before `PublicSite::Paths`/`PublicPath`
+  # ever compares it, the same way it already decodes any other non-ASCII or
+  # reserved character in a path segment.
+  def slugify(title)
+    slug = title.parameterize
+    return slug if slug.present?
+
+    title.downcase.gsub(/[^\p{L}\p{N}]+/, "-").gsub(/\A-+|-+\z/, "")
+  end
+
+  # A non-root page/post with no slug in some enabled locale would have no
+  # URL there at all (`PublicSite::Paths.page_path`/`post_path` return nil
+  # for a blank segment rather than erroring) -- silent and easy to miss, so
+  # this catches it as a form error instead.
+  #
+  # Checked per *enabled* locale, not "present in any locale" the way
+  # `title_present_in_any_locale` (Page/Post) is: a title in any locale is
+  # enough because untranslated locales fall back when reading it back, but
+  # a slug that's missing in one enabled locale has no fallback --
+  # `fill_blank_slugs` above is what's supposed to prevent that gap, filling
+  # every enabled locale from a title (its own, or the first one found
+  # walking its fallback chain). This validation exists for the one way that
+  # fill can still come up empty: `slugify` returns "" for a title with no
+  # letters or digits at all (bare punctuation/whitespace) in every locale it
+  # tried, same as a title that's blank outright.
+  #
+  # Raw jsonb hash, not the per-locale accessor: a locale that has never been
+  # written at all is absent from the hash entirely (as opposed to present
+  # with a blank value), and `Hash#[]` on a missing key is nil either way --
+  # reading it directly here, once, is simpler than a `public_send` per
+  # locale for the same result.
+  def slug_present_in_every_enabled_locale
+    return unless generates_slugs?
+
+    slugs = read_attribute(:slug).to_h
+
+    ::Locales.enabled.each do |locale|
+      next if slugs[locale.to_s].present?
+
+      # Reported against `slug_de`, and named per locale, for the same
+      # reason `slug_is_unused_in_every_locale` below reports its own
+      # collisions that way: whichever locale is missing a slug is not
+      # necessarily the one the editor is looking at.
+      errors.add(::Mobility.normalize_locale_accessor(:slug, locale), :blank,
+        message: "can't be blank in #{locale.to_s.upcase}")
+    end
+  end
 
   # `validates :slug, uniqueness:` would emit `WHERE pages.slug = 'about'`,
   # comparing a jsonb column to a string -- which Postgres rejects outright.

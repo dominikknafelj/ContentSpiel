@@ -87,35 +87,26 @@ class Page < ApplicationRecord
   # meaning a slugless child of the root would answer to "/", the homepage's
   # own address.
   #
-  # Before this validation existed, that produced the two-pages-one-URL bug:
-  # two pages then answered to one path, and the lookup could only return one
-  # of them -- the other unreachable at any address at all, while still being
-  # listed in the sitemap, with nothing the admin could see deciding which one
-  # lost. All from a single missed field on the page form, which reported no
-  # error anywhere.
+  # Before a slug-presence validation existed, that produced the
+  # two-pages-one-URL bug: two pages then answered to one path, and the
+  # lookup could only return one of them -- the other unreachable at any
+  # address at all, while still being listed in the sitemap, with nothing the
+  # admin could see deciding which one lost. All from a single missed field
+  # on the page form, which reported no error anywhere.
   #
-  # This validation is what keeps a blank segment from ever reaching
-  # `PublicSite::Paths` in the first place; `HasPublicPaths`'s own validation
+  # `LocalizedSlug#slug_present_in_every_enabled_locale` (registered by
+  # `localized_slug scope: :parent_id` above) is what keeps a blank segment
+  # from ever reaching `PublicSite::Paths` in the first place -- checked
+  # per *enabled* locale rather than "some locale has one," since a slug has
+  # no fallback the way a blank title does; `HasPublicPaths`'s own validation
   # (app/models/concerns/has_public_paths.rb) and the `public_paths (locale,
-  # path)` unique index are what additionally catch two *different*, non-blank
-  # slugs that would still resolve to the same address.
+  # path)` unique index are what additionally catch two *different*,
+  # non-blank slugs that would still resolve to the same address.
   #
   # The root is exempt because its slug is `""` by design (see
-  # `PublicSite::Paths.page_path`): the homepage contributes no segment and its
-  # path is "/".
-  #
-  # A raw jsonb-hash check, not `validates :slug, presence: true` (which
-  # reads the plain Mobility reader, i.e. whichever locale happens to be
-  # ambient when this save runs) -- the same ambient-locale trap
-  # `title_present_in_any_locale` above already sidesteps, and for the same
-  # reason it now matters here too: languages are runtime data (spec §4.1),
-  # so the request's ambient locale (I18n's fixed default, `:en`) is no
-  # longer guaranteed to be one of the site's enabled languages. A page
-  # titled and slugged only in "de" -- with "en" never touched and possibly
-  # not even enabled -- would otherwise fail this check for a locale nobody
-  # is serving, even though `LocalizedSlug#fill_blank_slugs` already gave it
-  # a slug in every locale that *is* enabled.
-  validate :slug_present_in_any_locale, unless: -> { parent_id.nil? }
+  # `PublicSite::Paths.page_path`): the homepage contributes no segment and
+  # its path is "/" -- `generates_slugs?` below is what tells the shared
+  # validation to skip it, the same guard `fill_blank_slugs` already uses.
 
   # `pages.position` is nullable because closure_tree is what fills it in,
   # after the first save -- so this cannot be a plain presence validation or no
@@ -186,12 +177,6 @@ class Page < ApplicationRecord
   # `validate :title_present_in_any_locale`.
   def title_present_in_any_locale
     errors.add(:title, :blank) if read_attribute(:title).to_h.values.all?(&:blank?)
-  end
-
-  # Raw jsonb hash, not the Mobility reader: see the comment above
-  # `validate :slug_present_in_any_locale`.
-  def slug_present_in_any_locale
-    errors.add(:slug, :blank) if read_attribute(:slug).to_h.values.all?(&:blank?)
   end
 
   # The tree has exactly one root: the homepage. Checked on update as well as

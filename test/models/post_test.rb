@@ -292,8 +292,12 @@ class PostTest < ActiveSupport::TestCase
 
     Mobility.with_locale(:de) do
       untitled.valid?
-      assert_empty untitled.errors[:slug_de],
+      assert_not_includes untitled.errors[:slug_de], "has already been taken in DE",
         "a post without a German slug of its own must not collide on another post's German slug"
+      # Still fails *presence* for de (and every other enabled locale) --
+      # genuinely blank, not a false collision -- covered by
+      # `LocalizedSlugTest` directly.
+      assert_includes untitled.errors[:slug_de], "can't be blank in DE"
     end
   end
 

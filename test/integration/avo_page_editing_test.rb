@@ -74,7 +74,11 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_match(/Slug can.{0,6}t be blank/, response.body,
+    # One error per enabled locale (`LocalizedSlug#slug_present_in_every_
+    # enabled_locale`), each against its own `slug_<locale>` field -- not a
+    # single generic "Slug can't be blank" -- so the admin sees exactly
+    # which tab(s) still need a slug rather than having to guess.
+    assert_match(/Slug en can.{0,6}t be blank in EN/, response.body,
       "the admin has to be told which field is missing, not just refused")
   end
 

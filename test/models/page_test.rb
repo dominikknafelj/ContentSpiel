@@ -87,12 +87,17 @@ class PageTest < ActiveSupport::TestCase
   # No title, since a title present in any locale would now have its slug
   # filled in automatically by `LocalizedSlug` -- this has to be a page with
   # no title at all to still exercise the blank-slug case.
+  #
+  # Reported against `slug_en` (the per-*enabled*-locale key
+  # `LocalizedSlug#slug_present_in_every_enabled_locale` uses), not a bare
+  # `:slug` -- every enabled locale is missing one here, so every one of
+  # them gets its own error; `en` stands in for all three.
   test "a non-root page requires a slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     slugless = Page.new(page_type: :standard, parent: root)
 
     assert_not slugless.valid?
-    assert_includes slugless.errors[:slug], "can't be blank"
+    assert_includes slugless.errors[:slug_en], "can't be blank in EN"
   end
 
   # The failure the validation exists to prevent, stated as the outcome rather
@@ -132,7 +137,7 @@ class PageTest < ActiveSupport::TestCase
     blank = Page.new(page_type: :standard, slug: "   ", parent: root)
 
     assert_not blank.valid?
-    assert_includes blank.errors[:slug], "can't be blank"
+    assert_includes blank.errors[:slug_en], "can't be blank in EN"
   end
 
   # Task 8c / code-structure review finding #2: a page titled in only one
@@ -280,8 +285,12 @@ class PageTest < ActiveSupport::TestCase
 
     Mobility.with_locale(:de) do
       untitled.valid?
-      assert_empty untitled.errors[:slug_de],
+      assert_not_includes untitled.errors[:slug_de], "has already been taken in DE",
         "a page without a German slug of its own must not collide on a sibling's German slug"
+      # It does still fail *presence* for de (and every other enabled
+      # locale) -- genuinely blank, not a false collision -- covered on its
+      # own in "a non-root page requires a slug" above.
+      assert_includes untitled.errors[:slug_de], "can't be blank in DE"
     end
   end
 

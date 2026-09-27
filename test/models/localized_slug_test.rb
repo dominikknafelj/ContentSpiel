@@ -97,4 +97,45 @@ class LocalizedSlugTest < ActiveSupport::TestCase
     assert b.errors[Mobility.normalize_locale_accessor(:slug, :en)].any? { |m| m.include?("EN") }
     assert Post.new(content_type: :now_update, title: "Same").valid?
   end
+
+  # Task 11 fix round 1: `String#parameterize` transliterates through ASCII,
+  # so a title with no Latin letters at all -- Japanese, here, one of the
+  # ~37 supported languages (spec §4.1) -- comes out "". `slugify`'s fallback
+  # keeps the title's own letters/digits instead of dropping them, so the
+  # locale still gets a real, working URL rather than silently having none.
+  test "a title with no Latin letters gets a Unicode slug instead of a blank one" do
+    with_locales(%w[en ja], default: "en") do
+      about = Page.create!(page_type: :standard, parent: @root, title_ja: "日本語のタイトル")
+
+      assert_equal "日本語のタイトル", about.slug_ja
+      assert_equal "/日本語のタイトル", about.full_path("ja")
+    end
+  end
+
+  # "Über uns" has Latin letters with diacritics -- `parameterize` handles
+  # those fine via transliteration -- so the Unicode-preserving fallback
+  # never runs here. Pinned so a future change to `slugify` can't quietly
+  # make this cross-locale test-writing-adjacent case go through the wrong
+  # branch and still pass.
+  test "a title with Latin diacritics still slugifies through parameterize, not the fallback" do
+    page = Page.create!(parent: @root, page_type: :standard, title_de: "Über uns")
+
+    assert_equal "uber-uns", page.slug_de
+  end
+
+  # `slugify`'s fallback strips a title down to nothing when it has no
+  # letters or digits in *any* script -- bare punctuation, here -- the same
+  # outcome as a blank title, and `fill_blank_slugs` leaves the slug blank
+  # rather than writing "". `LocalizedSlug#slug_present_in_every_enabled_
+  # locale` is what catches that: presence is checked per enabled locale, not
+  # "some locale has one," because a slug (unlike a title) has no fallback
+  # when read back.
+  test "a title made only of punctuation leaves that locale's slug blank, caught by the presence check" do
+    page = Page.new(page_type: :standard, parent: @root, title_en: "About", title_de: "…")
+
+    assert_not page.valid?
+    assert_equal "about", page.slug_en
+    assert_nil page.slug_de
+    assert_includes page.errors[:slug_de], "can't be blank in DE"
+  end
 end
