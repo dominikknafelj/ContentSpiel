@@ -127,7 +127,12 @@ No index or column exists per language.
 ### 5.3 Canonical post URLs
 
 - A post has at most one current URL per language: its **canonical listing page's** path, then `/`, then its slug.
-- **Canonical listing page:** the first page in tree order (depth-first, sibling `position`) that has a `post_list` block matching the post. Matching means the same content type and, if the block sets a tag, a post carrying that tag. Publication state is ignored here; the resolver applies it (§6.3).
+- **Canonical listing page:** the best page with a `post_list` block matching the post. Matching means the same content type (or no content type set) and, if the block sets a tag, a post carrying that tag. Candidates are ranked by:
+  1. **publication:** pages whose whole chain (page and ancestors) is live come first; an unpublished page is chosen only when no published one lists the post, so preview still works. Scheduled pages count as unpublished until live; paths are recomputed on writes only, so posts move onto a scheduled listing when something next syncs them (or `rebuild!`), not at the go-live moment itself;
+  2. **specificity:** a block naming the post's content type beats an unfiltered one; then a block whose tag the post carries beats one without a tag filter;
+  3. **tree order** (depth-first, sibling `position`) as the tiebreak.
+
+  So a homepage "latest posts" teaser or a draft page never takes a post's URL from a more specific published listing. The resolver still applies publication to the result (§6.3).
 - **No listing page:** the post has no public URL, same as today.
 - **Other listing pages:** the old behaviour, where a post also resolves under any other page that lists it, becomes a 301 to the canonical URL. Other listing pages are not stored as rows. The resolver computes this fallback (§6.3).
 
