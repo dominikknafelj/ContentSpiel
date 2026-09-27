@@ -5,3 +5,26 @@
 <%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, notice: flash[:notice], alert: flash[:alert]) %>
 
 <%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+
+<%# The one slot a block action with nothing left to replace on the page
+    (a stale PATCH/DELETE against an already-deleted block, spec §5.1's 410;
+    a failed `create` from the picker) reports into --
+    `Admin::ContentBlocksController#render_gone`/`#picker_error_stream`. %>
+<div id="content-blocks-alert"></div>
+
+<section class="admin-content-blocks mt-6" data-controller="admin--blocks"
+     data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>">
+  <div class="mb-3 flex items-center justify-between">
+    <h2 class="text-h2 text-ink">Blocks</h2>
+    <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
+  </div>
+
+  <div id="content-blocks-list" class="flex flex-col gap-3">
+    <% blocks = @page.content_blocks.to_a %>
+    <% blocks.each_with_index do |block, index| %>
+      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: index == blocks.size - 1) %>
+    <% end %>
+  </div>
+
+  <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+</section>

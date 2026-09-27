@@ -66,6 +66,21 @@ Rails.application.routes.draw do
         post :unpublish
         post :schedule
       end
+
+      # A page's blocks (cs-studio spec §5.1/§6.1, Task 5): nested under the
+      # page rather than a top-level resource, since a block is meaningless
+      # without the page it's on and every one of these actions already
+      # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
+      # #set_page`) -- there is no "show a block on its own" screen for
+      # `:show`/`:index` to serve. `reorder` is a `collection` route (it
+      # names every block to keep, not one) the same way the page tree's own
+      # move endpoint is `resource :tree`, not nested under one page;
+      # `duplicate` is a `member` route since it always starts from exactly
+      # one existing block.
+      resources :content_blocks, only: %i[create update destroy] do
+        collection { patch :reorder }
+        member { post :duplicate }
+      end
     end
 
     # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`

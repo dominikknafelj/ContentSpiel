@@ -35,20 +35,35 @@ module Admin
     # this is pure string formatting, not another id-safety pass.
     def self.error_id(prefix, name) = "#{prefix}-#{name}-errors"
 
-    def initialize(field:, form_name:, value:, original: nil, locale:, errors: [])
+    # `id_prefix:` overrides the id-derivation `dom_id_prefix(form_name)`
+    # otherwise falls back to -- needed the moment a single literal
+    # `form_name` (e.g. block cards all naming their schema fields
+    # `"block[settings]"`, cs-studio spec §5.1/Task 5) is shared by more
+    # than one instance of the same form on one screen: the submitted field
+    # *name* has to stay that one literal string (so the server-side split
+    # in `Admin::ContentBlocksController` sees a plain `params[:block]`
+    # regardless of which card posted it), but the rendered *ids* still have
+    # to be document-unique, or a Turbo Stream error-slot replace (and a
+    # `label for=`/`id=` pairing) for one card could silently land on
+    # another card's identically-named field instead. Defaulting to nil
+    # (falling back to the old `dom_id_prefix(form_name)` behaviour) keeps
+    # every existing single-instance-per-page caller (the post/group fields
+    # this component already serves) unchanged.
+    def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil)
       @field = field
       @form_name = form_name
       @value = value
       @original = original
       @locale = locale
       @errors = errors
+      @id_prefix = id_prefix || self.class.dom_id_prefix(form_name)
     end
 
     def label_text = field.name.humanize
 
-    def input_id = "#{self.class.dom_id_prefix(form_name)}-#{field.name}"
+    def input_id = "#{id_prefix}-#{field.name}"
 
-    def errors_id = self.class.error_id(self.class.dom_id_prefix(form_name), field.name)
+    def errors_id = self.class.error_id(id_prefix, field.name)
 
     # The nested `Admin::Fields::*` component this field's type dispatches
     # to -- `"#{type}_field.rb"`'s class name, by the same
@@ -58,7 +73,7 @@ module Admin
     # not also editing a hand-kept dispatch table here.
     def input_component
       "Admin::Fields::#{field.type.to_s.camelize}Field".constantize.new(
-        field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors
+        field: field, form_name: form_name, value: value, original: original, locale: locale, errors: errors, id_prefix: id_prefix
       )
     end
 
@@ -76,6 +91,6 @@ module Admin
 
     private
 
-    attr_reader :field, :form_name, :value, :original, :locale, :errors
+    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix
   end
 end
