@@ -178,8 +178,14 @@ class ContentBlock < ApplicationRecord
     errors.add(:block_type, "isn't a registered block type") if block_type.present? && BlockTypes.find(block_type).nil?
   end
 
+  # `locale: Locales.default`, not `settings_object`'s own ambient-`I18n.locale`
+  # default: a required translated setting is only ever *written* at
+  # `Locales.default` (`normalize_settings`'s comment explains why), so
+  # checking `required` against whatever `I18n.locale` a request happens to
+  # leave ambient -- unrelated to the site's own default -- would reject a
+  # block that saved correctly the moment those two locales disagree.
   def settings_are_valid
-    object = settings_object or return
+    object = settings_object(locale: Locales.default) or return
     return if object.valid?
 
     object.errors.each { |error| errors.add("settings.#{error.attribute}", error.type, message: error.message) }

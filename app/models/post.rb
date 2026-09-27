@@ -147,8 +147,14 @@ class Post < ApplicationRecord
     errors.add(:content_type, "isn't a registered content type") if content_type.present? && ContentTypes.find(content_type).nil?
   end
 
+  # `locale: Locales.default`, not `fields`'s own ambient-`I18n.locale`
+  # default: a required translated field is only ever *written* at
+  # `Locales.default` (`#fields=`'s own comment explains why), so checking
+  # `required` against whatever `I18n.locale` a request happens to leave
+  # ambient -- unrelated to the site's own default -- would reject a post
+  # that saved correctly the moment those two locales disagree.
   def fields_are_valid
-    object = fields or return
+    object = fields(locale: Locales.default) or return
     return if object.valid?
 
     object.errors.each { |error| errors.add("fields.#{error.attribute}", error.type, message: error.message) }

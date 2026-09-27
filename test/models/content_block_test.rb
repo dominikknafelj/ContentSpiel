@@ -1,6 +1,8 @@
 require "test_helper"
 
 class ContentBlockTest < ActiveSupport::TestCase
+  include TestTypes
+
   setup do
     @page = Page.create!(page_type: :standard, title: "Home", slug: "")
   end
@@ -251,5 +253,23 @@ class ContentBlockTest < ActiveSupport::TestCase
     post.update_column(:content_type, "gone/thing")
 
     assert_not block.lists?(post)
+  end
+
+  # A required translated setting is only ever written at `Locales.default`
+  # (`normalize_settings`'s own comment explains why: neither the standalone
+  # block form nor the page form's nested rows have a locale switcher for
+  # `settings` yet). Checking `required` against the *ambient* `I18n.locale`
+  # instead -- whatever a request happened to leave it at, unrelated to the
+  # site's own default -- would reject a block that saved correctly the
+  # moment that ambient locale doesn't match the site's default.
+  test "settings_are_valid checks a required translated field at the site's default locale, not the ambient one" do
+    with_locales(%w[de en], default: "de")
+
+    with_test_types do
+      block = @page.content_blocks.build(block_type: "test/quote", position: 0)
+      block.assign_settings({ "text" => "Hallo" }, locale: "de")
+
+      assert block.valid?, block.errors.full_messages.to_sentence
+    end
   end
 end
