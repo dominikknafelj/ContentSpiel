@@ -1,15 +1,22 @@
+<% content_for :preview_banner, render("layouts/public/preview_banner") if @preview_status %>
 <%= render "pages/seo_meta", page: @page, post: @post %>
 <%# The page's own heading and, for a landing page, its hero fields -- skipped
     at a post's own detail view, since content_blocks/_post_list_detail
     already renders that post's title as the response's one <h1>. %>
 <% if @post.nil? %>
-  <h1><%= @page.title %></h1>
-  <% if @page.landing? %>
-    <% if @page.subtitle.present? %>
-      <p class="subtitle"><%= @page.subtitle %></p>
+  <header class="mb-12">
+    <% if @page.root? && theme_site.tagline.present? %>
+      <p class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= theme_site.tagline %></p>
     <% end %>
-    <%= image_tag @page.hero_image if @page.hero_image.attached? %>
-  <% end %>
+    <h1 class="mt-3 font-semibold leading-tight tracking-tight <%= @page.root? ? "text-display" : "text-h1" %>"><%= translated(@page, :title) %></h1>
+    <% if @page.landing? %>
+      <% subtitle = translated(@page, :subtitle) %>
+      <% if subtitle.present? %>
+        <p class="subtitle mt-4 max-w-2xl text-lg text-dim"><%= subtitle %></p>
+      <% end %>
+      <%= image_tag @page.hero_image, alt: translated(@page, :hero_alt).to_s, class: "mt-8 w-full rounded-cs" if @page.hero_image.attached? %>
+    <% end %>
+  </header>
 <% end %>
 <%# A page's body is its blocks in `position` order (the association is ordered),
     each rendered by the partial named after its own block_type.
@@ -31,10 +38,10 @@
     makes clicking from a page down into its children possible at all.
     Published only, matching every other public listing on this site. %>
 <% if @page.children.published.any? %>
-  <nav class="page-children">
-    <ul>
+  <nav class="page-children mt-12 border-t border-line pt-6">
+    <ul class="space-y-2">
       <% @page.children.published.each do |child| %>
-        <li><%= link_to child.title, page_url_path(child) %></li>
+        <li><%= link_to translated(child, :title), page_url_path(child), class: "text-accent underline underline-offset-2 hover:text-accent-hover" %></li>
       <% end %>
     </ul>
   </nav>

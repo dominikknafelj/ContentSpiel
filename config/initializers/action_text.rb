@@ -1,24 +1,31 @@
 # ActionText's own sanitizer (ActionText::ContentHelper, run on every rendered
-# rich text body) safe-lists tags the same way Rails::HTML::Sanitizer does
-# everywhere else -- `iframe` isn't on that list by default, so YoutubeEmbed's
+# rich text body) needs `iframe` widened onto its safe-list, or YoutubeEmbed's
 # partial (app/views/youtube_embeds/_youtube_embed.html.erb) would render an
 # empty wrapper with the iframe itself silently stripped.
 #
-# Widening the safe-list app-wide rather than scoping it to YoutubeEmbed is an
-# acceptable trade here, not a blanket loosening: every rich text body in this
-# app (Post, Page, ContentBlock) is authored by the single Avo-authenticated
-# admin (design spec section 3), not public/untrusted input, and the `src` an
-# iframe can actually carry is never taken verbatim from that input --
-# YoutubeEmbed#video_id is validated against an 11-character id pattern before
-# it ever reaches the partial, so the URL a rendered iframe points at is always
-# one this app constructed itself.
+# This used to widen that safe-list via ContentHelper.allowed_tags/
+# allowed_attributes and claim the `src` an iframe carries is never taken
+# from input -- that claim was false: a rich text body is authored HTML, not
+# safe input. MCP's `body` param takes it raw, and the Trix editor's paste
+# fallback isn't guaranteed to route every iframe through YoutubeEmbed, so
+# `<iframe src="https://evil.example/">` in a Post/Page/ContentBlock body
+# would have rendered on the public site untouched.
+#
+# It's also moot: ActionText::ContentHelper#sanitize_action_text_content
+# always passes :tags/:attributes *and* :scrubber to
+# Rails::HTML::Sanitizer#sanitize, and rails-html-sanitizer's own
+# Sanitizer#scrub ignores :tags/:attributes entirely whenever a :scrubber is
+# present (see Rails::HTML4::Scrubber#scrub in rails-html-sanitizer) -- so
+# once a scrubber is installed below, ContentHelper.allowed_tags/
+# allowed_attributes would never even be consulted.
+#
+# RichTextScrubber (app/sanitizers/rich_text_scrubber.rb) is the real
+# defence: it carries the same widened safe-list this file used to set, plus
+# a per-node check an attribute allow-list can't express -- an iframe
+# survives only if its `src` is exactly a youtube-nocookie embed URL for an
+# 11-character video id, the one shape the partial above ever builds, and it
+# has no `srcdoc` at all. Everything else about the safe-list (default tags/
+# attributes, the attachment tag, figure/figcaption) is unchanged.
 Rails.application.config.to_prepare do
-  ActionText::ContentHelper.allowed_tags =
-    ActionText::ContentHelper.sanitizer.class.allowed_tags +
-    [ ActionText::Attachment.tag_name, "figure", "figcaption", "iframe" ]
-
-  ActionText::ContentHelper.allowed_attributes =
-    ActionText::ContentHelper.sanitizer.class.allowed_attributes +
-    ActionText::Attachment::ATTRIBUTES +
-    %w[frameborder allow allowfullscreen referrerpolicy]
+  ActionText::ContentHelper.scrubber = RichTextScrubber.new
 end

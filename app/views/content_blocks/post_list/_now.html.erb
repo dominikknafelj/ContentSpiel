@@ -1,0 +1,10 @@
+<% latest = posts.first %>
+<% if latest %>
+  <div class="grid gap-6 md:grid-cols-[10rem_1fr]">
+    <div class="font-cs-mono text-label uppercase tracking-mono text-meta">
+      <p>Now</p>
+      <p>Updated <%= post_date(latest) %></p>
+    </div>
+    <div class="cs-prose text-lg"><%= latest.body %></div>
+  </div>
+<% end %>

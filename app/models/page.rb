@@ -1,5 +1,7 @@
 class Page < ApplicationRecord
   extend Mobility
+  include SlugGeneration
+  include Publishable
 
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
@@ -16,8 +18,10 @@ class Page < ApplicationRecord
   has_closure_tree order: "position", numeric_order: true, dependent: :restrict_with_error
 
   # jsonb columns holding one value per locale; reading or writing them goes
-  # through the current Mobility.locale.
-  translates :title, :slug, :subtitle, :meta_title, :meta_description
+  # through the current Mobility.locale. `hero_alt` is the alt text for
+  # whichever hero image the page's theme renders, translated for the same
+  # reason every other piece of editor-facing copy here is.
+  translates :title, :slug, :subtitle, :meta_title, :meta_description, :hero_alt
 
   # A page's body is an ordered list of blocks; the renderer walks them in
   # `position` order and dispatches on each one's `block_type`.
@@ -38,12 +42,6 @@ class Page < ApplicationRecord
   has_one_attached :hero_image
 
   enum :page_type, { standard: 0, landing: 1 }
-
-  # What the public site is allowed to serve. A beginless range compiles to
-  # `published_at <= now()`, which drops both drafts (NULL, since every SQL
-  # comparison with NULL is NULL rather than true) and pages scheduled for a
-  # future date -- the same rule a post_list block applies to its Posts.
-  scope :published, -> { where(published_at: ..Time.current) }
 
   validates :title, presence: true
 
@@ -141,8 +139,11 @@ class Page < ApplicationRecord
   # later `.order` added for some other reason, would quietly withdraw it.
   # (The slug presence validation above is what actually keeps two pages off
   # one path; this is the tiebreak for a collision arriving some other way.)
-  def self.find_by_full_path(locale, path)
-    published.where("cached_paths ->> ? = ?", locale.to_s, path).order(:id).first
+  #
+  # Preview (signed-in editors) passes `include_unpublished: true`.
+  def self.find_by_full_path(locale, path, include_unpublished: false)
+    scope = include_unpublished ? all : published
+    scope.where("cached_paths ->> ? = ?", locale.to_s, path).order(:id).first
   end
 
   protected
@@ -190,6 +191,11 @@ class Page < ApplicationRecord
   end
 
   private
+
+  # The homepage's slug is "" by design (see `path_segment_pages`).
+  def generates_slugs?
+    parent_id.present?
+  end
 
   # closure_tree's own `after_save` reloads this record as part of renumbering,
   # which is what takes the requested number back out of reach of the callback
@@ -296,7 +302,12 @@ class Page < ApplicationRecord
 
       # Reported against `slug_de` rather than `slug`, so the admin form marks
       # the offending locale's tab instead of an ambient field nobody edits.
-      errors.add(accessor, :taken) if taken
+      #
+      # The message itself names the locale too, not just the field: a slug
+      # here can arrive via `SlugGeneration`'s default-locale fallback rather
+      # than anything the editor typed into this tab (Task 8c), so "has
+      # already been taken" alone would send them looking at the wrong one.
+      errors.add(accessor, :taken, message: "has already been taken in #{locale.to_s.upcase}") if taken
     end
   end
 

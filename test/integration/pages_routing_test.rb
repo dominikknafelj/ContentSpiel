@@ -139,14 +139,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_response :success
-    assert_includes response.body, "<title>Home</title>"
+    assert_includes response.body, "<title>Test Site</title>"
 
     # Not only an absent override: one the admin typed and then cleared is just
     # as blank, and must fall back the same way rather than emptying the title.
     get "/about"
 
     assert_response :success
-    assert_includes response.body, "<title>About</title>"
+    assert_includes response.body, "<title>About – Test Site</title>"
   end
 
   # A page with neither a meta_description nor (below) a post to describe emits
@@ -189,7 +189,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/blog/#{post.slug}"
 
     assert_response :success
-    assert_includes response.body, "<title>My First Post</title>"
+    assert_includes response.body, "<title>My First Post – Test Site</title>"
     assert_includes response.body, %(<meta name="description" content="A short summary.")
     assert_includes response.body, %(<meta property="og:type" content="article")
     assert_not_includes response.body, "Everything I&#39;ve written."
@@ -208,6 +208,8 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/de/ueber-uns"
 
     assert_response :success
+    # meta_title is an explicit override, taken as written -- same rule as the
+    # "ContentSpiel — Home" case above, so no " – Test Site" suffix here either.
     assert_includes response.body, "<title>Ueber mich</title>"
     assert_includes response.body, %(<meta name="description" content="Wer ich bin.")
     assert_includes response.body, %(<meta property="og:locale" content="de")
@@ -556,7 +558,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_response :success
-    assert_includes response.body, "<h1>Welcome</h1>"
+    assert_includes response.body, ">Welcome</h1>"
     assert_includes response.body, "A warm welcome"
     assert_match(/<img[^>]*src="[^"]*hero/, response.body)
   end
@@ -589,7 +591,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_not_includes response.body, "<h1>Blog</h1>"
-    assert_includes response.body, "<h1>My First Post</h1>"
+    assert_includes response.body, ">My First Post</h1>"
   end
 
   # Before this, the page tree and every post permalink existed only for a

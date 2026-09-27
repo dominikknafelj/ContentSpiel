@@ -48,6 +48,41 @@ class DefaultLocaleTest < ActionDispatch::IntegrationTest
     assert_equal "/en/about", view.page_url_path(@about, :en)
   end
 
+  # Task 8c / code-structure review finding #2: before this fix, a page
+  # titled only in the site's default locale left every other locale's slug
+  # blank, and a blank non-root slug collapses onto the parent's path
+  # (page.rb's own comment on `validates :slug` walks through the
+  # two-pages-one-URL collision that produces). Here the default locale is
+  # German and the new child is titled only in German, so English and
+  # Spanish are the locales that would have collapsed onto @root's path --
+  # "/en" and "/es" -- instead of getting a path of their own.
+  test "a page titled only in the default locale still gets its own path in every other locale" do
+    kontakt = Mobility.with_locale(:de) do
+      Page.create!(page_type: :standard, title: "Kontakt", parent: @root, published_at: Time.current)
+    end
+
+    # The slug (this task's fix) is what's under test -- reading the title
+    # back through Mobility's own fixed-:en fallback is a separate, explicitly
+    # out-of-scope concern (task brief), so this doesn't assert on rendered
+    # German copy showing up on an English page.
+    assert_not_equal @root.full_path(:en), kontakt.full_path(:en)
+    assert_not_equal @root.full_path(:es), kontakt.full_path(:es)
+    assert_equal "/en/kontakt", ApplicationController.new.view_context.page_url_path(kontakt, :en)
+
+    get "/en/kontakt"
+    assert_response :success
+
+    # And Home itself is unharmed: the collapse this guards against would
+    # have made Home and Kontakt both answer to "/en".
+    get "/en"
+    assert_response :success
+    assert_includes response.body, "Home"
+
+    get "/"
+    assert_response :success
+    assert_includes response.body, "Home"
+  end
+
   test "the sitemap swaps which locale is unprefixed" do
     require "sitemap_generator"
     require "tmpdir"

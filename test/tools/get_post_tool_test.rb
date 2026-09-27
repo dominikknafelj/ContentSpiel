@@ -20,6 +20,16 @@ class GetPostToolTest < ActiveSupport::TestCase
     assert_includes data["body"], "Full content"
   end
 
+  test "includes status alongside published" do
+    scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", published_at: 3.days.from_now)
+
+    response = call_tool(id: scheduled.id)
+
+    data = JSON.parse(response.content.first[:text])
+    assert_equal true, data["published"]
+    assert_equal "scheduled", data["status"]
+  end
+
   test "reads the body in the given locale" do
     post = Post.create!(content_type: :blog, title: "English", body: "<p>English body</p>")
     Mobility.with_locale(:de) { post.update!(body: "<p>Deutscher Text</p>") }

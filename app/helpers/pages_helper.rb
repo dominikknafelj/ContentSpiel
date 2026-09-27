@@ -12,13 +12,13 @@ module PagesHelper
   # title has to describe that post -- otherwise every post under a listing
   # shares the listing page's title, which is the opposite of per-page SEO.
   def seo_title(page, post: nil)
-    post&.title.presence || page.meta_title.presence || page.title
+    translated(post, :title).presence || translated(page, :meta_title).presence || translated(page, :title)
   end
 
   # nil rather than "" when there is nothing to say: the caller omits the tag
   # entirely, since an empty description is worse for a search result than none.
   def seo_description(page, post: nil)
-    post&.excerpt.presence || page.meta_description.presence
+    translated(post, :excerpt).presence || translated(page, :meta_description).presence
   end
 
   # The URL `page` resolves at in `locale` -- the locale segment
@@ -40,6 +40,17 @@ module PagesHelper
     path = page.full_path(locale)
     path = "" if path == "/"
     "#{locale_prefix(locale)}#{path}/#{post.slug}"
+  end
+
+  # "<page or post> – <site>" in the browser tab; the homepage is the site
+  # name alone, and an explicit meta title is taken as written.
+  def document_title(page, post: nil)
+    site_title = SiteSetting.instance.title
+    meta_title = translated(page, :meta_title)
+    return meta_title if post.nil? && meta_title.present?
+    return site_title if post.nil? && page.root?
+
+    "#{seo_title(page, post: post)} – #{site_title}"
   end
 
   private

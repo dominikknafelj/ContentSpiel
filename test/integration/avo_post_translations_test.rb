@@ -122,8 +122,15 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "has already been taken"
 
     # `slug_de` reads the literal German value; plain `slug` would fall back to
-    # the English one and pass no matter what.
-    assert_nil Post.find(@post.id).slug_de,
+    # the English one and pass no matter what. It's "hello-world", not nil or
+    # "hallo-welt": the setup block's `Post.create!` (English title only, at
+    # that point) already gave every untitled locale -- German included -- a
+    # slug from that English title (Task 8c's default-locale fallback), and
+    # `SlugGeneration` never overwrites an existing slug, so the setup
+    # block's later `update!(title: "Hallo Welt", ...)` left it alone. The
+    # point here is that the rejected submission didn't overwrite it with
+    # "belegt" either.
+    assert_equal "hello-world", Post.find(@post.id).slug_de,
       "the duplicate German slug must not have been written"
   end
 

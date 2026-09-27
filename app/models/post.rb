@@ -1,5 +1,7 @@
 class Post < ApplicationRecord
   extend Mobility
+  include SlugGeneration
+  include Publishable
 
   # `title`, `slug` and `excerpt` are jsonb columns holding one value per
   # locale; reading or writing them goes through the current Mobility.locale.
@@ -24,18 +26,21 @@ class Post < ApplicationRecord
 
   enum :content_type, { blog: 0, resume_entry: 1, now_update: 2 }
 
-  # What the public site is allowed to serve, in a listing or at a permalink.
-  # A beginless range compiles to `published_at <= now()`, which drops both
-  # drafts (NULL, since every SQL comparison with NULL is NULL rather than
-  # true) and posts scheduled for a future date -- the same rule `Page` applies
-  # to itself.
-  scope :published, -> { where(published_at: ..Time.current) }
+  # Resume entries' structured fields (spec §10.3), kept in the existing
+  # `metadata` jsonb so no migration is needed and other content types ignore
+  # them. Dates stay ISO strings ("2023-01-01"); an empty end date means
+  # "current role".
+  ROLE_TYPES = {
+    "ic" => "Individual contributor", "lead" => "Lead",
+    "manager" => "Manager", "freelance" => "Freelance"
+  }.freeze
+
+  store_accessor :metadata, :company, :role, :start_date, :end_date, :role_type
 
   validates :title, presence: true
   validates :slug, presence: true
+  validates :role_type, inclusion: { in: ROLE_TYPES.keys }, allow_blank: true
   validate :slug_is_unused_in_every_locale
-
-  before_validation :generate_slug_from_title, on: :create
 
   # The post whose slug in `locale` is `slug` -- as a visitor reading the site
   # in that locale sees it, meaning *through* Mobility's fallbacks, exactly the
@@ -73,10 +78,6 @@ class Post < ApplicationRecord
 
   private
 
-  def generate_slug_from_title
-    self.slug = title.to_s.parameterize if slug.blank? && title.present?
-  end
-
   # `validates :slug, uniqueness:` would emit `WHERE posts.slug = 'hello'`,
   # comparing a jsonb column to a string -- which Postgres rejects outright.
   # Mobility's `.i18n` scope rewrites the condition into a lookup of one
@@ -110,7 +111,12 @@ class Post < ApplicationRecord
 
       # Reported against `slug_de` rather than `slug`, so the admin form marks
       # the offending locale's tab instead of an ambient field nobody edits.
-      errors.add(accessor, :taken) if taken
+      #
+      # The message itself names the locale too, not just the field: a slug
+      # here can arrive via `SlugGeneration`'s default-locale fallback rather
+      # than anything the editor typed into this tab (Task 8c), so "has
+      # already been taken" alone would send them looking at the wrong one.
+      errors.add(accessor, :taken, message: "has already been taken in #{locale.to_s.upcase}") if taken
     end
   end
 end

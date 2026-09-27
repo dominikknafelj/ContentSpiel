@@ -1,0 +1,22 @@
+<footer class="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-line py-6 font-cs-mono text-label uppercase tracking-mono text-meta">
+  <p>© <%= Time.current.year %> <%= theme_site.title %></p>
+  <% links = safe_social_links %>
+  <% if links.any? %>
+    <ul class="flex flex-wrap gap-4">
+      <% links.each do |name, url| %>
+        <li><%= link_to name, url, rel: "me noopener", class: "hover:text-ink" %></li>
+      <% end %>
+    </ul>
+  <% end %>
+  <%# Only a signed-in editor gets this link (spec §10.4) -- the public site
+      has no accounts of its own, so its mere presence already tells a
+      visitor whether they're signed in, which is fine: it names no content
+      the anonymous response above it didn't already render. %>
+  <% if authenticated? && @page %>
+    <% record = @post || @page %>
+    <%= link_to (@post ? "Edit this post" : "Edit this page"),
+          (@post ? avo.edit_resources_post_path(record) : avo.edit_resources_page_path(record)),
+          class: "hover:text-ink" %>
+  <% end %>
+  <%= render "shared/theme_toggle" %>
+</footer>

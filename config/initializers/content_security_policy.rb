@@ -4,26 +4,24 @@
 # See the Securing Rails Applications Guide for more information:
 # https://guides.rubyonrails.org/security.html#content-security-policy-header
 
-# Rails.application.configure do
-#   config.content_security_policy do |policy|
-#     policy.default_src :self, :https
-#     policy.font_src    :self, :https, :data
-#     policy.img_src     :self, :https, :data
-#     policy.object_src  :none
-#     policy.script_src  :self, :https
-#     policy.style_src   :self, :https
-#     # Specify URI for violation reports
-#     # policy.report_uri "/csp-violation-report-endpoint"
-#   end
+# Deliberately narrow (structure review #37): this backstops
+# RichTextScrubber (app/sanitizers/rich_text_scrubber.rb) -- even if a rogue
+# iframe ever slipped past that scrubber, the browser itself would still
+# refuse to load a frame from anywhere but this app or youtube-nocookie.com.
+# `object_src`/`base_uri` close the two other classic injection vectors
+# (a plugin embed, a <base> tag rewriting relative URLs) at effectively no
+# cost to anything the app already does.
 #
-#   # Generate session nonces for permitted importmap, inline scripts, and inline styles.
-#   config.content_security_policy_nonce_generator = ->(request) { request.session.id.to_s }
-#   config.content_security_policy_nonce_directives = %w(script-src style-src)
-#
-#   # Automatically add `nonce` to `javascript_tag`, `javascript_include_tag`, and `stylesheet_link_tag`
-#   # if the corresponding directives are specified in `content_security_policy_nonce_directives`.
-#   # config.content_security_policy_nonce_auto = true
-#
-#   # Report violations without enforcing the policy.
-#   # config.content_security_policy_report_only = true
-# end
+# script-src/style-src/default-src are intentionally NOT set here: import
+# maps, Avo's admin, and inline scripts throughout this app all assume an
+# unconstrained policy today, and locking those down is a separate, larger
+# roadmap item -- setting them now would break the app, not harden it. No
+# nonce generator is configured for the same reason: nothing here needs one
+# yet.
+Rails.application.configure do
+  config.content_security_policy do |policy|
+    policy.frame_src  :self, "https://www.youtube-nocookie.com"
+    policy.object_src :none
+    policy.base_uri   :self
+  end
+end

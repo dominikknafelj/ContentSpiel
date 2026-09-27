@@ -6,11 +6,13 @@
 class ContentBlock < ApplicationRecord
   extend Mobility
 
-  # A jsonb column holding one caption per locale; reading or writing it goes
-  # through the current Mobility.locale. (`backend: :jsonb` is the app-wide
-  # default set in config/initializers/mobility.rb, so it isn't repeated here --
-  # same as Post's and Page's translated plain-text attributes.)
-  translates :caption
+  # jsonb columns holding one caption/alt text per locale; reading or writing
+  # them goes through the current Mobility.locale. (`backend: :jsonb` is the
+  # app-wide default set in config/initializers/mobility.rb, so it isn't
+  # repeated here -- same as Post's and Page's translated plain-text
+  # attributes.) `alt` only makes sense for `image` blocks, but it's declared
+  # unconditionally since Mobility attributes are defined at class-load time.
+  translates :caption, :alt
 
   # Rich text can't live in a jsonb column -- it has attachments and its own
   # table -- so `body` uses mobility-actiontext, which keeps one
@@ -59,11 +61,19 @@ class ContentBlock < ApplicationRecord
   # admin. It must therefore never reach `where`: `posts.content_type` is NOT
   # NULL, so `where(content_type: nil)` compiles to `content_type IS NULL` and
   # the block silently lists nothing at all.
-  def listed_posts
-    scope = Post.published
+  def listed_posts(include_unpublished: false)
+    scope = include_unpublished ? Post.all : Post.published
     content_type = settings["content_type"]
+    scope = scope.where(content_type: content_type) if content_type.present?
 
-    content_type.present? ? scope.where(content_type: content_type) : scope
+    # Tag names are matched case-insensitively: editors type "Rails" for a tag
+    # stored as "rails". Trim to handle pasted tags with surrounding whitespace.
+    tag = settings["tag"].to_s.strip
+    if tag.present?
+      scope = scope.where(id: PostTag.joins(:tag).where("LOWER(tags.name) = ?", tag.downcase).select(:post_id))
+    end
+
+    scope
   end
 
   private

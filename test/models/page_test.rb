@@ -83,9 +83,12 @@ class PageTest < ActiveSupport::TestCase
   # drops blank segments, so the page's cached_paths come out identical to its
   # parent's and two pages end up claiming one URL -- for a child of the root,
   # the homepage's "/". Only one of the two can ever be served.
+  # No title, since a title present in any locale would now have its slug
+  # filled in automatically by `SlugGeneration` -- this has to be a page with
+  # no title at all to still exercise the blank-slug case.
   test "a non-root page requires a slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    slugless = Page.new(page_type: :standard, title: "Oops", parent: root)
+    slugless = Page.new(page_type: :standard, parent: root)
 
     assert_not slugless.valid?
     assert_includes slugless.errors[:slug], "can't be blank"
@@ -94,11 +97,14 @@ class PageTest < ActiveSupport::TestCase
   # The failure the validation exists to prevent, stated as the outcome rather
   # than as the error message: no second page may end up holding the
   # homepage's path, and `/` must still belong to the homepage.
+  #
+  # No title, for the same reason as above: a title would get this page an
+  # auto-generated slug and the create would succeed.
   test "a slugless child cannot be saved onto its parent's path" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
 
     assert_raises(ActiveRecord::RecordInvalid) do
-      Page.create!(page_type: :standard, title: "Oops", parent: root, published_at: Time.current)
+      Page.create!(page_type: :standard, parent: root, published_at: Time.current)
     end
 
     assert_equal [ root ], Page.where("cached_paths ->> 'en' = '/'").to_a
@@ -117,13 +123,85 @@ class PageTest < ActiveSupport::TestCase
 
   # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
   # so it has to be blank here too -- otherwise " " passes validation and
-  # produces the very collision above.
+  # produces the very collision above. No title: with one present,
+  # `SlugGeneration` would treat "   " as not-yet-set (it's blank) and
+  # overwrite it with a title-derived slug before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    blank = Page.new(page_type: :standard, title: "Oops", slug: "   ", parent: root)
+    blank = Page.new(page_type: :standard, slug: "   ", parent: root)
 
     assert_not blank.valid?
     assert_includes blank.errors[:slug], "can't be blank"
+  end
+
+  # Task 8c / code-structure review finding #2: a page titled in only one
+  # locale used to leave every other locale's slug blank, and a blank
+  # non-root slug collapses onto the parent's path (see this file's own
+  # comment above `validates :slug` for the two-pages-one-URL bug that
+  # produces). SlugGeneration now fills an untitled locale's slug from the
+  # site's default-locale title instead, so the site's own default locale --
+  # not the app's fixed English default -- decides the fallback.
+  test "slugs for untitled locales fall back to the site's default-locale title" do
+    SiteSetting.instance.update!(default_locale: "de")
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    child = Mobility.with_locale(:de) { Page.create!(page_type: :standard, title: "Über uns", parent: root) }
+
+    assert_equal "uber-uns", child.slug_en
+    assert_equal "uber-uns", child.slug_es
+    assert_not_equal root.full_path(:en), child.full_path(:en)
+  end
+
+  # When even the default locale has no title, a blank slug is still the wrong
+  # answer -- the fallback has to be *some* present title, so it walks
+  # Mobility.available_locales and takes the first one it finds.
+  test "slugs fall back to the first present title when the default locale has none" do
+    SiteSetting.instance.update!(default_locale: "de")
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    child = Mobility.with_locale(:es) { Page.create!(page_type: :standard, title: "Sobre Nosotros", parent: root) }
+
+    assert_equal "sobre-nosotros", child.slug_en
+    assert_equal "sobre-nosotros", child.slug_de
+  end
+
+  # The fallback only ever fills a *blank* slug -- an explicit one, even one
+  # written in a locale other than the page's title, is left alone.
+  test "an explicitly set slug is kept even when the default-locale fallback would differ" do
+    SiteSetting.instance.update!(default_locale: "de")
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+
+    child = Mobility.with_locale(:de) do
+      Page.create!(page_type: :standard, title: "Über uns", slug_en: "who-we-are", parent: root)
+    end
+
+    assert_equal "who-we-are", child.slug_en
+  end
+
+  # The fallback can produce a genuine collision, not just a hypothetical one:
+  # two siblings can each want the same borrowed slug in a locale neither of
+  # them was actually titled in. `slug_is_unused_among_siblings_in_every_locale`
+  # (above) still catches it -- reported against `slug_en`, the locale that
+  # actually clashes, with a message that names it so an editor filling in a
+  # default-locale-only page knows which tab to open.
+  test "a fallback-filled slug can produce a real collision, reported against the locale it clashes in" do
+    SiteSetting.instance.update!(default_locale: "de")
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    Page.create!(page_type: :standard, title_en: "Team", slug_en: "team", title_de: "Mannschaft", parent: root)
+
+    clashing = Mobility.with_locale(:de) { Page.new(page_type: :standard, title: "Team", parent: root) }
+
+    # Ambient :de throughout: `clashing` is only titled in German, so title
+    # presence (a separate, unrelated validation) would otherwise fail under
+    # the default :en and mask the assertions this test actually cares about.
+    Mobility.with_locale(:de) do
+      assert_not clashing.valid?
+      assert_includes clashing.errors[:slug_en], "has already been taken in EN"
+      assert_empty clashing.errors[:slug_de], "the pages only clash in English, not German"
+
+      clashing.slug_en = "team-2"
+      assert clashing.valid?, clashing.errors.full_messages.inspect
+    end
   end
 
   # The slug validation above closes the route by which two pages could come to
@@ -159,7 +237,7 @@ class PageTest < ActiveSupport::TestCase
     assert_not duplicate.valid?
     # Attributed to the locale that actually collides, so the admin form can
     # mark that locale's tab.
-    assert_includes duplicate.errors[:slug_en], "has already been taken"
+    assert_includes duplicate.errors[:slug_en], "has already been taken in EN"
   end
 
   test "the same slug is allowed under a different parent" do
@@ -174,7 +252,12 @@ class PageTest < ActiveSupport::TestCase
 
   test "the same slug is allowed among siblings in different locales" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    # A German title of its own, so its real German slug is "kontakt" rather
+    # than a default-locale fallback of "about" -- otherwise this sibling
+    # would already hold "about" in German too (Task 8c), and the collision
+    # below would be a real one instead of the false one this test guards
+    # against.
+    Page.create!(page_type: :standard, title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
 
     Mobility.with_locale(:de) do
       other = Page.new(page_type: :standard, title: "Ueber uns", slug: "about", parent: root)
@@ -195,22 +278,34 @@ class PageTest < ActiveSupport::TestCase
     duplicate.slug_de = "ueber-uns"
 
     assert_not duplicate.valid?
-    assert_includes duplicate.errors[:slug_de], "has already been taken"
+    assert_includes duplicate.errors[:slug_de], "has already been taken in DE"
     assert_empty duplicate.errors[:slug_en]
   end
 
   # Reading `slug` in a locale the page has no slug for returns the English one
-  # via fallback. Validating *that* string as if it were the German slug makes
-  # a page collide with a German slug it does not actually have.
-  test "a page with no slug in the current locale is not blocked by a sibling's slug there" do
+  # via fallback. Validating *that* string as if it were the German slug would
+  # collide a page with a German slug it does not actually have -- which is
+  # exactly why the validation below reads the literal per-locale accessor and
+  # skips a genuinely blank one, rather than reading through Mobility's
+  # fallback.
+  #
+  # Task 8c means a *titled* page can no longer reach this validation with a
+  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # title the moment any title exists anywhere on the page. `update_columns`
+  # forces the untitled, pre-fill state a row predating that feature (or a
+  # bulk import) could still be in, the same way the "bypassed" tests further
+  # down force other pre/post-validation states.
+  test "a page with no slug anywhere is not blocked by a sibling's slug in the current locale" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    english_only = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    untitled = Page.create!(page_type: :standard, title: "Placeholder", parent: root)
+    untitled.update_columns(title: {}, slug: {})
     german = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root)
     Mobility.with_locale(:de) { german.update!(slug: "about") }
 
     Mobility.with_locale(:de) do
-      assert english_only.valid?,
-        "a page without a German slug must not collide on a sibling's German slug"
+      untitled.valid?
+      assert_empty untitled.errors[:slug_de],
+        "a page without a German slug of its own must not collide on a sibling's German slug"
     end
   end
 
@@ -317,7 +412,11 @@ class PageTest < ActiveSupport::TestCase
 
   test "the database allows the same sibling slug in two different locales" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
+    # A German title of its own, so "about" isn't also this sibling's real
+    # German slug (Task 8c's default-locale fallback would otherwise put it
+    # there) -- the point here is the *other* page's German slug, not a
+    # same-locale collision with this one.
+    Page.create!(page_type: :standard, title_en: "About", slug_en: "about", title_de: "Kontakt", parent: root)
     other = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root)
 
     other.update_column(:slug, { "en" => "contact", "de" => "about" })

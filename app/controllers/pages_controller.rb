@@ -44,12 +44,16 @@ class PagesController < ApplicationController
   around_action :render_in_requested_locale
 
   def show
-    @page = Page.find_by_full_path(effective_locale, requested_path)
-    return render :show if @page
+    @page = Page.find_by_full_path(effective_locale, requested_path, include_unpublished: preview_allowed?)
+    if @page
+      mark_preview
+      return render :show
+    end
 
     resolve_post_detail
 
     if @post
+      mark_preview
       render :show
     else
       render plain: "Not Found", status: :not_found
@@ -57,6 +61,20 @@ class PagesController < ApplicationController
   end
 
   private
+
+  # Signed-in editors see unpublished pages and posts at their real URL
+  # (spec §10.4); everyone else keeps getting 404 from the published scopes.
+  def preview_allowed?
+    return @preview_allowed if defined?(@preview_allowed)
+
+    @preview_allowed = authenticated?.present?
+  end
+
+  # A preview must never be cached: it shows content visitors can't see.
+  def mark_preview
+    @preview_status = [ (@post || @page).status, @page.status ].find { |status| status != "live" }
+    response.set_header("Cache-Control", "no-store") if @preview_status
+  end
 
   # No path matched a page. A `Post` has no page-tree node of its own (spec
   # section 4), so its permalink is the listing page's path plus its slug:
@@ -70,7 +88,7 @@ class PagesController < ApplicationController
   def resolve_post_detail
     parent_path, _, candidate_slug = requested_path.rpartition("/")
 
-    @page = Page.find_by_full_path(effective_locale, parent_path.presence || "/")
+    @page = Page.find_by_full_path(effective_locale, parent_path.presence || "/", include_unpublished: preview_allowed?)
 
     # The page's first listing block in `position` order (the association is
     # ordered), which for every page the spec describes is its only one.
@@ -82,7 +100,7 @@ class PagesController < ApplicationController
     # applied -- it trims how much of the list is shown, not which posts the
     # page is responsible for, which is why it lives in the partial rather than
     # in `listed_posts`.)
-    @post = @post_list_block.listed_posts
+    @post = @post_list_block.listed_posts(include_unpublished: preview_allowed?)
       .find_by_localized_slug(effective_locale, candidate_slug)
   end
 

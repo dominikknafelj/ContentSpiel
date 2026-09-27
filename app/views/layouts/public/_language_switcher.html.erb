@@ -1,0 +1,26 @@
+<%# Up to three languages as inline codes; more collapse into a <details>
+    menu, which needs no JavaScript. %>
+<% links = language_links(@page, @post) %>
+<% if links.size > 1 %>
+  <% if links.size <= 3 %>
+    <ul aria-label="Language" class="flex items-center gap-1 font-cs-mono text-label uppercase tracking-mono">
+      <% links.each do |link| %>
+        <li>
+          <%= link_to link.code, link.path, hreflang: link.code, lang: link.code,
+                aria: { current: ("true" if link.current) },
+                class: link.current ? "rounded-cs bg-ink px-1.5 py-0.5 text-paper" : "rounded-cs px-1.5 py-0.5 text-dim hover:text-ink" %>
+        </li>
+      <% end %>
+    </ul>
+  <% else %>
+    <details class="relative font-cs-mono text-label uppercase tracking-mono">
+      <summary class="cursor-pointer text-dim hover:text-ink"><%= I18n.locale %></summary>
+      <ul aria-label="Language" class="absolute right-0 z-10 mt-2 rounded-cs border border-line bg-surface p-2 shadow-menu">
+        <% links.each do |link| %>
+          <li><%= link_to link.name, link.path, hreflang: link.code, lang: link.code,
+                    aria: { current: ("true" if link.current) }, class: "block px-2 py-1 hover:text-ink" %></li>
+        <% end %>
+      </ul>
+    </details>
+  <% end %>
+<% end %>

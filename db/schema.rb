@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_26_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_27_090000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -65,6 +65,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_120000) do
   end
 
   create_table "content_blocks", force: :cascade do |t|
+    t.jsonb "alt", default: {}, null: false
     t.integer "block_type", null: false
     t.jsonb "caption", default: {}, null: false
     t.datetime "created_at", null: false
@@ -87,6 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_120000) do
   create_table "pages", force: :cascade do |t|
     t.jsonb "cached_paths", default: {}, null: false
     t.datetime "created_at", null: false
+    t.jsonb "hero_alt", default: {}, null: false
     t.jsonb "meta_description", default: {}, null: false
     t.jsonb "meta_title", default: {}, null: false
     t.integer "page_type", default: 0, null: false

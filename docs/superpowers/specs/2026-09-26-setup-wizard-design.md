@@ -277,3 +277,126 @@ become fully independent: changing one can never restyle the other.
   dropped, toggle present, blog/now/resume rows render their fields;
   existing routing/SEO tests stay green.
 - System: the theme-toggle test also covers a public page.
+
+### Additions (from the product review)
+
+- `<title>` includes the site name: `"<page or post title> – <site title>"`
+  (the homepage uses the site title alone).
+- The single-post view shows the publish date, tags and excerpt.
+
+## 10. Editor experience (added 2026-09-26)
+
+Driven by `docs/product/2026-09-26-backend-product-review.md` (a
+non-technical editor's walkthrough of the admin). Ships on the same
+branch as §9 (`editor-experience`, one PR). Everything stays within Avo
+Community — no paid add-ons.
+
+### 10.1 Bugfixes
+
+- **Slugs for every locale.** `Page` generates its slug from the title
+  like `Post` already does, and both generate a slug for **each** locale
+  that has a title but no slug (not only the ambient locale, not only on
+  create). The root page keeps its empty slug.
+- **Landing fields no longer lost on create.** The subtitle/hero fields
+  are always rendered and shown/hidden client-side (§10.4), instead of a
+  server-side `visible:` lambda that evaluates against the unsaved record.
+- **The post-list Tag setting works.** `ContentBlock#listed_posts`
+  filters by `settings["tag"]` (tag name) when present.
+
+### 10.2 Block editor (page form)
+
+Replaces the all-fields-on-every-row resource tool with an inline editor
+driven by one Stimulus controller; still Rails nested attributes, still
+one Save for the whole page.
+
+- Each row shows only its type's fields: **text** (Trix rich-text editor
+  per locale, one locale tab visible at a time), **image** (file, caption
+  and **alt text** per locale), **post list** (content type dropdown with
+  "All", tag select from existing tags, "Show up to N posts" number field).
+- Toolbar: "+ Text / + Image / + Post list" add a new row from a
+  `<template>`; ↑/↓ reorder rows and rewrite hidden `position` inputs;
+  delete marks `_destroy` and dims the row with an Undo. No position
+  number is shown.
+- New translated attribute `ContentBlock#alt` (Mobility jsonb, migration);
+  image blocks render it as the `<img alt>`.
+- Validation errors render next to their row.
+
+### 10.3 Post and page forms
+
+- **Resume entries** get typed fields — Company, Role, Start date, End
+  date (empty = current), Role type (select) — stored in `metadata` via
+  `store_accessor`; the raw metadata JSON field is removed from the form.
+  The public resume rows (§9) read these.
+- **Type-dependent fields** (resume fields on posts; subtitle + hero on
+  landing pages) are always rendered and shown/hidden by a small Stimulus
+  controller keyed on the type select.
+- `Page#hero_alt` (translated) for the hero image.
+- `Position` is removed from the page form (ordering happens in the Pages
+  tree and via siblings' defaults).
+- Enum values get human labels everywhere in Avo (content types, page
+  types, block types).
+
+### 10.4 Publishing status and preview
+
+- A `Publishable` concern (Post, Page) derives `status` from
+  `published_at`: **draft** (nil), **scheduled** (future), **live**
+  (past/now). Avo shows it as a badge on index and show views; the Pages
+  tree shows it per node (fixing "scheduled shows as published").
+- Avo actions **Publish now** (sets `published_at` to now) and
+  **Unpublish** (clears it) on posts and pages. `published_at` is
+  labelled "Publish date" with help text (empty = draft, future =
+  scheduled).
+- **Preview:** a signed-in user (valid session) can open unpublished pages
+  and posts at their normal public URL; such responses show a
+  "Preview · Draft/Scheduled — not visible to visitors" banner and send
+  `Cache-Control: no-store`. Anonymous visitors still get 404.
+- **Jump links:** "View on site" on page/post show views in Avo; "Edit
+  this page/post" link on the public site for signed-in users.
+
+### 10.5 Admin shell
+
+- A custom **Dashboard** tool is Avo's home (`config.home_path`): drafts,
+  scheduled items, recently edited pages/posts, and "New post / New page"
+  buttons.
+- The Content blocks resource is hidden from the sidebar (blocks are
+  edited inside their page); `config.app_name` is the site title; users
+  are titled by email; API tokens by user email + created date.
+- Sidebar grouping needs the paid `avo-menu` add-on and stays out.
+
+### 10.6 Connect an AI assistant (MCP)
+
+- A "Connect an AI assistant" tool page replaces the toast-only
+  "Regenerate my API token" action: a Generate button (non-Turbo form)
+  renders the raw token once with a Copy button, the MCP endpoint URL and
+  a client config snippet, with `Cache-Control: no-store`. The old action
+  is removed.
+- API tokens index hides the digest, shows status (Active/Revoked),
+  created and "last used"; a **Revoke** action replaces editing
+  `revoked_at` by hand.
+
+### 10.7 Translations
+
+- Fix the textarea that renders collapsed inside hidden locale tabs.
+- Under each non-default-locale field, show the default locale's value
+  as a hint.
+- A translation-status column on post and page indexes (e.g.
+  `EN ✓ DE – ES –`, based on title presence per locale).
+
+### 10.8 Out of scope (later)
+
+Revisions/restore, autosave, duplicate, media library, SEO snippet
+preview/OG image/hreflang/noindex, redirects, invites and roles, favicon,
+AI-created drafts, content export, automatic sitemap regeneration — plus
+everything already in §7.
+
+### 10.9 Tests
+
+- Model: slug generation per locale (pages and posts), tag filter,
+  `Publishable#status`, resume `store_accessor`s, `alt`/`hero_alt`.
+- Integration: preview (signed-in sees draft/scheduled with banner and
+  no-store; anonymous 404), Publish/Unpublish actions, dashboard and
+  "Connect an AI assistant" pages (token shown once, no-store, revoke),
+  Avo forms render without the removed technical fields, humanized labels.
+- System (Capybara): block editor — add text/image/post-list rows, type
+  into Trix, reorder, delete + undo, save, and the public page reflects it;
+  landing page create keeps subtitle; resume entry fields round-trip.
