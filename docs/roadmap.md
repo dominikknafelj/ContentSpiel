@@ -86,6 +86,8 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
 | Avo still mounted for settings, users, tokens, system status | Sub-project 3 | Sub-project 6 (remaining modules), sub-project 7 (remove Avo) |
 | Deletes are permanent | Sub-project 3 | Trash (Phase 2 / sub-project 6) |
+| CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
+| CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
 
 ## Out of scope (for now)
 
