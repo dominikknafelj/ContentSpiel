@@ -55,6 +55,14 @@ Rails.application.routes.draw do
   # get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
   # get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
 
+  # Signed-in preview of unpublished pages and posts (spec §6.4) -- its own
+  # URL space, so the public routes below can stay session-free and cacheable.
+  # Two routes for the same reason the public site has two: an optional
+  # `(/:locale)` would leave "about" in /preview/about to be read as a locale.
+  get "preview/:locale(/*path)", to: "preview#show", constraints: LocaleRouteConstraint,
+    defaults: { path: "" }, format: false, as: :localized_preview
+  get "preview(/*path)", to: "preview#show", defaults: { path: "" }, format: false, as: :preview
+
   # Every locale is reachable under its own prefix (e.g. /de/about), including
   # whichever one is currently the site's default -- but a default-locale
   # prefix isn't the *canonical* URL for that content; PagesController

@@ -2,50 +2,35 @@ require "test_helper"
 
 class PreviewTest < ActionDispatch::IntegrationTest
   setup do
-    @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    @draft = Page.create!(parent: @root, page_type: :standard, title: "Draft page")
-    @blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
-    @blog.content_blocks.create!(block_type: :post_list, position: 0)
-    @scheduled = Post.create!(content_type: :blog, title: "Coming soon", published_at: 2.days.from_now)
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    @root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    @draft = Page.create!(parent: @root, title: "Draft", published_at: nil)
   end
 
-  test "anonymous visitors get 404 for drafts and scheduled posts, in any locale" do
-    skip "moves to /preview in Task 7"
-    get "/draft-page"
-    assert_response :not_found
-    get "/de/draft-page"
-    assert_response :not_found
-    get "/blog/coming-soon"
-    assert_response :not_found
+  test "preview requires sign-in" do
+    get "/preview/draft"
+    assert_redirected_to new_session_path
   end
 
-  test "signed-in editors preview a draft page with a banner and no caching" do
-    skip "moves to /preview in Task 7"
+  test "signed-in editors preview drafts with a banner, no-store and noindex" do
     sign_in_as(users(:one))
-    get "/draft-page"
-
+    get "/preview/draft"
     assert_response :success
-    assert_includes response.body, "Preview · Draft"
-    assert_includes response.headers["Cache-Control"], "no-store"
+    assert_select "[role=status]", /Draft/
+    assert_equal "private, no-store", response.headers["Cache-Control"]
+    assert_equal "noindex", response.headers["X-Robots-Tag"]
+    assert_select "a[href=?]", "/avo/resources/pages/#{@draft.id}/edit"
   end
 
-  test "signed-in editors preview a scheduled post" do
-    skip "moves to /preview in Task 7"
+  test "links inside a preview stay in preview" do
     sign_in_as(users(:one))
-    get "/blog/coming-soon"
-
+    get "/preview/de/draft"
     assert_response :success
-    assert_includes response.body, "Preview · Scheduled"
+    assert_select "header a[href^='/preview']"
   end
 
-  test "live pages show an edit link only to signed-in editors, and no banner" do
-    skip "moves to /preview in Task 7"
-    get "/blog"
-    assert_select "a", text: "Edit this page", count: 0
-
-    sign_in_as(users(:one))
-    get "/blog"
-    assert_select "a[href='/avo/resources/pages/#{@blog.id}/edit']", text: "Edit this page"
-    assert_not_includes response.body, "Preview ·"
+  test "the public URL of a draft still 404s" do
+    get "/draft"
+    assert_response :not_found
   end
 end
