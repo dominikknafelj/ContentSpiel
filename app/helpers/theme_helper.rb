@@ -6,10 +6,10 @@ module ThemeHelper
 
   LanguageLink = Data.define(:code, :name, :path, :current)
 
-  # Memoized under a theme-specific ivar: controllers (e.g. SetupController)
-  # use @site_setting themselves.
+  # Current.site memoizes itself for the process/request; no ivar of our own
+  # needed the way SetupController's @site_setting is.
   def theme_site
-    @theme_site ||= SiteSetting.instance
+    Current.site
   end
 
   # Social links become real hrefs here for the first time, so only
@@ -51,51 +51,28 @@ module ThemeHelper
     start_year ? "#{start_year} – #{end_year}" : end_year
   end
 
-  # The current page -- or, at a permalink, the current post -- in each
-  # locale. A post's slug is read inside that locale, falling back to the
-  # default-locale slug exactly as the router does.
-  def language_links(page, post = nil)
-    return [] if page.nil?
+  # The record currently shown -- a page, or at a permalink the post itself
+  # -- in each enabled locale that has a path for it. Callers pass
+  # `@post || @page`: a post's own path already carries its canonical page's
+  # segments (`PublicSite::Paths#post_path`), so nothing here needs to know
+  # which kind of record it has.
+  def language_links(record)
+    return [] if record.nil?
 
-    I18n.available_locales.map(&:to_s).map do |code|
-      path = I18n.with_locale(code) { post ? post_url_path(page, post, code) : page_url_path(page, code) }
-      LanguageLink.new(code:, name: SetupHelper::LANGUAGE_NAMES.fetch(code, code.upcase), path:,
-        current: code == I18n.locale.to_s)
+    ::Locales.enabled.filter_map do |code|
+      path = public_urls.path_for(record, code) or next
+      LanguageLink.new(code:, name: ::Locales.name(code, native: true), path:, current: code == I18n.locale.to_s)
     end
   end
 
-  # Reads a Mobility-translated attribute for the public theme, falling back
-  # (when the current locale's own value is blank) to the *site's* runtime
-  # default locale, then to the first present locale walking
-  # Mobility.available_locales -- the exact order SlugGeneration already uses
-  # to fill a blank slug (see its comment for why: a site set up in German
-  # titles its pages only in German, and every other locale has to show
-  # *something* rather than nothing).
-  #
-  # Mobility's own `fallbacks` plugin (config/initializers/mobility.rb) falls
-  # back to a fixed I18n.default_locale (:en) -- correct for `config.i18n
-  # .fallbacks`, wrong here: a `de`-default site has nothing in :en to fall
-  # back to, and the plain reader would render blank. Passing an explicit
-  # `fallback:` list (Mobility 1.3's per-read override, see
-  # Mobility::Plugins::Fallbacks) bypasses the fixed default for this one
-  # read without touching that global config.
-  #
-  # Every public view that shows a translated title/subtitle/excerpt/caption/
-  # alt/meta field should read it through here rather than the plain Mobility
-  # accessor. Does not apply to ActionText bodies (`Page`/`Post`/
-  # `ContentBlock#body`) -- out of scope for this fix, see the fix's report.
+  # Reads a translated attribute for the public theme -- title, subtitle,
+  # excerpt, caption, alt, meta fields, and (since this task) ActionText
+  # bodies too, since a rich text block left blank in German has exactly the
+  # same "renders nothing" failure mode as a blank title. The fallback order
+  # itself now lives entirely in `Locales.fallback_chain`, so this is a thin
+  # wrapper -- kept as the call sites' entry point rather than inlined, so
+  # every public view keeps reading translated copy through one helper.
   def translated(record, attribute)
-    return nil if record.nil?
-
-    record.public_send(attribute, fallback: translated_fallback_locales)
-  end
-
-  private
-
-  def translated_fallback_locales
-    default_locale = theme_site.default_locale.to_sym
-    current_locale = I18n.locale.to_sym
-
-    ([ default_locale ] + ::Mobility.available_locales.map(&:to_sym)).uniq - [ current_locale ]
+    ::Locales.read(record, attribute)
   end
 end

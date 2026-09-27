@@ -29,7 +29,7 @@ class PostTest < ActiveSupport::TestCase
   # Task 8c / code-structure review finding #2: the same bug Page has -- a
   # post titled in only one locale used to leave every other locale's slug
   # blank, and `validates :slug, presence: true` reads through Mobility's
-  # fallback, so the post still saved even without one. SlugGeneration now
+  # fallback, so the post still saved even without one. LocalizedSlug now
   # fills an untitled locale's slug from the site's default-locale title
   # instead of leaving it blank.
   test "slugs for untitled locales fall back to the site's default-locale title" do
@@ -164,12 +164,16 @@ class PostTest < ActiveSupport::TestCase
     assert_equal({ "en" => "Hello World", "de" => "Hallo Welt" }, JSON.parse(raw["title"]))
   end
 
-  test "falls back to the default locale when a translation is missing" do
+  # Before this task, Mobility's own `fallbacks` plugin made every plain
+  # reader fall back to a fixed :en. That's gone (config/initializers
+  # /mobility.rb): the plain reader now returns the literal per-locale value,
+  # and the fallback that public views need lives in `Locales.read` instead
+  # (test/models/locales_test.rb covers it directly).
+  test "the plain reader no longer falls back to the default locale" do
     post = Post.create!(content_type: :blog, title: "Hello World")
 
-    Mobility.with_locale(:de) do
-      assert_equal "Hello World", post.title
-    end
+    assert_nil Mobility.with_locale(:de) { post.title }
+    assert_equal "Hello World", Locales.read(post, :title, locale: "de")
   end
 
   test "slug uniqueness is scoped to content_type and locale, not shared across locales" do
@@ -231,8 +235,11 @@ class PostTest < ActiveSupport::TestCase
       assert_includes reloaded.body.to_plain_text, "Hallo"
     end
     Mobility.with_locale(:es) do
-      # No Spanish body was ever written, so this is the English fallback.
-      assert_includes reloaded.body.to_plain_text, "Hi"
+      # No Spanish body was ever written, and plain readers no longer fall
+      # back to another locale (see config/initializers/mobility.rb) --
+      # that's `Locales.read`'s job now (see locales_test.rb), not the plain
+      # reader's.
+      assert_not reloaded.body.present?
     end
   end
 
@@ -272,7 +279,7 @@ class PostTest < ActiveSupport::TestCase
   # through Mobility's fallback.
   #
   # Task 8c means a *titled* post can no longer reach this validation with a
-  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # genuinely blank slug in any locale -- `LocalizedSlug` fills one from a
   # title the moment any title exists anywhere on the post. `update_columns`
   # forces the untitled, pre-fill state a row predating that feature (or a
   # bulk import) could still be in, the same way the "bypassed" tests further
@@ -285,21 +292,31 @@ class PostTest < ActiveSupport::TestCase
 
     Mobility.with_locale(:de) do
       untitled.valid?
-      assert_empty untitled.errors[:slug_de],
+      assert_not_includes untitled.errors[:slug_de], "has already been taken in DE",
         "a post without a German slug of its own must not collide on another post's German slug"
+      # Still fails *presence* for de (and every other enabled locale) --
+      # genuinely blank, not a false collision -- covered by
+      # `LocalizedSlugTest` directly.
+      assert_includes untitled.errors[:slug_de], "can't be blank in DE"
     end
   end
 
-  # The validation is the first line of defense; these indexes are the second,
-  # and later models copy their shape, so pin it directly.
-  test "the database rejects a same-locale duplicate slug when validation is bypassed" do
+  # Foundations task 4 (spec §5.2) drops the per-language unique slug indexes
+  # on posts outright: a post's literal slug is no longer required to be
+  # unique at the database layer, only by `LocalizedSlug`'s own validation
+  # above -- neither post here has a listing page, so neither has a public
+  # path to clash on either (spec §5.3's "a post without a listing page has
+  # no path to clash on"). The database-level safety net this test used to
+  # pin now lives one level up, on the *address* two records would actually
+  # collide at: see `HasPublicPaths#public_paths_are_available` and
+  # `PublicSite::PathsTest#"a post cannot take a path a child page already
+  # holds"`.
+  test "bypassing the slug validation no longer collides at the database layer" do
     Post.create!(content_type: :blog, title: "Hello World")
     sneaky = Post.create!(content_type: :blog, title: "Something Else")
 
-    assert_raises ActiveRecord::RecordNotUnique do
-      Post.transaction(requires_new: true) do
-        sneaky.update_column(:slug, { "en" => "hello-world" })
-      end
+    assert_nothing_raised do
+      sneaky.update_column(:slug, { "en" => "hello-world" })
     end
   end
 
@@ -324,7 +341,11 @@ class PostTest < ActiveSupport::TestCase
     assert_equal "hello-world", Post.find(other.id).slug
   end
 
-  test "the translated locales are the site's configured locales" do
-    assert_equal %i[en de es], Mobility.available_locales
+  # Mobility's available locales are every *supported* language (spec §4.1),
+  # not the site's own enabled subset -- that's `Locales.enabled`, a runtime
+  # setting Mobility can't see. Widening this list needs no migration and no
+  # per-locale accessor to be added by hand.
+  test "the translated locales are every supported language" do
+    assert_equal ::SUPPORTED_LOCALES.keys.map(&:to_sym), Mobility.available_locales
   end
 end

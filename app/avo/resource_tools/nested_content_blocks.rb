@@ -15,7 +15,7 @@ class Avo::ResourceTools::NestedContentBlocks < Avo::BaseResourceTool
   # The per-locale accessors Mobility defines for a block's translated
   # attributes, e.g. [:caption_en, :caption_de, :caption_es].
   def locale_accessors(attribute)
-    ::Mobility.available_locales.map do |locale|
+    ::Locales.enabled.map do |locale|
       [ locale, ::Mobility.normalize_locale_accessor(attribute, locale).to_sym ]
     end
   end

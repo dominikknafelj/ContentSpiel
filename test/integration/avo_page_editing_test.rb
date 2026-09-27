@@ -62,7 +62,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
   # landed on its parent's path, so a slugless child of the root claimed "/"
   # and could start answering for the homepage. The form has to turn that away
   # and say why, rather than accept it and quietly mis-route the site.
-  # No title: with one present, `SlugGeneration` fills the blank slug in from
+  # No title: with one present, `LocalizedSlug` fills the blank slug in from
   # it before this validation ever runs, so the create would succeed instead
   # of being refused.
   test "a page submitted without a slug is refused, with the reason on the form" do
@@ -74,7 +74,11 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_match(/Slug can.{0,6}t be blank/, response.body,
+    # One error per enabled locale (`LocalizedSlug#slug_present_in_every_
+    # enabled_locale`), each against its own `slug_<locale>` field -- not a
+    # single generic "Slug can't be blank" -- so the admin sees exactly
+    # which tab(s) still need a slug rather than having to guess.
+    assert_match(/Slug en can.{0,6}t be blank in EN/, response.body,
       "the admin has to be told which field is missing, not just refused")
   end
 
@@ -128,6 +132,47 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_not_nil @about.reload.position
   end
 
+  # `Page::TreeRanking#remember_requested_position` treats a parent change as
+  # a fresh rank request even when the submitted `position` is numerically
+  # unchanged from the page's rank under its *old* parent (see the comment on
+  # that method) -- ruling: the form shows the number, so rank = the number
+  # in the form, whichever parent it ends up under. The sibling-order tests
+  # above never change `parent_id`, so they can't exercise this: the whole
+  # point here is that the same submitted number means something different
+  # once the parent changes.
+  test "reparenting through the page form ranks by the submitted position under the new parent" do
+    a = Page.create!(title: "A", parent: @root)
+    b = Page.create!(title: "B", parent: @root)
+
+    a_first = Page.create!(title: "A First", parent: a)
+    moved = Page.create!(title: "Moved", parent: a)
+    a_third = Page.create!(title: "A Third", parent: a)
+    assert_equal [ a_first.id, moved.id, a_third.id ], a.children.reload.map(&:id)
+
+    b0 = Page.create!(title: "B0", parent: b)
+    b1 = Page.create!(title: "B1", parent: b)
+    b2 = Page.create!(title: "B2", parent: b)
+    assert_equal [ b0.id, b1.id, b2.id ], b.children.reload.map(&:id)
+
+    # `position: 1` is `moved`'s own rank under `a` -- unchanged from what the
+    # form was already showing before this submit.
+    put "/avo/resources/pages/#{moved.id}", params: { page: {
+      parent_id: b.id, position: 1
+    } }
+
+    assert_response :redirect
+
+    assert_equal [ b0.id, moved.id, b1.id, b2.id ], b.children.reload.map(&:id)
+    assert_equal [ 0, 1, 2, 3 ], b.children.map(&:position)
+
+    assert_equal [ a_first.id, a_third.id ], a.children.reload.map(&:id),
+      "a's remaining children must close the gap moved left behind"
+    assert_equal [ 0, 1 ], a.children.map(&:position),
+      "siblings must be left densely numbered from 0"
+
+    assert_equal "/b/moved", moved.reload.full_path("en")
+  end
+
   # -- conditional hero fields ----------------------------------------------
 
   # The hero image is a top-level field, so unlike the subtitle (which lives
@@ -152,7 +197,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, %(name="page[hero_image]"),
       "a standard page has no hero image"
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_not_includes response.body, %(name="page[subtitle_#{locale}]"),
         "a standard page has no subtitle in #{locale}"
     end
@@ -167,7 +212,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(name="page[hero_image]"),
       "a landing page has a hero image"
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_includes response.body, %(name="page[subtitle_#{locale}]"),
         "a landing page has a subtitle in #{locale}"
     end
@@ -194,7 +239,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       %w[title slug meta_title meta_description].each do |attribute|
         assert_includes response.body, %(name="page[#{attribute}_#{locale}]"),
           "expected an input for #{attribute} in #{locale}"
@@ -228,7 +273,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(name="page[content_blocks_attributes][0][settings][content_type]")
     assert_includes response.body, %(name="page[content_blocks_attributes][0][_destroy]")
 
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       assert_includes response.body, %(name="page[content_blocks_attributes][0][caption_#{locale}]")
       assert_includes response.body, %(name="page[content_blocks_attributes][0][body_#{locale}]")
     end
@@ -248,6 +293,26 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     block = @about.content_blocks.reload.first
     assert block.rich_text?
     assert_equal "Hello", block.body_en.to_plain_text.strip
+  end
+
+  # A language enabled at runtime (spec §9.6) must be writable through the
+  # nested block rows straight away: the rows render its caption/body inputs
+  # per request, so the permitted params can't be a list frozen at class load.
+  # The GET first makes sure the resource class is loaded before "fr" exists.
+  test "a block caption and body in a newly enabled language are saved" do
+    get "/avo/resources/pages/#{@about.id}/edit"
+    assert Locales::Enable.call("fr", actor: nil).ok?
+
+    put "/avo/resources/pages/#{@about.id}", params: { page: {
+      content_blocks_attributes: {
+        "0" => { block_type: "image", position: "0", caption_fr: "Légende", body_fr: "<p>Bonjour</p>" }
+      }
+    } }
+
+    assert_response :redirect
+    block = @about.content_blocks.reload.first
+    assert_equal "Légende", block.caption_fr
+    assert_equal "Bonjour", block.body_fr.to_plain_text.strip
   end
 
   # The blank row rides along on every save, so it must not save itself as an

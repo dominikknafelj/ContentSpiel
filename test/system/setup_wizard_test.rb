@@ -30,7 +30,7 @@ class SetupWizardTest < ApplicationSystemTestCase
     press "Save and continue"
 
     assert_selector "h1", text: "Languages"
-    choose "Deutsch"
+    select "Deutsch", from: "Default language"
     press "Save and continue"
 
     assert_selector "h1", text: "MCP token"

@@ -79,19 +79,25 @@ class PageTest < ActiveSupport::TestCase
     assert_includes child.errors[:base], "a root page already exists"
   end
 
-  # A blank slug on a non-root page is not a harmless omission: `build_path`
-  # drops blank segments, so the page's cached_paths come out identical to its
-  # parent's and two pages end up claiming one URL -- for a child of the root,
-  # the homepage's "/". Only one of the two can ever be served.
+  # A blank slug on a non-root page is not a harmless omission:
+  # `PublicSite::Paths.page_path` drops blank segments, so the page's path
+  # would come out identical to its parent's and two pages end up claiming one
+  # URL -- for a child of the root, the homepage's "/". Only one of the two
+  # can ever be served.
   # No title, since a title present in any locale would now have its slug
-  # filled in automatically by `SlugGeneration` -- this has to be a page with
+  # filled in automatically by `LocalizedSlug` -- this has to be a page with
   # no title at all to still exercise the blank-slug case.
+  #
+  # Reported against `slug_en` (the per-*enabled*-locale key
+  # `LocalizedSlug#slug_present_in_every_enabled_locale` uses), not a bare
+  # `:slug` -- every enabled locale is missing one here, so every one of
+  # them gets its own error; `en` stands in for all three.
   test "a non-root page requires a slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     slugless = Page.new(page_type: :standard, parent: root)
 
     assert_not slugless.valid?
-    assert_includes slugless.errors[:slug], "can't be blank"
+    assert_includes slugless.errors[:slug_en], "can't be blank in EN"
   end
 
   # The failure the validation exists to prevent, stated as the outcome rather
@@ -107,8 +113,7 @@ class PageTest < ActiveSupport::TestCase
       Page.create!(page_type: :standard, parent: root, published_at: Time.current)
     end
 
-    assert_equal [ root ], Page.where("cached_paths ->> 'en' = '/'").to_a
-    assert_equal root, Page.find_by_full_path(:en, "/")
+    assert_equal [ root ], Page.where(id: PublicPath.current.where(locale: "en", path: "/").select(:record_id)).to_a
   end
 
   # The root is the one page allowed a blank slug: it contributes no segment
@@ -121,24 +126,25 @@ class PageTest < ActiveSupport::TestCase
     assert_equal "/", root.full_path(:en)
   end
 
-  # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
-  # so it has to be blank here too -- otherwise " " passes validation and
-  # produces the very collision above. No title: with one present,
-  # `SlugGeneration` would treat "   " as not-yet-set (it's blank) and
-  # overwrite it with a title-derived slug before this validation ever ran.
+  # Whitespace is blank as far as `PublicSite::Paths.page_path` is concerned
+  # (it checks `segment.blank?`), so it has to be blank here too -- otherwise
+  # " " passes this validation and produces the very no-URL-at-all case
+  # above. No title: with one present, `LocalizedSlug` would treat "   " as
+  # not-yet-set (it's blank) and overwrite it with a title-derived slug
+  # before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     blank = Page.new(page_type: :standard, slug: "   ", parent: root)
 
     assert_not blank.valid?
-    assert_includes blank.errors[:slug], "can't be blank"
+    assert_includes blank.errors[:slug_en], "can't be blank in EN"
   end
 
   # Task 8c / code-structure review finding #2: a page titled in only one
   # locale used to leave every other locale's slug blank, and a blank
   # non-root slug collapses onto the parent's path (see this file's own
   # comment above `validates :slug` for the two-pages-one-URL bug that
-  # produces). SlugGeneration now fills an untitled locale's slug from the
+  # produces). LocalizedSlug now fills an untitled locale's slug from the
   # site's default-locale title instead, so the site's own default locale --
   # not the app's fixed English default -- decides the fallback.
   test "slugs for untitled locales fall back to the site's default-locale title" do
@@ -204,31 +210,6 @@ class PageTest < ActiveSupport::TestCase
     end
   end
 
-  # The slug validation above closes the route by which two pages could come to
-  # share a path from the admin. Should it ever happen some other way, the
-  # lookup still has to name one winner, and the same one every time -- and the
-  # winner is the older page, so a URL already in use is not taken over by a
-  # page created later.
-  #
-  # This holds because `find_by_full_path` orders by `id`. (ActiveRecord's
-  # `.first` already appends an implicit `ORDER BY id ASC` to an unordered
-  # relation, so the emitted SQL is identical either way -- the explicit
-  # `.order(:id)` states the guarantee this test depends on locally, instead of
-  # resting it on that implementation detail.)
-  test "a path claimed by two pages resolves to the older one" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    incumbent = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
-      published_at: Time.current)
-    latecomer = Page.create!(page_type: :standard, title: "Also About", slug: "also-about", parent: root,
-      published_at: Time.current)
-
-    # Written past the validations on purpose: this is the state the lookup has
-    # to survive, not a state the admin can now produce.
-    latecomer.update_columns(cached_paths: incumbent.cached_paths)
-
-    assert_equal incumbent, Page.find_by_full_path(:en, "/about")
-  end
-
   test "slug is unique among siblings, scoped to locale" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
@@ -290,7 +271,7 @@ class PageTest < ActiveSupport::TestCase
   # fallback.
   #
   # Task 8c means a *titled* page can no longer reach this validation with a
-  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # genuinely blank slug in any locale -- `LocalizedSlug` fills one from a
   # title the moment any title exists anywhere on the page. `update_columns`
   # forces the untitled, pre-fill state a row predating that feature (or a
   # bulk import) could still be in, the same way the "bypassed" tests further
@@ -304,8 +285,12 @@ class PageTest < ActiveSupport::TestCase
 
     Mobility.with_locale(:de) do
       untitled.valid?
-      assert_empty untitled.errors[:slug_de],
+      assert_not_includes untitled.errors[:slug_de], "has already been taken in DE",
         "a page without a German slug of its own must not collide on a sibling's German slug"
+      # It does still fail *presence* for de (and every other enabled
+      # locale) -- genuinely blank, not a false collision -- covered on its
+      # own in "a non-root page requires a slug" above.
+      assert_includes untitled.errors[:slug_de], "can't be blank in DE"
     end
   end
 
@@ -397,15 +382,22 @@ class PageTest < ActiveSupport::TestCase
     assert_equal at, page.reload.published_at
   end
 
-  # The validation is the first line of defense; these indexes are the second.
-  test "the database rejects a same-locale duplicate sibling slug when validation is bypassed" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "")
-    Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
-    sneaky = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root)
+  # `HasPublicPaths#public_paths_are_available` is the first line of defense
+  # against two pages claiming one address; the `public_paths (locale, path)`
+  # unique index is the second. (Task 3 dropped the per-locale unique slug
+  # indexes this test used to bypass `pages` with -- that job now belongs to
+  # `public_paths`, which nothing about a slug update touches directly, so the
+  # bypass has to write a `PublicPath` row itself to exercise the index.)
+  test "the database rejects a duplicate current path when validation is bypassed" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root,
+      published_at: Time.current)
+    sneaky = Page.create!(page_type: :standard, title: "Contact", slug: "contact", parent: root,
+      published_at: Time.current)
 
     assert_raises ActiveRecord::RecordNotUnique do
       Page.transaction(requires_new: true) do
-        sneaky.update_column(:slug, { "en" => "about" })
+        PublicPath.create!(record: sneaky, locale: "en", path: about.full_path(:en), current: true)
       end
     end
   end
@@ -474,42 +466,7 @@ class PageTest < ActiveSupport::TestCase
     assert_equal "/ueber-uns/team", leaf.full_path(:de)
   end
 
-  test "find_by_full_path locates the matching page" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-
-    assert_equal page, Page.find_by_full_path(:en, "/about")
-    assert_equal root, Page.find_by_full_path(:en, "/")
-    assert_nil Page.find_by_full_path(:en, "/does-not-exist")
-  end
-
-  # The lookup is scoped to one locale's key: an English path must not resolve
-  # for a German visitor just because some page holds it in English.
-  test "find_by_full_path only matches the requested locale" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    Mobility.with_locale(:de) { page.update!(slug: "ueber-uns") }
-
-    assert_equal page, Page.find_by_full_path(:de, "/ueber-uns")
-    assert_nil Page.find_by_full_path(:de, "/about")
-  end
-
-  # The lookup is what the public site routes through, so it answers for
-  # published pages only -- a draft is invisible at its own path, the same way
-  # an unpublished Post is absent from a post_list.
-  test "find_by_full_path ignores unpublished pages" do
-    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    draft = Page.create!(page_type: :standard, title: "Draft", slug: "draft", parent: root, published_at: nil)
-    Page.create!(page_type: :standard, title: "Scheduled", slug: "scheduled", parent: root, published_at: 1.day.from_now)
-
-    assert_nil Page.find_by_full_path(:en, "/draft")
-    assert_nil Page.find_by_full_path(:en, "/scheduled")
-
-    draft.update!(published_at: 1.minute.ago)
-    assert_equal draft, Page.find_by_full_path(:en, "/draft")
-  end
-
-  test "updating a slug recomputes cached_paths for the page and its descendants" do
+  test "updating a slug recomputes public_paths for the page and its descendants" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
     leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
@@ -522,7 +479,7 @@ class PageTest < ActiveSupport::TestCase
 
   # The cascade has to reach the whole subtree, not just the direct children:
   # a grandchild's path is shifted by its grandparent's slug just as much.
-  test "updating a slug recomputes cached_paths for indirect descendants too" do
+  test "updating a slug recomputes public_paths for indirect descendants too" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     section = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
     team = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
@@ -541,14 +498,13 @@ class PageTest < ActiveSupport::TestCase
     leaf = Page.create!(page_type: :standard, title: "Team", slug: "team", parent: section)
     Mobility.with_locale(:de) { section.update!(slug: "ueber-uns") }
 
-    # Sorted because jsonb does not preserve insertion order of keys.
-    assert_equal %w[de en es], leaf.reload.cached_paths.keys.sort
+    assert_equal %w[de en es], PublicPath.current.where(record: leaf).pluck(:locale).sort
     assert_equal "/ueber-uns/team", leaf.full_path(:de)
     assert_equal "/about/team", leaf.full_path(:en)
   end
 
   # A page's path changes when it moves, even though none of its own slugs did.
-  test "moving a page recomputes cached_paths for it and its descendants" do
+  test "moving a page recomputes public_paths for it and its descendants" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     origin = Page.create!(page_type: :standard, title: "Origin", slug: "origin", parent: root)
     destination = Page.create!(page_type: :standard, title: "Destination", slug: "destination", parent: root)
@@ -561,10 +517,11 @@ class PageTest < ActiveSupport::TestCase
     assert_equal "/destination/about/team", leaf.reload.full_path(:en)
   end
 
-  test "cached_paths is populated on create" do
+  test "public_paths is populated on create" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
     page = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root)
 
-    assert_equal({ "en" => "/about", "de" => "/about", "es" => "/about" }, page.reload.cached_paths)
+    assert_equal({ "en" => "/about", "de" => "/about", "es" => "/about" },
+      PublicPath.current.where(record: page).pluck(:locale, :path).to_h)
   end
 end

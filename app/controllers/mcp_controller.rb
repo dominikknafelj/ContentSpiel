@@ -18,7 +18,7 @@ class McpController < ActionController::API
       title: "ContentSpiel",
       version: "1.0.0",
       instructions: "Manage ContentSpiel's blog/resume/now-update posts across locales.",
-      tools: [ ListPostsTool, GetPostTool, CreatePostTool, UpdatePostTool ],
+      tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost ],
       server_context: { user: @current_api_user }
     )
 
@@ -48,5 +48,14 @@ class McpController < ActionController::API
 
     api_token.record_usage!(request.remote_ip)
     @current_api_user = api_token.user
+
+    # This controller is an `ActionController::API`, not an
+    # `ApplicationController` (see the class comment), so it doesn't inherit
+    # that controller's actor-setting `before_action` -- every write an MCP
+    # tool makes through `Posts::Save` (etc.) is attributed to the bearer
+    # token itself, not the human the token happens to belong to, since the
+    # token -- not a session -- is what was actually authenticated here.
+    Current.actor = api_token
+    Current.channel = :mcp
   end
 end

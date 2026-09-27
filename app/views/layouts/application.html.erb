@@ -6,11 +6,26 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="application-name" content="ContentSpiel">
     <meta name="mobile-web-app-capable" content="yes">
-    <%= csrf_meta_tags %>
+    <%# No csrf_meta_tags (spec §6.4): PublicController serves the same
+        cookie-less response to every visitor, and Rails only reads/writes
+        the session -- which would set a cookie on an otherwise anonymous,
+        publicly cacheable page -- to mint the token these tags embed. %>
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
 
     <%= yield :head %>
+
+    <%# hreflang alternates (spec §6.5): every enabled language's URL for the
+        page or post currently shown, plus x-default pointing search engines
+        at the site's own default language rather than making them guess. %>
+    <% if (alternate_record = @post || @page) %>
+      <% public_urls.alternates(alternate_record).each do |code, url| %>
+        <link rel="alternate" hreflang="<%= code %>" href="<%= url %>">
+      <% end %>
+      <% if (default_url = public_urls.url_for(alternate_record, Locales.default)) %>
+        <link rel="alternate" hreflang="x-default" href="<%= default_url %>">
+      <% end %>
+    <% end %>
 
     <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
     <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>

@@ -69,9 +69,11 @@ Rails.application.configure do
   #   authentication: :plain
   # }
 
-  # Locale fallbacks are configured for every environment in
-  # config/application.rb, so that Mobility's translated attributes fall back
-  # the same way in test and development as they do here.
+  # Locale fallbacks are not an environment setting: public output falls back
+  # along the site's own per-language chain (`Locales.fallback_chain`, read
+  # from site_settings at request time), the same in every environment, and
+  # Mobility's plain readers deliberately don't fall back at all
+  # (config/initializers/mobility.rb).
 
   # Do not dump schema after migrations.
   config.active_record.dump_schema_after_migration = false

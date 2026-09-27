@@ -10,38 +10,48 @@
 # app knows the canonical public host, so it is supplied by the environment.
 # The default is the placeholder sitemap_generator's own installer writes: a
 # sitemap generated without SITEMAP_HOST set is obviously wrong rather than
-# quietly pointing at localhost.
-SitemapGenerator::Sitemap.default_host = ENV.fetch("SITEMAP_HOST", "https://www.example.com")
+# quietly pointing at localhost. `PublicSite::Urls.default_host` is the same
+# fallback chain `Urls#url_for` uses everywhere else, so a URL built here and
+# one built for, say, an MCP response never disagree about the host.
+SitemapGenerator::Sitemap.default_host = PublicSite::Urls.default_host
+
+# One `Urls` instance for the whole run: its per-record path memoization
+# means a record with rows in several locales (every published record) only
+# computes its `alternates` once rather than once per locale entry below.
+urls = PublicSite::Urls.new(host: SitemapGenerator::Sitemap.default_host)
+
+# A record's own visibility, plus every ancestor page's: the same
+# `:published` rule `PagesController` resolves requests against (spec §6.3),
+# not merely a `public_paths` row existing (that row is written the moment
+# a draft is saved, spec §5.4). A page published under an unpublished parent
+# must not appear here either, so the sitemap never advertises a URL the
+# resolver would 404.
+visible = PublicSite::Resolver.method(:visible?)
 
 # `include_root` would add "/" unconditionally -- the loop below already adds
 # it itself (as the root Page's own entry in the current default locale, which
 # is exactly the page "/" resolves to), so leaving this on would list it twice.
 SitemapGenerator::Sitemap.create(include_root: false) do
-  # Read once rather than inside the loop below: SiteSetting.instance issues
-  # a fresh query every call, and nothing changes it mid-run here.
-  default_locale = SiteSetting.instance.default_locale
-
-  # Published only: a draft (or a page scheduled for a future date) has a
-  # cached path the moment it is saved, but PagesController 404s it, so listing
-  # it would point search engines at a URL that doesn't resolve.
+  # One entry per current `public_paths` row (page or post, every enabled
+  # locale) rather than walking the page tree and re-deriving posts' paths by
+  # hand -- `public_paths` already *is* the current, canonical address of
+  # every record in every language (spec §5.1), so this lists exactly what
+  # `PagesController` would resolve each one back to.
   #
-  # `find_each` rather than `all`, per the gem's README: the tree is walked in
-  # batches instead of being loaded into memory at once.
-  Page.published.find_each do |page|
-    # Every locale the site is published in, off the same row: each locale
-    # serves this page at its own path, and those are distinct URLs. The paths
-    # are the cached ones `Page#full_path` reads, which is what the catch-all
-    # route looks up, so what is listed here is exactly what resolves.
-    #
-    # The locale prefix is prepended rather than built with a route helper
-    # because `page_path` would re-escape the slashes inside the path glob.
-    # `full_path` is "/" for the root page and "/about" for a child. The
-    # site's current default locale gets no prefix at all (config/routes.rb,
-    # PagesHelper#locale_prefix) -- every other configured locale keeps one,
-    # e.g. "/de/about".
-    I18n.available_locales.each do |locale|
-      prefix = locale.to_s == default_locale ? "" : "/#{locale}"
-      add "#{prefix}#{page.full_path(locale)}", lastmod: page.updated_at
-    end
+  # `find_each` rather than `all`, per the gem's README: the table is walked
+  # in batches instead of being loaded into memory at once. `includes(:record)`
+  # avoids an N+1 for the polymorphic `record` lookup below.
+  PublicPath.current.includes(:record).find_each do |public_path|
+    record = public_path.record
+    next unless visible.call(record)
+
+    path = urls.path_for(record, public_path.locale)
+    next if path.nil?
+
+    # `alternates` from the same `urls` instance: each locale's entry lists
+    # every language's URL, including its own, exactly as
+    # `application.html.erb`'s hreflang tags do for a live request.
+    alternates = urls.alternates(record).map { |locale, href| { href: href, lang: locale } }
+    add path, lastmod: record.updated_at, alternates: alternates
   end
 end

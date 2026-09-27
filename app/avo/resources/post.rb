@@ -27,7 +27,7 @@ class Avo::Resources::Post < Avo::BaseResource
     # tab shows up empty instead of echoing the English text back at the editor
     # and tricking them into saving a copy of it.
     tabs do
-      ::Mobility.available_locales.each do |locale|
+      ::Locales.enabled.each do |locale|
         tab title: locale.to_s.upcase do
           # `normalize_locale_accessor` is what Mobility itself uses to name
           # these methods, so it stays correct for a region-qualified locale

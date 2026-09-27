@@ -23,7 +23,7 @@ class Avo::Resources::SiteSetting < Avo::BaseResource
     # way around -- confirmed against avo/fields/select_field.rb, which
     # inverts the hash to look a stored value's label back up.
     field :default_locale, as: :select,
-      options: ::I18n.available_locales.to_h { |locale| [ locale.to_s.upcase, locale.to_s ] }
+      options: ::Locales.enabled.to_h { |locale| [ locale.upcase, locale ] }
     field :logo, as: :file
   end
 end

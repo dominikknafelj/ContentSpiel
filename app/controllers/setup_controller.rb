@@ -23,6 +23,12 @@ class SetupController < ApplicationController
   allow_unauthenticated_access
   layout "setup"
 
+  # Overrides ApplicationController's `:admin` default (spec §7.1) -- setup
+  # writes (the site, languages, MCP token, starter content) run before an
+  # admin session necessarily exists, so they're attributed to their own
+  # channel rather than misreported as `:admin`.
+  before_action { Current.channel = :setup }
+
   before_action :require_setup_pending
   before_action :load_step, only: %i[show update]
   before_action :require_step_access, only: %i[show update]
@@ -41,9 +47,9 @@ class SetupController < ApplicationController
     case @step
     when "system_check" then @results = Setup::SystemCheck.run
     when "admin" then @user = User.new
-    when "site", "languages" then @site_setting = SiteSetting.instance
+    when "site", "languages" then @site_setting = Current.site
     when "review"
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
       @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
     end
 
@@ -131,7 +137,7 @@ class SetupController < ApplicationController
     end
 
     def update_site
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
 
       if @site_setting.update(site_params)
         redirect_to setup_step_path("languages")
@@ -157,10 +163,20 @@ class SetupController < ApplicationController
       permitted.merge(social_links: links.to_h)
     end
 
+    # Writes the chosen default plus any additional languages as
+    # `site_settings.locales` (spec §4.4) -- unlike every other step, this one
+    # can change what `Locales.enabled` returns, so every page and post needs
+    # a URL recomputed in whichever languages just became enabled (or lost
+    # one that just left) before the next step renders. `extra_locales` has
+    # no backing column -- it only exists as a form field -- so it's read
+    # straight off `params` rather than assigned to `@site_setting` directly.
     def update_languages
-      @site_setting = SiteSetting.instance
+      @site_setting = Current.site
+      permitted = params.expect(site_setting: [ :default_locale, extra_locales: [] ])
+      codes = ([ permitted[:default_locale] ] + Array(permitted[:extra_locales])).uniq.compact_blank
 
-      if @site_setting.update(default_locale: params.dig(:site_setting, :default_locale))
+      if @site_setting.update(default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } })
+        PublicSite::Paths.rebuild!
         redirect_to setup_step_path("mcp_token")
       else
         render :languages, status: :unprocessable_entity
@@ -172,13 +188,13 @@ class SetupController < ApplicationController
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
     def update_mcp_token
-      _token, @raw_token = ApiToken.generate!(Current.user)
+      _token, @raw_token = ApiTokens::Issue.call(Current.user).record
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end
 
     def update_starter_content
-      StarterContent.create_pages_and_posts!(locale: SiteSetting.instance.default_locale)
+      StarterContent.create_pages_and_posts!(locale: Current.site.default_locale)
       redirect_to setup_step_path("review"), notice: "Starter content added."
     end
 

@@ -33,23 +33,48 @@ class SiteSettingTest < ActiveSupport::TestCase
   end
 
   # PagesController and config/sitemap.rb both trust this value as one of the
-  # three configured locales without checking again -- an admin typing
-  # anything else in here would otherwise make every page's cached path
-  # unreachable at the site's own root.
+  # enabled locales without checking again -- an admin typing anything else in
+  # here would otherwise make every page's cached path unreachable at the
+  # site's own root.
   test "default_locale must be one of the configured locales" do
     setting = SiteSetting.instance
     setting.default_locale = "fr"
 
     assert_not setting.valid?
-    assert_includes setting.errors[:default_locale], "is not included in the list"
+    assert_includes setting.errors[:default_locale], "must be one of the enabled languages"
   end
 
-  test "default_locale accepts any configured locale" do
+  test "default_locale accepts any of the site's own enabled locales" do
     setting = SiteSetting.instance
 
-    I18n.available_locales.each do |locale|
-      setting.default_locale = locale.to_s
+    setting.locale_codes.each do |locale|
+      setting.default_locale = locale
       assert setting.valid?, "expected #{locale} to be a valid default_locale"
     end
+  end
+
+  test "locales must be supported, unique and include the default" do
+    setting = site_settings(:default)
+    setting.locales = [ { "code" => "xx" } ]
+    assert_not setting.valid?
+    assert_includes setting.errors[:locales], "contains an unsupported language: xx"
+
+    setting.locales = [ { "code" => "en" }, { "code" => "en" } ]
+    assert_not setting.valid?
+    assert_includes setting.errors[:locales], "lists a language twice"
+
+    setting.locales = [ { "code" => "en" } ]
+    setting.default_locale = "de"
+    assert_not setting.valid?
+    assert_includes setting.errors[:default_locale], "must be one of the enabled languages"
+
+    setting.locales = [ { "code" => "en", "fallbacks" => [ "fr" ] } ]
+    setting.default_locale = "en"
+    assert_not setting.valid?
+    assert_includes setting.errors[:locales], "en falls back to a language that isn't enabled: fr"
+
+    setting.locales = []
+    assert_not setting.valid?
+    assert_includes setting.errors[:locales], "must enable at least one language"
   end
 end

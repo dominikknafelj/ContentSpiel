@@ -5,6 +5,6 @@
       <p>Now</p>
       <p>Updated <%= post_date(latest) %></p>
     </div>
-    <div class="cs-prose text-lg"><%= latest.body %></div>
+    <div class="cs-prose text-lg"><%= translated(latest, :body) %></div>
   </div>
 <% end %>

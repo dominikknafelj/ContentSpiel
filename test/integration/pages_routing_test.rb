@@ -679,4 +679,32 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "youtube-nocookie.com/embed/dQw4w9WgXcQ"
   end
+
+  # Task 11 fix round 1: a title with no Latin letters (Japanese, here) gets a
+  # Unicode slug (`LocalizedSlug#slugify`'s fallback for a blank
+  # `parameterize`), and `PublicPath.path` stores that slug literally, raw
+  # UTF-8 -- not percent-encoded. What actually crosses the wire in a real
+  # request is percent-encoded, though (a browser encodes the URL bar's text
+  # before sending it, same as it would for a space or a "?"), so this builds
+  # the request the way a real one would arrive and confirms Rails' router
+  # decodes it back to the exact string `PublicPath.path` holds before
+  # `PublicSite::Resolver` ever compares the two.
+  test "a page titled only in a non-Latin language resolves at its percent-encoded URL" do
+    root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    assert Locales::Enable.call("ja", actor: nil).ok?
+
+    about = Page.create!(page_type: :standard, parent: root, title_ja: "会社概要", published_at: Time.current)
+    ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body_ja: "<p>概要です</p>")
+
+    assert_equal "会社概要", about.slug_ja
+    assert_equal "/会社概要", about.full_path("ja")
+
+    encoded_segment = ERB::Util.url_encode(about.slug_ja)
+    assert_not_equal about.slug_ja, encoded_segment, "the segment must actually be percent-encoded to exercise decoding"
+
+    get "/ja/#{encoded_segment}"
+
+    assert_response :success
+    assert_includes response.body, "概要です"
+  end
 end

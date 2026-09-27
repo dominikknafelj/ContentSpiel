@@ -2,6 +2,6 @@
 # skips the one-row index and opens its edit form directly.
 class Avo::SiteSettingsController < Avo::ResourcesController
   def index
-    redirect_to avo.edit_resources_site_setting_path(SiteSetting.instance)
+    redirect_to avo.edit_resources_site_setting_path(Current.site)
   end
 end

@@ -8,7 +8,7 @@ class Avo::Actions::CreateStarterPages < Avo::BaseAction
     "in the site's default language. Anything that already exists is left alone."
 
   def handle(**args)
-    StarterContent.create_pages_and_posts!(locale: SiteSetting.instance.default_locale)
+    StarterContent.create_pages_and_posts!(locale: Current.site.default_locale)
     succeed("Starter pages are ready.")
   end
 end

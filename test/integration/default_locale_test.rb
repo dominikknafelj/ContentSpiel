@@ -42,7 +42,12 @@ class DefaultLocaleTest < ActionDispatch::IntegrationTest
   end
 
   test "page_url_path omits the prefix for the new default and adds one for the old" do
-    view = ApplicationController.new.view_context
+    # `page_url_path` now delegates to `PagesController#public_urls` (spec
+    # §6.2), which needs a real request to read its host from -- a bare
+    # `ApplicationController.new.view_context` (as this test used before)
+    # never has one, so a live dispatch stands in for it.
+    get "/"
+    view = @controller.view_context
 
     assert_equal "/ueber-uns", view.page_url_path(@about, :de)
     assert_equal "/en/about", view.page_url_path(@about, :en)
@@ -67,7 +72,9 @@ class DefaultLocaleTest < ActionDispatch::IntegrationTest
     # German copy showing up on an English page.
     assert_not_equal @root.full_path(:en), kontakt.full_path(:en)
     assert_not_equal @root.full_path(:es), kontakt.full_path(:es)
-    assert_equal "/en/kontakt", ApplicationController.new.view_context.page_url_path(kontakt, :en)
+
+    get "/"
+    assert_equal "/en/kontakt", @controller.view_context.page_url_path(kontakt, :en)
 
     get "/en/kontakt"
     assert_response :success

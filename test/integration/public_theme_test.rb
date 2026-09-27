@@ -29,6 +29,15 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
     assert_select "footer [data-controller=theme]"
   end
 
+  test "the page head carries hreflang alternates for every enabled language, plus x-default" do
+    get "/about"
+
+    assert_select "head link[rel=alternate][hreflang=en][href='http://www.example.com/about']"
+    assert_select "head link[rel=alternate][hreflang=de][href='http://www.example.com/de/uber']"
+    assert_select "head link[rel=alternate][hreflang=es][href='http://www.example.com/es/about']"
+    assert_select "head link[rel=alternate][hreflang=x-default][href='http://www.example.com/about']"
+  end
+
   test "the language switcher links the current page in every locale" do
     get "/about"
 
@@ -41,7 +50,7 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title_en: "Hello", published_at: 1.day.ago)
-    # Since Task 8c every post gets a German slug by SlugGeneration's
+    # Since Task 8c every post gets a German slug by LocalizedSlug's
     # fallback the moment it has a title anywhere, so this scenario can no
     # longer arise through a validated save -- `update_columns` forces the
     # pre-fallback, no-German-slug state directly, the same way

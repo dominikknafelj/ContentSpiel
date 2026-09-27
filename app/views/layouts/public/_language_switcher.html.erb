@@ -1,6 +1,6 @@
 <%# Up to three languages as inline codes; more collapse into a <details>
     menu, which needs no JavaScript. %>
-<% links = language_links(@page, @post) %>
+<% links = language_links(@post || @page) %>
 <% if links.size > 1 %>
   <% if links.size <= 3 %>
     <ul aria-label="Language" class="flex items-center gap-1 font-cs-mono text-label uppercase tracking-mono">

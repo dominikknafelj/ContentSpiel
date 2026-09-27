@@ -4,7 +4,7 @@ require "test_helper"
 # live dev server first (curl, real JSON-RPC requests, a real bearer token),
 # not just in these tests: `tools/list`, `create_post_tool` (checked the
 # response body was the clean stored HTML, not a rendered-view artifact --
-# see PostSerializer's own comment for that one), `get_post_tool`,
+# see Mcp::PostSerializer's own comment for that one), `get_post_tool`,
 # `update_post_tool`, a malformed call, and an invalid token.
 class McpTest < ActionDispatch::IntegrationTest
   setup do
@@ -47,6 +47,14 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  # Doubles as the regression guard for the app/tools -> Mcp:: namespace move
+  # (Task 12): these four names are what MCP clients already call the tools
+  # by, and the mcp gem derives a tool's default name from its demodulized
+  # class name -- so `Mcp::Tools::CreatePost` would default to "create_post",
+  # not "create_post_tool", if each tool didn't pin its name explicitly with
+  # `tool_name`. This test was green before that move (the baseline) and
+  # must stay green after it, unchanged, precisely because the names it
+  # asserts are the ones clients depend on, not the classes' own names.
   test "a valid request lists all four post tools" do
     mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
 
