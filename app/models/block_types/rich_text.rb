@@ -8,6 +8,7 @@ module BlockTypes
       BlockTypes.register :rich_text do |t|
         t.label "Rich text"
         t.uses :body
+        t.component Blocks::RichTextComponent
       end
     end
   end

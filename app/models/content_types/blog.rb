@@ -6,6 +6,8 @@ module ContentTypes
       ContentTypes.register :blog do |t|
         t.label "Blog"
         t.color "#3b82f6"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
 
         # Moved from the old `StarterContent::SECTIONS` entry verbatim: the
         # section page this type's sample post seeds into, and the sample

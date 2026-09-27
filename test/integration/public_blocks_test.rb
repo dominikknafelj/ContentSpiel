@@ -90,6 +90,18 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Training for a half marathon"
   end
 
+  test "an unregistered stored block type is skipped on render" do
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: "<p>Hello there</p>")
+    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: "<p>Gone</p>")
+    gallery.update_column(:block_type, "gallery")
+
+    get "/"
+
+    assert_response :success
+    assert_select ".cs-prose", text: /Hello there/
+    assert_not_includes response.body, "Gone"
+  end
+
   test "a post detail shows date, excerpt and tags" do
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)

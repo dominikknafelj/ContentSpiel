@@ -16,6 +16,8 @@ module ContentTypes
       ContentTypes.register :resume_entry do |t|
         t.label "Resume entry"
         t.color "#10b981"
+        t.list_component Posts::ResumeListComponent
+        t.detail_component Posts::DetailComponent
         t.field :company, :string
         t.field :role, :string
         t.field :role_type, :select, options: ROLE_TYPES

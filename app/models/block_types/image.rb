@@ -8,6 +8,7 @@ module BlockTypes
       BlockTypes.register :image do |t|
         t.label "Image"
         t.uses :image, :caption, :alt
+        t.component Blocks::ImageComponent
       end
     end
   end

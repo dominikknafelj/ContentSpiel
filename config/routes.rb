@@ -32,6 +32,17 @@ Rails.application.routes.draw do
     # 2026-09-26 §5).
     get "system_status", to: "tools#system_status", as: :system_status
   end
+  # A component browser for the ViewComponents under app/components
+  # (open-types spec §5), development only -- never mounted in test or
+  # production, and declared here, before the public catch-alls below, so
+  # "/lookbook" isn't swallowed as a page path first. Renders through
+  # `ComponentPreviewsController` (config/initializers/view_component.rb),
+  # the same controller the preview smoke test
+  # (test/components/previews_test.rb) uses, so what an editor sees in
+  # Lookbook and what that test asserts never raises are the same rendering
+  # path.
+  mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
+
   resource :session
   resources :passwords, param: :token
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html

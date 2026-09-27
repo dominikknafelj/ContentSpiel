@@ -11,6 +11,7 @@ module BlockTypes
         t.field :tag, :string
         t.field :limit, :integer, min: 1
         t.capability :lists_posts
+        t.component Blocks::PostListComponent
       end
     end
 
