@@ -14,10 +14,9 @@
       modules, an optional page tree, and the main content frame.
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
-      read it via `closest` without a server round trip. Only the modules
-      column is real yet -- the tree column (`content_for :tree`) and the
-      resource controllers that fill `content` arrive in Tasks 3-7; until
-      then this grid quietly collapses to two columns.
+      read it via `closest` without a server round trip. The grid quietly
+      collapses to two columns on any screen with no tree column of its own
+      (every one but Pages -- `content_for :tree` is never set outside it).
 
       The modules column itself collapses to icons below `md` (spec §4.2):
       the grid's own first track narrows from a fixed 16rem to `auto`, and
@@ -55,11 +54,13 @@
 
         <div>
           <%# One shared icon marks the whole "old admin" group (rather than
-              one per Avo link): it's a temporary section (design spec
-              2026-09-26, "Replace Avo") that goes away once Tasks 4-7 give
-              Pages/Posts/Tags/Settings their own CS Studio screens, so it
-              isn't worth a bespoke icon per link. Its own sub-links stay
-              text-only and `hidden` below `md`, rather than also collapsing
+              one per Avo link): it's a temporary section (project memory
+              "Replace Avo", decided 2026-09-26) that goes away once
+              sub-project 6 gives Settings/Users/API tokens/System status
+              their own CS Studio screens the way Pages/Posts/Tags already
+              have theirs, so it isn't worth a bespoke icon per link. Its
+              own sub-links stay text-only and `hidden` below `md`, rather
+              than also collapsing
               to icons, since four indistinguishable icon-only rows would be
               no more usable than no row at all. %>
           <p class="flex items-center justify-center gap-2 font-cs-mono text-label uppercase tracking-mono text-meta md:justify-start">

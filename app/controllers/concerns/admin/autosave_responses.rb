@@ -1,9 +1,9 @@
 module Admin
   # The Turbo Stream response shape every autosaving form shares (cs-studio
-  # spec §6.1/§5.1) -- the page settings form today, a block card and the
-  # post form once Tasks 5/6 add their own PATCH endpoints. One place builds
-  # this so every later editor answers its own autosave the same way, rather
-  # than re-deriving "what does a save response look like" per controller.
+  # spec §6.1/§5.1): the page settings form, a block card and the post form
+  # all answer their own PATCH endpoint through this one shared shape,
+  # rather than each re-deriving "what does a save response look like" on
+  # its own.
   #
   # `record:` and `result:` are kept separate deliberately, not just
   # `result.record` read twice: `result.errors` (an array of full messages,
