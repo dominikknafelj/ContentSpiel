@@ -12,7 +12,13 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
   end
 
   test "register, fetch, find, names and capabilities" do
-    BlockTypes.register(:quote) { |t| t.label "Quote"; t.field :cite, :string; t.capability :lists_posts }
+    BlockTypes.register(:quote) do |t|
+      t.label "Quote"
+      t.field :cite, :string
+      t.field :content_type, :content_type
+      t.field :tag, :string
+      t.capability :lists_posts
+    end
     assert_equal %w[quote], BlockTypes.names
     assert_equal "Quote", BlockTypes.fetch(:quote).label
     assert_nil BlockTypes.find("nope")
@@ -39,5 +45,20 @@ class ContentModel::RegistryTest < ActiveSupport::TestCase
   test "unknown field types and nested field groups are rejected at registration" do
     assert_raises(ArgumentError) { BlockTypes.register(:x) { |t| t.field :a, :colour } }
     assert_raises(ArgumentError) { FieldGroups.register(:bad) { |c| c.field :inner, :group, of: :cta } }
+  end
+
+  # `BlockTypes::PostList.listed_posts`/`.lists?` -- what every caller of the
+  # `lists_posts` capability actually dispatches to -- read
+  # `settings.content_type`/`settings.tag` unconditionally. A block type that
+  # claims the capability without declaring those fields would only find out
+  # the hard way, as a `NoMethodError` the first time a listing actually
+  # renders; checking for them at registration turns that into an
+  # immediate, loud `ArgumentError` instead.
+  test "a lists_posts block type without content_type/tag fields is rejected at registration" do
+    assert_raises(ArgumentError) { BlockTypes.register(:x) { |t| t.capability :lists_posts } }
+    assert_raises(ArgumentError) { BlockTypes.register(:x) { |t| t.capability :lists_posts; t.field :content_type, :content_type } }
+
+    BlockTypes.register(:x) { |t| t.capability :lists_posts; t.field :content_type, :content_type; t.field :tag, :string }
+    assert_equal %w[x], BlockTypes.names
   end
 end
