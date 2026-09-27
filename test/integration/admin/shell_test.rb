@@ -1,4 +1,5 @@
 require "test_helper"
+require "open3"
 
 class Admin::ShellTest < ActionDispatch::IntegrationTest
   setup { site_settings(:default).update!(setup_completed_at: Time.current) }
@@ -7,6 +8,35 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert_equal "cs-studio", ContentSpiel::ADMIN_PATH
     get "/cs-studio"
     assert_redirected_to "/cs-studio/sign-in"
+  end
+
+  # Fix (final-fixes round, finding 8): the reserved list itself, checked
+  # directly (no subprocess needed) -- every static first segment another
+  # route in this app already claims, plus every locale `SUPPORTED_LOCALES`
+  # could ever have enabled (not just `Locales.enabled`, a runtime setting
+  # this boot-time constant can't read).
+  test "the reserved-paths denylist covers every already-claimed first segment" do
+    assert_equal(
+      (%w[preview setup mcp up avo rails lookbook assets cable sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
+      ContentSpiel::RESERVED_PATHS.sort
+    )
+  end
+
+  # Fix (final-fixes round, finding 8): the actual boot-time refusal, proven
+  # by really booting -- `ContentSpiel::ADMIN_PATH` is a constant, set once
+  # when this process itself booted, so there's no way to re-run its own
+  # `tap` block against a bad value from inside this already-running test
+  # process. A subprocess is what actually re-triggers it: one static
+  # reserved word (`avo`) and one locale code (`de`), enough to prove both
+  # halves of the denylist actually reach the raise, not every one of
+  # `RESERVED_PATHS`' several dozen entries -- the list itself is already
+  # covered exhaustively, without a subprocess, just above.
+  test "booting with a reserved ADMIN_PATH actually fails" do
+    %w[avo de].each do |reserved|
+      output, status = Open3.capture2e({ "ADMIN_PATH" => reserved, "RAILS_ENV" => "test" }, "bin/rails", "runner", "1")
+      assert_not status.success?, "expected ADMIN_PATH=#{reserved} to fail boot"
+      assert_includes output, "already reserved"
+    end
   end
 
   test "signing in lands in CS Studio with the modules column" do
