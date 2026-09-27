@@ -71,6 +71,37 @@ class ContentModel::FieldSetTest < ActiveSupport::TestCase
     assert_equal({ "headline" => "Hallo" }, fields.translated_hash)
   end
 
+  # `group`/`groups` values arrive as jsonb read straight back from the
+  # database (or, for `groups`, from an admin form's `has_many`-shaped
+  # params -- an Array of Hashes only when nothing's gone wrong). A stray
+  # non-Hash value -- a hand-edited row, a plugin's own bug -- must come back
+  # as an ordinary validation error, the same as any other bad input, not as
+  # a `NoMethodError` from `Hash`-only jsonb code assuming its shape.
+  test "a non-hash group value is an :invalid error, not a crash" do
+    fields = ContentModel::FieldSet.for(@with_groups).new({}, { "en" => { "lead" => "not a hash" } }, locale: "en")
+    assert_nothing_raised { fields.valid? }
+    assert_not fields.valid?
+    assert fields.errors["lead"].any?
+    assert_nothing_raised { fields.group(:lead) }
+    assert_nil fields.group(:lead)
+  end
+
+  test "a non-array groups value is an :invalid error, not a crash" do
+    fields = ContentModel::FieldSet.for(@with_groups).new({ "speakers" => "not an array" })
+    assert_nothing_raised { fields.valid? }
+    assert_not fields.valid?
+    assert fields.errors["speakers"].any?
+    assert_nothing_raised { fields.group(:speakers) }
+  end
+
+  test "a groups list with a non-hash item is an :invalid error, not a crash" do
+    fields = ContentModel::FieldSet.for(@with_groups).new({ "speakers" => [ { "name" => "Ada" }, "not a hash" ] })
+    assert_nothing_raised { fields.valid? }
+    assert_not fields.valid?
+    assert fields.errors["speakers"].any?
+    assert_nothing_raised { fields.group(:speakers) }
+  end
+
   test "group fields can't declare a default" do
     assert_raises(ArgumentError) do
       ContentModel::ContentTypeDefinition.new("thing").tap { |t| t.field :speakers, :groups, of: "test/speaker", default: [] }

@@ -105,16 +105,26 @@ module ContentModel
       def all_translations = @translations
 
       # The nested `FieldSet` instance for a `group` field, or an Array of
-      # them for a `groups` field.
+      # them for a `groups` field. Values come straight out of jsonb (or, for
+      # `groups`, an admin form's own params) with nothing guaranteeing their
+      # shape -- a `group` is only ever a Hash and a `groups` list only ever
+      # an Array of them when nothing's gone wrong; anything else (a stray
+      # String, a Hash where a `groups` value should be an Array, a
+      # non-Hash item inside that Array) reads back as `nil`/skipped rather
+      # than blowing up on `Hash`-only code downstream (`FieldSet.new`'s own
+      # `to_h`). `validate_group` is what turns that same malformed shape
+      # into a reported `:invalid` error instead of silence.
       def group(name)
         field = definition.fields.find { |f| f.name == name.to_s }
         raw = raw_value(field)
         klass = FieldGroups.fetch(field.options[:of]).field_set
 
         if field.type == :groups
-          Array(raw).map { |item| klass.new(item, {}, locale: @locale) }
+          return [] unless raw.nil? || raw.is_a?(Array)
+
+          Array(raw).map { |item| item.is_a?(Hash) ? klass.new(item, {}, locale: @locale) : nil }
         else
-          raw && klass.new(raw, {}, locale: @locale)
+          raw.is_a?(Hash) ? klass.new(raw, {}, locale: @locale) : nil
         end
       end
 
@@ -220,8 +230,20 @@ module ContentModel
 
       # A `group` field validates its one nested instance; `groups`
       # validates every item in the list, prefixing each nested error with its
-      # index (`speakers.1.name`) so a form can point at the exact row.
+      # index (`speakers.1.name`) so a form can point at the exact row. The
+      # value's *shape* -- a `group` must be a Hash, `nil`, or absent; a
+      # `groups` value must be an Array of Hashes, `nil`, or absent -- is
+      # checked before touching `group(field.name)` at all: `group` already
+      # degrades a malformed value to `nil`/skipped rather than raising (see
+      # its own comment), so without this check a whole-field shape error
+      # would silently read back as "blank" instead of being reported.
       def validate_group(field)
+        raw = raw_value(field)
+        unless group_shape_valid?(field, raw)
+          errors.add(field.name, :invalid)
+          return
+        end
+
         items = field.type == :groups ? Array(group(field.name)).each_with_index.to_a : [ [ group(field.name), nil ] ]
 
         errors.add(field.name, :blank) if field.required? && items.all? { |item, _| item.nil? }
@@ -232,6 +254,12 @@ module ContentModel
           prefix = index.nil? ? field.name : "#{field.name}.#{index}"
           item.errors.each { |error| errors.add("#{prefix}.#{error.attribute}", error.type, message: error.message) }
         end
+      end
+
+      def group_shape_valid?(field, raw)
+        return true if raw.nil?
+
+        field.type == :groups ? raw.is_a?(Array) && raw.all? { |item| item.is_a?(Hash) } : raw.is_a?(Hash)
       end
 
       def url?(value)
