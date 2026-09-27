@@ -1,14 +1,14 @@
 <%# Signed-in preview banner (spec §6.4): PreviewController is the only place
     that sets @preview_record, so this only ever renders there, via
-    pages/show.html.erb's `content_for :preview_banner`. "Edit" still goes to
-    Avo for now -- CS Studio: switch in Task 4/7 to `admin_page_path(@page)` /
-    `admin_post_path(@post)` once those editors exist (cs-studio spec §3).
-    "View live" only appears once the record is actually live; linking to its
-    public address while it's still a draft or scheduled would be a dead
-    end. %>
+    pages/show.html.erb's `content_for :preview_banner`. A page's "Edit" now
+    goes to CS Studio's own editor (Task 4); a post's still goes to Avo --
+    switch that one too once Task 6 gives posts their own CS Studio editor
+    (cs-studio spec §3). "View live" only appears once the record is
+    actually live; linking to its public address while it's still a draft
+    or scheduled would be a dead end. %>
 <div role="status" class="mt-4 rounded-cs border border-warn bg-warn-tint px-3 py-2 font-cs-mono text-label uppercase tracking-mono text-warn-ink">
   <span>Preview · <%= @preview_record.status.humanize %> — not visible to visitors</span>
-  <%= link_to "Edit", (@post ? avo.edit_resources_post_path(@post) : avo.edit_resources_page_path(@page)), class: "ml-2 underline" %>
+  <%= link_to "Edit", (@post ? avo.edit_resources_post_path(@post) : admin_page_path(@page)), class: "ml-2 underline" %>
   <% if @preview_record.live? %>
     <%= link_to "View live", PublicSite::Urls.new.path_for(@preview_record), class: "ml-2 underline" %>
   <% end %>

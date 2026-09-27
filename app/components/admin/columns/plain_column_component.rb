@@ -9,8 +9,8 @@ module Admin
     # excerpt, a meta description) without needing a whole separate
     # component per column.
     class PlainColumnComponent < Base
-      def initialize(name:, value:, original: nil, errors: [], locale: nil, multiline: false)
-        super(name: name, value: value, original: original, errors: errors, locale: locale)
+      def initialize(name:, value:, original: nil, errors: [], locale: nil, multiline: false, id: nil, html_name: nil, **html)
+        super(name: name, value: value, original: original, errors: errors, locale: locale, id: id, html_name: html_name, **html)
         @multiline = multiline
       end
 

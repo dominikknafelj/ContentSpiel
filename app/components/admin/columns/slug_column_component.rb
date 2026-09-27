@@ -15,8 +15,8 @@ module Admin
     # later" pattern in `Admin::FieldComponent`) without this component
     # needing to know about that controller yet.
     class SlugColumnComponent < Base
-      def initialize(value:, base_url:, name: "slug", original: nil, errors: [], locale: nil)
-        super(name: name, value: value, original: original, errors: errors, locale: locale)
+      def initialize(value:, base_url:, name: "slug", original: nil, errors: [], locale: nil, id: nil, html_name: nil, **html)
+        super(name: name, value: value, original: original, errors: errors, locale: locale, id: id, html_name: html_name, **html)
         @base_url = base_url
       end
 

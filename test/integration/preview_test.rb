@@ -19,7 +19,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
     assert_select "[role=status]", /Draft/
     assert_equal "private, no-store", response.headers["Cache-Control"]
     assert_equal "noindex", response.headers["X-Robots-Tag"]
-    assert_select "a[href=?]", "/avo/resources/pages/#{@draft.id}/edit"
+    assert_select "a[href=?]", "/cs-studio/pages/#{@draft.id}"
   end
 
   test "links inside a preview stay in preview" do

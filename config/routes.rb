@@ -55,11 +55,18 @@ Rails.application.routes.draw do
     get "password/:token/edit", to: "passwords#edit", as: :edit_password
     patch "password/:token", to: "passwords#update", as: :update_password
 
-    # The Pages module (cs-studio spec §4.1/§5.1): `show`/`update`/`destroy`
-    # are routed now but land in Task 4 -- `new`/`create` (this task) already
-    # redirect to `admin_page_path`, so the helper has to exist even before
-    # its controller action does.
-    resources :pages, only: %i[index new create show update destroy]
+    # The Pages module (cs-studio spec §4.1/§5.1). `member` adds the three
+    # publish-state actions the record header's own buttons post to
+    # (Publish now / Unpublish / Schedule…, spec §5.1) -- each its own
+    # one-shot POST, deliberately outside the settings form's autosave
+    # (`Admin::PagesController`'s own class comment explains why).
+    resources :pages, only: %i[index new create show update destroy] do
+      member do
+        post :publish
+        post :unpublish
+        post :schedule
+      end
+    end
 
     # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`
     # (singular) rather than nested under `pages` -- a move names the page

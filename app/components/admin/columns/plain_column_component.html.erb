@@ -1,12 +1,12 @@
 <div class="admin-column mb-4" data-field-name="<%= name %>">
-  <label class="<%= setup_label_class %> mb-1" for="<%= name %>"><%= name.to_s.humanize %></label>
+  <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
 
   <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
     <div>
       <% if multiline %>
-        <%= tag.textarea value, name: name, id: name, class: setup_input_class, rows: 3 %>
+        <%= tag.textarea value, **html.merge(name: html_name, id: id, class: setup_input_class, rows: 3) %>
       <% else %>
-        <%= tag.input type: "text", name: name, id: name, value: value, class: setup_input_class %>
+        <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: setup_input_class)) %>
       <% end %>
     </div>
 

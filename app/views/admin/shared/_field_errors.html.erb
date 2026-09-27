@@ -1,0 +1,14 @@
+<%# locals: id, messages -- the Turbo Stream replacement target for one
+    autosaving field's error slot (cs-studio spec §6.1). Rendered with the
+    same markup every `Admin::Columns::*` component already builds inline
+    (matching classes, same "wrap every message in its own <p>" shape) so a
+    field looks identical whether its errors came from the initial page
+    load or a later autosave replace -- and always rendered, even with an
+    empty `messages`, since an empty replace is exactly what clears a
+    field's stale error once the value that caused it is fixed
+    (`Admin::AutosaveResponses#autosave_stream`). %>
+<div id="<%= id %>" class="mt-1 text-sm text-danger-ink">
+  <% messages.each do |message| %>
+    <p><%= message %></p>
+  <% end %>
+</div>
