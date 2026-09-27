@@ -12,8 +12,7 @@ class Avo::Actions::RegenerateApiToken < Avo::BaseAction
     "The old token stops working immediately, and the new one is shown once -- copy it before closing this."
 
   def handle(current_user:, **args)
-    current_user.api_tokens.active.each(&:revoke!)
-    _token, raw = ApiToken.generate!(current_user)
+    _token, raw = ApiTokens::Issue.call(current_user, rotate: true).record
 
     succeed("New token: #{raw}")
   end

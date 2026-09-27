@@ -25,8 +25,8 @@ class Avo::Resources::ApiToken < Avo::BaseResource
     action Avo::Actions::RegenerateApiToken
   end
 
-  # Tokens are minted by ApiToken.generate!, which is what hashes the raw token
-  # into the NOT NULL `token_digest` column -- a hand-filled New form could only
+  # Tokens are minted through ApiTokens::Issue, which is what hashes the raw
+  # token into the NOT NULL `token_digest` column -- a hand-filled New form could only
   # ever raise NotNullViolation. Avo 4.2.3 Community has no `new_enabled` flag
   # (per-action gating lives in the avo-authorization plugin, which isn't
   # installed and stubs out to "always allowed"), so the Create button is

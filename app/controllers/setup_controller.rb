@@ -178,7 +178,7 @@ class SetupController < ApplicationController
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
     def update_mcp_token
-      _token, @raw_token = ApiToken.generate!(Current.user)
+      _token, @raw_token = ApiTokens::Issue.call(Current.user).record
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end

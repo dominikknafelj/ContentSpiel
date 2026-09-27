@@ -8,6 +8,6 @@ class Avo::ApiTokensController < Avo::ResourcesController
   private
     def refuse_manual_creation
       redirect_to resources_api_tokens_path,
-        flash: { warning: "API tokens are generated with ApiToken.generate!, not created by hand." }
+        flash: { warning: "API tokens are generated through ApiTokens::Issue, not created by hand." }
     end
 end
