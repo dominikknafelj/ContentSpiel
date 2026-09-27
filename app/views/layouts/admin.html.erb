@@ -29,18 +29,25 @@
     <div class="grid min-h-screen grid-cols-[auto_1fr] md:grid-cols-[16rem_1fr]<%= " lg:grid-cols-[16rem_18rem_1fr]" if content_for?(:tree) %>">
       <nav aria-label="Modules" class="flex flex-col gap-6 border-r border-line bg-surface p-4">
         <ul class="flex flex-col gap-2">
+          <%# `admin_url_options` on every one of these (final-fixes round,
+              finding 5): without it, following a modules link while editing
+              a non-default language silently dropped back to
+              `Locales.default` -- these three are the one navigation in
+              the whole shell that doesn't already run through a component
+              (`Admin::TreeNodeComponent#path`, `Admin::LanguageSwitcherComponent`,
+              ...) that threads it through for its own links already. %>
           <li>
-            <%= link_to admin_root_path, class: nav_link_classes do %>
+            <%= link_to admin_root_path(**admin_url_options), class: nav_link_classes do %>
               <%= render "admin/shared/icon", name: :pages %><span class="sr-only md:not-sr-only">Pages</span>
             <% end %>
           </li>
           <li>
-            <%= link_to admin_posts_path, class: nav_link_classes do %>
+            <%= link_to admin_posts_path(**admin_url_options), class: nav_link_classes do %>
               <%= render "admin/shared/icon", name: :posts %><span class="sr-only md:not-sr-only">Posts</span>
             <% end %>
           </li>
           <li>
-            <%= link_to admin_tags_path, class: nav_link_classes do %>
+            <%= link_to admin_tags_path(**admin_url_options), class: nav_link_classes do %>
               <%= render "admin/shared/icon", name: :tags %><span class="sr-only md:not-sr-only">Tags</span>
             <% end %>
           </li>

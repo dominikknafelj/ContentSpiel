@@ -12,6 +12,18 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
     @page = create_page(title: "About")
   end
 
+  # Fix (final-fixes round, finding 5): the modules column's own Pages/
+  # Posts/Tags links used to drop `?locale=` outright, silently bouncing an
+  # editor back to `Locales.default` the moment they followed one while
+  # working in another language.
+  test "the modules column's own links keep the editing locale" do
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio?locale=de']"
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/posts?locale=de']"
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/tags?locale=de']"
+  end
+
   test "the switcher lists enabled languages and marks missing ones" do
     get "/cs-studio/pages/#{@page.id}"
     assert_select "nav[aria-label='Languages'] a", Locales.enabled.size - 1
