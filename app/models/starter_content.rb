@@ -11,6 +11,12 @@
 # this locale's slug/title translation happens to be blank -- a page or post
 # that already exists in *any* locale still counts. Creation itself still
 # happens in the given locale only.
+#
+# Creation goes through the same write-path services (`Pages::Save`,
+# `ContentBlocks::Save`, `Posts::Save`) admin, MCP and setup use (spec §7.3),
+# not plain ActiveRecord -- but the input here is fixed, not user-typed, so a
+# failed Result can only mean this module itself is broken. `raise!` turns
+# that into a loud failure instead of a silently half-built starter site.
 module StarterContent
   WELCOME_HTML = "<p>Welcome to your new site. Sign in to the admin to edit this page.</p>".freeze
 
@@ -29,22 +35,23 @@ module StarterContent
 
   # Always run when setup finishes, so "/" is never a 404 on a new site.
   def ensure_home!(locale:)
-    Mobility.with_locale(locale) do
-      home = Page.find_by(parent_id: nil) ||
-        Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-      home.content_blocks.create!(block_type: :rich_text, position: 0, body: WELCOME_HTML) if home.content_blocks.none?
-      home
+    home = Page.find_by(parent_id: nil) ||
+      raise!(Pages::Save.call(attributes: { published: true }, translations: { locale => { title: "Home", slug: "" } }))
+
+    if home.content_blocks.none?
+      raise!(ContentBlocks::Save.call(ContentBlock.new(page: home), attributes: { block_type: "rich_text" },
+        translations: { locale => { body: WELCOME_HTML } }))
     end
+
+    home
   end
 
   def create_pages_and_posts!(locale:)
     home = ensure_home!(locale: locale)
 
-    Mobility.with_locale(locale) do
-      SECTIONS.each do |section|
-        find_or_create_section_page!(home, section)
-        find_or_create_sample_post!(section)
-      end
+    SECTIONS.each do |section|
+      find_or_create_section_page!(home, section, locale)
+      find_or_create_sample_post!(section, locale)
     end
   end
 
@@ -58,19 +65,26 @@ module StarterContent
     SECTIONS.all? { |section| find_section_page(home, section).present? }
   end
 
-  def find_or_create_section_page!(home, section)
-    find_section_page(home, section) ||
-      Page.create!(parent: home, page_type: :standard, title: section[:title], slug: section[:slug],
-        published_at: Time.current).tap do |page|
-        page.content_blocks.create!(block_type: :post_list, position: 0,
-          settings: { "content_type" => section[:content_type] })
-      end
+  def find_or_create_section_page!(home, section, locale)
+    find_section_page(home, section) || begin
+      page = raise!(Pages::Save.call(attributes: { parent: home, published: true },
+        translations: { locale => { title: section[:title], slug: section[:slug] } }))
+
+      raise!(ContentBlocks::Save.call(ContentBlock.new(page: page), attributes: { block_type: "post_list",
+        settings: { "content_type" => section[:content_type] } }))
+
+      page
+    end
   end
 
-  def find_or_create_sample_post!(section)
-    attributes = section[:post]
-    find_sample_post(section) ||
-      Post.create!(content_type: section[:content_type], published_at: Time.current, **attributes)
+  def find_or_create_sample_post!(section, locale)
+    find_sample_post(section) || begin
+      post = section[:post]
+      translated = post.slice(:title, :excerpt, :body)
+      attributes = post.except(:title, :excerpt, :body).merge(content_type: section[:content_type], published: true)
+
+      raise!(Posts::Save.call(attributes: attributes, translations: { locale => translated }))
+    end
   end
 
   def find_section_page(home, section)
@@ -92,5 +106,16 @@ module StarterContent
       return match if match
     end
     nil
+  end
+
+  # Fixed input, not user input (see the module comment above): a failed
+  # Result here means this module's own hard-coded attributes are wrong, not
+  # that a validation legitimately rejected something an editor typed. Loud
+  # and immediate beats a starter site left half-built with no error anyone
+  # would see.
+  def raise!(result)
+    raise "StarterContent: #{result.errors.to_sentence}" unless result.ok?
+
+    result.record
   end
 end

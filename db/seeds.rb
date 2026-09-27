@@ -11,26 +11,48 @@ return unless Rails.env.development?
 # would try to recreate it (and fail validation) on every re-run. `.i18n`
 # rewrites the condition into a lookup of the current locale's key inside the
 # column instead, the same way Page/Post's own uniqueness validations do.
-def find_or_create_post!(content_type:, title:)
+#
+# Creation itself goes through `Posts::Save`/`Pages::Save`/`ContentBlocks::
+# Save` -- the same write path admin, MCP and setup use (spec §7.3) -- rather
+# than plain ActiveRecord. This is fixed, hard-coded input, not anything a
+# user typed, so a failed Result here can only mean this file itself is
+# broken; raising loudly beats leaving a half-seeded dev database with no
+# error anyone would see.
+def find_or_create_post!(content_type:, title:, published_at:, excerpt: nil, body: nil, metadata: nil, tags: [])
   post = Post.i18n.where(title: title).where(content_type: content_type).first
   return post if post
 
-  Post.create! do |p|
-    p.content_type = content_type
-    p.title = title
-    yield p if block_given?
-  end
+  attributes = { content_type: content_type, published_at: published_at, metadata: metadata, tag_names: tags }.compact
+  translations = { "en" => { title: title, excerpt: excerpt, body: body }.compact }
+
+  result = Posts::Save.call(attributes: attributes, translations: translations)
+  raise "seeds: #{result.errors.to_sentence}" unless result.ok?
+
+  result.record
 end
 
-def find_or_create_page!(parent:, slug:)
+def find_or_create_page!(parent:, slug:, title:, published_at: Time.current, page_type: :standard)
   page = Page.i18n.where(slug: slug).where(parent_id: parent.id).first
   return page if page
 
-  Page.create! do |p|
-    p.parent = parent
-    p.slug = slug
-    yield p if block_given?
-  end
+  result = Pages::Save.call(attributes: { parent: parent, page_type: page_type, published_at: published_at },
+    translations: { "en" => { title: title, slug: slug } })
+  raise "seeds: #{result.errors.to_sentence}" unless result.ok?
+
+  result.record
+end
+
+def find_or_create_block!(page:, block_type:, position:, settings: nil, body: nil)
+  block = page.content_blocks.find_by(block_type: block_type, position: position)
+  return block if block
+
+  attributes = { block_type: block_type, position: position, settings: settings }.compact
+  translations = { "en" => { body: body }.compact }
+
+  result = ContentBlocks::Save.call(ContentBlock.new(page: page), attributes: attributes, translations: translations)
+  raise "seeds: #{result.errors.to_sentence}" unless result.ok?
+
+  result.record
 end
 
 User.find_or_create_by!(email_address: "admin@example.com") do |user|
@@ -43,9 +65,6 @@ SiteSetting.instance.tap do |settings|
   settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end
 
-rails_tag = Tag.find_or_create_by!(name: "rails")
-ruby_tag = Tag.find_or_create_by!(name: "ruby")
-
 # A YoutubeEmbed pasted into a rich text body renders wherever it's attached
 # (design spec section 8) -- find_or_create_from_url is what reuses the same
 # row when the same video shows up more than once below, exactly as a real
@@ -57,10 +76,9 @@ end
 
 demo_video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
-foundation_post = find_or_create_post!(content_type: :blog, title: "Building ContentSpiel") do |post|
-  post.published_at = 2.weeks.ago
-  post.excerpt = "Why this site is a page tree of content blocks instead of a handful of fixed routes."
-  post.body = <<~HTML
+foundation_post = find_or_create_post!(content_type: :blog, title: "Building ContentSpiel", published_at: 2.weeks.ago,
+  excerpt: "Why this site is a page tree of content blocks instead of a handful of fixed routes.",
+  tags: %w[rails ruby], body: <<~HTML)
     <p>ContentSpiel's public site is a <strong>Page</strong> tree, not a fixed
     set of routes -- every page is built from an ordered list of content
     blocks (rich text, images, and post listings), the same way TYPO3 or
@@ -68,95 +86,58 @@ foundation_post = find_or_create_post!(content_type: :blog, title: "Building Con
     <p>Here's a talk that shaped how I think about that boundary:</p>
     #{youtube_attachment_html(demo_video)}
   HTML
-end
-foundation_post.tags = [ rails_tag, ruby_tag ]
 
-i18n_post = find_or_create_post!(content_type: :blog, title: "Translating Everything With Mobility") do |post|
-  post.published_at = 1.week.ago
-  post.excerpt = "English, German, and Spanish, from day one -- jsonb columns, not a locale-per-row table."
-  post.body = <<~HTML
+i18n_post = find_or_create_post!(content_type: :blog, title: "Translating Everything With Mobility",
+  published_at: 1.week.ago,
+  excerpt: "English, German, and Spanish, from day one -- jsonb columns, not a locale-per-row table.",
+  tags: %w[ruby], body: <<~HTML)
     <p>Every translatable attribute on <strong>Post</strong> and
     <strong>Page</strong> is a jsonb column holding one value per locale,
     via the <code>mobility</code> gem. Rich text uses
     <code>mobility-actiontext</code> instead, since ActionText needs its own
     table for attachments.</p>
   HTML
-end
-i18n_post.tags = [ ruby_tag ]
 
 # Undirected in the mind graph (page-tree design spec section 4): one row
 # here shows as one edge, read in either direction.
 PostRelation.find_or_create_by!(post: foundation_post, related_post: i18n_post)
 
-find_or_create_post!(content_type: :resume_entry, title: "Senior Software Engineer") do |post|
-  post.published_at = 3.years.ago
-  post.metadata = { "company" => "Acme Corp", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" }
-  post.body = "<p>Led the platform team rebuilding Acme's content pipeline.</p>"
+find_or_create_post!(content_type: :resume_entry, title: "Senior Software Engineer", published_at: 3.years.ago,
+  metadata: { "company" => "Acme Corp", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" },
+  body: "<p>Led the platform team rebuilding Acme's content pipeline.</p>")
+
+find_or_create_post!(content_type: :resume_entry, title: "Software Engineer", published_at: 6.years.ago,
+  metadata: { "company" => "Widgets Inc", "role_type" => "ic", "start_date" => "2020-01-01", "end_date" => "2022-12-31" },
+  body: "<p>Built and maintained Widgets Inc's customer-facing API.</p>")
+
+find_or_create_post!(content_type: :now_update, title: "What I'm up to now", published_at: 2.days.ago,
+  body: "<p>Adding rich embeds and a mind-graph view to this very site.</p>")
+
+root = Page.find_by(parent_id: nil)
+root ||= begin
+  result = Pages::Save.call(attributes: { page_type: :standard, published: true },
+    translations: { "en" => { title: "Home", slug: "" } })
+  raise "seeds: #{result.errors.to_sentence}" unless result.ok?
+
+  result.record
 end
 
-find_or_create_post!(content_type: :resume_entry, title: "Software Engineer") do |post|
-  post.published_at = 6.years.ago
-  post.metadata = { "company" => "Widgets Inc", "role_type" => "ic", "start_date" => "2020-01-01", "end_date" => "2022-12-31" }
-  post.body = "<p>Built and maintained Widgets Inc's customer-facing API.</p>"
-end
+find_or_create_block!(page: root, block_type: :rich_text, position: 0,
+  body: "<p>Hi, I'm the site owner. This is a demo of ContentSpiel's page tree, content blocks, and rich embeds.</p>")
+find_or_create_block!(page: root, block_type: :post_list, position: 1, settings: { "limit" => 5 })
 
-find_or_create_post!(content_type: :now_update, title: "What I'm up to now") do |post|
-  post.published_at = 2.days.ago
-  post.body = "<p>Adding rich embeds and a mind-graph view to this very site.</p>"
-end
+about = find_or_create_page!(parent: root, slug: "about", title: "About")
+find_or_create_block!(page: about, block_type: :rich_text, position: 0,
+  body: "<p>I write about Rails, i18n, and building admin tools Avo Community doesn't ship out of the box.</p>" \
+    "#{youtube_attachment_html(demo_video)}")
 
-root = Page.find_or_create_by!(page_type: :standard, parent_id: nil) do |page|
-  page.title = "Home"
-  page.slug = ""
-  page.published_at = Time.current
-end
+blog = find_or_create_page!(parent: root, slug: "blog", title: "Blog")
+find_or_create_block!(page: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
 
-ContentBlock.find_or_create_by!(page: root, block_type: :rich_text, position: 0) do |block|
-  block.body = "<p>Hi, I'm the site owner. This is a demo of ContentSpiel's page tree, content blocks, and rich embeds.</p>"
-end
-ContentBlock.find_or_create_by!(page: root, block_type: :post_list, position: 1) do |block|
-  block.settings = { "limit" => 5 }
-end
+resume = find_or_create_page!(parent: root, slug: "resume", title: "Resume")
+find_or_create_block!(page: resume, block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
 
-find_or_create_page!(parent: root, slug: "about") do |page|
-  page.title = "About"
-  page.page_type = :standard
-  page.published_at = Time.current
-end.tap do |about|
-  ContentBlock.find_or_create_by!(page: about, block_type: :rich_text, position: 0) do |block|
-    block.body = "<p>I write about Rails, i18n, and building admin tools Avo Community doesn't ship out of the box.</p>" \
-      "#{youtube_attachment_html(demo_video)}"
-  end
-end
-
-find_or_create_page!(parent: root, slug: "blog") do |page|
-  page.title = "Blog"
-  page.page_type = :standard
-  page.published_at = Time.current
-end.tap do |blog|
-  ContentBlock.find_or_create_by!(page: blog, block_type: :post_list, position: 0) do |block|
-    block.settings = { "content_type" => "blog" }
-  end
-end
-
-find_or_create_page!(parent: root, slug: "resume") do |page|
-  page.title = "Resume"
-  page.page_type = :standard
-  page.published_at = Time.current
-end.tap do |resume|
-  ContentBlock.find_or_create_by!(page: resume, block_type: :post_list, position: 0) do |block|
-    block.settings = { "content_type" => "resume_entry" }
-  end
-end
-
-find_or_create_page!(parent: root, slug: "now") do |page|
-  page.title = "Now"
-  page.page_type = :standard
-  page.published_at = Time.current
-end.tap do |now_page|
-  ContentBlock.find_or_create_by!(page: now_page, block_type: :post_list, position: 0) do |block|
-    block.settings = { "content_type" => "now_update" }
-  end
-end
+now_page = find_or_create_page!(parent: root, slug: "now", title: "Now")
+find_or_create_block!(page: now_page, block_type: :post_list, position: 0, settings: { "content_type" => "now_update" })
 
 PublicSite::Paths.rebuild!

@@ -26,6 +26,21 @@ class Page < ApplicationRecord
   # are built from the ancestor chain `has_closure_tree` provides.
   include HasPublicPaths
 
+  # Model-specific concern for the "move to rank N" logic (spec §3), included
+  # here -- right after `has_closure_tree` -- so its `after_save
+  # :place_among_siblings` (app/models/page/tree_ranking.rb) is declared, and
+  # therefore runs, before `after_save :sync_public_paths` below: a move or
+  # reorder can change which page is *canonical* for a post_list block
+  # elsewhere in the tree (`PublicSite::Paths.canonical_page` ranks pages by
+  # sibling `position`), so paths must not be (re)computed until every
+  # sibling's position has been written out by `place_among_siblings`. Include
+  # order is what fixes callback order here (both are `after_save`s declared
+  # on `Page` itself, so Rails would otherwise just run them in declaration
+  # order) -- moving this include below `after_save :sync_public_paths` would
+  # silently flip that order back and let canonical-page resyncs read stale
+  # positions.
+  include Page::TreeRanking
+
   # jsonb columns holding one value per locale; reading or writing them goes
   # through the current Mobility.locale. `hero_alt` is the alt text for
   # whichever hero image the page's theme renders, translated for the same
@@ -119,24 +134,6 @@ class Page < ApplicationRecord
   # unreachable at its own URL.
   after_save :sync_public_paths
 
-  # Reordering a branch is done by typing a new `position` (page-tree design
-  # spec section 5 waives drag-and-drop, so that number *is* the reordering
-  # UI), and the number has to mean "put me at this rank among my siblings".
-  #
-  # closure_tree does renumber siblings after a position change, but only from
-  # the number that was written: two siblings holding the same number is a tie
-  # Postgres breaks however it likes, so typing the number of the page you want
-  # to get ahead of usually leaves the order exactly as it was. Only a number
-  # below every sibling's, or above all of them, moved the page at all.
-  #
-  # So the rank is applied here instead: the requested number is captured
-  # before closure_tree renumbers over it, and the siblings are then written
-  # out in the order it asks for. `update_columns` keeps that from re-entering
-  # this chain on every sibling, and leaves the dense 0..n-1 numbering
-  # closure_tree expects.
-  before_save :remember_requested_position
-  after_save :place_among_siblings
-
   private
 
   # The homepage's slug is "" by design (see `PublicSite::Paths.page_path`).
@@ -171,28 +168,6 @@ class Page < ApplicationRecord
 
     types = ContentBlock.post_list.where(page_id: self_and_descendant_ids).map { |block| block.settings["content_type"].presence }
     types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
-  end
-
-  # closure_tree's own `after_save` reloads this record as part of renumbering,
-  # which is what takes the requested number back out of reach of the callback
-  # that has to act on it.
-  def remember_requested_position
-    @requested_position = position if will_save_change_to_position?
-  end
-
-  def place_among_siblings
-    requested = @requested_position
-    @requested_position = nil
-    return if requested.nil?
-
-    # `self` rather than the row for this page, so the in-memory record ends up
-    # holding the position it was actually given.
-    others = self.class.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
-    ordered = others.insert(requested.clamp(0, others.size), self)
-
-    ordered.each_with_index do |page, index|
-      page.update_columns(position: index) unless page.position == index
-    end
   end
 
   # Raw jsonb hash, not the Mobility reader: see the comment above
