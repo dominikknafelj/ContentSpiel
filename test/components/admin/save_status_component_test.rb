@@ -31,6 +31,15 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :stale)
     assert_text "Changed elsewhere — reload to see the latest"
+
+    # Fix (final-fixes round, finding 4): never rendered by a server
+    # response (see this state's own class comment), but its exact text
+    # still has to be governed by this one component, the same as every
+    # other state's -- `autosave_controller.js`'s own client-only text has
+    # to keep matching it by hand, not by any shared code, so this is what a
+    # future edit here is actually being kept in sync with.
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :signed_out)
+    assert_text "Signed out — sign in again to keep saving"
   end
 
   test "rejects an unknown state" do

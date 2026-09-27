@@ -9,7 +9,16 @@ module Admin
   # an empty element rather than an empty string with visible chrome around
   # it, so the header note it sits in doesn't visibly flash on load.
   class SaveStatusComponent < AdminComponent
-    STATES = %i[idle saving saved error stale offline retrying].freeze
+    # `signed_out` (final-fixes round, finding 4) is never rendered by any
+    # server response -- `autosave_controller.js` sets this text itself, the
+    # moment it notices a save's own response redirected (an expired
+    # session), rather than a server ever answering a Turbo Stream that
+    # replaces this element with it. It's a state here anyway, not a bare
+    # string duplicated in the JS, so its wording stays governed by this
+    # one class the same way every other state's already is -- and so a
+    # Lookbook preview or a future server-side use of it has somewhere to
+    # read the exact text from.
+    STATES = %i[idle saving saved error stale offline retrying signed_out].freeze
 
     def initialize(id:, state: :idle, at: nil, count: 0)
       raise ArgumentError, "unknown save status state #{state.inspect}" unless STATES.include?(state)
@@ -29,6 +38,7 @@ module Admin
       when :retrying then "Not saved — retrying"
       when :offline then "Not saved — check your connection"
       when :stale then "Changed elsewhere — reload to see the latest"
+      when :signed_out then "Signed out — sign in again to keep saving"
       end
     end
 

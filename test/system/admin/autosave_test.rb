@@ -101,6 +101,54 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_page_title_eventually("Second edit wins")
   end
 
+  # Fix (final-fixes round, finding 4): a session that expired between this
+  # page loading and the very next autosave firing used to leave the status
+  # line stuck on "Saving…" forever -- `fetch`'s own default `redirect:
+  # "follow"` quietly turns the server's 302-to-sign-in into a *followed*,
+  # final 200 response for the sign-in page itself, which the original code
+  # then handed straight to `Turbo.renderStreamMessage` as if it were a real
+  # answer. Destroying the signed-in user's own session row server-side
+  # (rather than clearing the browser's cookie, which `resume_session`'s own
+  # `cookies.signed[:session_id]` lookup would just as happily accept a
+  # fresh one for) is what reproduces "signed in a moment ago, expired
+  # since" without touching anything this test doesn't own.
+  test "an autosave whose session expired meanwhile shows Signed out, not stuck on Saving forever" do
+    visit "/cs-studio/pages/#{@page.id}"
+    users(:one).sessions.destroy_all
+
+    title_field = find_field("Title")
+    title_field.set("Nobody is signed in anymore")
+    title_field.send_keys(:tab)
+
+    assert_selector "#page-save-status", text: "Signed out — sign in again to keep saving", wait: 5
+  end
+
+  # Fix (final-fixes round, finding 4): a response that arrives but isn't
+  # this endpoint's own Turbo Stream answer (a 500, here) used to be handed
+  # to `Turbo.renderStreamMessage` exactly like a real success -- no
+  # `<turbo-stream>` tags in it for Turbo to act on, so nothing visibly
+  # happened, but the status line never moved off "Saving…" either. `fetch`
+  # is stubbed here (the same technique the "second edit wins" test above
+  # already uses) rather than the server actually 500ing, since nothing in
+  # this app can be made to fail on demand; `window.setTimeout` is stubbed
+  # alongside it purely to collapse this controller's own 1s/3s/9s retry
+  # backoff so the test doesn't have to sit through 13 real seconds of it.
+  test "a response that isn't a real answer (a 500, not a turbo-stream) retries, then shows check your connection" do
+    visit "/cs-studio/pages/#{@page.id}"
+
+    page.execute_script(<<~JS)
+      const originalSetTimeout = window.setTimeout
+      window.setTimeout = (fn, _delay) => originalSetTimeout(fn, 0)
+      window.fetch = () => Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))
+    JS
+
+    title_field = find_field("Title")
+    title_field.set("This will never actually save")
+    title_field.send_keys(:tab)
+
+    assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 5
+  end
+
   private
 
   # See this test's own comment for why the status line's text alone isn't
