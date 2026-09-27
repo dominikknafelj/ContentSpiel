@@ -32,4 +32,24 @@ module Locales
     configured = Array(Current.site.locale_entry(code)&.fetch("fallbacks", nil)).map(&:to_s)
     ([ code.to_s ] + configured + [ default ] + enabled).uniq
   end
+
+  # The one fallback-aware reader for public output (spec §4.3): the first
+  # present value walking `fallback_chain(locale)`. Each step reads the
+  # literal per-locale value -- plain Mobility readers no longer fall back on
+  # their own (config/initializers/mobility.rb) -- so a translation left
+  # blank in German shows the default language's text rather than nothing.
+  #
+  # Works for jsonb attributes and ActionText bodies alike: `present?` on a
+  # rich text is "has non-blank content", and `Mobility.with_locale` reads
+  # literally for both backends the same way, unlike passing `locale:` to the
+  # accessor, which the action_text backend doesn't accept.
+  def read(record, attribute, locale: I18n.locale)
+    return nil if record.nil?
+
+    fallback_chain(locale).each do |code|
+      value = Mobility.with_locale(code) { record.public_send(attribute) }
+      return value if value.present?
+    end
+    nil
+  end
 end

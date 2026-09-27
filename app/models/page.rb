@@ -1,7 +1,9 @@
 class Page < ApplicationRecord
   extend Mobility
-  include SlugGeneration
+  include LocalizedSlug
   include Publishable
+
+  localized_slug scope: :parent_id
 
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
@@ -43,7 +45,19 @@ class Page < ApplicationRecord
 
   enum :page_type, { standard: 0, landing: 1 }
 
-  validates :title, presence: true
+  # "Titled" means *some* locale has a title, not "the locale that happens to
+  # be ambient when this record is saved" -- a page may legitimately exist in
+  # German before it is ever written in English, or vice versa. Before this
+  # task, `validates :title, presence: true` got this right by accident:
+  # Mobility's own global fallback plugin meant the plain reader returned
+  # *some* locale's title regardless of which one was ambient. Now that plain
+  # readers read literally (config/initializers/mobility.rb), the same
+  # `validates :title, presence: true` would instead reject a fully-titled
+  # page just because it was saved inside a `Mobility.with_locale(:de)` block
+  # for an unrelated German-only edit -- so this reads the raw jsonb hash
+  # directly rather than through Mobility, sidestepping the ambient locale
+  # entirely.
+  validate :title_present_in_any_locale
 
   # A page's path is its ancestors' slugs plus its own, and `build_path` drops
   # blank segments -- so a non-root page without a slug contributes nothing and
@@ -73,7 +87,6 @@ class Page < ApplicationRecord
   validates :position, presence: true, on: :update
 
   validate :only_one_root_page
-  validate :slug_is_unused_among_siblings_in_every_locale
 
   # Prepended so it runs ahead of the callbacks `has_closure_tree` installed:
   # closure_tree's own `_ct_before_destroy` tears down this page's hierarchy
@@ -180,14 +193,13 @@ class Page < ApplicationRecord
     end
   end
 
-  # The slug as a visitor in `locale` sees it -- deliberately through
-  # Mobility's fallbacks (spec section 6), so a page with no German slug still
-  # contributes its English one and the German path is a usable URL rather than
-  # one with a hole where a segment should be. This is the opposite of what the
-  # slug uniqueness validation below wants, which is why that one reaches for
-  # the literal per-locale accessor instead.
+  # The slug as a visitor in `locale` sees it. Every enabled locale already
+  # has a slug of its own by the time this runs -- `LocalizedSlug` fills a
+  # blank one from the locale's fallback chain the moment the page gets a
+  # title in any locale -- so no fallback is needed here: the literal
+  # per-locale accessor is the slug this path segment builds with.
   def slug_in(locale)
-    Mobility.with_locale(locale) { slug }
+    public_send(::Mobility.normalize_locale_accessor(:slug, locale))
   end
 
   private
@@ -250,11 +262,17 @@ class Page < ApplicationRecord
     "/" + pages.map { |page| page.slug_in(locale) }.compact_blank.join("/")
   end
 
-  # Every configured locale, not just `Mobility.locale`: the admin edits one
+  # Every enabled locale, not just `Mobility.locale`: the admin edits one
   # locale per request, but the site serves all of them off the same row, so
   # all of them have to be recomputed together.
   def per_locale
-    Mobility.available_locales.to_h { |locale| [ locale.to_s, yield(locale) ] }
+    ::Locales.enabled.to_h { |locale| [ locale.to_s, yield(locale) ] }
+  end
+
+  # Raw jsonb hash, not the Mobility reader: see the comment above
+  # `validate :title_present_in_any_locale`.
+  def title_present_in_any_locale
+    errors.add(:title, :blank) if read_attribute(:title).to_h.values.all?(&:blank?)
   end
 
   # The tree has exactly one root: the homepage. Checked on update as well as
@@ -267,48 +285,6 @@ class Page < ApplicationRecord
     scope = scope.where.not(id: id) if persisted?
 
     errors.add(:base, "a root page already exists") if scope.exists?
-  end
-
-  # `validates :slug, uniqueness:` would emit `WHERE pages.slug = 'about'`,
-  # comparing a jsonb column to a string -- which Postgres rejects outright.
-  # Mobility's `.i18n` scope rewrites the condition into a lookup of one
-  # locale's key inside the column, so two siblings may share a slug as long as
-  # they don't share it *in the same locale*.
-  #
-  # Every locale is checked, not just `Mobility.locale`: the admin form writes
-  # all of them in a single request that runs under one ambient locale, so
-  # checking only that one lets the rest through to the per-locale unique
-  # indexes, where the collision surfaces as a raw Postgres error instead of a
-  # form error.
-  def slug_is_unused_among_siblings_in_every_locale
-    Mobility.available_locales.each do |locale|
-      accessor = Mobility.normalize_locale_accessor(:slug, locale)
-
-      # The literal value for this locale. The plain `slug` reader falls back
-      # to English, which would ask whether the *English* slug is taken as,
-      # say, a German one -- and reject a page over a German slug it does not
-      # have.
-      value = public_send(accessor)
-      next if value.blank?
-
-      # `.i18n` reads the locale off `Mobility.locale` when `where` runs rather
-      # than from an argument, so the query is built inside the locale it asks
-      # about.
-      taken = Mobility.with_locale(locale) do
-        scope = Page.i18n.where(slug: value).where(parent_id: parent_id)
-        scope = scope.where.not(id: id) if persisted?
-        scope.exists?
-      end
-
-      # Reported against `slug_de` rather than `slug`, so the admin form marks
-      # the offending locale's tab instead of an ambient field nobody edits.
-      #
-      # The message itself names the locale too, not just the field: a slug
-      # here can arrive via `SlugGeneration`'s default-locale fallback rather
-      # than anything the editor typed into this tab (Task 8c), so "has
-      # already been taken" alone would send them looking at the wrong one.
-      errors.add(accessor, :taken, message: "has already been taken in #{locale.to_s.upcase}") if taken
-    end
   end
 
   # Deleting a branch has to be deliberate: the admin removes the leaves first.

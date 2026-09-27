@@ -82,12 +82,12 @@ module StarterContent
     find_in_any_locale { Post.i18n.where(title: title).where(content_type: section[:content_type]).first }
   end
 
-  # Runs `block` once per configured locale, inside that locale, and returns
+  # Runs `block` once per enabled locale, inside that locale, and returns
   # the first match -- so a record found by its translation in any locale is
   # treated as "already exists", the same record `create_pages_and_posts!`
   # would otherwise create a duplicate of under the locale it's writing.
   def find_in_any_locale
-    Mobility.available_locales.each do |locale|
+    Locales.enabled.each do |locale|
       match = Mobility.with_locale(locale) { yield }
       return match if match
     end

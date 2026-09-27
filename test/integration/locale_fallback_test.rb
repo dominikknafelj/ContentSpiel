@@ -7,7 +7,7 @@ require "test_helper"
 #
 # Reproduction this guards against: SiteSetting default_locale "de", a child
 # page of Home titled only in German. Its en/es slugs are filled from the
-# German title by SlugGeneration, so GET /en/<slug> resolves (200), but
+# German title by LocalizedSlug, so GET /en/<slug> resolves (200), but
 # before this fix rendered an empty <title>, an empty <h1>, and the nav link
 # rendered its own href as visible text (`link_to nil, path`).
 class LocaleFallbackTest < ActionDispatch::IntegrationTest
@@ -20,7 +20,7 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
     kontakt = Mobility.with_locale(:de) do
       Page.create!(page_type: :standard, title: "Kontaktprobe", parent: @root, published_at: Time.current)
     end
-    # en/es slugs come from SlugGeneration's default-locale fallback, not an
+    # en/es slugs come from LocalizedSlug's fallback, not an
     # editor typing one -- confirms the page really is reachable at /en/...
     assert_equal "kontaktprobe", kontakt.slug_en
 
@@ -57,5 +57,21 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
 
     assert_select "h1", text: "Contact"
     assert_select "h1", text: "Kontakt", count: 0
+  end
+
+  # ThemeHelper#translated (backed by Locales.read) covers ActionText bodies
+  # too, not just jsonb attributes -- the same "titled only in German" gap
+  # applied to a rich text block's body before this task.
+  test "a German-only rich text block renders its body on the English page" do
+    seite = Mobility.with_locale(:de) do
+      page = Page.create!(page_type: :standard, title: "Kontaktseite", parent: @root, published_at: Time.current)
+      page.content_blocks.create!(block_type: :rich_text, position: 0, body: "<p>German body</p>")
+      page
+    end
+
+    get "/en/#{seite.slug_en}"
+    assert_response :success
+
+    assert_includes response.body, "German body"
   end
 end

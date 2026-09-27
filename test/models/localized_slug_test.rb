@@ -1,6 +1,6 @@
 require "test_helper"
 
-class SlugGenerationTest < ActiveSupport::TestCase
+class LocalizedSlugTest < ActiveSupport::TestCase
   setup do
     @root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
   end
@@ -55,10 +55,11 @@ class SlugGenerationTest < ActiveSupport::TestCase
     assert_equal "hallo-welt", post.slug_de
   end
 
-  # `blank_slug_fallback_title` reads `SiteSetting.instance`, a database row --
-  # not worth fetching on every save of a page that has no blank slug to fill
-  # in the first place. Counting queries, rather than stubbing (no mocking
-  # library, per project constraints), so this exercises the real callback.
+  # The fallback title (`Locales.fallback_chain`, via `Current.site`) reads
+  # `SiteSetting.instance`, a database row -- not worth fetching on every save
+  # of a page that has no blank slug to fill in the first place. Counting
+  # queries, rather than stubbing (no mocking library, per project
+  # constraints), so this exercises the real callback.
   test "saving a page with every locale already slugged does not query SiteSetting" do
     page = Page.create!(parent: @root, page_type: :standard, title_en: "About", slug_en: "about",
       title_de: "Über uns", slug_de: "uber-uns", title_es: "Sobre Nosotros", slug_es: "sobre-nosotros")
@@ -87,5 +88,13 @@ class SlugGenerationTest < ActiveSupport::TestCase
 
     assert_equal 0, site_setting_queries,
       "no locale's slug was blank, so the default-locale fallback should never be looked up"
+  end
+
+  test "slug uniqueness is enforced per scope and locale through the macro" do
+    a = Post.create!(content_type: :blog, title: "Same")
+    b = Post.new(content_type: :blog, title: "Same")
+    assert_not b.valid?
+    assert b.errors[Mobility.normalize_locale_accessor(:slug, :en)].any? { |m| m.include?("EN") }
+    assert Post.new(content_type: :now_update, title: "Same").valid?
   end
 end

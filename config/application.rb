@@ -30,12 +30,6 @@ module ContentSpiel
     config.i18n.available_locales = %i[en de es]
     config.i18n.default_locale = :en
 
-    # Fall back to English when a translation is missing. Set here rather than
-    # only in production so that Mobility's fallbacks behave identically in
-    # every environment (a translated attribute with no German value reads as
-    # the English one).
-    config.i18n.fallbacks = [ :en ]
-
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

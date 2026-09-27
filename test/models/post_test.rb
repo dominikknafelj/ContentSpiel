@@ -164,12 +164,16 @@ class PostTest < ActiveSupport::TestCase
     assert_equal({ "en" => "Hello World", "de" => "Hallo Welt" }, JSON.parse(raw["title"]))
   end
 
-  test "falls back to the default locale when a translation is missing" do
+  # Before this task, Mobility's own `fallbacks` plugin made every plain
+  # reader fall back to a fixed :en. That's gone (config/initializers
+  # /mobility.rb): the plain reader now returns the literal per-locale value,
+  # and the fallback that public views need lives in `Locales.read` instead
+  # (test/models/locales_test.rb covers it directly).
+  test "the plain reader no longer falls back to the default locale" do
     post = Post.create!(content_type: :blog, title: "Hello World")
 
-    Mobility.with_locale(:de) do
-      assert_equal "Hello World", post.title
-    end
+    assert_nil Mobility.with_locale(:de) { post.title }
+    assert_equal "Hello World", Locales.read(post, :title, locale: "de")
   end
 
   test "slug uniqueness is scoped to content_type and locale, not shared across locales" do
@@ -231,8 +235,11 @@ class PostTest < ActiveSupport::TestCase
       assert_includes reloaded.body.to_plain_text, "Hallo"
     end
     Mobility.with_locale(:es) do
-      # No Spanish body was ever written, so this is the English fallback.
-      assert_includes reloaded.body.to_plain_text, "Hi"
+      # No Spanish body was ever written, and plain readers no longer fall
+      # back to another locale (see config/initializers/mobility.rb) --
+      # that's `Locales.read`'s job now (see locales_test.rb), not the plain
+      # reader's.
+      assert_not reloaded.body.present?
     end
   end
 

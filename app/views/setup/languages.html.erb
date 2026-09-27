@@ -10,7 +10,7 @@
   <%= render "setup/errors", record: @site_setting %>
   <fieldset class="space-y-2">
     <legend class="<%= setup_label_class %>">Default language</legend>
-    <% I18n.available_locales.map(&:to_s).each do |code| %>
+    <% Locales.enabled.each do |code| %>
       <label class="flex items-center gap-3">
         <%= form.radio_button :default_locale, code %>
         <span><%= language_name(code) %></span>

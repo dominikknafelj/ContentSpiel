@@ -26,7 +26,7 @@ class Avo::Resources::ContentBlock < Avo::BaseResource
     # a block's rich text gets the full editor; the page form's inline rows
     # deliberately keep it to a plain HTML textarea (see the resource tool).
     tabs do
-      ::Mobility.available_locales.each do |locale|
+      ::Locales.enabled.each do |locale|
         tab title: locale.to_s.upcase do
           field ::Mobility.normalize_locale_accessor(:caption, locale).to_sym,
             as: :text, name: "Caption"

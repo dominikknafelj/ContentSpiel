@@ -36,8 +36,19 @@ Mobility.configure do
     # "untranslated" and falls back, rather than rendering an empty string.
     presence
 
-    # Missing translations fall through to I18n.default_locale (:en).
-    fallbacks
+    # Off by default: `fallbacks({})` keeps the plugin (so a per-read
+    # `fallback:` override still works, and the `presence`/`cache` plugins
+    # above it in the stack still apply) but gives it no locales to fall
+    # through to, so a plain reader with no explicit `locale:`/`fallback:`
+    # returns the literal value for the ambient locale -- nil if that locale
+    # has nothing, never another locale's text. (`fallbacks false` would drop
+    # the plugin's reader override entirely, taking the `fallback:` kwarg with
+    # it.) Public views never see this literal value directly: they read
+    # through `Locales.read` (app/models/locales.rb), which walks
+    # `Locales.fallback_chain` itself. Admin and MCP want the literal value on
+    # purpose, so an empty translation shows as empty rather than borrowing
+    # another locale's text.
+    fallbacks({})
 
     # Defines `title_en` / `title_de=` / ... for every available locale. The
     # Avo resource edits one locale per tab through these, and unlike the plain

@@ -31,4 +31,20 @@ class LocalesTest < ActiveSupport::TestCase
     site_settings(:default).update!(default_locale: "en")
     assert_equal "en", Current.site.default_locale
   end
+
+  test "read walks the fallback chain and plain readers no longer fall back" do
+    site_settings(:default).update!(default_locale: "de")
+    post = Mobility.with_locale(:de) { Post.create!(content_type: :blog, title: "Hallo") }
+
+    assert_nil Mobility.with_locale(:en) { post.title }
+    assert_equal "Hallo", Locales.read(post, :title, locale: "en")
+    assert_nil Locales.read(nil, :title)
+  end
+
+  test "read falls back for rich text bodies too" do
+    site_settings(:default).update!(default_locale: "de")
+    post = Mobility.with_locale(:de) { Post.create!(content_type: :blog, title: "Hallo", body: "<p>Text</p>") }
+
+    assert_includes Locales.read(post, :body, locale: "es").to_s, "Text"
+  end
 end

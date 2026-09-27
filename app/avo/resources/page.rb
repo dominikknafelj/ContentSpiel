@@ -21,7 +21,7 @@ class Avo::Resources::Page < Avo::BaseResource
       :position,
       :block_type,
       :image,
-      *::Mobility.available_locales.flat_map { |locale|
+      *::Locales.enabled.flat_map { |locale|
         [ ::Mobility.normalize_locale_accessor(:caption, locale).to_sym,
           ::Mobility.normalize_locale_accessor(:body, locale).to_sym ]
       },
@@ -65,7 +65,7 @@ class Avo::Resources::Page < Avo::BaseResource
     # the accessors (`title_de` and friends) are used instead of the plain
     # reader.
     tabs do
-      ::Mobility.available_locales.each do |locale|
+      ::Locales.enabled.each do |locale|
         tab title: locale.to_s.upcase do
           field locale_accessor(:title, locale), as: :text, name: "Title"
           field locale_accessor(:slug, locale), as: :text, name: "Slug"

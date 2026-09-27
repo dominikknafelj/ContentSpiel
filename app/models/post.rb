@@ -1,7 +1,9 @@
 class Post < ApplicationRecord
   extend Mobility
-  include SlugGeneration
+  include LocalizedSlug
   include Publishable
+
+  localized_slug scope: :content_type
 
   # `title`, `slug` and `excerpt` are jsonb columns holding one value per
   # locale; reading or writing them goes through the current Mobility.locale.
@@ -37,10 +39,22 @@ class Post < ApplicationRecord
 
   store_accessor :metadata, :company, :role, :start_date, :end_date, :role_type
 
-  validates :title, presence: true
+  # "Titled" means *some* locale has a title, not "the locale that happens to
+  # be ambient when this record is saved" -- a post may legitimately exist in
+  # German before it is ever written in English, or vice versa (see the
+  # pinned test "a title in a non-default locale satisfies the presence
+  # requirement"). Before this task, `validates :title, presence: true` got
+  # this right by accident: Mobility's own global fallback plugin meant the
+  # plain reader returned *some* locale's title regardless of which one was
+  # ambient. Now that plain readers read literally (config/initializers
+  # /mobility.rb), the same `validates :title, presence: true` would instead
+  # reject a fully-titled post just because it was saved inside a
+  # `Mobility.with_locale(:de)` block for an unrelated German-only edit -- so
+  # this reads the raw jsonb hash directly rather than through Mobility,
+  # sidestepping the ambient locale entirely.
+  validate :title_present_in_any_locale
   validates :slug, presence: true
   validates :role_type, inclusion: { in: ROLE_TYPES.keys }, allow_blank: true
-  validate :slug_is_unused_in_every_locale
 
   # The post whose slug in `locale` is `slug` -- as a visitor reading the site
   # in that locale sees it, meaning *through* Mobility's fallbacks, exactly the
@@ -78,45 +92,9 @@ class Post < ApplicationRecord
 
   private
 
-  # `validates :slug, uniqueness:` would emit `WHERE posts.slug = 'hello'`,
-  # comparing a jsonb column to a string -- which Postgres rejects outright.
-  # Mobility's `.i18n` scope rewrites the condition into a lookup of one
-  # locale's key inside the column, so two posts may share a slug as long as
-  # they don't share it *in the same locale*.
-  #
-  # Every locale is checked, not just `Mobility.locale`: the admin form writes
-  # all of them in a single request that runs under one ambient locale, so
-  # checking only that one lets the rest through to the per-locale unique
-  # indexes, where the collision surfaces as a raw Postgres error instead of a
-  # form error.
-  def slug_is_unused_in_every_locale
-    Mobility.available_locales.each do |locale|
-      accessor = Mobility.normalize_locale_accessor(:slug, locale)
-
-      # The literal value for this locale. The plain `slug` reader falls back
-      # to English, which would ask whether the *English* slug is taken as,
-      # say, a German one -- and reject a post over a German slug it does not
-      # have.
-      value = public_send(accessor)
-      next if value.blank?
-
-      # `.i18n` reads the locale off `Mobility.locale` when `where` runs rather
-      # than from an argument, so the query is built inside the locale it asks
-      # about.
-      taken = Mobility.with_locale(locale) do
-        scope = Post.i18n.where(slug: value).where(content_type: content_type)
-        scope = scope.where.not(id: id) if persisted?
-        scope.exists?
-      end
-
-      # Reported against `slug_de` rather than `slug`, so the admin form marks
-      # the offending locale's tab instead of an ambient field nobody edits.
-      #
-      # The message itself names the locale too, not just the field: a slug
-      # here can arrive via `SlugGeneration`'s default-locale fallback rather
-      # than anything the editor typed into this tab (Task 8c), so "has
-      # already been taken" alone would send them looking at the wrong one.
-      errors.add(accessor, :taken, message: "has already been taken in #{locale.to_s.upcase}") if taken
-    end
+  # Raw jsonb hash, not the Mobility reader: see the comment above
+  # `validate :title_present_in_any_locale`.
+  def title_present_in_any_locale
+    errors.add(:title, :blank) if read_attribute(:title).to_h.values.all?(&:blank?)
   end
 end
