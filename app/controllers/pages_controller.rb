@@ -24,7 +24,8 @@ class PagesController < PublicController
 
     case result.status
     when :found
-      assign_record(result.record)
+      return render(:not_found, status: :not_found) unless assign_record(result.record)
+
       # `stale?` answers a matching `If-None-Match` with a bare 304 itself --
       # `render :show` below only ever runs for a genuinely stale request.
       # `expires_in ... public: true` plus `stale?(public: true)` together

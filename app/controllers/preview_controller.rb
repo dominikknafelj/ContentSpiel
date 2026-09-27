@@ -18,7 +18,8 @@ class PreviewController < ApplicationController
 
     case result.status
     when :found
-      assign_record(result.record)
+      return render("pages/not_found", status: :not_found) unless assign_record(result.record)
+
       @preview_record = @post || @page
       render "pages/show"
     when :redirect

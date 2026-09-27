@@ -27,15 +27,25 @@ module PublicPageRendering
 
   private
 
-  # A post renders inside its canonical listing page, as before.
+  # A post renders inside its canonical listing page, as before. Returns
+  # false -- and the caller renders the 404 -- for a post with no canonical
+  # page right now: its current `public_paths` row can briefly outlive the
+  # listing that gave it one (a block removed without callbacks, a sync not
+  # yet run), and `:preview` finds that row without the `:published`
+  # visibility check that would otherwise have turned it away first. There
+  # is no page to render the post inside, so it's "not found" rather than a
+  # NoMethodError on a nil page.
   def assign_record(record)
     if record.is_a?(Post)
-      @post = record
       @page = PublicSite::Paths.canonical_page(record)
+      return false if @page.nil?
+
+      @post = record
       @post_list_block = @page.content_blocks.find { |block| block.lists?(record) }
     else
       @page = record
     end
+    true
   end
 
   def render_in_requested_locale(&block)

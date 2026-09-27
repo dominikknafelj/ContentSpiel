@@ -33,4 +33,19 @@ class PreviewTest < ActionDispatch::IntegrationTest
     get "/draft"
     assert_response :not_found
   end
+
+  # A post's current row can outlive its canonical page for a moment (a
+  # block removed without callbacks, a sync that hasn't run yet): preview
+  # doesn't gate on `Resolver.visible?`, so it finds the row -- and must
+  # render the 404 rather than a NoMethodError on a nil page.
+  test "a post whose listing page is gone 404s in preview instead of raising" do
+    blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
+    block = blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    ContentBlock.where(id: block.id).delete_all
+
+    sign_in_as(users(:one))
+    get "/preview/blog/hello"
+    assert_response :not_found
+  end
 end
