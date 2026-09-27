@@ -40,11 +40,12 @@ module Admin
     # insertion instruction, not a column `ContentBlocks::Save` assigns.
     def create
       block = @page.content_blocks.new
+      previous_last_id = last_block_id
       result = ContentBlocks::Save.call(block, attributes: { block_type: params.dig(:block, :block_type) })
 
       if result.ok?
         reposition_after(result.record, params[:after_id])
-        render turbo_stream: insertion_stream(result.record, params[:after_id]), status: :created
+        render turbo_stream: insertion_stream(result.record, params[:after_id], previous_last_id: previous_last_id), status: :created
       else
         render turbo_stream: picker_error_stream(result.errors), status: :unprocessable_entity
       end
@@ -124,6 +125,7 @@ module Admin
       source = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless source
 
+      previous_last_id = last_block_id
       copy = @page.content_blocks.new(block_type: source.block_type, settings: source.settings, translated_settings: source.translated_settings)
       copy_translations(source, copy)
 
@@ -132,7 +134,7 @@ module Admin
 
       attach_duplicate_image(copy, source) if source.image.attached?
       reposition_after(copy, source.id)
-      render turbo_stream: turbo_stream.after(ActionView::RecordIdentifier.dom_id(source), block_card_component(copy.reload)), status: :created
+      render turbo_stream: insertion_stream(copy.reload, source.id, previous_last_id: previous_last_id), status: :created
     end
 
     private
@@ -141,8 +143,8 @@ module Admin
       @page = Page.find(params[:page_id])
     end
 
-    def block_card_component(block)
-      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options)
+    def block_card_component(block, last: false)
+      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: last)
     end
 
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
@@ -254,15 +256,58 @@ module Admin
     # Where the new card's own Turbo Stream lands: right after the card it
     # was added below (the between-cards picker), or appended to the list
     # (the end-of-list picker, or a stale/blank `after_id`).
-    def insertion_stream(block, after_id)
-      after_block = after_id.present? ? @page.content_blocks.find_by(id: after_id) : nil
+    #
+    # `previous_last_id:` (final-fixes round, finding 10) is whichever
+    # block was last *before* this insertion (`create`/`duplicate`'s own
+    # `last_block_id`, read before either one creates anything) -- needed to
+    # know whether this insertion just bumped that card out of last place.
+    # `Admin::BlockCardComponent#last?` (whether a card renders its own
+    # trailing "+" between-picker, or leaves that slot to the page's
+    # always-present end-of-list one) is baked into each card's markup at
+    # render time, not recomputed by the browser -- so the newly inserted
+    # card has to be told directly whether it's the new last one (`new_
+    # last_id`, freshly read off the database now that `reposition_after`
+    # has already run), and whichever card *was* last has to be re-rendered
+    # too the moment that's no longer it, or it would stay stuck showing no
+    # "+" of its own for the rest of this editing session.
+    def insertion_stream(block, after_id, previous_last_id: nil)
+      ordered = @page.content_blocks.reload.order(:position).to_a
+      new_last_id = ordered.last&.id
+      after_block = after_id.present? ? ordered.find { |candidate| candidate.id == after_id.to_i } : nil
 
-      if after_block
-        turbo_stream.after(ActionView::RecordIdentifier.dom_id(after_block), block_card_component(block))
+      new_card_stream = if after_block
+        turbo_stream.after(ActionView::RecordIdentifier.dom_id(after_block), block_card_component(block, last: block.id == new_last_id))
       else
-        turbo_stream.append("content-blocks-list", block_card_component(block))
+        turbo_stream.append("content-blocks-list", block_card_component(block, last: block.id == new_last_id))
       end
+
+      [ new_card_stream, *stale_last_card_stream(ordered, previous_last_id, new_last_id) ]
     end
+
+    # The one extra stream `insertion_stream` needs whenever an insertion
+    # bumped the previously-last card out of last place: re-rendered with
+    # `last: false` so it picks up the trailing "+" between-picker it's now
+    # missing. Nothing to do when there was no previous last card (an empty
+    # page's very first block), or the last card didn't actually change (a
+    # `create`/`duplicate` inserted strictly before it, e.g. a between-cards
+    # picker click on anything but the last card).
+    def stale_last_card_stream(ordered, previous_last_id, new_last_id)
+      return [] if previous_last_id.nil? || previous_last_id == new_last_id
+
+      previous_last_block = ordered.find { |candidate| candidate.id == previous_last_id }
+      return [] unless previous_last_block
+
+      [ turbo_stream.replace(ActionView::RecordIdentifier.dom_id(previous_last_block), block_card_component(previous_last_block, last: false)) ]
+    end
+
+    # `reorder`, not `order`: `Page#content_blocks` already carries its own
+    # default `-> { order(:position) }` scope, and a plain `.order(...)`
+    # only *appends* to an association's existing order rather than
+    # replacing it -- so `.order(position: :desc)` here would have quietly
+    # produced `ORDER BY position ASC, position DESC` (the first clause
+    # already fully determining the result, making the second a no-op) and
+    # still handed back the *first* block, not the last one.
+    def last_block_id = @page.content_blocks.reorder(position: :desc).pick(:id)
 
     def picker_error_stream(errors)
       turbo_stream.replace("content-blocks-alert", partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: errors })

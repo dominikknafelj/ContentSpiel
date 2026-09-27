@@ -37,6 +37,60 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
+  # Fix (final-fixes round, finding 10): the end-of-list picker (rendered
+  # once, statically, below the whole list) and a card's own trailing
+  # between-picker (`last: false` only) used to both end up showing at the
+  # tail after an append -- the newly-appended card kept the default
+  # `last: false` regardless of actually being last now, so it rendered its
+  # own redundant trailing picker right above the page's already-present
+  # end-of-list one -- and the card that *was* last lost nothing (it never
+  # had one to lose), but was left permanently missing the between-picker
+  # it should have gained the moment something followed it.
+  test "adding a block at the end gives the new card no trailing picker, and gives the previous last card one" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    post blocks_path, params: { block: { block_type: "rich_text" } }, as: :turbo_stream
+    assert_response :success
+
+    new_block = @page.content_blocks.order(:position).last
+    assert_not_includes response.body, "block-picker-after-#{new_block.id}"
+    assert_includes response.body, "block-picker-after-#{first.id}"
+    assert_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+  end
+
+  test "adding a block between two existing cards touches neither one's own picker" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    post blocks_path, params: { block: { block_type: "rich_text" }, after_id: first.id }, as: :turbo_stream
+    assert_response :success
+
+    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
+  end
+
+  test "duplicating the last block gives the copy no trailing picker, and gives the source one" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
+    assert_response :success
+
+    copy = @page.content_blocks.order(:position).last
+    assert_not_equal first.id, copy.id
+    assert_not_includes response.body, "block-picker-after-#{copy.id}"
+    assert_includes response.body, "block-picker-after-#{first.id}"
+  end
+
+  test "duplicating a block that isn't last doesn't touch the actual last card's picker" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
+    assert_response :success
+
+    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
+  end
+
   test "reorder, duplicate and delete" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
