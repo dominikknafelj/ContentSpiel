@@ -19,10 +19,4 @@ class Avo::ResourceTools::NestedContentBlocks < Avo::BaseResourceTool
       [ locale, ::Mobility.normalize_locale_accessor(attribute, locale).to_sym ]
     end
   end
-
-  # The keys a post_list block reads out of `settings` (see
-  # app/views/content_blocks/_post_list.html.erb).
-  def setting_keys
-    %w[content_type tag limit]
-  end
 end

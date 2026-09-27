@@ -1,8 +1,9 @@
 <% content_for :preview_banner, render("layouts/public/preview_banner") if @preview_record %>
 <%= render "pages/seo_meta", page: @page, post: @post %>
 <%# The page's own heading and, for a landing page, its hero fields -- skipped
-    at a post's own detail view, since content_blocks/_post_list_detail
-    already renders that post's title as the response's one <h1>. %>
+    at a post's own detail view, since Posts::DetailComponent (which replaced
+    the old content_blocks partial _post_list_detail) already renders that
+    post's title as the response's one <h1>. %>
 <% if @post.nil? %>
   <header class="mb-12">
     <% if @page.root? && theme_site.tagline.present? %>
@@ -18,20 +19,33 @@
     <% end %>
   </header>
 <% end %>
-<%# A page's body is its blocks in `position` order (the association is ordered),
-    each rendered by the partial named after its own block_type.
+<%# A page's body is its blocks in `position` order (the association is
+    ordered), each rendered by its own registered type's ViewComponent
+    (`Theme.current.component_for`, open-types spec §5) rather than a partial
+    named after `block_type` -- the registry, not the view path, is what a
+    plugin's block type or an alternate theme now hooks into.
 
     The one exception is a post detail request (`/en/blog/my-post`): the block
-    the controller matched the post under renders that single post in place of
-    its listing, while the page's other blocks -- its intro text, its image --
-    still render around it. Compared against `@post_list_block` -- the block the
-    controller resolved the post under -- rather than `block.post_list?`, so
-    that a page carrying more than one listing swaps out only that block. %>
+    the controller matched the post under renders that single post, through
+    its content type's `detail_component`, in place of its listing, while the
+    page's other blocks -- its intro text, its image -- still render around
+    it. Compared against `@post_list_block` -- the block the controller
+    resolved the post under -- rather than `block.post_list?`, so that a page
+    carrying more than one listing swaps out only that block.
+
+    A stored `block_type` that isn't (or is no longer) registered --
+    `block.definition` is nil -- renders nothing rather than 500ing the public
+    site (global constraints): a removed plugin's type must degrade
+    gracefully for whoever already has it on a page, not take the whole
+    request down. %>
 <% @page.content_blocks.each do |block| %>
   <% if @post && block == @post_list_block %>
-    <%= render "content_blocks/post_list_detail", post: @post %>
+    <% definition = @post.definition %>
+    <%= render Theme.current.component_for(definition, :detail_component).new(post: @post) if definition %>
+  <% elsif (definition = block.definition) %>
+    <%= render Theme.current.component_for(definition).new(block: block, page: @page) %>
   <% else %>
-    <%= render "content_blocks/#{block.block_type}", block: block, page: @page %>
+    <% Rails.logger.warn("Skipping block #{block.id}: unregistered block type #{block.block_type.inspect}") %>
   <% end %>
 <% end %>
 <%# The tree is otherwise reachable only by typing an exact URL -- this is what

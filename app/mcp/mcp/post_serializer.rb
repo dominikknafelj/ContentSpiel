@@ -35,7 +35,17 @@ module Mcp
         # reading it.
         status: post.status,
         published_at: post.published_at&.iso8601,
-        metadata: post.metadata,
+        # The content type's own typed fields (open-types spec §6): the
+        # untranslated ones plus whatever this `locale` has translated, both
+        # already cast and keyed by field name -- literal, not
+        # fallback-walking, since MCP reads the locale it was asked for (the
+        # same rule admin reads follow, unlike the public site's
+        # `Locales.read`). Replaces the raw `metadata` this used to expose:
+        # that was one type's jsonb column with no indication of which keys
+        # even applied to this post's type, let alone their casting.
+        # `fields` is nil for an unregistered content_type (nothing to
+        # build a schema from), hence the `|| {}` rather than exposing nil.
+        fields: (post_fields = post.fields(locale: locale)) ? post_fields.untranslated_hash.merge(post_fields.translated_hash) : {},
         # nil for a post nothing currently lists (spec §6.2) -- a client asking
         # for a post's URL is told there isn't one yet, rather than being handed
         # a guess built from the post's own attributes.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_27_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -66,15 +66,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_120000) do
 
   create_table "content_blocks", force: :cascade do |t|
     t.jsonb "alt", default: {}, null: false
-    t.integer "block_type", null: false
+    t.string "block_type", null: false
     t.jsonb "caption", default: {}, null: false
     t.datetime "created_at", null: false
-    t.bigint "page_id", null: false
+    t.bigint "owner_id", null: false
+    t.string "owner_type", null: false
     t.integer "position", default: 0, null: false
     t.jsonb "settings", default: {}, null: false
+    t.jsonb "translated_settings", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.index ["page_id", "position"], name: "index_content_blocks_on_page_id_and_position"
-    t.index ["page_id"], name: "index_content_blocks_on_page_id"
+    t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
   end
 
   create_table "page_hierarchies", id: false, force: :cascade do |t|
@@ -122,14 +123,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_120000) do
   end
 
   create_table "posts", force: :cascade do |t|
-    t.integer "content_type", default: 0, null: false
+    t.string "content_type", null: false
     t.datetime "created_at", null: false
     t.jsonb "excerpt", default: {}, null: false
     t.jsonb "metadata", default: {}, null: false
     t.datetime "published_at"
     t.jsonb "slug", default: {}, null: false
     t.jsonb "title", default: {}, null: false
+    t.jsonb "translated_metadata", default: {}, null: false
     t.datetime "updated_at", null: false
+    t.index ["content_type"], name: "index_posts_on_content_type"
   end
 
   create_table "public_paths", force: :cascade do |t|
@@ -190,7 +193,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_120000) do
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_tokens", "users"
-  add_foreign_key "content_blocks", "pages"
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"

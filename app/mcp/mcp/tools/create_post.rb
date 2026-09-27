@@ -10,6 +10,7 @@ module Mcp
   module Tools
     class CreatePost < MCP::Tool
       extend Mcp::ErrorResponse
+      extend Mcp::FieldsSplitting
 
       # Pinned explicitly: the mcp gem derives a tool's default name from its
       # *demodulized* class name (MCP::StringUtils.handle_from_class_name --
@@ -22,28 +23,59 @@ module Mcp
       description "Create a new post. content_type and title are required; everything else is optional. " \
         "Translated fields (title/body/excerpt) are written in the given locale " \
         "(default: the site's current default locale). Defaults to a draft (no published_at) unless " \
-        "published: true is given."
-      input_schema(
-        properties: {
-          content_type: { type: "string", enum: Post.content_types.keys },
-          title: { type: "string" },
-          body: { type: "string", description: "HTML." },
-          excerpt: { type: "string" },
-          locale: { type: "string", enum: Locales::SUPPORTED.keys },
-          published: { type: "boolean" }
-        },
-        required: [ "content_type", "title" ]
-      )
+        "published: true is given. `fields` holds the content type's own typed fields (open-types " \
+        "spec §6), e.g. a resume_entry's company/role_type/start_date/end_date."
       annotations(read_only_hint: false, destructive_hint: false, idempotent_hint: false, open_world_hint: false,
         title: "Create post")
 
-      def self.call(content_type:, title:, body: nil, excerpt: nil, locale: nil, published: false, server_context:)
+      # `input_schema(...)` (the class macro every other tool uses) sets
+      # `@input_schema_value` once, when this file is first loaded -- fine
+      # for `Locales::SUPPORTED`, a fixed constant, but `content_type`'s enum
+      # has to be `ContentTypes.names` *at read time*, not at load time: the
+      # registry is only populated once `to_prepare` runs, and it can grow
+      # further afterwards (a plugin, or a test registering a type). The mcp
+      # gem itself re-reads this on every `tools/list` and before every call
+      # (`MCP::Tool.input_schema_value`/`#input_schema`, see `MCP::Server
+      # #call_tool`), so overriding the reader instead of calling the macro
+      # is what makes a type registered after boot show up here without a
+      # restart.
+      def self.input_schema_value
+        MCP::Tool::InputSchema.new(
+          properties: {
+            content_type: { type: "string", enum: ContentTypes.names },
+            title: { type: "string" },
+            body: { type: "string", description: "HTML." },
+            excerpt: { type: "string" },
+            fields: { type: "object", description: "The content type's own typed fields, keyed by field name " \
+              "(e.g. {\"company\": \"Acme\"} for resume_entry). See each type's field schema." },
+            locale: { type: "string", enum: Locales::SUPPORTED.keys },
+            published: { type: "boolean" }
+          },
+          required: [ "content_type", "title" ]
+        )
+      end
+
+      def self.call(content_type:, title:, body: nil, excerpt: nil, fields: nil, locale: nil, published: false, server_context:)
         locale ||= Locales.default
         invalid_locale = reject_unless_enabled(locale)
         return invalid_locale if invalid_locale
 
-        result = Posts::Save.call(attributes: { content_type: content_type, published: published },
-          translations: { locale => { title: title, body: body, excerpt: excerpt }.compact })
+        attributes = { content_type: content_type, published: published }
+        translations = { locale => { title: title, body: body, excerpt: excerpt }.compact }
+
+        # Split by the content type's own schema (translated vs. not) rather
+        # than handing the whole `fields` hash to both -- a translated key
+        # belongs in `translations[locale]`, not in `attributes`, or it would
+        # land in the *default* locale regardless of the locale this call
+        # actually asked for (Posts::Save assigns `attributes[:fields]` at
+        # `Locales.default`; see its own comment).
+        if fields
+          untranslated, translated = split_fields(content_type, fields)
+          attributes[:fields] = untranslated
+          translations[locale][:fields] = translated
+        end
+
+        result = Posts::Save.call(attributes: attributes, translations: translations)
         return error_response(result.errors.to_sentence) unless result.ok?
 
         data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }

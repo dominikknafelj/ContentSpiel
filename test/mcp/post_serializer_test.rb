@@ -25,7 +25,8 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
     assert_equal true, data[:published]
     assert_equal "live", data[:status]
     assert_equal post.published_at.iso8601, data[:published_at]
-    assert_equal({ "company" => "Acme", "role_type" => "lead" }, data[:metadata])
+    assert_equal({ "company" => "Acme", "role_type" => "lead" }, data[:fields])
+    assert_not data.key?(:metadata)
     # Nothing lists this post, so it has no canonical URL (spec §5.3) -- the
     # serializer says so rather than guessing one from the post's own fields.
     assert_nil data[:url]
@@ -78,5 +79,32 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
     data = Mobility.with_locale(:de) { Mcp::PostSerializer.call(post, :de) }
 
     assert_equal "Deutscher Titel", data[:title]
+  end
+
+  # A registered type's own `fields` -- not just a fixed list of built-ins --
+  # decide what shows up here: `fields` merges the untranslated hash with
+  # whichever locale's translations, and a translated field's value lives
+  # under that locale specifically. A test-only type (open-types spec §8's
+  # "open-type proof") is what exercises that path, since none of the
+  # built-ins have a translated field.
+  test "fields merges untranslated and this locale's translated values, for a type registered at runtime" do
+    saved = ContentTypes.all.dup
+    ContentTypes.reset!
+    ContentTypes.register(:test_note) do |t|
+      t.label "Test note"
+      t.field :priority, :integer
+      t.field :headline, :string, translated: true
+    end
+
+    post = Post.create!(content_type: :test_note, title: "A note", metadata: { "priority" => 3 })
+    post.assign_fields({ headline: "Wichtig" }, locale: :de)
+    post.save!
+
+    data = Mcp::PostSerializer.call(post, :de)
+
+    assert_equal({ "priority" => 3, "headline" => "Wichtig" }, data[:fields])
+  ensure
+    ContentTypes.reset!
+    saved.each { |definition| ContentTypes.registry_put(definition) }
   end
 end

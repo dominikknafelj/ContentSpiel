@@ -12,6 +12,27 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
       excerpt: "Original excerpt")
   end
 
+  test "fields updates the post's own content type's typed fields" do
+    post = Post.create!(content_type: :resume_entry, title: "Staff Engineer",
+      metadata: { "company" => "Acme", "role_type" => "lead" })
+
+    call_tool(id: post.id, fields: { role_type: "manager", start_date: "2024-01-01" })
+
+    post.reload
+    assert_equal "Acme", post.fields.company
+    assert_equal "manager", post.fields.role_type
+    assert_equal Date.new(2024, 1, 1), post.fields.start_date
+  end
+
+  test "an invalid field value on update returns an MCP error response naming the field" do
+    post = Post.create!(content_type: :resume_entry, title: "Staff Engineer")
+
+    response = call_tool(id: post.id, fields: { role_type: "boss" })
+
+    assert response.error?
+    assert_match(/role type/i, response.content.first[:text])
+  end
+
   test "updates only the fields given, leaving the rest alone" do
     call_tool(id: @post.id, title: "New Title")
 

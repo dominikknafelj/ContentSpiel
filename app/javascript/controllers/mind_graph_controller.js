@@ -8,11 +8,12 @@ import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } 
 // implementation on its own).
 const SVG_NS = "http://www.w3.org/2000/svg"
 
-const NODE_COLOR_BY_CONTENT_TYPE = {
-  blog: "#3b82f6",
-  resume_entry: "#10b981",
-  now_update: "#f59e0b"
-}
+// A node whose post's content type isn't (or is no longer) registered --
+// `Avo::ToolsController#mind_graph` sends `color: nil` for one, the same
+// `find`-not-`fetch` reasoning as `Post#definition` itself -- falls back to
+// this neutral grey rather than the old hard-coded per-content_type map,
+// which only ever knew about the three built-ins.
+const FALLBACK_NODE_COLOR = "#9ca3af"
 
 // A pointerdown that moves less than this many total pixels before its
 // pointerup is a click, not a drag -- "click a node to open that post"
@@ -82,7 +83,7 @@ export default class extends Controller {
 
     const circle = document.createElementNS(SVG_NS, "circle")
     circle.setAttribute("r", 8)
-    circle.setAttribute("fill", NODE_COLOR_BY_CONTENT_TYPE[node.contentType] || "currentColor")
+    circle.setAttribute("fill", node.color || FALLBACK_NODE_COLOR)
     group.appendChild(circle)
 
     const label = document.createElementNS(SVG_NS, "text")

@@ -41,7 +41,7 @@ module PublicPageRendering
       return false if @page.nil?
 
       @post = record
-      @post_list_block = @page.content_blocks.find { |block| block.lists?(record) }
+      @post_list_block = @page.content_blocks.listing.find { |block| block.lists?(record) }
     else
       @page = record
     end

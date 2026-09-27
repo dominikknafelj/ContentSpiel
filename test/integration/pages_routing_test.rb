@@ -36,7 +36,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
   test "the root page renders at the unprefixed root" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
 
     get "/"
 
@@ -47,7 +47,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a nested page renders at its full path" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
 
     get "/about"
 
@@ -89,7 +89,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     release = Page.create!(page_type: :standard, title: "Release v1.0", slug: "v1.0", parent: root,
       published_at: Time.current)
-    ContentBlock.create!(page: release, block_type: :rich_text, position: 0, body: "<p>Release notes</p>")
+    ContentBlock.create!(owner: release, block_type: :rich_text, position: 0, body: "<p>Release notes</p>")
 
     assert_equal "/v1.0", release.full_path(:en)
 
@@ -182,7 +182,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root,
       meta_description: "Everything I've written.", published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", excerpt: "A short summary.",
       body: "<p>Full post content</p>", published_at: Time.current)
 
@@ -221,7 +221,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a page renders in the locale its path was requested under" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    block = ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
+    block = ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
     Mobility.with_locale(:de) do
       about.update!(slug: "ueber-uns")
       block.update!(body: "<p>Ueber uns</p>")
@@ -256,8 +256,8 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
   test "a page renders its blocks in position order" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(page: root, block_type: :rich_text, position: 1, body: "<p>Second</p>")
-    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>First</p>")
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 1, body: "<p>Second</p>")
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: "<p>First</p>")
 
     get "/"
 
@@ -268,7 +268,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post_list block renders matching posts" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
     get "/blog"
@@ -282,7 +282,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post_list block omits unpublished posts" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "Published Post", published_at: 1.day.ago)
     Post.create!(content_type: :blog, title: "Draft Post", published_at: nil)
     Post.create!(content_type: :blog, title: "Scheduled Post", published_at: 1.day.from_now)
@@ -298,7 +298,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post_list block respects its limit setting" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0,
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0,
       settings: { "content_type" => "blog", "limit" => 2 })
     Post.create!(content_type: :blog, title: "Newest Post", published_at: 1.hour.ago)
     Post.create!(content_type: :blog, title: "Middle Post", published_at: 1.day.ago)
@@ -315,7 +315,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post_list block only lists its own content type" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "A Blog Entry", published_at: 1.day.ago)
     Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
@@ -334,7 +334,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     everything = Page.create!(page_type: :standard, title: "Everything", slug: "everything", parent: root,
       published_at: Time.current)
-    ContentBlock.create!(page: everything, block_type: :post_list, position: 0, settings: {})
+    ContentBlock.create!(owner: everything, block_type: :post_list, position: 0, settings: {})
     Post.create!(content_type: :blog, title: "A Blog Entry", published_at: 1.day.ago)
     Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
@@ -351,7 +351,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     everything = Page.create!(page_type: :standard, title: "Everything", slug: "everything", parent: root,
       published_at: Time.current)
-    ContentBlock.create!(page: everything, block_type: :post_list, position: 0, settings: {})
+    ContentBlock.create!(owner: everything, block_type: :post_list, position: 0, settings: {})
     resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry",
       body: "<p>Where I worked</p>", published_at: 1.day.ago)
 
@@ -367,7 +367,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a trailing slug that matches a post under a post_list block renders that post's detail view" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
@@ -383,8 +383,8 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post detail view still renders the page's other blocks" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :rich_text, position: 0, body: "<p>Blog intro</p>")
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 1, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :rich_text, position: 0, body: "<p>Blog intro</p>")
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 1, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
@@ -398,7 +398,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a trailing segment that matches no post under a post_list block, and no Page, is 404" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
 
     get "/blog/no-such-post"
 
@@ -410,7 +410,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a trailing slug under a page with no post_list block is 404" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: "<p>About us</p>")
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
     get "/about/#{post.slug}"
@@ -432,7 +432,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post detail under an unpublished page is 404" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     draft_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: nil)
-    ContentBlock.create!(page: draft_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: draft_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
@@ -446,7 +446,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "an unpublished post's detail view is 404" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     draft = Post.create!(content_type: :blog, title: "Draft Post", body: "<p>Secret draft</p>", published_at: nil)
     scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", body: "<p>Not yet</p>",
       published_at: 1.day.from_now)
@@ -463,7 +463,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post of another content type is not reachable under a post_list block" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry", published_at: 1.day.ago)
 
     get "/blog/#{resume_entry.slug}"
@@ -477,7 +477,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post detail resolves and renders in the locale it was requested under" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
     Mobility.with_locale(:de) do
@@ -498,7 +498,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post untranslated in the requested locale is reachable at its default-locale slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
     Mobility.with_locale(:de) { post.update!(body: "<p>Ganzer Beitrag</p>") }
@@ -515,7 +515,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post's own localized slug wins over another post's fallback slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     Post.create!(content_type: :blog, title: "Shared Slug", slug: "geteilt", body: "<p>English only</p>",
       published_at: Time.current)
     german = Post.create!(content_type: :blog, title: "Another Post", slug: "another-post",
@@ -538,7 +538,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # 500.
   test "a request with a non-HTML Accept header still renders the page" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: "<p>Welcome</p>")
 
     get "/", headers: { "Accept" => "application/json" }
 
@@ -583,7 +583,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post's detail view does not also render its listing page's title" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", body: "<p>Full post content</p>",
       published_at: Time.current)
 
@@ -600,7 +600,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post_list block links each post's title to its permalink" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
     get "/blog"
@@ -615,7 +615,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # "/<slug>" rather than "//<slug>".
   test "a post_list block on the root page links to a root-level permalink" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(page: root, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: root, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
     get "/"
@@ -654,7 +654,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     embed = YoutubeEmbed.create!(video_id: "dQw4w9WgXcQ")
     body = %(<p>Check this out</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
-    ContentBlock.create!(page: root, block_type: :rich_text, position: 0, body: body)
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: body)
 
     get "/"
 
@@ -669,7 +669,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post detail view renders an embedded YouTube video pasted into its body" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(page: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     embed = YoutubeEmbed.create!(video_id: "dQw4w9WgXcQ")
     body = %(<p>Full post content</p><action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
     post = Post.create!(content_type: :blog, title: "My First Post", body: body, published_at: Time.current)
@@ -694,7 +694,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert Locales::Enable.call("ja", actor: nil).ok?
 
     about = Page.create!(page_type: :standard, parent: root, title_ja: "会社概要", published_at: Time.current)
-    ContentBlock.create!(page: about, block_type: :rich_text, position: 0, body_ja: "<p>概要です</p>")
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_ja: "<p>概要です</p>")
 
     assert_equal "会社概要", about.slug_ja
     assert_equal "/会社概要", about.full_path("ja")

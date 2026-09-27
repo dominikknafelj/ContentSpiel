@@ -348,4 +348,28 @@ class PostTest < ActiveSupport::TestCase
   test "the translated locales are every supported language" do
     assert_equal ::SUPPORTED_LOCALES.keys.map(&:to_sym), Mobility.available_locales
   end
+
+  # A required translated field is only ever written at `Locales.default`
+  # (`Post#fields=`'s own comment: there's no locale switcher for `fields` in
+  # Avo yet, same limit `ContentBlock#normalize_settings` is under for
+  # `settings`). Checking `required` against the *ambient* `I18n.locale`
+  # instead -- whatever a request happened to leave it at, unrelated to the
+  # site's own default -- would reject a post that saved correctly the
+  # moment that ambient locale doesn't match the site's default.
+  test "fields_are_valid checks a required translated field at the site's default locale, not the ambient one" do
+    with_locales(%w[de en], default: "de")
+
+    saved = ContentTypes.all.dup
+    begin
+      ContentTypes.register("test/headline") { |t| t.label "Headline"; t.field :headline, :string, required: true, translated: true }
+
+      post = Post.new(content_type: "test/headline", title: "Hi")
+      post.assign_fields({ "headline" => "Hallo" }, locale: "de")
+
+      assert post.valid?, post.errors.full_messages.to_sentence
+    ensure
+      ContentTypes.reset!
+      saved.each { |definition| ContentTypes.registry_put(definition) }
+    end
+  end
 end

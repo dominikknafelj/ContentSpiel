@@ -4,18 +4,23 @@
     and `removable` (false for the blank "add" row, which has nothing to
     remove yet).
 
-    Which fields matter depends on the block's type -- body for rich_text,
-    image + caption for image, settings for post_list -- but all of them are
-    rendered on every row: the type is routinely changed while drafting, and
-    Avo 4.2.3 Community has no client-side conditional fields to swap them
-    with. Each group says which type it belongs to instead. %>
+    `image`/`caption`/`body` are existing columns -- shown unconditionally on
+    every row regardless of the block's type: it's routinely changed while
+    drafting, and Avo 4.2.3 Community has no client-side conditional fields
+    to swap them with. `settings`, by contrast, is rendered from the block's
+    *own* `block_type` (open-types spec §6, `_typed_fields.html.erb`) -- so a
+    freshly-added row (blank `block_type`) shows none until a type is picked
+    and the row is saved once; picking a different type on an existing row
+    shows the previous type's fields until that save happens too, the same
+    "reflects what's in the database, not what you just typed" the rest of
+    this row already lives with (Avo 4.2.3 Community has no live re-render). %>
 <%= render ui.card(title: title, padded: true) do %>
   <div class="space-y-4">
     <div class="flex flex-wrap gap-4 items-end">
       <div>
         <%= f.label :block_type, "Type", class: "font-semibold" %>
         <%= f.select :block_type,
-              ContentBlock.block_types.keys.map { |type| [ type.humanize, type ] },
+              BlockTypes.all.map { |definition| [ definition.label, definition.name ] },
               { include_blank: "—" },
               class: input_classes %>
       </div>
@@ -38,15 +43,16 @@
       <%= f.file_field :image, class: input_classes %>
     </div>
 
-    <div class="flex flex-wrap gap-4">
-      <% tool.setting_keys.each do |key| %>
-        <div>
-          <%= label_tag "#{f.object_name}[settings][#{key}]", "#{key.humanize} (post list blocks)", class: "font-semibold" %>
-          <%= text_field_tag "#{f.object_name}[settings][#{key}]",
-                f.object.settings.to_h[key], class: input_classes, id: nil %>
-        </div>
-      <% end %>
-    </div>
+    <%# `locale: Locales.default`, not `settings_object`'s own ambient-
+        `I18n.locale` default: `normalize_settings` (ContentBlock) always
+        writes a translated setting under `Locales.default`, whatever
+        `I18n.locale` happened to be ambient for the request that saved it
+        (Avo's own controllers never touch it) -- reading this row back at
+        the ambient locale instead would show every translated setting as
+        blank the moment the two disagree, even though the save itself
+        worked. %>
+    <%= render "avo/partials/typed_fields", definition: f.object.definition,
+          current_values: f.object.settings_object(locale: Locales.default), name_prefix: "#{f.object_name}[settings]" %>
 
     <% tool.locale_accessors(:caption).each do |locale, accessor| %>
       <div>

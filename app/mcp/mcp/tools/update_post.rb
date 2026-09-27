@@ -10,6 +10,7 @@ module Mcp
   module Tools
     class UpdatePost < MCP::Tool
       extend Mcp::ErrorResponse
+      extend Mcp::FieldsSplitting
 
       # Pinned explicitly -- see the comment on CreatePost#tool_name for why
       # the mcp gem's class-name-derived default ("update_post") would
@@ -23,13 +24,16 @@ module Mcp
         "date is kept, but on a draft *or a scheduled* post (a future published_at) it is set to now, " \
         "publishing it immediately rather than leaving it scheduled. published: false unpublishes " \
         "back to a draft. The response's `status` field (\"draft\"/\"scheduled\"/\"live\") reflects " \
-        "the result; `published` is kept as a boolean for compatibility."
+        "the result; `published` is kept as a boolean for compatibility. `fields` holds the post's " \
+        "own content type's typed fields (open-types spec §6); it can't change content_type itself."
       input_schema(
         properties: {
           id: { type: "integer" },
           title: { type: "string" },
           body: { type: "string", description: "HTML." },
           excerpt: { type: "string" },
+          fields: { type: "object", description: "The content type's own typed fields, keyed by field name " \
+            "(e.g. {\"company\": \"Acme\"} for resume_entry). See each type's field schema." },
           locale: { type: "string", enum: Locales::SUPPORTED.keys },
           published: { type: "boolean", description: "Omit to leave the current publish state alone." }
         },
@@ -38,7 +42,7 @@ module Mcp
       annotations(read_only_hint: false, destructive_hint: false, idempotent_hint: true, open_world_hint: false,
         title: "Update post")
 
-      def self.call(id:, title: nil, body: nil, excerpt: nil, locale: nil, published: nil, server_context:)
+      def self.call(id:, title: nil, body: nil, excerpt: nil, fields: nil, locale: nil, published: nil, server_context:)
         post = Post.find_by(id: id)
         return error_response("Post #{id} not found") unless post
 
@@ -52,6 +56,15 @@ module Mcp
         # always made, just delegated now instead of hand-rolled per call.
         attributes = published.nil? ? {} : { published: published }
         translations = { locale => { title: title, body: body, excerpt: excerpt }.compact }
+
+        # Split against the post's own (already-persisted) content type --
+        # unlike CreatePost there's no candidate `content_type` argument to
+        # read this off of, and this tool can't change it anyway.
+        if fields
+          untranslated, translated = split_fields(post.content_type, fields)
+          attributes[:fields] = untranslated
+          translations[locale][:fields] = translated
+        end
 
         result = Posts::Save.call(post, attributes: attributes, translations: translations)
         return error_response(result.errors.to_sentence) unless result.ok?

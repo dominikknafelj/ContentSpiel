@@ -2,11 +2,13 @@
    views; see app/assets/tailwind/application.css for the product side. */
 @import "tailwindcss" source(none);
 @source "../../../../views/pages";
-@source "../../../../views/content_blocks";
 @source "../../../../views/layouts/application.html.erb";
 @source "../../../../views/layouts/public";
 @source "../../../../views/shared";
 @source "../../../../helpers/theme_helper.rb";
+@source "../../../../components/blocks";
+@source "../../../../components/posts";
+@source "../../../../components/fields";
 @import "./tokens.css";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));

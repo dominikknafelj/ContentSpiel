@@ -64,6 +64,19 @@ class MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "resume_entry", node["contentType"]
   end
 
+  # The registry's own colour (open-types spec §6), not a map the client
+  # hard-codes -- so a type registered later (a plugin, an admin-defined
+  # type) gets a graph colour for free, with no JS change.
+  test "a node carries its post's content type's colour from the registry" do
+    sign_in_as(@user)
+    post = Post.create!(content_type: :resume_entry, title: "My Resume Entry")
+
+    get "/avo/mind_graph"
+
+    node = graph_nodes(response.body).find { |n| n["id"] == post.id }
+    assert_equal "#10b981", node["color"]
+  end
+
   test "with no posts, the graph shows an empty state instead of an empty canvas" do
     sign_in_as(@user)
 

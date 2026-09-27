@@ -48,6 +48,12 @@ class Avo::ToolsController < Avo::ApplicationController
         id: post.id,
         title: post.title,
         contentType: post.content_type,
+        # The registry's own colour for this post's type (open-types spec
+        # §6), not a map the client hard-codes per content_type -- nil for a
+        # post whose stored type isn't (or is no longer) registered, same
+        # `find`-not-`fetch` reasoning as `Post#definition` itself; the
+        # client falls back to a neutral grey for that case.
+        color: post.definition&.color,
         editUrl: avo.edit_resources_post_path(post)
       }
     end

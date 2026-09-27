@@ -59,7 +59,7 @@ module PublicSite
       page_row = PublicPath.current.find_by(record_type: "Page", locale: locale.to_s, path: parent_path.presence || "/")
       return nil if page_row.nil? || slug.blank?
 
-      post = Post.where("slug ->> ? = ?", locale.to_s, slug).find { |candidate| page_row.record.content_blocks.any? { |b| b.lists?(candidate) } }
+      post = Post.where("slug ->> ? = ?", locale.to_s, slug).find { |candidate| page_row.record.content_blocks.listing.any? { |b| b.lists?(candidate) } }
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)

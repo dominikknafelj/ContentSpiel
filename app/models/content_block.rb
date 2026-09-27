@@ -1,8 +1,12 @@
-# One row per block on a page, in `position` order. All three block types share
-# this table and are told apart by `block_type` -- the same
-# single-model-plus-enum shape `Post` uses for its content types (page-tree
-# design spec section 3). Which columns matter depends on the type: `body` for
-# rich_text, `image` + `caption` for image, `settings` for post_list.
+# One row per block, in `position` order, on whatever owns it -- only `Page`
+# today, but the owner is polymorphic (open-types spec §4.1) so a future
+# owner (a snippet, say) can hold blocks the same way. All block types share
+# this table and are told apart by `block_type`, a plain string checked
+# against the `BlockTypes` registry rather than a closed enum -- the same
+# registry-backed shape `Post#content_type` uses for its own types (open-types
+# spec §3). Which columns matter depends on the type: `body` for rich_text,
+# `image` + `caption` for image, `settings`/`translated_settings` for
+# post_list.
 class ContentBlock < ApplicationRecord
   extend Mobility
 
@@ -19,13 +23,8 @@ class ContentBlock < ApplicationRecord
   # ActionText::RichText row per locale. This replaces `has_rich_text :body`.
   translates :body, backend: :action_text
 
-  belongs_to :page
+  belongs_to :owner, polymorphic: true
 
-  enum :block_type, { rich_text: 0, image: 1, post_list: 2 }
-
-  # Shares its name with the `image` enum value without colliding: the enum
-  # contributes the class-level scope `ContentBlock.image` and the predicate
-  # `#image?`, while Active Storage contributes the instance reader `#image`.
   has_one_attached :image
 
   validates :block_type, presence: true
@@ -37,19 +36,33 @@ class ContentBlock < ApplicationRecord
   # form error instead.
   validates :position, presence: true
 
-  # `settings` holds a post_list's query criteria (`content_type`, `tag`,
-  # `limit`). Only `content_type` is checked, and only for post_list blocks: it
-  # names a Post enum value, so a typo would silently return no posts at render
-  # time instead of failing in the admin.
-  validate :post_list_settings_reference_a_real_content_type, if: :post_list?
-
   # Every row of the admin's nested block form carries the same `settings`
-  # inputs, whatever the block's type, so a rich_text block would otherwise be
-  # saved holding `{"content_type" => "", "tag" => "", "limit" => ""}`. Those
-  # blanks are not the same as "unset": the post_list partial asks
-  # `settings["limit"].present?` and hands `settings["content_type"]` straight
-  # to a `where` on an enum column.
-  before_validation :discard_blank_settings
+  # inputs, whatever the block's type (`app/views/avo/partials/
+  # _content_block_row.html.erb`), so a rich_text block would otherwise be
+  # saved holding `{"content_type" => "", "tag" => "", "limit" => ""}` --
+  # written straight onto the `settings` column by Rails' own nested
+  # attributes, bypassing `assign_settings` entirely. Re-deriving `settings`
+  # from the type's own field schema before every validation is what
+  # actually replaces the old blanket `discard_blank_settings`: a field that
+  # doesn't belong to this `block_type` (or a blank value for one that does)
+  # is dropped by `ContentModel::FieldSet#untranslated_hash`, the same way it
+  # would be through `assign_settings` -- this just makes that happen
+  # regardless of which path wrote `settings`.
+  before_validation :normalize_settings
+
+  # Checked at validation time, not by a database constraint (open-types spec
+  # §4.2): a `block_type` naming a type that isn't (or is no longer)
+  # registered -- a typo, a removed plugin -- comes back as an ordinary
+  # validation error rather than the enum's old `ArgumentError`, which would
+  # otherwise crash the request instead of coming back through the normal
+  # error path (a service's `Result#failure`).
+  validate :block_type_is_registered
+
+  # Delegates to the type's own `ContentModel::FieldSet` (built from its field
+  # schema) rather than a hand-written check like the old
+  # `post_list_settings_reference_a_real_content_type` -- every type's
+  # `settings` are validated the same way, not just post_list's.
+  validate :settings_are_valid
 
   # A post_list block's own criteria decide which posts have a canonical URL
   # under it (spec §5.3): adding, editing or removing one can hand a post its
@@ -63,92 +76,150 @@ class ContentBlock < ApplicationRecord
   after_save :sync_listed_post_paths
   after_destroy :sync_listed_post_paths
 
-  # The published posts this block is responsible for: its listing renders them
-  # (newest first, trimmed to `settings["limit"]`) and its page serves a
-  # permalink for each of them.
-  #
-  # An absent `content_type` means "every content type" -- the same reading
-  # `post_list_settings_reference_a_real_content_type` below is written
-  # against, and the one an editor gets by leaving the field empty in the
-  # admin. It must therefore never reach `where`: `posts.content_type` is NOT
-  # NULL, so `where(content_type: nil)` compiles to `content_type IS NULL` and
-  # the block silently lists nothing at all.
-  def listed_posts(include_unpublished: false)
-    scope = include_unpublished ? Post.all : Post.published
-    content_type = settings["content_type"]
-    scope = scope.where(content_type: content_type) if content_type.present?
+  # Blocks whose type has the `lists_posts` capability (open-types spec §6) --
+  # what `PublicSite::Paths`, the resolver's permalink fallback and
+  # `PublicPageRendering#assign_record` all mean by "the listing blocks" now
+  # that `post_list` is a registered type rather than a hardcoded enum value.
+  scope :listing, -> { where(block_type: BlockTypes.with_capability(:lists_posts).map(&:name)) }
 
-    # Tag names are matched case-insensitively: editors type "Rails" for a tag
-    # stored as "rails". Trim to handle pasted tags with surrounding whitespace.
-    tag = settings["tag"].to_s.strip
-    if tag.present?
-      scope = scope.where(id: PostTag.joins(:tag).where("LOWER(tags.name) = ?", tag.downcase).select(:post_id))
-    end
-
-    scope
+  # `ActiveModel::Validations` aliases this to `#send` by default, which
+  # chokes on the dotted paths `settings_are_valid` below adds errors under
+  # (`settings.content_type` is not a method) -- generating an error's full
+  # message reads the attribute's current value through this. Same fix as
+  # `ContentModel::FieldSet::Base`'s own override, for the same reason.
+  def read_attribute_for_validation(key)
+    respond_to?(key) ? public_send(key) : nil
   end
 
-  # Whether this block's listing would include `post`, ignoring publication:
-  # the same content-type-and-tag criteria `listed_posts` applies, minus its
-  # `Post.published`/`Post.all` scope. `PublicSite::Paths.canonical_page`
-  # (spec §5.3) needs this per-post rather than per-scope test to collect
-  # every candidate listing for a post -- it then ranks them by the listing
-  # page's publication, the block's specificity and tree order itself; the
-  # *post's* own publication is the resolver's to gate (spec §6.3).
-  # Kept deliberately in lockstep with `listed_posts` above: any criteria
-  # change there has to land here too, or a post's listing and its canonical
-  # URL would disagree about which page is responsible for it.
-  def lists?(post)
-    return false unless post_list?
-    return false if settings["content_type"].present? && settings["content_type"] != post.content_type
+  # This block's registered type, or nil for a stored `block_type` that isn't
+  # (or is no longer) registered -- e.g. a removed plugin's type. `find`, not
+  # `fetch`: an unknown stored type must never raise here, since this is read
+  # from render and path-sync boundaries that a stale record must not be able
+  # to 500 (global constraints).
+  def definition = BlockTypes.find(block_type)
 
-    tag = settings["tag"].to_s.strip
-    tag.blank? || post.tags.any? { |t| t.name.downcase == tag.downcase }
+  # The type's `ContentModel::FieldSet` instance over this block's
+  # `settings`/`translated_settings`, or nil when `block_type` isn't
+  # registered (there is no schema to build one from).
+  def settings_object(locale: I18n.locale, fallback: false)
+    definition&.field_set&.new(settings, translated_settings, locale:, fallback:)
+  end
+
+  # Casts and validates `hash` against the type's schema, then writes the
+  # result back onto `settings`/`translated_settings`. Does nothing for an
+  # unregistered type -- there is no schema to assign against, and
+  # `block_type_is_registered` is what reports that instead.
+  def assign_settings(hash, locale:)
+    object = settings_object(locale:) or return
+
+    object.assign(hash)
+    self.settings = object.untranslated_hash
+    self.translated_settings = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
+  end
+
+  # The published posts this block is responsible for: its listing renders
+  # them (newest first, trimmed to `settings.limit`) and its page serves a
+  # permalink for each of them. Delegates to `BlockTypes::PostList` -- the
+  # only type with the `lists_posts` capability today, so there is nothing
+  # yet to dispatch between; a second listing type would move this onto the
+  # definition itself instead (`t.lists_posts_with ...`).
+  def listed_posts(include_unpublished: false)
+    return Post.none unless definition&.capability?(:lists_posts)
+
+    BlockTypes::PostList.listed_posts(settings_object, include_unpublished: include_unpublished)
+  end
+
+  # Whether this block's listing would include `post`, ignoring publication --
+  # see `BlockTypes::PostList.lists?` for the criteria themselves.
+  # `PublicSite::Paths.canonical_page` (spec §5.3) needs this per-post rather
+  # than per-scope test to collect every candidate listing for a post -- it
+  # then ranks them by the listing page's publication, the block's
+  # specificity and tree order itself; the *post's* own publication is the
+  # resolver's to gate (spec §6.3).
+  def lists?(post)
+    definition&.capability?(:lists_posts) ? BlockTypes::PostList.lists?(settings_object, post) : false
   end
 
   private
 
+  # `object.assign(settings)` (not just building `settings_object` and
+  # reading `untranslated_hash` off it) is what makes this actually replace
+  # `discard_blank_settings`: `settings_object` alone reads the raw hash as
+  # *already* split into untranslated/translated by column, but the raw
+  # `settings` this runs against is whatever Rails' nested attributes wrote
+  # straight onto the column (see the class comment above `before_validation
+  # :normalize_settings`) -- untranslated *and* translated keys mixed
+  # together, since that write path knows nothing about the type's schema.
+  # `FieldSet#assign` is what actually sorts a key by `field.translated?`;
+  # skipping it (the previous version of this method) silently dropped every
+  # translated key the raw form ever wrote, because `untranslated_hash`
+  # only ever reads `@values`, never `@translations`. It lands in the site's
+  # default locale specifically -- neither the standalone
+  # `Avo::Resources::ContentBlock` form nor the page form's nested rows have
+  # a locale switcher for `settings` (unlike `caption`/`body`, which get one
+  # via Mobility's tabs), so that's the only locale this path can write to
+  # until the admin (sub-project 3) gives it one.
+  def normalize_settings
+    # `locale: Locales.default` explicitly, not `settings_object`'s own
+    # ambient-`I18n.locale` default: `object.assign` and `#translated_hash`
+    # below both key off this same `@locale`, so building against a locale
+    # that might not be `Locales.default` would both assign and read back
+    # under the wrong key -- and then `all_translations.merge(Locales.default
+    # => ...)` would stamp the *right* key with the *wrong* locale's value
+    # while leaving a stray, never-cleaned entry under the ambient one.
+    object = settings_object(locale: Locales.default) or return
+
+    object.assign(settings)
+    self.settings = object.untranslated_hash
+    self.translated_settings = object.all_translations.merge(Locales.default => object.translated_hash).compact_blank
+  end
+
+  def block_type_is_registered
+    errors.add(:block_type, "isn't a registered block type") if block_type.present? && BlockTypes.find(block_type).nil?
+  end
+
+  # `locale: Locales.default`, not `settings_object`'s own ambient-`I18n.locale`
+  # default: a required translated setting is only ever *written* at
+  # `Locales.default` (`normalize_settings`'s comment explains why), so
+  # checking `required` against whatever `I18n.locale` a request happens to
+  # leave ambient -- unrelated to the site's own default -- would reject a
+  # block that saved correctly the moment those two locales disagree.
+  def settings_are_valid
+    object = settings_object(locale: Locales.default) or return
+    return if object.valid?
+
+    object.errors.each { |error| errors.add("settings.#{error.attribute}", error.type, message: error.message) }
+  end
+
   # Every content type a post_list save or destroy could have handed a
   # canonical page to, or taken one away from: the block's content type as it
   # is now (skipped if this isn't -- or, on a save that changed `block_type`
-  # away from post_list, no longer is -- a post_list block), and, only on a
-  # save, the content type it matched *before* this save (skipped when that
-  # doesn't apply either). `_before_last_save` accessors read back the value
-  # from before the save that just ran regardless of whether that particular
+  # away from a listing type, no longer is -- one), and, only on a save, the
+  # content type it matched *before* this save (skipped when that doesn't
+  # apply either). `_before_last_save` accessors read back the value from
+  # before the save that just ran regardless of whether that particular
   # attribute changed in it, which is exactly "before this edit" whether the
   # edit touched `settings`, `block_type`, both, or neither -- and after a
   # destroy they read back the value from the *previous* save instead, which
   # for an otherwise-untouched record is simply its current value, so
-  # `post_list?` alone (still readable on a destroyed record; only mutation is
-  # frozen) already covers that case without a second lookup.
+  # `definition&.capability?(:lists_posts)` alone (still readable on a
+  # destroyed record; only mutation is frozen) already covers that case
+  # without a second lookup.
   #
   # `nil` here means "every content type", the same reading `listed_posts`
-  # and the settings validation give a blank `settings["content_type"]` --
-  # `presence` is what keeps that blank from reaching `sync_posts` as `""`.
+  # and `settings_are_valid` give a blank `content_type` field -- `presence`
+  # is what keeps that blank from reaching `sync_posts` as `""`.
   def sync_listed_post_paths
-    return unless post_list? || block_type_before_last_save == "post_list"
+    old_definition = BlockTypes.find(block_type_before_last_save)
+    return unless definition&.capability?(:lists_posts) || old_definition&.capability?(:lists_posts)
 
-    content_types_to_resync.each { |content_type| PublicSite::Paths.sync_posts(content_type) }
+    content_types_to_resync(old_definition).each { |content_type| PublicSite::Paths.sync_posts(content_type) }
   end
 
-  def content_types_to_resync
+  def content_types_to_resync(old_definition)
     types = []
-    types << settings["content_type"].presence if post_list?
-    types << settings_before_last_save["content_type"].presence if block_type_before_last_save == "post_list"
+    types << settings_object&.content_type if definition&.capability?(:lists_posts)
+    types << settings_before_last_save["content_type"].presence if old_definition&.capability?(:lists_posts)
     types.uniq
-  end
-
-  def discard_blank_settings
-    self.settings = settings.to_h.compact_blank
-  end
-
-  def post_list_settings_reference_a_real_content_type
-    content_type = settings["content_type"]
-
-    # Absent means "every content type", which is a valid list.
-    return if content_type.blank?
-    return if Post.content_types.key?(content_type.to_s)
-
-    errors.add(:settings, "content_type must be one of: #{Post.content_types.keys.join(', ')}")
   end
 end

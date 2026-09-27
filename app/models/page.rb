@@ -48,8 +48,11 @@ class Page < ApplicationRecord
   translates :title, :slug, :subtitle, :meta_title, :meta_description, :hero_alt
 
   # A page's body is an ordered list of blocks; the renderer walks them in
-  # `position` order and dispatches on each one's `block_type`.
-  has_many :content_blocks, -> { order(:position) }, dependent: :destroy
+  # `position` order and dispatches on each one's `block_type`. `as: :owner`
+  # because `ContentBlock#owner` is polymorphic (open-types spec §4.1) --
+  # only `Page` uses it today, but a future owner can hold blocks the same
+  # way.
+  has_many :content_blocks, -> { order(:position) }, as: :owner, dependent: :destroy
 
   # The admin edits a page's blocks inside the page's own form (page-tree design
   # spec section 5), which is Rails' nested attributes underneath:
@@ -173,7 +176,8 @@ class Page < ApplicationRecord
   # this callback reads them -- and the subtree-scoped resync already covers
   # moves, per the above.)
   def resync_listed_posts
-    types = ContentBlock.post_list.where(page_id: self_and_descendant_ids).map { |block| block.settings["content_type"].presence }
+    blocks = ContentBlock.listing.where(owner: self_and_descendants)
+    types = blocks.map { |block| block.settings_object.content_type }
     types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
   end
 

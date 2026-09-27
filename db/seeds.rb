@@ -18,11 +18,11 @@ return unless Rails.env.development?
 # user typed, so a failed Result here can only mean this file itself is
 # broken; raising loudly beats leaving a half-seeded dev database with no
 # error anyone would see.
-def find_or_create_post!(content_type:, title:, published_at:, excerpt: nil, body: nil, metadata: nil, tags: [])
+def find_or_create_post!(content_type:, title:, published_at:, excerpt: nil, body: nil, fields: nil, tags: [])
   post = Post.i18n.where(title: title).where(content_type: content_type).first
   return post if post
 
-  attributes = { content_type: content_type, published_at: published_at, metadata: metadata, tag_names: tags }.compact
+  attributes = { content_type: content_type, published_at: published_at, fields: fields, tag_names: tags }.compact
   translations = { "en" => { title: title, excerpt: excerpt, body: body }.compact }
 
   result = Posts::Save.call(attributes: attributes, translations: translations)
@@ -49,7 +49,7 @@ def find_or_create_block!(page:, block_type:, position:, settings: nil, body: ni
   attributes = { block_type: block_type, position: position, settings: settings }.compact
   translations = { "en" => { body: body }.compact }
 
-  result = ContentBlocks::Save.call(ContentBlock.new(page: page), attributes: attributes, translations: translations)
+  result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: attributes, translations: translations)
   raise "seeds: #{result.errors.to_sentence}" unless result.ok?
 
   result.record
@@ -103,11 +103,11 @@ i18n_post = find_or_create_post!(content_type: :blog, title: "Translating Everyt
 PostRelation.find_or_create_by!(post: foundation_post, related_post: i18n_post)
 
 find_or_create_post!(content_type: :resume_entry, title: "Senior Software Engineer", published_at: 3.years.ago,
-  metadata: { "company" => "Acme Corp", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" },
+  fields: { "company" => "Acme Corp", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" },
   body: "<p>Led the platform team rebuilding Acme's content pipeline.</p>")
 
 find_or_create_post!(content_type: :resume_entry, title: "Software Engineer", published_at: 6.years.ago,
-  metadata: { "company" => "Widgets Inc", "role_type" => "ic", "start_date" => "2020-01-01", "end_date" => "2022-12-31" },
+  fields: { "company" => "Widgets Inc", "role_type" => "ic", "start_date" => "2020-01-01", "end_date" => "2022-12-31" },
   body: "<p>Built and maintained Widgets Inc's customer-facing API.</p>")
 
 find_or_create_post!(content_type: :now_update, title: "What I'm up to now", published_at: 2.days.ago,

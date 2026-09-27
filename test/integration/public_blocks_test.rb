@@ -71,8 +71,9 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "resume rows show company, role type and period" do
-    Post.create!(content_type: :resume_entry, title: "Staff Engineer", company: "Acme", role_type: "lead",
-      start_date: "2023-01-01", end_date: "", published_at: 1.day.ago)
+    post = Post.new(content_type: "resume_entry", title: "Staff Engineer", published_at: 1.day.ago)
+    post.assign_fields({ "company" => "Acme", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" }, locale: "en")
+    post.save!
     @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "resume_entry" })
     get "/"
 
@@ -87,6 +88,18 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_includes response.body, "Training for a half marathon"
+  end
+
+  test "an unregistered stored block type is skipped on render" do
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: "<p>Hello there</p>")
+    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: "<p>Gone</p>")
+    gallery.update_column(:block_type, "gallery")
+
+    get "/"
+
+    assert_response :success
+    assert_select ".cs-prose", text: /Hello there/
+    assert_not_includes response.body, "Gone"
   end
 
   test "a post detail shows date, excerpt and tags" do

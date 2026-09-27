@@ -66,10 +66,23 @@ module PublicSite
       end
     end
 
+    # A post or page of an unregistered stored type gets no path at all: it
+    # renders nothing on the public site (global constraints -- unknown
+    # stored types never 500 it), so it must not be reachable at a URL
+    # either. Only `Post` has a type to check here -- a `Page`'s `page_type`
+    # is a closed enum (layout, not open content), so it has no equivalent
+    # "unregistered" state.
     def compute_path(record, locale)
       case record
       when Page then page_path(record, locale)
-      when Post then post_path(record, locale)
+      when Post
+        if record.definition.nil?
+          Rails.logger.warn("[public_paths] Post##{record.id} gets no #{locale} URL: " \
+            "#{record.content_type.inspect} isn't a registered content type")
+          nil
+        else
+          post_path(record, locale)
+        end
       end
     end
 
@@ -121,19 +134,24 @@ module PublicSite
     # pages: this is also what a block's own save/destroy calls (via
     # `sync_posts`), where nothing about the page tree changed at all.
     def canonical_page(post)
-      blocks = ContentBlock.post_list.includes(:page).select { |block| block.lists?(post) }
-      chains = blocks.map(&:page).uniq.index_with { |page| page.self_and_ancestors.to_a.reverse }
+      # `ContentBlock.listing` is every block whose type has the
+      # `lists_posts` capability -- only a `Page` owner is a candidate at
+      # all (open-types spec §4.1 lets other records own blocks too, but
+      # none render a listing of their own posts today).
+      blocks = ContentBlock.listing.includes(:owner).select { |block| block.owner.is_a?(Page) && block.lists?(post) }
+      chains = blocks.map(&:owner).uniq.index_with { |page| page.self_and_ancestors.to_a.reverse }
 
       best = blocks.min_by do |block|
-        chain = chains[block.page]
+        chain = chains[block.owner]
+        settings = block.settings_object
         [
           chain.all?(&:live?) ? 0 : 1,
-          block.settings["content_type"].present? ? 0 : 1,
-          block.settings["tag"].to_s.strip.present? ? 0 : 1,
+          settings.content_type.present? ? 0 : 1,
+          settings.tag.to_s.strip.present? ? 0 : 1,
           chain.map { |page| page.position.to_i }
         ]
       end
-      best&.page
+      best&.owner
     end
 
     # A post's path is its canonical listing page's current path, then `/`,
