@@ -59,7 +59,7 @@ module ThemeHelper
 
     ::Locales.enabled.map do |code|
       path = I18n.with_locale(code) { post ? post_url_path(page, post, code) : page_url_path(page, code) }
-      LanguageLink.new(code:, name: ::Locales.name(code), path:, current: code == I18n.locale.to_s)
+      LanguageLink.new(code:, name: ::Locales.name(code, native: true), path:, current: code == I18n.locale.to_s)
     end
   end
 

@@ -126,7 +126,7 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     # "hallo-welt": the setup block's `Post.create!` (English title only, at
     # that point) already gave every untitled locale -- German included -- a
     # slug from that English title (Task 8c's default-locale fallback), and
-    # `SlugGeneration` never overwrites an existing slug, so the setup
+    # `LocalizedSlug` never overwrites an existing slug, so the setup
     # block's later `update!(title: "Hallo Welt", ...)` left it alone. The
     # point here is that the rejected submission didn't overwrite it with
     # "belegt" either.

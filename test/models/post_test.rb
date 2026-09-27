@@ -29,7 +29,7 @@ class PostTest < ActiveSupport::TestCase
   # Task 8c / code-structure review finding #2: the same bug Page has -- a
   # post titled in only one locale used to leave every other locale's slug
   # blank, and `validates :slug, presence: true` reads through Mobility's
-  # fallback, so the post still saved even without one. SlugGeneration now
+  # fallback, so the post still saved even without one. LocalizedSlug now
   # fills an untitled locale's slug from the site's default-locale title
   # instead of leaving it blank.
   test "slugs for untitled locales fall back to the site's default-locale title" do
@@ -279,7 +279,7 @@ class PostTest < ActiveSupport::TestCase
   # through Mobility's fallback.
   #
   # Task 8c means a *titled* post can no longer reach this validation with a
-  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # genuinely blank slug in any locale -- `LocalizedSlug` fills one from a
   # title the moment any title exists anywhere on the post. `update_columns`
   # forces the untitled, pre-fill state a row predating that feature (or a
   # bulk import) could still be in, the same way the "bypassed" tests further

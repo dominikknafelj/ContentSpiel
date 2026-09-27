@@ -1,5 +1,5 @@
 # Creates a post (design spec section 10). content_type is required and
-# Post.slug is auto-generated from title (SlugGeneration), so the minimum
+# Post.slug is auto-generated from title (LocalizedSlug), so the minimum
 # viable call is just content_type + title.
 class CreatePostTool < MCP::Tool
   description "Create a new post. content_type and title are required; everything else is optional. " \

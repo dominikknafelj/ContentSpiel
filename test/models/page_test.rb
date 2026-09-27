@@ -84,7 +84,7 @@ class PageTest < ActiveSupport::TestCase
   # parent's and two pages end up claiming one URL -- for a child of the root,
   # the homepage's "/". Only one of the two can ever be served.
   # No title, since a title present in any locale would now have its slug
-  # filled in automatically by `SlugGeneration` -- this has to be a page with
+  # filled in automatically by `LocalizedSlug` -- this has to be a page with
   # no title at all to still exercise the blank-slug case.
   test "a non-root page requires a slug" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
@@ -124,7 +124,7 @@ class PageTest < ActiveSupport::TestCase
   # Whitespace is blank as far as `build_path`'s `compact_blank` is concerned,
   # so it has to be blank here too -- otherwise " " passes validation and
   # produces the very collision above. No title: with one present,
-  # `SlugGeneration` would treat "   " as not-yet-set (it's blank) and
+  # `LocalizedSlug` would treat "   " as not-yet-set (it's blank) and
   # overwrite it with a title-derived slug before this validation ever ran.
   test "a whitespace-only slug does not satisfy the requirement" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "")
@@ -138,7 +138,7 @@ class PageTest < ActiveSupport::TestCase
   # locale used to leave every other locale's slug blank, and a blank
   # non-root slug collapses onto the parent's path (see this file's own
   # comment above `validates :slug` for the two-pages-one-URL bug that
-  # produces). SlugGeneration now fills an untitled locale's slug from the
+  # produces). LocalizedSlug now fills an untitled locale's slug from the
   # site's default-locale title instead, so the site's own default locale --
   # not the app's fixed English default -- decides the fallback.
   test "slugs for untitled locales fall back to the site's default-locale title" do
@@ -290,7 +290,7 @@ class PageTest < ActiveSupport::TestCase
   # fallback.
   #
   # Task 8c means a *titled* page can no longer reach this validation with a
-  # genuinely blank slug in any locale -- `SlugGeneration` fills one from a
+  # genuinely blank slug in any locale -- `LocalizedSlug` fills one from a
   # title the moment any title exists anywhere on the page. `update_columns`
   # forces the untitled, pre-fill state a row predating that feature (or a
   # bulk import) could still be in, the same way the "bypassed" tests further

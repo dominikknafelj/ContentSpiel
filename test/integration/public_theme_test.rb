@@ -41,7 +41,7 @@ class PublicThemeTest < ActionDispatch::IntegrationTest
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title_en: "Hello", published_at: 1.day.ago)
-    # Since Task 8c every post gets a German slug by SlugGeneration's
+    # Since Task 8c every post gets a German slug by LocalizedSlug's
     # fallback the moment it has a title anywhere, so this scenario can no
     # longer arise through a validated save -- `update_columns` forces the
     # pre-fallback, no-German-slug state directly, the same way

@@ -62,7 +62,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
   # landed on its parent's path, so a slugless child of the root claimed "/"
   # and could start answering for the homepage. The form has to turn that away
   # and say why, rather than accept it and quietly mis-route the site.
-  # No title: with one present, `SlugGeneration` fills the blank slug in from
+  # No title: with one present, `LocalizedSlug` fills the blank slug in from
   # it before this validation ever runs, so the create would succeed instead
   # of being refused.
   test "a page submitted without a slug is refused, with the reason on the form" do
