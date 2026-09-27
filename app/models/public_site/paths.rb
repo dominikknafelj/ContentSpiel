@@ -73,32 +73,75 @@ module PublicSite
       end
     end
 
-    # The first page, in tree order (depth-first by sibling position), with a
-    # post_list block that lists `post` (spec §5.3) -- "first" meaning the
-    # one whose own position, then its parent's, then its parent's parent's
-    # and so on up to the root, sorts lowest, which is exactly a depth-first
-    # walk from the root without actually performing one: `self_and_ancestors`
-    # (closure_tree, root last) reversed puts the root's position first and
-    # this page's own last, so comparing those arrays lexicographically ranks
-    # an earlier branch ahead of a later one at whichever ancestor they
-    # diverge, and only falls through to a deeper `position` when every
-    # shallower one ties -- which happens only between a page and its own
-    # descendant, never between two different pages, since sibling `position`
-    # values are unique (closure_tree's own invariant).
+    # The page a post's URL runs through (spec §5.3): the best of every page
+    # with a post_list block that lists `post`, ranked by, in order,
+    #
+    # 1. publication -- a candidate whose whole page chain (the page and every
+    #    ancestor) is live comes before one that isn't. Without this, a draft
+    #    page earlier in the tree takes every matching post's URL, the
+    #    resolver then 404s them publicly (`Resolver.visible?` checks this
+    #    same page's chain), and the published listing links to those 404s --
+    #    leaking the draft page's slug in its hrefs. An unpublished candidate
+    #    still wins when it is the *only* kind there is, so a post listed only
+    #    by a draft page keeps a URL there and `/preview` can show it.
+    #
+    #    "Live" is `Publishable#live?`, so a *scheduled* page counts as
+    #    unpublished until its time comes -- and nothing writes a row at that
+    #    moment, so posts don't move onto a scheduled listing page when it
+    #    goes live, only at the next sync that reaches them (any write to that
+    #    page, its blocks or the posts, or `rebuild!`). Until then they stay
+    #    at the published listing they already had, which keeps serving them;
+    #    the ETag already changes at go-live (`PublicSite.content_version`), so
+    #    the page itself isn't served stale.
+    #
+    # 2. specificity -- a block naming the post's content type beats an
+    #    unfiltered one, then a block whose tag the post carries beats one
+    #    with no tag filter. This is what keeps a homepage "latest posts"
+    #    teaser (unfiltered, and on the root, which always comes first in tree
+    #    order) from taking every post's URL away from /blog. (A block that
+    #    names a *different* type or a tag the post lacks isn't a candidate at
+    #    all -- `lists?` already said no.)
+    #
+    # 3. tree order -- depth-first by sibling position, as the tiebreak. That
+    #    is the page whose own position, then its parent's, and so on up to
+    #    the root, sorts lowest: `self_and_ancestors` (closure_tree, root
+    #    last) reversed puts the root's position first and this page's own
+    #    last, so comparing those arrays lexicographically ranks an earlier
+    #    branch ahead of a later one at whichever ancestor they diverge, and
+    #    only falls through to a deeper `position` when every shallower one
+    #    ties -- which happens only between a page and its own descendant,
+    #    never between two different pages, since sibling `position` values
+    #    are unique (closure_tree's own invariant).
+    #
+    # One `self_and_ancestors` load per candidate page serves both (1) and
+    # (3). Ranked per *block*, not per page: a page carrying both a teaser and
+    # a typed listing competes with its most specific one.
     #
     # Every post_list block is checked, not just the ones on already-synced
     # pages: this is also what a block's own save/destroy calls (via
     # `sync_posts`), where nothing about the page tree changed at all.
     def canonical_page(post)
-      pages = ContentBlock.post_list.includes(:page).select { |block| block.lists?(post) }.map(&:page).uniq
-      pages.min_by { |page| page.self_and_ancestors.reverse.map { |p| p.position.to_i } }
+      blocks = ContentBlock.post_list.includes(:page).select { |block| block.lists?(post) }
+      chains = blocks.map(&:page).uniq.index_with { |page| page.self_and_ancestors.to_a.reverse }
+
+      best = blocks.min_by do |block|
+        chain = chains[block.page]
+        [
+          chain.all?(&:live?) ? 0 : 1,
+          block.settings["content_type"].present? ? 0 : 1,
+          block.settings["tag"].to_s.strip.present? ? 0 : 1,
+          chain.map { |page| page.position.to_i }
+        ]
+      end
+      best&.page
     end
 
     # A post's path is its canonical listing page's current path, then `/`,
     # then its own slug -- nil (no URL) when it has no canonical page, or that
-    # page itself currently has no path (mid-move, or a draft-chain gap the
-    # resolver's publication check handles, not this one -- §5.3 is explicit
-    # that publication is ignored here).
+    # page itself currently has no path (mid-move). A canonical page that is
+    # unpublished (only chosen when no published candidate exists, see
+    # `canonical_page`) still gives the post a path: the resolver's
+    # publication check is what keeps it off the public site.
     def post_path(post, locale)
       page = canonical_page(post)
       segment = post.public_send(Mobility.normalize_locale_accessor(:slug, locale))

@@ -72,13 +72,19 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal "/about", current(about)
   end
 
-  def listing(parent, title, content_type, tag: nil)
-    Page.create!(parent: parent, title: title, published_at: 1.day.ago).tap do |page|
-      settings = { "content_type" => content_type }
-      settings["tag"] = tag if tag
-      page.content_blocks.create!(block_type: :post_list, position: 0, settings: settings)
+  def listing(parent, title, content_type, tag: nil, published_at: 1.day.ago)
+    Page.create!(parent: parent, title: title, published_at: published_at).tap do |page|
+      add_listing_block(page, content_type, tag: tag)
     end
   end
+
+  def add_listing_block(page, content_type, tag: nil)
+    settings = { "content_type" => content_type }.compact
+    settings["tag"] = tag if tag
+    page.content_blocks.create!(block_type: :post_list, position: page.content_blocks.count, settings: settings)
+  end
+
+  def resolve(path, scope: :published) = PublicSite::Resolver.new(scope: scope).call(locale: "en", path: path)
 
   test "a post lives under the first listing page in tree order" do
     blog = listing(@root, "Blog", "blog")
@@ -123,5 +129,93 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     listing(@root, "Rails", "blog", tag: "rails")
     post = Post.create!(content_type: :blog, title: "Other", published_at: 1.day.ago)
     assert_nil current(post)
+  end
+
+  # -- canonical listing page choice (spec §5.3) ------------------------------
+
+  # The seeded site's shape: the homepage carries an unfiltered "latest posts"
+  # teaser, and /blog is the real blog listing. Tree order alone would hand
+  # every post to the root (it always comes first) -- specificity is what
+  # keeps posts under the section that actually names their type.
+  test "a homepage teaser does not take a post's URL from a typed listing" do
+    add_listing_block(@root, nil)
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+    assert_equal "/blog/hello", current(post)
+    assert_equal :redirect, resolve("/hello").status
+  end
+
+  test "a draft listing earlier in the tree does not take a published listing's posts" do
+    listing(@root, "Drafts", "blog", published_at: nil)
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+    assert_equal "/blog/hello", current(post)
+    assert_equal :found, resolve("/blog/hello").status
+  end
+
+  test "a listing under a draft section counts as unpublished" do
+    section = Page.create!(parent: @root, title: "Section", published_at: nil)
+    listing(section, "Inner", "blog")
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+  end
+
+  test "with only a draft listing, the post lives under it for preview but is not public" do
+    drafts = listing(@root, "Drafts", "blog", published_at: nil)
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal drafts, PublicSite::Paths.canonical_page(post)
+    assert_equal "/drafts/hello", current(post)
+    assert_equal :found, resolve("/drafts/hello", scope: :preview).status
+    assert_equal :not_found, resolve("/drafts/hello").status
+  end
+
+  test "a content-type listing beats an unfiltered one at equal publication" do
+    listing(@root, "Everything", nil)
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+  end
+
+  test "a tag-matching listing beats one with no tag filter" do
+    listing(@root, "Blog", "blog")
+    rails = listing(@root, "Rails", "blog", tag: "rails")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    post.tags << Tag.create!(name: "rails")
+
+    assert_equal rails, PublicSite::Paths.canonical_page(post)
+    assert_equal "/rails/hello", current(post)
+  end
+
+  test "publishing a draft listing that comes first in the tree takes the posts over" do
+    drafts = listing(@root, "Drafts", "blog", published_at: nil)
+    listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post)
+
+    drafts.update!(published_at: 1.minute.ago)
+
+    assert_equal "/drafts/hello", current(post)
+  end
+
+  # Moves and reorders reach the post through the moved page's own
+  # subtree-scoped resync (`Page#resync_listed_posts`): the listing page that
+  # moved is the only one whose rank relative to the others changed.
+  test "moving a listing page ahead of another listing makes it canonical" do
+    listing(@root, "Blog", "blog")
+    archive = listing(@root, "Archive", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post)
+
+    archive.update!(position: 0)
+
+    assert_equal "/archive/hello", current(post)
   end
 end

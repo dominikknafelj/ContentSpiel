@@ -12,9 +12,10 @@ module PublicSite
     end
 
     # The record and every ancestor page must be published -- for a post,
-    # that means its *canonical* listing page (spec §5.3 ignores publication
-    # when deriving that page, so a draft page can still be the one a post's
-    # URL runs through) and that page's own ancestors. One closure-table
+    # that means its *canonical* listing page and that page's own ancestors.
+    # `canonical_page` prefers a published listing (spec §5.3), so this only
+    # turns a post away when no published page lists it at all -- then its
+    # URL runs through a draft page, reachable in preview only. One closure-table
     # query per record: `self_and_ancestors` is a scope, not a loaded array,
     # so this stays a single indexed lookup rather than N ancestor checks.
     def self.visible?(record)

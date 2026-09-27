@@ -91,9 +91,10 @@ class ContentBlock < ApplicationRecord
   # Whether this block's listing would include `post`, ignoring publication:
   # the same content-type-and-tag criteria `listed_posts` applies, minus its
   # `Post.published`/`Post.all` scope. `PublicSite::Paths.canonical_page`
-  # (spec §5.3) needs this per-post rather than per-scope test to pick a
-  # post's *first* matching page in tree order regardless of draft state --
-  # the resolver, not path derivation, is what publication gates (spec §6.3).
+  # (spec §5.3) needs this per-post rather than per-scope test to collect
+  # every candidate listing for a post -- it then ranks them by the listing
+  # page's publication, the block's specificity and tree order itself; the
+  # *post's* own publication is the resolver's to gate (spec §6.3).
   # Kept deliberately in lockstep with `listed_posts` above: any criteria
   # change there has to land here too, or a post's listing and its canonical
   # URL would disagree about which page is responsible for it.
