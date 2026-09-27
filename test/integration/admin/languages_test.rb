@@ -1,6 +1,11 @@
 require "test_helper"
 
 class Admin::LanguagesTest < ActionDispatch::IntegrationTest
+  # Only needed by the carried-in post-level test below (Task 9, from Task
+  # 8's review) -- see `test/support/test_types.rb`'s own comment for why
+  # every file that calls `with_test_types` includes this module itself.
+  include TestTypes
+
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_as(users(:one))
@@ -49,5 +54,32 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
     block.reload
     assert_equal 5, block.settings["limit"]
     assert_not block.translated_settings.key?("de")
+  end
+
+  # Carried in from Task 8's review (Task 9's own brief): the same
+  # untranslated-field rule as the block-level test just above, but for a
+  # post's own typed `fields` -- `test/event#venue` (`t.field :venue,
+  # :string`, no `translated: true`) is `Post#fields_are_valid`'s
+  # equivalent of a block's untranslated settings field, so it has to show
+  # the same "Same in all languages" hint with no read-only original in a
+  # non-default locale. `test/event#title` (a plain Mobility column, always
+  # translated) is the control: it must still show its original the way
+  # every other translated field already does, proving this isn't just
+  # "post-level fields never show an original."
+  test "a post's untranslated field shows Same in all languages, while its translated title still shows the original" do
+    with_test_types do
+      post = Posts::Save.call(Post.new, attributes: { content_type: "test/event", fields: { venue: "Main Hall" } },
+        translations: { Locales.default => { title: "Launch day" } }).record
+      assert post.persisted?, post.errors.full_messages.to_sentence
+
+      get "/cs-studio/posts/#{post.id}", params: { locale: "de" }
+
+      assert_select "[data-field-name='venue']" do
+        assert_select "p", text: "Same in all languages"
+        assert_select "[data-original-for='venue']", count: 0
+      end
+
+      assert_select "[data-original-for='title']", text: "Launch day"
+    end
   end
 end
