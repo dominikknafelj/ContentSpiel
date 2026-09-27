@@ -10,6 +10,8 @@ require "test_helper"
 # so each one is tested against the real rendered form and the real submit
 # path rather than trusting the field declarations to line up.
 class AvoPageEditingTest < ActionDispatch::IntegrationTest
+  include TestTypes
+
   setup do
     @user = User.create!(email_address: "editor@example.com", password: "password123")
     sign_in_as(@user)
@@ -249,6 +251,22 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
 
   # -- nested content blocks -------------------------------------------------
 
+  # `BlockTypes.names.map(&:humanize)` -- the row's old option-label source --
+  # only ever looked right for the built-ins because every one of them
+  # happens to set an explicit `label` that matches its bare name's own
+  # `humanize` ("post_list" -> "Post list" either way). A prefixed plugin
+  # name doesn't: `"test/quote".humanize` is "Test/quote", not this type's
+  # actual label "Quote" -- the same mismatch `Avo::Resources::ContentBlock`
+  # (the standalone block form) already avoids by reading `definition.label`.
+  test "the block-type select in the nested row is labelled from each definition's own label" do
+    with_test_types do
+      get "/avo/resources/pages/#{@about.id}/edit"
+
+      assert_response :success
+      assert_select "option[value='test/quote']", "Quote"
+    end
+  end
+
   test "the page form renders a nested row per content block plus a blank one to add with" do
     @about.content_blocks.create!(block_type: :rich_text, position: 0)
 
@@ -388,6 +406,32 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     # (`ContentBlock#normalize_settings`), the same schema `assign_settings`
     # would cast it through.
     assert_equal({ "content_type" => "blog", "tag" => "rails", "limit" => 5 }, block.settings)
+  end
+
+  # `normalize_settings` (`ContentBlock`) always writes a translated setting
+  # under `Locales.default`, whatever the ambient `I18n.locale` was when the
+  # request came in -- Avo's own controllers never touch `I18n.locale`, so it
+  # stays at `config.i18n.default_locale` ("en") for every request regardless
+  # of the site's own default. Redisplaying the saved row has to read back
+  # from that same `Locales.default` key, not the ambient locale, or a site
+  # whose default isn't "en" would show every translated setting as blank
+  # the moment the page reloads, even though it saved correctly.
+  test "a saved translated setting redisplays in the nested row under the site's default locale" do
+    with_locales(%w[de en], default: "de")
+
+    with_test_types do
+      put "/avo/resources/pages/#{@about.id}", params: { page: {
+        content_blocks_attributes: {
+          "0" => { block_type: "test/quote", position: "0", settings: { text: "Hallo" } }
+        }
+      } }
+      assert_response :redirect
+
+      get "/avo/resources/pages/#{@about.id}/edit"
+      assert_response :success
+      assert_includes response.body, %(name="page[content_blocks_attributes][0][settings][text]" value="Hallo"),
+        "expected the saved translated setting to redisplay"
+    end
   end
 
   # Every block's row carries the same settings inputs, so a rich_text block

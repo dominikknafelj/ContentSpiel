@@ -20,7 +20,7 @@
       <div>
         <%= f.label :block_type, "Type", class: "font-semibold" %>
         <%= f.select :block_type,
-              BlockTypes.names.map { |type| [ type.humanize, type ] },
+              BlockTypes.all.map { |definition| [ definition.label, definition.name ] },
               { include_blank: "—" },
               class: input_classes %>
       </div>
@@ -43,8 +43,16 @@
       <%= f.file_field :image, class: input_classes %>
     </div>
 
+    <%# `locale: Locales.default`, not `settings_object`'s own ambient-
+        `I18n.locale` default: `normalize_settings` (ContentBlock) always
+        writes a translated setting under `Locales.default`, whatever
+        `I18n.locale` happened to be ambient for the request that saved it
+        (Avo's own controllers never touch it) -- reading this row back at
+        the ambient locale instead would show every translated setting as
+        blank the moment the two disagree, even though the save itself
+        worked. %>
     <%= render "avo/partials/typed_fields", definition: f.object.definition,
-          current_values: f.object.settings_object, name_prefix: "#{f.object_name}[settings]" %>
+          current_values: f.object.settings_object(locale: Locales.default), name_prefix: "#{f.object_name}[settings]" %>
 
     <% tool.locale_accessors(:caption).each do |locale, accessor| %>
       <div>
