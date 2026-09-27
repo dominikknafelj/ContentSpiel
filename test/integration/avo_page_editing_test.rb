@@ -295,6 +295,26 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_equal "Hello", block.body_en.to_plain_text.strip
   end
 
+  # A language enabled at runtime (spec §9.6) must be writable through the
+  # nested block rows straight away: the rows render its caption/body inputs
+  # per request, so the permitted params can't be a list frozen at class load.
+  # The GET first makes sure the resource class is loaded before "fr" exists.
+  test "a block caption and body in a newly enabled language are saved" do
+    get "/avo/resources/pages/#{@about.id}/edit"
+    assert Locales::Enable.call("fr", actor: nil).ok?
+
+    put "/avo/resources/pages/#{@about.id}", params: { page: {
+      content_blocks_attributes: {
+        "0" => { block_type: "image", position: "0", caption_fr: "Légende", body_fr: "<p>Bonjour</p>" }
+      }
+    } }
+
+    assert_response :redirect
+    block = @about.content_blocks.reload.first
+    assert_equal "Légende", block.caption_fr
+    assert_equal "Bonjour", block.body_fr.to_plain_text.strip
+  end
+
   # The blank row rides along on every save, so it must not save itself as an
   # empty block each time the page is edited.
   test "the blank nested row is not saved as an empty block" do

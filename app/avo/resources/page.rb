@@ -14,6 +14,17 @@ class Avo::Resources::Page < Avo::BaseResource
   #
   # `settings: {}` rather than a scalar: it is a jsonb column submitted as a
   # nested hash, and a scalar entry would drop it.
+  #
+  # Every *supported* locale's caption/body, not just the enabled ones: this
+  # is evaluated once, when the class loads, while the nested rows
+  # (Avo::ResourceTools::NestedContentBlocks) render `Locales.enabled` per
+  # request -- a list built from `Locales.enabled` here froze the languages
+  # enabled at boot, so a language turned on at runtime (spec §9.6) had its
+  # block text silently filtered out until the next restart. It also kept a
+  # DB query out of class loading. The supported list is a fixed, bounded
+  # constant, and Mobility defines accessors for all of it
+  # (`config.i18n.available_locales`), so permitting a disabled language's
+  # keys is harmless: nothing renders inputs for them.
   self.extra_params = [
     content_blocks_attributes: [
       :id,
@@ -21,7 +32,7 @@ class Avo::Resources::Page < Avo::BaseResource
       :position,
       :block_type,
       :image,
-      *::Locales.enabled.flat_map { |locale|
+      *::Locales::SUPPORTED.keys.flat_map { |locale|
         [ ::Mobility.normalize_locale_accessor(:caption, locale).to_sym,
           ::Mobility.normalize_locale_accessor(:body, locale).to_sym ]
       },
