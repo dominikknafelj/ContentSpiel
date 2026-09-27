@@ -63,6 +63,29 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal %w[list_posts_tool get_post_tool create_post_tool update_post_tool].sort, names.sort
   end
 
+  # `create_post_tool`'s `content_type` enum has to be read fresh on every
+  # `tools/list`, not frozen the moment the class body ran -- a type
+  # registered after boot (a plugin, or this test) must still show up
+  # without a server restart. Registering one here and then listing is what
+  # actually proves that, rather than just asserting the built-in three.
+  test "the create_post_tool content_type enum reflects the registry, including a type registered at runtime" do
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
+    tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "create_post_tool" }
+    assert_equal %w[blog resume_entry now_update].sort, tool["inputSchema"]["properties"]["content_type"]["enum"].sort
+
+    saved = ContentTypes.all.dup
+    begin
+      ContentTypes.register(:test_type) { |t| t.label "Test type" }
+
+      mcp_post(jsonrpc: "2.0", id: 2, method: "tools/list")
+      tool = response.parsed_body["result"]["tools"].find { |t| t["name"] == "create_post_tool" }
+      assert_includes tool["inputSchema"]["properties"]["content_type"]["enum"], "test_type"
+    ensure
+      ContentTypes.reset!
+      saved.each { |definition| ContentTypes.registry_put(definition) }
+    end
+  end
+
   test "a valid tool call creates a post, scoped to the token's user" do
     assert_difference "Post.count", 1 do
       mcp_post(

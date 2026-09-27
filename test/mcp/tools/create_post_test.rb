@@ -76,4 +76,24 @@ class Mcp::Tools::CreatePostTest < ActiveSupport::TestCase
 
     assert response.error?
   end
+
+  test "fields creates a post with its content type's typed fields" do
+    response = call_tool(content_type: "resume_entry", title: "Staff Engineer",
+      fields: { company: "Acme", role_type: "lead", start_date: "2023-01-01" })
+
+    data = JSON.parse(response.content.first[:text])
+    assert_equal({ "company" => "Acme", "role_type" => "lead", "start_date" => "2023-01-01" }, data["fields"])
+    assert_not data.key?("metadata")
+  end
+
+  test "an invalid field value returns an MCP error response naming the field" do
+    response = nil
+
+    assert_no_difference "Post.count" do
+      response = call_tool(content_type: "resume_entry", title: "Staff Engineer", fields: { role_type: "boss" })
+    end
+
+    assert response.error?
+    assert_match(/role type/i, response.content.first[:text])
+  end
 end

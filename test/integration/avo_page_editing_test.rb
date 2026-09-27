@@ -261,8 +261,15 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
       "expected a blank nested row to add a block with"
   end
 
+  # `:post_list`, not `:image`: `settings` inputs now come from the block's
+  # *own* type schema (`_typed_fields.html.erb`, open-types spec §6) rather
+  # than a fixed list rendered on every row regardless of type -- image has
+  # no settings fields at all, so post_list (which has `content_type`) is
+  # what actually exercises a settings input showing up here. `image`/
+  # `caption`/`body` stay unconditional (existing columns, not schema
+  # fields), so they're still asserted below even off a post_list block.
   test "the nested block row exposes the type-specific and translated fields" do
-    @about.content_blocks.create!(block_type: :image, position: 0)
+    @about.content_blocks.create!(block_type: :post_list, position: 0)
 
     get "/avo/resources/pages/#{@about.id}/edit"
 

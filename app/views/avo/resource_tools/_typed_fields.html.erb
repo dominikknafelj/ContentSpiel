@@ -1,0 +1,17 @@
+<%# The typed-fields editor mounted on Avo::Resources::Post and
+    Avo::Resources::ContentBlock -- see app/avo/resource_tools/typed_fields.rb
+    for why this is a resource tool.
+
+    `form` is only present on New/Edit; the tool is registered `show_on:
+    :forms` so it should never render anywhere else, but a missing guard here
+    would be a 500 rather than a blank panel on Show. %>
+<% if form.present? && form.object.definition&.fields&.any? %>
+  <% record = form.object %>
+  <%= render ui.panel(title: "Fields") do |panel| %>
+    <% panel.with_body do %>
+      <%= render "avo/partials/typed_fields", definition: record.definition,
+            current_values: tool.current_values(record),
+            name_prefix: "#{form.object_name}[#{tool.param_key(record)}]" %>
+    <% end %>
+  <% end %>
+<% end %>

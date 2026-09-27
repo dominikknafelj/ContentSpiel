@@ -16,14 +16,21 @@ module Mcp
 
       description "List posts, optionally filtered by content type. Titles/slugs/excerpts are read in the given locale " \
         "(default: the site's current default locale)."
-      input_schema(
-        properties: {
-          content_type: { type: "string", enum: ContentTypes.names, description: "Only list posts of this type." },
-          locale: { type: "string", enum: Locales::SUPPORTED.keys }
-        }
-      )
       annotations(read_only_hint: true, idempotent_hint: true, destructive_hint: false, open_world_hint: false,
         title: "List posts")
+
+      # Overrides the reader rather than calling the `input_schema(...)`
+      # macro -- see the identical comment on CreatePost#input_schema_value
+      # for why `content_type`'s enum has to come from `ContentTypes.names`
+      # at read time rather than being frozen at class-load time.
+      def self.input_schema_value
+        MCP::Tool::InputSchema.new(
+          properties: {
+            content_type: { type: "string", enum: ContentTypes.names, description: "Only list posts of this type." },
+            locale: { type: "string", enum: Locales::SUPPORTED.keys }
+          }
+        )
+      end
 
       def self.call(content_type: nil, locale: nil, server_context:)
         locale ||= Locales.default
