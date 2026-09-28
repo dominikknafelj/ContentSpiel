@@ -74,7 +74,15 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # load (PR #30's first CI run), failing a test that had nothing wrong with
   # it. The deadline scales with Capybara's own wait time so CI and local
   # runs get the same patience as every other Capybara wait.
+  #
+  # A longer deadline alone didn't help on CI (PR #30's second run waited
+  # the full 8s on a fully rendered page): WebDriver key events only reach a
+  # page Chrome considers focused, and headless Chrome on CI sometimes
+  # doesn't. So focus emulation is switched on first (a CDP call; a no-op
+  # where it's already focused), and a failure reports the page's focus
+  # state so a recurrence says why instead of just "never".
   def await_native_input(timeout: Capybara.default_max_wait_time * 4)
+    emulate_focus
     page.execute_script("window.__nativeInputSeen = false; document.addEventListener('keydown', () => { window.__nativeInputSeen = true }, { capture: true, once: true })")
     deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
     loop do
@@ -84,6 +92,12 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
 
       sleep 0.05
     end
-    raise "the browser never accepted native keyboard input (waited #{timeout}s)"
+    state = page.evaluate_script("({ hasFocus: document.hasFocus(), visibility: document.visibilityState, active: document.activeElement && document.activeElement.tagName })")
+    raise "the browser never accepted native keyboard input (waited #{timeout}s; page state #{state.inspect})"
+  end
+
+  def emulate_focus
+    browser = page.driver.browser
+    browser.execute_cdp("Emulation.setFocusEmulationEnabled", enabled: true) if browser.respond_to?(:execute_cdp)
   end
 end
