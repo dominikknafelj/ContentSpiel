@@ -296,3 +296,11 @@ Owners are users with the flag.
 - Per-field permissions.
 - Page authorship.
 - Admin-defined (non-code) permissions.
+
+## Amendments (during implementation)
+
+- **Publish-only changes need only `publish`** (final fix wave). A save of a stored post or page that asks for nothing but a publish-state change (`published`/`published_at`, no translations, no other attribute) is judged on `posts.publish`/`pages.publish` alone, not `edit` as well, so a "Publishers" group (read + publish) can publish, unpublish and schedule from CS Studio's header buttons and through MCP's `update_post(published:)`. Every other change keeps §3.3's rules (edit, plus publish when already published).
+- **`audit.view` is not content-scoped** (final fix wave). The log's events carry snapshots of every record, whatever else the viewer may read, so the permission is labelled "View audit log (all content)" and should be granted accordingly.
+- **Managing a group needs its rights** (final fix wave). Taking members out of a group, removing or narrowing its grants, deleting it, or changing a user's membership in it requires, for a non-owner, every grant the group holds as it stands (`AccessControl.can_manage_group?`). Renaming a group doesn't.
+- **A token is never an owner** (final fix wave). Wherever an owner is waved through (owner flags, owner accounts, granting and assigning groups), an `ApiToken` actor, even an owner's, is judged on its effective rights: its group intersected with its user.
+- **The public site runs on an untrusted `:public` channel** (final fix wave), so a nil actor there is denied, never mistaken for the trusted console case.
