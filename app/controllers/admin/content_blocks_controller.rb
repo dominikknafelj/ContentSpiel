@@ -10,7 +10,6 @@ module Admin
   class ContentBlocksController < BaseController
     include AutosaveResponses
     include FileParams
-    include RichTextParams
 
     # Which schema-declared settings fields and `uses_columns` a save
     # actually writes to depends on the block's own registered type (spec
@@ -65,7 +64,6 @@ module Admin
       return render_gone unless block
 
       attributes, translations = split_block_params(block)
-      body_warnings = apply_block_body_markdown(block, translations)
       attributes = drop_blank_file_params(attributes, fields: ATTRIBUTE_COLUMNS)
       attributes[:image] = nil if !attributes.key?(:image) && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
       image_changing = attributes.key?(:image)
@@ -82,7 +80,6 @@ module Admin
       )
 
       streams << image_field_stream(result.record) if result.ok? && image_changing
-      streams << body_warnings_stream("#{Admin::BlockCardComponent.error_prefix(block)}-body", body_warnings) if body_warnings
 
       render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
     end
@@ -179,20 +176,6 @@ module Admin
       ATTRIBUTE_COLUMNS.each { |column| attributes[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
 
       [ attributes, translations ]
-    end
-
-    # The interim Markdown textarea's `block[body_markdown]` (see
-    # `Admin::RichTextParams`), read only for a type that `uses :body` --
-    # the same gate `split_block_params` applies to `block[body]` itself.
-    # `translations` is Symbol-keyed here, unlike the posts controller's
-    # String-keyed permitted Hash, so the body is moved across explicitly.
-    def apply_block_body_markdown(block, translations)
-      return nil unless block.definition&.uses_columns&.include?("body")
-
-      translated = translations.key?(:body) ? { "body" => translations[:body] } : {}
-      warnings = apply_body_markdown(translated, params.fetch(:block, ActionController::Parameters.new), block)
-      translations[:body] = translated["body"] if translated.key?("body")
-      warnings
     end
 
     # A `groups` field's raw params need straightening into an ordered

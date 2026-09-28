@@ -1,0 +1,266 @@
+require "application_system_test_case"
+
+# The Tiptap editor in CS Studio (tiptap spec §4.1/§9): `admin--rich-text`
+# mounts Tiptap on `Admin::Columns::RichTextColumnComponent`, writes
+# `editor.getJSON()` into the column's hidden `…[body]` input and dispatches
+# `input` so the form's own `admin--autosave` sends it. Every test here ends
+# by reading the *saved* document back and running it through
+# `RichText::Document#validate` -- the editor's schema has to match
+# `RichText::Schema` exactly (task 7's "schema fidelity" ruling), so anything
+# it can produce must be something the server accepts.
+#
+# Clicks are scripted (`press`), never native, for the reason
+# `ApplicationSystemTestCase#press` gives. Typing goes through a real
+# WebDriver key sequence into the focused ProseMirror element (`type_text`),
+# since ProseMirror reads its own DOM mutations/`beforeinput` events --
+# setting a value from JS would bypass exactly the code under test.
+class Admin::RichTextSystemTest < ApplicationSystemTestCase
+  YOUTUBE_ID = "dQw4w9WgXcQ".freeze
+
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    @post = create_post(title: "Notes")
+  end
+
+  test "typed text with a toolbar Bold autosaves a bold mark" do
+    visit_post
+
+    editor.click
+    type_text "Hello "
+    press "Bold"
+    type_text "world"
+
+    document = saved_post_document { |doc| doc_text(doc).include?("world") }
+    bold = text_nodes(document).find { |node| node["text"] == "world" }
+    assert_equal [ { "type" => "bold" } ], bold["marks"]
+    assert_equal "Hello ", text_nodes(document).first["text"]
+  end
+
+  test "pasting a YouTube URL inserts a youtube node" do
+    visit_post
+
+    editor.click
+    paste(text: "https://youtu.be/#{YOUTUBE_ID}")
+
+    assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+    document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
+    youtube = nodes(document).find { |node| node["type"] == "youtube" }
+    assert_equal({ "id" => YOUTUBE_ID }, youtube["attrs"])
+  end
+
+  test "an image uploaded through the Image button is inserted and its alt text saved" do
+    visit_post
+
+    editor.click
+    attach_file(file_fixture("tiny.png").to_s) { press "Image" }
+
+    within(".admin-rich-text-popover") do
+      fill_in "Alt text", with: "A"
+      press "Done"
+    end
+
+    document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "alt") == "A" } }
+    image = nodes(document).find { |node| node["type"] == "image" }
+    asset = MediaAsset.find(image.dig("attrs", "asset_id"))
+    assert_equal({ "asset_id" => asset.id, "alt" => "A", "caption" => "" }, image["attrs"])
+    assert_selector ".ProseMirror img[src='#{asset.url}']"
+  end
+
+  test "a failed upload shows its errors inline and inserts nothing" do
+    visit_post
+
+    editor.click
+    attach_file(file_fixture("fake.png").to_s) { press "Image" }
+
+    assert_selector "[data-admin--rich-text-target='message']", text: /File/
+    refute_selector ".ProseMirror img"
+    assert_equal 0, MediaAsset.count
+  end
+
+  test "the internal link picker inserts an internalLink mark to an existing page" do
+    target = create_page(title: "Contact")
+    visit_post
+
+    editor.click
+    press "Internal link"
+    within(".admin-rich-text-popover") do
+      fill_in "Search pages and posts", with: "Cont"
+      press "Contact"
+    end
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } }
+    assert_equal "Contact", linked["text"]
+    assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ], linked["marks"]
+  end
+
+  test "an external link is checked client-side before it's applied" do
+    visit_post
+
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL", with: "javascript:alert(1)"
+      press "Apply"
+      assert_text "Use an http(s), mailto or relative link"
+      fill_in "URL", with: "https://example.com/docs"
+      press "Apply"
+    end
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } }
+    assert_equal "https://example.com/docs", linked["text"]
+    assert_equal [ { "type" => "link", "attrs" => { "href" => "https://example.com/docs" } } ], linked["marks"]
+  end
+
+  # Pasted HTML is parsed against the editor's own schema, so anything
+  # outside `RichText::Schema` (underline, tables, H1, a `javascript:` link,
+  # a bare `<img>` with no `MediaAsset` behind it) is dropped or flattened
+  # to what the schema does have, never smuggled into the saved document.
+  test "pasted HTML is constrained to the schema" do
+    visit_post
+
+    editor.click
+    paste(html: <<~HTML, text: "fallback")
+      <h1>Big title</h1>
+      <p><u>under</u> <b>bold</b> <a href="javascript:alert(1)">bad</a> <a href="https://example.com" target="_blank" rel="nofollow">good</a></p>
+      <table><tr><td>cell</td></tr></table>
+      <img src="https://example.com/x.png">
+      <ol start="3" type="a"><li>third</li></ol>
+    HTML
+
+    document = saved_post_document { |doc| doc_text(doc).include?("third") }
+    json = document.to_h.to_json
+    refute_includes json, "underline"
+    refute_includes json, "javascript"
+    refute_includes json, "table"
+    refute_includes json, "_blank"
+    assert nodes(document).none? { |node| node["type"] == "image" }
+    assert nodes(document).none? { |node| node["type"] == "heading" && !(2..4).cover?(node.dig("attrs", "level")) }
+    list = nodes(document).find { |node| node["type"] == "orderedList" }
+    assert_equal({ "start" => 3 }, list["attrs"])
+  end
+
+  test "in a translation the primary-language original shows the rendered English body" do
+    @post.assign_body(rich_doc("Hello **there**"), locale: :en)
+    @post.save!
+
+    visit "/cs-studio/posts/#{@post.id}?locale=de"
+
+    assert_selector "[data-original-for='body'] strong", text: "there"
+    # The German editor itself starts empty -- the original is beside it,
+    # not loaded into it.
+    assert_no_text_in_editor "there"
+  end
+
+  # Turbo Stream replacement of a whole block card (task 7's lifecycle
+  # ruling): the old card's `admin--rich-text` disconnects (destroying its
+  # editor), the new card's connects and mounts exactly one editor, and
+  # typing into the new one still autosaves. Also detaches and re-attaches
+  # the *same* card element (what a drag reorder does), which Stimulus
+  # answers with disconnect-then-connect on one element -- the case that
+  # would double-mount if `connect` didn't start from a clean mount point.
+  test "a block card swapped by a Turbo Stream mounts one editor and still saves" do
+    page_record = create_page(title: "About")
+    block = page_record.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit "/cs-studio/pages/#{page_record.id}"
+    card_id = ActionView::RecordIdentifier.dom_id(block)
+    assert_selector "##{card_id} .ProseMirror", count: 1
+
+    page.execute_script(<<~JS, card_id)
+      const id = arguments[0]
+      fetch(window.location.href, { headers: { Accept: "text/html" } }).then((response) => response.text()).then((html) => {
+        const fresh = new DOMParser().parseFromString(html, "text/html").getElementById(id)
+        fresh.setAttribute("data-swapped", "true")
+        window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${id}"><template>${fresh.outerHTML}</template></turbo-stream>`)
+      })
+    JS
+    assert_selector "##{card_id}[data-swapped='true'] .ProseMirror", count: 1
+
+    page.execute_script(<<~JS, card_id)
+      const card = document.getElementById(arguments[0])
+      const parent = card.parentNode
+      const next = card.nextSibling
+      card.remove()
+      window.setTimeout(() => parent.insertBefore(card, next), 50)
+    JS
+    assert_selector "##{card_id} .ProseMirror", count: 1
+    assert_selector ".ProseMirror", count: 1
+
+    find("##{card_id} .ProseMirror").click
+    type_text "Swapped and saved"
+
+    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    document = block.reload.body_document(locale: :en)
+    assert_includes doc_text(document), "Swapped and saved"
+    assert_empty document.validate
+  end
+
+  private
+
+  def visit_post
+    visit "/cs-studio/posts/#{@post.id}"
+    assert_selector ".ProseMirror"
+  end
+
+  def editor = find(".ProseMirror")
+
+  # Real key events into whatever currently has focus (the ProseMirror
+  # element, after `editor.click`) -- not `editor.send_keys`, which may
+  # move the caret back to the end of the element and, with it, drop a
+  # stored mark a toolbar button just set.
+  def type_text(text)
+    page.driver.browser.action.send_keys(text).perform
+  end
+
+  # A synthetic `paste` carrying a real `DataTransfer` -- ProseMirror reads
+  # `event.clipboardData` exactly as it would for a native paste, and
+  # headless Chrome's own clipboard is not reliably reachable from WebDriver.
+  def paste(text: nil, html: nil)
+    page.execute_script(<<~JS, text, html)
+      const data = new DataTransfer()
+      if (arguments[0]) data.setData("text/plain", arguments[0])
+      if (arguments[1]) data.setData("text/html", arguments[1])
+      const target = document.querySelector(".ProseMirror")
+      target.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }))
+    JS
+  end
+
+  # Polls the database (not the status line -- see
+  # `test/system/admin/autosave_test.rb`'s "second quick edit" comment for
+  # why a status line can lie about *which* save landed) until the saved
+  # document satisfies `condition`, then asserts it validates.
+  def saved_post_document(timeout: 6, &condition)
+    deadline = Time.current + timeout
+    document = nil
+    loop do
+      document = @post.reload.body_document(locale: :en)
+      break if condition.call(document)
+      flunk "the saved document never matched: #{document.to_h.to_json}" if Time.current > deadline
+      sleep 0.1
+    end
+    assert_empty document.validate, "the editor saved a document the server schema rejects"
+    document
+  end
+
+  def nodes(document)
+    stack = [ document.to_h ]
+    found = []
+    until stack.empty?
+      node = stack.pop
+      found << node
+      stack.concat(Array(node["content"]).reverse)
+    end
+    found
+  end
+
+  def text_nodes(document) = nodes(document).select { |node| node["type"] == "text" }
+
+  def doc_text(document) = text_nodes(document).map { |node| node["text"] }.join
+
+  def assert_no_text_in_editor(text)
+    assert_selector ".ProseMirror"
+    refute_selector ".ProseMirror", text: text
+  end
+end

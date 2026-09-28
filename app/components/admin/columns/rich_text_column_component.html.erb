@@ -1,26 +1,52 @@
 <div class="admin-column mb-4" data-field-name="<%= name %>">
-  <label class="<%= setup_label_class %> mb-1" for="<%= markdown_id %>"><%= name.to_s.humanize %></label>
-
-  <%# The document JSON under `html_name` (e.g. `post[body]`) -- see the
-      class comment. `html_name`, not `name`: a caller nesting this under a
-      form object needs the param to arrive as `params[:post][:body]`, and
-      `name` alone is only the label/`data-field-name`'s concern. %>
-  <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value %>
+  <p id="<%= label_id %>" class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></p>
 
   <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
-    <div>
-      <%= tag.textarea markdown_value, name: markdown_html_name, id: markdown_id, rows: 12,
-            class: "#{setup_input_class} font-cs-mono text-sm", spellcheck: "true" %>
-      <p class="mt-1 text-sm text-meta">
-        Markdown. Embeds go on their own line: <code>::youtube{id="…"}</code>, <code>::image{asset="42" alt="…" caption="…"}</code>.
-        Link to this site with <code>[text](cs:page/ID)</code> or <code>[text](cs:post/ID)</code>.
-      </p>
-    </div>
+    <%# `admin--rich-text` (tiptap spec §4.1) -- see the class comment for
+        every `data-*` value below. `relative` anchors the controller's own
+        popovers (link, internal link, image, YouTube) to this editor. %>
+    <%= tag.div class: "admin-rich-text relative min-w-0",
+          data: {
+            controller: "admin--rich-text",
+            "admin--rich-text-upload-url-value": upload_url,
+            "admin--rich-text-link-targets-url-value": link_targets_url,
+            "admin--rich-text-locale-value": editor_locale,
+            "admin--rich-text-asset-urls-value": asset_urls_json,
+            "admin--rich-text-link-titles-value": link_titles_json
+          } do %>
+      <%# The document JSON under `html_name` (e.g. `post[body]`) -- see the
+          class comment. `html_name`, not `name`: a caller nesting this
+          under a form object needs the param to arrive as
+          `params[:post][:body]`, and `name` alone is only the label/
+          `data-field-name`'s concern. %>
+      <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value, data: { "admin--rich-text-target": "input" } %>
+
+      <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
+           class="flex flex-wrap gap-1 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
+           data-action="mousedown->admin--rich-text#keepFocus">
+        <% TOOLBAR.each do |action, label, text| %>
+          <%= tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": "false",
+                class: "admin-rich-text-button min-w-8 cursor-pointer rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent",
+                data: { action: "admin--rich-text##{action}", "admin--rich-text-command": action } %>
+        <% end %>
+      </div>
+
+      <%# No `name`: the chosen file goes to the upload endpoint by `fetch`,
+          never with the autosave form's own `FormData`. %>
+      <%= tag.input type: "file", accept: ACCEPT, hidden: true, tabindex: -1, "aria-label": "Upload image",
+            data: { "admin--rich-text-target": "file", action: "change->admin--rich-text#upload" } %>
+
+      <%= tag.div id: editor_id, "aria-labelledby": label_id,
+            class: "admin-rich-text-editor rounded-b-cs border border-line-strong bg-surface text-ink",
+            data: { "admin--rich-text-target": "editor" } %>
+
+      <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text-target="message"></p>
+    <% end %>
 
     <% if show_original? %>
       <div class="rounded-cs border border-line bg-sunken px-3 py-2">
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
-        <div data-original-for="<%= name %>" class="cs-prose text-ink"><%= original_html %></div>
+        <div data-original-for="<%= name %>" class="admin-rich-text-content text-ink"><%= original_html %></div>
         <span data-translate-slot="<%= name %>"></span>
       </div>
     <% end %>
@@ -31,6 +57,4 @@
       <p><%= message %></p>
     <% end %>
   </div>
-
-  <%= render partial: "admin/shared/field_warnings", locals: { id: warnings_id, messages: [] } %>
 </div>

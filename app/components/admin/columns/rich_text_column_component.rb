@@ -1,44 +1,75 @@
 module Admin
   module Columns
-    # The rich-text column (`Post`/`ContentBlock` body, tiptap spec §4.1).
-    #
-    # **Interim (Task 5 -> Task 7).** Until Tiptap lands this renders:
+    # The rich-text column (`Post`/`ContentBlock` body, tiptap spec §4.1):
+    # the Tiptap editor, mounted by the `admin--rich-text` Stimulus
+    # controller. Renders:
     # - a hidden input (`html_name`, e.g. `post[body]`) holding the
-    #   document's JSON -- the contract Tiptap's `admin--rich-text`
-    #   controller will write `editor.getJSON()` into, and what the
-    #   controllers/services already accept as `translations[locale][:body]`;
-    # - a Markdown `<textarea>` (`…[body_markdown]`) editors actually type
-    #   into. The controllers convert it server-side
-    #   (`RichText::Document.from_markdown`) and it wins over the hidden JSON
-    #   whenever it differs from the stored document's own Markdown (see
-    #   `Admin::RichTextParams`);
+    #   document's JSON -- the one contract between the editor and the
+    #   server. The controller writes `JSON.stringify(editor.getJSON())`
+    #   into it on every change and dispatches `input`, so the enclosing
+    #   form's own `admin--autosave` sends it like any other field; the
+    #   controllers hand it to their services untouched as
+    #   `translations[locale][:body]`, and `HasRichTextBody` parses and
+    #   validates it (`RichText::Document#validate`). It is also where the
+    #   editor reads its *initial* content from on every `connect()` -- not
+    #   a separate data value -- so an editor remounted after a drag
+    #   reorder (Stimulus disconnects and reconnects the moved element)
+    #   comes back with the edits made so far, not the page-load state.
+    # - the toolbar (`TOOLBAR`, spec §4.1's exact list), as real
+    #   server-rendered `<button type="button">`s: accessible names come
+    #   from here, not from JS, and a system test can `press` them;
+    # - the editor mount (empty; Tiptap fills it) and a message slot the
+    #   controller fills with an upload's own 422 `errors` (spec §7: shown
+    #   inline, nothing inserted -- never `alert()`);
     # - in a translation, the primary language's document rendered to HTML,
-    #   read-only, beside the editor (plus the `data-translate-slot` every
-    #   other column's original carries);
-    # - the usual error slot, plus a warnings slot the autosave response
-    #   fills with Markdown conversion warnings (an unknown directive, a
-    #   `cs:` link to a missing record, ...).
+    #   read-only, beside the editor, plus the `data-translate-slot` every
+    #   other column's original carries;
+    # - the usual error slot (`#{id}-errors`, what `Admin::AutosaveResponses`
+    #   replaces after a save).
+    #
+    # Everything the editor needs from the server arrives as `data-*`
+    # values rendered here with route helpers -- the upload and link-target
+    # endpoints (never a hardcoded `/cs-studio`: the admin path is
+    # configurable, `ContentSpiel::ADMIN_PATH`), the editing locale the
+    # link picker searches in, and two lookups for what the document
+    # already references: `MediaAsset` URLs for its `image` nodes (the node
+    # itself stores only `asset_id`, schema fidelity, so the editor can't
+    # show a picture without being told where it lives) and titles for its
+    # `internalLink` targets. A referenced asset or record that no longer
+    # exists is simply absent from its lookup, which the editor renders as
+    # a "missing" placeholder (spec §7) -- the same absence the public
+    # renderer degrades to nothing/plain text.
     #
     # The public interface -- `name:`, `value:`, `original:`, `errors:`,
-    # `locale:`, `id:`, `html_name:` -- is exactly `Admin::Columns::Base`'s,
-    # so Task 7 swaps the editor internals without touching a caller.
+    # `locale:`, `id:`, `html_name:` -- is exactly `Admin::Columns::Base`'s.
     # `value`/`original` are a `RichText::Document`, a document Hash, or nil.
     class RichTextColumnComponent < Base
-      # The Markdown shown in (and compared against) the textarea for
-      # `document` -- "" for a blank document rather than the lone "\n" an
-      # empty `doc` dumps as, so an untouched empty textarea reads as
-      # "unchanged". Shared with `Admin::RichTextParams` so the "did the
-      # editor change the Markdown?" comparison uses exactly the text this
-      # component rendered.
-      def self.markdown_for(document) = document.blank? ? "" : document.to_markdown
+      # [action, accessible name, visible text]. `action` is the
+      # `admin--rich-text` method the button runs (`data-action` below) and
+      # the key the controller reports active state under
+      # (`aria-pressed`). The order and set are spec §4.1's.
+      TOOLBAR = [
+        [ "bold", "Bold", "B" ],
+        [ "italic", "Italic", "I" ],
+        [ "strike", "Strikethrough", "S" ],
+        [ "code", "Inline code", "<>" ],
+        [ "heading2", "Heading 2", "H2" ],
+        [ "heading3", "Heading 3", "H3" ],
+        [ "heading4", "Heading 4", "H4" ],
+        [ "bulletList", "Bullet list", "•" ],
+        [ "orderedList", "Numbered list", "1." ],
+        [ "blockquote", "Quote", "❝" ],
+        [ "codeBlock", "Code block", "{ }" ],
+        [ "horizontalRule", "Horizontal rule", "―" ],
+        [ "link", "Link", "Link" ],
+        [ "internalLink", "Internal link", "Page" ],
+        [ "image", "Image", "Image" ],
+        [ "youtube", "YouTube", "YouTube" ]
+      ].freeze
 
-      # The textarea's own param name, beside `html_name`'s: `post[body]` ->
-      # `post[body_markdown]`, a bare `body` -> `body_markdown`.
-      def self.markdown_html_name(html_name)
-        html_name.to_s.end_with?("]") ? html_name.to_s.sub(/\]\z/, "_markdown]") : "#{html_name}_markdown"
-      end
-
-      def self.warnings_id(id) = "#{id}-warnings"
+      # The upload's own `accept` -- `MediaAsset`'s content types (spec
+      # §4.2). A hint for the file chooser only; the server decides.
+      ACCEPT = "image/png,image/jpeg,image/gif,image/webp".freeze
 
       def document = self.class.to_document(value)
 
@@ -46,15 +77,44 @@ module Admin
 
       def json_value = document.to_h.to_json
 
-      def markdown_value = self.class.markdown_for(document)
-
-      def markdown_html_name = self.class.markdown_html_name(html_name)
-
-      def markdown_id = "#{id}-markdown"
-
-      def warnings_id = self.class.warnings_id(id)
-
       def show_original? = !original_document.blank?
+
+      def editor_id = "#{id}-editor"
+
+      def label_id = "#{id}-label"
+
+      def upload_url = helpers.admin_media_assets_path
+
+      def link_targets_url = helpers.admin_link_targets_path
+
+      # The language this column edits -- what the link picker searches
+      # titles in. `locale` is nil only for a caller that doesn't pass one
+      # (a Lookbook preview), which edits the primary language.
+      def editor_locale = (locale.presence || ::Locales.default).to_s
+
+      # `{ "42" => "/rails/active_storage/..." }` for every `image` node's
+      # `asset_id` that still names a `MediaAsset` (see the class comment).
+      def asset_urls_json
+        ids = self.class.collect(document) { |node| node["type"] == "image" ? node.dig("attrs", "asset_id") : nil }
+        MediaAsset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
+      end
+
+      # `{ "page:12" => "Contact" }` for every `internalLink` target that
+      # still exists, titled in this column's own editing locale (Mobility
+      # falls back to the primary language, like every other translated
+      # read in CS Studio).
+      def link_titles_json
+        targets = self.class.collect(document) do |node|
+          Array(node["marks"]).filter_map { |mark| mark["attrs"] if mark.is_a?(Hash) && mark["type"] == "internalLink" && mark["attrs"].is_a?(Hash) }
+        end.flatten
+
+        titles = {}
+        { "page" => Page, "post" => Post }.each do |type, model|
+          ids = targets.select { |attrs| attrs["type"] == type }.map { |attrs| attrs["id"] }.grep(Integer)
+          model.where(id: ids).each { |record| titles["#{type}:#{record.id}"] = record.title(locale: editor_locale).to_s }
+        end
+        titles.to_json
+      end
 
       # Rendered through the same `RichText::HtmlRenderer` (and scrubber)
       # the public site uses, in the primary language, with preview URLs so
@@ -68,6 +128,25 @@ module Admin
         when Hash then RichText::Document.new(value)
         else RichText::Document.empty
         end
+      end
+
+      # Every non-nil value the block returns for a node of `document`,
+      # walked iteratively rather than recursively -- this runs on whatever
+      # the column was handed, which (like `RichText::Document#normalized`'s
+      # own walk) may be a document nobody ever validated, nested deeper
+      # than a recursive walk should be trusted with.
+      def self.collect(document)
+        found = []
+        stack = [ document.to_h ]
+        until stack.empty?
+          node = stack.pop
+          next unless node.is_a?(Hash)
+
+          result = yield(node)
+          found << result unless result.nil?
+          stack.concat(node["content"]) if node["content"].is_a?(Array)
+        end
+        found
       end
     end
   end

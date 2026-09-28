@@ -92,74 +92,35 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal rich_doc("Kept"), post_record.reload.body_document(locale: "en").to_h
   end
 
-  # The interim Markdown textarea (Task 5 -> Task 7): `body_markdown` wins
-  # over the hidden JSON `body`, and its conversion warnings land in the
-  # field's own warnings slot.
-  test "body_markdown is converted server-side and wins over the JSON body" do
+  # The interim Markdown textarea is gone (Task 7): the Tiptap editor writes
+  # the document JSON into `post[body]` and that is the only body param. A
+  # stray `body_markdown` (an old tab, a hand-built request) is ignored
+  # outright rather than converted.
+  test "a body_markdown param is ignored" do
     post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("Kept"))
 
     patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { body: rich_doc("Stale").to_json, body_markdown: "Fresh **text**\n\n::nope{x=\"1\"}" },
-                base_updated_at: post_record.updated_at.iso8601(6) },
+      params: { post: { title: "Renamed", body_markdown: "Replaced **text**" }, base_updated_at: post_record.updated_at.iso8601(6) },
       as: :turbo_stream
 
     assert_response :success
-    document = post_record.reload.body_document(locale: "en")
-    assert_includes document.to_markdown, "Fresh **text**"
-    assert_not_includes document.to_markdown, "Stale"
-    assert_select_in_stream "post-body-warnings", /nope/
+    assert_equal "Renamed", post_record.reload.title(locale: :en)
+    assert_equal rich_doc("Kept"), post_record.body_document(locale: "en").to_h
   end
 
-  # An autosave triggered by some *other* field resends the textarea
-  # unchanged; that must not round-trip the stored document through Markdown
-  # (lossy for e.g. empty spacer paragraphs), so unchanged Markdown keeps the
-  # JSON body instead.
-  test "unchanged body_markdown does not rewrite the stored document" do
-    post_record = create_post(title: "Engineer")
-    spaced = { "type" => "doc", "content" => [
-      { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "One" } ] },
-      { "type" => "paragraph" },
-      { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Two" } ] } ] }
-    post_record.update!(body: spaced)
-    markdown = post_record.body_document(locale: "en").to_markdown.gsub("\n", "\r\n")
-
-    patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { title: "Renamed", body: spaced.to_json, body_markdown: markdown }, base_updated_at: post_record.updated_at.iso8601(6) },
-      as: :turbo_stream
-
-    assert_response :success
-    assert_equal spaced, post_record.reload.body_document(locale: "en").to_h
-  end
-
-  # The hidden JSON input is never refreshed by an autosave response, so
-  # once the textarea has been edited it holds a stale document; a later
-  # save that resends the (now unchanged) Markdown must not let that stale
-  # JSON revert the edit.
-  test "a stale JSON body never reverts an earlier Markdown edit" do
-    post_record = create_post(title: "Engineer")
-    stale = RichText::Document.empty.to_h.to_json
-
-    patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { body: stale, body_markdown: "Typed" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
-    patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { title: "Renamed", body: stale, body_markdown: "Typed" }, base_updated_at: post_record.reload.updated_at.iso8601(6) },
-      as: :turbo_stream
-
-    assert_response :success
-    assert_equal rich_doc("Typed"), post_record.reload.body_document(locale: "en").to_h
-  end
-
-  test "the editor shows the body as Markdown with the hidden JSON input" do
+  test "the editor mounts the Tiptap editor on the hidden JSON input" do
     post_record = create_post(title: "Engineer")
     post_record.update!(body: rich_doc("Hello **there**"))
 
     get "/cs-studio/posts/#{post_record.id}"
 
     assert_response :success
-    assert_select "textarea[name='post[body_markdown]']", text: /Hello \*\*there\*\*/
-    assert_select "input[type=hidden][name='post[body]']" do |inputs|
+    assert_select "textarea[name='post[body_markdown]']", count: 0
+    assert_select "[data-controller='admin--rich-text'] input[type=hidden][name='post[body]']" do |inputs|
       assert_equal rich_doc("Hello **there**"), JSON.parse(inputs.first["value"])
     end
+    assert_select "[data-controller='admin--rich-text'][data-admin--rich-text-locale-value='en']"
   end
 
   test "a translation shows the primary language's body rendered read-only" do

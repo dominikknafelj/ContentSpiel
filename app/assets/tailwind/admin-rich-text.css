@@ -1,0 +1,45 @@
+/* The rich-text editor in CS Studio (tiptap spec §4.1) and the read-only
+   primary-language original beside it. Both show a document as bare
+   elements (ProseMirror's DOM; `RichText::HtmlRenderer`'s output), so there
+   are no per-element classes to hang utilities on -- element styles here,
+   product tokens only (--cs-*), never the public theme's --th-*.
+
+   `injectCSS: false` in `admin--rich-text` turns off Tiptap's own injected
+   <style>, so the few rules ProseMirror actually depends on (whitespace
+   handling, the gap cursor, the selected-node outline) live here too. */
+.admin-rich-text-content { line-height: 1.6; overflow-wrap: break-word; }
+.admin-rich-text-content > * + * { margin-top: 0.75em; }
+.admin-rich-text-content h2, .admin-rich-text-content h3, .admin-rich-text-content h4 { font-weight: 600; line-height: 1.25; }
+.admin-rich-text-content h2 { font-size: 1.4em; }
+.admin-rich-text-content h3 { font-size: 1.2em; }
+.admin-rich-text-content h4 { font-size: 1.05em; }
+.admin-rich-text-content a { color: var(--cs-accent); text-decoration: underline; text-underline-offset: 2px; }
+.admin-rich-text-content ul { list-style: disc; padding-left: 1.5em; }
+.admin-rich-text-content ol { list-style: decimal; padding-left: 1.5em; }
+.admin-rich-text-content li > * + * { margin-top: 0.25em; }
+.admin-rich-text-content blockquote { border-left: 2px solid var(--cs-line-strong); padding-left: 1em; color: var(--cs-dim); }
+.admin-rich-text-content pre { font-family: var(--cs-mono); background: var(--cs-sunken); padding: 0.75em 1em; overflow-x: auto; border-radius: var(--cs-radius); }
+.admin-rich-text-content code { font-family: var(--cs-mono); font-size: 0.9em; }
+.admin-rich-text-content hr { border: 0; border-top: 1px solid var(--cs-line-strong); margin: 1em 0; }
+.admin-rich-text-content img { max-width: 100%; max-height: 20rem; height: auto; border-radius: var(--cs-radius); }
+.admin-rich-text-content figcaption { font-family: var(--cs-mono); font-size: var(--cs-t-label); color: var(--cs-meta); margin-top: 0.25em; }
+.admin-rich-text-content iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; }
+
+/* ProseMirror essentials (normally Tiptap's injected CSS). */
+.admin-rich-text-editor .ProseMirror { position: relative; white-space: pre-wrap; word-wrap: break-word; font-variant-ligatures: none; }
+.admin-rich-text-editor .ProseMirror [contenteditable="false"] { white-space: normal; }
+.admin-rich-text-editor .ProseMirror pre { white-space: pre-wrap; }
+.admin-rich-text-editor .ProseMirror-gapcursor { display: none; pointer-events: none; position: absolute; }
+.admin-rich-text-editor .ProseMirror-gapcursor::after { content: ""; display: block; position: absolute; top: -2px; width: 20px; border-top: 1px solid var(--cs-ink); }
+.admin-rich-text-editor .ProseMirror-focused .ProseMirror-gapcursor { display: block; }
+.admin-rich-text-editor .ProseMirror-selectednode,
+.admin-rich-text-editor .is-selected { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+
+/* Embeds as the editor shows them: a labelled block (YouTube), the image
+   with its caption/alt line, and the "missing" placeholder (spec §7) for an
+   image asset or internal-link target that no longer exists. */
+.admin-rich-text-embed { border: 1px dashed var(--cs-line-strong); border-radius: var(--cs-radius); background: var(--cs-sunken); padding: 0.75em 1em; font-family: var(--cs-mono); font-size: var(--cs-t-label); color: var(--cs-dim); }
+.admin-rich-text-image { cursor: pointer; }
+.admin-rich-text-internal-link { cursor: default; }
+.admin-rich-text-content a.admin-rich-text-internal-link { text-decoration-style: dotted; }
+.admin-rich-text-content .admin-rich-text-missing { color: var(--cs-danger-ink); border-color: var(--cs-danger); }

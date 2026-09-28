@@ -117,9 +117,9 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal rich_doc("Hello there"), block.reload.body_document(locale: "en").to_h
   end
 
-  test "a rich_text block's body_markdown saves into the form's locale" do
+  test "a rich_text block's body saves into the form's locale" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("English"))
-    patch "#{blocks_path}/#{block.id}", params: { locale: "de", block: { body_markdown: "Deutsch" }, base_updated_at: block.updated_at.iso8601(6) },
+    patch "#{blocks_path}/#{block.id}", params: { locale: "de", block: { body: rich_doc("Deutsch").to_json }, base_updated_at: block.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
     stored = block.reload.read_attribute(:body)

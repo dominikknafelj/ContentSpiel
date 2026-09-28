@@ -1,0 +1,481 @@
+import { Controller } from "@hotwired/stimulus"
+import { Editor } from "@tiptap/core"
+import { extensions, safeHref, normalizeHref } from "rich_text/schema"
+import { youtubeIdFrom } from "rich_text/youtube"
+import { createPopover, createField, createSelect, createButton } from "rich_text/popover"
+
+// The Tiptap rich-text editor in CS Studio (tiptap spec §4.1), on
+// `Admin::Columns::RichTextColumnComponent` -- see that component's comment
+// for every target and value this reads.
+//
+// The contract with the rest of CS Studio is the hidden `input` target:
+// on every document change this writes `JSON.stringify(editor.getJSON())`
+// into it and dispatches a bubbling `input` event, which the enclosing
+// form's own `admin--autosave` already listens for -- the editor never
+// saves anything itself. The schema (`rich_text/schema.js`) is
+// `RichText::Schema`'s, type for type, so whatever lands in that input is
+// something `RichText::Document#validate` accepts.
+//
+// Lifecycle (task 7's ruling): mount in `connect()`, destroy in
+// `disconnect()`, and nothing that outlives either. That's what makes the
+// editor survive everything that moves or replaces a block card:
+// - a Turbo Stream `replace` of the whole card disconnects this element
+//   (its editor destroyed) and connects the new one (a fresh editor);
+// - a drag reorder *moves* the card, which Stimulus answers with
+//   disconnect-then-connect on the same element -- so `connect()` always
+//   empties the mount point first, and reads its content from the hidden
+//   input (which has every edit so far), never from the page-load HTML;
+// - a Turbo cache snapshot captures the rendered ProseMirror DOM; restoring
+//   it connects again, and the same "empty the mount point first" rule is
+//   what keeps that from becoming a second, dead editor beside the live one.
+// Pending fetches (upload, link search) are aborted on disconnect, and
+// their handlers check the editor is still the one they started with.
+export default class extends Controller {
+  static targets = [ "input", "editor", "file", "message" ]
+
+  static values = {
+    uploadUrl: String,
+    linkTargetsUrl: String,
+    locale: String,
+    assetUrls: Object,
+    linkTitles: Object
+  }
+
+  static texts = {
+    badLink: "Use an http(s), mailto or relative link",
+    badYoutube: "That isn't a YouTube URL or video ID",
+    uploadFailed: "Upload failed — check your connection",
+    uploadRejected: "Upload failed",
+    invalidContent: "This text contains something the editor can't show, so it's read-only here. Nothing has been changed.",
+    searchFailed: "Search failed — check your connection",
+    noResults: "No pages or posts match",
+    searchHint: "Type to search titles"
+  }
+
+  connect() {
+    this.aborter = new AbortController()
+    this.popover = null
+    this.contentInvalid = false
+    // Copies, not the value objects themselves: the upload and the link
+    // picker add to these as the editor is used, and writing a Stimulus
+    // value back would re-render nothing useful but cost a data-attribute
+    // round trip per upload.
+    this.assetUrls = { ...this.assetUrlsValue }
+    this.linkTitles = { ...this.linkTitlesValue }
+
+    const mount = document.createElement("div")
+    this.editorTarget.replaceChildren(mount)
+
+    this.editor = new Editor({
+      element: mount,
+      content: this.initialContent(),
+      extensions: extensions({
+        resolveAssetUrl: (id) => this.assetUrls[id] || null,
+        resolveLinkTitle: (type, id) => this.linkTitles[`${type}:${id}`] || null,
+        onEditImage: (position) => this.openImagePopover(position)
+      }),
+      injectCSS: false,
+      enableContentCheck: true,
+      editorProps: {
+        attributes: { class: "admin-rich-text-content min-h-40 px-3 py-2 focus:outline-2 focus:outline-accent" }
+      },
+      onContentError: () => this.handleInvalidContent(),
+      onUpdate: () => this.writeDocument(),
+      onTransaction: () => this.refreshToolbar()
+    })
+
+    this.refreshToolbar()
+  }
+
+  disconnect() {
+    this.aborter?.abort()
+    this.closePopover({ refocus: false })
+    this.editor?.destroy()
+    this.editor = null
+    this.editorTarget.replaceChildren()
+  }
+
+  // The hidden input's JSON, or nothing for an empty/absent document (an
+  // empty `doc` isn't valid ProseMirror content -- a doc needs at least one
+  // block -- and would otherwise trip the content check below).
+  initialContent() {
+    try {
+      const document = JSON.parse(this.inputTarget.value || "null")
+      return document && Array.isArray(document.content) && document.content.length > 0 ? document : null
+    } catch {
+      return null
+    }
+  }
+
+  // A stored document the editor's schema can't represent (a type
+  // registered on the server that this editor doesn't know, say): Tiptap
+  // would otherwise load it as an *empty* document, and the first keystroke
+  // would then save that over the real one. Read-only and never written
+  // back instead -- the stored document stays exactly as it is.
+  handleInvalidContent() {
+    this.contentInvalid = true
+    queueMicrotask(() => this.editor?.setEditable(false))
+    this.showMessage(this.constructor.texts.invalidContent)
+    this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => { button.disabled = true })
+  }
+
+  writeDocument() {
+    if (this.contentInvalid || !this.editor) return
+
+    this.inputTarget.value = JSON.stringify(this.editor.getJSON())
+    this.inputTarget.dispatchEvent(new Event("input", { bubbles: true }))
+  }
+
+  // Keeps the editor's selection (and focus) when a toolbar button is
+  // pressed with the mouse -- the button would otherwise take focus first,
+  // blurring the editor mid-command.
+  keepFocus(event) {
+    if (event.target.closest("button")) event.preventDefault()
+  }
+
+  // Toolbar commands. `data-action="admin--rich-text#<name>"` on each
+  // button (`RichTextColumnComponent::TOOLBAR`).
+  bold() { this.run((chain) => chain.toggleBold()) }
+  italic() { this.run((chain) => chain.toggleItalic()) }
+  strike() { this.run((chain) => chain.toggleStrike()) }
+  code() { this.run((chain) => chain.toggleCode()) }
+  heading2() { this.run((chain) => chain.toggleHeading({ level: 2 })) }
+  heading3() { this.run((chain) => chain.toggleHeading({ level: 3 })) }
+  heading4() { this.run((chain) => chain.toggleHeading({ level: 4 })) }
+  bulletList() { this.run((chain) => chain.toggleBulletList()) }
+  orderedList() { this.run((chain) => chain.toggleOrderedList()) }
+  blockquote() { this.run((chain) => chain.toggleBlockquote()) }
+  codeBlock() { this.run((chain) => chain.toggleCodeBlock()) }
+  horizontalRule() { this.run((chain) => chain.setHorizontalRule()) }
+
+  image() {
+    if (!this.editable()) return
+    this.showMessage("")
+    this.fileTarget.click()
+  }
+
+  run(build) {
+    if (!this.editable()) return
+    this.closePopover({ refocus: false })
+    build(this.editor.chain().focus()).run()
+  }
+
+  editable() {
+    return this.editor && !this.contentInvalid
+  }
+
+  // `aria-pressed` on every toolbar button whose command is "on" at the
+  // current selection (the product CSS styles `aria-pressed:` itself).
+  refreshToolbar() {
+    if (!this.editor) return
+
+    const active = {
+      bold: () => this.editor.isActive("bold"),
+      italic: () => this.editor.isActive("italic"),
+      strike: () => this.editor.isActive("strike"),
+      code: () => this.editor.isActive("code"),
+      heading2: () => this.editor.isActive("heading", { level: 2 }),
+      heading3: () => this.editor.isActive("heading", { level: 3 }),
+      heading4: () => this.editor.isActive("heading", { level: 4 }),
+      bulletList: () => this.editor.isActive("bulletList"),
+      orderedList: () => this.editor.isActive("orderedList"),
+      blockquote: () => this.editor.isActive("blockquote"),
+      codeBlock: () => this.editor.isActive("codeBlock"),
+      link: () => this.editor.isActive("link"),
+      internalLink: () => this.editor.isActive("internalLink"),
+      image: () => this.editor.isActive("image"),
+      youtube: () => this.editor.isActive("youtube")
+    }
+
+    this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => {
+      const check = active[button.getAttribute("data-admin--rich-text-command")]
+      button.setAttribute("aria-pressed", check && check() ? "true" : "false")
+    })
+  }
+
+  // --- Upload (spec §4.1/§7) ---------------------------------------------
+  //
+  // POSTs the chosen file to `<admin>/media_assets` (multipart `file`, the
+  // CSRF token from the layout's meta tag) and inserts
+  // `image{asset_id, alt: "", caption: ""}` on a 201, then opens the image
+  // popover so alt text can be written straight away. A 422's `errors` are
+  // shown inline in the message slot; nothing is inserted.
+  async upload(event) {
+    event.stopPropagation()
+    const file = this.fileTarget.files[0]
+    this.fileTarget.value = ""
+    if (!file || !this.editable()) return
+
+    const editor = this.editor
+    const body = new FormData()
+    body.append("file", file)
+
+    let response
+    try {
+      response = await fetch(this.uploadUrlValue, {
+        method: "POST",
+        body,
+        signal: this.aborter.signal,
+        headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
+      })
+    } catch (error) {
+      if (error.name !== "AbortError" && editor === this.editor) this.showMessage(this.constructor.texts.uploadFailed)
+      return
+    }
+
+    const json = await response.json().catch(() => ({}))
+    if (editor !== this.editor) return
+
+    if (response.status !== 201 || !Number.isInteger(json.id)) {
+      const errors = Array.isArray(json.errors) && json.errors.length ? json.errors : [ this.constructor.texts.uploadRejected ]
+      this.showMessage(errors.join(". "))
+      return
+    }
+
+    this.showMessage("")
+    this.assetUrls[json.id] = json.url
+    this.editor.chain().focus().insertImage({ asset_id: json.id }).run()
+
+    const position = this.findNode((node) => node.type.name === "image" && node.attrs.asset_id === json.id)
+    if (position !== null) this.openImagePopover(position)
+  }
+
+  findNode(predicate) {
+    let found = null
+    this.editor.state.doc.descendants((node, position) => {
+      if (found === null && predicate(node)) found = position
+      return found === null
+    })
+    return found
+  }
+
+  csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || ""
+  }
+
+  showMessage(text) {
+    if (this.hasMessageTarget) this.messageTarget.textContent = text || ""
+  }
+
+  // --- Popovers ------------------------------------------------------------
+
+  openPopover(popover) {
+    this.closePopover({ refocus: false })
+    this.popover = popover
+    this.element.querySelector("[role=toolbar]").after(popover.root)
+    popover.root.querySelector("input, select, button")?.focus()
+  }
+
+  closePopover({ refocus = true } = {}) {
+    if (!this.popover) return
+
+    clearTimeout(this.searchTimer)
+    this.searchAborter?.abort()
+    this.popover.root.remove()
+    this.popover = null
+    if (refocus) this.editor?.commands.focus()
+  }
+
+  // Link (external): http(s), mailto or relative only, checked here before
+  // anything is applied (the server validates again on save). With text
+  // selected it links that text; inside an existing link, it edits that
+  // link; with nothing selected it inserts the URL itself as the link text.
+  link() {
+    if (!this.editable()) return
+
+    const current = this.editor.isActive("link") ? this.editor.getAttributes("link").href || "" : ""
+    const popover = createPopover({ title: "Link", onSubmit: () => apply(), onClose: () => this.closePopover() })
+    const url = createField("URL", { value: current, placeholder: "https://…" })
+    popover.body.append(url.wrapper)
+
+    const apply = () => {
+      const href = normalizeHref(url.input.value)
+      if (!safeHref(href)) {
+        popover.setError(this.constructor.texts.badLink)
+        return
+      }
+
+      const { empty } = this.editor.state.selection
+      const chain = this.editor.chain().focus()
+      if (!empty) {
+        chain.unsetMark("internalLink").setLink({ href })
+      } else if (this.editor.isActive("link")) {
+        chain.extendMarkRange("link").setLink({ href })
+      } else {
+        chain.unsetMark("internalLink").insertContent({ type: "text", text: href, marks: [ { type: "link", attrs: { href } } ] })
+      }
+      chain.run()
+      this.closePopover()
+    }
+
+    popover.actions.append(createButton("Apply", apply, { variant: "primary" }))
+    if (current) {
+      popover.actions.append(createButton("Remove link", () => {
+        this.editor.chain().focus().extendMarkRange("link").unsetLink().run()
+        this.closePopover()
+      }, { variant: "danger" }))
+    }
+    popover.actions.append(createButton("Cancel", () => this.closePopover()))
+    this.openPopover(popover)
+  }
+
+  // Internal link: searches `<admin>/link_targets` (pages and posts by
+  // title, in this column's own editing locale, optionally one type) and
+  // stores `internalLink{type, id}` -- never a URL (see
+  // `rich_text/internal_link.js`). Same selection rules as `link()`: with
+  // nothing selected the target's title is inserted as the link text.
+  internalLink() {
+    if (!this.editable()) return
+
+    const popover = createPopover({ title: "Internal link", onSubmit: () => this.search(query, type, results, popover, { now: true }), onClose: () => this.closePopover() })
+    const query = createField("Search pages and posts", { placeholder: "Title…" })
+    const type = createSelect("Type", [ [ "", "Pages and posts" ], [ "page", "Pages" ], [ "post", "Posts" ] ])
+    const results = document.createElement("ul")
+    results.className = "flex max-h-60 flex-col gap-1 overflow-y-auto"
+    results.setAttribute("aria-label", "Link targets")
+
+    const hint = document.createElement("li")
+    hint.className = "text-sm text-meta"
+    hint.textContent = this.constructor.texts.searchHint
+    results.append(hint)
+
+    query.input.addEventListener("input", () => this.search(query, type, results, popover))
+    type.select.addEventListener("change", () => this.search(query, type, results, popover, { now: true }))
+
+    popover.body.append(query.wrapper, type.wrapper, results)
+    if (this.editor.isActive("internalLink")) {
+      popover.actions.append(createButton("Remove link", () => {
+        this.editor.chain().focus().unsetInternalLink().run()
+        this.closePopover()
+      }, { variant: "danger" }))
+    }
+    popover.actions.append(createButton("Cancel", () => this.closePopover()))
+    this.openPopover(popover)
+  }
+
+  search(query, type, results, popover, { now = false } = {}) {
+    clearTimeout(this.searchTimer)
+    this.searchTimer = setTimeout(() => this.fetchTargets(query.input.value, type.select.value, results, popover), now ? 0 : 200)
+  }
+
+  async fetchTargets(q, type, results, popover) {
+    if (q.trim() === "" && type === "") return
+
+    this.searchAborter?.abort()
+    this.searchAborter = new AbortController()
+    const url = new URL(this.linkTargetsUrlValue, window.location.origin)
+    url.searchParams.set("q", q.trim())
+    url.searchParams.set("locale", this.localeValue)
+    if (type) url.searchParams.set("type", type)
+
+    let targets
+    try {
+      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: this.searchAborter.signal })
+      if (!response.ok) throw new Error(`link_targets answered ${response.status}`)
+      targets = await response.json()
+    } catch (error) {
+      if (error.name !== "AbortError" && this.popover === popover) popover.setError(this.constructor.texts.searchFailed)
+      return
+    }
+    if (this.popover !== popover) return
+
+    popover.setError("")
+    // Unchanged results aren't re-rendered: a result button someone is
+    // about to click shouldn't be swapped out from under them by an
+    // identical answer to a later keystroke's search.
+    const key = JSON.stringify(targets)
+    if (results.dataset.key === key) return
+    results.dataset.key = key
+
+    results.replaceChildren(...(targets.length ? targets.map((target) => this.targetItem(target)) : [ this.emptyItem() ]))
+  }
+
+  targetItem(target) {
+    const item = document.createElement("li")
+    const title = target.title || `(untitled ${target.type} #${target.id})`
+    const button = createButton(title, () => this.applyInternalLink(target, title))
+    button.classList.add("w-full", "justify-between")
+    const kind = document.createElement("span")
+    kind.className = "font-cs-mono text-label uppercase tracking-mono text-meta"
+    kind.textContent = ` ${target.type}`
+    button.append(kind)
+    item.append(button)
+    return item
+  }
+
+  emptyItem() {
+    const item = document.createElement("li")
+    item.className = "text-sm text-meta"
+    item.textContent = this.constructor.texts.noResults
+    return item
+  }
+
+  applyInternalLink(target, title) {
+    const attrs = { type: target.type, id: target.id }
+    this.linkTitles[`${target.type}:${target.id}`] = title
+
+    const { empty } = this.editor.state.selection
+    if (empty && !this.editor.isActive("internalLink")) {
+      this.editor.chain().focus().unsetMark("link").insertContent({ type: "text", text: title, marks: [ { type: "internalLink", attrs } ] }).run()
+    } else {
+      this.editor.chain().focus().extendMarkRange("internalLink").setInternalLink(attrs).run()
+    }
+    this.closePopover()
+  }
+
+  // Image: alt text and caption for the `image` node at `position` (just
+  // uploaded, or clicked). Applied on Done -- re-checking the node is still
+  // an image there, since the document may have changed meanwhile.
+  openImagePopover(position) {
+    if (!this.editable()) return
+
+    const node = this.editor.state.doc.nodeAt(position)
+    if (!node || node.type.name !== "image") return
+
+    const popover = createPopover({ title: "Image", onSubmit: () => done(), onClose: () => this.closePopover() })
+    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: "Describe the image" })
+    const caption = createField("Caption", { value: node.attrs.caption || "" })
+    popover.body.append(alt.wrapper, caption.wrapper)
+
+    const done = () => {
+      const current = this.editor.state.doc.nodeAt(position)
+      if (current && current.type.name === "image") {
+        this.editor.chain().focus().setNodeSelection(position).updateAttributes("image", { alt: alt.input.value, caption: caption.input.value }).run()
+      }
+      this.closePopover()
+    }
+
+    popover.actions.append(createButton("Done", done, { variant: "primary" }))
+    popover.actions.append(createButton("Remove image", () => {
+      const current = this.editor.state.doc.nodeAt(position)
+      if (current && current.type.name === "image") this.editor.chain().focus().setNodeSelection(position).deleteSelection().run()
+      this.closePopover()
+    }, { variant: "danger" }))
+    popover.actions.append(createButton("Cancel", () => this.closePopover()))
+    this.openPopover(popover)
+  }
+
+  // YouTube: a URL (any form `youtubeIdFrom` knows) or a bare 11-character
+  // id -- the same node the paste rule inserts.
+  youtube() {
+    if (!this.editable()) return
+
+    const popover = createPopover({ title: "YouTube", onSubmit: () => insert(), onClose: () => this.closePopover() })
+    const url = createField("YouTube URL or video ID", { placeholder: "https://www.youtube.com/watch?v=…" })
+    popover.body.append(url.wrapper)
+
+    const insert = () => {
+      const id = youtubeIdFrom(url.input.value, { allowBareId: true })
+      if (!id) {
+        popover.setError(this.constructor.texts.badYoutube)
+        return
+      }
+      this.editor.chain().focus().insertYoutube(id).run()
+      this.closePopover()
+    }
+
+    popover.actions.append(createButton("Insert", insert, { variant: "primary" }))
+    popover.actions.append(createButton("Cancel", () => this.closePopover()))
+    this.openPopover(popover)
+  }
+}
