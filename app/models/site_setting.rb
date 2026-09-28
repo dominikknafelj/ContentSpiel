@@ -5,12 +5,26 @@ class SiteSetting < ApplicationRecord
   validates :title, presence: true
 
   validate :locales_are_well_formed
+  validate :social_links_are_safe
   validate :default_locale_is_enabled
 
   after_commit :reset_cached_state
 
   def self.instance
     first || create!(title: "My Site")
+  end
+
+  # The one rule for a social link's URL: an absolute http/https/mailto
+  # URL. Enforced on save (`#social_links_are_safe`) and again by the
+  # public footer (`ThemeHelper#safe_social_links`) as defence in depth for a
+  # row written around validations.
+  SOCIAL_LINK_SCHEMES = %w[http https mailto].freeze
+
+  def self.safe_social_link?(url)
+    scheme = URI.parse(url.to_s.strip).scheme
+    scheme.present? && SOCIAL_LINK_SCHEMES.include?(scheme.downcase)
+  rescue URI::InvalidURIError
+    false
   end
 
   def locale_codes
@@ -39,6 +53,15 @@ class SiteSetting < ApplicationRecord
 
   def only_one_record_exists
     errors.add(:base, "only one SiteSetting may exist") if SiteSetting.exists?
+  end
+
+  # Final fix wave (E): a link the footer can't render -- `github.com/dana`
+  # typed without its scheme, most often -- is an error where it's typed,
+  # rather than saving fine and then silently never appearing.
+  def social_links_are_safe
+    social_links.to_h.each do |name, url|
+      errors.add(:social_links, "#{name} must start with https://, http:// or mailto:") unless self.class.safe_social_link?(url)
+    end
   end
 
   def locales_are_well_formed

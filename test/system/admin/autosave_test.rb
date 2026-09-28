@@ -54,17 +54,24 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    # Slows every `fetch` call by half a second before it's even issued --
-    # a JS-side stub (the brief's own suggested approach) rather than a
-    # server-side hook, so no production code has to grow a test-only delay
-    # switch. Long enough that the two edits below reliably land while the
-    # first attempt's request is still outstanding, short enough this test
-    # doesn't drag.
+    # Holds the first PATCH until the test releases it -- a JS-side stub
+    # (no production code grows a test-only delay switch) that makes "the
+    # second edit lands while the first save is in flight" a fact rather
+    # than a race against a timer (final fix wave, P22: the earlier version
+    # delayed every fetch by 500ms and flaked when the second edit took
+    # longer than that to type on a loaded machine). Counts every PATCH
+    # started, so the test can also prove the second edit *waited*
+    # (`admin--autosave`'s `busy`/`pending`) instead of firing alongside.
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
-      window.fetch = (...args) => new Promise((resolve) => {
-        window.setTimeout(() => resolve(originalFetch(...args)), 500)
-      })
+      window.__patchesStarted = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() !== "PATCH") return originalFetch(url, options)
+
+        window.__patchesStarted += 1
+        if (window.__patchesStarted > 1) return originalFetch(url, options)
+        return new Promise((resolve) => { window.__releaseFirstPatch = () => resolve(originalFetch(url, options)) })
+      }
     JS
 
     # `Tab` blurs the field with a native key event on an element that's
@@ -76,30 +83,32 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     title_field = find_field("Title")
     title_field.set("First edit")
     title_field.send_keys(:tab)
-
-    # Confirms the first attempt is actually under way (and thus `busy`)
-    # before the second edit below has any chance of racing ahead of it.
-    assert_selector "#page-save-status", text: "Saving…"
+    await_js "typeof window.__releaseFirstPatch === 'function'"
 
     title_field = find_field("Title")
     title_field.set("Second edit wins")
     title_field.send_keys(:tab)
 
-    # The first attempt's delayed fetch resolves, `admin--autosave` notices
-    # `pending` and immediately fires the second attempt (itself delayed by
-    # the same stub) with whatever the form holds *now*.
-    #
+    # Still exactly one request: the second edit is queued behind the held
+    # first one, not sent alongside it.
+    assert_equal 1, page.evaluate_script("window.__patchesStarted")
+    assert_selector "#page-save-status", text: "Saving…"
+
+    # Releasing the first request lets `admin--autosave` notice `pending`
+    # and send the second attempt with whatever the form holds *now*.
+    page.execute_script("window.__releaseFirstPatch()")
+    await_js "window.__patchesStarted === 2"
+
     # Polling the database directly, rather than asserting the status
-    # line's own final text, sidesteps a *second*, unrelated race this test
-    # exposed while being written: `Turbo.renderStreamMessage` applies a
-    # `<turbo-stream>` response on the browser's next animation frame, not
-    # synchronously -- so the *first* attempt's own deferred "Saved"
-    # replace can still land (and visually flash) *after* the second
-    # attempt has already moved the status back to "Saving…", which is
-    # enough to fool `assert_text` into matching a stale "Saved" from the
-    # first save rather than waiting for the second one to actually finish.
-    # The database write is the one thing that can't lie about which save
-    # actually landed last.
+    # line's own final text, sidesteps a *second*, unrelated race: `Turbo
+    # .renderStreamMessage` applies a `<turbo-stream>` response on the
+    # browser's next animation frame, not synchronously -- so the *first*
+    # attempt's own deferred "Saved" replace can still land (and visually
+    # flash) *after* the second attempt has already moved the status back to
+    # "Saving…", which is enough to fool `assert_text` into matching a stale
+    # "Saved" from the first save rather than waiting for the second one to
+    # actually finish. The database write is the one thing that can't lie
+    # about which save actually landed last.
     assert_page_title_eventually("Second edit wins")
   end
 
@@ -162,6 +171,23 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
   # See this test's own comment for why the status line's text alone isn't
   # a trustworthy signal that the *second* save (specifically) has landed.
+  # Waits (in the browser, polling every 20ms) until `condition` -- a JS
+  # expression -- is true, the same handshake `await_admin_controllers`
+  # uses; fails after `timeout` seconds instead of hanging.
+  def await_js(condition, timeout: 5)
+    met = page.evaluate_async_script(<<~JS, condition, timeout * 1000)
+      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
+      const deadline = Date.now() + timeout
+      const poll = () => {
+        if (Function(`return (${condition})`)()) return done(true)
+        if (Date.now() > deadline) return done(false)
+        setTimeout(poll, 20)
+      }
+      poll()
+    JS
+    assert met, "timed out waiting for #{condition}"
+  end
+
   def assert_page_title_eventually(title)
     deadline = Time.current + 5.seconds
 

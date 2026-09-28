@@ -31,6 +31,18 @@ class Admin::Fields::GroupsFieldTest < ViewComponent::TestCase
     end
   end
 
+  # Final fix wave (P9): a `%>` inside the template's `<%#` comment ended
+  # the comment early, and the rest of it rendered as visible text.
+  test "the template's own comment never renders" do
+    with_test_types do
+      field = Field.new(name: "speakers", type: :groups, options: { of: "test/speaker" })
+      render_inline Admin::Fields::GroupsField.new(field:, form_name: "post[fields]", value: [], locale: "en")
+
+      assert_not_includes rendered_content, "key at all"
+      assert_not_includes rendered_content, "groups_present][]\", since"
+    end
+  end
+
   test "an empty groups value renders no existing rows" do
     with_test_types do
       field = Field.new(name: "speakers", type: :groups, options: { of: "test/speaker" })

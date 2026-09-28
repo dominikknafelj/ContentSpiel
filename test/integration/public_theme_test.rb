@@ -2,7 +2,12 @@ require "test_helper"
 
 class PublicThemeTest < ActionDispatch::IntegrationTest
   setup do
-    SiteSetting.instance.update!(title: "Dana's Notes", social_links: {
+    # `update_columns`: SiteSetting refuses an unsafe link on save now, but
+    # the footer's own filter (`ThemeHelper#safe_social_links`) stays as
+    # defence in depth for a row written some other way, which is what this
+    # checks.
+    SiteSetting.instance.update!(title: "Dana's Notes")
+    SiteSetting.instance.update_columns(social_links: {
       "GitHub" => "HTTPS://github.com/dana", "Mail" => "mailto:dana@example.com",
       "Evil" => "javascript:alert(1)", "Broken" => "ht tp://nope"
     })

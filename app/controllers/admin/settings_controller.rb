@@ -58,7 +58,7 @@ module Admin
         status_id: "#{ID_PREFIX}-save-status",
         error_prefix: ID_PREFIX,
         base_updated_at: params[:base_updated_at],
-        fields: { title: [ :title ], tagline: [ :tagline ], logo: [ :logo ], default_locale: [ :default_locale ] }
+        fields: { title: [ :title ], tagline: [ :tagline ], logo: [ :logo ], default_locale: [ :default_locale ], social_links: [ :social_links ] }
       )
 
       streams << logo_field_stream(site) if saved && logo_changing

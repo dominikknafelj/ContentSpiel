@@ -76,6 +76,15 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links)
   end
 
+  test "a social link without a scheme is refused with a message, not dropped" do
+    patch "/cs-studio/settings", params: { site_setting: {
+      social_links: [ { name: "GitHub", url: "github.com/dana" } ]
+    }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_includes response.body, "must start with https://, http:// or mailto:"
+    assert_equal({}, @site.reload.social_links.to_h)
+  end
+
   test "the default language is restricted to the site's own enabled languages" do
     get "/cs-studio/settings"
     assert_select "select[name='site_setting[default_locale]'] option", 3

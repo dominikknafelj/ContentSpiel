@@ -1,7 +1,7 @@
 <div data-controller="admin--groups" class="admin-groups-field">
   <%# Rendered whether or not any row survives to be submitted (cs-studio
       final-fixes round, finding 2): a `groups` field with every row removed
-      sends no `<%= input_name %>` key at all -- there's nothing left to
+      sends no `input_name` key at all -- there's nothing left to
       name -- which the controller's own split (`Admin::PostsController
       #update`/`Admin::ContentBlocksController#split_block_params`) would
       otherwise read as "this form never touched this field," leaving

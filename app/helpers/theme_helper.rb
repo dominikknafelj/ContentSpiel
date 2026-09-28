@@ -2,8 +2,6 @@
 # layout shows comes from SiteSetting and the page tree, so editors' settings
 # have a visible effect.
 module ThemeHelper
-  SAFE_LINK_SCHEMES = %w[http https mailto].freeze
-
   LanguageLink = Data.define(:code, :name, :path, :current)
 
   # Current.site memoizes itself for the process/request; no ivar of our own
@@ -13,17 +11,12 @@ module ThemeHelper
   end
 
   # Social links become real hrefs here for the first time, so only
-  # http/https/mailto URLs render -- a `javascript:` link typed into the
-  # settings must never reach the page.
+  # http/https/mailto URLs render -- a `javascript:` link must never reach
+  # the page. SiteSetting already refuses one on save
+  # (`SiteSetting.safe_social_link?`); this is the same rule again for a row
+  # written around its validations.
   def safe_social_links
-    theme_site.social_links.to_h.select { |_name, url| safe_link?(url) }
-  end
-
-  def safe_link?(url)
-    scheme = URI.parse(url.to_s.strip).scheme
-    scheme.present? && SAFE_LINK_SCHEMES.include?(scheme.downcase)
-  rescue URI::InvalidURIError
-    false
+    theme_site.social_links.to_h.select { |_name, url| SiteSetting.safe_social_link?(url) }
   end
 
   def theme_root_page

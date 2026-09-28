@@ -122,18 +122,6 @@ class Post < ApplicationRecord
     self.translated_metadata = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
   end
 
-  # The plain `attr_writer`-shaped counterpart to `assign_fields`: whatever
-  # calls `assign_attributes(fields: hash)` generically (rather than through
-  # a service) lands here, always at `Locales.default`, since a bare setter
-  # has no locale parameter of its own to take one from. CS Studio's own
-  # typed-fields editor doesn't go through this at all -- `Posts::Save`
-  # calls `assign_fields` directly, once per submitted locale, the same
-  # split a content block's own `settings` gets through
-  # `ContentBlocks::Save`.
-  def fields=(hash)
-    assign_fields(hash, locale: Locales.default)
-  end
-
   private
 
   # Raw jsonb hash, not the Mobility reader: see the comment above
@@ -147,8 +135,8 @@ class Post < ApplicationRecord
   end
 
   # `locale: Locales.default`, not `fields`'s own ambient-`I18n.locale`
-  # default: a required translated field is only ever *written* at
-  # `Locales.default` (`#fields=`'s own comment explains why), so checking
+  # default: a required translated field is always written at least at
+  # `Locales.default` (`Posts::Save` assigns top-level `fields` there), so checking
   # `required` against whatever `I18n.locale` a request happens to leave
   # ambient -- unrelated to the site's own default -- would reject a post
   # that saved correctly the moment those two locales disagree.
