@@ -7,21 +7,23 @@
 # `RichText::DuplicateType` against whatever's still sitting in the
 # registry from before the reload).
 #
-# `markdown_out` still raises `NotImplementedError` for every type -- Task 3
-# fills those in. `html` is real as of this task (`RichText::HtmlRenderer`,
-# design spec §3.3): every block below renders through `TAG` --
-# `ActionController::Base.helpers`, the same memoized helper proxy
-# `RichText::HtmlRenderer` itself reaches for -- rather than this module
-# including `ActionView::Helpers::TagHelper` directly, because a block
-# handed to `register_node`/`register_mark` here is *called* later by that
-# renderer, and a Ruby block keeps the `self` (and hence its method lookup)
-# it had at *definition* time -- this module -- not whatever object ends up
-# invoking it. See `RichText::HtmlRenderer`'s own comment for the fuller
-# version of this reasoning.
+# `html` (`RichText::HtmlRenderer`, design spec §3.3) and `markdown_out`
+# (`RichText::Markdown`, design spec §3.4) are both real as of this task:
+# every block below renders through `TAG` -- `ActionController::Base
+# .helpers`, the same memoized helper proxy `RichText::HtmlRenderer` itself
+# reaches for -- rather than this module including `ActionView::Helpers
+# ::TagHelper` directly, because a block handed to `register_node`/
+# `register_mark` here is *called* later by that renderer, and a Ruby block
+# keeps the `self` (and hence its method lookup) it had at *definition*
+# time -- this module -- not whatever object ends up invoking it. See
+# `RichText::HtmlRenderer`'s own comment for the fuller version of this
+# reasoning. `markdown_out` blocks don't need `TAG` at all (Markdown has no
+# tag helpers to reach for), but stay defined here alongside `html` rather
+# than in `RichText::Markdown` itself, for the same reason every other
+# per-type rendering rule lives on the type's own registration: one place
+# to look for "how does a youtube node render", in either direction.
 module RichText
   module BuiltIns
-    NOT_YET_RENDERED = ->(*) { raise NotImplementedError, "RichText Markdown rendering arrives in Task 3" }
-
     TAG = ActionController::Base.helpers
 
     def self.register
@@ -40,48 +42,118 @@ module RichText
       # the identity block, not a special case the renderer has to know
       # about.
       identity_html = ->(node, children, ctx) { children }
+      identity_markdown = ->(node, children, ctx) { children }
 
       RichText::Schema.register_node("doc") do |node|
         node.html(&identity_html)
-        node.markdown_out(&NOT_YET_RENDERED)
+        # `Dumper::BLOCK_CONTAINER_TYPES` already joins "doc"'s block
+        # children with blank lines before this ever runs -- identity here
+        # is exactly as load-bearing as it is for "html" above.
+        node.markdown_out(&identity_markdown)
       end
 
       RichText::Schema.register_node("text") do |node|
         node.html(&identity_html)
-        node.markdown_out(&NOT_YET_RENDERED)
+        # `RichText::Markdown::Dumper#render_text_node` has already
+        # escaped this node's own text and wrapped every mark around it by
+        # the time this runs -- identity, same reasoning as "html" above.
+        node.markdown_out(&identity_markdown)
       end
 
-      # The standard ProseMirror block types that just wrap their already-
-      # rendered children in one fixed element, no attributes of their own
-      # to read.
-      { "paragraph" => :p, "blockquote" => :blockquote, "bulletList" => :ul, "orderedList" => :ol, "listItem" => :li }.each do |name, tag_name|
+      # `paragraph`/`listItem` both render their (already block-joined, per
+      # `Dumper::BLOCK_CONTAINER_TYPES`) Markdown children unchanged --
+      # "paragraph" because CommonMark needs nothing extra to mark a run
+      # of text as a paragraph, "listItem" because numbering/bulleting is
+      # the *list's* job (see `bulletList`/`orderedList` below).
+      #
+      # "paragraph" additionally runs `RichText::Markdown.escape_leading`
+      # on its assembled children -- the one place literal text can start a
+      # fresh Markdown line (a `blockquote`/`listItem`'s own nested
+      # paragraph included, since their `"> "`/marker prefix comes *after*
+      # this runs) -- so a paragraph whose literal text happens to look
+      # like an ATX heading, a directive, or a list/blockquote marker comes
+      # back as that same literal text, not as the block type it merely
+      # resembles. See `RichText::Markdown::Loader#directive_for`'s own
+      # comment for why this is what actually makes that distinction safe.
+      { "paragraph" => :p, "listItem" => :li }.each do |name, tag_name|
         RichText::Schema.register_node(name) do |node|
           node.html { |n, children, ctx| TAG.tag.public_send(tag_name, children) }
-          node.markdown_out(&NOT_YET_RENDERED)
+          node.markdown_out { |n, children, ctx| name == "paragraph" ? RichText::Markdown.escape_leading(children) : children }
+        end
+      end
+
+      RichText::Schema.register_node("blockquote") do |node|
+        node.html { |n, children, ctx| TAG.tag.blockquote(children) }
+        node.markdown_out { |n, children, ctx| children.each_line.map { |line| line.chomp.empty? ? ">" : "> #{line.chomp}" }.join("\n") }
+      end
+
+      # Both list types hand their `markdown_out` an *Array* of
+      # already-rendered `listItem` strings, one per item, rather than one
+      # joined String (`RichText::Markdown::Dumper::LIST_CONTAINER_TYPES`'s
+      # own comment) -- only the list itself knows each item's marker
+      # (`"- "`, or `"1. "`/`"2. "`/... counting up from `start`) and how
+      # far to indent that item's own continuation lines underneath it
+      # (`RichText::Markdown::Dumper.indent_list_item`).
+      RichText::Schema.register_node("bulletList") do |node|
+        node.html { |n, children, ctx| TAG.tag.ul(children) }
+        node.markdown_out { |n, children, ctx| children.map { |item| RichText::Markdown::Dumper.indent_list_item("- ", item) }.join("\n\n") }
+      end
+
+      # `start` (Global Constraints; normalized here per Task 3's brief,
+      # "normalise attribute defaults ... so the round trip is exact")
+      # defaults to `1` -- CommonMark's own default for a list whose first
+      # marker is bare `"1. "` -- so a hand-built document that omits
+      # `start` still numbers, and reloading Markdown that never specified
+      # one comes back with the same explicit `1` rather than a missing
+      # attrs key that would then fail to `assert_equal` a document that
+      # always sets it.
+      RichText::Schema.register_node("orderedList") do |node|
+        node.attribute :start, :integer
+        node.html { |n, children, ctx| TAG.tag.ol(children) }
+        node.markdown_out do |n, children, ctx|
+          start = n.dig("attrs", "start") || 1
+          children.each_with_index.map { |item, index| RichText::Markdown::Dumper.indent_list_item("#{start + index}. ", item) }.join("\n\n")
         end
       end
 
       # `codeBlock`'s children are "text" nodes carrying no marks -- marks
       # don't make sense inside a code block -- so this always produces
       # `<pre><code>...</code></pre>`, matching CommonMark's own fenced-
-      # code-block shape ahead of Task 3's Markdown writer.
+      # code-block shape.
+      #
+      # `language` (optional; normalized the same way `orderedList.start`
+      # is, per Task 3's brief) names the fence's info string
+      # (` ```ruby `) -- blank/absent renders a bare ` ``` ` fence.
+      # `RichText::Markdown::Dumper` renders this node's children with
+      # `raw: true` (its own comment), so `children` here is the code's
+      # literal source text, never backslash-escaped.
       RichText::Schema.register_node("codeBlock") do |node|
+        node.attribute :language, :string
         node.html { |n, children, ctx| TAG.tag.pre(TAG.tag.code(children)) }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out do |n, children, ctx|
+          language = n.dig("attrs", "language")
+          "```#{language}\n#{children}\n```"
+        end
       end
 
       # Void elements: neither ever has meaningful "content" to render (a
       # `horizontalRule`/`hardBreak` node in a well-formed document has
-      # none), so their `html` blocks ignore `children` outright rather
-      # than rendering an empty container around it.
+      # none), so their `html`/`markdown_out` blocks ignore `children`
+      # outright rather than rendering an empty container around it.
       RichText::Schema.register_node("horizontalRule") do |node|
         node.html { |n, children, ctx| TAG.tag.hr }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out { |n, children, ctx| "---" }
       end
 
+      # A hard line break is CommonMark's own backslash-newline, not two
+      # trailing spaces -- trailing whitespace is exactly the kind of thing
+      # an editor, a git diff, or a well-meaning "trim trailing whitespace"
+      # hook silently strips, which would quietly turn this back into a
+      # soft break (plain text) on the next round trip; a literal backslash
+      # has no such footgun.
       RichText::Schema.register_node("hardBreak") do |node|
         node.html { |n, children, ctx| TAG.tag.br }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out { |n, children, ctx| "\\\n" }
       end
 
       # `heading.level` is capped at H4 (design decisions table: "Standard
@@ -91,26 +163,26 @@ module RichText
       RichText::Schema.register_node("heading") do |node|
         node.attribute :level, :integer, required: true, in: 2..4
         node.html { |n, children, ctx| TAG.tag.public_send("h#{n["attrs"]["level"]}", children) }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out { |n, children, ctx| "#{"#" * n["attrs"]["level"]} #{children}" }
       end
 
       # `youtube.id` is a directive node (Markdown: `::youtube{id="..."}`,
       # design spec §3.4), not CommonMark -- `directive "youtube"` records
-      # that for Task 3's parser/writer. The id itself must match YouTube's
-      # actual 11-character video-id shape (`RichText::YOUTUBE_ID_PATTERN`,
-      # shared with `YoutubeEmbed`'s own validation) so a bad id is caught
-      # at save time rather than rendering a broken embed -- and, per design
-      # spec §3.3, `html` re-checks that same shape itself rather than
-      # trusting a document that reaches the renderer already passed
-      # `RichText::Document#validate`: an MCP-authored or otherwise
-      # never-validated document (the "hostile documents render inert"
-      # case) must render just as inertly as a validated one would have
-      # refused to save.
+      # that for `RichText::Markdown::Loader`'s parser. The id itself must
+      # match YouTube's actual 11-character video-id shape
+      # (`RichText::YOUTUBE_ID_PATTERN`, shared with `YoutubeEmbed`'s own
+      # validation) so a bad id is caught at save time rather than
+      # rendering a broken embed -- and, per design spec §3.3, `html`
+      # re-checks that same shape itself rather than trusting a document
+      # that reaches the renderer already passed `RichText::Document
+      # #validate`: an MCP-authored or otherwise never-validated document
+      # (the "hostile documents render inert" case) must render just as
+      # inertly as a validated one would have refused to save.
       RichText::Schema.register_node("youtube") do |node|
         node.attribute :id, :string, required: true, format: RichText::YOUTUBE_ID_PATTERN
         node.directive "youtube"
         node.html { |n, children, ctx| render_youtube(n) }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out { |n, children, ctx| %(::youtube{id="#{n["attrs"]["id"]}"}) }
       end
 
       # `image` is also a directive node (`::image{asset="42" alt="..." caption="..."}`).
@@ -125,31 +197,36 @@ module RichText
       # `html` mirrors the same `defined?(MediaAsset)` guard: until Task 4,
       # this renders nothing at all (the same shape a present-but-deleted
       # `asset_id` already has to handle -- see the "missing asset" render
-      # test). The `defined?(MediaAsset)` branch is left raising
-      # `NotImplementedError`, the same placeholder shape `NOT_YET_RENDERED`
-      # uses elsewhere in this file, rather than a guessed-at real lookup:
-      # nothing in this task can ever reach it (there is no `MediaAsset` to
-      # define it away with), and writing a real `MediaAsset` → URL mapping
-      # without that model in hand would just be guessing at Task 4's own
-      # interface. Task 4 replaces this whole `html` block with the real
+      # test). Task 4 replaces this whole `html` block with the real
       # lookup + `RichText::ImageComponent` render; the component itself
       # (`src:`/`alt:`/`caption:`) doesn't know or care what a `MediaAsset`
       # is, so nothing about it changes when Task 4 arrives.
+      #
+      # `markdown_out` only ever quotes `alt`/`caption` when present --
+      # Task 4's own test adds the round trip; this task only has to define
+      # the directive's shape (Global Constraints) so that test is the only
+      # thing Task 4 needs to add.
       RichText::Schema.register_node("image") do |node|
         node.attribute :asset_id, :integer, required: true, validate: ->(value) { defined?(MediaAsset) ? MediaAsset.exists?(value) : true }
         node.attribute :alt, :string
         node.attribute :caption, :string
         node.directive "image"
         node.html { |n, children, ctx| defined?(MediaAsset) ? raise(NotImplementedError, "RichText image rendering arrives in Task 4") : "".html_safe }
-        node.markdown_out(&NOT_YET_RENDERED)
+        node.markdown_out { |n, children, ctx| render_image_directive(n) }
       end
     end
 
     def self.register_marks
-      { "bold" => :strong, "italic" => :em, "strike" => :s, "code" => :code }.each do |name, tag_name|
+      # Each mark wraps its (already-escaped, already-inner-marks-wrapped)
+      # content in the same delimiter on both sides -- `"code"`'s single
+      # backtick included, even though a code *span*'s content is raw
+      # rather than escaped (`RichText::Markdown::Dumper#render_text_node`'s
+      # own comment): that's a decision about what reaches this block, not
+      # one this block has to make itself.
+      { "bold" => { tag: :strong, wrap: "**" }, "italic" => { tag: :em, wrap: "*" }, "strike" => { tag: :s, wrap: "~~" }, "code" => { tag: :code, wrap: "`" } }.each do |name, cfg|
         RichText::Schema.register_mark(name) do |mark|
-          mark.html { |m, content, ctx| TAG.tag.public_send(tag_name, content) }
-          mark.markdown_out(&NOT_YET_RENDERED)
+          mark.html { |m, content, ctx| TAG.tag.public_send(cfg[:tag], content) }
+          mark.markdown_out { |m, content, ctx| "#{cfg[:wrap]}#{content}#{cfg[:wrap]}" }
         end
       end
 
@@ -166,7 +243,7 @@ module RichText
       RichText::Schema.register_mark("link") do |mark|
         mark.attribute :href, :string, required: true, validate: ->(value) { safe_href?(value) }
         mark.html { |m, content, ctx| render_link(m, content) }
-        mark.markdown_out(&NOT_YET_RENDERED)
+        mark.markdown_out { |m, content, ctx| "[#{content}](#{RichText::Markdown.escape_link_destination(m.dig("attrs", "href").to_s)})" }
       end
 
       # `internalLink` needs both attributes together to check existence
@@ -180,6 +257,11 @@ module RichText
       # with no `<a>` at all, whenever the target is missing -- a
       # never-validated document, or a page/post deleted after this document
       # was saved, must degrade gracefully rather than link to nothing.
+      #
+      # `markdown_out` writes `cs:page/<id>`/`cs:post/<id>` (design spec
+      # §3.4) -- `RichText::Markdown::Loader#link_mark_for` is this
+      # format's other half, turning that same `cs:` scheme back into an
+      # `internalLink` mark on the way in.
       RichText::Schema.register_mark("internalLink") do |mark|
         mark.attribute :type, :string, required: true, in: %w[page post]
         mark.attribute :id, :integer, required: true, validate: ->(value, attrs) {
@@ -190,7 +272,7 @@ module RichText
           end
         }
         mark.html { |m, content, ctx| render_internal_link(m, content, ctx) }
-        mark.markdown_out(&NOT_YET_RENDERED)
+        mark.markdown_out { |m, content, ctx| "[#{content}](cs:#{m.dig("attrs", "type")}/#{m.dig("attrs", "id")})" }
       end
     end
 
@@ -225,6 +307,21 @@ module RichText
       return content unless safe_href?(href)
 
       TAG.tag.a(content, href: href)
+    end
+
+    # `::image{asset="42" alt="..." caption="..."}` -- `alt`/`caption` are
+    # both optional (the node's own `attribute` declarations above), so
+    # each is only rendered as a `key="value"` pair when actually present,
+    # rather than as an always-there-but-sometimes-empty `alt=""`; the
+    # directive round trip (`RichText::Markdown::Loader#build_image_node`)
+    # mirrors this same "absent means the key was never given at all", not
+    # "given as blank".
+    def self.render_image_directive(node)
+      attrs = node["attrs"] || {}
+      parts = [ %(asset="#{RichText::Markdown.escape_directive_attr(attrs["asset_id"])}") ]
+      parts << %(alt="#{RichText::Markdown.escape_directive_attr(attrs["alt"])}") if attrs["alt"].present?
+      parts << %(caption="#{RichText::Markdown.escape_directive_attr(attrs["caption"])}") if attrs["caption"].present?
+      "::image{#{parts.join(" ")}}"
     end
 
     # A record that exists but isn't publicly visible -- unpublished, or

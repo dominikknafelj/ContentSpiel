@@ -41,7 +41,26 @@ module RichText
       @hash = hash || EMPTY_HASH.deep_dup
     end
 
+    # Parses `markdown` (design spec §3.4) into `[RichText::Document,
+    # warnings]`, where `warnings` is an Array of Strings, empty when
+    # nothing had to be dropped or degraded -- MCP's write path for
+    # `posts.body`/`content_blocks.body`. Delegates entirely to
+    # `RichText::Markdown.load`; see that module's own comment for why the
+    # conversion lives there rather than on this class (it's a big enough
+    # walk, in both directions, to earn its own file, the same way
+    # `RichText::HtmlRenderer` does for `#to_html` below). Never raises: an
+    # MCP-authored String is exactly as untrusted as a hand-edited jsonb
+    # row, so this degrades what it can't represent instead of failing the
+    # whole write.
+    def self.from_markdown(markdown) = RichText::Markdown.load(markdown)
+
     def to_h = @hash
+
+    # Renders this document to Markdown (design spec §3.4) -- MCP's read
+    # path for `posts.body`/`content_blocks.body`. Delegates to
+    # `RichText::Markdown.dump`; see `.from_markdown` above for why the
+    # conversion itself lives on that module rather than here.
+    def to_markdown = RichText::Markdown.dump(self)
 
     # Renders this document to a scrubbed, html_safe HTML String (design
     # spec §3.3), through `RichText::HtmlRenderer`. Defaults match what a

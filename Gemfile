@@ -85,6 +85,14 @@ gem "avo", "~> 4.2"
 gem "mobility", "~> 1.3"
 gem "mobility-actiontext", "~> 1.1"
 
+# Parses/renders CommonMark for `RichText::Markdown` (design spec §3.4) --
+# MCP reads and writes rich-text bodies as Markdown, converted to and from
+# the Tiptap/ProseMirror JSON `RichText::Document` wraps
+# [https://github.com/gjtorikian/commonmarker]. Only its AST (`Commonmarker
+# .parse`) is walked -- `RichText::Markdown` never calls its HTML renderer,
+# so the gem's own `unsafe`/raw-HTML rendering path is never reached.
+gem "commonmarker", "~> 2.10"
+
 # Stores the page tree in a closure table, so ancestor/descendant lookups for
 # the navigation are one join deep regardless of nesting
 # [https://github.com/closuretree/closure_tree].
