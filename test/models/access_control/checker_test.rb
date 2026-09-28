@@ -39,7 +39,9 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
       assert AccessControl.trusted?(nil, channel)
     end
 
-    [ :admin, :mcp, "mcp", "", :"" ].each do |channel|
+    # `:public` (final fix wave, Minor 9): the public site's channel is
+    # untrusted, so nothing reached from it acts as a trusted code path.
+    [ :admin, :mcp, "mcp", "", :"", :public ].each do |channel|
       assert_not allowed?(nil, "users.manage", channel: channel), "nil actor allowed on #{channel.inspect}"
       assert_not AccessControl.trusted?(nil, channel)
     end

@@ -508,6 +508,23 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal "Other post", @other_post.reload.title
   end
 
+  # Final fix wave (Minor 10): the page editor checks many permissions on
+  # its one page (header buttons, settings, every block card); its branch
+  # is loaded once, not once per check.
+  test "the page editor loads a branch-scoped page's branch once" do
+    grant_branch("pages.read", "pages.edit", "pages.publish", "pages.delete", "pages.create")
+    3.times { ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" }) }
+    sign_in_as(users(:editor_branch))
+
+    statements = []
+    collect = ->(*, payload) { statements << payload[:sql] unless payload[:name] == "SCHEMA" }
+    ActiveSupport::Notifications.subscribed(collect, "sql.active_record") { get "/cs-studio/pages/#{@inside.id}" }
+
+    assert_response :success
+    branch_lookups = statements.grep(/FROM "page_hierarchies"/).grep(/"descendant_id" = /)
+    assert_operator branch_lookups.size, :<=, 1, branch_lookups.join("\n")
+  end
+
   # --- Carry-overs ---------------------------------------------------------------
 
   test "a denied media upload is a 403 with JSON errors" do

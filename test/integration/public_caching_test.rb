@@ -23,6 +23,21 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_select "meta[name=csrf-token]", count: 0
   end
 
+  # Final fix wave (Minor 9): the public site runs on its own, untrusted
+  # channel -- nil actor on `:public` is denied everything -- rather than
+  # the nil channel a console gets.
+  test "a public request runs on the untrusted public channel" do
+    seen = nil
+    original = PublicSite::Resolver.method(:new)
+    with_singleton_override(PublicSite::Resolver, :new, ->(**options) { seen = [ Current.channel, Current.actor ]; original.call(**options) }) do
+      get "/"
+    end
+
+    assert_response :success
+    assert_equal [ :public, nil ], seen
+    assert_not AccessControl.trusted?(nil, seen.first)
+  end
+
   test "a matching etag gets a 304" do
     get "/"
     get "/", headers: { "If-None-Match" => response.headers["ETag"] }

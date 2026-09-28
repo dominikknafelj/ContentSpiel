@@ -84,7 +84,15 @@ module Admin
     # alike -- there's exactly one "what does this page's editor look like"
     # template, same reasoning as `Admin::TreeComponent` being the one
     # thing "what does the tree look like" can mean.
+    #
+    # The editor asks `can?` about this one page many times (header
+    # buttons, settings, every block card); its branch is loaded once, up
+    # front (final fix wave, Minor 10), so no check pays for a closure
+    # query. Only here: a write action hands `@page` to a service, which
+    # must judge the page's position as stored, not a snapshot
+    # (`AccessControl.preload_branches`).
     def show
+      AccessControl.preload_branches([ @page ])
     end
 
     # The settings form's own autosave endpoint (spec §6.1): every field in

@@ -126,6 +126,73 @@ class McpAccessControlTest < ActionDispatch::IntegrationTest
     assert_equal "Theirs", theirs.reload.title
   end
 
+  # --- Final fix wave (parked T10 items, Important 1) --------------------
+
+  test "an Author token's update_post is audited as the token on the mcp channel" do
+    author = users(:author)
+    mine = as(author) { create_post(title: "Mine", published: false) }
+    token, raw = ApiToken.generate!(author, group: access_control_groups(:author))
+
+    result = call_tool(raw, "update_post_tool", id: mine.id, title: "Mine, edited")
+
+    assert_equal false, result["isError"], text_of(result)
+    event = Audit::Event.where(action: "post.updated", subject: mine).order(:id).last
+    assert_equal "mcp", event.channel
+    assert_equal token, event.actor
+    assert_equal author.id, event.user_id
+    assert_equal [ "Mine", "Mine, edited" ], event.field_changes["en title"]
+  end
+
+  test "an MCP denial records access.denied on the mcp channel, as the token" do
+    theirs = create_post(title: "Theirs", published: false)
+    theirs.update!(author: users(:two))
+    token, raw = ApiToken.generate!(users(:author), group: access_control_groups(:author))
+
+    call_tool(raw, "update_post_tool", id: theirs.id, title: "Mine now")
+
+    event = Audit::Event.find_by!(action: "access.denied", subject: theirs)
+    assert_equal "mcp", event.channel
+    assert_equal token, event.actor
+    assert_equal users(:author).id, event.user_id
+    assert_equal({ "permission" => "posts.edit" }, event.metadata)
+  end
+
+  test "a publisher token publishes with update_post(published:) but can't edit" do
+    draft = create_post(title: "Draft", published: false)
+    publishers = AccessControl::Group.create!(name: "Publishers")
+    %w[posts.read posts.publish].each { |key| publishers.grants.create!(permission: key, scope: {}) }
+    raw = token_for(users(:one), publishers)
+
+    published = call_tool(raw, "update_post_tool", id: draft.id, published: true)
+    assert_equal false, published["isError"], text_of(published)
+    assert draft.reload.live?
+
+    edited = call_tool(raw, "update_post_tool", id: draft.id, title: "Renamed")
+    assert_equal true, edited["isError"]
+    assert_equal "Draft", draft.reload.title
+  end
+
+  # The post's URL runs through its listing page; an unpublished listing
+  # page the token can't read mustn't have its path disclosed that way.
+  test "a post's url is withheld when its listing page is unpublished and unreadable" do
+    listing = create_page(title: "Hidden blog", published: false)
+    ContentBlocks::Save.call(listing.content_blocks.new, attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    post_record = create_post(title: "Listed")
+    posts_only = AccessControl::Group.create!(name: "Post readers")
+    posts_only.grants.create!(permission: "posts.read", scope: {})
+
+    hidden = call_tool(token_for(users(:one), posts_only), "get_post_tool", id: post_record.id)
+    shown = call_tool(token_for(users(:one), access_control_groups(:read_only)), "get_post_tool", id: post_record.id)
+
+    assert_nil hidden["structuredContent"]["url"]
+    assert_not_includes text_of(hidden), "hidden-blog"
+    assert_equal "https://www.example.com/hidden-blog/listed", shown["structuredContent"]["url"]
+
+    Pages::Save.call(listing, attributes: { published: true })
+    public_now = call_tool(token_for(users(:one), posts_only), "get_post_tool", id: post_record.id)
+    assert_equal "https://www.example.com/hidden-blog/listed", public_now["structuredContent"]["url"]
+  end
+
   # --- Instructions ------------------------------------------------------
 
   test "the initialize response names the token's group, and nothing about other tokens or users" do
