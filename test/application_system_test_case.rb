@@ -68,14 +68,22 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # A handshake rather than a sleep: presses Shift (which types nothing and
   # triggers nothing) until the page actually receives a native `keydown`,
   # i.e. until the browser is accepting WebDriver input on this page.
-  def await_native_input(attempts: 50)
+  #
+  # Bounded by time, not by a count of attempts: a fixed 50 tries (~2.5s)
+  # was enough locally but ran out on a slower CI runner right after a page
+  # load (PR #30's first CI run), failing a test that had nothing wrong with
+  # it. The deadline scales with Capybara's own wait time so CI and local
+  # runs get the same patience as every other Capybara wait.
+  def await_native_input(timeout: Capybara.default_max_wait_time * 4)
     page.execute_script("window.__nativeInputSeen = false; document.addEventListener('keydown', () => { window.__nativeInputSeen = true }, { capture: true, once: true })")
-    attempts.times do
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout
+    loop do
       page.driver.browser.action.send_keys(:shift).perform
       return if page.evaluate_script("window.__nativeInputSeen")
+      break if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
 
       sleep 0.05
     end
-    raise "the browser never accepted native keyboard input"
+    raise "the browser never accepted native keyboard input (waited #{timeout}s)"
   end
 end
