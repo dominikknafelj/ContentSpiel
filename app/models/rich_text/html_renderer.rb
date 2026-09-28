@@ -70,10 +70,34 @@ module RichText
     # optional "marks" array instead -- see `RichText::Document#validate_node`
     # for the same structural split), so it gets its own branch rather than
     # forcing that generic shape onto it.
-    def render_node(node)
+    #
+    # This has to be just as total as `RichText::Document#validate_node`
+    # against a document that never passed `#validate` at all -- an
+    # MCP-authored or hand-edited jsonb row, not something the editor could
+    # ever produce -- since rendering runs unconditionally, not gated on
+    # validity. `depth` is `RichText::Document::MAX_DEPTH`'s same recursion
+    # guard, for the same reason (a long chain of single-child nodes would
+    # otherwise blow the stack instead of failing gracefully); past it, a
+    # node's content is simply dropped rather than rendered. `node.is_a?
+    # (Hash)` is what makes every other malformed shape below safe: a `nil`
+    # or a bare Array/String/Integer standing in for a node object (in
+    # "content", or as the document root itself) lands here and renders as
+    # nothing, logged, rather than raising the moment anything below tries
+    # `node["type"]`.
+    def render_node(node, depth = 0)
+      return "".html_safe if depth > RichText::Document::MAX_DEPTH
+
+      unless node.is_a?(Hash)
+        log_unknown("node", node.inspect)
+        return "".html_safe
+      end
+
+      node = normalize_attrs(node)
       return render_text_node(node) if node["type"] == "text"
 
-      children = HELPERS.safe_join(Array(node["content"]).map { |child| render_node(child) })
+      content = node["content"]
+      child_nodes = content.is_a?(Array) ? content : []
+      children = HELPERS.safe_join(child_nodes.map { |child| render_node(child, depth + 1) })
 
       type = RichText::Schema.node(node["type"])
       if type.nil?
@@ -91,13 +115,34 @@ module RichText
     # by the time one runs. Marks then nest in their array order -- the
     # first mark wraps the raw escaped text (innermost), each later mark
     # wraps the previous result (progressively more outer) -- via `reduce`.
+    #
+    # `node["marks"]` given as anything but an Array (a Hash, most
+    # plausibly -- ProseMirror JSON has no schema enforcement of its own) is
+    # treated as "no marks" rather than coerced with `Array(...)`, the same
+    # "checked, not coerced" rule `RichText::Document#validate_marks` uses
+    # and for the same reason: `Array({"type" => "bold"})` reshapes a Hash
+    # into `[["type", "bold"]]`, which would then hand `apply_mark` a
+    # two-element Array instead of quietly doing nothing.
     def render_text_node(node)
       content = ERB::Util.html_escape(node["text"].to_s)
-      content = Array(node["marks"]).reduce(content) { |html, mark_data| apply_mark(mark_data, html) }
+      marks = node["marks"]
+      marks = marks.is_a?(Array) ? marks : []
+      content = marks.reduce(content) { |html, mark_data| apply_mark(mark_data, html) }
       RichText::Schema.node("text").html.call(node, content, context)
     end
 
+    # Same `is_a?(Hash)` guard `#render_node` uses, for a `"marks"` array
+    # entry instead of a `"content"` one -- a stray non-object slipped into
+    # `"marks"` is exactly as malformed as one slipped into `"content"`, and
+    # gets the same "log and keep the content unmarked" treatment rather
+    # than a `NoMethodError` from `mark_data["type"]`.
     def apply_mark(mark_data, content)
+      unless mark_data.is_a?(Hash)
+        log_unknown("mark", mark_data.inspect)
+        return content
+      end
+
+      mark_data = normalize_attrs(mark_data)
       mark = RichText::Schema.mark(mark_data["type"])
       if mark.nil?
         log_unknown("mark", mark_data["type"])
@@ -105,6 +150,20 @@ module RichText
       end
 
       mark.html.call(mark_data, content, context)
+    end
+
+    # Every built-in `html` block (`RichText::BuiltIns`) reads `"attrs"`
+    # assuming it's a Hash -- `n["attrs"]["level"]`, `mark_data.dig("attrs",
+    # "href")` -- because `RichText::Schema::Attribute`'s own DSL only ever
+    # describes attributes as key/value pairs. A document that skips
+    # `#validate` can hand a node/mark `"attrs"` of any shape at all (an
+    # Array, a String, or simply omit it, leaving it `nil`), so every
+    # `render_node`/`apply_mark` call normalizes it to a real (possibly
+    # empty) Hash *before* any `html` block ever sees the node/mark --
+    # one choke point, rather than every block added here or by a future
+    # plugin having to re-guard its own `"attrs"` access.
+    def normalize_attrs(node)
+      node["attrs"].is_a?(Hash) ? node : node.merge("attrs" => {})
     end
 
     # Design spec §3.3: an unknown node or mark type is skipped (no wrapper

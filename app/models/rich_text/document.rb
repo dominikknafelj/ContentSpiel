@@ -87,6 +87,14 @@ module RichText
     # digest differently. Array element order is left alone -- `"content"`
     # order is meaningful (it's the document's reading order), unlike Hash
     # key order.
+    #
+    # `#to_html` computes this *before* it ever reaches
+    # `RichText::HtmlRenderer` (it's part of the cache key) -- so
+    # `canonicalize` has to be just as total against a pathologically deep
+    # or malformed document as `#validate`/`RichText::HtmlRenderer` are;
+    # see that method's own comment for why it caps recursion at
+    # `MAX_DEPTH` rather than trusting every document handed to `#digest`
+    # is shallow.
     def digest = Digest::SHA256.hexdigest(JSON.generate(canonicalize(@hash)))
 
     # Walks the document against `RichText::Schema` and returns every
@@ -135,10 +143,44 @@ module RichText
       end
     end
 
-    def canonicalize(value)
+    # A stand-in for anything past `MAX_DEPTH` in `#canonicalize` -- see
+    # that method's comment for why this has to be a scalar, not the
+    # original (still arbitrarily deep) Hash/Array it replaces.
+    DEPTH_TRUNCATED = "…depth-truncated…"
+
+    # Recurses through `@hash` sorting Hash keys, same `MAX_DEPTH` ceiling
+    # `#validate_node`/`RichText::HtmlRenderer#render_node` use, for the same
+    # reason: an attacker- or corruption-built document can be an
+    # arbitrarily deep chain of single-child nodes, and `#digest` walks it
+    # (as part of `#to_html`'s cache key, and hence *before* any of the
+    # renderer's own depth guard ever runs) just as eagerly as `#validate`
+    # does.
+    #
+    # Past `MAX_DEPTH`, this doesn't just stop *descending* -- it replaces
+    # whatever's there with `DEPTH_TRUNCATED`, a scalar with no nested
+    # Hash/Array of its own. Merely returning the original (still deeply
+    # nested) sub-tree unchanged would still hand `JSON.generate` a
+    # structure past *its own* default nesting limit (100) a few thousand
+    # levels down, trading a `SystemStackError` for a `JSON::NestingError`
+    # instead of actually fixing anything -- and raising `max_nesting:
+    # false` on the `JSON.generate` call in `#digest` would just move the
+    # crash back to the C extension's own recursion instead of Ruby's,
+    # which is no safer. A flat scalar is the only shape that's guaranteed
+    # safe to hand `JSON.generate` regardless of how deep the original
+    # document went; correct digests for a document this deep were never
+    # achievable anyway, so "stop, don't crash" is the only property that
+    # matters this far down. A non-Hash, non-Array leaf (String/Integer/
+    # nil/true/false, or a malformed node that's an Array where a Hash
+    # belonged, or vice versa) already falls through to `else value`
+    # untouched -- there's nothing to sort inside a scalar, and re-shaping
+    # a wrong-typed value isn't this method's job, `#validate` is what
+    # reports that as an error.
+    def canonicalize(value, depth = 0)
+      return DEPTH_TRUNCATED if depth > MAX_DEPTH
+
       case value
-      when Hash then value.keys.sort.index_with { |key| canonicalize(value[key]) }
-      when Array then value.map { |element| canonicalize(element) }
+      when Hash then value.keys.sort.index_with { |key| canonicalize(value[key], depth + 1) }
+      when Array then value.map { |element| canonicalize(element, depth + 1) }
       else value
       end
     end

@@ -194,8 +194,22 @@ module RichText
       end
     end
 
+    # Browsers resolve HTML/numeric-character-reference escapes and discard
+    # embedded control characters *before* they decide what a link's scheme
+    # is -- `javascript&#58;alert(1)` and `&#x6A;avascript:alert(1)` both
+    # execute as a `javascript:` URI despite never containing that literal
+    # substring, and `java\tscript:alert(1)` does too, once the tab is
+    # stripped. A `URI.parse` of the raw, still-encoded String would see
+    # scheme `nil` (no literal `:`) or some other harmless-looking scheme
+    # and wave both straight through -- so this decodes and strips control
+    # characters *before* ever asking `URI` what the scheme is, the same
+    # normalization step a browser performs, rather than trusting the
+    # scheme a hostile String merely *looks* like it doesn't have.
     def self.safe_href?(value)
-      uri = URI.parse(value) rescue nil
+      return false unless value.is_a?(String)
+
+      decoded = CGI.unescapeHTML(value).gsub(/[[:cntrl:]]/, "").strip
+      uri = URI.parse(decoded) rescue nil
       !uri.nil? && (uri.scheme.nil? || %w[http https mailto].include?(uri.scheme))
     end
 
@@ -213,13 +227,29 @@ module RichText
       TAG.tag.a(content, href: href)
     end
 
+    # A record that exists but isn't publicly visible -- unpublished, or
+    # under an unpublished ancestor page (`PublicSite::Resolver.visible?`,
+    # the exact same rule `PagesController`'s own public render path is
+    # gated by) -- renders as plain text outside preview, same as a
+    # genuinely missing target: a public visitor must never see a link to a
+    # page that would 404 (or, worse, redirect them into a draft) the
+    # instant they clicked it. In preview (`ctx.preview`), editors are
+    # exactly the audience who needs to see and click links to unpublished
+    # content, so the visibility gate is skipped entirely there --
+    # `PublicSite::Resolver` draws the same distinction for its own
+    # `:preview` scope, and reusing its `visible?` here (rather than
+    # re-deriving "published, with every ancestor also published" from
+    # scratch) is what keeps the two rules from drifting apart.
     def self.render_internal_link(mark_data, content, ctx)
       attrs = mark_data["attrs"] || {}
       record = case attrs["type"]
       when "page" then Page.find_by(id: attrs["id"])
       when "post" then Post.find_by(id: attrs["id"])
       end
-      path = record && ctx.urls.path_for(record, ctx.locale)
+      return content if record.nil?
+      return content if !ctx.preview && !PublicSite::Resolver.visible?(record)
+
+      path = ctx.urls.path_for(record, ctx.locale)
       path ? TAG.tag.a(content, href: path) : content
     end
   end
