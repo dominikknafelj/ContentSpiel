@@ -1,37 +1,13 @@
 Rails.application.routes.draw do
   # While setup is required, every route below is unreachable (design spec
   # 2026-09-26 §3): these two catch-alls are declared first, so they win over
-  # Avo and the public page routes. A lambda, so the constant is only
+  # CS Studio and the public page routes. A lambda, so the constant is only
   # resolved per request (never while routes load during boot).
   constraints(->(request) { Setup::RedirectConstraint.matches?(request) }) do
     match "/", to: redirect("/setup", status: 302), via: :all, as: :setup_required_root
     match "*path", to: redirect("/setup", status: 302), via: :all, format: false, as: :setup_required
   end
 
-  mount_avo do
-    get "pages_tree", to: "tools#pages_tree", as: :pages_tree
-    # PATCH rather than the tool's own GET verb -- this is what the tree's
-    # Stimulus controller calls on every drop, inside `mount_avo` so it
-    # inherits the same session gate as the page itself. The moved page's id
-    # travels in the body alongside `parent_id`/`position` rather than the
-    # path, so the view can hand the controller one fixed URL up front
-    # instead of building one per node.
-    patch "pages_tree/reorder", to: "tools#reorder_page", as: :reorder_page
-
-    # What the Trix editor's paste handler calls to turn a pasted YouTube URL
-    # into an attachable it can insert (design spec section 8) -- inside
-    # `mount_avo` so it inherits the same session gate as the page itself,
-    # same reasoning as the reorder endpoint above.
-    post "youtube_embeds", to: "youtube_embeds#create", as: :youtube_embeds
-
-    # Admin-only mind graph (design spec section 9): Post nodes + PostRelation
-    # edges, rendered client-side as a force-directed graph.
-    get "mind_graph", to: "tools#mind_graph", as: :mind_graph
-
-    # The setup wizard's system check, re-runnable later (design spec
-    # 2026-09-26 §5).
-    get "system_status", to: "tools#system_status", as: :system_status
-  end
   # A component browser for the ViewComponents under app/components
   # (open-types spec §5), development only -- never mounted in test or
   # production, and declared here, before the public catch-alls below, so
@@ -96,6 +72,19 @@ Rails.application.routes.draw do
     # top-level GET).
     resource :tree, only: %i[update], controller: :tree
 
+    # The Tiptap editor's own upload button (design spec §4.1/§4.2): POSTs
+    # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
+    # (422) -- `create` only, there is no listing/edit/destroy screen for a
+    # `MediaAsset` yet (design spec §4.2's "Relation to open types": that
+    # arrives with the media library sub-project).
+    resources :media_assets, only: :create
+
+    # The internal-link picker's own search (design spec §4.1/§4.2): a
+    # `GET`, not nested under `pages`/`posts` -- it searches across both at
+    # once (`?type=` narrows to one), so there is no single owning resource
+    # to nest it under the way `content_blocks` nests under `pages`.
+    get "link_targets", to: "link_targets#index"
+
     # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
     # (no tree column of its own -- a post has no parent/child structure the
     # way a page does) plus the post editor. `member` adds the same three
@@ -117,6 +106,61 @@ Rails.application.routes.draw do
     # itself; new tags are only ever created in passing, through a post's own
     # `tag_names` (`Posts::Save`).
     resources :tags, only: %i[index update destroy]
+
+    # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
+    # singleton's own autosaving form (title, tagline, logo, social links,
+    # default language) -- `resource` (singular), like the page tree's own
+    # `resource :tree`, since there's exactly one settings row to show or
+    # update, never a collection or an `:id` to route on.
+    resource :settings, only: %i[show update]
+
+    # The Languages module (cs-studio spec §6.1, Task 8), nested under
+    # "settings" by *path* only (`scope`, not `namespace` -- the brief calls
+    # for a plain `Admin::LanguagesController`, not `Admin::Settings::
+    # LanguagesController`) so its URLs read as part of the Settings module
+    # the way the spec's own module list ("Languages (settings/languages)")
+    # names it. `create`/`destroy` are `Locales::Enable`/`Locales::Disable`
+    # (one language at a time, by its code as `:id`); the bulk `update`
+    # (fallbacks + reorder, `Locales::Configure`) has no `:id` of its own --
+    # the languages screen's one form always submits every enabled
+    # language's row together, the same way `ContentBlocks::Reorder` is
+    # handed a complete order rather than a delta -- so it's a bare `patch`
+    # on the collection path rather than a `resources` member/collection
+    # action.
+    scope "settings", as: "settings" do
+      resources :languages, only: %i[index create destroy]
+      patch "languages", to: "languages#update"
+    end
+
+    # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
+    # edit/update (email, and a password only when one was typed --
+    # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
+    # -- `Admin::UsersController#destroy` is also where deleting *yourself*
+    # ends your own session, since only the controller knows which request
+    # this is). Invites stay on the roadmap (spec §6.1) -- there is no
+    # separate "invite" action here.
+    resources :users, only: %i[index new create edit update destroy]
+
+    # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
+    # tokens. No `:new`/`:show` -- "Create token" is one button on the list
+    # that POSTs straight to `create`, and `create` *renders* the one-time
+    # reveal itself (never a redirect to a `show`, which would need the raw
+    # token to survive a second request somewhere -- see `Admin::
+    # ApiTokensController#create`). `destroy` is revoke
+    # (`ApiTokens::Revoke`): the row stays, marked revoked, for the list's
+    # own "last used / IP" history.
+    resources :api_tokens, only: %i[index create destroy]
+
+    # System status and the mind graph (design spec §6.1, Task 9): one
+    # read-only screen each, `resource` (singular) since neither has an
+    # `:id` to route on. "Run again" on the status screen is a plain reload
+    # of `show` -- `Setup::SystemCheck` runs on every request.
+    resource :system_status, only: :show, controller: :system_status
+    resource :mind_graph, only: :show, controller: :mind_graph
+
+    # "Create starter pages" on the Pages home (design spec §6.1, Task 9):
+    # one POST, `StarterContent.create_pages_and_posts!`, idempotent.
+    resources :starter_contents, only: :create
 
     # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
     # the placeholder `home#show` this task's brief removes.
@@ -209,6 +253,12 @@ Rails.application.routes.draw do
   # same Journey behavior the locale route above works around with `(/*path)`
   # -- but here there's no static segment ahead of the glob to wrap it against,
   # so the homepage gets its own route instead.
+  #
+  # The constraint (final fix wave, C) keeps Active Storage's own URLs out of
+  # this catch-all: Rails draws the Active Storage routes *after* this file,
+  # so without it `/rails/active_storage/blobs/...` -- every image a page,
+  # post or rich-text body embeds -- was routed here and answered 404.
   root to: "pages#show", format: false
-  get "*path", to: "pages#show", as: :page, format: false
+  get "*path", to: "pages#show", as: :page, format: false,
+    constraints: ->(request) { !request.path.start_with?("#{ActiveStorage.routes_prefix}/") }
 end

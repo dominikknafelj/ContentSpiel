@@ -8,11 +8,11 @@ import Sortable from "sortablejs"
 // own comment explains why the index can't just be baked in ahead of time),
 // and `row` is every actual row, existing or freshly added.
 //
-// Unlike the "Pages tree" Avo tool's own Sortable controller
-// (pages_tree_controller.js), a drop here never round-trips to the server --
-// a `groups` field's rows are just nested form inputs, not their own
-// records, so there's nothing to persist until the *page/post* form itself
-// autosaves (Task 4). `dispatchInput` is what makes that connection: every
+// Unlike the page tree's own Sortable controller (tree_controller.js), a
+// drop here never round-trips to the server -- a `groups` field's rows are
+// just nested form inputs, not their own records, so there's nothing to
+// persist until the *page/post* form itself autosaves (Task 4).
+// `dispatchInput` is what makes that connection: every
 // add/remove/reorder fires a bubbling `input` event, which is exactly what
 // that autosave controller already debounces on for a plain keystroke.
 export default class extends Controller {

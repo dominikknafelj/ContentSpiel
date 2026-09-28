@@ -1,7 +1,7 @@
 <%# `data-admin--tree-move-url-value` is read once by the Stimulus controller
     on connect -- every drop PATCHes that one URL regardless of which node in
-    the tree moved (spec §4.2), the same "one fixed URL, the moved page's id
-    travels in the body" shape the Avo tree tool this follows already uses. %>
+    the tree moved (spec §4.2): one fixed URL, with the moved page's id
+    travelling in the body instead. %>
 <turbo-frame id="tree" data-controller="admin--tree" data-admin--tree-move-url-value="<%= helpers.admin_tree_path(**url_options) %>">
   <%# A flash-style status for the last move, replaced on its own by
       Admin::TreeController#update -- kept empty (not `sr-only`'d away

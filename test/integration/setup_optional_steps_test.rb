@@ -41,4 +41,25 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
     assert_redirected_to setup_step_path("review")
     assert StarterContent.added?(locale: "de")
   end
+
+  # Final fix wave (C, P23): the wizard takes the same locked, re-checked
+  # path as CS Studio (`StarterContent.add_once!`), and a failure is a form
+  # error on the step, never a 500.
+  test "adding starter content twice doesn't duplicate anything" do
+    patch setup_step_path("starter_content")
+
+    assert_no_difference [ "Page.count", "Post.count" ] do
+      patch setup_step_path("starter_content")
+    end
+    assert_redirected_to setup_step_path("review")
+  end
+
+  test "a starter content failure is shown on the step instead of a 500" do
+    with_singleton_override(StarterContent, :create_pages_and_posts!, ->(**) { raise StarterContent::Error, "StarterContent: Slug has already been taken" }) do
+      patch setup_step_path("starter_content")
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert]", text: /couldn.t be added/
+  end
 end

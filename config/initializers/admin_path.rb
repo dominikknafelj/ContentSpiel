@@ -15,8 +15,6 @@ module ContentSpiel
   # - "setup" -- the first-run setup wizard;
   # - "mcp" -- the MCP server endpoint;
   # - "up" -- Rails' own health check (`rails_health_check`);
-  # - "avo" -- the old admin, still mounted (spec §7's "Avo is still
-  #   mounted" interim state);
   # - "rails" -- every engine Rails itself mounts under `/rails/*` in
   #   development (`/rails/info`, `/rails/mailers`, ActiveStorage's own
   #   `/rails/active_storage/...`);
@@ -34,7 +32,7 @@ module ContentSpiel
   #   `Locales.enabled` -- a runtime setting this boot-time check can't
   #   read, and a locale disabled today can be re-enabled tomorrow with no
   #   deploy, spec §4.4).
-  RESERVED_PATHS = %w[preview setup mcp up avo rails lookbook assets cable sitemap.xml].freeze + SUPPORTED_LOCALES.keys
+  RESERVED_PATHS = %w[preview setup mcp up rails lookbook assets cable sitemap.xml].freeze + SUPPORTED_LOCALES.keys
 
   ADMIN_PATH = ENV.fetch("ADMIN_PATH", "cs-studio").to_s.delete_prefix("/").delete_suffix("/").tap do |path|
     raise ArgumentError, "ADMIN_PATH must be one URL segment like \"cs-studio\" (got #{path.inspect})" unless path.match?(/\A[a-z0-9][a-z0-9_-]*\z/)

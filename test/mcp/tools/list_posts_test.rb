@@ -66,7 +66,7 @@ class Mcp::Tools::ListPostsTest < ActiveSupport::TestCase
   # dump would bloat every listing for content an agent has to ask for by
   # id anyway (Mcp::Tools::GetPost).
   test "list entries omit the full body" do
-    Post.create!(content_type: :blog, title: "A Blog Post", body: "<p>Full content</p>")
+    Post.create!(content_type: :blog, title: "A Blog Post", body: rich_doc("Full content"))
 
     response = call_tool
 

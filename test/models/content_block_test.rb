@@ -36,27 +36,33 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert_includes block.errors[:owner], "must exist"
   end
 
-  test "a rich_text block accepts a rich text body" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: "<p>Hi</p>")
+  test "a rich_text block stores a JSON body document" do
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
 
-    assert block.body.present?
-    assert_includes block.body.to_plain_text, "Hi"
+    assert_equal rich_doc("Hi"), block.reload.body_document(locale: Locales.default).to_h
   end
 
-  # Same mobility-actiontext setup as Post#body: one ActionText::RichText row
-  # per locale, not one per record.
+  # Same per-locale jsonb shape as Post#body: one document per locale.
   test "a rich_text block's body is independently translatable per locale" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: "<p>Hi</p>")
-    Mobility.with_locale(:de) { block.update!(body: "<p>Hallo</p>") }
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
+    block.assign_body(rich_doc("Hallo"), locale: "de")
+    block.save!
 
     reloaded = ContentBlock.find(block.id)
 
-    assert_includes reloaded.body.to_plain_text, "Hi"
-    Mobility.with_locale(:de) { assert_includes reloaded.body.to_plain_text, "Hallo" }
-    # No Spanish body was ever written, and plain readers no longer fall back
-    # to another locale (see config/initializers/mobility.rb) -- that's
-    # `Locales.read`'s job now (see locales_test.rb), not the plain reader's.
-    Mobility.with_locale(:es) { assert_not reloaded.body.present? }
+    assert_equal rich_doc("Hi"), reloaded.body_document(locale: "en").to_h
+    assert_equal rich_doc("Hallo"), reloaded.body_document(locale: "de").to_h
+    # No Spanish body was ever written, and `body_document` reads the literal
+    # locale -- falling back is `Locales.read`'s job (see locales_test.rb).
+    assert reloaded.body_document(locale: "es").blank?
+  end
+
+  test "an invalid body document is a validation error on body" do
+    block = ContentBlock.new(owner: @page, block_type: :rich_text, position: 0)
+    block.assign_body({ "type" => "doc", "content" => [ { "type" => "nope/unknown" } ] }, locale: "en")
+
+    assert_not block.save
+    assert block.errors[:body].any?
   end
 
   test "an image block accepts an attached image and a caption" do
@@ -172,16 +178,16 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "Page#content_blocks are ordered by position" do
-    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 1, body: "second")
-    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: "first")
+    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 1, body: rich_doc("second"))
+    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("first"))
 
     assert_equal [ 0, 1 ], @page.content_blocks.map(&:position)
-    assert_equal [ "first", "second" ],
-      @page.content_blocks.map { |block| block.body.to_plain_text }
+    assert_equal [ "first\n", "second\n" ],
+      @page.content_blocks.map { |block| block.body_document(locale: "en").to_markdown }
   end
 
   test "destroying a page destroys its content blocks" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: "<p>Hi</p>")
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
 
     assert @page.destroy
     assert_not ContentBlock.exists?(block.id)

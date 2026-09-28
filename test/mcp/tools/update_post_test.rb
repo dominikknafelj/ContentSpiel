@@ -8,7 +8,7 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
 
   setup do
     @user = User.create!(email_address: "agent@example.com", password: "password123")
-    @post = Post.create!(content_type: :blog, title: "Original Title", body: "<p>Original body</p>",
+    @post = Post.create!(content_type: :blog, title: "Original Title", body: rich_doc("Original body"),
       excerpt: "Original excerpt")
   end
 
@@ -38,14 +38,30 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
 
     @post.reload
     assert_equal "New Title", @post.title
-    assert_includes @post.body.to_s, "Original body"
+    assert_equal rich_doc("Original body"), @post.body_document(locale: "en").to_h
     assert_equal "Original excerpt", @post.excerpt
   end
 
-  test "updates the body" do
-    call_tool(id: @post.id, body: "<p>New body</p>")
+  test "updates the body from Markdown" do
+    response = call_tool(id: @post.id, body: "New *body*")
 
-    assert_includes @post.reload.body.to_s, "New body"
+    assert_equal rich_doc("New *body*"), @post.reload.body_document(locale: "en").to_h
+    assert_equal "New *body*\n", JSON.parse(response.content.first[:text])["body"]
+  end
+
+  test "updates the body in the given locale only" do
+    call_tool(id: @post.id, body: "Neuer Text", locale: "de")
+
+    @post.reload
+    assert_equal rich_doc("Neuer Text"), @post.body_document(locale: "de").to_h
+    assert_equal rich_doc("Original body"), @post.body_document(locale: "en").to_h
+  end
+
+  test "Markdown conversion warnings are appended to the response text" do
+    response = call_tool(id: @post.id, body: "::mystery{a=\"b\"}")
+
+    assert_not response.error?
+    assert_match(/mystery/, response.content.last[:text])
   end
 
   test "published: true publishes a draft" do

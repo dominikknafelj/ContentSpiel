@@ -147,20 +147,18 @@ class SetupController < ApplicationController
     end
 
     # The form always renders a few name/URL rows; a row missing either half
-    # is dropped rather than saved as a broken link. A request that omits the
-    # social_links key entirely (no rows submitted at all, e.g. a crafted or
-    # partial PATCH) leaves the previously saved links alone rather than
-    # wiping them out.
+    # is dropped rather than saved as a broken link (`SiteSetting#social_
+    # link_rows=`, Task 8 -- moved out of here so `Admin::SettingsController`
+    # shares the exact same normalisation instead of hand-keeping its own
+    # copy). A request that omits the social_links key entirely (no rows
+    # submitted at all, e.g. a crafted or partial PATCH) leaves the
+    # previously saved links alone rather than wiping them out.
     def site_params
       permitted = params.expect(site_setting: [ :title, :tagline, :logo, social_links: [ [ :name, :url ] ] ])
       return permitted unless permitted.key?(:social_links)
 
-      rows = Array(permitted.delete(:social_links))
-      links = rows.filter_map do |row|
-        name, url = row[:name].to_s.strip, row[:url].to_s.strip
-        [ name, url ] if name.present? && url.present?
-      end
-      permitted.merge(social_links: links.to_h)
+      permitted[:social_link_rows] = permitted.delete(:social_links)
+      permitted
     end
 
     # Writes the chosen default plus any additional languages as
@@ -193,17 +191,25 @@ class SetupController < ApplicationController
       render :mcp_token_created
     end
 
+    # `StarterContent.add_once!` (final fix wave, P23): the same locked,
+    # re-checked path CS Studio's "Create starter pages" takes, so a double
+    # submit can't race itself into a duplicate-slug 500. A failure is shown
+    # on this step (422), like any other step's form error.
     def update_starter_content
-      StarterContent.create_pages_and_posts!(locale: Current.site.default_locale)
-      redirect_to setup_step_path("review"), notice: "Starter content added."
+      created = StarterContent.add_once!(locale: Current.site.default_locale)
+      redirect_to setup_step_path("review"), notice: created ? "Starter content added." : "Starter content was already there."
+    rescue StarterContent::Error => error
+      Rails.logger.warn("[setup starter content] #{error.class}: #{error.message}")
+      flash.now[:alert] = "Starter content couldn't be added — a page may already use one of its addresses."
+      render :starter_content, status: :unprocessable_entity
     end
 
     def update_review
       Setup.complete!
-      # CS Studio, not Avo, is where every sign-in lands now (cs-studio spec
-      # §3) -- finishing setup is no exception, even though the admin who
-      # just walked through this wizard is still signed in from `update_admin`
-      # above and could just as easily have been sent to Avo directly.
+      # CS Studio is where every sign-in lands now (cs-studio spec §3) --
+      # finishing setup is no exception, even though the admin who just
+      # walked through this wizard is already signed in from `update_admin`
+      # above.
       redirect_to admin_root_path, notice: "Setup complete."
     end
 end

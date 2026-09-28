@@ -16,6 +16,8 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
 
       visit "/cs-studio/posts/#{post_record.id}"
 
+      await_admin_controllers
+
       # "Add Test/speaker" -- `Admin::Fields::GroupsField#add_label`, built
       # off `test/speaker`'s own default (unlabeled) `humanize`d name --
       # purely client-side (`admin--groups#add`), no request of its own.

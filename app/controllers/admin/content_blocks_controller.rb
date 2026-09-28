@@ -18,7 +18,7 @@ module Admin
     # since a different block on the same page can have an entirely
     # different schema. `TRANSLATED_COLUMNS`/`ATTRIBUTE_COLUMNS` below are
     # the one thing that *is* fixed: which of the columns a type can `uses`
-    # at all are translated (Mobility/ActionText) versus a plain attribute
+    # at all are translated (Mobility) versus a plain attribute
     # (the attachment) -- `block.definition.uses_columns` still gates which
     # of these a given type's own params are actually read from.
     #
@@ -150,7 +150,7 @@ module Admin
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
     # fields with `translated?` go to `translations[locale][:settings]`,
     # the rest to `attributes[:settings]`; `caption`/`alt`/`body` are
-    # translated columns, `image` is a plain attribute -- every one of
+    # translated columns (`body` the rich-text document JSON), `image` is a plain attribute -- every one of
     # those gated by whether this block's own type actually `uses` that
     # column at all, the same allowlist reasoning
     # `Admin::PagesController::ATTRIBUTE_FIELDS` uses for its own record.
@@ -317,41 +317,30 @@ module Admin
     # -- fix round 1, same one source `TRANSLATED_COLUMNS` above derives
     # from), copied literally (no fallback) from `source` onto `copy` --
     # `Mobility.with_locale` is what both the reader and the writer need for
-    # a translated column (Locales.default note in `ContentBlocks::Save`
-    # explains why the writer side can't take a `locale:` keyword directly
-    # the way a jsonb reader can). `body` alone gets its own `blank?` guard:
-    # it's an ActionText association, not a jsonb value, so copying a blank
-    # one over would create an empty `ActionText::RichText` row for a
-    # locale that never had one.
+    # a jsonb column (Locales.default note in `ContentBlocks::Save` explains
+    # why the writer side can't take a `locale:` keyword directly the way a
+    # jsonb reader can).
     #
-    # Fix (final-fixes round, finding 3): `column == :body` used to copy
-    # `value.to_s` -- `value` here is the mobility-actiontext backend's own
-    # `RichTextTranslation` record (`Mobility::Backends::ActionText#read`
-    # returns the record, not a String), and *its* `to_s` renders the body
-    # through `action_text/contents/content`'s own layout
-    # (`ActionText::Content#to_rendered_html_with_layout`) -- the same
-    # wrapping `<div class="trix-content">...</div>` Trix itself expects to
-    # generate, not to receive back as more body content. Assigning that
-    # rendered HTML straight back as the *copy's* body nested it inside a
-    # second `trix-content` wrapper every time `duplicate` ran, and ran any
-    # attachment through the *display* renderer first (`to_trix_html` ->
-    # `render_attachments`), which drops the `sgid` an attachment's own
-    # canonical node needs to stay editable in Trix (see `ActionText::
-    # Content#render_attachments`) in favour of a plain `<img>`.
-    # `value.body` is the raw `ActionText::Content` underneath that record
-    # (`ActionText::RichText#body`) -- assigning it back re-canonicalizes
-    # the exact same fragment (attachments' own `sgid`s included) rather
-    # than re-rendering it, so a duplicate's body is byte-for-byte the
-    # source's, and duplicating a duplicate stays that way indefinitely
-    # instead of accumulating another wrapper layer every time.
+    # `body` is the rich-text JSON document (tiptap spec §3.1), copied as
+    # data through `body_document`/`assign_body` rather than the Mobility
+    # reader/writer pair the other columns use: `assign_body` is the one
+    # writer that refuses a "nothing" value instead of silently deleting the
+    # locale (`HasRichTextBody#assign_body`). A document is copied verbatim, so a
+    # duplicate's body is exactly the source's, and duplicating a duplicate
+    # stays that way (the ActionText-era bug this method used to guard
+    # against -- a re-rendered `trix-content` wrapper nesting itself on
+    # every duplicate -- has no equivalent for plain JSON). A blank locale
+    # is skipped rather than copied as an empty document.
     def copy_translations(source, copy)
       Locales.enabled.each do |code|
         Mobility.with_locale(code) do
           ContentBlocks::Save::TRANSLATED.each do |column|
-            value = source.public_send(column)
-            next if column == :body && value.blank?
-
-            copy.public_send("#{column}=", column == :body ? value.body : value)
+            if column == :body
+              document = source.body_document(locale: code)
+              copy.assign_body(document, locale: code) unless document.blank?
+            else
+              copy.public_send("#{column}=", source.public_send(column))
+            end
           end
         end
       end

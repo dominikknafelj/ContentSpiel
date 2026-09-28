@@ -15,6 +15,9 @@ class Current < ActiveSupport::CurrentAttributes
   # than crash on -- nothing in this sub-project requires an actor to be
   # present.
   attribute :actor, :channel
+
+  # `PublicSite.current_content_version`'s per-request memo.
+  attribute :content_version
   delegate :user, to: :session, allow_nil: true
 
   # The site's settings row, loaded at most once per request (spec §6.1) --

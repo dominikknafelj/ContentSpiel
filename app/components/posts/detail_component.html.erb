@@ -3,7 +3,7 @@
   <h1 class="mt-3 text-h1 font-semibold leading-tight tracking-tight"><%= translated(post, :title) %></h1>
   <% excerpt = translated(post, :excerpt) %>
   <% if excerpt.present? %><p class="mt-4 text-lg text-dim"><%= excerpt %></p><% end %>
-  <div class="cs-prose mt-8"><%= translated(post, :body) %></div>
+  <div class="cs-prose mt-8"><%= rich_text(post) %></div>
   <% if post.tags.any? %>
     <ul class="mt-10 flex flex-wrap gap-3 font-cs-mono text-label uppercase tracking-mono text-meta">
       <% post.tags.each do |tag| %><li><%= tag.name %></li><% end %>

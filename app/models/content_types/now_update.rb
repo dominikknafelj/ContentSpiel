@@ -11,7 +11,7 @@ module ContentTypes
         t.detail_component Posts::DetailComponent
 
         t.starter section: { title: "Now", slug: "now" },
-          sample: { title: "What I'm doing now", body: "<p>Share what you're focused on at the moment.</p>" }
+          sample: { title: "What I'm doing now", body: "Share what you're focused on at the moment." }
       end
     end
   end

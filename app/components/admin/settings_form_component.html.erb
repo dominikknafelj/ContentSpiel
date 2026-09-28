@@ -1,0 +1,48 @@
+<div class="admin-settings-form rounded-cs border border-line bg-surface p-4">
+  <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
+        data: {
+          controller: "admin--autosave",
+          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+          "admin--autosave-status-id-value": status_id
+        } do %>
+
+    <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "title", id: field_id("title"), html_name: field_html_name("title"), value: site_setting.title
+        ) %>
+
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "tagline", id: field_id("tagline"), html_name: field_html_name("tagline"), value: site_setting.tagline
+        ) %>
+
+    <%= render partial: "admin/shared/hero_image_field", locals: {
+          section_id: logo_section_id, name: "logo",
+          image_id: field_id("logo"), image_html_name: field_html_name("logo"), image_value: site_setting.logo,
+          checkbox_id: field_id("remove_logo"), checkbox_html_name: field_html_name("remove_logo"),
+          show_checkbox: site_setting.logo.attached?
+        } %>
+
+    <div class="admin-column mb-4" data-field-name="default_locale">
+      <%= label_tag field_id("default_locale"), "Default language", class: setup_label_class %>
+      <%= select_tag field_html_name("default_locale"), options_for_select(default_locale_options, site_setting.default_locale),
+            id: field_id("default_locale"), class: setup_input_class %>
+      <div id="<%= errors_id("default_locale") %>" class="mt-1 text-sm text-danger-ink"></div>
+    </div>
+
+    <fieldset>
+      <legend class="<%= setup_label_class %>">Social links</legend>
+      <div class="mt-1 space-y-2">
+        <% social_link_rows.each do |name, url| %>
+          <div class="grid grid-cols-2 gap-2">
+            <%= text_field_tag "site_setting[social_links][][name]", name, placeholder: "e.g. GitHub",
+                  aria: { label: "Network" }, class: setup_input_class %>
+            <%= url_field_tag "site_setting[social_links][][url]", url, placeholder: "https://…",
+                  aria: { label: "URL" }, class: setup_input_class %>
+          </div>
+        <% end %>
+      </div>
+      <div id="<%= errors_id("social_links") %>" class="mt-1 text-sm text-danger-ink"></div>
+    </fieldset>
+  <% end %>
+</div>

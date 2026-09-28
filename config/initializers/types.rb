@@ -16,4 +16,13 @@ Rails.application.config.to_prepare do
   ContentTypes::Blog.register
   ContentTypes::ResumeEntry.register
   ContentTypes::NowUpdate.register
+
+  # The Tiptap node/mark schema (design spec §3.2) -- a separate registry
+  # from the three above (`RichText::Schema`, not `ContentModel::Registry`),
+  # but reset-then-register for the exact same reason: a code reload in
+  # development must re-register the built-ins cleanly instead of raising
+  # `RichText::DuplicateType` against whatever's still sitting in the
+  # registry from before the reload.
+  RichText::Schema.reset!
+  RichText::BuiltIns.register
 end

@@ -113,10 +113,108 @@ class PostTest < ActiveSupport::TestCase
     assert_equal({}, post.metadata)
   end
 
-  test "body accepts rich text content" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    assert post.body.present?
-    assert_includes post.body.to_plain_text, "Hi"
+  test "body stores a JSON document per locale" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
+
+    document = post.reload.body_document(locale: Locales.default)
+    assert_kind_of RichText::Document, document
+    assert_equal rich_doc("Hi"), document.to_h
+  end
+
+  test "body_document is an empty document for a locale never written" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    assert post.body_document(locale: "de").blank?
+  end
+
+  test "assign_body writes only the given locale" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
+
+    post.assign_body(rich_doc("Hallo"), locale: "de")
+    post.save!
+    post.reload
+
+    assert_equal rich_doc("Hi"), post.body_document(locale: "en").to_h
+    assert_equal rich_doc("Hallo"), post.body_document(locale: "de").to_h
+  end
+
+  test "assign_body accepts a RichText::Document and a JSON string" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    post.assign_body(RichText::Document.new(rich_doc("Doc")), locale: "en")
+    post.assign_body(rich_doc("Json").to_json, locale: "de")
+    post.save!
+    post.reload
+
+    assert_equal rich_doc("Doc"), post.body_document(locale: "en").to_h
+    assert_equal rich_doc("Json"), post.body_document(locale: "de").to_h
+  end
+
+  test "an invalid body document is a validation error on body and is never saved" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Kept"))
+
+    post.assign_body({ "type" => "doc", "content" => [ { "type" => "heading", "attrs" => { "level" => 1 },
+      "content" => [ { "type" => "text", "text" => "H1" } ] } ] }, locale: "de")
+
+    assert_not post.save
+    assert post.errors[:body].any? { |message| message.include?("heading.level") }, post.errors.full_messages.inspect
+    assert_equal rich_doc("Kept"), post.reload.body_document(locale: "en").to_h
+    assert post.body_document(locale: "de").blank?
+  end
+
+  test "malformed JSON for a body is a validation error, not an exception" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    post.assign_body("{not json", locale: "en")
+
+    assert_not post.valid?
+    assert post.errors[:body].any?
+  end
+
+  # Fix round 1 (m3): nothing at all is not "clear this locale" -- it
+  # used to delete the locale's document silently.
+  test "a body that is nil, blank or JSON null is rejected, and the stored document kept" do
+    [ nil, "", "  ", "null" ].each_with_index do |value, index|
+      post = Post.create!(content_type: :blog, title: "Hello #{index}", body: rich_doc("Kept"))
+
+      post.assign_body(value, locale: "en")
+
+      assert_not post.save, "#{value.inspect} should not save"
+      assert post.errors[:body].any?
+      assert_equal rich_doc("Kept"), post.reload.body_document(locale: "en").to_h
+    end
+  end
+
+  test "an explicit empty document clears a body" do
+    post = Post.create!(content_type: :blog, title: "Hello", body: rich_doc("Gone"))
+
+    post.assign_body(RichText::Document::EMPTY_HASH.to_json, locale: "en")
+    post.save!
+
+    assert post.reload.body_document(locale: "en").blank?
+  end
+
+  test "a valid assignment after a rejected one clears the rejection" do
+    post = Post.create!(content_type: :blog, title: "Hello")
+
+    post.assign_body("null", locale: "en")
+    post.assign_body(rich_doc("Fine"), locale: "en")
+
+    assert post.save, post.errors.full_messages.inspect
+  end
+
+  # A stale reference in a document nobody touched in this save (an
+  # internal link whose target was later deleted) must not block unrelated
+  # edits: only the locales whose document actually changed are validated.
+  test "an unchanged body document is not re-validated" do
+    target = create_post(title: "Target")
+    link = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "see", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "post", "id" => target.id } } ] } ] } ] }
+    post = Post.create!(content_type: :blog, title: "Hello World", body: link)
+    target.destroy!
+
+    post.reload.title = "Renamed"
+    assert post.save, post.errors.full_messages.inspect
   end
 
   test "title, slug, and excerpt are independently translatable per locale" do
@@ -213,34 +311,18 @@ class PostTest < ActiveSupport::TestCase
     end
   end
 
-  test "body is independently translatable per locale" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-
-    Mobility.with_locale(:de) { post.update!(body: "<p>Hallo</p>") }
-
-    assert_includes post.body.to_plain_text, "Hi"
-    Mobility.with_locale(:de) do
-      assert_includes post.body.to_plain_text, "Hallo"
-    end
-  end
-
   test "translated rich text survives a round trip through the database" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    Mobility.with_locale(:de) { post.update!(body: "<p>Hallo</p>") }
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
+    Mobility.with_locale(:de) { post.update!(body: rich_doc("Hallo")) }
 
     reloaded = Post.find(post.id)
 
-    assert_includes reloaded.body.to_plain_text, "Hi"
-    Mobility.with_locale(:de) do
-      assert_includes reloaded.body.to_plain_text, "Hallo"
-    end
-    Mobility.with_locale(:es) do
-      # No Spanish body was ever written, and plain readers no longer fall
-      # back to another locale (see config/initializers/mobility.rb) --
-      # that's `Locales.read`'s job now (see locales_test.rb), not the plain
-      # reader's.
-      assert_not reloaded.body.present?
-    end
+    assert_equal rich_doc("Hi"), reloaded.body_document(locale: "en").to_h
+    assert_equal rich_doc("Hallo"), reloaded.body_document(locale: "de").to_h
+    # No Spanish body was ever written, and `body_document` reads the
+    # literal locale -- falling back is `Locales.read`'s job (see
+    # locales_test.rb), not the model reader's.
+    assert reloaded.body_document(locale: "es").blank?
   end
 
   # The admin form submits every locale's slug in one request, under one
@@ -349,12 +431,10 @@ class PostTest < ActiveSupport::TestCase
     assert_equal ::SUPPORTED_LOCALES.keys.map(&:to_sym), Mobility.available_locales
   end
 
-  # A required translated field is only ever written at `Locales.default`
-  # (`Post#fields=`'s own comment: there's no locale switcher for `fields` in
-  # Avo yet, same limit `ContentBlock#normalize_settings` is under for
-  # `settings`). Checking `required` against the *ambient* `I18n.locale`
-  # instead -- whatever a request happened to leave it at, unrelated to the
-  # site's own default -- would reject a post that saved correctly the
+  # `fields_are_valid` checks a required translated field against
+  # `Locales.default`'s own document, not the *ambient* `I18n.locale` --
+  # whatever a request happened to leave it at, unrelated to the site's own
+  # default -- which would otherwise reject a post that saved correctly the
   # moment that ambient locale doesn't match the site's default.
   test "fields_are_valid checks a required translated field at the site's default locale, not the ambient one" do
     with_locales(%w[de en], default: "de")
@@ -371,5 +451,58 @@ class PostTest < ActiveSupport::TestCase
       ContentTypes.reset!
       saved.each { |definition| ContentTypes.registry_put(definition) }
     end
+  end
+
+  # Task 7 fix round 1 (I2): the editor resends the whole document on every
+  # edit, dead references included -- a body linking to a since-deleted
+  # page (or showing a since-deleted image) must still save after an edit,
+  # while a *new* link to a missing record is still rejected.
+  test "a body with a dead reference can still be edited; a new dead reference can't be added" do
+    target = create_page(title: "Doomed")
+    asset = create_media_asset
+    post = create_post(title: "Notes")
+    linked = ->(text, id) { { "type" => "text", "text" => text, "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => id } } ] } }
+    image = { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } }
+    body = ->(*paragraph) { { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => paragraph }, image ] } }
+
+    post.assign_body(body.call(linked.call("go", target.id)), locale: :en)
+    assert post.save, post.errors.full_messages.to_sentence
+
+    Pages::Destroy.call(target)
+    asset.destroy!
+
+    post.reload.assign_body(body.call({ "type" => "text", "text" => "Edited " }, linked.call("go", target.id)), locale: :en)
+    assert post.save, post.errors.full_messages.to_sentence
+
+    post.assign_body(body.call(linked.call("go", target.id), linked.call("new", 999_999)), locale: :en)
+    assert_not post.save
+    assert_includes post.errors[:body].join, "internalLink.id is invalid"
+  end
+
+  # The stored document's marks are in the schema's canonical order,
+  # whatever order the editor sent them in.
+  test "assign_body stores marks in canonical order" do
+    post = create_post(title: "Notes")
+    post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "x", "marks" => [ { "type" => "link", "attrs" => { "href" => "/a" } }, { "type" => "bold" } ] } ] } ] }.to_json, locale: :en)
+
+    assert_equal %w[bold link], post.body(locale: :en).dig("content", 0, "content", 0, "marks").map { |mark| mark["type"] }
+  end
+
+  test "a legacy body that only differs by normalisation doesn't block an unrelated save" do
+    post = create_post(title: "Legacy")
+    # Stored before the content-model rules: bold with edge whitespace (which
+    # #normalized hoists) next to a code+bold run the schema now forbids.
+    legacy = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "a " },
+      { "type" => "text", "text" => " b ", "marks" => [ { "type" => "bold" } ] },
+      { "type" => "text", "text" => "c", "marks" => [ { "type" => "bold" }, { "type" => "code" } ] } ] } ] }
+    post.update_column(:body, { "en" => legacy })
+    post.reload
+
+    post.title = "Retitled"
+    post.assign_body(legacy.to_json, locale: "en")
+
+    assert post.save, post.errors.full_messages.to_sentence
   end
 end

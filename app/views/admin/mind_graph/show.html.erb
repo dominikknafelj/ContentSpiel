@@ -1,0 +1,22 @@
+<%# The mind graph (design spec §6.1, Task 9): `PostGraph`'s data as a
+    `<script type="application/json">` data island rather than a
+    `data-*-value` attribute -- the browser never executes it, and
+    `json_escape` turns every `<`, `>` and `&` into a `\u` escape, so a
+    post title like `</script><script>…` can't close the element early.
+    `admin--mind-graph` parses it and draws the graph (d3-force).
+    Read-only: relations are edited in the post editor's related-posts
+    picker. %>
+<% content_for :title, "Mind graph" %>
+<div class="mb-4">
+  <h1 class="text-h1 text-ink">Mind graph</h1>
+  <p class="mt-1 text-meta">How your posts relate to each other. Drag a node to reposition it; click a node to open that post.</p>
+</div>
+
+<% if @graph[:nodes].empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Posts and the relations between them appear here.") %>
+<% else %>
+  <div data-controller="admin--mind-graph" class="rounded-cs border border-line bg-surface">
+    <script type="application/json" id="mind-graph-data" data-admin--mind-graph-target="data"><%= json_escape(@graph.to_json).html_safe %></script>
+    <svg data-admin--mind-graph-target="svg" class="block h-[600px] w-full text-ink" role="img" aria-label="Post relationship graph"></svg>
+  </div>
+<% end %>

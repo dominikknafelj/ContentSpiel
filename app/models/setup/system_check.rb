@@ -1,8 +1,9 @@
-# Read-only environment checks shown in the setup wizard and on Avo's System
-# status page (design spec 2026-09-26 §4). Never blocking: every failure is a
-# warning explaining what won't work and how to fix it. Each probe is a
-# callable so tests can swap it; a probe that raises (including LoadError, which
-# is what a missing libvips looks like) counts as a failure.
+# Read-only environment checks shown in the setup wizard and on CS Studio's
+# System status page (design spec 2026-09-26 §4). Never blocking: every
+# failure is a warning explaining what won't work and how to fix it. Each
+# probe is a callable so tests can swap it; a probe that raises (including
+# LoadError, which is what a missing libvips looks like) counts as a
+# failure.
 module Setup
   class SystemCheck
     Result = Data.define(:label, :status, :message) do

@@ -90,7 +90,15 @@ module Admin
     # per-locale accessor, not the plain reader, same reasoning `Admin::
     # PageSettingsFormComponent#value` gives (config/initializers/mobility.rb
     # turns off the plain reader's own cross-locale fallback deliberately).
-    def value(column) = post.public_send(column, locale: locale)
+    #
+    # `:body` is the rich-text JSON document (tiptap spec §3.1), read through
+    # `body_document` -- the model's own seam that turns the stored Hash
+    # into a `RichText::Document` -- rather than the raw Mobility accessor.
+    def value(column)
+      return post.body_document(locale: locale) if column == :body
+
+      post.public_send(column, locale: locale)
+    end
 
     # The default-language value, shown read-only beside a translated column
     # whenever the editing locale isn't already the default one (spec §6.2)
@@ -98,6 +106,7 @@ module Admin
     # Columns::Base#show_original?` there's nothing to compare against.
     def original(column)
       return nil if locale.to_s == ::Locales.default
+      return post.body_document(locale: ::Locales.default) if column == :body
 
       post.public_send(column, locale: ::Locales.default)
     end

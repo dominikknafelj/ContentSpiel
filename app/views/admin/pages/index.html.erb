@@ -2,8 +2,44 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
+<%# "Create starter pages" (design spec §6.1, Task 9) is offered -- in the
+    empty state and in the "More" menu -- only while the starter sections
+    are missing (`StarterContent.added?`, the wizard's own check), the same
+    guard the wizard's optional step implies. Its form posts to `_top`:
+    the new pages land in the tree, outside the `content` frame, so the
+    redirect back here has to replace the whole shell to show them. %>
+<% offer_starter_pages = !StarterContent.added?(locale: Locales.default) %>
+
+<% if flash[:notice].present? %>
+  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
+<% end %>
+<% if flash[:alert].present? %>
+  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
+<% end %>
+
+<% if offer_starter_pages %>
+  <div class="mb-4 flex justify-end">
+    <details class="admin-pages-menu relative">
+      <summary class="cursor-pointer <%= setup_secondary_link_class %>">More</summary>
+      <div class="absolute right-0 z-10 mt-2 w-72 rounded-cs border border-line-strong bg-surface p-3 shadow-menu">
+        <p class="mb-2 text-sm text-meta">Adds a page listing each type of post, plus one sample post each, in the default language.</p>
+        <%= form_with url: admin_starter_contents_path(**admin_url_options), method: :post, data: { turbo_frame: "_top" } do %>
+          <%= render Admin::ButtonComponent.new(label: "Create starter pages", variant: :secondary, type: "submit") %>
+        <% end %>
+      </div>
+    </details>
+  </div>
+<% end %>
+
 <%= render Admin::EmptyStateComponent.new(title: "Pages", description: "Choose a page in the tree, or add one.") do |empty_state| %>
   <% empty_state.with_action do %>
-    <%= link_to "+ Add a page", new_admin_page_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+    <div class="flex flex-wrap items-center justify-center gap-2">
+      <%= link_to "+ Add a page", new_admin_page_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+      <% if offer_starter_pages %>
+        <%= form_with url: admin_starter_contents_path(**admin_url_options), method: :post, data: { turbo_frame: "_top" } do %>
+          <%= render Admin::ButtonComponent.new(label: "Create starter pages", variant: :secondary, type: "submit") %>
+        <% end %>
+      <% end %>
+    </div>
   <% end %>
 <% end %>

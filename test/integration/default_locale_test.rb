@@ -1,7 +1,7 @@
 require "test_helper"
 
-# SiteSetting#default_locale is a runtime setting (editable in Avo, no deploy
-# required) that decides which of the site's locales is served with no
+# SiteSetting#default_locale is a runtime setting (editable in CS Studio, no
+# deploy required) that decides which of the site's locales is served with no
 # prefix at all. Every other test in this suite exercises the *default*
 # default_locale ("en") -- this file is what actually proves the setting is
 # live, not just stored: changing it has to change routing, redirects, and

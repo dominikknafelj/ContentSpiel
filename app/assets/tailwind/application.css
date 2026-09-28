@@ -10,4 +10,10 @@
 @source "../../views/layouts/admin.html.erb";
 @source "../../helpers/setup_helper.rb";
 @source "../../components/admin";
+/* Class names built in JS (the rich-text editor's toolbar state and
+   popovers, tiptap spec §4.1) -- not in any view, so Tailwind has to be
+   told to look here too. */
+@source "../../javascript/controllers/admin";
+@source "../../javascript/rich_text";
 @import "./content-spiel.tailwind.css";
+@import "./admin-rich-text.css";

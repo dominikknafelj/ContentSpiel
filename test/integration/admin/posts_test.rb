@@ -52,16 +52,85 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   end
 
   # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
-  # RichTextColumnComponent` fix (`name` -> `html_name`) -- before it, this
-  # form's Trix editor submitted a top-level `body` param instead of
-  # `post[body]`, so `post_params.permit(*TRANSLATED_COLUMNS)` never saw it
-  # and the save silently no-opped on the body itself.
+  # RichTextColumnComponent` fix (`name` -> `html_name`) -- the body has to
+  # arrive nested as `post[body]` or `post_params.permit(*TRANSLATED_COLUMNS)`
+  # never sees it. Since the JSON-document switch the `body` param is the
+  # hidden input's document JSON String (design spec §4.1).
   test "the body autosaves" do
     post_record = create_post(title: "Engineer")
     patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { body: "<p>Hello there</p>" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { post: { body: rich_doc("Hello there").to_json }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_includes post_record.reload.body(locale: :en).to_s, "Hello there"
+    assert_equal rich_doc("Hello there"), post_record.reload.body_document(locale: "en").to_h
+  end
+
+  test "the body param saves into the locale of the form" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("English"))
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { locale: "de", post: { body: rich_doc("Deutsch").to_json }, base_updated_at: post_record.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    stored = post_record.reload.read_attribute(:body)
+    assert_equal rich_doc("Deutsch"), stored["de"]
+    assert_equal rich_doc("English"), stored["en"]
+  end
+
+  test "an invalid body document answers 422 and leaves the stored document alone" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("Kept"))
+    invalid = { "type" => "doc", "content" => [ { "type" => "youtube", "attrs" => { "id" => "nope" } } ] }
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { body: invalid.to_json }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Couldn"
+    assert_select_in_stream "post-body-errors", /youtube/
+    assert_equal rich_doc("Kept"), post_record.reload.body_document(locale: "en").to_h
+  end
+
+  # The interim Markdown textarea is gone (Task 7): the Tiptap editor writes
+  # the document JSON into `post[body]` and that is the only body param. A
+  # stray `body_markdown` (an old tab, a hand-built request) is ignored
+  # outright rather than converted.
+  test "a body_markdown param is ignored" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("Kept"))
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Renamed", body_markdown: "Replaced **text**" }, base_updated_at: post_record.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Renamed", post_record.reload.title(locale: :en)
+    assert_equal rich_doc("Kept"), post_record.body_document(locale: "en").to_h
+  end
+
+  test "the editor mounts the Tiptap editor on the hidden JSON input" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("Hello **there**"))
+
+    get "/cs-studio/posts/#{post_record.id}"
+
+    assert_response :success
+    assert_select "textarea[name='post[body_markdown]']", count: 0
+    assert_select "[data-controller='admin--rich-text'] input[type=hidden][name='post[body]']" do |inputs|
+      assert_equal rich_doc("Hello **there**"), JSON.parse(inputs.first["value"])
+    end
+    assert_select "[data-controller='admin--rich-text'][data-admin--rich-text-locale-value='en']"
+  end
+
+  test "a translation shows the primary language's body rendered read-only" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body: rich_doc("Hello **there**"))
+
+    get "/cs-studio/posts/#{post_record.id}", params: { locale: "de" }
+
+    assert_response :success
+    assert_select "[data-original-for=body] strong", text: "there"
   end
 
   # Fix round 1 (minor): a stray double/trailing comma while typing a
@@ -109,5 +178,71 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_equal [], post_record.reload.fields.group(:speakers).map(&:name)
     end
+  end
+
+  # Related posts (design spec §6.1). The picker's hidden-field contract:
+  # the section always submits a blank sentinel `post[related_post_ids][]`
+  # plus one entry per related post, so the key is present exactly when the
+  # picker was rendered -- an autosave PATCH from a form without it (or any
+  # other client) leaves the relations alone rather than clearing them.
+  test "the editor renders the related-posts picker with the current relations" do
+    post_record = create_post(title: "A")
+    related = create_post(title: "Related one")
+    linking = create_post(title: "Links here")
+    PostRelation.create!(post: post_record, related_post: related)
+    PostRelation.create!(post: linking, related_post: post_record)
+
+    get "/cs-studio/posts/#{post_record.id}"
+
+    assert_select "[data-controller~='admin--related-posts'][data-admin--related-posts-search-url-value='/cs-studio/link_targets?type=post']" do
+      assert_select "input[type=hidden][name='post[related_post_ids][]'][value='']", 1
+      assert_select "input[type=hidden][name='post[related_post_ids][]'][value='#{related.id}']", 1
+      assert_select "li", text: /Related one/
+      assert_select "*", text: /Links here/
+    end
+    assert_select "#post-related_post_ids-errors"
+  end
+
+  test "autosaving the related posts replaces them" do
+    post_record = create_post(title: "A")
+    old = create_post(title: "Old")
+    new_one = create_post(title: "New")
+    PostRelation.create!(post: post_record, related_post: old)
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "A", related_post_ids: [ "", new_one.id.to_s, post_record.id.to_s ] } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ new_one.id ], post_record.post_relations.reload.pluck(:related_post_id)
+  end
+
+  test "the sentinel alone clears the related posts" do
+    post_record = create_post(title: "A")
+    PostRelation.create!(post: post_record, related_post: create_post(title: "Old"))
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { related_post_ids: [ "" ] } }, as: :turbo_stream
+
+    assert_response :success
+    assert_empty post_record.post_relations.reload
+  end
+
+  test "a PATCH without the key leaves the related posts alone" do
+    post_record = create_post(title: "A")
+    old = create_post(title: "Old")
+    PostRelation.create!(post: post_record, related_post: old)
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "A2" } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ old.id ], post_record.post_relations.reload.pluck(:related_post_id)
+  end
+
+  test "an unknown related post id answers with the error in its slot" do
+    post_record = create_post(title: "A")
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { related_post_ids: [ "", "0" ] } }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "post-related_post_ids-errors", /don.t exist/
   end
 end

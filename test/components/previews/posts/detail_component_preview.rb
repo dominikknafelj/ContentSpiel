@@ -6,7 +6,7 @@ module Posts
   class DetailComponentPreview < ViewComponent::Preview
     def default
       post = PreviewFixtures.post(title: "Hello, world", excerpt: "The first post on this site.",
-        body: "<p>This is a sample post body, rendered the same way a permalink would.</p>")
+        body: PreviewFixtures.rich_doc("This is a sample post body, rendered the same way a permalink would."))
       post.tags << Tag.create!(name: "rails-#{SecureRandom.hex(4)}")
 
       render Posts::DetailComponent.new(post: post)

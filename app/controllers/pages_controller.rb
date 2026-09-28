@@ -34,7 +34,7 @@ class PagesController < PublicController
       # but must always revalidate against the ETag rather than serving a
       # stale copy for up to `max-age` seconds.
       expires_in 0, public: true, must_revalidate: true
-      render :show if stale?(etag: [ result.record, PublicSite.content_version ], public: true)
+      render :show if stale?(etag: [ result.record, PublicSite.current_content_version ], public: true)
     when :redirect
       redirect_to result.location, status: result.http_status
     else

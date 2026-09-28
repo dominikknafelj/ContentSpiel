@@ -1,0 +1,6 @@
+<figure class="content-block content-block--image my-10">
+  <%= image_tag src, alt: alt.to_s, class: "w-full rounded-cs" %>
+  <% if caption.present? %>
+    <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= caption %></figcaption>
+  <% end %>
+</figure>

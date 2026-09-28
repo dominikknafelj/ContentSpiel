@@ -4,7 +4,9 @@ require "application_system_test_case"
 # prefers, checks the page followed it, then flips and reloads.
 class ThemeToggleTest < ApplicationSystemTestCase
   setup do
-    User.destroy_all
+    # `delete_all`, not `destroy_all` -- see `SetupTestHelper#start_fresh_
+    # install`'s own comment (Task 8's `User#ensure_not_last_owner`).
+    User.delete_all
     site_settings(:default).update!(setup_completed_at: nil)
   end
 

@@ -17,21 +17,16 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_root_path
   end
 
-  # The normal case: signing in *because* `/avo` demanded it sends the visitor
-  # on to the page they actually asked for, not just the admin root.
-  #
-  # Literal paths throughout, not the `admin_sign_in_url`/`admin_sign_in_path`
-  # route helpers used elsewhere in this file: calling them in a test that has
-  # already visited an Avo-mounted path resolves to the wrong (Avo-prefixed)
-  # URL, a quirk of Avo's own engine routing rather than anything this
-  # redirect logic does.
+  # The normal case: signing in *because* a protected page demanded it sends
+  # the visitor on to the page they actually asked for, not just the admin
+  # root.
   test "signing in after being redirected from a protected page returns there" do
-    get "/avo/pages_tree"
+    get "/cs-studio/settings"
     assert_redirected_to "/cs-studio/sign-in"
 
     post "/cs-studio/sign-in", params: { email_address: "admin@example.com", password: "password123" }
 
-    assert_redirected_to "/avo/pages_tree"
+    assert_redirected_to "/cs-studio/settings"
   end
 
   test "signing in with invalid credentials redirects back to the sign-in form" do

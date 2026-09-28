@@ -105,16 +105,34 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   end
 
   # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
-  # RichTextColumnComponent` fix (`name` -> `html_name`) -- before it, this
-  # card's Trix editor submitted a top-level `body` param instead of
-  # `block[body]`, so `split_block_params`'s own `block_params.key?(:body)`
-  # check never saw it and the save silently no-opped on the body itself.
+  # RichTextColumnComponent` fix (`name` -> `html_name`) -- the body has to
+  # arrive nested as `block[body]` or `split_block_params`'s own
+  # `block_params.key?(:body)` check never sees it. Since the JSON-document
+  # switch the param is the hidden input's document JSON String.
   test "a rich_text block's body autosaves" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
-    patch "#{blocks_path}/#{block.id}", params: { block: { body: "<p>Hello there</p>" }, base_updated_at: block.updated_at.iso8601(6) },
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("Hello there").to_json }, base_updated_at: block.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
-    assert_includes block.reload.body(locale: :en).to_s, "Hello there"
+    assert_equal rich_doc("Hello there"), block.reload.body_document(locale: "en").to_h
+  end
+
+  test "a rich_text block's body saves into the form's locale" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("English"))
+    patch "#{blocks_path}/#{block.id}", params: { locale: "de", block: { body: rich_doc("Deutsch").to_json }, base_updated_at: block.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :success
+    stored = block.reload.read_attribute(:body)
+    assert_equal rich_doc("Deutsch"), stored["de"]
+    assert_equal rich_doc("English"), stored["en"]
+  end
+
+  test "an invalid block body answers 422 with the error in the body slot" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: "{broken" }, base_updated_at: block.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select_in_stream "block-#{block.id}-body-errors", /Body/
   end
 
   # Fix (final-fixes round, finding 2): the block-card counterpart to
@@ -138,7 +156,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   test "updating a deleted block answers gone" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     block.destroy!
-    patch "#{blocks_path}/#{block.id}", params: { block: { body: "<p>x</p>" } }, as: :turbo_stream
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("x").to_json } }, as: :turbo_stream
     assert_response :gone
     assert_includes response.body, "This block was deleted"
   end
@@ -173,34 +191,26 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert copy.image.blob.download.present?, "the copy's own blob must still be downloadable"
   end
 
-  # Fix (final-fixes round, finding 3): duplicating a rich_text block used
-  # to store `value.to_s` -- the *rendered* Trix layout, `trix-content`
-  # wrapper and all -- instead of the raw body, so duplicating twice nested
-  # a second wrapper inside the first, and an attachment's own canonical
-  # node (its `sgid`) was replaced by whatever the display renderer turned
-  # it into. `copy_translations` now copies `value.body` (the raw
-  # `ActionText::Content`) instead.
-  test "duplicating a rich_text block preserves its raw body (attachment sgid included), even duplicated twice" do
-    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
-    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    sgid = blob.attachable_sgid
-    body_html = %(<div>Hi</div><action-text-attachment sgid="#{sgid}" content-type="image/png" url="/rails/active_storage/blobs/redirect/x/tiny.png" width="1" height="1"></action-text-attachment>)
-    block.update!(body: body_html)
-    original_html = block.body.body.to_html
+  # Duplicating copies every locale's JSON body document verbatim (the
+  # ActionText-era version of this test guarded against a re-rendered
+  # `trix-content` wrapper nesting itself on every duplicate; a JSON
+  # document is copied as data, so the same guarantee is "byte-for-byte
+  # equal, even duplicated twice").
+  test "duplicating a rich_text block copies every locale's body document, even duplicated twice" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("Hi **there**"))
+    block.assign_body(rich_doc("Hallo"), locale: "de")
+    block.save!
+    original = block.reload.read_attribute(:body)
 
     post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
     assert_response :success
     copy = @page.content_blocks.order(:position).last
-
-    assert_equal original_html, copy.body.body.to_html
-    assert_not_includes copy.body.body.to_html, "trix-content"
-    assert_includes copy.body.body.to_html, sgid
+    assert_equal original, copy.read_attribute(:body)
 
     post "#{blocks_path}/#{copy.id}/duplicate", as: :turbo_stream
     assert_response :success
     copy2 = @page.content_blocks.order(:position).last
-
-    assert_equal original_html, copy2.body.body.to_html
+    assert_equal original, copy2.read_attribute(:body)
   end
 
   # Fix round 2 (this task's own label bug, spotted alongside round 1's

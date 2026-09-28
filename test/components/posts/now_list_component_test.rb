@@ -5,7 +5,7 @@ class Posts::NowListComponentTest < ActiveSupport::TestCase
 
   test "shows the latest update's text" do
     page = root_page
-    post = Post.create!(content_type: :now_update, title: "Now", body: "<p>Training for a half marathon</p>", published_at: 1.day.ago)
+    post = Post.create!(content_type: :now_update, title: "Now", body: rich_doc("Training for a half marathon"), published_at: 1.day.ago)
 
     render_inline(Posts::NowListComponent.new(posts: [ post ], page: page))
 

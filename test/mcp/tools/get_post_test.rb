@@ -11,13 +11,13 @@ class Mcp::Tools::GetPostTest < ActiveSupport::TestCase
   end
 
   test "returns the full post, including body" do
-    post = Post.create!(content_type: :blog, title: "A Blog Post", body: "<p>Full content</p>")
+    post = Post.create!(content_type: :blog, title: "A Blog Post", body: rich_doc("Full **content**"))
 
     response = call_tool(id: post.id)
 
     data = JSON.parse(response.content.first[:text])
     assert_equal post.id, data["id"]
-    assert_includes data["body"], "Full content"
+    assert_equal "Full **content**\n", data["body"]
   end
 
   test "includes status alongside published" do
@@ -31,8 +31,8 @@ class Mcp::Tools::GetPostTest < ActiveSupport::TestCase
   end
 
   test "reads the body in the given locale" do
-    post = Post.create!(content_type: :blog, title: "English", body: "<p>English body</p>")
-    Mobility.with_locale(:de) { post.update!(body: "<p>Deutscher Text</p>") }
+    post = Post.create!(content_type: :blog, title: "English", body: rich_doc("English body"))
+    Mobility.with_locale(:de) { post.update!(body: rich_doc("Deutscher Text")) }
 
     response = call_tool(id: post.id, locale: "de")
 

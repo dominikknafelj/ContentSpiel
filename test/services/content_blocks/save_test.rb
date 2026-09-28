@@ -5,14 +5,16 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     page = create_page(title: "Page")
 
     first = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
-      translations: { "en" => { body: "<p>One</p>" } })
+      translations: { "en" => { body: rich_doc("One") } })
     second = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
-      translations: { "en" => { body: "<p>Two</p>" } })
+      translations: { "en" => { body: rich_doc("Two").to_json } })
 
     assert first.ok?
     assert second.ok?
     assert_equal 0, first.record.position
     assert_equal 1, second.record.position
+    assert_equal rich_doc("One"), first.record.reload.body_document(locale: "en").to_h
+    assert_equal rich_doc("Two"), second.record.reload.body_document(locale: "en").to_h
   end
 
   test "a position given on create is kept, not overridden" do

@@ -11,6 +11,10 @@ module Mcp
   module PostSerializer
     module_function
 
+    # An empty document dumps as a lone "\n"; a blank body is "" instead,
+    # the unambiguous "nothing here" a client can test for.
+    def body_markdown(document) = document.blank? ? "" : document.to_markdown
+
     def call(post, locale)
       {
         id: post.id,
@@ -19,14 +23,13 @@ module Mcp
         title: post.title,
         slug: post.slug,
         excerpt: post.excerpt,
-        # `post.body` (Mobility-backed) is a
-        # Mobility::Backends::ActionText::RichTextTranslation, whose own #to_s
-        # renders through the full action_text/contents/_content view+layout
-        # (Rails' dev-mode template-annotation comments and the trix-content
-        # div wrapper leak straight into this otherwise-raw API response).
-        # #body is the real ActionText::Content inside it; #to_html on that is
-        # the raw stored fragment, with neither.
-        body: post.body.body&.to_html,
+        # Markdown (tiptap spec §3.4) -- the same format `create_post`/
+        # `update_post` accept, so a client can read a body, edit it and
+        # write it straight back. Literal, not fallback-walking (same rule as
+        # `fields` below): "" for a locale with no body of its own, so an
+        # agent translating a post sees that there's nothing there yet
+        # rather than the default language's text posing as this one's.
+        body: body_markdown(post.body_document(locale: locale)),
         published: post.published_at.present?,
         # `status` (draft/scheduled/live, from Publishable) spells out what
         # `published`/`published_at` alone leave a client to infer -- in

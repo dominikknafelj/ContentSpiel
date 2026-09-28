@@ -2,7 +2,7 @@ module Admin
   module Columns
     # A plain string/text input for a translated jsonb column (spec §4.3) --
     # `Page#subtitle/meta_title/meta_description`, `Post#excerpt`,
-    # `ContentBlock#caption`/`alt` -- as opposed to a `has_rich_text` column
+    # `ContentBlock#caption`/`alt` -- as opposed to a rich-text `body` column
     # (`RichTextColumnComponent`) or the schema-declared, `ContentModel`-
     # backed fields `Admin::FieldComponent` renders. `multiline:` picks a
     # `<textarea>` over a single-line `<input>` for the longer ones (an

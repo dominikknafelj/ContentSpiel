@@ -1,0 +1,34 @@
+<%# "New user" (cs-studio spec §6.1) -- email + password up front
+    (`has_secure_password` requires a password on create). Mirrors
+    `admin/posts/new.html.erb`'s own shape. %>
+<div class="mx-auto max-w-md">
+  <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New user</h1>
+
+  <% if @user.errors.any? %>
+    <p class="mb-4 text-danger-ink" role="alert"><%= @user.errors.full_messages.to_sentence %></p>
+  <% end %>
+
+  <%= form_with url: admin_users_path(**admin_url_options), method: :post do %>
+    <div class="mb-4">
+      <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
+      <%= email_field_tag "user[email_address]", @user.email_address, id: "user_email_address", autofocus: true,
+            autocomplete: "username", class: setup_input_class %>
+    </div>
+
+    <div class="mb-4">
+      <%= label_tag "user_password", "Password", class: setup_label_class %>
+      <%= password_field_tag "user[password]", nil, id: "user_password", autocomplete: "new-password", class: setup_input_class %>
+    </div>
+
+    <div class="mb-4">
+      <%= label_tag "user_password_confirmation", "Confirm password", class: setup_label_class %>
+      <%= password_field_tag "user[password_confirmation]", nil, id: "user_password_confirmation",
+            autocomplete: "new-password", class: setup_input_class %>
+    </div>
+
+    <div class="flex gap-2">
+      <%= render Admin::ButtonComponent.new(label: "Create user", variant: :primary, type: "submit") %>
+      <%= link_to "Cancel", admin_users_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+    </div>
+  <% end %>
+</div>

@@ -7,7 +7,10 @@
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%= javascript_importmap_tags "admin" %>
+    <%# Per-screen head tags -- today only the API token reveal's
+        `turbo-cache-control` (admin/api_tokens/create). %>
+    <%= yield :head %>
   </head>
 
   <%# CS Studio's shell (cs-studio spec §4.2): a grid of up to three columns --
@@ -50,29 +53,35 @@
               <%= render "admin/shared/icon", name: :tags %><span class="sr-only md:not-sr-only">Tags</span>
             <% end %>
           </li>
+          <li>
+            <%= link_to admin_settings_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :settings %><span class="sr-only md:not-sr-only">Settings</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to admin_users_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :users %><span class="sr-only md:not-sr-only">Users</span>
+            <% end %>
+          </li>
+          <%# The last three screens the old admin still had, CS Studio's own
+              since Task 9 -- nothing in this column links out of CS Studio
+              any more. %>
+          <li>
+            <%= link_to admin_api_tokens_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :assistant %><span class="sr-only md:not-sr-only">AI assistant</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to admin_mind_graph_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :graph %><span class="sr-only md:not-sr-only">Mind graph</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to admin_system_status_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :status %><span class="sr-only md:not-sr-only">System status</span>
+            <% end %>
+          </li>
         </ul>
-
-        <div>
-          <%# One shared icon marks the whole "old admin" group (rather than
-              one per Avo link): it's a temporary section (project memory
-              "Replace Avo", decided 2026-09-26) that goes away once
-              sub-project 6 gives Settings/Users/API tokens/System status
-              their own CS Studio screens the way Pages/Posts/Tags already
-              have theirs, so it isn't worth a bespoke icon per link. Its
-              own sub-links stay text-only and `hidden` below `md`, rather
-              than also collapsing
-              to icons, since four indistinguishable icon-only rows would be
-              no more usable than no row at all. %>
-          <p class="flex items-center justify-center gap-2 font-cs-mono text-label uppercase tracking-mono text-meta md:justify-start">
-            <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">(old admin)</span>
-          </p>
-          <ul class="mt-2 hidden flex-col gap-2 md:flex">
-            <li><%= link_to "Settings", "/avo/resources/site_settings" %></li>
-            <li><%= link_to "Users", "/avo/resources/users" %></li>
-            <li><%= link_to "API tokens", "/avo/resources/api_tokens" %></li>
-            <li><%= link_to "System status", "/avo/system_status" %></li>
-          </ul>
-        </div>
 
         <div class="mt-auto flex flex-col gap-2">
           <%= render "shared/theme_toggle" %>

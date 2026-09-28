@@ -11,7 +11,9 @@ Mobility.configure do
     # translated plain-text column in this app is a Postgres jsonb column named
     # after the attribute (`posts.title` holds `{"en" => ..., "de" => ...}`),
     # which is what the :jsonb backend expects with no column prefix/suffix.
-    # Rich text opts out per-attribute with `backend: :action_text`.
+    # Rich-text bodies too: `posts.body`/`content_blocks.body` hold one
+    # Tiptap JSON document per locale (`HasRichTextBody`) -- there is no
+    # ActionText backend any more (tiptap design spec §5).
     backend :jsonb
 
     active_record
@@ -50,10 +52,10 @@ Mobility.configure do
     # another locale's text.
     fallbacks({})
 
-    # Defines `title_en` / `title_de=` / ... for every available locale. The
-    # Avo resource edits one locale per tab through these, and unlike the plain
-    # reader they deliberately do *not* fall back -- editing the German tab has
-    # to show German or nothing, never the English text.
+    # Defines `title_en` / `title_de=` / ... for every available locale. CS
+    # Studio's own forms edit one locale at a time through these, and unlike
+    # the plain reader they deliberately do *not* fall back -- editing the
+    # German tab has to show German or nothing, never the English text.
     locale_accessors
   end
 end

@@ -2,8 +2,6 @@
 # layout shows comes from SiteSetting and the page tree, so editors' settings
 # have a visible effect.
 module ThemeHelper
-  SAFE_LINK_SCHEMES = %w[http https mailto].freeze
-
   LanguageLink = Data.define(:code, :name, :path, :current)
 
   # Current.site memoizes itself for the process/request; no ivar of our own
@@ -13,17 +11,12 @@ module ThemeHelper
   end
 
   # Social links become real hrefs here for the first time, so only
-  # http/https/mailto URLs render -- a `javascript:` link typed into the
-  # settings must never reach the page.
+  # http/https/mailto URLs render -- a `javascript:` link must never reach
+  # the page. SiteSetting already refuses one on save
+  # (`SiteSetting.safe_social_link?`); this is the same rule again for a row
+  # written around its validations.
   def safe_social_links
-    theme_site.social_links.to_h.select { |_name, url| safe_link?(url) }
-  end
-
-  def safe_link?(url)
-    scheme = URI.parse(url.to_s.strip).scheme
-    scheme.present? && SAFE_LINK_SCHEMES.include?(scheme.downcase)
-  rescue URI::InvalidURIError
-    false
+    theme_site.social_links.to_h.select { |_name, url| SiteSetting.safe_social_link?(url) }
   end
 
   def theme_root_page
@@ -70,13 +63,24 @@ module ThemeHelper
   end
 
   # Reads a translated attribute for the public theme -- title, subtitle,
-  # excerpt, caption, alt, meta fields, and (since this task) ActionText
-  # bodies too, since a rich text block left blank in German has exactly the
-  # same "renders nothing" failure mode as a blank title. The fallback order
-  # itself now lives entirely in `Locales.fallback_chain`, so this is a thin
-  # wrapper -- kept as the call sites' entry point rather than inlined, so
-  # every public view keeps reading translated copy through one helper.
+  # excerpt, caption, alt, meta fields. The fallback order itself lives
+  # entirely in `Locales.fallback_chain`, so this is a thin wrapper -- kept
+  # as the call sites' entry point rather than inlined, so every public view
+  # keeps reading translated copy through one helper. Rich-text bodies go
+  # through `#rich_text` below instead, which also renders them.
   def translated(record, attribute)
     ::Locales.read(record, attribute)
+  end
+
+  # A record's rich-text body (tiptap spec §4.3), rendered to scrubbed HTML:
+  # `Locales.read(record, :body)` picks the first non-blank language's
+  # `RichText::Document` (a body left blank in German falls back exactly
+  # like a blank title), and `to_html` renders it for the *request's*
+  # locale -- even when the document itself came from a fallback language,
+  # an internal link should still point at the German page on a German
+  # URL. `urls:` is the controller's own `public_urls`, so `/preview`
+  # renders internal links under `/preview` and the public site doesn't.
+  def rich_text(record)
+    ::Locales.read(record, :body).to_html(locale: I18n.locale, urls: public_urls)
   end
 end

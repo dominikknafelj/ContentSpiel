@@ -4,7 +4,8 @@
 # this table and are told apart by `block_type`, a plain string checked
 # against the `BlockTypes` registry rather than a closed enum -- the same
 # registry-backed shape `Post#content_type` uses for its own types (open-types
-# spec §3). Which columns matter depends on the type: `body` for rich_text,
+# spec §3). Which columns matter depends on the type: `body` (per-locale JSON
+# documents, see `HasRichTextBody`) for rich_text,
 # `image` + `caption` for image, `settings`/`translated_settings` for
 # post_list.
 class ContentBlock < ApplicationRecord
@@ -18,10 +19,10 @@ class ContentBlock < ApplicationRecord
   # unconditionally since Mobility attributes are defined at class-load time.
   translates :caption, :alt
 
-  # Rich text can't live in a jsonb column -- it has attachments and its own
-  # table -- so `body` uses mobility-actiontext, which keeps one
-  # ActionText::RichText row per locale. This replaces `has_rich_text :body`.
-  translates :body, backend: :action_text
+  # `body_document(locale:)`/`assign_body` over the jsonb `body` column
+  # (design spec §3.1) -- only `rich_text` blocks (`t.uses :body`) ever
+  # write one, but like `caption`/`alt` it's declared unconditionally.
+  include HasRichTextBody
 
   belongs_to :owner, polymorphic: true
 
@@ -36,10 +37,10 @@ class ContentBlock < ApplicationRecord
   # form error instead.
   validates :position, presence: true
 
-  # Every row of the admin's nested block form carries the same `settings`
-  # inputs, whatever the block's type (`app/views/avo/partials/
-  # _content_block_row.html.erb`), so a rich_text block would otherwise be
-  # saved holding `{"content_type" => "", "tag" => "", "limit" => ""}` --
+  # Every block card in CS Studio's editor (`app/components/admin/
+  # block_card_component.rb`) carries the same `settings` inputs, whatever
+  # the block's type, so a rich_text block would otherwise be saved holding
+  # `{"content_type" => "", "tag" => "", "limit" => ""}` --
   # written straight onto the `settings` column by Rails' own nested
   # attributes, bypassing `assign_settings` entirely. Re-deriving `settings`
   # from the type's own field schema before every validation is what
@@ -154,11 +155,10 @@ class ContentBlock < ApplicationRecord
   # skipping it (the previous version of this method) silently dropped every
   # translated key the raw form ever wrote, because `untranslated_hash`
   # only ever reads `@values`, never `@translations`. It lands in the site's
-  # default locale specifically -- neither the standalone
-  # `Avo::Resources::ContentBlock` form nor the page form's nested rows have
-  # a locale switcher for `settings` (unlike `caption`/`body`, which get one
-  # via Mobility's tabs), so that's the only locale this path can write to
-  # until the admin (sub-project 3) gives it one.
+  # default locale specifically -- the raw `settings=` writer Rails' own
+  # `accepts_nested_attributes_for` generates carries no locale of its own
+  # (unlike `ContentBlocks::Save`'s own per-locale `assign_settings` calls),
+  # so that's the only locale this path can write to.
   def normalize_settings
     # `locale: Locales.default` explicitly, not `settings_object`'s own
     # ambient-`I18n.locale` default: `object.assign` and `#translated_hash`

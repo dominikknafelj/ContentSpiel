@@ -15,10 +15,9 @@ import { Turbo } from "@hotwired/turbo-rails"
 // bypasses Turbo Drive, so nothing else applies this for us" pattern
 // `admin--tree`'s own drag handler already uses.
 //
-// Debounced 1000ms after `input`/`change`/`trix-change` (a Trix editor's own
-// change event -- toolbar formatting and a finished attachment upload alike
-// fire this but not a plain `input`, cs-studio final-fixes round, finding
-// 7), immediately on `focusout` (global constraints §6.1) -- `queue`/
+// Debounced 1000ms after `input`/`change` (a rich-text editor reports its
+// own edits by dispatching `input` from its hidden field, tiptap spec
+// §4.1), immediately on `focusout` (global constraints §6.1) -- `queue`/
 // `saveNow` below are just two ways of arriving at the same `trigger`.
 //
 // Concurrency: `busy` covers the *entire* attempt, including any retry

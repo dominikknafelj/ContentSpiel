@@ -77,4 +77,19 @@ class SiteSettingTest < ActiveSupport::TestCase
     assert_not setting.valid?
     assert_includes setting.errors[:locales], "must enable at least one language"
   end
+
+  # Final fix wave (E): a link the footer would refuse to render (no
+  # scheme, or a scheme other than http/https/mailto) is a validation error
+  # where it's typed, instead of saving fine and silently never appearing.
+  test "social links must start with https://, http:// or mailto:" do
+    setting = SiteSetting.instance
+
+    setting.social_link_rows = [ { name: "GitHub", url: "github.com/dana" }, { name: "Evil", url: "javascript:alert(1)" } ]
+    assert_not setting.valid?
+    assert_includes setting.errors[:social_links], "GitHub must start with https://, http:// or mailto:"
+    assert_includes setting.errors[:social_links], "Evil must start with https://, http:// or mailto:"
+
+    setting.social_link_rows = [ { name: "GitHub", url: "https://github.com/dana" }, { name: "Mail", url: "MAILTO:dana@example.com" } ]
+    assert setting.valid?, setting.errors.full_messages.to_sentence
+  end
 end

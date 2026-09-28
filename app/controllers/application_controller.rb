@@ -6,7 +6,7 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 
-  # Every admin request (Avo, setup, preview) writes through this actor and
+  # Every admin request (CS Studio, setup, preview) writes through this actor and
   # channel by default (spec §7.1) -- `SetupController` overrides just the
   # channel to `:setup` since setup runs before an admin session may exist;
   # `McpController` doesn't inherit this at all (it's an `ActionController::API`,

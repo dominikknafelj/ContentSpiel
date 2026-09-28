@@ -1,7 +1,22 @@
 require_relative "boot"
 require_relative "supported_locales"
 
-require "rails/all"
+# `rails/all` minus ActionText (tiptap design spec §5): rich text is stored
+# as per-locale JSON documents (`HasRichTextBody`, `RichText::Document`),
+# and ActionText's engine would otherwise still boot its models, routes,
+# helpers and the Trix/actiontext importmap assets. Active Storage stays --
+# `MediaAsset` and image blocks use it directly, and it never depended on
+# ActionText.
+require "rails"
+require "active_record/railtie"
+require "active_storage/engine"
+require "action_controller/railtie"
+require "action_view/railtie"
+require "action_mailer/railtie"
+require "active_job/railtie"
+require "action_cable/engine"
+require "action_mailbox/engine"
+require "rails/test_unit/railtie"
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.

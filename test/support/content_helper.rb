@@ -21,6 +21,30 @@ module ContentHelper
     result.record
   end
 
+  # A real, persisted `MediaAsset` (design spec §4.2) for tests exercising
+  # a rich-text `image` node's `asset_id` -- `test/fixtures/files/tiny.png`
+  # is a real 1x1 PNG (not a fixture row: `MediaAsset` has no fixtures,
+  # same "build through the write path" reasoning as `create_page`/
+  # `create_post` above, just with the model itself as that path -- design
+  # spec §4.2 names no service in front of it).
+  def create_media_asset(filename: "tiny.png", content_type: "image/png")
+    asset = MediaAsset.new
+    asset.file.attach(io: File.open(file_fixture(filename)), filename: filename, content_type: content_type)
+    assert asset.save, asset.errors.full_messages.to_sentence
+    asset
+  end
+
+  # A rich-text body document Hash (design spec §3.1) built from Markdown --
+  # what `posts.body`/`content_blocks.body` store per locale. Fails
+  # loudly on a conversion warning: a test's own fixed Markdown degrading
+  # silently would make it assert against something other than what it
+  # reads as.
+  def rich_doc(markdown)
+    document, warnings = RichText::Document.from_markdown(markdown)
+    assert_empty warnings, "rich_doc(#{markdown.inspect}) produced warnings"
+    document.to_h
+  end
+
   def with_locales(codes, default:)
     site_settings(:default).update!(locales: codes.map { |code| { "code" => code } }, default_locale: default)
     PublicSite::Paths.rebuild!

@@ -1,9 +1,8 @@
 <%# Signed-in preview banner (spec §6.4): PreviewController is the only place
     that sets @preview_record, so this only ever renders there, via
     pages/show.html.erb's `content_for :preview_banner`. A page's "Edit" goes
-    to CS Studio's own page editor (Task 4); a post's now goes to CS
-    Studio's own post editor too (Task 7), replacing the Avo link this
-    banner used until then. "View live" only appears once the record is
+    to CS Studio's own page editor (Task 4); a post's goes to CS Studio's
+    own post editor (Task 7). "View live" only appears once the record is
     actually live; linking to its public address while it's still a draft
     or scheduled would be a dead end. %>
 <div role="status" class="mt-4 rounded-cs border border-warn bg-warn-tint px-3 py-2 font-cs-mono text-label uppercase tracking-mono text-warn-ink">

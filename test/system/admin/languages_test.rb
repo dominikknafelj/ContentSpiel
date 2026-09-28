@@ -13,6 +13,7 @@ class Admin::LanguagesSystemTest < ApplicationSystemTestCase
 
   test "switching language shows the primary original, and a typed value saves only there" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     # `Locales.enabled` for the default fixture (`db/schema.rb`'s own
     # `site_settings.locales` default) is en/de/es -- "Deutsch" (native:

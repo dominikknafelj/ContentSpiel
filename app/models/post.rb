@@ -15,10 +15,10 @@ class Post < ApplicationRecord
   # locale; reading or writing them goes through the current Mobility.locale.
   translates :title, :slug, :excerpt
 
-  # Rich text can't live in a jsonb column -- it has attachments and its own
-  # table -- so `body` uses mobility-actiontext, which keeps one
-  # ActionText::RichText row per locale. This replaces `has_rich_text :body`.
-  translates :body, backend: :action_text
+  # `body_document(locale:)`/`assign_body` over the jsonb `body` column
+  # (design spec §3.1). Included after `extend Mobility` above -- it calls
+  # `translates` itself.
+  include HasRichTextBody
 
   has_many :post_tags, dependent: :destroy
   has_many :tags, through: :post_tags
@@ -122,19 +122,6 @@ class Post < ApplicationRecord
     self.translated_metadata = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
   end
 
-  # The seam `Avo::Resources::Post`'s typed-fields tool (`app/avo/
-  # resource_tools/typed_fields.rb`) writes through: its `extra_params`
-  # entry (`fields: {}`) makes Avo call `assign_attributes(fields: hash)` on
-  # submit, same as any other attribute, and `assign_attributes` just calls
-  # this. `locale: Locales.default` because that tool has no locale switcher
-  # of its own yet (unlike `title`/`body`, which get one via Mobility's
-  # tabs) -- a translated content-type field isn't editable in Avo until
-  # sub-project 3 gives it one, the same limit a block's own group/groups
-  # settings fields are under (see `_typed_fields.html.erb`).
-  def fields=(hash)
-    assign_fields(hash, locale: Locales.default)
-  end
-
   private
 
   # Raw jsonb hash, not the Mobility reader: see the comment above
@@ -148,8 +135,8 @@ class Post < ApplicationRecord
   end
 
   # `locale: Locales.default`, not `fields`'s own ambient-`I18n.locale`
-  # default: a required translated field is only ever *written* at
-  # `Locales.default` (`#fields=`'s own comment explains why), so checking
+  # default: a required translated field is always written at least at
+  # `Locales.default` (`Posts::Save` assigns top-level `fields` there), so checking
   # `required` against whatever `I18n.locale` a request happens to leave
   # ambient -- unrelated to the site's own default -- would reject a post
   # that saved correctly the moment those two locales disagree.

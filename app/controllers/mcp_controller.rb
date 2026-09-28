@@ -8,7 +8,7 @@
 # ActionController::API rather than ApplicationController: this is a bearer
 # token API, not a browser session, and API controllers skip CSRF protection
 # (ApplicationController's Authentication concern is cookie-session auth for
-# human admins signing into Avo -- a different mechanism entirely).
+# human admins signing into CS Studio -- a different mechanism entirely).
 class McpController < ActionController::API
   before_action :authenticate
 

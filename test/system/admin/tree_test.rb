@@ -13,6 +13,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
 
   test "dragging a page onto another node reparents it and persists" do
     visit "/cs-studio"
+    await_admin_controllers
 
     assert_selector "li[data-page-id='#{@alpha.id}']"
     assert_selector "ul[data-parent-id='#{@beta.id}']"

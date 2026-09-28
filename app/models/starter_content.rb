@@ -1,8 +1,9 @@
-# The pages and sample posts the setup wizard (and Avo's "Create starter
-# pages" action) can add, written in one locale -- the site's default at the
-# time. Every method is idempotent: it looks records up first, through
-# Mobility's `.i18n` scope, because translated columns are jsonb and a plain
-# `where(slug: ...)` would never match (see db/seeds.rb).
+# The pages and sample posts the setup wizard (and CS Studio's own "Create
+# starter pages" button on the Pages home) can add, written in one locale --
+# the site's default at the time. Every method is idempotent: it looks
+# records up first, through Mobility's `.i18n` scope, because translated
+# columns are jsonb and a plain `where(slug: ...)` would never match (see
+# db/seeds.rb).
 #
 # That lookup spans every configured locale (`find_in_any_locale`), not just
 # the one being written: an admin who ran this in one locale and later
@@ -24,7 +25,14 @@
 # type gets starter content the same way a built-in does, with nothing to
 # edit in this module.
 module StarterContent
-  WELCOME_HTML = "<p>Welcome to your new site. Sign in to the admin to edit this page.</p>".freeze
+  # What `raise!`/`document` raise -- a `RuntimeError` like the bare
+  # `raise "..."` they used before, so nothing that already expected one
+  # changes, but specific enough for CS Studio's "Create starter pages"
+  # (`Admin::StarterContentsController`) to rescue without swallowing every
+  # other RuntimeError.
+  class Error < RuntimeError; end
+
+  WELCOME_MARKDOWN = "Welcome to your new site. Sign in to the admin to edit this page.".freeze
 
   module_function
 
@@ -35,7 +43,7 @@ module StarterContent
 
     if home.content_blocks.none?
       raise!(ContentBlocks::Save.call(ContentBlock.new(owner: home), attributes: { block_type: "rich_text" },
-        translations: { locale => { body: WELCOME_HTML } }))
+        translations: { locale => { body: document(WELCOME_MARKDOWN) } }))
     end
 
     home
@@ -48,6 +56,32 @@ module StarterContent
       find_or_create_section_page!(home, section, locale)
       find_or_create_sample_post!(section, locale)
     end
+  end
+
+  # The one way callers add starter content (final fix wave, P23) -- the
+  # setup wizard's step and CS Studio's "Create starter pages" both. Returns
+  # `true` when it created the sections, `false` when they already existed.
+  #
+  # Two requests at once (two tabs, a double submit) would both pass
+  # `added?` and race each other into the same section slugs, the loser
+  # raising on slug uniqueness after possibly half-building a section. So
+  # the check and the creation run in one transaction holding the
+  # `SiteSetting` singleton's row lock: the second request waits for the
+  # first to commit, then re-checks `added?` inside the lock and finds the
+  # sections there. A failure that still gets through (a hand-made page
+  # already owning a starter slug) rolls the whole attempt back and is
+  # raised as `StarterContent::Error`, the one error callers rescue into a
+  # message.
+  def add_once!(locale:)
+    SiteSetting.transaction do
+      SiteSetting.instance.lock!
+      next false if added?(locale: locale)
+
+      create_pages_and_posts!(locale: locale)
+      true
+    end
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
+    raise Error, "StarterContent: #{error.message}"
   end
 
   # `locale:` is kept for interface compatibility with the other methods
@@ -84,7 +118,8 @@ module StarterContent
   def find_or_create_sample_post!(section, locale)
     find_sample_post(section) || begin
       sample = section[:sample]
-      translated = sample.slice(:title, :excerpt, :body)
+      translated = sample.slice(:title, :excerpt)
+      translated[:body] = document(sample[:body]) if sample.key?(:body)
       attributes = sample.except(:title, :excerpt, :body).merge(content_type: section[:content_type], published: true)
 
       raise!(Posts::Save.call(attributes: attributes, translations: { locale => translated }))
@@ -112,13 +147,25 @@ module StarterContent
     nil
   end
 
+  # The JSON document (tiptap spec §3.1) for a starter body written as
+  # Markdown -- `WELCOME_MARKDOWN` here, or a content type's own
+  # `starter sample: { body: ... }`. Conversion warnings are a bug in that
+  # fixed text, not something to degrade around, so they raise like a
+  # failed `Result` does (`raise!` below).
+  def document(markdown)
+    document, warnings = RichText::Document.from_markdown(markdown)
+    raise Error, "StarterContent: #{warnings.to_sentence}" if warnings.any?
+
+    document.to_h
+  end
+
   # Fixed input, not user input (see the module comment above): a failed
   # Result here means this module's own hard-coded attributes are wrong, not
   # that a validation legitimately rejected something an editor typed. Loud
   # and immediate beats a starter site left half-built with no error anyone
   # would see.
   def raise!(result)
-    raise "StarterContent: #{result.errors.to_sentence}" unless result.ok?
+    raise Error, "StarterContent: #{result.errors.to_sentence}" unless result.ok?
 
     result.record
   end

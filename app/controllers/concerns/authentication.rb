@@ -59,7 +59,7 @@ module Authentication
     # cookie recorded a page to return to only when `request_authentication`
     # redirected here from one; without that, `admin_root_url` would send a
     # fresh admin login back out to the public site instead of into CS
-    # Studio (cs-studio spec §3 -- CS Studio, not Avo, is the landing page).
+    # Studio (cs-studio spec §3 -- CS Studio is the landing page).
     def after_authentication_url
       session.delete(:return_to_after_authenticating) || admin_root_url
     end

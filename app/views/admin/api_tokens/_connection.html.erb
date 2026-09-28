@@ -1,0 +1,14 @@
+<%# locals: token -- what an MCP client needs besides the token itself: the
+    endpoint (`mcp_url`) and a ready-to-paste `mcpServers` config
+    (`mcp_client_config`), with the raw token filled in on the one-time
+    reveal and a placeholder on the list. %>
+<dl class="flex flex-col gap-1">
+  <dt class="<%= setup_label_class %>">MCP URL</dt>
+  <dd><code id="mcp-url" class="font-cs-mono text-ink"><%= mcp_url %></code></dd>
+</dl>
+
+<div class="mt-4">
+  <p class="<%= setup_label_class %>">Client configuration</p>
+  <pre id="<%= local_assigns[:config_id] || "mcp-client-config" %>" class="mt-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono text-sm"
+    <%= tag.attributes(data: local_assigns[:config_data] || {}) %>><%= mcp_client_config(token) %></pre>
+</div>
