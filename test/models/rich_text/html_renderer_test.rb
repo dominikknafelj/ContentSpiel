@@ -46,6 +46,16 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_not_includes html, "<img"
   end
 
+  test "an image renders a figure with its alt and caption" do
+    asset = create_media_asset
+    html = render({ "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "A", "caption" => "C" } })
+    assert_includes html, "<figure"
+    assert_includes html, %(alt="A")
+    assert_includes html, %(src="#{asset.url}")
+    assert_includes html, "<figcaption"
+    assert_includes html, "C</figcaption>"
+  end
+
   test "youtube renders the nocookie embed" do
     assert_includes render({ "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } }), "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
   end

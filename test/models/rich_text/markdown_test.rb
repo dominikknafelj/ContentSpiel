@@ -11,7 +11,7 @@ class RichText::MarkdownTest < ActiveSupport::TestCase
 
   test "every built-in round-trips" do
     page = create_page(title: "About")
-    asset = nil # MediaAsset arrives in Task 4; the image case is added there
+    asset = create_media_asset
     document = RichText::Document.new("type" => "doc", "content" => [
       { "type" => "heading", "attrs" => { "level" => 2 }, "content" => [ { "type" => "text", "text" => "Hi" } ] },
       { "type" => "paragraph", "content" => [
@@ -21,10 +21,12 @@ class RichText::MarkdownTest < ActiveSupport::TestCase
       { "type" => "orderedList", "attrs" => { "start" => 1 }, "content" => [ { "type" => "listItem", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "one" } ] } ] } ] },
       { "type" => "codeBlock", "attrs" => { "language" => "ruby" }, "content" => [ { "type" => "text", "text" => "puts 1" } ] },
       { "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } },
+      { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "A", "caption" => "C" } },
       { "type" => "horizontalRule" } ])
     assert_equal document.to_h, round_trip(document)
     assert_includes document.to_markdown, "::youtube{id=\"dQw4w9WgXcQ\"}"
     assert_includes document.to_markdown, "(cs:page/#{page.id})"
+    assert_includes document.to_markdown, "::image{asset=\"#{asset.id}\" alt=\"A\" caption=\"C\"}"
   end
 
   test "directive-looking text inside code stays code" do

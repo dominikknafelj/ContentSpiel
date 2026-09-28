@@ -96,6 +96,19 @@ Rails.application.routes.draw do
     # top-level GET).
     resource :tree, only: %i[update], controller: :tree
 
+    # The Tiptap editor's own upload button (design spec §4.1/§4.2): POSTs
+    # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
+    # (422) -- `create` only, there is no listing/edit/destroy screen for a
+    # `MediaAsset` yet (design spec §4.2's "Relation to open types": that
+    # arrives with the media library sub-project).
+    resources :media_assets, only: :create
+
+    # The internal-link picker's own search (design spec §4.1/§4.2): a
+    # `GET`, not nested under `pages`/`posts` -- it searches across both at
+    # once (`?type=` narrows to one), so there is no single owning resource
+    # to nest it under the way `content_blocks` nests under `pages`.
+    get "link_targets", to: "link_targets#index"
+
     # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
     # (no tree column of its own -- a post has no parent/child structure the
     # way a page does) plus the post editor. `member` adds the same three

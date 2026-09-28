@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,6 +76,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_000000) do
     t.jsonb "translated_settings", default: {}, null: false
     t.datetime "updated_at", null: false
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
+  end
+
+  create_table "media_assets", force: :cascade do |t|
+    t.string "content_type"
+    t.bigint "byte_size"
+    t.integer "width"
+    t.integer "height"
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
   end
 
   create_table "page_hierarchies", id: false, force: :cascade do |t|
