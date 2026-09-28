@@ -118,11 +118,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a rich_text block's body_markdown saves into the form's locale" do
-    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body_doc: rich_doc("English"))
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("English"))
     patch "#{blocks_path}/#{block.id}", params: { locale: "de", block: { body_markdown: "Deutsch" }, base_updated_at: block.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
-    stored = block.reload.read_attribute(:body_doc)
+    stored = block.reload.read_attribute(:body)
     assert_equal rich_doc("Deutsch"), stored["de"]
     assert_equal rich_doc("English"), stored["en"]
   end
@@ -197,20 +197,20 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   # document is copied as data, so the same guarantee is "byte-for-byte
   # equal, even duplicated twice").
   test "duplicating a rich_text block copies every locale's body document, even duplicated twice" do
-    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body_doc: rich_doc("Hi **there**"))
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("Hi **there**"))
     block.assign_body(rich_doc("Hallo"), locale: "de")
     block.save!
-    original = block.reload.read_attribute(:body_doc)
+    original = block.reload.read_attribute(:body)
 
     post "#{blocks_path}/#{block.id}/duplicate", as: :turbo_stream
     assert_response :success
     copy = @page.content_blocks.order(:position).last
-    assert_equal original, copy.read_attribute(:body_doc)
+    assert_equal original, copy.read_attribute(:body)
 
     post "#{blocks_path}/#{copy.id}/duplicate", as: :turbo_stream
     assert_response :success
     copy2 = @page.content_blocks.order(:position).last
-    assert_equal original, copy2.read_attribute(:body_doc)
+    assert_equal original, copy2.read_attribute(:body)
   end
 
   # Fix round 2 (this task's own label bug, spotted alongside round 1's

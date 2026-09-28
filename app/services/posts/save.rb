@@ -43,9 +43,9 @@ module Posts
         # `body` is a rich-text JSON document (tiptap spec §3.1), not a
         # Mobility string: a Hash (MCP after Markdown conversion, seeds) or
         # the admin's hidden-input JSON String -- `Post#assign_body` accepts
-        # either and writes the jsonb `body_doc`, never the legacy ActionText
-        # `body` a plain `assign_attributes(body: ...)` would still reach
-        # until Task 6 removes it.
+        # either, parses the String, and refuses a "nothing" value that a
+        # plain `assign_attributes(body: ...)` would write straight through
+        # (Mobility turns it into nil, deleting the locale's document).
         @post.assign_body(values[:body], locale: locale) if values.key?(:body)
         @post.assign_fields(values[:fields], locale: locale) if values.key?(:fields)
       end

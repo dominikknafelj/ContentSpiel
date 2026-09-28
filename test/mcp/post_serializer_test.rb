@@ -3,7 +3,7 @@ require "test_helper"
 class Mcp::PostSerializerTest < ActiveSupport::TestCase
   test "serializes a post's translated and structural fields together" do
     post = Post.create!(content_type: :resume_entry, title: "Senior Engineer", excerpt: "Led the team",
-      body_doc: rich_doc("Some **details**"), published_at: Time.current,
+      body: rich_doc("Some **details**"), published_at: Time.current,
       metadata: { "company" => "Acme", "role_type" => "lead" })
 
     data = Mcp::PostSerializer.call(post, :en)
@@ -104,7 +104,7 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
   end
 
   test "body is the requested locale's own Markdown, without falling back" do
-    post = Post.create!(content_type: :blog, title: "English", body_doc: rich_doc("English body"))
+    post = Post.create!(content_type: :blog, title: "English", body: rich_doc("English body"))
 
     assert_equal "", Mcp::PostSerializer.call(post, :de)[:body]
   end

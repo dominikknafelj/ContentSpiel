@@ -114,7 +114,7 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "body stores a JSON document per locale" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
 
     document = post.reload.body_document(locale: Locales.default)
     assert_kind_of RichText::Document, document
@@ -128,7 +128,7 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "assign_body writes only the given locale" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
 
     post.assign_body(rich_doc("Hallo"), locale: "de")
     post.save!
@@ -151,7 +151,7 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "an invalid body document is a validation error on body and is never saved" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Kept"))
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Kept"))
 
     post.assign_body({ "type" => "doc", "content" => [ { "type" => "heading", "attrs" => { "level" => 1 },
       "content" => [ { "type" => "text", "text" => "H1" } ] } ] }, locale: "de")
@@ -175,7 +175,7 @@ class PostTest < ActiveSupport::TestCase
   # used to delete the locale's document silently.
   test "a body that is nil, blank or JSON null is rejected, and the stored document kept" do
     [ nil, "", "  ", "null" ].each_with_index do |value, index|
-      post = Post.create!(content_type: :blog, title: "Hello #{index}", body_doc: rich_doc("Kept"))
+      post = Post.create!(content_type: :blog, title: "Hello #{index}", body: rich_doc("Kept"))
 
       post.assign_body(value, locale: "en")
 
@@ -186,7 +186,7 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "an explicit empty document clears a body" do
-    post = Post.create!(content_type: :blog, title: "Hello", body_doc: rich_doc("Gone"))
+    post = Post.create!(content_type: :blog, title: "Hello", body: rich_doc("Gone"))
 
     post.assign_body(RichText::Document::EMPTY_HASH.to_json, locale: "en")
     post.save!
@@ -210,7 +210,7 @@ class PostTest < ActiveSupport::TestCase
     target = create_post(title: "Target")
     link = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
       { "type" => "text", "text" => "see", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "post", "id" => target.id } } ] } ] } ] }
-    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: link)
+    post = Post.create!(content_type: :blog, title: "Hello World", body: link)
     target.destroy!
 
     post.reload.title = "Renamed"
@@ -312,8 +312,8 @@ class PostTest < ActiveSupport::TestCase
   end
 
   test "translated rich text survives a round trip through the database" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
-    Mobility.with_locale(:de) { post.update!(body_doc: rich_doc("Hallo")) }
+    post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
+    Mobility.with_locale(:de) { post.update!(body: rich_doc("Hallo")) }
 
     reloaded = Post.find(post.id)
 

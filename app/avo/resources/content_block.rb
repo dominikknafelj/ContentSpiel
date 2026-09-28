@@ -21,7 +21,7 @@ class Avo::Resources::ContentBlock < Avo::BaseResource
     # filter's).
     field :block_type, as: :select, options: ::BlockTypes.all.to_h { |definition| [ definition.label, definition.name ] }
 
-    # `image`/`caption`/`body` are existing columns every block type either
+    # `image`/`caption` are existing columns every block type either
     # `uses` or doesn't -- shown unconditionally rather than gated on the
     # type, same as the page form's inline row (a block's type is routinely
     # changed while drafting). `settings`, by contrast, *is* type-specific
@@ -31,16 +31,14 @@ class Avo::Resources::ContentBlock < Avo::BaseResource
     field :image, as: :file
 
     # Same tabs-plus-locale-accessors arrangement as Avo::Resources::Post and
-    # Avo::Resources::Page -- see the note in the Post resource. This is where
-    # a block's rich text gets the full editor; the page form's inline rows
-    # deliberately keep it to a plain HTML textarea (see the resource tool).
+    # Avo::Resources::Page -- see the note in the Post resource. A rich-text
+    # block's `body` isn't editable here: it's a per-locale JSON document
+    # (tiptap spec §3.1) that CS Studio edits; Avo goes in tiptap Task 10.
     tabs do
       ::Locales.enabled.each do |locale|
         tab title: locale.to_s.upcase do
           field ::Mobility.normalize_locale_accessor(:caption, locale).to_sym,
             as: :text, name: "Caption"
-          field ::Mobility.normalize_locale_accessor(:body, locale).to_sym,
-            as: :trix, name: "Body"
         end
       end
     end

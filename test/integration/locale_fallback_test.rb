@@ -65,7 +65,7 @@ class LocaleFallbackTest < ActionDispatch::IntegrationTest
   test "a German-only rich text block renders its body on the English page" do
     seite = Mobility.with_locale(:de) do
       page = Page.create!(page_type: :standard, title: "Kontaktseite", parent: @root, published_at: Time.current)
-      page.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("German body"))
+      page.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("German body"))
       page
     end
 

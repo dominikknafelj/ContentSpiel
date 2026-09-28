@@ -47,7 +47,9 @@ class Avo::Resources::Post < Avo::BaseResource
           field ::Mobility.normalize_locale_accessor(:title, locale).to_sym, as: :text, name: "Title"
           field ::Mobility.normalize_locale_accessor(:slug, locale).to_sym, as: :text, name: "Slug"
           field ::Mobility.normalize_locale_accessor(:excerpt, locale).to_sym, as: :textarea, name: "Excerpt"
-          field ::Mobility.normalize_locale_accessor(:body, locale).to_sym, as: :trix, name: "Body"
+          # No `body` field: it's a per-locale JSON document now (tiptap
+          # spec §3.1), edited in CS Studio -- Avo's Trix field would write
+          # HTML into it. Avo itself goes in tiptap Task 10.
         end
       end
     end

@@ -4,8 +4,8 @@
 # this table and are told apart by `block_type`, a plain string checked
 # against the `BlockTypes` registry rather than a closed enum -- the same
 # registry-backed shape `Post#content_type` uses for its own types (open-types
-# spec §3). Which columns matter depends on the type: `body` (the JSON
-# `body_doc`, see `HasRichTextBody`) for rich_text,
+# spec §3). Which columns matter depends on the type: `body` (per-locale JSON
+# documents, see `HasRichTextBody`) for rich_text,
 # `image` + `caption` for image, `settings`/`translated_settings` for
 # post_list.
 class ContentBlock < ApplicationRecord
@@ -19,14 +19,7 @@ class ContentBlock < ApplicationRecord
   # unconditionally since Mobility attributes are defined at class-load time.
   translates :caption, :alt
 
-  # The legacy ActionText body (mobility-actiontext, one ActionText::RichText
-  # row per locale). Nothing reads it any more -- the body is the per-locale
-  # JSON document from `HasRichTextBody` below -- but it stays declared until
-  # Task 6's `rich_text:migrate_from_action_text` has converted every row,
-  # after which Task 6 drops it and renames `body_doc` to `body`.
-  translates :body, backend: :action_text
-
-  # `body_document(locale:)`/`assign_body` over the jsonb `body_doc` column
+  # `body_document(locale:)`/`assign_body` over the jsonb `body` column
   # (design spec §3.1) -- only `rich_text` blocks (`t.uses :body`) ever
   # write one, but like `caption`/`alt` it's declared unconditionally.
   include HasRichTextBody

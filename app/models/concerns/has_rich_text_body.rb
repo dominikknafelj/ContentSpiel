@@ -1,16 +1,14 @@
 # The per-locale rich-text body (design spec §3.1) `Post` and `ContentBlock`
 # share: one Tiptap/ProseMirror JSON document per language in the jsonb
-# `body_doc` column (`{ locale => tiptap_doc }`), read back as a
+# `body` column (`{ locale => tiptap_doc }`), read back as a
 # `RichText::Document` and validated against `RichText::Schema` before it's
 # ever written.
 #
-# `body_doc` is the column's interim name -- the ActionText `body` it
-# replaces stays declared (`translates :body, backend: :action_text`) on
-# both models until Task 6 has migrated every ActionText row and dropped
-# ActionText, then renames `body_doc` to `body`. Everything outside the
-# models reads and writes through `#body_document`/`#assign_body` (and
-# `Locales.read(record, :body)` for public output), never `body_doc`
-# directly, so that rename touches this file and the migration only.
+# Everything outside the models reads and writes through
+# `#body_document`/`#assign_body` (and `Locales.read(record, :body)` for
+# public output) rather than the raw Mobility accessor: those are where a
+# stored value becomes a `RichText::Document`, and where a submitted JSON
+# String is parsed and a "nothing" write is refused.
 module HasRichTextBody
   extend ActiveSupport::Concern
 
@@ -20,7 +18,7 @@ module HasRichTextBody
     # Hash, not a String -- Mobility's jsonb backend stores whatever JSON
     # value it's handed per locale, and its `presence` plugin only ever
     # nils out `""`.
-    translates :body_doc
+    translates :body
 
     validate :body_documents_valid
   end
@@ -31,7 +29,7 @@ module HasRichTextBody
   # that isn't a document Hash at all, reads as `RichText::Document.empty`
   # rather than nil, so callers never have to special-case "no document".
   def body_document(locale:)
-    value = body_doc(locale: locale.to_s)
+    value = body(locale: locale.to_s)
     value.is_a?(Hash) ? RichText::Document.new(value) : RichText::Document.empty
   end
 
@@ -67,7 +65,7 @@ module HasRichTextBody
     unassignable_body_locales.delete(code)
     return unassignable_body_locales << code if value.nil?
 
-    public_send(:body_doc=, value, locale: code)
+    public_send(:body=, value, locale: code)
   end
 
   private
@@ -96,13 +94,13 @@ module HasRichTextBody
   # not something an unrelated edit should be blocked on.
   #
   # Errors land on `:body` (spec §3.5), the name the admin's error slot and
-  # every caller already know -- not `body_doc`, the column's interim name.
+  # every caller already know.
   def body_documents_valid
     unassignable_body_locales.each { |code| errors.add(:body, :invalid, message: "(#{code}) isn't a document -- send an empty document to clear it") }
 
-    previous = persisted? ? attribute_in_database(:body_doc).to_h : {}
+    previous = persisted? ? attribute_in_database(:body).to_h : {}
 
-    read_attribute(:body_doc).to_h.each do |code, value|
+    read_attribute(:body).to_h.each do |code, value|
       next if previous[code] == value
 
       body_errors_for(value).each { |message| errors.add(:body, :invalid, message: "(#{code}) #{message}") }

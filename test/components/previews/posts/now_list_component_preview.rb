@@ -7,7 +7,7 @@ module Posts
   class NowListComponentPreview < ViewComponent::Preview
     def default
       page = PreviewFixtures.page(title: "Now list preview")
-      post = PreviewFixtures.post(title: "Now", content_type: "now_update", body_doc: PreviewFixtures.rich_doc("Training for a half marathon."))
+      post = PreviewFixtures.post(title: "Now", content_type: "now_update", body: PreviewFixtures.rich_doc("Training for a half marathon."))
 
       render Posts::NowListComponent.new(posts: Post.where(id: post.id), page: page)
     end

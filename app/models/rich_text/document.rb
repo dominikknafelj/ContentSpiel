@@ -6,10 +6,11 @@
 # mutate a document in place (an edit round-trips through the editor and
 # writes a whole new Hash back).
 #
-# `#to_html`/`#to_markdown`/`.from_markdown`/`.from_html` (spec §3.1) arrive
-# in Tasks 2/3/5 -- this task only needs enough of the value object for
-# storage and validation to exist: `.new`, `.empty`, `#to_h`, `#blank?`,
-# `#digest` and `#validate`.
+# Conversions (`#to_html`, `#to_markdown`/`.from_markdown`, `.from_html`)
+# each delegate to their own class -- `RichText::HtmlRenderer`,
+# `RichText::Markdown`, `RichText::HtmlImport` -- so this file stays about
+# the value itself: `.new`, `.empty`, `#to_h`, `#blank?`, `#digest`,
+# `#validate` and `#normalized`.
 module RichText
   class Document
     # The canonical "nothing here yet" document -- an empty `doc` node with
@@ -105,6 +106,13 @@ module RichText
     # row, so this degrades what it can't represent instead of failing the
     # whole write.
     def self.from_markdown(markdown) = RichText::Markdown.load(markdown)
+
+    # Converts stored ActionText/Trix HTML (design spec §5) into
+    # `[RichText::Document, unmapped]` -- `unmapped` being one String per
+    # piece of HTML that had no faithful equivalent (its text is kept where
+    # it has any). Only `rich_text:migrate_from_action_text` needs this;
+    # see `RichText::HtmlImport` for the mapping and its options.
+    def self.from_html(html, **options) = RichText::HtmlImport.new(**options).call(html)
 
     def to_h = @hash
 

@@ -92,7 +92,7 @@
 <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4 rounded-cs border border-line bg-surface p-4",
       data: {
         controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue trix-change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
         "admin--autosave-status-id-value": save_status_id
       } do %>
 

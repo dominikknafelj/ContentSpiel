@@ -80,10 +80,9 @@ end
 gem "avo", "~> 4.2"
 
 # Translates model content per locale [https://github.com/shioyama/mobility].
-# `mobility-actiontext` is a separate gem -- the ActionText backend is not
-# bundled with Mobility itself.
+# Every translated attribute, rich-text bodies included, uses its jsonb
+# backend (config/initializers/mobility.rb).
 gem "mobility", "~> 1.3"
-gem "mobility-actiontext", "~> 1.1"
 
 # Parses/renders CommonMark for `RichText::Markdown` (design spec §3.4) --
 # MCP reads and writes rich-text bodies as Markdown, converted to and from

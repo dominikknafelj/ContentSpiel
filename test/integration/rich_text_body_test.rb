@@ -13,7 +13,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a rich_text block renders its JSON document as HTML" do
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("Hello **there**"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello **there**"))
 
     get "/"
 
@@ -24,7 +24,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   test "a post detail renders its JSON body" do
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
-    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago, body_doc: rich_doc("## Section\n\nBody *text*"))
+    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago, body: rich_doc("## Section\n\nBody *text*"))
 
     get "/blog/hello"
 
@@ -33,7 +33,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a now list renders the latest update's JSON body" do
-    Post.create!(content_type: :now_update, title: "Now", published_at: 1.day.ago, body_doc: rich_doc("Training for a half marathon"))
+    Post.create!(content_type: :now_update, title: "Now", published_at: 1.day.ago, body: rich_doc("Training for a half marathon"))
     @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "now_update" })
 
     get "/"
@@ -42,7 +42,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a locale without a body falls back to the primary language's document" do
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("English body"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("English body"))
 
     get "/de"
 
@@ -51,7 +51,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a locale whose document is blank falls back to the primary language" do
-    block = @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("English body"))
+    block = @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("English body"))
     block.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph" } ] }, locale: "de")
     block.save!
 
@@ -61,7 +61,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   end
 
   test "a locale with its own body renders that one, not the fallback" do
-    block = @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("English body"))
+    block = @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("English body"))
     block.assign_body(rich_doc("Deutscher Text"), locale: "de")
     block.save!
 
@@ -74,7 +74,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   test "internal links resolve in the request's locale" do
     about = Page.create!(parent: @root, page_type: :standard, title: "About", published_at: Time.current)
     Mobility.with_locale(:de) { about.update!(slug: "ueber-uns") }
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("See [about](cs:page/#{about.id})"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [about](cs:page/#{about.id})"))
 
     get "/de"
 
@@ -84,7 +84,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   test "internal links in a preview stay under /preview" do
     sign_in_as(users(:one))
     draft = Page.create!(parent: @root, page_type: :standard, title: "Draft", published_at: nil)
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("See [the draft](cs:page/#{draft.id})"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [the draft](cs:page/#{draft.id})"))
 
     get "/preview"
 
@@ -99,7 +99,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
   test "a cached body picks up a link target being published, renamed and deleted" do
     with_memory_cache do
       target = Page.create!(parent: @root, page_type: :standard, title: "Later", published_at: nil)
-      @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("See [later](cs:page/#{target.id})"))
+      @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("See [later](cs:page/#{target.id})"))
 
       get "/"
       assert_select ".content-block--rich-text a", count: 0
@@ -124,7 +124,7 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     with_memory_cache do
       asset = create_media_asset
       @root.content_blocks.create!(block_type: :rich_text, position: 0,
-        body_doc: rich_doc(%(Intro\n\n::image{asset="#{asset.id}" alt="Alt" caption="Cap"})))
+        body: rich_doc(%(Intro\n\n::image{asset="#{asset.id}" alt="Alt" caption="Cap"})))
 
       get "/"
       assert_select ".content-block--rich-text img[alt='Alt']"

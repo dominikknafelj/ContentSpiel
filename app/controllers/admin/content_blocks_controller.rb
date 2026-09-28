@@ -19,7 +19,7 @@ module Admin
     # since a different block on the same page can have an entirely
     # different schema. `TRANSLATED_COLUMNS`/`ATTRIBUTE_COLUMNS` below are
     # the one thing that *is* fixed: which of the columns a type can `uses`
-    # at all are translated (Mobility/ActionText) versus a plain attribute
+    # at all are translated (Mobility) versus a plain attribute
     # (the attachment) -- `block.definition.uses_columns` still gates which
     # of these a given type's own params are actually read from.
     #
@@ -340,9 +340,9 @@ module Admin
     #
     # `body` is the rich-text JSON document (tiptap spec §3.1), copied as
     # data through `body_document`/`assign_body` rather than the Mobility
-    # reader/writer pair the other columns use: the legacy ActionText `body`
-    # accessor still exists until Task 6, and reading or writing through it
-    # would copy the wrong thing. A document is copied verbatim, so a
+    # reader/writer pair the other columns use: `assign_body` is the one
+    # writer that refuses a "nothing" value instead of silently deleting the
+    # locale (`HasRichTextBody#assign_body`). A document is copied verbatim, so a
     # duplicate's body is exactly the source's, and duplicating a duplicate
     # stays that way (the ActionText-era bug this method used to guard
     # against -- a re-rendered `trix-content` wrapper nesting itself on

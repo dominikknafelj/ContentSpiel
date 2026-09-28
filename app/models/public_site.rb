@@ -14,9 +14,7 @@
 # tiptap Task 5 fix round 1): a rendered body bakes in its internal links'
 # hrefs (slug renames, a target published or deleted) and its images'
 # `MediaAsset` URLs, none of which change the document's own digest. The
-# `MediaAsset` maximum/count are here for that reason. (ActionText's
-# `maximum(:updated_at)` used to be an input too; nothing public renders
-# ActionText since Task 5, so it's gone.)
+# `MediaAsset` maximum/count are here for that reason.
 module PublicSite
   module_function
 

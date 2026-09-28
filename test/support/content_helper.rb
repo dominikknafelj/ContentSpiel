@@ -35,7 +35,7 @@ module ContentHelper
   end
 
   # A rich-text body document Hash (design spec §3.1) built from Markdown --
-  # what `posts.body_doc`/`content_blocks.body_doc` store per locale. Fails
+  # what `posts.body`/`content_blocks.body` store per locale. Fails
   # loudly on a conversion warning: a test's own fixed Markdown degrading
   # silently would make it assert against something other than what it
   # reads as.

@@ -36,7 +36,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
   test "the root page renders at the unprefixed root" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body_doc: rich_doc("Welcome"))
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: rich_doc("Welcome"))
 
     get "/"
 
@@ -47,7 +47,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a nested page renders at its full path" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_doc: rich_doc("About us"))
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: rich_doc("About us"))
 
     get "/about"
 
@@ -89,7 +89,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     release = Page.create!(page_type: :standard, title: "Release v1.0", slug: "v1.0", parent: root,
       published_at: Time.current)
-    ContentBlock.create!(owner: release, block_type: :rich_text, position: 0, body_doc: rich_doc("Release notes"))
+    ContentBlock.create!(owner: release, block_type: :rich_text, position: 0, body: rich_doc("Release notes"))
 
     assert_equal "/v1.0", release.full_path(:en)
 
@@ -184,7 +184,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
       meta_description: "Everything I've written.", published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", excerpt: "A short summary.",
-      body_doc: rich_doc("Full post content"), published_at: Time.current)
+      body: rich_doc("Full post content"), published_at: Time.current)
 
     get "/blog/#{post.slug}"
 
@@ -221,10 +221,10 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a page renders in the locale its path was requested under" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    block = ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_doc: rich_doc("About us"))
+    block = ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: rich_doc("About us"))
     Mobility.with_locale(:de) do
       about.update!(slug: "ueber-uns")
-      block.update!(body_doc: rich_doc("Ueber uns"))
+      block.update!(body: rich_doc("Ueber uns"))
     end
 
     get "/de/ueber-uns"
@@ -256,8 +256,8 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
 
   test "a page renders its blocks in position order" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(owner: root, block_type: :rich_text, position: 1, body_doc: rich_doc("Second"))
-    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body_doc: rich_doc("First"))
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 1, body: rich_doc("Second"))
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: rich_doc("First"))
 
     get "/"
 
@@ -353,7 +353,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
       published_at: Time.current)
     ContentBlock.create!(owner: everything, block_type: :post_list, position: 0, settings: {})
     resume_entry = Post.create!(content_type: :resume_entry, title: "A Resume Entry",
-      body_doc: rich_doc("Where I worked"), published_at: 1.day.ago)
+      body: rich_doc("Where I worked"), published_at: 1.day.ago)
 
     get "/everything/#{resume_entry.slug}"
 
@@ -368,7 +368,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
 
     get "/blog/#{post.slug}"
@@ -383,9 +383,9 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a post detail view still renders the page's other blocks" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
-    ContentBlock.create!(owner: blog_page, block_type: :rich_text, position: 0, body_doc: rich_doc("Blog intro"))
+    ContentBlock.create!(owner: blog_page, block_type: :rich_text, position: 0, body: rich_doc("Blog intro"))
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 1, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
 
     get "/blog/#{post.slug}"
@@ -410,7 +410,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a trailing slug under a page with no post_list block is 404" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     about = Page.create!(page_type: :standard, title: "About", slug: "about", parent: root, published_at: Time.current)
-    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_doc: rich_doc("About us"))
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body: rich_doc("About us"))
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current)
 
     get "/about/#{post.slug}"
@@ -433,7 +433,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     draft_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: nil)
     ContentBlock.create!(owner: draft_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
 
     get "/blog/#{post.slug}"
@@ -447,8 +447,8 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    draft = Post.create!(content_type: :blog, title: "Draft Post", body_doc: rich_doc("Secret draft"), published_at: nil)
-    scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", body_doc: rich_doc("Not yet"),
+    draft = Post.create!(content_type: :blog, title: "Draft Post", body: rich_doc("Secret draft"), published_at: nil)
+    scheduled = Post.create!(content_type: :blog, title: "Scheduled Post", body: rich_doc("Not yet"),
       published_at: 1.day.from_now)
 
     get "/blog/#{draft.slug}"
@@ -478,11 +478,11 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
     Mobility.with_locale(:de) do
       blog_page.update!(slug: "blogeintraege")
-      post.update!(slug: "mein-erster-beitrag", title: "Mein erster Beitrag", body_doc: rich_doc("Ganzer Beitrag"))
+      post.update!(slug: "mein-erster-beitrag", title: "Mein erster Beitrag", body: rich_doc("Ganzer Beitrag"))
     end
 
     get "/de/blogeintraege/mein-erster-beitrag"
@@ -499,9 +499,9 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
-    Mobility.with_locale(:de) { post.update!(body_doc: rich_doc("Ganzer Beitrag")) }
+    Mobility.with_locale(:de) { post.update!(body: rich_doc("Ganzer Beitrag")) }
 
     get "/de/blog/#{post.slug}"
 
@@ -516,11 +516,11 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    Post.create!(content_type: :blog, title: "Shared Slug", slug: "geteilt", body_doc: rich_doc("English only"),
+    Post.create!(content_type: :blog, title: "Shared Slug", slug: "geteilt", body: rich_doc("English only"),
       published_at: Time.current)
     german = Post.create!(content_type: :blog, title: "Another Post", slug: "another-post",
-      body_doc: rich_doc("English body"), published_at: Time.current)
-    Mobility.with_locale(:de) { german.update!(slug: "geteilt", body_doc: rich_doc("Deutscher Beitrag")) }
+      body: rich_doc("English body"), published_at: Time.current)
+    Mobility.with_locale(:de) { german.update!(slug: "geteilt", body: rich_doc("Deutscher Beitrag")) }
 
     get "/de/blog/geteilt"
 
@@ -538,7 +538,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # 500.
   test "a request with a non-HTML Accept header still renders the page" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
-    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body_doc: rich_doc("Welcome"))
+    ContentBlock.create!(owner: root, block_type: :rich_text, position: 0, body: rich_doc("Welcome"))
 
     get "/", headers: { "Accept" => "application/json" }
 
@@ -584,7 +584,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
-    post = Post.create!(content_type: :blog, title: "My First Post", body_doc: rich_doc("Full post content"),
+    post = Post.create!(content_type: :blog, title: "My First Post", body: rich_doc("Full post content"),
       published_at: Time.current)
 
     get "/blog/#{post.slug}"
@@ -651,7 +651,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   test "a rich_text block renders an embedded YouTube video from its body" do
     root = Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     ContentBlock.create!(owner: root, block_type: :rich_text, position: 0,
-      body_doc: rich_doc("Check this out\n\n::youtube{id=\"dQw4w9WgXcQ\"}"))
+      body: rich_doc("Check this out\n\n::youtube{id=\"dQw4w9WgXcQ\"}"))
 
     get "/"
 
@@ -668,7 +668,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     blog_page = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: root, published_at: Time.current)
     ContentBlock.create!(owner: blog_page, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
     post = Post.create!(content_type: :blog, title: "My First Post", published_at: Time.current,
-      body_doc: rich_doc("Full post content\n\n::youtube{id=\"dQw4w9WgXcQ\"}"))
+      body: rich_doc("Full post content\n\n::youtube{id=\"dQw4w9WgXcQ\"}"))
 
     get "/blog/#{post.slug}"
 
@@ -690,7 +690,7 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert Locales::Enable.call("ja", actor: nil).ok?
 
     about = Page.create!(page_type: :standard, parent: root, title_ja: "会社概要", published_at: Time.current)
-    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_doc_ja: rich_doc("概要です"))
+    ContentBlock.create!(owner: about, block_type: :rich_text, position: 0, body_ja: rich_doc("概要です"))
 
     assert_equal "会社概要", about.slug_ja
     assert_equal "/会社概要", about.full_path("ja")

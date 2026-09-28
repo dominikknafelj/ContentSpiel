@@ -1,5 +1,6 @@
-/* Element styles for ActionText rich text on the public site (editors write
-   in Trix, so there are no classes to hang utilities on). */
+/* Element styles for rich-text bodies on the public site (rendered from JSON
+   documents by RichText::HtmlRenderer as bare elements, so there are no
+   classes to hang utilities on). */
 .cs-prose { line-height: 1.7; color: var(--th-ink); }
 .cs-prose > * + * { margin-top: 1em; }
 .cs-prose h1, .cs-prose h2, .cs-prose h3 { font-weight: 600; line-height: 1.25; margin-top: 1.6em; }

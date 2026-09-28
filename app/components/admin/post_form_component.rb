@@ -92,9 +92,8 @@ module Admin
     # turns off the plain reader's own cross-locale fallback deliberately).
     #
     # `:body` is the rich-text JSON document (tiptap spec §3.1), read through
-    # `body_document` -- the model's own seam over the interim `body_doc`
-    # column -- not the legacy ActionText `body` accessor that still exists
-    # until Task 6.
+    # `body_document` -- the model's own seam that turns the stored Hash
+    # into a `RichText::Document` -- rather than the raw Mobility accessor.
     def value(column)
       return post.body_document(locale: locale) if column == :body
 

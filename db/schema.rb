@@ -10,20 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
-
-  create_table "action_text_rich_texts", force: :cascade do |t|
-    t.text "body"
-    t.datetime "created_at", null: false
-    t.string "locale", null: false
-    t.string "name", null: false
-    t.bigint "record_id", null: false
-    t.string "record_type", null: false
-    t.datetime "updated_at", null: false
-    t.index ["record_type", "record_id", "name", "locale"], name: "index_action_text_rich_texts_uniqueness", unique: true
-  end
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
@@ -75,7 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_020000) do
     t.jsonb "settings", default: {}, null: false
     t.jsonb "translated_settings", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.jsonb "body_doc", default: {}, null: false
+    t.jsonb "body", default: {}, null: false
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
   end
 
@@ -144,7 +133,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_020000) do
     t.jsonb "title", default: {}, null: false
     t.jsonb "translated_metadata", default: {}, null: false
     t.datetime "updated_at", null: false
-    t.jsonb "body_doc", default: {}, null: false
+    t.jsonb "body", default: {}, null: false
     t.index ["content_type"], name: "index_posts_on_content_type"
   end
 
@@ -194,13 +183,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_020000) do
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
-  end
-
-  create_table "youtube_embeds", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.string "video_id", null: false
-    t.index ["video_id"], name: "index_youtube_embeds_on_video_id", unique: true
   end
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"

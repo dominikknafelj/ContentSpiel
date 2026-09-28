@@ -284,8 +284,10 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
   # than a fixed list rendered on every row regardless of type -- image has
   # no settings fields at all, so post_list (which has `content_type`) is
   # what actually exercises a settings input showing up here. `image`/
-  # `caption`/`body` stay unconditional (existing columns, not schema
-  # fields), so they're still asserted below even off a post_list block.
+  # `caption` stay unconditional (existing columns, not schema fields), so
+  # they're still asserted below even off a post_list block. `body` has no
+  # input at all any more: it's a per-locale JSON document edited in CS
+  # Studio (tiptap Task 6), not HTML an Avo textarea could write.
   test "the nested block row exposes the type-specific and translated fields" do
     @about.content_blocks.create!(block_type: :post_list, position: 0)
 
@@ -300,7 +302,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
 
     Locales.enabled.each do |locale|
       assert_includes response.body, %(name="page[content_blocks_attributes][0][caption_#{locale}]")
-      assert_includes response.body, %(name="page[content_blocks_attributes][0][body_#{locale}]")
+      assert_not_includes response.body, %(name="page[content_blocks_attributes][0][body_#{locale}]")
     end
   end
 
@@ -308,7 +310,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
     assert_difference -> { @about.content_blocks.count }, 1 do
       put "/avo/resources/pages/#{@about.id}", params: { page: {
         content_blocks_attributes: {
-          "0" => { block_type: "rich_text", position: "0", body_en: "<p>Hello</p>" }
+          "0" => { block_type: "rich_text", position: "0" }
         }
       } }
     end
@@ -317,27 +319,26 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
 
     block = @about.content_blocks.reload.first
     assert_equal "rich_text", block.block_type
-    assert_equal "Hello", block.body_en.to_plain_text.strip
+    assert block.body_document(locale: "en").blank?
   end
 
   # A language enabled at runtime (spec §9.6) must be writable through the
-  # nested block rows straight away: the rows render its caption/body inputs
+  # nested block rows straight away: the rows render its caption inputs
   # per request, so the permitted params can't be a list frozen at class load.
   # The GET first makes sure the resource class is loaded before "fr" exists.
-  test "a block caption and body in a newly enabled language are saved" do
+  test "a block caption in a newly enabled language is saved" do
     get "/avo/resources/pages/#{@about.id}/edit"
     assert Locales::Enable.call("fr", actor: nil).ok?
 
     put "/avo/resources/pages/#{@about.id}", params: { page: {
       content_blocks_attributes: {
-        "0" => { block_type: "image", position: "0", caption_fr: "Légende", body_fr: "<p>Bonjour</p>" }
+        "0" => { block_type: "image", position: "0", caption_fr: "Légende" }
       }
     } }
 
     assert_response :redirect
     block = @about.content_blocks.reload.first
     assert_equal "Légende", block.caption_fr
-    assert_equal "Bonjour", block.body_fr.to_plain_text.strip
   end
 
   # The blank row rides along on every save, so it must not save itself as an
@@ -347,7 +348,7 @@ class AvoPageEditingTest < ActionDispatch::IntegrationTest
       put "/avo/resources/pages/#{@about.id}", params: { page: {
         title_en: "About us",
         content_blocks_attributes: {
-          "0" => { block_type: "", position: "", body_en: "", settings: { content_type: "" } }
+          "0" => { block_type: "", position: "", caption_en: "", settings: { content_type: "" } }
         }
       } }
     end

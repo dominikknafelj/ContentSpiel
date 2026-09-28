@@ -8,13 +8,14 @@
 # their raw jsonb in a `RichText::Document` at the model boundary.
 #
 # `YOUTUBE_ID_PATTERN` lives on the namespace module, not on `BuiltIns` or
-# `NodeType`, because it's shared with `YoutubeEmbed` view-component
-# validation (design spec §3.3) and with the eventual Markdown directive
-# parser (Task 3) -- both need the exact same rule the `youtube` node's
-# `id` attribute enforces, and a single shared constant is the only way to
-# guarantee "matches Tiptap's stored id" and "matches the embed component's
-# rule" can't drift apart. An 11-character id built from letters, digits,
-# `-` and `_` is YouTube's actual video-id shape.
+# `NodeType`, because more than the `youtube` node's own `id` attribute
+# needs it: its `html` renderer re-checks every id against it, and the
+# ActionText importer (`RichText::HtmlImport`) only emits a node whose id
+# passes it -- the rule the retired `YoutubeEmbed` model used to own
+# (design spec §5). One shared constant is what keeps "a valid stored id"
+# and "an id the embed will render" from drifting apart. An 11-character id
+# built from letters, digits, `-` and `_` is YouTube's actual video-id
+# shape.
 module RichText
   YOUTUBE_ID_PATTERN = /\A[\w-]{11}\z/
 

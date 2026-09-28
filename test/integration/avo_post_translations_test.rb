@@ -13,8 +13,8 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     @user = User.create!(email_address: "translator@example.com", password: "password123")
     sign_in_as(@user)
 
-    @post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    Mobility.with_locale(:de) { @post.update!(title: "Hallo Welt", body: "<p>Hallo</p>") }
+    @post = Post.create!(content_type: :blog, title: "Hello World", body: rich_doc("Hi"))
+    Mobility.with_locale(:de) { @post.update!(title: "Hallo Welt", body: rich_doc("Hallo")) }
   end
 
   test "the post form renders one tab per enabled locale" do
@@ -38,10 +38,20 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     Locales.enabled.each do |locale|
-      %w[title slug excerpt body].each do |attribute|
+      %w[title slug excerpt].each do |attribute|
         assert_includes response.body, %(name="post[#{attribute}_#{locale}]"),
           "expected an input for #{attribute} in #{locale}"
       end
+      # The body is a per-locale JSON document edited in CS Studio (tiptap
+      # Task 6) -- Avo's Trix field would write HTML into it.
+      assert_not_includes response.body, %(name="post[body_#{locale}]")
+    end
+  end
+
+  test "a post with a JSON body renders on index and show" do
+    [ "/avo/resources/posts", "/avo/resources/posts/#{@post.id}" ].each do |path|
+      get path
+      assert_response :success, path
     end
   end
 
@@ -66,8 +76,7 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
       content_type: "blog",
       title_en: "Hello World", slug_en: "hello-world", excerpt_en: "A greeting",
       title_de: "Hallo Welt", slug_de: "hallo-welt", excerpt_de: "Ein Gruss",
-      title_es: "Hola Mundo", slug_es: "hola-mundo", excerpt_es: "Un saludo",
-      body_en: "<p>Hi</p>", body_de: "<p>Hallo</p>", body_es: "<p>Hola</p>"
+      title_es: "Hola Mundo", slug_es: "hola-mundo", excerpt_es: "Un saludo"
     } }
 
     assert_response :redirect
@@ -75,15 +84,15 @@ class AvoPostTranslationsTest < ActionDispatch::IntegrationTest
     saved = Post.find(@post.id)
 
     {
-      en: [ "Hello World", "hello-world", "A greeting", "Hi" ],
-      de: [ "Hallo Welt", "hallo-welt", "Ein Gruss", "Hallo" ],
-      es: [ "Hola Mundo", "hola-mundo", "Un saludo", "Hola" ]
+      en: [ "Hello World", "hello-world", "A greeting", rich_doc("Hi") ],
+      de: [ "Hallo Welt", "hallo-welt", "Ein Gruss", rich_doc("Hallo") ],
+      es: [ "Hola Mundo", "hola-mundo", "Un saludo", RichText::Document.empty.to_h ]
     }.each do |locale, (title, slug, excerpt, body)|
       Mobility.with_locale(locale) do
         assert_equal title, saved.title, "wrong title in #{locale}"
         assert_equal slug, saved.slug, "wrong slug in #{locale}"
         assert_equal excerpt, saved.excerpt, "wrong excerpt in #{locale}"
-        assert_equal body, saved.body.to_plain_text.strip, "wrong body in #{locale}"
+        assert_equal body, saved.body_document(locale: locale).to_h, "the body in #{locale} must be left alone"
       end
     end
   end

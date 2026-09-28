@@ -37,14 +37,14 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "a rich_text block stores a JSON body document" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body_doc: rich_doc("Hi"))
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
 
     assert_equal rich_doc("Hi"), block.reload.body_document(locale: Locales.default).to_h
   end
 
-  # Same per-locale jsonb shape as Post#body_doc: one document per locale.
+  # Same per-locale jsonb shape as Post#body: one document per locale.
   test "a rich_text block's body is independently translatable per locale" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body_doc: rich_doc("Hi"))
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
     block.assign_body(rich_doc("Hallo"), locale: "de")
     block.save!
 
@@ -178,8 +178,8 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "Page#content_blocks are ordered by position" do
-    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 1, body_doc: rich_doc("second"))
-    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body_doc: rich_doc("first"))
+    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 1, body: rich_doc("second"))
+    ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("first"))
 
     assert_equal [ 0, 1 ], @page.content_blocks.map(&:position)
     assert_equal [ "first\n", "second\n" ],
@@ -187,7 +187,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "destroying a page destroys its content blocks" do
-    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body_doc: rich_doc("Hi"))
+    block = ContentBlock.create!(owner: @page, block_type: :rich_text, position: 0, body: rich_doc("Hi"))
 
     assert @page.destroy
     assert_not ContentBlock.exists?(block.id)

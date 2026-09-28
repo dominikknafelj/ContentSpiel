@@ -103,8 +103,8 @@ module Admin
     def uses_columns = definition.uses_columns
 
     # `"body"` is the rich-text JSON document (tiptap spec §3.1), read
-    # through `body_document` rather than the legacy ActionText `body`
-    # accessor that still exists until Task 6.
+    # through `body_document` (a `RichText::Document`) rather than the raw
+    # Mobility accessor.
     def column_value(name)
       return block.image if name == "image"
       return block.body_document(locale: locale) if name == "body"

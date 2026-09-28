@@ -48,11 +48,11 @@ module RichText
     # rendered tree, rather than piecemeal per node -- `RichTextScrubber`'s
     # youtube-nocookie iframe check in particular only makes sense evaluated
     # against a fully-formed `<iframe>` tag, not a half-built fragment a
-    # single node's `html` block produced in isolation. This is the same
-    # scrubber, and the same `Rails::HTML5::SafeListSanitizer`, that
-    # `ActionText::ContentHelper` installs for every other rich-text render
-    # path (`config/initializers/action_text.rb`) -- one safety net, run at
-    # the very end of every path that turns a document into HTML.
+    # single node's `html` block produced in isolation. This is the only
+    # place `RichTextScrubber` is installed (it used to back ActionText's
+    # own sanitizer too, until ActionText was removed) -- one safety net,
+    # run at the very end of every path that turns a document into HTML,
+    # including a plugin type's own `html` block.
     def render(document)
       html = render_node(document.to_h)
       Rails::HTML5::SafeListSanitizer.new.sanitize(html, scrubber: RichTextScrubber.new).html_safe

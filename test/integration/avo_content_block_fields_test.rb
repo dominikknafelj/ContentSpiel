@@ -34,6 +34,20 @@ class AvoContentBlockFieldsTest < ActionDispatch::IntegrationTest
     assert_match(/name="content_block\[settings\]\[tag\]"[^>]*value="rails"/, response.body)
   end
 
+  # tiptap Task 6: `body` is a per-locale JSON document now, with no Avo
+  # field -- a block that has one must still show, edit and list without a
+  # 500 (Avo would otherwise try to render a Hash through its Trix field).
+  test "a rich_text block with a JSON body renders on index, show and edit without a body field" do
+    block = @page.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello **there**"))
+
+    [ "/avo/resources/content_blocks", "/avo/resources/content_blocks/#{block.id}", "/avo/resources/content_blocks/#{block.id}/edit" ].each do |path|
+      get path
+      assert_response :success, path
+      assert_not_includes response.body, "trix-editor", path
+    end
+    assert_not_includes response.body, %(name="content_block[body_en]")
+  end
+
   test "a rich_text block's form renders no settings inputs" do
     block = @page.content_blocks.create!(block_type: :rich_text, position: 0)
 

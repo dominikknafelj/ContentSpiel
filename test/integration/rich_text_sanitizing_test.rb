@@ -18,7 +18,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
 
   test "raw iframe HTML in Markdown never reaches a page's rich text" do
     document, = RichText::Document.from_markdown(%(Before\n\n<iframe src="https://evil.example/x"></iframe>\n\nAfter))
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: document.to_h)
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: document.to_h)
     get "/"
 
     assert_response :success
@@ -32,7 +32,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     document, = RichText::Document.from_markdown(%(Before <iframe src="https://evil.example/x"></iframe> after))
-    Post.create!(content_type: :blog, title: "Hello", published_at: Time.current, body_doc: document.to_h)
+    Post.create!(content_type: :blog, title: "Hello", published_at: Time.current, body: document.to_h)
     get "/blog/hello"
 
     assert_response :success
@@ -45,7 +45,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
   # children's text, never markup built from those attrs.
   test "an unknown node type smuggled into a stored document renders no iframe" do
     block = @root.content_blocks.create!(block_type: :rich_text, position: 0)
-    block.update_column(:body_doc, { "en" => { "type" => "doc", "content" => [
+    block.update_column(:body, { "en" => { "type" => "doc", "content" => [
       { "type" => "iframe", "attrs" => { "src" => "https://evil.example/x", "srcdoc" => "<script>alert(1)</script>" },
         "content" => [ { "type" => "text", "text" => "Visible" } ] } ] } })
     get "/"
@@ -58,7 +58,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
   end
 
   test "a youtube node renders the youtube-nocookie embed iframe" do
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc(%(Intro\n\n::youtube{id="dQw4w9WgXcQ"})))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc(%(Intro\n\n::youtube{id="dQw4w9WgXcQ"})))
     get "/"
 
     assert_response :success
@@ -67,7 +67,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
 
   test "ordinary rich text formatting survives" do
     @root.content_blocks.create!(block_type: :rich_text, position: 0,
-      body_doc: rich_doc("**Bold** and [a link](https://example.com)\n\n- one\n- two"))
+      body: rich_doc("**Bold** and [a link](https://example.com)\n\n- one\n- two"))
     get "/"
 
     assert_response :success

@@ -175,8 +175,8 @@ module RichText
       # Loader plus a bespoke renderer here (review round 1's I6).
       #
       # The id itself must match YouTube's actual 11-character video-id
-      # shape (`RichText::YOUTUBE_ID_PATTERN`, shared with `YoutubeEmbed`'s
-      # own validation) so a bad id is caught at save time rather than
+      # shape (`RichText::YOUTUBE_ID_PATTERN`, shared with
+      # `RichText::HtmlImport`) so a bad id is caught at save time rather than
       # rendering a broken embed -- and, per design spec §3.3, `html`
       # re-checks that same shape itself rather than trusting a document
       # that reaches the renderer already passed `RichText::Document

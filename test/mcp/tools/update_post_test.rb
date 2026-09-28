@@ -8,7 +8,7 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
 
   setup do
     @user = User.create!(email_address: "agent@example.com", password: "password123")
-    @post = Post.create!(content_type: :blog, title: "Original Title", body_doc: rich_doc("Original body"),
+    @post = Post.create!(content_type: :blog, title: "Original Title", body: rich_doc("Original body"),
       excerpt: "Original excerpt")
   end
 

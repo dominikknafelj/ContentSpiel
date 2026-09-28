@@ -18,12 +18,6 @@ Rails.application.routes.draw do
     # instead of building one per node.
     patch "pages_tree/reorder", to: "tools#reorder_page", as: :reorder_page
 
-    # What the Trix editor's paste handler calls to turn a pasted YouTube URL
-    # into an attachable it can insert (design spec section 8) -- inside
-    # `mount_avo` so it inherits the same session gate as the page itself,
-    # same reasoning as the reorder endpoint above.
-    post "youtube_embeds", to: "youtube_embeds#create", as: :youtube_embeds
-
     # Admin-only mind graph (design spec section 9): Post nodes + PostRelation
     # edges, rendered client-side as a force-directed graph.
     get "mind_graph", to: "tools#mind_graph", as: :mind_graph

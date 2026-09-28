@@ -4,7 +4,7 @@
     and `removable` (false for the blank "add" row, which has nothing to
     remove yet).
 
-    `image`/`caption`/`body` are existing columns -- shown unconditionally on
+    `image`/`caption` are existing columns -- shown unconditionally on
     every row regardless of the block's type: it's routinely changed while
     drafting, and Avo 4.2.3 Community has no client-side conditional fields
     to swap them with. `settings`, by contrast, is rendered from the block's
@@ -61,17 +61,7 @@
       </div>
     <% end %>
 
-    <%# Deliberately a plain HTML textarea rather than a rich editor: the
-        block's own Avo form (reachable from the Content blocks panel on the
-        page's Show view) is where `body` gets the full Trix editor with
-        attachments. Mobility's action_text backend accepts an HTML string
-        through these accessors, so what is typed here is the same value. %>
-    <% tool.locale_accessors(:body).each do |locale, accessor| %>
-      <div>
-        <%= f.label accessor, "Body HTML (#{locale.to_s.upcase}) (rich text blocks)", class: "font-semibold" %>
-        <%= f.text_area accessor, value: f.object.public_send(accessor)&.to_trix_html,
-              rows: 4, class: input_classes("w-full") %>
-      </div>
-    <% end %>
+    <%# No `body` input: a rich-text block's body is a per-locale JSON
+        document (tiptap spec §3.1) edited in CS Studio, not HTML. %>
   </div>
 <% end %>

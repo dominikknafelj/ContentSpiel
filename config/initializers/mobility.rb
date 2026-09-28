@@ -11,7 +11,9 @@ Mobility.configure do
     # translated plain-text column in this app is a Postgres jsonb column named
     # after the attribute (`posts.title` holds `{"en" => ..., "de" => ...}`),
     # which is what the :jsonb backend expects with no column prefix/suffix.
-    # Rich text opts out per-attribute with `backend: :action_text`.
+    # Rich-text bodies too: `posts.body`/`content_blocks.body` hold one
+    # Tiptap JSON document per locale (`HasRichTextBody`) -- there is no
+    # ActionText backend any more (tiptap design spec §5).
     backend :jsonb
 
     active_record

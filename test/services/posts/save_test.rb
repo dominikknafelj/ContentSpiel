@@ -22,7 +22,7 @@ class Posts::SaveTest < ActiveSupport::TestCase
 
   test "an invalid body document fails with an error on body and saves nothing" do
     post = create_post(title: "Hello")
-    post.update!(body_doc: rich_doc("Kept"))
+    post.update!(body: rich_doc("Kept"))
 
     result = Posts::Save.call(post, translations: { "en" => { body: { "type" => "paragraph" } } })
 

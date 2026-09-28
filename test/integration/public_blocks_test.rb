@@ -7,7 +7,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "the homepage shows the tagline eyebrow and rich text in prose" do
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("Hello there"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello there"))
     get "/"
 
     assert_includes response.body, "Writing about Rails"
@@ -83,7 +83,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "a now list shows the latest update's text" do
-    Post.create!(content_type: :now_update, title: "Now", body_doc: rich_doc("Training for a half marathon"), published_at: 1.day.ago)
+    Post.create!(content_type: :now_update, title: "Now", body: rich_doc("Training for a half marathon"), published_at: 1.day.ago)
     @root.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "now_update" })
     get "/"
 
@@ -91,8 +91,8 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "an unregistered stored block type is skipped on render" do
-    @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("Hello there"))
-    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body_doc: rich_doc("Gone"))
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello there"))
+    gallery = @root.content_blocks.create!(block_type: :rich_text, position: 1, body: rich_doc("Gone"))
     gallery.update_column(:block_type, "gallery")
 
     get "/"
@@ -106,7 +106,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     blog = Page.create!(parent: @root, page_type: :standard, title: "Blog", published_at: Time.current)
     blog.content_blocks.create!(block_type: :post_list, position: 0)
     post = Post.create!(content_type: :blog, title: "Hello", excerpt: "Short summary",
-      published_at: Time.zone.local(2026, 9, 12), body_doc: rich_doc("Body text"))
+      published_at: Time.zone.local(2026, 9, 12), body: rich_doc("Body text"))
     post.tags << Tag.create!(name: "hotwire")
     get "/blog/hello"
 

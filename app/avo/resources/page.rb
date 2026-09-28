@@ -15,7 +15,7 @@ class Avo::Resources::Page < Avo::BaseResource
   # `settings: {}` rather than a scalar: it is a jsonb column submitted as a
   # nested hash, and a scalar entry would drop it.
   #
-  # Every *supported* locale's caption/body, not just the enabled ones: this
+  # Every *supported* locale's caption, not just the enabled ones: this
   # is evaluated once, when the class loads, while the nested rows
   # (Avo::ResourceTools::NestedContentBlocks) render `Locales.enabled` per
   # request -- a list built from `Locales.enabled` here froze the languages
@@ -32,10 +32,7 @@ class Avo::Resources::Page < Avo::BaseResource
       :position,
       :block_type,
       :image,
-      *::Locales::SUPPORTED.keys.flat_map { |locale|
-        [ ::Mobility.normalize_locale_accessor(:caption, locale).to_sym,
-          ::Mobility.normalize_locale_accessor(:body, locale).to_sym ]
-      },
+      *::Locales::SUPPORTED.keys.map { |locale| ::Mobility.normalize_locale_accessor(:caption, locale).to_sym },
       { settings: {} }
     ]
   ]

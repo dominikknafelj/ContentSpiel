@@ -5,7 +5,7 @@ class Blocks::RichTextComponentTest < ActiveSupport::TestCase
 
   test "renders the block's body in prose" do
     page = root_page
-    block = page.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("Hello there"))
+    block = page.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Hello there"))
 
     render_inline(Blocks::RichTextComponent.new(block: block, page: page))
 

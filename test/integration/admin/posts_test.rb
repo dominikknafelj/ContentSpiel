@@ -66,21 +66,21 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
   test "the body param saves into the locale of the form" do
     post_record = create_post(title: "Engineer")
-    post_record.update!(body_doc: rich_doc("English"))
+    post_record.update!(body: rich_doc("English"))
 
     patch "/cs-studio/posts/#{post_record.id}",
       params: { locale: "de", post: { body: rich_doc("Deutsch").to_json }, base_updated_at: post_record.updated_at.iso8601(6) },
       as: :turbo_stream
 
     assert_response :success
-    stored = post_record.reload.read_attribute(:body_doc)
+    stored = post_record.reload.read_attribute(:body)
     assert_equal rich_doc("Deutsch"), stored["de"]
     assert_equal rich_doc("English"), stored["en"]
   end
 
   test "an invalid body document answers 422 and leaves the stored document alone" do
     post_record = create_post(title: "Engineer")
-    post_record.update!(body_doc: rich_doc("Kept"))
+    post_record.update!(body: rich_doc("Kept"))
     invalid = { "type" => "doc", "content" => [ { "type" => "youtube", "attrs" => { "id" => "nope" } } ] }
 
     patch "/cs-studio/posts/#{post_record.id}",
@@ -120,7 +120,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
       { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "One" } ] },
       { "type" => "paragraph" },
       { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Two" } ] } ] }
-    post_record.update!(body_doc: spaced)
+    post_record.update!(body: spaced)
     markdown = post_record.body_document(locale: "en").to_markdown.gsub("\n", "\r\n")
 
     patch "/cs-studio/posts/#{post_record.id}",
@@ -151,7 +151,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
   test "the editor shows the body as Markdown with the hidden JSON input" do
     post_record = create_post(title: "Engineer")
-    post_record.update!(body_doc: rich_doc("Hello **there**"))
+    post_record.update!(body: rich_doc("Hello **there**"))
 
     get "/cs-studio/posts/#{post_record.id}"
 
@@ -164,7 +164,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
   test "a translation shows the primary language's body rendered read-only" do
     post_record = create_post(title: "Engineer")
-    post_record.update!(body_doc: rich_doc("Hello **there**"))
+    post_record.update!(body: rich_doc("Hello **there**"))
 
     get "/cs-studio/posts/#{post_record.id}", params: { locale: "de" }
 
