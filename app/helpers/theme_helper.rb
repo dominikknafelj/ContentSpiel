@@ -87,7 +87,7 @@ module ThemeHelper
   # an internal link should still point at the German page on a German
   # URL. `urls:` is the controller's own `public_urls`, so `/preview`
   # renders internal links under `/preview` and the public site doesn't.
-  def rich_text(record, attribute = :body)
-    ::Locales.read(record, attribute).to_html(locale: I18n.locale, urls: public_urls)
+  def rich_text(record)
+    ::Locales.read(record, :body).to_html(locale: I18n.locale, urls: public_urls)
   end
 end

@@ -91,4 +91,57 @@ class RichTextBodyTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select ".content-block--rich-text a[href='/preview/draft']", text: "the draft"
   end
+
+  # Fix round 1 (I1): with a real cache store (the suite otherwise runs on
+  # :null_store), a cached render must not outlive a change to what its
+  # internal links point at -- publishing the target, deleting it, renaming
+  # its slug -- none of which changes the document's own digest.
+  test "a cached body picks up a link target being published, renamed and deleted" do
+    with_memory_cache do
+      target = Page.create!(parent: @root, page_type: :standard, title: "Later", published_at: nil)
+      @root.content_blocks.create!(block_type: :rich_text, position: 0, body_doc: rich_doc("See [later](cs:page/#{target.id})"))
+
+      get "/"
+      assert_select ".content-block--rich-text a", count: 0
+      assert_select ".content-block--rich-text", text: /See later/
+
+      target.update!(published_at: 1.minute.ago)
+      get "/"
+      assert_select ".content-block--rich-text a[href='/later']", text: "later"
+
+      target.update!(slug: "renamed")
+      get "/"
+      assert_select ".content-block--rich-text a[href='/renamed']", text: "later"
+
+      target.destroy!
+      get "/"
+      assert_select ".content-block--rich-text a", count: 0
+      assert_select ".content-block--rich-text", text: /See later/
+    end
+  end
+
+  test "a cached body picks up an image's media asset being deleted" do
+    with_memory_cache do
+      asset = create_media_asset
+      @root.content_blocks.create!(block_type: :rich_text, position: 0,
+        body_doc: rich_doc(%(Intro\n\n::image{asset="#{asset.id}" alt="Alt" caption="Cap"})))
+
+      get "/"
+      assert_select ".content-block--rich-text img[alt='Alt']"
+
+      asset.destroy!
+      get "/"
+      assert_select ".content-block--rich-text img", count: 0
+    end
+  end
+
+  private
+
+  def with_memory_cache
+    original = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    yield
+  ensure
+    Rails.cache = original
+  end
 end

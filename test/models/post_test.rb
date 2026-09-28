@@ -171,6 +171,38 @@ class PostTest < ActiveSupport::TestCase
     assert post.errors[:body].any?
   end
 
+  # Fix round 1 (m3): nothing at all is not "clear this locale" -- it
+  # used to delete the locale's document silently.
+  test "a body that is nil, blank or JSON null is rejected, and the stored document kept" do
+    [ nil, "", "  ", "null" ].each_with_index do |value, index|
+      post = Post.create!(content_type: :blog, title: "Hello #{index}", body_doc: rich_doc("Kept"))
+
+      post.assign_body(value, locale: "en")
+
+      assert_not post.save, "#{value.inspect} should not save"
+      assert post.errors[:body].any?
+      assert_equal rich_doc("Kept"), post.reload.body_document(locale: "en").to_h
+    end
+  end
+
+  test "an explicit empty document clears a body" do
+    post = Post.create!(content_type: :blog, title: "Hello", body_doc: rich_doc("Gone"))
+
+    post.assign_body(RichText::Document::EMPTY_HASH.to_json, locale: "en")
+    post.save!
+
+    assert post.reload.body_document(locale: "en").blank?
+  end
+
+  test "a valid assignment after a rejected one clears the rejection" do
+    post = Post.create!(content_type: :blog, title: "Hello")
+
+    post.assign_body("null", locale: "en")
+    post.assign_body(rich_doc("Fine"), locale: "en")
+
+    assert post.save, post.errors.full_messages.inspect
+  end
+
   # A stale reference in a document nobody touched in this save (an
   # internal link whose target was later deleted) must not block unrelated
   # edits: only the locales whose document actually changed are validated.

@@ -46,7 +46,17 @@ module HasRichTextBody
   # as an ordinary validation error on `body` (a 422 in the admin) and is
   # never persisted -- the same "report, don't crash" posture
   # `RichText::Document#validate` takes toward malformed shapes.
+  #
+  # Nothing -- `nil`, `""`, or JSON that parses to nothing (`"null"`) --
+  # is rejected the same way (fix round 1, m3), not treated as "clear this
+  # locale": writing nil through Mobility would silently delete the
+  # locale's document. Clearing a body is an explicit empty document
+  # (`{"type":"doc","content":[]}`, or the empty paragraph an editor
+  # sends), which is stored like any other and reads back as blank. The
+  # rejected locale is remembered in `@unassignable_body_locales` (nothing
+  # is written for it) so `#body_documents_valid` can report it.
   def assign_body(document, locale:)
+    code = locale.to_s
     value =
       case document
       when RichText::Document then document.to_h
@@ -54,13 +64,21 @@ module HasRichTextBody
       else document
       end
 
-    public_send(:body_doc=, value, locale: locale.to_s)
+    unassignable_body_locales.delete(code)
+    return unassignable_body_locales << code if value.nil?
+
+    public_send(:body_doc=, value, locale: code)
   end
 
   private
 
+  def unassignable_body_locales = (@unassignable_body_locales ||= Set.new)
+
+  # A blank String is "nothing", not an unparseable document: stored raw,
+  # Mobility's `presence` plugin would turn `""` into nil and delete the
+  # locale anyway.
   def parse_body_json(string)
-    return nil if string.blank?
+    return nil if string.strip.empty?
 
     JSON.parse(string)
   rescue JSON::ParserError
@@ -80,6 +98,8 @@ module HasRichTextBody
   # Errors land on `:body` (spec §3.5), the name the admin's error slot and
   # every caller already know -- not `body_doc`, the column's interim name.
   def body_documents_valid
+    unassignable_body_locales.each { |code| errors.add(:body, :invalid, message: "(#{code}) isn't a document -- send an empty document to clear it") }
+
     previous = persisted? ? attribute_in_database(:body_doc).to_h : {}
 
     read_attribute(:body_doc).to_h.each do |code, value|

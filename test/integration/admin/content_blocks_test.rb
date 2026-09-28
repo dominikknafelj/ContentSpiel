@@ -156,7 +156,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   test "updating a deleted block answers gone" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     block.destroy!
-    patch "#{blocks_path}/#{block.id}", params: { block: { body_doc: rich_doc("x") } }, as: :turbo_stream
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("x").to_json } }, as: :turbo_stream
     assert_response :gone
     assert_includes response.body, "This block was deleted"
   end

@@ -130,10 +130,19 @@ module RichText
     # built-in, or a plugin's type shape changing) invalidates every cached
     # render instead of serving stale HTML for a type whose rendering rules
     # just changed.
+    #
+    # `context.content_version` (fix round 1) is the site's content
+    # fingerprint (`PublicSite.current_content_version`): the digest only
+    # covers the document itself, but its HTML also depends on the world
+    # around it -- an internal link renders as text until its target is
+    # published, points at the target's *current* slug, and degrades to text
+    # once the target is deleted; an image renders its `MediaAsset`'s URL, or
+    # nothing once the asset is gone. Without it, Solid Cache would keep
+    # serving the first render of each of those forever.
     def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
       context = RichText::RenderContext.new(locale: locale, urls: urls)
 
-      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview ]) do
+      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version ]) do
         RichText::HtmlRenderer.new(context).render(self)
       end
     end

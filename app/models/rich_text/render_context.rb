@@ -10,14 +10,21 @@
 # back into `ctx.urls` for it) and so it's cheap to fold into the render
 # cache key (`RichText::Document#to_html`) without the cache key builder
 # needing to know `PublicSite::Urls` has a `#preview?` at all.
+#
+# `content_version` (fix round 1) is `PublicSite.current_content_version` --
+# the site's content fingerprint, memoised per request -- captured here for
+# the same reason as `preview`: the render cache key needs it, because a
+# rendered body bakes in link hrefs and image URLs that change without the
+# document itself changing (see `RichText::Document#to_html`).
 module RichText
   class RenderContext
-    attr_reader :locale, :urls, :preview
+    attr_reader :locale, :urls, :preview, :content_version
 
-    def initialize(locale:, urls:)
+    def initialize(locale:, urls:, content_version: PublicSite.current_content_version)
       @locale = locale
       @urls = urls
       @preview = urls.preview?
+      @content_version = content_version
     end
   end
 end

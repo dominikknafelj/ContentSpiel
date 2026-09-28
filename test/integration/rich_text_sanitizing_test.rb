@@ -36,6 +36,7 @@ class RichTextSanitizingTest < ActionDispatch::IntegrationTest
     get "/blog/hello"
 
     assert_response :success
+    assert_not_includes response.body, "evil.example"
     assert_not_includes response.body, "<iframe"
   end
 

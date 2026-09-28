@@ -31,6 +31,22 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_text Locales.name(Locales.default, native: true)
   end
 
+  # Fix round 1 (m2): the read-only original is rendered HTML, so markup
+  # typed as *text* in the primary language must come out escaped, never
+  # live.
+  test "the original escapes script tags and event handlers typed as text" do
+    original = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => %(<script>alert(1)</script><b onclick="x()">bold</b>) } ] } ] }
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, original: original)
+
+    refute_selector "[data-original-for=body] script", visible: :all
+    refute_selector "[data-original-for=body] b"
+    refute_selector "[onclick]"
+    assert_includes rendered_content, "&lt;script&gt;"
+    assert_selector "[data-original-for=body]", text: %(<script>alert(1)</script><b onclick="x()">bold</b>)
+  end
+
   test "no original column when none is given, or when the original is blank" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: doc("Hello"))
     refute_selector "[data-original-for]"
