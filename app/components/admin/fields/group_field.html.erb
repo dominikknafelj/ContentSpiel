@@ -1,0 +1,12 @@
+<fieldset class="rounded-cs border border-line p-3">
+  <legend class="<%= setup_label_class %>"><%= field.name.humanize %></legend>
+  <% subfields.each do |subfield| %>
+    <%= render Admin::FieldComponent.new(
+          field: subfield,
+          form_name: input_name,
+          value: subfield_value(subfield),
+          original: subfield_original(subfield),
+          locale: locale
+        ) %>
+  <% end %>
+</fieldset>

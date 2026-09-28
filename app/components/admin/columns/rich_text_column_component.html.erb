@@ -1,0 +1,31 @@
+<div class="admin-column mb-4" data-field-name="<%= name %>">
+  <label class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></label>
+
+  <%# `html_name`, not `name` -- Task 7 fix: `rich_text_area_tag` (ActionText's
+      own tag helper) uses whatever string it's given as the hidden field's
+      literal `name=` attribute, with no notion of the surrounding form's own
+      nesting the way `form.rich_text_area` would supply automatically. The
+      bare `name` (e.g. "body") is only ever the *label*/`data-field-name`'s
+      concern; every other column component here already draws that same
+      distinction (`html_name` defaults to `name` when a caller has no
+      nested form to submit into, e.g. this component's own Lookbook
+      preview), so a caller that *does* need `params[:post][:body]` or
+      `params[:block][:body]` -- both `Admin::PostFormComponent` and
+      `Admin::BlockCardComponent` pass `html_name: field_html_name("body")`
+      today -- was silently submitting `params[:body]` at the top level
+      instead until this fix. %>
+  <%= helpers.rich_text_area_tag html_name, value %>
+
+  <% if show_original? %>
+    <div class="mt-2 rounded-cs border border-line bg-sunken px-3 py-2 cs-prose">
+      <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
+      <%= sanitized_original %>
+    </div>
+  <% end %>
+
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
+    <% errors.each do |message| %>
+      <p><%= message %></p>
+    <% end %>
+  </div>
+</div>

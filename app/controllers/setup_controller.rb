@@ -130,7 +130,7 @@ class SetupController < ApplicationController
         session.delete(:setup_token_verified)
         redirect_to setup_step_path("site")
       elsif User.exists?
-        redirect_to new_session_path, alert: "An admin account already exists. Sign in to continue setup."
+        redirect_to admin_sign_in_path, alert: "An admin account already exists. Sign in to continue setup."
       else
         render :admin, status: :unprocessable_entity
       end
@@ -200,6 +200,10 @@ class SetupController < ApplicationController
 
     def update_review
       Setup.complete!
-      redirect_to Avo.configuration.root_path, notice: "Setup complete."
+      # CS Studio, not Avo, is where every sign-in lands now (cs-studio spec
+      # §3) -- finishing setup is no exception, even though the admin who
+      # just walked through this wizard is still signed in from `update_admin`
+      # above and could just as easily have been sent to Avo directly.
+      redirect_to admin_root_path, notice: "Setup complete."
     end
 end

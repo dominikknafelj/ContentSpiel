@@ -40,7 +40,7 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "sign-in uses the product layout and stylesheet" do
-    get new_session_path
+    get admin_sign_in_path
 
     assert_select "link[rel=stylesheet][href*='/tailwind-']"
     assert_select "link[rel=stylesheet][href*='theme-default']", count: 0

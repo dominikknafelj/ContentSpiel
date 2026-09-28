@@ -1,0 +1,9 @@
+<% content_for :tree do %>
+  <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
+<% end %>
+
+<%= render Admin::EmptyStateComponent.new(title: "Pages", description: "Choose a page in the tree, or add one.") do |empty_state| %>
+  <% empty_state.with_action do %>
+    <%= link_to "+ Add a page", new_admin_page_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <% end %>
+<% end %>

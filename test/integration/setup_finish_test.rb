@@ -22,7 +22,7 @@ class SetupFinishTest < ActionDispatch::IntegrationTest
   test "finishing creates the homepage, ends setup and opens the admin" do
     patch setup_step_path("review")
 
-    assert_redirected_to "/avo"
+    assert_redirected_to "/cs-studio"
     assert_not Setup.required?
 
     get "/"

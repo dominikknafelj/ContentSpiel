@@ -1,0 +1,15 @@
+<div class="admin-column mb-4" data-field-name="<%= name %>">
+  <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
+
+  <% if attached? %>
+    <%= image_tag value, class: "mb-2 max-h-32 rounded-cs border border-line object-cover" %>
+  <% end %>
+
+  <%= tag.input(**html.merge(type: "file", name: html_name, id: id, accept: "image/*", class: setup_input_class)) %>
+
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
+    <% errors.each do |message| %>
+      <p><%= message %></p>
+    <% end %>
+  </div>
+</div>

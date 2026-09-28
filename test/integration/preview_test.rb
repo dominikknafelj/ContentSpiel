@@ -9,7 +9,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
 
   test "preview requires sign-in" do
     get "/preview/draft"
-    assert_redirected_to new_session_path
+    assert_redirected_to admin_sign_in_path
   end
 
   test "signed-in editors preview drafts with a banner, no-store and noindex" do
@@ -19,7 +19,7 @@ class PreviewTest < ActionDispatch::IntegrationTest
     assert_select "[role=status]", /Draft/
     assert_equal "private, no-store", response.headers["Cache-Control"]
     assert_equal "noindex", response.headers["X-Robots-Tag"]
-    assert_select "a[href=?]", "/avo/resources/pages/#{@draft.id}/edit"
+    assert_select "a[href=?]", "/cs-studio/pages/#{@draft.id}"
   end
 
   test "links inside a preview stay in preview" do

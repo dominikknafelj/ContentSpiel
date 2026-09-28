@@ -86,7 +86,7 @@ class SetupAccessTest < ActionDispatch::IntegrationTest
 
     get setup_step_path("site")
 
-    assert_redirected_to new_session_path
+    assert_redirected_to admin_sign_in_path
   end
 
   test "signing in resumes the step that was asked for" do
@@ -94,7 +94,7 @@ class SetupAccessTest < ActionDispatch::IntegrationTest
     User.create!(email_address: "owner@example.com", password: "password123")
     get setup_step_path("site")
 
-    post session_path, params: { email_address: "owner@example.com", password: "password123" }
+    post admin_sign_in_path, params: { email_address: "owner@example.com", password: "password123" }
 
     assert_redirected_to setup_step_path("site")
   end

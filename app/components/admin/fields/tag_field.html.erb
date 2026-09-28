@@ -1,0 +1,6 @@
+<%= tag.input type: "text", name: input_name, id: input_id, value: value, list: datalist_id, class: setup_input_class, required: field.required? %>
+<datalist id="<%= datalist_id %>">
+  <% tag_names.each do |name| %>
+    <option value="<%= name %>"></option>
+  <% end %>
+</datalist>

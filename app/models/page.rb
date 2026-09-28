@@ -5,6 +5,14 @@ class Page < ApplicationRecord
 
   localized_slug scope: :parent_id
 
+  # A root child's slug is the whole first path segment after the domain --
+  # exactly where CS Studio lives too (cs-studio spec §3). Checked here,
+  # alongside the other slug validations above, rather than inside the
+  # shared LocalizedSlug concern: this rule is specific to a page's position
+  # in *this* tree (only a root child's slug becomes a top-level segment;
+  # Post has no tree position and no equivalent rule).
+  validate :slug_not_reserved_for_admin
+
   # closure_tree 9.8: `has_closure_tree` builds the PageHierarchy model and the
   # parent/children/ancestors/descendants associations on top of the
   # `page_hierarchies` closure table.
@@ -179,6 +187,22 @@ class Page < ApplicationRecord
     blocks = ContentBlock.listing.where(owner: self_and_descendants)
     types = blocks.map { |block| block.settings_object.content_type }
     types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
+  end
+
+  # Checked per enabled locale, the same granularity
+  # `LocalizedSlug#slug_is_unused_in_every_locale` uses, so the admin form
+  # marks whichever locale's tab actually collides -- an editor translating
+  # a page one language at a time only typed the reserved value into one of
+  # them.
+  def slug_not_reserved_for_admin
+    return unless parent&.root?
+
+    ::Locales.enabled.each do |locale|
+      accessor = ::Mobility.normalize_locale_accessor(:slug, locale)
+      next unless public_send(accessor) == ContentSpiel::ADMIN_PATH
+
+      errors.add(accessor, "is reserved for the admin")
+    end
   end
 
   # Raw jsonb hash, not the Mobility reader: see the comment above

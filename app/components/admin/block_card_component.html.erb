@@ -1,0 +1,116 @@
+<div id="<%= dom_id %>" data-block-id="<%= block.id %>" data-admin--blocks-target="card"
+     class="admin-block-card rounded-cs border border-line bg-surface">
+  <div class="flex items-center gap-2 border-b border-line p-3">
+    <span class="admin-block-card__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+
+    <% if unavailable? %>
+      <span class="flex-1 font-semibold text-danger-ink"><%= unavailable_label %></span>
+    <% else %>
+      <button type="button" class="flex-1 truncate text-left font-semibold text-ink" data-action="click->admin--blocks#toggle">
+        <%= label %>
+      </button>
+    <% end %>
+
+    <%# The "⋯" menu (spec §5.1) is a plain, single-level `<details>` --
+        the same disclosure pattern `Admin::RecordHeaderComponent`'s own
+        "Schedule…" already uses -- not nested inside the collapse toggle
+        above, so a click inside it never also fires that button's own
+        `data-action`. %>
+    <details class="admin-block-card__menu relative shrink-0">
+      <summary class="cursor-pointer list-none rounded-cs px-2 py-1 text-meta hover:bg-sunken" aria-label="Block actions">⋯</summary>
+      <div class="absolute right-0 z-10 mt-1 flex w-40 flex-col gap-1 rounded-cs border border-line-strong bg-surface p-1 shadow-menu">
+        <% unless unavailable? %>
+          <%= button_to "Duplicate", duplicate_path, method: :post, class: "w-full rounded-cs px-2 py-1 text-left text-sm text-ink hover:bg-sunken" %>
+          <button type="button" data-action="click->admin--blocks#moveUp" class="w-full rounded-cs px-2 py-1 text-left text-sm text-ink hover:bg-sunken">Move up</button>
+          <button type="button" data-action="click->admin--blocks#moveDown" class="w-full rounded-cs px-2 py-1 text-left text-sm text-ink hover:bg-sunken">Move down</button>
+        <% end %>
+        <button type="button" class="w-full rounded-cs px-2 py-1 text-left text-sm text-danger-ink hover:bg-danger-tint"
+                onclick="document.getElementById('<%= delete_dialog_id %>').showModal()">Delete</button>
+      </div>
+    </details>
+  </div>
+
+  <% unless unavailable? %>
+    <div data-block-body class="flex flex-col gap-3 p-3">
+      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+
+      <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
+            data: {
+              controller: "admin--autosave",
+              action: "input->admin--autosave#queue change->admin--autosave#queue trix-change->admin--autosave#queue focusout->admin--autosave#saveNow",
+              "admin--autosave-status-id-value": status_id
+            } do %>
+        <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+        <% schema_fields.each do |field| %>
+          <%= render Admin::FieldComponent.new(
+                field: field, form_name: "block[settings]",
+                value: value_for(field), original: original_for(field), locale: locale,
+                errors: field_errors(field), id_prefix: error_prefix
+              ) %>
+        <% end %>
+
+        <% uses_columns.each do |column| %>
+          <% case column
+             when "body" %>
+            <%= render Admin::Columns::RichTextColumnComponent.new(
+                  name: "body", id: field_id("body"), html_name: field_html_name("body"),
+                  value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale
+                ) %>
+          <% when "caption" %>
+            <%= render Admin::Columns::PlainColumnComponent.new(
+                  name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
+                  value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale
+                ) %>
+          <% when "alt" %>
+            <%= render Admin::Columns::PlainColumnComponent.new(
+                  name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
+                  value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale
+                ) %>
+          <% when "image" %>
+            <%# Same shared partial (and the same "Remove image"/new-upload-
+                wins pattern) as the page settings form's own hero image
+                section, Task 4 fix rounds 1/2 -- re-rendered here on a
+                normal GET and again by
+                `Admin::ContentBlocksController#image_field_stream` after
+                any save that touches the attachment. `name: "image"` (fix
+                round 1) is what keeps this column's label reading "Image"
+                rather than the partial's own default "hero_image" ->
+                "Hero image", which never described a block's own image
+                column. %>
+            <%= render partial: "admin/shared/hero_image_field", locals: {
+                  section_id: image_section_id, name: "image",
+                  image_id: field_id("image"), image_html_name: field_html_name("image"), image_value: column_value("image"),
+                  checkbox_id: field_id("remove_image"), checkbox_html_name: field_html_name("remove_image"),
+                  show_checkbox: block.image.attached?
+                } %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this block?", body: "This can't be undone.") do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: destroy_path, method: :delete do %>
+        <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%# The collapsed "+ add block" trigger between this card and the next
+      (spec §5.1) is a *child* of this card's own wrapper, not a sibling in
+      the list -- so a drag that moves this card (SortableJS, `admin--
+      blocks`, which only ever sorts the list's direct children) carries its
+      own "add after me" affordance along with it automatically, rather than
+      that trigger being left stranded between whatever two cards now happen
+      to sit either side of its old position. Nesting it here also keeps it
+      out of Sortable's own item list for free -- `Sortable.create` never
+      needs a `draggable:`/`filter:` option to skip it, since it was never a
+      direct child of the sortable list to begin with. The very last card
+      renders none of its own; the page-level "add at the end" picker
+      already covers that same slot. %>
+  <% unless unavailable? || last? %>
+    <%= render Admin::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, after_id: block.id) %>
+  <% end %>
+</div>

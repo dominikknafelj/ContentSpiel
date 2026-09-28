@@ -1,0 +1,24 @@
+<div class="admin-column mb-4" data-field-name="<%= name %>">
+  <label class="<%= setup_label_class %> mb-1" for="<%= id %>">Slug</label>
+
+  <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: setup_input_class)) %>
+
+  <%# `data-admin--slug-preview-target="output"` is always present, not
+      passed in via `**html` the way the input's own target is (Task 4) --
+      this span only ever plays one role, so there's no caller-specific
+      variation to thread through, unlike the input above which is also a
+      plain slug field with no live-preview controller in view (e.g. a
+      future post editor that hasn't wired one up yet). A wrapping
+      `data-controller="admin--slug-preview"` that never shows up (this
+      component's own Lookbook preview, a post form before Task 6 adds this
+      controller there) simply leaves the attribute inert. %>
+  <p class="mt-1 text-sm text-meta">
+    <span data-slug-preview-base><%= base_url %>/</span><span data-admin--slug-preview-target="output"><%= value %></span>
+  </p>
+
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
+    <% errors.each do |message| %>
+      <p><%= message %></p>
+    <% end %>
+  </div>
+</div>

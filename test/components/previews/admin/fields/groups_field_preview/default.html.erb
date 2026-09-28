@@ -1,0 +1,8 @@
+<%
+  FieldGroups.register("test/preview_speaker") do |g|
+    g.field :name, :string, required: true
+    g.field :bio, :text
+  end
+%>
+<%= render Admin::Fields::GroupsField.new(field: field, form_name: "post[fields]", value: [ { "name" => "Ada Lovelace" }, { "name" => "Grace Hopper" } ], locale: "en") %>
+<% Rails.application.reloader.prepare! %>

@@ -1,0 +1,12 @@
+<dialog id="<%= id %>" class="admin-confirm-dialog rounded-cs border border-line-strong bg-surface p-6 shadow-menu">
+  <h2 class="text-h2 text-ink"><%= title %></h2>
+  <% if body.present? %>
+    <p class="mt-2 text-ink"><%= body %></p>
+  <% end %>
+  <div class="mt-4 flex justify-end gap-2">
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::ButtonComponent.new(label: cancel_label, variant: :secondary, type: "submit") %>
+    <% end %>
+    <%= confirm_action %>
+  </div>
+</dialog>

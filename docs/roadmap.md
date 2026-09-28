@@ -77,6 +77,18 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Provider/API key + opt-in; audit AI edits |
 | Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
 
+## Known interim states
+
+Deliberate gaps shipped ahead of the item that closes them (greenfield: fine while tracked here).
+
+| Interim state | Since | Closed by |
+|---|---|---|
+| CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
+| Avo still mounted for settings, users, tokens, system status | Sub-project 3 | Sub-project 6 (remaining modules), sub-project 7 (remove Avo) |
+| Deletes are permanent | Sub-project 3 | Trash (Phase 2 / sub-project 6) |
+| CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
+| CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
+
 ## Out of scope (for now)
 
 Multi-site, e-commerce, memberships/paywall, built-in comments.

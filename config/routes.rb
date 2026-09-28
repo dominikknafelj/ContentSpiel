@@ -43,8 +43,85 @@ Rails.application.routes.draw do
   # path.
   mount Lookbook::Engine, at: "/lookbook" if Rails.env.development?
 
-  resource :session
-  resources :passwords, param: :token
+  # CS Studio, the admin (cs-studio spec §3). Its path is configurable
+  # (ContentSpiel::ADMIN_PATH) and sign-in lives under it, so the public site
+  # advertises no login page. Declared before /preview and the public
+  # catch-alls, which would otherwise swallow it as a page path.
+  scope ContentSpiel::ADMIN_PATH, module: :admin, as: :admin do
+    get "sign-in", to: "sessions#new", as: :sign_in
+    post "sign-in", to: "sessions#create"
+    delete "sign-out", to: "sessions#destroy", as: :sign_out
+    resource :password, only: %i[new create]
+    get "password/:token/edit", to: "passwords#edit", as: :edit_password
+    patch "password/:token", to: "passwords#update", as: :update_password
+
+    # The Pages module (cs-studio spec §4.1/§5.1). `member` adds the three
+    # publish-state actions the record header's own buttons post to
+    # (Publish now / Unpublish / Schedule…, spec §5.1) -- each its own
+    # one-shot POST, deliberately outside the settings form's autosave
+    # (`Admin::PagesController`'s own class comment explains why).
+    resources :pages, only: %i[index new create show update destroy] do
+      member do
+        post :publish
+        post :unpublish
+        post :schedule
+      end
+
+      # A page's blocks (cs-studio spec §5.1/§6.1, Task 5): nested under the
+      # page rather than a top-level resource, since a block is meaningless
+      # without the page it's on and every one of these actions already
+      # needs `page_id` to scope its lookup (`Admin::ContentBlocksController
+      # #set_page`) -- there is no "show a block on its own" screen for
+      # `:show`/`:index` to serve. `reorder` is a `collection` route (it
+      # names every block to keep, not one) the same way the page tree's own
+      # move endpoint is `resource :tree`, not nested under one page;
+      # `duplicate` is a `member` route since it always starts from exactly
+      # one existing block.
+      resources :content_blocks, only: %i[create update destroy] do
+        collection { patch :reorder }
+        member { post :duplicate }
+      end
+    end
+
+    # The page tree's own move endpoint (cs-studio spec §4.2), a `resource`
+    # (singular) rather than nested under `pages` -- a move names the page
+    # being dragged in its own params (`page_id`), not the URL, since the
+    # same one PATCH target serves every node in the tree. `update` only
+    # (final-fixes round, finding 11): the tree's own GET is already free on
+    # every Pages view via `content_for :tree` -- a bare `:show` here
+    # answered a plain GET with a Turbo Stream body, which nothing in this
+    # app ever actually requests (no `<turbo-frame src="...">` points at
+    # it) and no browser navigating here directly could even render (a
+    # `<turbo-stream>` response isn't valid, renderable HTML for a
+    # top-level GET).
+    resource :tree, only: %i[update], controller: :tree
+
+    # The Posts module (cs-studio spec §4.1/§5.2): a flat, filterable list
+    # (no tree column of its own -- a post has no parent/child structure the
+    # way a page does) plus the post editor. `member` adds the same three
+    # publish-state actions the page editor's own record header posts to
+    # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
+    # comment explains why each is a one-shot POST kept deliberately outside
+    # the post form's own autosave, not folded into `update`).
+    resources :posts, only: %i[index new create show update destroy] do
+      member do
+        post :publish
+        post :unpublish
+        post :schedule
+      end
+    end
+
+    # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
+    # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
+    # an inline rename (`:update`) and a delete (`:destroy`) from the list
+    # itself; new tags are only ever created in passing, through a post's own
+    # `tag_names` (`Posts::Save`).
+    resources :tags, only: %i[index update destroy]
+
+    # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
+    # the placeholder `home#show` this task's brief removes.
+    root to: "pages#index"
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # First-run setup wizard (design spec 2026-09-26 §4). SetupController

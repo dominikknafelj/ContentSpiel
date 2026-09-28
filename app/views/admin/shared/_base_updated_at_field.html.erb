@@ -1,0 +1,9 @@
+<%# locals: id, value -- the autosave form's own concurrency baseline
+    (cs-studio spec §6.1), refreshed to the record's fresh `updated_at`
+    after every successful save (`Admin::AutosaveResponses#autosave_stream`)
+    so the *next* autosave compares against what this one just wrote, not
+    whatever was loaded when the page first rendered. A plain Turbo Stream
+    `replace` swaps this whole hidden input (id and all) for the same
+    reason every other slot here does: the id has to survive the replace
+    unchanged, or the next PATCH would have nothing to overwrite it again. %>
+<%= hidden_field_tag "base_updated_at", value, id: id %>

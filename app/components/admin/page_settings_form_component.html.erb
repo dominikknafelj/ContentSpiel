@@ -1,0 +1,87 @@
+<details open class="admin-page-settings rounded-cs border border-line bg-surface p-4">
+  <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Page settings</summary>
+
+  <%# `data-controller="admin--autosave"` sits on this form directly (not a
+      wrapping element) -- see that controller's own comment for why its
+      save-status line, which lives in the record header instead, doesn't
+      need a Stimulus target here to reach it. %>
+  <%= form_with url: form_url, method: :patch, class: "mt-4 flex flex-col gap-4",
+        data: {
+          controller: "admin--autosave",
+          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+          "admin--autosave-status-id-value": status_id
+        } do %>
+
+    <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+    <%# Wraps title + slug only, for `admin--slug-preview` (Task 4, carried
+        in from Task 2's review): a bubbling `input` listener here is enough
+        to keep the slug preview live without either field's own component
+        knowing that controller exists. %>
+    <div data-controller="admin--slug-preview" data-action="input->admin--slug-preview#update">
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "title", id: field_id("title"), html_name: field_html_name("title"),
+            value: value(:title), original: original(:title), locale: locale,
+            data: { "admin--slug-preview-target": "title" }
+          ) %>
+
+      <% if show_slug? %>
+        <%= render Admin::Columns::SlugColumnComponent.new(
+              name: "slug", id: field_id("slug"), html_name: field_html_name("slug"),
+              value: value(:slug), base_url: slug_base_url, original: original(:slug), locale: locale,
+              data: { "admin--slug-preview-target": "slug" }
+            ) %>
+      <% end %>
+    </div>
+
+    <div class="admin-column mb-4" data-field-name="page_type">
+      <%= label_tag field_id("page_type"), "Page type", class: setup_label_class %>
+      <%= select_tag field_html_name("page_type"), options_for_select(page_type_options, page.page_type),
+            id: field_id("page_type"), class: setup_input_class %>
+      <div id="<%= errors_id("page_type") %>" class="mt-1 text-sm text-danger-ink"></div>
+    </div>
+
+    <%= render Admin::Columns::PlainColumnComponent.new(
+          name: "subtitle", id: field_id("subtitle"), html_name: field_html_name("subtitle"),
+          value: value(:subtitle), original: original(:subtitle), locale: locale
+        ) %>
+
+    <% if landing? %>
+      <%# `admin/shared/hero_image_field` (Task 4 fix round 2) is the one
+          template for "what does the hero section look like" -- rendered
+          here on a normal GET, and again by
+          `Admin::PagesController#hero_image_stream` after any save that
+          replaces or removes the attachment, so the checkbox below (and
+          the preview above it) never goes stale the way a plain autosave
+          -- which only ever reflects back whatever an editor already typed
+          into an unrelated input -- would otherwise leave it. %>
+      <%= render partial: "admin/shared/hero_image_field", locals: {
+            section_id: hero_image_section_id,
+            image_id: field_id("hero_image"), image_html_name: field_html_name("hero_image"), image_value: page.hero_image,
+            checkbox_id: field_id("remove_hero_image"), checkbox_html_name: field_html_name("remove_hero_image"),
+            show_checkbox: page.hero_image.attached?
+          } %>
+
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "hero_alt", id: field_id("hero_alt"), html_name: field_html_name("hero_alt"),
+            value: value(:hero_alt), original: original(:hero_alt), locale: locale
+          ) %>
+    <% end %>
+
+    <details class="admin-page-settings__seo">
+      <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">SEO</summary>
+
+      <div class="mt-3 flex flex-col gap-4">
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "meta_title", id: field_id("meta_title"), html_name: field_html_name("meta_title"),
+              value: value(:meta_title), original: original(:meta_title), locale: locale
+            ) %>
+
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "meta_description", id: field_id("meta_description"), html_name: field_html_name("meta_description"),
+              value: value(:meta_description), original: original(:meta_description), locale: locale, multiline: true
+            ) %>
+      </div>
+    </details>
+  <% end %>
+</details>
