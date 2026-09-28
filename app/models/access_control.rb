@@ -34,6 +34,54 @@ module AccessControl
 
     def trusted?(actor, channel) = Checker.trusted?(actor, channel)
 
+    # Design spec §3.3 "Scopes for reading" -- see `AccessControl::Scoping`.
+    # `relation` (a `Post`, `Page` or `ContentBlock` relation) narrowed to
+    # the records `allowed?(actor, key, record)` would allow: untouched for
+    # owners and trusted code paths, `relation.none` when nothing can
+    # match. `key` names a subject permission (a read key also admits its
+    # subject's write grants); an admin-area key, or one for another
+    # subject, raises ArgumentError. Costs no queries of its own beyond
+    # loading the actor's grants, once per request.
+    def scope(actor, key, relation, channel: Current.channel)
+      Scoping.new(actor, key, channel).apply(relation)
+    end
+
+    # The CS Studio page tree (design spec §3.3): the ids of the pages
+    # `actor` may read, plus `context` -- the ancestors of those pages
+    # that aren't readable themselves, which the tree shows greyed out,
+    # without actions, so a readable page deep in the tree still has its
+    # path to the root. Three queries at most, whatever the tree's size:
+    # the grants (memoised), the readable ids, and their ancestors from
+    # the closure table (a subquery on the first, not a list of ids).
+    def tree_visibility(actor, channel: Current.channel)
+      readable_pages = scope(actor, "pages.read", Page.all, channel: channel)
+      readable = readable_pages.pluck(:id).to_set
+      ancestors = PageHierarchy.where(descendant_id: readable_pages.select(:id)).distinct.pluck(:ancestor_id)
+      { readable: readable, context: ancestors.to_set - readable }
+    end
+
+    # Design spec §3.3 "Performance": `allowed?` over a list of pages (the
+    # tree's per-row buttons) would otherwise query the closure table once
+    # per page for its branch. This loads every listed page's self-and-
+    # ancestor ids in one query and keeps them on the page objects, where
+    # `Checker.page_branch_ids` finds them. It's a snapshot, like any
+    # preloaded association: a page moved after the preload still answers
+    # from its old position until it's loaded afresh. Only call it on a
+    # list about to be rendered; a write service is handed the record its
+    # controller loaded for that request, never a preloaded list entry.
+    # Returns `pages`.
+    def preload_branches(pages)
+      persisted = pages.select(&:persisted?)
+      return pages if persisted.empty?
+
+      found = PageHierarchy.where(descendant_id: persisted.map(&:id)).pluck(:descendant_id, :ancestor_id)
+        .group_by(&:first).transform_values { |pairs| pairs.map(&:last) }
+      persisted.each do |page|
+        page.instance_variable_set(Checker::PRELOADED_BRANCH_IDS, found.fetch(page.id, []))
+      end
+      pages
+    end
+
     def page_branch_ids(page) = Checker.page_branch_ids(page)
 
     # No privilege escalation (design spec §3.3 "Groups"): may `user` hand

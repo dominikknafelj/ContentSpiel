@@ -25,6 +25,21 @@ module AccessControl
     # §3.1 "Blocks").
     BLOCK_OWNER_PREFIX = { "Page" => "pages", "Post" => "posts" }.freeze
 
+    # Where `AccessControl.preload_branches` leaves a page's branch ids.
+    PRELOADED_BRANCH_IDS = :@access_control_branch_ids
+
+    # The grant keys that can satisfy `permission` -- itself, plus, for a
+    # subject's `read`, every registered write key on the same subject
+    # (design spec §3.3 "Implication"). Shared with `Scoping`.
+    def self.candidate_keys(permission)
+      keys = [ permission.key ]
+      if permission.action == :read && permission.subject
+        prefix = permission.key.delete_suffix(".read")
+        keys += WRITE_ACTIONS.map { |action| "#{prefix}.#{action}" }.select { |key| Permissions.find(key) }
+      end
+      keys
+    end
+
     def self.trusted?(actor, channel)
       actor.nil? && TRUSTED_CHANNELS.include?(channel.presence&.to_sym)
     end
@@ -33,7 +48,14 @@ module AccessControl
     # listed roots are matched against. An unsaved page has no closure
     # rows yet; it will sit under its parent, so it's in exactly the
     # branches its parent is in (and none, for a new root).
+    #
+    # A page passed through `AccessControl.preload_branches` answers from
+    # that preload instead of querying (design spec §3.3 "Performance":
+    # one closure query per page set, not one per row).
     def self.page_branch_ids(page)
+      if page.instance_variable_defined?(PRELOADED_BRANCH_IDS)
+        return page.instance_variable_get(PRELOADED_BRANCH_IDS)
+      end
       return page.self_and_ancestor_ids unless page.new_record?
 
       page.parent ? page_branch_ids(page.parent) : []
@@ -81,21 +103,14 @@ module AccessControl
       grant_set.for(candidate_keys).any? { |grant| grant_matches?(grant, user_id) }
     end
 
-    def candidate_keys
-      @candidate_keys ||= begin
-        keys = [ @permission.key ]
-        if @permission.action == :read && @permission.subject
-          prefix = @permission.key.delete_suffix(".read")
-          keys += WRITE_ACTIONS.map { |action| "#{prefix}.#{action}" }.select { |key| Permissions.find(key) }
-        end
-        keys
-      end
-    end
+    def candidate_keys = @candidate_keys ||= self.class.candidate_keys(@permission)
 
-    # Every scope key present on the grant must match (AND). Fail-closed
-    # throughout (Review Focus 3): a key this record can't be matched
-    # against, an empty list, a stale page id or a content type that's no
-    # longer registered all simply match nothing, never raise.
+    # Every scope key present on the grant must match (AND); the rules
+    # live in `Scoping::Condition`, shared with `AccessControl.scope` so a
+    # list and a single check can never disagree. Fail-closed throughout
+    # (Review Focus 3): a key this record can't be matched against, an
+    # empty list, a stale page id or a content type that's no longer
+    # registered all simply match nothing, never raise.
     #
     # A nil record asks "does the actor hold this key anywhere?" (a
     # sidebar entry, a "New page" button whose parent isn't chosen yet),
@@ -104,22 +119,7 @@ module AccessControl
     def grant_matches?(grant, user_id)
       return true if @record.nil?
 
-      grant.scope.all? do |scope_key, value|
-        case scope_key
-        when "content_types" then @record.is_a?(Post) && Array(value).include?(@record.content_type)
-        when "page_ids" then @record.is_a?(Page) && Array(value).map(&:to_i).intersect?(branch_ids)
-        when "own" then !grant.scope_own? || own?(user_id)
-        else false
-        end
-      end
-    end
-
-    # Design spec §3.3: "There is no record yet, so `own` always matches on
-    # create" -- the post's author becomes the actor.
-    def own?(user_id)
-      return false unless @record.is_a?(Post)
-
-      @record.new_record? || (user_id.present? && @record.author_id == user_id)
+      Scoping::Condition.new(grant, user_id, @permission).matches?(@record, -> { branch_ids })
     end
 
     # `pages.create` is checked against the branch the new page will join
