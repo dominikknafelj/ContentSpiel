@@ -42,6 +42,15 @@ module RichText
     # distinguishes the two by arity.
     Attribute = Data.define(:name, :type, :required, :in, :format, :validate)
 
+    # One directive attribute mapping (`TypeDefinition#directive`'s
+    # `**mapping`) -- `node_attr` is the node's own `attribute` name the
+    # directive's `key="value"` pair feeds (not necessarily the same name
+    # as the directive key itself -- `image`'s `asset` directive attribute
+    # names the node's `asset_id`), `type` is the coercion to apply to the
+    # directive's raw String value (`:string` is the identity; `:integer`
+    # parses it, per `TypeDefinition#coerce_directive_value`).
+    DirectiveAttribute = Data.define(:node_attr, :type)
+
     # Mixed into both `NodeType` and `MarkType` (via `include`, not
     # duplicated into each file): a node and a mark register through the
     # exact same tiny DSL -- `attribute`, plus renderer slots for HTML and
@@ -89,16 +98,85 @@ module RichText
       # writer, same placeholder story as `html` above.
       def markdown_out(&block) = block ? (@markdown_out = block) : @markdown_out
 
-      # Reserved for Task 3's Markdown *parser* (CommonMark for standard
-      # types; a `::name{...}` directive for custom ones). `directive`
-      # records which directive keyword a type answers to
-      # (`directive "youtube"`) so the parser can look a directive name up
-      # against the schema instead of hardcoding "youtube and image are
-      # special"; `markdown_in` itself isn't called by anything until
-      # Task 3, but the slot is declared now so every built-in's
-      # registration block doesn't need reshaping later.
+      # Unused -- reserved for a future Markdown parser hook distinct from
+      # `#directive`'s own (every directive-bearing built-in parses through
+      # `RichText::Markdown::Loader#build_directive`/`#attrs_from_directive`
+      # below instead, driven by the schema rather than a per-type block).
       def markdown_in(&block) = block ? (@markdown_in = block) : @markdown_in
-      def directive(name = nil) = name ? (@directive = name.to_s) : @directive
+
+      # `directive(name, **mapping)` (design spec §3.4) -- records the
+      # `::name{...}` keyword this type answers to in Markdown, plus how
+      # each directive attribute (a `key="value"` pair, always a raw
+      # String) maps onto this type's own `attribute` declarations. A
+      # mapping value of `:string`/`:integer` means "the directive key *is*
+      # the node attribute name, coerced to that type"; `{ attr: :other,
+      # type: :integer }` remaps the key too -- `image`'s `asset` directive
+      # attribute names the node's `asset_id`, not `asset`.
+      #
+      # `RichText::Schema.directive_node` finds a type by this name (fed
+      # into `RichText::Markdown::Loader#build_directive`), and
+      # `#attrs_from_directive`/`#directive_markdown` below are this
+      # declaration's read and write halves -- one declaration drives both
+      # the parser and the writer, so a plugin's directive node type only
+      # has to state this mapping once, not keep the two in sync by hand
+      # the way `youtube`/`image` used to (a hardcoded `case name when
+      # "youtube" ... when "image" ...` in the Loader, and a bespoke
+      # `render_youtube_directive`/`render_image_directive` per node in
+      # `RichText::BuiltIns`).
+      def directive(name = nil, **mapping)
+        return @directive unless name
+
+        @directive = name.to_s
+        @directive_attributes = mapping.each_with_object({}) do |(key, spec), hash|
+          node_attr, type = spec.is_a?(Hash) ? [ spec.fetch(:attr, key), spec.fetch(:type, :string) ] : [ key, spec ]
+          hash[key.to_s] = DirectiveAttribute.new(node_attr: node_attr.to_sym, type: type)
+        end
+        @directive
+      end
+
+      def directive_attributes = @directive_attributes || {}
+
+      # Builds this type's `"attrs"` Hash from a directive's raw
+      # `key="value"` String attributes (already unescaped) --
+      # `RichText::Markdown::Loader#build_directive`'s other half. A
+      # directive key this type never mapped is ignored; a mapped key the
+      # directive didn't supply is left out of the result entirely (not
+      # set to `nil`) so an optional attribute genuinely absent from the
+      # directive stays genuinely absent from the node, matching what
+      # `RichText::Markdown::Dumper` would itself have produced.
+      def attrs_from_directive(raw_attrs)
+        directive_attributes.each_with_object({}) do |(key, spec), attrs|
+          next unless raw_attrs.key?(key)
+
+          attrs[spec.node_attr.to_s] = coerce_directive_value(raw_attrs[key], spec.type)
+        end
+      end
+
+      # The Markdown directive line for `node` -- `#attrs_from_directive`'s
+      # other half, called from this type's own `markdown_out` block
+      # (`RichText::BuiltIns`). Emits one `key="value"` pair per declared
+      # directive attribute whose value is present, plus any that are
+      # `blank?` but back a `required:` node `attribute` anyway (rendered,
+      # rather than silently vanishing from the directive line -- a
+      # required attribute being blank only happens on a document that
+      # skipped `#validate`, the same "hostile documents render inert, not
+      # broken" posture every other `html`/`markdown_out` block here takes).
+      def directive_markdown(node)
+        attrs = node["attrs"].is_a?(Hash) ? node["attrs"] : {}
+        parts = directive_attributes.filter_map do |key, spec|
+          value = attrs[spec.node_attr.to_s]
+          next if value.blank? && !find_attribute(spec.node_attr)&.required
+
+          %(#{key}="#{RichText::Markdown.escape_directive_attr(value)}")
+        end
+        "::#{@directive}{#{parts.join(" ")}}"
+      end
+
+      private
+
+      def coerce_directive_value(value, type)
+        type == :integer ? Integer(value, exception: false) : value
+      end
     end
 
     class << self
@@ -107,6 +185,27 @@ module RichText
 
       def node(name) = nodes[name.to_s]
       def mark(name) = marks[name.to_s]
+
+      # Finds the registered node type that answers to Markdown directive
+      # `name` (`::name{...}`) -- only nodes declare a `directive` (a mark
+      # has no standalone Markdown line of its own to answer to), so this
+      # only ever searches `nodes`, not `marks`. `RichText::Markdown::Loader
+      # #build_directive` is the only caller; dispatching this way --
+      # asking the schema "who owns this directive name" -- rather than a
+      # hardcoded `case name when "youtube" ... when "image" ...` is what
+      # lets a plugin's own directive node type be found exactly the way a
+      # built-in's is (design spec §3.4, review round 1's I6).
+      def directive_node(name) = nodes.values.find { |type| type.directive == name.to_s }
+
+      # The position `name` registered in (`RichText::Schema.register_mark`
+      # call order), or `nil` for an unregistered name -- `RichText
+      # ::Document#normalized`/`RichText::Markdown::Loader#text_node`'s
+      # shared notion of "canonical mark order" (review round 1's I7):
+      # Tiptap/ProseMirror already keeps an editor-built document's marks
+      # in schema order, so this is what "already canonical" means for a
+      # mark array, and what both the digest-adjacent `#normalized` and the
+      # Markdown loader canonicalize *into*.
+      def mark_order(name) = marks.keys.index(name.to_s)
 
       def reset!
         @nodes = {}

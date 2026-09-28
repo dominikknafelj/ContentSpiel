@@ -37,8 +37,60 @@ module RichText
 
     def self.empty = new(EMPTY_HASH.deep_dup)
 
+    # Deep-copies `value`, converting every Hash key to a String and every
+    # Symbol *value* to a String too (fix round 1's addendum) -- run once,
+    # here, at construction, so every other method on this class can
+    # assume `@hash` never mixes Symbol and String keys or values. Two
+    # real bugs motivate this, not just tidiness: `#digest`'s
+    # `payload.keys.sort` raises `ArgumentError` the moment one Hash in the
+    # tree has both a String and a Symbol key (`<=>` isn't defined between
+    # them), which would make `#to_html` raise too (it computes `#digest`
+    # for its cache key); and a Symbol value sitting where a String was
+    # expected (`node["type"] == :text` instead of `"text"`) would silently
+    # fail every `==`/`Schema.node(...)` lookup that assumes a String,
+    # degrading a document instead of erroring. Neither is hypothetical --
+    # a hand-built Hash (admin code, a test, MCP) has no way to guarantee
+    # either on its own, and jsonb itself has no Symbol type to preserve
+    # even if one slipped in before a save.
+    #
+    # Iterative, not recursive, for the exact same reason `#write_canonical`
+    # is (that method's own comment): an admin form, MCP, or a hand-edited
+    # jsonb row can hand this class a document nesting arbitrarily deep,
+    # and this has to survive that just as safely as `#digest`/`#validate`
+    # already do, not introduce a *third* place a pathologically deep
+    # document can blow the stack. `container[key] = value` writes
+    # directly into an already-allocated parent Hash/Array rather than
+    # this returning a value up a call chain, which is what lets it rebuild
+    # arbitrarily deep nested structure with a flat, heap-allocated stack
+    # instead of one Ruby frame per level.
+    def self.stringify(root)
+      result_holder = [ nil ]
+      stack = [ [ root, result_holder, 0 ] ]
+
+      until stack.empty?
+        value, container, key = stack.pop
+
+        case value
+        when Hash
+          out = {}
+          container[key] = out
+          value.each { |k, v| stack << [ v, out, k.to_s ] }
+        when Array
+          out = Array.new(value.size)
+          container[key] = out
+          value.each_with_index { |v, index| stack << [ v, out, index ] }
+        when Symbol
+          container[key] = value.to_s
+        else
+          container[key] = value
+        end
+      end
+
+      result_holder[0]
+    end
+
     def initialize(hash)
-      @hash = hash || EMPTY_HASH.deep_dup
+      @hash = hash.nil? ? EMPTY_HASH.deep_dup : self.class.stringify(hash)
     end
 
     # Parses `markdown` (design spec §3.4) into `[RichText::Document,
@@ -160,7 +212,81 @@ module RichText
       errors
     end
 
+    # A new `RichText::Document` with every text node's `"marks"` Array
+    # reordered into `RichText::Schema`'s own mark *registration* order
+    # (fix round 1's I7) -- bold before italic before strike before code
+    # before link before internalLink, for the built-ins. This is what
+    # Tiptap/ProseMirror already keeps an editor-built document's marks in
+    # (ProseMirror stores a node's marks sorted by the schema's own mark
+    # index, not by whatever order an editor happened to apply them), so an
+    # ordinary document is already canonical; this exists for the documents
+    # that aren't -- most notably `RichText::Markdown::Loader`'s own input,
+    # before that class settled on emitting schema order directly, and any
+    # hand-built Hash a test or a script constructs with marks in some
+    # other order.
+    #
+    # `#to_h`/`#digest`/`#validate` deliberately do *not* run this
+    # automatically -- they report on the document exactly as given, the
+    # same "report, don't silently rewrite" posture every other
+    # malformed-shape guard on this class takes -- so round-trip exactness
+    # through Markdown (`RichText::MarkdownTest`'s own round-trip test) is
+    # only guaranteed against `#normalized`, not the raw `#to_h`, for a
+    # document whose mark order wasn't already canonical to begin with:
+    # `[italic, bold]` and `[bold, italic]` produce indistinguishable
+    # Markdown (`***hey***` either way) and so can only ever come back as
+    # one of the two -- the canonical one.
+    #
+    # Iterative, not recursive (`#stringify`'s own comment, same reason):
+    # this may run on a document nobody has ever called `#validate` on.
+    def normalized = self.class.new(canonicalize_marks(@hash))
+
     private
+
+    # `RichText::Schema.mark_order` (registration order) rather than
+    # whatever order a `"marks"` Array already happens to be in -- an
+    # unregistered mark type (`mark_order` returns `nil`) sorts after every
+    # registered one, stably, rather than raising or reordering
+    # arbitrarily; there's no canonical position for a name the schema
+    # doesn't know.
+    def sort_marks(marks)
+      marks.each_with_index.sort_by { |mark, index| [ (mark.is_a?(Hash) ? RichText::Schema.mark_order(mark["type"]) : nil) || Float::INFINITY, index ] }.map(&:first)
+    end
+
+    # `#normalized`'s own walk -- structurally the same iterative
+    # deep-rebuild `.stringify` is, except this one only ever transforms a
+    # `"marks"` Array (via `#sort_marks`, leaving every mark Hash inside it
+    # otherwise untouched -- a mark has no nested "content"/"marks" of its
+    # own to further canonicalize) and passes every other Hash/Array/scalar
+    # through unchanged.
+    def canonicalize_marks(root)
+      result_holder = [ nil ]
+      stack = [ [ root, result_holder, 0 ] ]
+
+      until stack.empty?
+        value, container, key = stack.pop
+
+        case value
+        when Hash
+          out = {}
+          container[key] = out
+          value.each do |k, v|
+            if k == "marks" && v.is_a?(Array)
+              out[k] = sort_marks(v)
+            else
+              stack << [ v, out, k ]
+            end
+          end
+        when Array
+          out = Array.new(value.size)
+          container[key] = out
+          value.each_with_index { |v, index| stack << [ v, out, index ] }
+        else
+          container[key] = value
+        end
+      end
+
+      result_holder[0]
+    end
 
     def content?(node, depth = 0)
       return false unless node.is_a?(Hash)

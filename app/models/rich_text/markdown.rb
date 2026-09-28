@@ -35,9 +35,11 @@ module RichText
     # A directive line is a paragraph on its own, consisting of exactly one
     # `::name{key="value" ...}` run and nothing else (design spec §3.4) --
     # `youtube`/`image` are the only built-ins that use one today, but any
-    # future custom node type can register its own `directive` name
-    # (`RichText::Schema::TypeDefinition#directive`) and be found the same
-    # way (`Loader::DIRECTIVE_NODE_NAMES`).
+    # future custom node type can register its own `directive` name and
+    # attribute mapping (`RichText::Schema::TypeDefinition#directive`) and
+    # be found the same way, via `RichText::Schema.directive_node` --
+    # `Loader#build_directive` looks the parsed name up there rather than
+    # hardcoding which names are directives.
     DIRECTIVE_PATTERN = /\A::([a-z][\w\/-]*)\{(.*)\}\z/
 
     # `key="value"` pairs inside a directive's braces, allowing a
@@ -58,18 +60,36 @@ module RichText
     # bolded one) concatenate with no separator, so an unescaped `*` at the
     # end of one and the start of the next could accidentally spell out a
     # `**` this document never had.
-    ESCAPE_CHARS = /[\\`*_\[\]<>~]/
+    #
+    # `&` (review round 1's I4) for the same "unconditionally, not just
+    # where currently ambiguous" reason: CommonMark recognizes HTML/numeric
+    # character entities (`&copy;`, `&amp;`, `&#65;`) anywhere in a text
+    # run and decodes them, with no way to tell "the editor typed a literal
+    # ampersand that happens to be followed by a word and a semicolon" from
+    # "this was meant as an entity" once it's plain text -- a backslash
+    # before the `&` blocks that recognition (CommonMark §6.2's entity rule
+    # only fires on an unescaped `&`) while resolving away to the literal
+    # `&` on reload, the same mechanism `LEADING_BLOCK_CHARS`/`::` escaping
+    # already relies on elsewhere in this file.
+    ESCAPE_CHARS = /[\\`*_\[\]<>~&]/
 
     # A line-*leading* character or sequence CommonMark treats as a block
-    # marker (ATX heading, blockquote, thematic break/bullet, fenced code,
-    # an ordered-list marker) rather than as ordinary paragraph text --
-    # checked (and escaped) only once, against a paragraph's fully-assembled
-    # text, never per text-node: `ESCAPE_CHARS` already protects every
-    # occurrence of these chars *elsewhere* in a run, but a mark can
-    # legitimately put one at position 0 on purpose (`**bold start**`), so
-    # this only fires for what's actually literal, unmarked-up text sitting
-    # at the very front of the paragraph.
-    LEADING_BLOCK_CHARS = /\A([#>~`+-])/
+    # marker (ATX heading, blockquote, bullet list) rather than as ordinary
+    # paragraph text -- checked (and escaped) only against a paragraph's
+    # *first* child, and only when that child carries no marks at all
+    # (`Dumper#render_text_node`'s `leading` parameter; review round 1's
+    # I3 narrowed this down from "the paragraph's whole assembled text",
+    # which incorrectly caught a leading `code` mark's own backtick fence
+    # too -- indistinguishable, as a plain String, from literal text that
+    # merely starts with a backtick).
+    #
+    # Backtick and tilde are deliberately *not* here, even though CommonMark
+    # also treats a leading run of 3+ of either as a fenced-code-block
+    # marker: `ESCAPE_CHARS` already backslash-escapes every literal
+    # backtick/tilde a bare text node contains, at any position including
+    # the front, so by the time this ever runs on genuinely unmarked
+    # literal text there's no unescaped one left for this to catch.
+    LEADING_BLOCK_CHARS = /\A([#>+-])/
     LEADING_ORDERED_MARKER = /\A(\d+)([.)])/
 
     class << self
@@ -84,14 +104,14 @@ module RichText
       # comment for the full "raw" story.
       def escape_text(text) = text.gsub(ESCAPE_CHARS) { |char| "\\#{char}" }
 
-      # Escapes whatever's sitting at the very front of a fully-rendered
-      # paragraph, if (and only if) it would otherwise be read as a block
+      # Escapes whatever's sitting at the very front of a paragraph's bare
+      # first child, if (and only if) it would otherwise be read as a block
       # marker instead of the start of a plain paragraph -- see
       # `LEADING_BLOCK_CHARS`'s own comment. Also covers this module's own
       # directive syntax: a paragraph whose literal text happens to *look*
       # like `::name{...}` must not come back as that directive on reload
-      # (see `Loader#directive_source_for`, which checks the raw Markdown
-      # source rather than the parsed text for exactly this reason) -- this
+      # (see `Loader#directive_for`, which checks the raw Markdown source
+      # rather than the parsed text for exactly this reason) -- this
       # is what makes that check actually correct instead of merely
       # untriggered by luck: escaping the leading `:` here means the
       # *source* this method's output produces no longer starts with a bare
@@ -124,6 +144,29 @@ module RichText
       # `ATTRIBUTE_PATTERN`'s inverse for a value already captured between
       # the (still-escaped) quotes.
       def unescape_directive_attr(value) = value.gsub(/\\(.)/) { Regexp.last_match(1) }
+
+      # Wraps a `code` mark's raw (never backslash-escaped -- `Dumper
+      # #render_text_node`'s own comment) content in backticks per
+      # CommonMark's actual code-span rule (spec §6.5), rather than the
+      # fixed single backtick every other delimiter-wrapped mark can get
+      # away with (review round 1's I3): the opening/closing run must be
+      # *longer* than the longest run of consecutive backticks already
+      # inside `content` (`` a`b `` needs a 2-backtick fence, not 1, or the
+      # single backtick inside it would end the span early), and a single
+      # space is added on each side whenever `content` itself starts or
+      # ends with a backtick, so that backtick doesn't visually/
+      # structurally merge with the fence. An empty `content` is a known,
+      # narrow gap this doesn't close (there's no backtick-fenced spelling
+      # of a *truly* empty code span that CommonMark parses back as one
+      # rather than as literal backticks) -- not exercised by any built-in,
+      # since every real code span has at least the one character a
+      # `code` mark was applied to.
+      def wrap_code_span(content)
+        longest_run = content.scan(/`+/).map(&:length).max || 0
+        fence = "`" * (longest_run + 1)
+        pad = !content.empty? && (content.start_with?("`") || content.end_with?("`")) ? " " : ""
+        "#{fence}#{pad}#{content}#{pad}#{fence}"
+      end
     end
 
     # Walks a `RichText::Document`'s Hash and produces a Markdown String,
@@ -186,6 +229,17 @@ module RichText
 
       private
 
+      # Known, accepted lossiness (fix round 1's m9): an empty `paragraph`
+      # (no text, no marks) dumps to an empty String, which
+      # `BLOCK_CONTAINER_TYPES`'s own `.reject(&:empty?)` then drops
+      # entirely rather than emitting a blank line for it -- Markdown has
+      # no way to *spell* an empty paragraph as its own block (a blank
+      # line is just paragraph-separator syntax, not content), so a
+      # spacer paragraph an editor left in on purpose doesn't survive a
+      # Markdown round trip. Not worth solving: MCP is the only caller of
+      # `.from_markdown` at all, and nothing meaningful is lost when the
+      # thing being dropped was already empty.
+
       # `raw`, once set by a `codeBlock` ancestor, propagates to every text
       # node underneath it: a code block's children are always bare "text"
       # nodes with no marks (`RichText::BuiltIns`' own comment on
@@ -203,9 +257,9 @@ module RichText
       # #validate_node` both take, for the same reason: this walks
       # `document.to_h` directly, not something `#validate` has necessarily
       # already passed over.
-      def render_node(node, raw: false)
+      def render_node(node, raw: false, leading: false)
         return "" unless node.is_a?(Hash)
-        return render_text_node(node, raw) if node["type"] == "text"
+        return render_text_node(node, raw, leading) if node["type"] == "text"
 
         type_name = node["type"]
         type = RichText::Schema.node(type_name)
@@ -221,7 +275,17 @@ module RichText
           elsif BLOCK_CONTAINER_TYPES.include?(type_name)
             child_nodes.map { |child| render_node(child) }.reject(&:empty?).join("\n\n")
           else
-            child_nodes.map { |child| render_node(child, raw: raw || type_name == "codeBlock") }.join
+            # Only "paragraph"'s own *first* child can ever need
+            # `RichText::Markdown.escape_leading` (below) -- see
+            # `#render_text_node`'s comment for why that's narrowed all the
+            # way down to "an unmarked text node in that one position",
+            # not "paragraph's fully-assembled text" (an earlier version
+            # of this escape, fixed in review round 1's I3, ran against
+            # the joined String instead and corrupted a leading `code`
+            # mark's own backtick fence in the process -- indistinguishable,
+            # as a plain String, from literal text that merely starts with
+            # a backtick).
+            child_nodes.each_with_index.map { |child, index| render_node(child, raw: raw || type_name == "codeBlock", leading: type_name == "paragraph" && index.zero?) }.join
           end
 
         type.markdown_out.call(node, children, nil)
@@ -231,15 +295,22 @@ module RichText
       # `RichText::Document#validate_node`'s identical split) -- its
       # `"text"` is escaped first (unless `raw`, or the node itself carries
       # a `code` mark -- a code *span*'s content is exactly as literal as a
-      # code *block*'s, and for the same reason), then each mark wraps it
-      # in array order, innermost first, matching
-      # `RichText::HtmlRenderer#render_text_node`'s own `reduce` -- one
-      # convention for "what does mark order mean", shared by both
-      # renderers, rather than two that could drift apart.
-      def render_text_node(node, raw)
+      # code *block*'s, and for the same reason), then, if this is a
+      # paragraph's own first child *and* it carries no marks at all,
+      # `RichText::Markdown.escape_leading` runs next -- a marked-up first
+      # child (bold, code, ...) is never at risk of being misread as a
+      # different block type, only genuinely bare literal text is (review
+      # round 1's I3's fix, narrowing what used to run against the whole
+      # paragraph's assembled text instead). Every mark then wraps the
+      # result in array order, innermost first, matching `RichText
+      # ::HtmlRenderer#render_text_node`'s own `reduce` -- one convention
+      # for "what does mark order mean", shared by both renderers, rather
+      # than two that could drift apart.
+      def render_text_node(node, raw, leading = false)
         text = node["text"].to_s
         marks = node["marks"].is_a?(Array) ? node["marks"] : []
         text = RichText::Markdown.escape_text(text) unless raw || marks.any? { |mark| mark.is_a?(Hash) && mark["type"] == "code" }
+        text = RichText::Markdown.escape_leading(text) if leading && marks.empty?
         content = marks.reduce(text) { |acc, mark_data| apply_mark(mark_data, acc) }
 
         RichText::Schema.node("text").markdown_out.call(node, content, nil)
@@ -271,9 +342,42 @@ module RichText
     # a shape this file invented from raw source text -- reach
     # `RichText::Document#validate` unvetted. `#load` degrades what it can
     # (a bad YouTube id in a `::youtube{}`, a `cs:` link to nothing) and
-    # simply drops what it can't (raw HTML, a table, a plain-URL image),
-    # collecting a human-readable warning for each.
+    # simply drops what it can't (raw HTML, a plain-URL image), collecting
+    # a human-readable warning for each.
     class Loader
+      # `RichText::Document::MAX_DEPTH` bounds how far `#render_children`/
+      # `#list_item_node` (block nesting) and `#render_inline_node` (mark
+      # nesting) will descend, for two related but distinct reasons
+      # (review round 1's C1/C2):
+      #
+      # Block nesting *has* to stay within this exact ceiling for
+      # correctness, not just stack safety: a document this class builds
+      # deeper than `RichText::Document#validate` itself allows would come
+      # back invalid with no warning explaining why (a real regression a
+      # 600-deep `> > > ... hi` input exposed) -- so once `depth` would
+      # exceed it, the deeper content is dropped rather than built at all,
+      # one warning recorded (`#warn_once`, not once *per* dropped node --
+      # a pathological document could otherwise flood `warnings` with
+      # thousands of near-identical messages).
+      #
+      # Mark nesting (`emph`/`strong`/`strikethrough`/`link`) has no such
+      # correctness requirement -- however deep, it always flattens into
+      # one leaf text node's flat `"marks"` Array, which has no structural
+      # depth of its own once built -- but *building* it the way this
+      # class currently does (recursing once per nesting level) still
+      # spends one Ruby stack frame per level, and a `("> " * 5000) +
+      # "hi\n"`-shaped input applied to emphasis instead of blockquotes
+      # would blow the stack exactly the same way (`SystemStackError`,
+      # never a `StandardError`, so `#load`'s own `rescue` alone can't
+      # catch it -- this ceiling is what keeps the walk from ever reaching
+      # that call in the first place). Past it, `#render_inline_node`
+      # stops recursing and flattens whatever's left with
+      # `#collect_plain_text`, which is iterative (no Ruby recursion at
+      # all -- the same reason `RichText::Document#write_canonical`/
+      # `#stringify` don't recurse either), so it stays safe regardless of
+      # how much further the real nesting actually goes.
+      MAX_DEPTH = RichText::Document::MAX_DEPTH
+
       def initialize(markdown)
         source = markdown.is_a?(String) ? markdown : markdown.to_s
         @source = source.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "")
@@ -284,15 +388,21 @@ module RichText
       # Returns `[RichText::Document, warnings]` (design spec §3.4) --
       # `warnings` is always an Array of Strings, empty when nothing had to
       # be dropped or degraded. The outer `rescue` is a last-resort net
-      # underneath every other guard in this class: if Commonmarker's own
-      # native parser ever raises on some input none of the guards below
+      # underneath every other guard in this class -- widened to
+      # `SystemStackError` too (review round 1's C1), since Commonmarker's
+      # own native parser has been observed to raise exactly that on
+      # sufficiently extreme input (an extra guard `#safe_parse` also
+      # takes, independently of this one, since parsing happens there
+      # before any of this class's own depth-capped walking ever starts):
+      # if either raises on something none of the guards below
       # anticipated, an MCP write still gets back an empty (valid) document
       # and a warning explaining why, rather than a 500.
       def load
         root = safe_parse
-        content = root ? render_children(root) : []
+        content = root ? render_children(root, 1) : []
         [ RichText::Document.new({ "type" => "doc", "content" => content }), @warnings ]
-      rescue StandardError => e
+      rescue StandardError, SystemStackError => e
+        Rails.logger.error("RichText::Markdown::Loader: #{e.class}: #{e.message}")
         [ RichText::Document.empty, [ "failed to parse markdown: #{e.message}" ] ]
       end
 
@@ -300,39 +410,97 @@ module RichText
 
       def safe_parse
         @warnings = []
-        Commonmarker.parse(@source, options: { extension: { table: false } })
-      rescue StandardError => e
+        @depth_warned = {}
+        Commonmarker.parse(@source, options: { extension: { table: true } })
+      rescue StandardError, SystemStackError => e
+        Rails.logger.error("RichText::Markdown::Loader: #{e.class}: #{e.message}")
         @warnings << "failed to parse markdown: #{e.message}"
         nil
+      end
+
+      # Every degrade/drop below goes through this instead of pushing onto
+      # `@warnings` directly, so a written-off document's problems are
+      # findable in the log the same way `RichText::HtmlRenderer
+      # #log_unknown` already makes an unknown node/mark type findable --
+      # `warnings` alone only reaches the MCP caller that requested this
+      # particular write; the log is what a developer chasing "why did my
+      # editor's content change" days later actually has.
+      def record_warning(message)
+        Rails.logger.warn("RichText::Markdown::Loader: #{message}")
+        @warnings << message
+      end
+
+      # Same as `#record_warning`, but at most once per `key` for this
+      # whole `#load` call -- for the one class of warning (nesting past
+      # `MAX_DEPTH`) a single pathological document could otherwise
+      # trigger thousands of times, once per node past the ceiling.
+      def warn_once(key, message)
+        return if @depth_warned[key]
+
+        @depth_warned[key] = true
+        record_warning(message)
       end
 
       # Walks one AST node's direct children into an Array of Tiptap block
       # nodes -- shared by the document root, `blockquote`, and each list
       # `item`, all of which just hold "some number of blocks, in order"
       # (mirroring `Dumper::BLOCK_CONTAINER_TYPES`'s same three, on the way
-      # out).
-      def render_children(ast_node) = ast_node.each.flat_map { |child| render_block(child) }
+      # out). `depth` is what each of *this* call's direct children would
+      # occupy in the resulting document (`RichText::Document#validate`'s
+      # own convention: the root "doc"'s content is depth 1) -- passed
+      # straight to `#render_block`, which is what actually enforces
+      # `MAX_DEPTH` (`#render_block`'s own comment).
+      def render_children(ast_node, depth) = ast_node.each.flat_map { |child| render_block(child, depth) }
 
       # One block-level Commonmarker node -> zero or more Tiptap block
       # nodes (zero for whatever this drops -- a raw HTML block, an
-      # unsupported block type). A `:paragraph` is the one case that can
-      # expand to something other than itself: `#directive_for` recognizes
-      # our own `::name{...}` shape and replaces the whole paragraph with
-      # the node it names, when it can.
-      def render_block(node)
+      # unsupported block type, or anything past `MAX_DEPTH`). A
+      # `:paragraph` is the one case that can expand to something other
+      # than itself: `#directive_for` recognizes our own `::name{...}`
+      # shape and replaces the whole paragraph with the node it names,
+      # when it can. A `:table` (review round 1's I5) is the one case that
+      # can expand to *several* -- one paragraph per row, since nothing in
+      # this schema represents a table -- rather than the single-element
+      # Array every other branch returns.
+      def render_block(node, depth)
+        if depth > MAX_DEPTH
+          warn_once(:depth, "dropped content nested past the maximum depth (#{MAX_DEPTH})")
+          return []
+        end
+
         case node.type
         when :paragraph then [ directive_for(node) || paragraph_node(node) ]
         when :heading then [ heading_node(node) ]
-        when :list then [ list_node(node) ]
-        when :block_quote then [ { "type" => "blockquote", "content" => render_children(node) } ]
+        when :list then [ list_node(node, depth) ]
+        when :block_quote then [ { "type" => "blockquote", "content" => render_children(node, depth + 1) } ]
         when :code_block then [ code_block_node(node) ]
         when :thematic_break then [ { "type" => "horizontalRule" } ]
+        when :table
+          record_warning("dropped a table, degraded to one paragraph per row")
+          table_rows_as_paragraphs(node)
         when :html_block
-          @warnings << "dropped a raw HTML block"
+          record_warning("dropped a raw HTML block")
           []
         else
-          @warnings << "dropped unsupported block content (#{node.type})"
+          record_warning("dropped unsupported block content (#{node.type})")
           []
+        end
+      end
+
+      # This schema has no tabular node type at all (Global Constraints;
+      # design spec §3.2's node list has no `table`), so a table can only
+      # ever degrade, never translate -- one paragraph per `:table_row`,
+      # its `:table_cell`s flattened to plain text (`#collect_plain_text`,
+      # the same iterative flattening `#render_inline_node` falls back to
+      # past `MAX_DEPTH`; a cell's own inline structure -- a bold cell, a
+      # link -- isn't worth preserving for content this degraded already)
+      # and joined with `" | "`, a plain-text echo of the pipes the
+      # original table syntax used, so the degraded paragraph still *reads*
+      # like tabular data instead of running every cell together.
+      def table_rows_as_paragraphs(table_node)
+        table_node.each.map do |row|
+          text = row.each.map { |cell| collect_plain_text(cell) }.join(" | ")
+          { "type" => "paragraph", "content" => text.empty? ? [] : [ { "type" => "text", "text" => text } ] }
         end
       end
 
@@ -375,14 +543,31 @@ module RichText
       # attribute expects -- see this file's own round-trip test.
       # `bulletList` has no attributes at all, so it never gets an
       # `"attrs"` key (matching `RichText::BuiltIns`' declaration).
-      def list_node(node)
-        items = node.each.map { |item| { "type" => "listItem", "content" => render_children(item) } }
+      #
+      # `depth` here is the *list's own* depth (already confirmed `<=
+      # MAX_DEPTH` by `#render_block`'s own check before this is ever
+      # called) -- each `listItem` occupies `depth + 1`, checked by
+      # `#list_item_node` itself rather than `#render_block` (a listItem
+      # is built directly here, not dispatched through `#render_block` the
+      # way every other node type is), and that item's *own* children
+      # occupy `depth + 2`.
+      def list_node(node, depth)
+        items = node.each.filter_map { |item| list_item_node(item, depth + 1) }
 
         if node.list_type == :ordered
           { "type" => "orderedList", "attrs" => { "start" => node.list_start || 1 }, "content" => items }
         else
           { "type" => "bulletList", "content" => items }
         end
+      end
+
+      def list_item_node(item, depth)
+        if depth > MAX_DEPTH
+          warn_once(:depth, "dropped content nested past the maximum depth (#{MAX_DEPTH})")
+          return nil
+        end
+
+        { "type" => "listItem", "content" => render_children(item, depth + 1) }
       end
 
       # `fence_info` is CommonMark's own name for a fenced code block's
@@ -404,17 +589,30 @@ module RichText
       end
 
       # Walks one inline Commonmarker node into zero or more Tiptap "text"
-      # (or `hardBreak`) nodes. `marks_stack` accumulates outer-to-inner as
-      # this descends into `emph`/`strong`/`strikethrough`/`link` -- a
-      # leaf's actual `"marks"` Array is built innermost-first
-      # (`#text_node`'s own `.reverse`), matching the same convention
-      # `Dumper#render_text_node`/`RichText::HtmlRenderer#render_text_node`
-      # both already use for mark order.
-      def render_inline(ast_node, marks_stack = [])
-        ast_node.each.flat_map { |child| render_inline_node(child, marks_stack) }
+      # (or `hardBreak`) nodes. `marks_stack` accumulates as this descends
+      # into `emph`/`strong`/`strikethrough`/`link` -- what order a leaf's
+      # actual `"marks"` Array ends up in doesn't depend on *this* stack's
+      # own order at all, though (`#text_node`'s own comment): it's sorted
+      # into schema registration order, the same canonical order
+      # `RichText::Document#normalized` defines (review round 1's I7).
+      #
+      # `depth` counts nesting purely for stack-safety (`MAX_DEPTH`'s own
+      # comment) -- once it would exceed `MAX_DEPTH`, this stops recursing
+      # per level and instead flattens whatever's left with
+      # `#collect_plain_text` (iterative, so it's safe regardless of how
+      # much further the real nesting goes).
+      def render_inline(ast_node, marks_stack = [], depth = 0)
+        ast_node.each.flat_map { |child| render_inline_node(child, marks_stack, depth) }
       end
 
-      def render_inline_node(node, marks_stack)
+      NESTING_INLINE_TYPES = %i[emph strong strikethrough link].freeze
+
+      def render_inline_node(node, marks_stack, depth)
+        if depth > MAX_DEPTH && NESTING_INLINE_TYPES.include?(node.type)
+          warn_once(:inline_depth, "flattened inline formatting nested past the maximum depth (#{MAX_DEPTH})")
+          return [ text_node(collect_plain_text(node), marks_stack) ]
+        end
+
         case node.type
         when :text then [ text_node(node.string_content.to_s, marks_stack) ]
         when :softbreak then [ text_node(" ", marks_stack) ]
@@ -430,27 +628,64 @@ module RichText
         # reassembling into the one text node it started as. Transparent
         # here, the same as `emph`/`strong`/... above -- it carries no mark
         # of its own, just its child's literal text.
-        when :escaped then render_inline(node, marks_stack)
-        when :emph then render_inline(node, marks_stack + [ { "type" => "italic" } ])
-        when :strong then render_inline(node, marks_stack + [ { "type" => "bold" } ])
-        when :strikethrough then render_inline(node, marks_stack + [ { "type" => "strike" } ])
+        when :escaped then render_inline(node, marks_stack, depth)
+        when :emph then render_inline(node, marks_stack + [ { "type" => "italic" } ], depth + 1)
+        when :strong then render_inline(node, marks_stack + [ { "type" => "bold" } ], depth + 1)
+        when :strikethrough then render_inline(node, marks_stack + [ { "type" => "strike" } ], depth + 1)
         when :code then [ text_node(node.string_content.to_s, marks_stack + [ { "type" => "code" } ]) ]
-        when :link then render_link(node, marks_stack)
+        when :link then render_link(node, marks_stack, depth + 1)
         when :image
-          @warnings << "dropped an image with a plain URL (#{node.url}); use an ::image{} directive instead"
-          render_inline(node, marks_stack)
+          record_warning("dropped an image with a plain URL (#{node.url}); use an ::image{} directive instead")
+          render_inline(node, marks_stack, depth)
         when :html_inline
-          @warnings << "dropped raw inline HTML"
+          record_warning("dropped raw inline HTML")
           []
         else
-          @warnings << "dropped unsupported inline content (#{node.type})"
+          record_warning("dropped unsupported inline content (#{node.type})")
           []
         end
       end
 
+      # `RichText::Schema.mark_order` (registration order, e.g. bold before
+      # italic before strike before code before link before internalLink
+      # for the built-ins) rather than `marks_stack`'s own nesting order
+      # (review round 1's I7) -- `[italic, bold]` and `[bold, italic]`
+      # nested Markdown (`***hey***`, ambiguous either way once parsed)
+      # both come back the one canonical order every editor-built document
+      # already uses, instead of arbitrarily picking whichever nesting
+      # order this parse happened to produce. An unregistered mark type
+      # (`RichText::Schema.mark_order` returns `nil`) sorts after every
+      # registered one, stably, rather than raising or reordering
+      # arbitrarily -- there's no canonical position for a name the schema
+      # doesn't know.
       def text_node(text, marks_stack)
-        marks = marks_stack.reverse
+        marks = marks_stack.sort_by { |mark| RichText::Schema.mark_order(mark["type"]) || Float::INFINITY }
         marks.empty? ? { "type" => "text", "text" => text } : { "type" => "text", "text" => text, "marks" => marks }
+      end
+
+      # Iteratively (no Ruby recursion -- the same reason `RichText
+      # ::Document#write_canonical`/`#stringify` aren't recursive either)
+      # flattens every descendant `:text`/`:code` node's literal content
+      # into one plain String, dropping any mark structure along the way.
+      # The one caller (`#render_inline_node`, past `MAX_DEPTH`) has
+      # already given up on preserving nested formatting that deep, so
+      # this only needs to recover the text, safely, regardless of how
+      # much further the actual nesting goes.
+      def collect_plain_text(ast_node)
+        text = +""
+        stack = ast_node.each.to_a.reverse
+
+        until stack.empty?
+          node = stack.pop
+          case node.type
+          when :text, :code then text << node.string_content.to_s
+          when :softbreak then text << " "
+          when :linebreak then text << "\n"
+          else stack.concat(node.each.to_a.reverse)
+          end
+        end
+
+        text
       end
 
       # `cs:page/<id>`/`cs:post/<id>` (design spec §3.4) become an
@@ -460,9 +695,9 @@ module RichText
       # entirely (keeping the link's own text) with a warning, exactly the
       # "hostile documents render inert" posture `RichText::BuiltIns`'
       # `html` blocks already take for the same two attributes.
-      def render_link(node, marks_stack)
+      def render_link(node, marks_stack, depth)
         mark = link_mark_for(node.url.to_s)
-        render_inline(node, mark ? marks_stack + [ mark ] : marks_stack)
+        render_inline(node, mark ? marks_stack + [ mark ] : marks_stack, depth)
       end
 
       def link_mark_for(href)
@@ -471,7 +706,7 @@ module RichText
         elsif RichText::BuiltIns.safe_href?(href)
           { "type" => "link", "attrs" => { "href" => href } }
         else
-          @warnings << "dropped a link with an unsafe href (#{href.inspect})"
+          record_warning("dropped a link with an unsafe href (#{href.inspect})")
           nil
         end
       end
@@ -481,7 +716,7 @@ module RichText
         mark = { "type" => "internalLink", "attrs" => { "type" => type, "id" => Integer(id.to_s, exception: false) } }
         return mark if valid_mark?(mark)
 
-        @warnings << "dropped an internal link to a missing #{type} (#{id})"
+        record_warning("dropped an internal link to a missing #{type} (#{id})")
         nil
       end
 
@@ -518,41 +753,35 @@ module RichText
 
       def source_lines = @source_lines ||= @source.lines
 
+      # Schema-driven, not a hardcoded `case name when "youtube" ... when
+      # "image" ...` (review round 1's I6): `RichText::Schema
+      # .directive_node` finds whichever registered node type (built-in or
+      # plugin) declared this directive `name`
+      # (`RichText::Schema::TypeDefinition#directive`), and
+      # `#attrs_from_directive` -- that same declaration's read half --
+      # builds the candidate `"attrs"` Hash. `#valid_node?` is what decides
+      # whether the result is actually usable (a bad YouTube id, a missing
+      # `asset`) -- reusing the schema's own attribute rules rather than
+      # this method re-deriving them, exactly as it already did before this
+      # was made generic.
       def build_directive(name, attrs_string, raw)
-        attrs = parse_directive_attrs(attrs_string)
-
-        case name
-        when "youtube" then build_youtube_node(attrs, raw)
-        when "image" then build_image_node(attrs, raw)
-        else
-          @warnings << "unknown directive #{raw.inspect}, kept as text"
-          nil
+        type = RichText::Schema.directive_node(name)
+        unless type
+          record_warning("unknown directive #{raw.inspect}, kept as text")
+          return nil
         end
+
+        node = { "type" => type.name, "attrs" => type.attrs_from_directive(parse_directive_attrs(attrs_string)) }
+        return node if valid_node?(node)
+
+        record_warning("invalid #{name} directive #{raw.inspect}, kept as text")
+        nil
       end
 
       def parse_directive_attrs(attrs_string)
         attrs_string.to_s.scan(RichText::Markdown::ATTRIBUTE_PATTERN).each_with_object({}) do |(key, value), hash|
           hash[key] = RichText::Markdown.unescape_directive_attr(value)
         end
-      end
-
-      def build_youtube_node(attrs, raw)
-        node = { "type" => "youtube", "attrs" => { "id" => attrs["id"].to_s } }
-        return node if valid_node?(node)
-
-        @warnings << "invalid youtube directive #{raw.inspect}, kept as text"
-        nil
-      end
-
-      def build_image_node(attrs, raw)
-        node_attrs = { "asset_id" => attrs["asset"] && Integer(attrs["asset"], exception: false) }
-        node_attrs["alt"] = attrs["alt"] if attrs["alt"].present?
-        node_attrs["caption"] = attrs["caption"] if attrs["caption"].present?
-        node = { "type" => "image", "attrs" => node_attrs }
-        return node if valid_node?(node)
-
-        @warnings << "invalid image directive #{raw.inspect}, kept as text"
-        nil
       end
 
       # Both `#valid_node?`/`#valid_mark?` check a single degraded-or-not

@@ -54,4 +54,47 @@ class RichText::DocumentTest < ActiveSupport::TestCase
     errors = doc(node).validate
     assert errors.any? { |message| message.include?("maximum nesting depth") }
   end
+
+  # Fix round 1's addendum: `#digest`'s `payload.keys.sort` raises
+  # `ArgumentError` the instant one Hash in the tree mixes a String and a
+  # Symbol key (`<=>` isn't defined between them), which would make
+  # `#to_html` raise too, since it computes `#digest` for its cache key --
+  # and a Symbol *value* sitting where a String was expected would fail
+  # every `==` comparison silently instead. Construction now stringifies
+  # both, so a Symbol-keyed document and its String-keyed twin are simply
+  # the same document.
+  test "construction stringifies symbol keys and values so mixed-key documents don't raise" do
+    symbol_keyed = RichText::Document.new(type: "doc", content: [ { type: "paragraph", content: [ { type: "text", text: "hi" } ] } ])
+    string_keyed = RichText::Document.new("type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "hi" } ] } ])
+
+    assert_equal string_keyed.to_h, symbol_keyed.to_h
+    assert_equal string_keyed.digest, symbol_keyed.digest
+    assert_kind_of String, symbol_keyed.to_html(locale: "en", urls: PublicSite::Urls.new)
+  end
+
+  # Same addendum: the stringify walk has to be exactly as depth-safe as
+  # `#write_canonical`'s own iterative walk (this class's own regression
+  # test above uses 500; this uses 5000, comfortably past it) -- a
+  # recursive implementation would overflow the stack building this Hash
+  # in the first place, before `RichText::Document.new` ever got a chance
+  # to run.
+  test "construction survives a pathologically deep, symbol-keyed document without raising" do
+    node = { type: "text", text: "x" }
+    5000.times { node = { type: "blockquote", content: [ node ] } }
+
+    document = RichText::Document.new(type: "doc", content: [ node ])
+    assert_kind_of String, document.digest
+  end
+
+  # Fix round 1's I7: an editor-built document already keeps its marks in
+  # schema registration order (what ProseMirror itself stores), so
+  # `#normalized` is a no-op for one -- this is really a regression test
+  # for `#normalized` *not* reordering (or otherwise altering) a document
+  # that was already canonical, complementing `RichText::MarkdownTest`'s
+  # own coverage of the actually-reordering case.
+  test "normalized is a no-op for a document whose marks are already in schema order" do
+    document = doc({ "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "hey", "marks" => [ { "type" => "bold" }, { "type" => "italic" } ] } ] })
+    assert_equal document.to_h, document.normalized.to_h
+  end
 end
