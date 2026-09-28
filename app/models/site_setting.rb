@@ -5,7 +5,7 @@ class SiteSetting < ApplicationRecord
   validates :title, presence: true
 
   validate :locales_are_well_formed
-  validate :social_links_are_safe
+  validate :social_links_are_safe, if: :will_save_change_to_social_links?
   validate :default_locale_is_enabled
 
   after_commit :reset_cached_state

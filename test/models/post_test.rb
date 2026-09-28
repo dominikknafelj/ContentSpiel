@@ -488,4 +488,21 @@ class PostTest < ActiveSupport::TestCase
 
     assert_equal %w[bold link], post.body(locale: :en).dig("content", 0, "content", 0, "marks").map { |mark| mark["type"] }
   end
+
+  test "a legacy body that only differs by normalisation doesn't block an unrelated save" do
+    post = create_post(title: "Legacy")
+    # Stored before the content-model rules: bold with edge whitespace (which
+    # #normalized hoists) next to a code+bold run the schema now forbids.
+    legacy = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "a " },
+      { "type" => "text", "text" => " b ", "marks" => [ { "type" => "bold" } ] },
+      { "type" => "text", "text" => "c", "marks" => [ { "type" => "bold" }, { "type" => "code" } ] } ] } ] }
+    post.update_column(:body, { "en" => legacy })
+    post.reload
+
+    post.title = "Retitled"
+    post.assign_body(legacy.to_json, locale: "en")
+
+    assert post.save, post.errors.full_messages.to_sentence
+  end
 end

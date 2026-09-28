@@ -21,7 +21,6 @@ pin "application"
 pin "admin", preload: "admin"
 pin "@hotwired/turbo-rails", to: "turbo.min.js"
 pin "@hotwired/stimulus", to: "stimulus.min.js"
-pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
 pin_all_from "app/javascript/controllers", under: "controllers"
 pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", preload: "admin"
 # The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by

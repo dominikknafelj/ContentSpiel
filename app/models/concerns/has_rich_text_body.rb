@@ -111,6 +111,13 @@ module HasRichTextBody
 
     read_attribute(:body).to_h.each do |code, value|
       next if previous[code] == value
+      # `assign_body` stores `#normalized` documents, so a body stored before
+      # a normalisation rule existed comes back "changed" on every autosave
+      # of an unrelated field (the editor always resends it). A difference
+      # that is only normalisation isn't an edit: without this, a legacy
+      # body that breaks a newer structural rule would wedge every save of
+      # the record while the editor shows it read-only.
+      next if previous[code].is_a?(Hash) && RichText::Document.new(previous[code]).normalized.to_h == value
 
       body_errors_for(value, previous[code]).each { |message| errors.add(:body, :invalid, message: "(#{code}) #{message}") }
     end
