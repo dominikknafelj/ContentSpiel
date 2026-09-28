@@ -101,6 +101,24 @@ class MediaAssetTest < ActiveSupport::TestCase
     asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "x.html", content_type: "text/html")
     assert asset.save, asset.errors.full_messages.to_sentence
 
-    assert_equal "image/png", asset.file.blob.content_type
+    # From the database (final fix wave, P4): the in-memory blob could hold
+    # the forced value without it ever having been written.
+    assert_equal "image/png", ActiveStorage::Blob.find(asset.file.blob.id).content_type
+  end
+
+  # Final fix wave (C, P5): an already-persisted blob attached by signed id
+  # keeps its stored `content_type` -- which is what it's served with -- and
+  # this class never rewrites another record's blob. So when that stored
+  # type disagrees with the bytes, the attachment is refused rather than
+  # served under a type nobody validated.
+  test "a persisted blob whose stored content type disagrees with its bytes is refused" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "x.html", content_type: "text/html", identify: false)
+    assert_equal "text/html", blob.content_type
+
+    asset = MediaAsset.new
+    asset.file.attach(blob.signed_id)
+
+    assert_not asset.valid?
+    assert_includes asset.errors[:file], "doesn't match its stored content type"
   end
 end

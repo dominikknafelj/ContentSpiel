@@ -129,6 +129,47 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     end
   end
 
+  # Final fix wave (C): the HTML also depends on code -- a renderer or
+  # component markup change must not keep serving the old HTML out of Solid
+  # Cache after a deploy. `RichText.code_revision` (the deploy's revision)
+  # is part of the key.
+  test "the render cache key varies by code revision" do
+    original_cache, original_revision = Rails.cache, RichText.code_revision
+    store = Class.new(ActiveSupport::Cache::MemoryStore) do
+      def keys = (@keys ||= [])
+      def fetch(name, *args, **options, &block) = (keys << name) && super
+    end.new
+    Rails.cache = store
+
+    begin
+      document = RichText::Document.new("type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text("hi") ] } ])
+      RichText.code_revision = "one"
+      document.to_html(locale: "en", urls: PublicSite::Urls.new)
+      RichText.code_revision = "two"
+      document.to_html(locale: "en", urls: PublicSite::Urls.new)
+
+      first, second = store.keys
+      assert_includes first, "one"
+      assert_includes second, "two"
+      assert_equal first - [ "one" ], second - [ "two" ]
+    ensure
+      Rails.cache = original_cache
+      RichText.code_revision = original_revision
+    end
+  end
+
+  test "code_revision comes from KAMAL_VERSION, then a REVISION file, then a boot-time value" do
+    assert_equal "abc123", RichText.resolve_code_revision(env: { "KAMAL_VERSION" => "abc123" }, revision_file: nil)
+
+    Tempfile.create("REVISION") do |file|
+      file.write("def456\n")
+      file.flush
+      assert_equal "def456", RichText.resolve_code_revision(env: {}, revision_file: Pathname(file.path))
+    end
+
+    assert_match(/\Aboot-\h{16}\z/, RichText.resolve_code_revision(env: {}, revision_file: Pathname("/nonexistent/REVISION")))
+  end
+
   # Fix round 1 (I1): a document that never passed `RichText::Document
   # #validate` can hand the renderer any JSON shape at all -- these are
   # exactly the malformed shapes `RichText::DocumentTest` proves `#validate`

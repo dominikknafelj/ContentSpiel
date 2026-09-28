@@ -34,4 +34,33 @@ module RichText
   # there's no single natural "the registry file" for this error to live
   # next to instead.
   class DuplicateType < StandardError; end
+
+  # The running code's revision (final fix wave, C) -- part of the rich-text
+  # render cache key (`RichText::Document#to_html`), because a cached render
+  # depends on code as much as on the document: a change to a built-in's
+  # `html` block or to `RichText::YoutubeComponent`/`ImageComponent` markup
+  # must reach pages after a deploy instead of Solid Cache (which outlives
+  # deploys) serving the old HTML until something else invalidates it.
+  #
+  # `resolve_code_revision`'s order: `KAMAL_VERSION` (Kamal sets it in every
+  # app container it boots -- the deployed git revision), else a `REVISION`
+  # file in the app root (the usual convention for other deploy tools),
+  # else a random value chosen when this module loads. That last fallback
+  # (development, test, a hand-run container) is always *correct* -- a new
+  # process never serves an older process's renders -- at the cost of cold
+  # caches after every boot. Resolved once, when this module loads (eagerly,
+  # before Puma forks, in production), so every worker of one boot agrees.
+  class << self
+    attr_writer :code_revision
+
+    def code_revision = @code_revision ||= resolve_code_revision
+
+    def resolve_code_revision(env: ENV, revision_file: Rails.root.join("REVISION"))
+      env["KAMAL_VERSION"].presence ||
+        (revision_file&.file? && revision_file.read.strip.presence) ||
+        "boot-#{SecureRandom.hex(8)}"
+    end
+  end
+
+  self.code_revision = resolve_code_revision
 end

@@ -84,4 +84,28 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "isn&#39;t enabled"
     assert_nil @site.reload.locale_entry("de")["fallbacks"]
   end
+
+  # Final fix wave (C, P18): the rows are read through strong parameters
+  # (`permit(:position, fallbacks: [])` per language code), not
+  # `to_unsafe_h`, so a malformed submission is refused like any other
+  # invalid one instead of raising, and nothing but those two fields
+  # reaches `Locales::Configure`.
+  test "a malformed submission is refused without an error page" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+
+    patch "/cs-studio/settings/languages", params: { languages: "junk" }
+    assert_response :redirect
+    follow_redirect!
+    assert_response :success
+    assert_equal %w[en de], @site.reload.locale_codes
+
+    patch "/cs-studio/settings/languages", params: { languages: {
+      "en" => { position: "2", fallbacks: { "evil" => "x" }, code: "fr" },
+      "de" => { position: "1", fallbacks: [ "en" ] }
+    } }
+    assert_response :redirect
+    @site.reload
+    assert_equal %w[de en], @site.locale_codes
+    assert_nil @site.locale_entry("en")["fallbacks"]
+  end
 end

@@ -58,6 +58,32 @@ module StarterContent
     end
   end
 
+  # The one way callers add starter content (final fix wave, P23) -- the
+  # setup wizard's step and CS Studio's "Create starter pages" both. Returns
+  # `true` when it created the sections, `false` when they already existed.
+  #
+  # Two requests at once (two tabs, a double submit) would both pass
+  # `added?` and race each other into the same section slugs, the loser
+  # raising on slug uniqueness after possibly half-building a section. So
+  # the check and the creation run in one transaction holding the
+  # `SiteSetting` singleton's row lock: the second request waits for the
+  # first to commit, then re-checks `added?` inside the lock and finds the
+  # sections there. A failure that still gets through (a hand-made page
+  # already owning a starter slug) rolls the whole attempt back and is
+  # raised as `StarterContent::Error`, the one error callers rescue into a
+  # message.
+  def add_once!(locale:)
+    SiteSetting.transaction do
+      SiteSetting.instance.lock!
+      next false if added?(locale: locale)
+
+      create_pages_and_posts!(locale: locale)
+      true
+    end
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => error
+    raise Error, "StarterContent: #{error.message}"
+  end
+
   # `locale:` is kept for interface compatibility with the other methods
   # (callers pass it), but the lookup below already checks every locale, so
   # it goes unused here.

@@ -147,10 +147,15 @@ module RichText
     # once the target is deleted; an image renders its `MediaAsset`'s URL, or
     # nothing once the asset is gone. Without it, Solid Cache would keep
     # serving the first render of each of those forever.
+    #
+    # `RichText.code_revision` (final fix wave, C) covers the last input:
+    # the code itself. `Schema.version` only changes when a type's
+    # *attributes* do; a changed `html` block or component template doesn't
+    # touch it, and Solid Cache outlives a deploy.
     def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
       context = RichText::RenderContext.new(locale: locale, urls: urls)
 
-      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version ]) do
+      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]) do
         RichText::HtmlRenderer.new(context).render(self)
       end
     end

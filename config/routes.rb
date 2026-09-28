@@ -253,6 +253,12 @@ Rails.application.routes.draw do
   # same Journey behavior the locale route above works around with `(/*path)`
   # -- but here there's no static segment ahead of the glob to wrap it against,
   # so the homepage gets its own route instead.
+  #
+  # The constraint (final fix wave, C) keeps Active Storage's own URLs out of
+  # this catch-all: Rails draws the Active Storage routes *after* this file,
+  # so without it `/rails/active_storage/blobs/...` -- every image a page,
+  # post or rich-text body embeds -- was routed here and answered 404.
   root to: "pages#show", format: false
-  get "*path", to: "pages#show", as: :page, format: false
+  get "*path", to: "pages#show", as: :page, format: false,
+    constraints: ->(request) { !request.path.start_with?("#{ActiveStorage.routes_prefix}/") }
 end

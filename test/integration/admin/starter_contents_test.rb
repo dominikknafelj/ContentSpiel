@@ -76,14 +76,4 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_select "[role=status]", text: "Starter pages already exist"
   end
-
-  private
-
-  def with_singleton_override(object, name, implementation)
-    original = object.method(name)
-    object.define_singleton_method(name, &implementation)
-    yield
-  ensure
-    object.define_singleton_method(name, original)
-  end
 end

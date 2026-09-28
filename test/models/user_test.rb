@@ -26,4 +26,26 @@ class UserTest < ActiveSupport::TestCase
     assert users(:two).destroy
     assert_not User.exists?(users(:two).id)
   end
+
+  # Final fix wave (C, P16): the last-user check runs *before* the
+  # dependent destroys (so a refused delete never even starts deleting
+  # sessions/tokens), and counts under a row lock, so two admins deleting
+  # the two remaining users at the same moment can't both see "one other
+  # user left" and both succeed.
+  test "the last-user check runs first and counts under a row lock" do
+    users(:two).destroy!
+    last = users(:one)
+    last.sessions.create!
+
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      assert_not last.destroy
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+
+    assert statements.any? { |sql| sql.include?(%(FROM "users")) && sql.include?("FOR UPDATE") }, statements.join("\n")
+    assert_not statements.any? { |sql| sql.match?(/DELETE FROM "sessions"/) }, "dependent sessions were deleted before the check refused"
+  end
 end

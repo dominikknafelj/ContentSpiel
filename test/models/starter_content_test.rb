@@ -66,4 +66,37 @@ class StarterContentTest < ActiveSupport::TestCase
     end
     assert StarterContent.added?(locale: "en")
   end
+
+  # Final fix wave (C, P23): the one path both the setup wizard and CS
+  # Studio's "Create starter pages" take -- under the `SiteSetting` row
+  # lock, re-checking `added?` inside it, with any write failure rolled
+  # back and raised as `StarterContent::Error`.
+  test "add_once! creates the starter content once, under the site settings lock" do
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      assert StarterContent.add_once!(locale: "en")
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+    assert statements.any? { |sql| sql.include?(%(FROM "site_settings")) && sql.include?("FOR UPDATE") }
+
+    assert_no_difference [ "Page.count", "Post.count" ] do
+      assert_not StarterContent.add_once!(locale: "en")
+    end
+  end
+
+  test "add_once! rolls back and raises StarterContent::Error when a write fails" do
+    home = root_page
+    failing = ->(**) {
+      Pages::Save.call(attributes: { parent: home, published: true }, translations: { "en" => { title: "Half built" } })
+      raise ActiveRecord::RecordNotUnique, "duplicate slug"
+    }
+
+    with_singleton_override(StarterContent, :create_pages_and_posts!, failing) do
+      assert_no_difference [ "Page.count", "Post.count" ] do
+        assert_raises(StarterContent::Error) { StarterContent.add_once!(locale: "en") }
+      end
+    end
+  end
 end

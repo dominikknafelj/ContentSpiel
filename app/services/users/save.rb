@@ -11,7 +11,8 @@ module Users
   # `password` here means "leave the password alone," and both fields are
   # dropped before assignment rather than passed through empty -- the same
   # "a blank value is a no-op, not a write" rule `Admin::FileParams` applies
-  # to an untouched file input.
+  # to an untouched file input. A typed password, though, always needs its
+  # confirmation (`#unconfirmed_password`).
   class Save < ApplicationService
     def initialize(user = User.new, attributes:, actor: Current.actor)
       @user = user
@@ -27,10 +28,24 @@ module Users
 
       creating = !@user.persisted?
       @user.assign_attributes(attrs)
+      return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
       return failure(@user) unless @user.save
 
       record_event(creating ? :user_created : :user_updated, user: @user)
       success(@user)
+    end
+
+    private
+
+    # Final fix wave (C, P17): a typed password needs a typed confirmation.
+    # `has_secure_password` only compares the two when the confirmation is
+    # non-nil, so a password sent without one (a form missing the field, a
+    # caller forgetting it) would otherwise be set unconfirmed. Validated
+    # first so this error joins any others instead of replacing them.
+    def unconfirmed_password
+      @user.validate
+      @user.errors.add(:password_confirmation, :blank)
+      failure(@user)
     end
   end
 end

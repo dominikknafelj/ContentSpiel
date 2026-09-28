@@ -384,14 +384,32 @@ module RichText
     SCHEME_PATTERN = /\A([a-z][a-z0-9+.\-]*):/i
     SAFE_SCHEMES = %w[http https mailto].freeze
 
+    #
+    # Decoding is the browser's own (final fix wave, P15): an href attribute
+    # value parsed by Nokogiri's HTML5 parser, so every HTML5 named
+    # reference is resolved -- `javascript&colon;`, `java&Tab;script:` --
+    # not only the HTML4 set `CGI.unescapeHTML` knows, and with HTML5's own
+    # attribute rules (a semicolon-less legacy reference followed by `=`
+    # stays literal). Only a value containing `&` needs the parse at all.
+    # The value sits in a single-quoted attribute, so its own `'` is written
+    # as `&#39;` (decoded straight back); nothing else in it can end the
+    # attribute early.
     def self.safe_href?(value)
       return false unless value.is_a?(String)
 
-      decoded = CGI.unescapeHTML(value).gsub(/[[:cntrl:][:space:]]/, "")
+      decoded = decode_attribute(value).gsub(/[[:cntrl:][:space:]]/, "")
       return false if decoded.empty?
 
       scheme = decoded[SCHEME_PATTERN, 1]
       scheme.nil? || SAFE_SCHEMES.include?(scheme.downcase)
+    end
+
+    def self.decode_attribute(value)
+      return value unless value.include?("&")
+
+      Nokogiri::HTML5.fragment("<a href='#{value.gsub("'", "&#39;")}'></a>").at_css("a")&.[]("href").to_s
+    rescue ArgumentError
+      ""
     end
 
     def self.render_youtube(node)

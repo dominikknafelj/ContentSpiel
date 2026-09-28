@@ -191,9 +191,17 @@ class SetupController < ApplicationController
       render :mcp_token_created
     end
 
+    # `StarterContent.add_once!` (final fix wave, P23): the same locked,
+    # re-checked path CS Studio's "Create starter pages" takes, so a double
+    # submit can't race itself into a duplicate-slug 500. A failure is shown
+    # on this step (422), like any other step's form error.
     def update_starter_content
-      StarterContent.create_pages_and_posts!(locale: Current.site.default_locale)
-      redirect_to setup_step_path("review"), notice: "Starter content added."
+      created = StarterContent.add_once!(locale: Current.site.default_locale)
+      redirect_to setup_step_path("review"), notice: created ? "Starter content added." : "Starter content was already there."
+    rescue StarterContent::Error => error
+      Rails.logger.warn("[setup starter content] #{error.class}: #{error.message}")
+      flash.now[:alert] = "Starter content couldn't be added — a page may already use one of its addresses."
+      render :starter_content, status: :unprocessable_entity
     end
 
     def update_review

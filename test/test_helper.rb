@@ -28,6 +28,15 @@ module ActiveSupport
     # the spec calls for, keeps that leak from ever being observable.
     setup { Setup.reset! }
 
-    # Add more helper methods to be used by all tests here...
+    # Replaces a singleton method (a module function, a class method) for
+    # the block's duration, then restores it -- for forcing a failure out of
+    # a collaborator the code under test calls.
+    def with_singleton_override(object, name, implementation)
+      original = object.method(name)
+      object.define_singleton_method(name, &implementation)
+      yield
+    ensure
+      object.define_singleton_method(name, original)
+    end
   end
 end

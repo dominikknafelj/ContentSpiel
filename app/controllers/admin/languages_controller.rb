@@ -32,10 +32,7 @@ module Admin
     # sorted back into an ordered Array by `position` before being handed to
     # the service, which is the one thing that actually cares about order.
     def update
-      rows = params.fetch(:languages, {}).to_unsafe_h
-      entries = rows.map { |code, row| { "code" => code, "position" => row["position"].to_i, "fallbacks" => Array(row["fallbacks"]) } }
-        .sort_by { |entry| entry["position"] }
-        .map { |entry| entry.except("position") }
+      entries = language_rows.sort_by { |entry| entry["position"] }.map { |entry| entry.except("position") }
 
       result = Locales::Configure.call(entries)
       redirect_after(result)
@@ -51,6 +48,26 @@ module Admin
     end
 
     private
+
+    # `languages[code] = { position:, fallbacks: [] }`, read through strong
+    # parameters row by row (final fix wave, P18) rather than
+    # `to_unsafe_h`: the keys are language codes (dynamic, so no single
+    # `permit` call can name them), but each row's own shape is fixed, so
+    # each is `permit`ted to exactly those two fields. A row that isn't a
+    # Hash at all counts as "no position, no fallbacks"; a submission that
+    # isn't a Hash of rows is no rows -- `Locales::Configure` then refuses
+    # it ("must list exactly the enabled languages") like any other invalid
+    # submission, instead of this raising.
+    def language_rows
+      languages = params[:languages]
+      return [] unless languages.is_a?(ActionController::Parameters)
+
+      languages.keys.map do |code|
+        row = languages[code]
+        permitted = row.is_a?(ActionController::Parameters) ? row.permit(:position, fallbacks: []) : {}
+        { "code" => code.to_s, "position" => permitted[:position].to_i, "fallbacks" => Array(permitted[:fallbacks]) }
+      end
+    end
 
     def redirect_after(result)
       if result.ok?

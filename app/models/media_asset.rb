@@ -61,6 +61,19 @@ class MediaAsset < ApplicationRecord
   def image_type_and_size
     errors.add(:file, "must be 10 MB or smaller") if file.blob.byte_size > MAX_BYTE_SIZE
     errors.add(:file, "must be a PNG, JPEG, GIF, or WEBP image") unless ALLOWED_CONTENT_TYPES.include?(sniffed_content_type)
+    errors.add(:file, "doesn't match its stored content type") if stored_type_mismatch?
+  end
+
+  # Final fix wave (C, P5): an already-persisted blob (attached by signed id,
+  # or as an `ActiveStorage::Blob`) is served with *its own* stored
+  # `content_type`, which `#force_blob_content_type` deliberately never
+  # rewrites (it's some other record's committed row). So the sniff passing
+  # isn't enough there: a PNG stored as `text/html` would still be served as
+  # HTML. Such a blob is refused instead. A new blob can't mismatch -- its
+  # type is forced to the sniff before it's written.
+  def stored_type_mismatch?
+    blob = file.blob
+    !blob.new_record? && sniffed_content_type.present? && blob.content_type != sniffed_content_type
   end
 
   # `Marcel::MimeType.for(io)`, called with neither `:name` nor
