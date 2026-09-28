@@ -159,6 +159,27 @@ Rails.application.routes.draw do
     # separate "invite" action here.
     resources :users, only: %i[index new create edit update destroy]
 
+    # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
+    # tokens. No `:new`/`:show` -- "Create token" is one button on the list
+    # that POSTs straight to `create`, and `create` *renders* the one-time
+    # reveal itself (never a redirect to a `show`, which would need the raw
+    # token to survive a second request somewhere -- see `Admin::
+    # ApiTokensController#create`). `destroy` is revoke
+    # (`ApiTokens::Revoke`): the row stays, marked revoked, for the list's
+    # own "last used / IP" history.
+    resources :api_tokens, only: %i[index create destroy]
+
+    # System status and the mind graph (design spec §6.1, Task 9): one
+    # read-only screen each, `resource` (singular) since neither has an
+    # `:id` to route on. "Run again" on the status screen is a plain reload
+    # of `show` -- `Setup::SystemCheck` runs on every request.
+    resource :system_status, only: :show, controller: :system_status
+    resource :mind_graph, only: :show, controller: :mind_graph
+
+    # "Create starter pages" on the Pages home (design spec §6.1, Task 9):
+    # one POST, `StarterContent.create_pages_and_posts!`, idempotent.
+    resources :starter_contents, only: :create
+
     # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
     # the placeholder `home#show` this task's brief removes.
     root to: "pages#index"

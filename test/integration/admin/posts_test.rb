@@ -179,4 +179,70 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
       assert_equal [], post_record.reload.fields.group(:speakers).map(&:name)
     end
   end
+
+  # Related posts (design spec §6.1). The picker's hidden-field contract:
+  # the section always submits a blank sentinel `post[related_post_ids][]`
+  # plus one entry per related post, so the key is present exactly when the
+  # picker was rendered -- an autosave PATCH from a form without it (or any
+  # other client) leaves the relations alone rather than clearing them.
+  test "the editor renders the related-posts picker with the current relations" do
+    post_record = create_post(title: "A")
+    related = create_post(title: "Related one")
+    linking = create_post(title: "Links here")
+    PostRelation.create!(post: post_record, related_post: related)
+    PostRelation.create!(post: linking, related_post: post_record)
+
+    get "/cs-studio/posts/#{post_record.id}"
+
+    assert_select "[data-controller~='admin--related-posts'][data-admin--related-posts-search-url-value='/cs-studio/link_targets?type=post']" do
+      assert_select "input[type=hidden][name='post[related_post_ids][]'][value='']", 1
+      assert_select "input[type=hidden][name='post[related_post_ids][]'][value='#{related.id}']", 1
+      assert_select "li", text: /Related one/
+      assert_select "*", text: /Links here/
+    end
+    assert_select "#post-related_post_ids-errors"
+  end
+
+  test "autosaving the related posts replaces them" do
+    post_record = create_post(title: "A")
+    old = create_post(title: "Old")
+    new_one = create_post(title: "New")
+    PostRelation.create!(post: post_record, related_post: old)
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "A", related_post_ids: [ "", new_one.id.to_s, post_record.id.to_s ] } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ new_one.id ], post_record.post_relations.reload.pluck(:related_post_id)
+  end
+
+  test "the sentinel alone clears the related posts" do
+    post_record = create_post(title: "A")
+    PostRelation.create!(post: post_record, related_post: create_post(title: "Old"))
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { related_post_ids: [ "" ] } }, as: :turbo_stream
+
+    assert_response :success
+    assert_empty post_record.post_relations.reload
+  end
+
+  test "a PATCH without the key leaves the related posts alone" do
+    post_record = create_post(title: "A")
+    old = create_post(title: "Old")
+    PostRelation.create!(post: post_record, related_post: old)
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "A2" } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ old.id ], post_record.post_relations.reload.pluck(:related_post_id)
+  end
+
+  test "an unknown related post id answers with the error in its slot" do
+    post_record = create_post(title: "A")
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { post: { related_post_ids: [ "", "0" ] } }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "post-related_post_ids-errors", /don.t exist/
+  end
 end

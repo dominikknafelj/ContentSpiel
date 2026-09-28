@@ -1,0 +1,41 @@
+<%# The one-time reveal (design spec §6.1, Task 9) -- rendered straight from
+    `Admin::ApiTokensController#create`, served `no-store`; see that
+    action's own comment for why nothing else ever holds the raw token.
+    `data-turbo-temporary` on the whole reveal: Turbo removes it from the
+    page snapshot it caches on the way out, so Back shows the list
+    without it rather than restoring it from Turbo's own cache.
+    `admin--token-reveal` does the copying (Clipboard API, falling back to
+    selecting the text) and blanks the token on `pagehide` for the
+    browser's own back/forward cache. %>
+<% content_for :title, "AI assistant" %>
+<div data-controller="admin--token-reveal" data-turbo-temporary class="flex flex-col gap-4">
+  <div>
+    <h1 class="text-h1 text-ink">Your new token</h1>
+    <p role="status" class="mt-1 text-warn-ink">Copy it now — it's only shown once. If you lose it, revoke it and create a new one.</p>
+  </div>
+
+  <div class="rounded-cs border border-line bg-surface p-4">
+    <p class="<%= setup_label_class %>">Token</p>
+    <div class="mt-1 flex flex-wrap items-start gap-2">
+      <pre id="api-token-value" data-admin--token-reveal-target="secret"
+        class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
+      <%= render Admin::ButtonComponent.new(label: "Copy token", variant: :secondary, type: "button",
+            data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-value" }) %>
+    </div>
+
+    <div class="mt-4">
+      <%= render "admin/api_tokens/connection", token: @raw_token, config_id: "api-token-config",
+            config_data: { "admin--token-reveal-target": "secret" } %>
+      <div class="mt-2">
+        <%= render Admin::ButtonComponent.new(label: "Copy configuration", variant: :secondary, type: "button",
+              data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-config" }) %>
+      </div>
+    </div>
+
+    <p data-admin--token-reveal-target="status" role="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
+  </div>
+
+  <div>
+    <%= link_to "Done", admin_api_tokens_path(**admin_url_options), class: setup_primary_button_class %>
+  </div>
+</div>

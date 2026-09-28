@@ -85,4 +85,91 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal [ "a" ], post.reload.tags.map(&:name)
     assert_not Tag.exists?(name: "b")
   end
+
+  # Related posts (design spec §6.1): `related_post_ids` is the complete
+  # list of this post's *forward* relations (`post_relations`) -- whatever
+  # it names is kept or added, whatever it leaves out is removed.
+  test "related_post_ids replaces the post's forward relations" do
+    post = create_post(title: "A")
+    kept = create_post(title: "B")
+    dropped = create_post(title: "C")
+    added = create_post(title: "D")
+    PostRelation.create!(post: post, related_post: kept)
+    PostRelation.create!(post: post, related_post: dropped)
+
+    result = Posts::Save.call(post, attributes: { related_post_ids: [ kept.id.to_s, added.id.to_s ] })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ kept.id, added.id ].sort, post.post_relations.pluck(:related_post_id).sort
+  end
+
+  test "related_post_ids ignores the post itself and blank entries" do
+    post = create_post(title: "A")
+    other = create_post(title: "B")
+
+    result = Posts::Save.call(post, attributes: { related_post_ids: [ "", post.id, other.id ] })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ other.id ], post.post_relations.pluck(:related_post_id)
+  end
+
+  test "an empty related_post_ids clears every forward relation" do
+    post = create_post(title: "A")
+    PostRelation.create!(post: post, related_post: create_post(title: "B"))
+
+    result = Posts::Save.call(post, attributes: { related_post_ids: [] })
+
+    assert result.ok?
+    assert_empty post.post_relations.reload
+  end
+
+  test "a missing related_post_ids key leaves the relations alone" do
+    post = create_post(title: "A")
+    other = create_post(title: "B")
+    PostRelation.create!(post: post, related_post: other)
+
+    result = Posts::Save.call(post, translations: { "en" => { title: "A2" } })
+
+    assert result.ok?
+    assert_equal [ other.id ], post.post_relations.pluck(:related_post_id)
+  end
+
+  test "unknown related post ids fail with an error and change nothing" do
+    post = create_post(title: "A")
+    other = create_post(title: "B")
+    PostRelation.create!(post: post, related_post: other)
+
+    result = Posts::Save.call(post, attributes: { related_post_ids: [ other.id, 0, "nope" ] },
+      translations: { "en" => { title: "Renamed" } })
+
+    assert_not result.ok?
+    assert result.record.errors[:related_post_ids].any?
+    assert_equal [ other.id ], post.post_relations.reload.pluck(:related_post_id)
+    assert_equal "A", post.reload.title(locale: :en)
+  end
+
+  # Relations are read as undirected (`Post#all_related_posts`): a post
+  # that already points at this one is already related, so naming it here
+  # is a no-op rather than a reverse-pair validation failure.
+  test "an id already related in the opposite direction is left as it is" do
+    post = create_post(title: "A")
+    other = create_post(title: "B")
+    PostRelation.create!(post: other, related_post: post)
+
+    result = Posts::Save.call(post, attributes: { related_post_ids: [ other.id ] })
+
+    assert result.ok?, result.errors.inspect
+    assert_empty post.post_relations.reload
+    assert_equal [ other.id ], post.all_related_posts.pluck(:id)
+  end
+
+  test "related_post_ids works when creating a post" do
+    other = create_post(title: "B")
+
+    result = Posts::Save.call(attributes: { content_type: "blog", related_post_ids: [ other.id ] },
+      translations: { "en" => { title: "New" } })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ other.id ], result.record.post_relations.pluck(:related_post_id)
+  end
 end

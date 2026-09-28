@@ -144,4 +144,8 @@
   <%= render Admin::TagInputComponent.new(
         value: tag_names_value, name: field_html_name("tag_names"), id: field_id("tag_names"), errors: field_errors("tag_names")
       ) %>
+
+  <%= render Admin::RelatedPostsComponent.new(
+        post: post, locale: locale, url_options: url_options, errors: field_errors("related_post_ids")
+      ) %>
 <% end %>

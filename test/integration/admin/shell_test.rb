@@ -55,10 +55,13 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a[href='/avo/resources/users']", count: 0
     assert_select "nav[aria-label='Modules'] a[href='/avo/resources/site_settings']", count: 0
 
-    # API tokens and System status haven't moved yet (later tasks), so the
-    # "(old admin)" group still names them.
-    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/api_tokens']", text: "API tokens"
-    assert_select "nav[aria-label='Modules'] a[href='/avo/system_status']", text: "System status"
+    # The last old-admin screens are CS Studio modules now (Task 9): the
+    # "(old admin)" group is gone, and nothing in the shell links to /avo.
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/api_tokens']", text: "AI assistant"
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/system_status']", text: "System status"
+    assert_select "a[href^='/avo']", count: 0
+    assert_not_includes response.body, "(old admin)"
   end
 
   test "the old public sign-in routes are gone" do

@@ -103,6 +103,12 @@ module Admin
 
       attributes[:tag_names] = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
 
+      # The related-posts picker's own contract (`Admin::RelatedPostsComponent`
+      # / `Posts::Save#assign_related_posts`): passed on only when the key
+      # was actually submitted -- absent leaves the relations alone, the
+      # picker's blank sentinel alone (`[""]`) clears them.
+      attributes[:related_post_ids] = Array(post_params.permit(related_post_ids: [])[:related_post_ids]) if post_params.key?(:related_post_ids)
+
       result = Posts::Save.call(@post, attributes: attributes, translations: { admin_locale => translated })
 
       streams = autosave_stream(
@@ -281,7 +287,10 @@ module Admin
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land
         # without a second wiring pass.
-        tag_names: [ "tag_names" ]
+        tag_names: [ "tag_names" ],
+        # `Posts::Save#assign_related_posts`' unknown-id error, in
+        # `Admin::RelatedPostsComponent`'s own slot.
+        related_post_ids: [ "related_post_ids" ]
       }
 
       @post.definition&.fields&.each { |field| fields[field.name] = [ "fields.#{field.name}" ] }

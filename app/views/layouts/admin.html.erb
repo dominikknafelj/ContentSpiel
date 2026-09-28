@@ -60,28 +60,25 @@
               <%= render "admin/shared/icon", name: :users %><span class="sr-only md:not-sr-only">Users</span>
             <% end %>
           </li>
+          <%# The last three screens the old admin still had, CS Studio's own
+              since Task 9 -- nothing in this column links out of CS Studio
+              any more. %>
+          <li>
+            <%= link_to admin_api_tokens_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :assistant %><span class="sr-only md:not-sr-only">AI assistant</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to admin_mind_graph_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :graph %><span class="sr-only md:not-sr-only">Mind graph</span>
+            <% end %>
+          </li>
+          <li>
+            <%= link_to admin_system_status_path(**admin_url_options), class: nav_link_classes do %>
+              <%= render "admin/shared/icon", name: :status %><span class="sr-only md:not-sr-only">System status</span>
+            <% end %>
+          </li>
         </ul>
-
-        <div>
-          <%# One shared icon marks the whole "old admin" group (rather than
-              one per Avo link): it's a temporary section (project memory
-              "Replace Avo", decided 2026-09-26) that goes away once
-              sub-project 6 gives every remaining screen here its own CS
-              Studio module the way Pages/Posts/Tags/Settings/Users already
-              have theirs (Task 8 moved Settings and Users out of this list;
-              API tokens and System status are still to come), so it isn't
-              worth a bespoke icon per link. Its own sub-links stay
-              text-only and `hidden` below `md`, rather than also collapsing
-              to icons, since two indistinguishable icon-only rows would be
-              no more usable than no row at all. %>
-          <p class="flex items-center justify-center gap-2 font-cs-mono text-label uppercase tracking-mono text-meta md:justify-start">
-            <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">(old admin)</span>
-          </p>
-          <ul class="mt-2 hidden flex-col gap-2 md:flex">
-            <li><%= link_to "API tokens", "/avo/resources/api_tokens" %></li>
-            <li><%= link_to "System status", "/avo/system_status" %></li>
-          </ul>
-        </div>
 
         <div class="mt-auto flex flex-col gap-2">
           <%= render "shared/theme_toggle" %>
