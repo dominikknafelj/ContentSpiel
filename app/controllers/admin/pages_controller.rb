@@ -287,20 +287,16 @@ module Admin
       end
     end
 
-    # `find_by`, not `find`: an absent or stale `parent_id` (the empty
-    # state's "Add a page" names none at all) is "use the homepage," not a
-    # 404 -- only an *invalid* choice should ever be a hard error, and
-    # `Pages::Save` has no rule of its own to catch that distinction since a
-    # blank `parent:` there just means "make a new root," which `Page`'s own
-    # `only_one_root_page` validation already refuses whenever one exists.
-    #
-    # Looked up through the read scope, like every other record here: an
-    # unreadable parent id is treated as absent (the homepage), where
-    # `Pages::Save` then decides `pages.create` against the homepage's
-    # branch instead -- a stale or forged id never reveals whether that
-    # page exists.
+    # No `parent_id` at all (the empty state's "Add a page" names none) is
+    # "use the homepage". A named one is looked up through the read scope
+    # like every other record here, the same way `new` does: an id the
+    # actor can't read -- or one that no longer exists -- is a 404, never a
+    # silent fallback to the homepage that would put the page somewhere
+    # the editor didn't choose. `Pages::Save` then decides `pages.create`
+    # against the parent's branch.
     def requested_parent
-      admin_scope(Page.all).find_by(id: params.dig(:page, :parent_id)) || root_page
+      parent_id = params.dig(:page, :parent_id)
+      parent_id.present? ? admin_scope(Page.all).find(parent_id) : root_page
     end
   end
 end

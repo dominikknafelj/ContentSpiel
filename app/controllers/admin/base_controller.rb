@@ -75,15 +75,29 @@ module Admin
     # also for a Turbo form submission, which renders an error response's
     # HTML in place. `message` is a service's refusal ("You don't have
     # permission to publish posts") when there is one.
+    #
+    # An autosave (a Turbo Stream request from `admin--autosave`) refused
+    # here -- a tab left open after the user lost the area -- gets the
+    # 403 save-status stream a service refusal gets
+    # (`AutosaveResponses#autosave_status`), in the status line the
+    # controller names (`forbidden_status_id`), rather than an HTML page
+    # the autosave controller would take for a network failure and retry.
     def forbidden!(message = nil)
       message ||= FORBIDDEN_MESSAGE
+      status_id = request.format.turbo_stream? ? forbidden_status_id : nil
 
       if request.format.json?
         render json: { errors: [ message ] }, status: :forbidden
+      elsif status_id
+        render turbo_stream: turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)), status: :forbidden
       else
         render "admin/errors/forbidden", status: :forbidden, formats: [ :html ], content_type: "text/html", locals: { message: message }
       end
     end
+
+    # The save-status line of this request's autosave form, for
+    # `forbidden!`; nil where the action isn't an autosave.
+    def forbidden_status_id = nil
 
     # A service failure answered in HTML: the 403 page for a permission
     # refusal, otherwise whatever the block does for any other failure.

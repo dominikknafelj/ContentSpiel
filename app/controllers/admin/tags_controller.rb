@@ -70,6 +70,8 @@ module Admin
 
     private
 
+    def forbidden_status_id = action_name == "update" ? "tag-#{params[:id].to_i}-save-status" : nil
+
     def row_status_id(tag) = "tag-#{tag.id}-save-status"
 
     def row_error_prefix(tag) = "tag-#{tag.id}"

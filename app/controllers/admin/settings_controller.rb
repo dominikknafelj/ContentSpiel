@@ -66,6 +66,8 @@ module Admin
 
     private
 
+    def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
+
     # Mirrors `Admin::PagesController#hero_image_stream`: the logo section
     # (preview + "Remove image" checkbox) is the one part of this form a
     # plain autosave doesn't otherwise bring back in sync with what was

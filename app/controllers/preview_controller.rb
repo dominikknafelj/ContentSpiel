@@ -16,9 +16,17 @@ class PreviewController < ApplicationController
     response.set_header("Cache-Control", "private, no-store")
     response.set_header("X-Robots-Tag", "noindex")
 
+    # Every answer that says anything about a record -- its content, or
+    # (for a redirect from an old address) where it lives now -- needs the
+    # record readable first; anything else is the same 404 as no record.
+    return render("pages/not_found", status: :not_found) if result.record && !readable?(result.record)
+
     case result.status
     when :found
-      return render("pages/not_found", status: :not_found) unless readable?(result.record) && assign_record(result.record)
+      return render("pages/not_found", status: :not_found) unless assign_record(result.record)
+      # A post is shown on its listing page -- that page's title, SEO meta
+      # and other blocks -- so the page must be readable too.
+      return render("pages/not_found", status: :not_found) if @post && !readable?(@page)
 
       @preview_record = @post || @page
       render "pages/show"

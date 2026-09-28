@@ -74,6 +74,10 @@ module Admin
       # §4.2). A hint for the file chooser only; the server decides.
       ACCEPT = "image/png,image/jpeg,image/gif,image/webp".freeze
 
+      # What an internal link to a page or post the actor can't read shows
+      # instead of its title (see `#link_titles_json`).
+      UNREADABLE_TITLES = { "page" => "A page you can't open", "post" => "A post you can't open" }.freeze
+
       # The toolbar actually rendered: `TOOLBAR` without "Image" for someone
       # who can't upload (`media.upload`, access-control design spec §5's
       # "Upload" button) -- the button's only way to add an image is an
@@ -115,6 +119,16 @@ module Admin
       # still exists, titled in this column's own editing locale (Mobility
       # falls back to the primary language, like every other translated
       # read in CS Studio).
+      #
+      # Only a target the actor may read is titled (access-control design
+      # spec §3.3): otherwise saving a link to any id and reloading would
+      # read out any page's or post's title. One the actor can't read gets
+      # the neutral `UNREADABLE_TITLES` label instead -- told apart from a
+      # deleted target (absent here, the editor's "missing" placeholder)
+      # only for references already in the document, since a new link to
+      # an unreadable target is refused on save with the same message as a
+      # missing one (the `internalLink.id` validation in
+      # `RichText::BuiltIns`).
       def link_titles_json
         targets = self.class.collect(document) do |node|
           Array(node["marks"]).filter_map { |mark| mark["attrs"] if mark.is_a?(Hash) && mark["type"] == "internalLink" && mark["attrs"].is_a?(Hash) }
@@ -123,7 +137,11 @@ module Admin
         titles = {}
         { "page" => Page, "post" => Post }.each do |type, model|
           ids = targets.select { |attrs| attrs["type"] == type }.map { |attrs| attrs["id"] }.grep(Integer)
-          model.where(id: ids).each { |record| titles["#{type}:#{record.id}"] = record.title(locale: editor_locale).to_s }
+          next if ids.empty?
+
+          readable = AccessControl.scope(Current.actor, "#{type}s.read", model.where(id: ids)).to_a
+          readable.each { |record| titles["#{type}:#{record.id}"] = record.title(locale: editor_locale).to_s }
+          (model.where(id: ids).pluck(:id) - readable.map(&:id)).each { |id| titles["#{type}:#{id}"] = UNREADABLE_TITLES.fetch(type) }
         end
         titles.to_json
       end

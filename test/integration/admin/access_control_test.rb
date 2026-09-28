@@ -279,6 +279,103 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal [ @other_post.id ], PostRelation.where(post: @own_post).pluck(:related_post_id)
   end
 
+  # --- Fix round 1 -------------------------------------------------------------
+
+  test "the editor shows no title for a link to a page the actor can't read (I1)" do
+    block = ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: link_doc("page", @outside.id) } }).record
+    assert block.persisted?
+    grant_branch("pages.edit", "pages.publish")
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/pages/#{@inside.id}"
+
+    assert_response :success
+    titles = JSON.parse(css_select("[data-admin--rich-text-link-titles-value]").first["data-admin--rich-text-link-titles-value"])
+    assert_equal({ "page:#{@outside.id}" => "A page you can't open" }, titles)
+    assert_not_includes response.body, "Outside"
+
+    # The link was already there, so editing the block around it still saves.
+    patch "/cs-studio/pages/#{@inside.id}/content_blocks/#{block.id}",
+      params: { block: { body: link_doc("page", @outside.id, text: "still here").to_json } }, as: :turbo_stream
+    assert_response :success
+  end
+
+  test "adding a link to an unreadable page fails exactly like a link to a missing one (I1)" do
+    block = ContentBlocks::Save.call(@inside.content_blocks.new, attributes: { block_type: "rich_text" }).record
+    grant_branch("pages.edit", "pages.publish")
+    sign_in_as(users(:editor_branch))
+    path = "/cs-studio/pages/#{@inside.id}/content_blocks/#{block.id}"
+
+    error_id = Admin::FieldComponent.error_id(Admin::BlockCardComponent.error_prefix(block), "body")
+    unreadable, missing = [ @outside.id, Page.maximum(:id) + 1000 ].map do |target_id|
+      patch path, params: { block: { body: link_doc("page", target_id).to_json } }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{error_id}']").text.squish
+    end
+
+    assert_includes unreadable, "internalLink.id is invalid"
+    assert_equal missing, unreadable
+
+    patch path, params: { block: { body: link_doc("page", @branch.id).to_json } }, as: :turbo_stream
+    assert_response :success
+  end
+
+  test "previewing a readable post listed on an unreadable page is not found (I2)" do
+    blog = create_page(title: "Blog")
+    ContentBlocks::Save.call(blog.content_blocks.new, attributes: { block_type: "post_list", settings: { "content_type" => "blog" } })
+    Posts::Save.call(@other_post, attributes: { published: true })
+    grant_branch("pages.read")
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: {})
+    sign_in_as(users(:editor_branch))
+
+    get "/preview/blog/other-post"
+    assert_response :not_found
+
+    sign_in_as(users(:two))
+    get "/preview/blog/other-post"
+    assert_response :success
+  end
+
+  test "a preview redirect from an old address checks the target is readable first (M2)" do
+    Pages::Save.call(@outside, translations: { "en" => { slug: "elsewhere" } })
+    grant_branch("pages.read")
+    sign_in_as(users(:editor_branch))
+
+    get "/preview/outside"
+    assert_response :not_found
+
+    sign_in_as(users(:two))
+    get "/preview/outside"
+    assert_redirected_to "/preview/elsewhere"
+  end
+
+  test "an autosave refused by an area check answers the 403 save-status stream (M5)" do
+    tag = Tag.create!(name: "news")
+    sign_in_as(users(:author))
+
+    patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "hijacked" } }, as: :turbo_stream
+
+    assert_response :forbidden
+    assert_equal "text/vnd.turbo-stream.html", response.media_type
+    assert_select_in_stream "tag-#{tag.id}-save-status", /you don.t have permission/
+    assert_equal "news", tag.reload.name
+  end
+
+  test "creating a page under an unreadable parent is not found, not the homepage (M7)" do
+    grant_branch("pages.create")
+    sign_in_as(users(:editor_branch))
+
+    assert_no_difference -> { Page.count } do
+      post "/cs-studio/pages", params: { page: { title: "Sneaky", parent_id: @outside.id } }
+    end
+    assert_response :not_found
+
+    assert_difference -> { @branch.children.count }, 1 do
+      post "/cs-studio/pages", params: { page: { title: "Fine", parent_id: @branch.id } }
+    end
+  end
+
   # --- Buttons ------------------------------------------------------------------
 
   test "publish, delete and add-block are absent for a reader, present for an admin" do
@@ -438,6 +535,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def link_doc(type, id, text: "click")
+    { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => text, "marks" => [ { "type" => "internalLink", "attrs" => { "type" => type, "id" => id } } ] }
+    ] } ] }
+  end
 
   def grant_branch(*keys, root: @branch)
     keys.each do |key|
