@@ -26,6 +26,14 @@ class Post < ApplicationRecord
   has_many :post_relations, dependent: :destroy
   has_many :related_posts, through: :post_relations
 
+  # Nullable (design spec §3.2): not every post has an author, and a user
+  # delete nullifies this column rather than orphaning the post or blocking
+  # the delete -- "own" (the `posts.*` grant scope keyed to this column,
+  # `AccessControl::Grant#scope_own?`) then simply stops matching for
+  # anyone, which is fine, not an error. `Posts::Save` (a later task) sets
+  # it to the acting user on create.
+  belongs_to :author, class_name: "User", optional: true
+
   # PostRelation holds two FKs into posts. `post_relations` only covers the
   # `post_id` side; without this the `related_post_id` side is left dangling
   # and destroying the post raises ActiveRecord::InvalidForeignKey.

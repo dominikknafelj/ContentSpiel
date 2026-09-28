@@ -55,9 +55,34 @@ def find_or_create_block!(page:, block_type:, position:, settings: nil, body: ni
   result.record
 end
 
+# Idempotent by name (design spec §6), so this is safe to call even though
+# `db:migrate`'s own data migration (`SeedAccessControlGroups`) already
+# seeded these groups in any database that's been migrated -- a dev
+# database rebuilt via `db:schema:load` skips migrations entirely and
+# would otherwise have no groups at all for `author@example.com` below to
+# join.
+groups = AccessControl::Seeds.ensure_built_in_groups!
+
+# The dev admin account is this app's stand-in for the setup wizard's own
+# account, which is always an owner (design spec §6) -- without `owner:
+# true` here, a freshly seeded dev database would start with zero owners,
+# unable to grant that flag back to anyone (`User#at_least_one_owner`).
 User.find_or_create_by!(email_address: "admin@example.com") do |user|
   user.password = "password123"
+  user.owner = true
 end
+
+# A second dev account with narrower access than the owner above, for
+# exercising CS Studio and MCP as a non-owner Author would see them
+# (design spec §6).
+author = User.find_or_create_by!(email_address: "author@example.com") do |user|
+  user.password = "password123"
+end
+AccessControl::Membership.find_or_create_by!(user: author, group: groups.fetch(AccessControl::Seeds::AUTHOR_NAME))
+
+puts "Seeded dev accounts:"
+puts "  admin@example.com / password123 (owner)"
+puts "  author@example.com / password123 (Author group)"
 
 SiteSetting.instance.tap do |settings|
   settings.update!(title: "ContentSpiel", tagline: "Notes from building a personal CMS") if settings.title.blank?

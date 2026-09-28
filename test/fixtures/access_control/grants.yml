@@ -1,0 +1,63 @@
+<%#
+  Mirrors AccessControl::Seeds::BUILT_IN (design spec §5) row for row --
+  fixtures load directly into the DB, so there's no shared code path with
+  that constant to lean on for consistency, but the Admin group's "every
+  built-in permission" is still generated from the live registry
+  (AccessControl::Permissions.keys) rather than copied out by hand, the
+  same way Seeds.ensure_built_in_groups! itself resolves `grants: :all`.
+  `branch_editors` (test/fixtures/access_control/groups.yml) holds no
+  grants here on purpose (ruling R3) -- pages have no fixtures to scope a
+  page_ids grant to.
+%>
+
+<% AccessControl::Permissions.keys.each do |key| %>
+admin_<%= key.tr(".", "_") %>:
+  group: admin
+  permission: <%= key %>
+  scope: {}
+<% end %>
+
+<% %w[posts.read posts.create posts.edit posts.publish posts.delete
+      pages.read pages.create pages.edit pages.publish pages.move pages.delete
+      tags.manage media.upload].each do |key| %>
+editor_<%= key.tr(".", "_") %>:
+  group: editor
+  permission: <%= key %>
+  scope: {}
+<% end %>
+
+author_posts_read:
+  group: author
+  permission: posts.read
+  scope: {}
+
+author_posts_create:
+  group: author
+  permission: posts.create
+  scope: {}
+
+author_posts_edit:
+  group: author
+  permission: posts.edit
+  scope:
+    own: true
+
+author_media_upload:
+  group: author
+  permission: media.upload
+  scope: {}
+
+author_pages_read:
+  group: author
+  permission: pages.read
+  scope: {}
+
+read_only_posts_read:
+  group: read_only
+  permission: posts.read
+  scope: {}
+
+read_only_pages_read:
+  group: read_only
+  permission: pages.read
+  scope: {}

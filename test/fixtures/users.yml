@@ -1,9 +1,37 @@
 <% password_digest = BCrypt::Password.create("password") %>
 
+# The sole owner (access-control design spec §3.2/Task 2 ruling R3) -- most
+# existing tests that need "a user who can do anything" use this one and
+# never touch groups at all, since an owner bypasses grants entirely.
 one:
   email_address: one@example.com
+  owner: true
   password_digest: <%= password_digest %>
 
+# Deliberately NOT an owner (ruling R3) -- a member of the built-in Admin
+# group instead (test/fixtures/access_control/memberships.yml), so every
+# existing test that already relies on `users(:two)` having full run of
+# the admin keeps working once `AccessControl.allowed?` is actually
+# consulted (a later task), without every one of those tests needing to
+# change.
 two:
   email_address: two@example.com
+  password_digest: <%= password_digest %>
+
+# One user per seeded group below (ruling R3), for later tasks' own tests
+# of what each group can and can't do -- none of them is an owner.
+author:
+  email_address: author@example.com
+  password_digest: <%= password_digest %>
+
+# Member of the custom "Branch editors" group (test/fixtures/access_control
+# /groups.yml), which holds no grants in fixtures -- pages have no
+# fixtures of their own to scope a `page_ids` grant to, so a test that
+# needs one builds it itself against a page it created.
+editor_branch:
+  email_address: editor_branch@example.com
+  password_digest: <%= password_digest %>
+
+reader:
+  email_address: reader@example.com
   password_digest: <%= password_digest %>

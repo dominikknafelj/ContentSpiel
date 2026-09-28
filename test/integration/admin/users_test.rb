@@ -88,22 +88,23 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "User deleted"
   end
 
-  test "refuses to delete the last user" do
-    users(:two).destroy!
-
+  test "refuses to delete the last owner" do
     assert_no_difference -> { User.count } do
       delete "/cs-studio/users/#{users(:one).id}"
     end
 
     assert_response :redirect
     follow_redirect!
-    assert_includes response.body, "The last user can&#39;t be deleted"
+    assert_includes response.body, "The last owner can&#39;t be deleted"
   end
 
   test "deleting yourself signs you out" do
-    users(:two) # a second user exists, so this isn't the last-user case
+    # users(:one) is the sole owner (test/fixtures/users.yml) and can't be
+    # deleted at all, last-owner or not -- deletes as :two instead, who
+    # isn't an owner, so nothing here is exercising the last-owner guard.
+    sign_in_as(users(:two))
 
-    delete "/cs-studio/users/#{users(:one).id}"
+    delete "/cs-studio/users/#{users(:two).id}"
 
     assert_redirected_to admin_sign_in_path
     follow_redirect!

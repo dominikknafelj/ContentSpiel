@@ -1,0 +1,35 @@
+# Four built-in groups (design spec §5, exact names per Global Constraints)
+# plus one custom group for the "editor_branch" user fixture
+# (test/fixtures/users.yml). Deliberately hand-written rather than driven
+# by `AccessControl::Seeds::BUILT_IN` -- fixtures load straight into the
+# DB, bypassing `Seeds.ensure_built_in_groups!` entirely, so there's no
+# path through which the two could silently disagree without a test (this
+# file's own `AccessControl::GroupTest`, and every group-scoped fixture
+# user) catching it.
+admin:
+  name: Admin
+  description: Every permission, unscoped.
+  built_in: true
+
+editor:
+  name: Editor
+  description: Full, unscoped access to posts and pages, plus tags and media.
+  built_in: true
+
+author:
+  name: Author
+  description: Own posts, read-only pages.
+  built_in: true
+
+read_only:
+  name: Read only
+  description: Read-only access to posts and pages.
+  built_in: true
+
+# Not built-in, and deliberately empty of grants (Task 2 brief ruling R3):
+# pages have no fixtures of their own to scope a `page_ids` grant to, so a
+# test that needs one builds it against a page it creates.
+branch_editors:
+  name: Branch editors
+  description: Edits one page branch.
+  built_in: false
