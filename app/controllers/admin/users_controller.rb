@@ -5,8 +5,7 @@ module Admin
   # means "leave it alone"), destroy (refused for the last user,
   # `Users::Destroy` -> `User#ensure_not_last_owner`). Invites stay on the
   # roadmap (spec §6.1) -- there is no separate "invite" action here, only
-  # `new`/`create` with a password set up front, the same as Avo's own form
-  # did.
+  # `new`/`create` with a password set up front.
   #
   # Plain redirect-with-flash throughout, not autosave: a user's email and
   # password are exactly the kind of field an accidental keystroke-triggered

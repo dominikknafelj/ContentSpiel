@@ -1,6 +1,6 @@
 module Users
-  # Creates or updates a User (spec §6.1, porting Avo's own user form):
-  # email address, plus a password only when one was actually typed.
+  # Creates or updates a User (spec §6.1): email address, plus a password
+  # only when one was actually typed.
   #
   # An edit screen's password/confirmation inputs are always present in the
   # submitted form (there's no other way to offer "change your password"

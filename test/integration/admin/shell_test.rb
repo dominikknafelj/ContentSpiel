@@ -17,7 +17,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # this boot-time constant can't read).
   test "the reserved-paths denylist covers every already-claimed first segment" do
     assert_equal(
-      (%w[preview setup mcp up avo rails lookbook assets cable sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
+      (%w[preview setup mcp up rails lookbook assets cable sitemap.xml] + SUPPORTED_LOCALES.keys).sort,
       ContentSpiel::RESERVED_PATHS.sort
     )
   end
@@ -27,12 +27,12 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
   # when this process itself booted, so there's no way to re-run its own
   # `tap` block against a bad value from inside this already-running test
   # process. A subprocess is what actually re-triggers it: one static
-  # reserved word (`avo`) and one locale code (`de`), enough to prove both
-  # halves of the denylist actually reach the raise, not every one of
+  # reserved word (`preview`) and one locale code (`de`), enough to prove
+  # both halves of the denylist actually reach the raise, not every one of
   # `RESERVED_PATHS`' several dozen entries -- the list itself is already
   # covered exhaustively, without a subprocess, just above.
   test "booting with a reserved ADMIN_PATH actually fails" do
-    %w[avo de].each do |reserved|
+    %w[preview de].each do |reserved|
       output, status = Open3.capture2e({ "ADMIN_PATH" => reserved, "RAILS_ENV" => "test" }, "bin/rails", "runner", "1")
       assert_not status.success?, "expected ADMIN_PATH=#{reserved} to fail boot"
       assert_includes output, "already reserved"
@@ -47,20 +47,17 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a", text: "Posts"
     assert_select "nav[aria-label='Modules'] a", text: "Tags"
 
-    # Settings and Users are CS Studio's own screens now (Task 8), not
-    # "(old admin)" links out to Avo -- the modules column links straight
+    # Settings and Users are CS Studio's own screens now (Task 8), not links
+    # out to a separate old-admin group -- the modules column links straight
     # to them the same way it already does for Pages/Posts/Tags.
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/settings']", text: "Settings"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/users']", text: "Users"
-    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/users']", count: 0
-    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/site_settings']", count: 0
 
     # The last old-admin screens are CS Studio modules now (Task 9): the
-    # "(old admin)" group is gone, and nothing in the shell links to /avo.
+    # "(old admin)" group is gone.
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/api_tokens']", text: "AI assistant"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/system_status']", text: "System status"
-    assert_select "a[href^='/avo']", count: 0
     assert_not_includes response.body, "(old admin)"
   end
 

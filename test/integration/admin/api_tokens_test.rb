@@ -5,12 +5,20 @@ require "test_helper"
 # in the `create` response itself -- never in a redirect, the flash, the
 # session, the database or the log.
 class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
-  setup do
-    site_settings(:default).update!(setup_completed_at: Time.current)
-    sign_in_as(users(:one))
+  setup { site_settings(:default).update!(setup_completed_at: Time.current) }
+
+  # Checked directly here since CS Studio's own Admin::BaseController gate
+  # is worth a test per screen, the same as Admin::MindGraphTest and
+  # Admin::SystemStatusTest already do.
+  test "an unauthenticated request is redirected to sign-in" do
+    get "/cs-studio/api_tokens"
+    assert_redirected_to "/cs-studio/sign-in"
   end
 
-  test "the list shows active and revoked tokens with last used and IP" do
+  # CS Studio has no standalone show page (the list is the whole screen), so
+  # a token's owner is asserted against its own list row.
+  test "the list shows active and revoked tokens with the owner's email, last used and IP" do
+    sign_in_as(users(:one))
     active, = ApiToken.generate!(users(:one))
     active.record_usage!("203.0.113.5")
     revoked, = ApiToken.generate!(users(:two))
@@ -20,11 +28,13 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "#" + ActionView::RecordIdentifier.dom_id(active) do
+      assert_select "*", text: /#{Regexp.escape(users(:one).email_address)}/
       assert_select "*", text: /203\.0\.113\.5/
       assert_select "*", text: /Active/
       assert_select "button", text: "Revoke"
     end
     assert_select "#" + ActionView::RecordIdentifier.dom_id(revoked) do
+      assert_select "*", text: /#{Regexp.escape(users(:two).email_address)}/
       assert_select "*", text: /Revoked/
       assert_select "button", text: "Revoke", count: 0
     end
@@ -32,6 +42,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the list names the MCP URL and a client config snippet" do
+    sign_in_as(users(:one))
     get "/cs-studio/api_tokens"
 
     assert_includes response.body, "#{PublicSite::Urls.default_host}/mcp"
@@ -39,6 +50,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "creating a token reveals it once, no-store, in the response itself" do
+    sign_in_as(users(:one))
     assert_difference -> { ApiToken.count }, 1 do
       post "/cs-studio/api_tokens"
     end
@@ -61,6 +73,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the raw token never reaches the log" do
+    sign_in_as(users(:one))
     io = StringIO.new
     original = Rails.logger
     Rails.logger = ActiveSupport::Logger.new(io)
@@ -77,6 +90,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "revoking a token stops it authenticating MCP requests immediately" do
+    sign_in_as(users(:one))
     token, raw = ApiToken.generate!(users(:one))
 
     mcp_list(raw)
@@ -91,6 +105,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   end
 
   test "the modules column links to the AI assistant module" do
+    sign_in_as(users(:one))
     get "/cs-studio/api_tokens"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/api_tokens']", text: "AI assistant"
   end

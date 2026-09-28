@@ -1,8 +1,9 @@
-# The pages and sample posts the setup wizard (and Avo's "Create starter
-# pages" action) can add, written in one locale -- the site's default at the
-# time. Every method is idempotent: it looks records up first, through
-# Mobility's `.i18n` scope, because translated columns are jsonb and a plain
-# `where(slug: ...)` would never match (see db/seeds.rb).
+# The pages and sample posts the setup wizard (and CS Studio's own "Create
+# starter pages" button on the Pages home) can add, written in one locale --
+# the site's default at the time. Every method is idempotent: it looks
+# records up first, through Mobility's `.i18n` scope, because translated
+# columns are jsonb and a plain `where(slug: ...)` would never match (see
+# db/seeds.rb).
 #
 # That lookup spans every configured locale (`find_in_any_locale`), not just
 # the one being written: an admin who ran this in one locale and later

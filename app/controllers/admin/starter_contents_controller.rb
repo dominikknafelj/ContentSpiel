@@ -2,7 +2,7 @@ module Admin
   # "Create starter pages" (design spec §6.1, Task 9), the setup wizard's
   # optional starter-content step available again from the Pages home --
   # `StarterContent.create_pages_and_posts!` reused as-is, in the site's
-  # default language, exactly as the wizard and Avo's old action ran it.
+  # default language, exactly as the wizard's own step runs it.
   #
   # The Pages home only offers this while the starter sections are missing
   # (`StarterContent.added?`, the same check the wizard uses), but a stale

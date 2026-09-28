@@ -1,8 +1,7 @@
 module ApiTokens
   # Revokes a single token (spec §7.2). Immediate -- once this returns, the
-  # raw value that authenticated it no longer does, whether the caller is an
-  # admin retiring a credential or `ApiTokens::Issue` clearing the way for a
-  # rotated one.
+  # raw value that authenticated it no longer does. The list's own "Revoke"
+  # button is the only caller today.
   class Revoke < ApplicationService
     def initialize(token, actor: Current.actor)
       @token = token

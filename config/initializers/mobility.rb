@@ -52,10 +52,10 @@ Mobility.configure do
     # another locale's text.
     fallbacks({})
 
-    # Defines `title_en` / `title_de=` / ... for every available locale. The
-    # Avo resource edits one locale per tab through these, and unlike the plain
-    # reader they deliberately do *not* fall back -- editing the German tab has
-    # to show German or nothing, never the English text.
+    # Defines `title_en` / `title_de=` / ... for every available locale. CS
+    # Studio's own forms edit one locale at a time through these, and unlike
+    # the plain reader they deliberately do *not* fall back -- editing the
+    # German tab has to show German or nothing, never the English text.
     locale_accessors
   end
 end

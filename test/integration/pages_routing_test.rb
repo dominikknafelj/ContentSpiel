@@ -547,8 +547,9 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   end
 
   # A landing page's title/subtitle/hero image are the reason `page_type`
-  # exists at all (page-tree design spec section 3) -- Avo has always been able
-  # to edit them, but nothing on the public side ever read them back.
+  # exists at all (page-tree design spec section 3) -- the admin has always
+  # been able to edit them, but nothing on the public side ever read them
+  # back.
   test "a landing page renders its title, subtitle, and hero image" do
     root = Page.create!(page_type: :landing, title: "Welcome", subtitle: "A warm welcome", slug: "",
       published_at: Time.current)

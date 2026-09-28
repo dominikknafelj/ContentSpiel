@@ -4,7 +4,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
   test "every page redirects to /setup while setup is required" do
     start_fresh_install
 
-    [ "/", "/about", "/de/about", "/avo", "/avo/resources/posts" ].each do |path|
+    [ "/", "/about", "/de/about", "/cs-studio", "/cs-studio/posts" ].each do |path|
       get path
       assert_redirected_to "/setup", "expected #{path} to redirect to /setup"
     end
@@ -13,7 +13,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
   test "non-GET requests are redirected too" do
     start_fresh_install
 
-    post "/avo/resources/posts"
+    post "/cs-studio/posts"
 
     assert_redirected_to "/setup"
   end
@@ -35,7 +35,7 @@ class SetupRedirectTest < ActionDispatch::IntegrationTest
     get admin_sign_in_path
     assert_response :success
 
-    get "/avo"
+    get "/cs-studio"
     assert_not_equal "/setup", URI.parse(response.location.to_s).path
   end
 end

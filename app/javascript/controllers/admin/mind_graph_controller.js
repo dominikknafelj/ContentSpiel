@@ -1,10 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
 import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from "d3-force"
 
-// CS Studio's mind graph (`admin/mind_graph/show`, design spec §6.1),
-// ported from the Avo tool's own `mind_graph_controller.js`: d3-force
-// computes node positions, this controller turns them into SVG and wires
-// up dragging. The data is `PostGraph`'s `{ nodes, edges }`, read from a
+// CS Studio's mind graph (`admin/mind_graph/show`, design spec §6.1):
+// d3-force computes node positions, this controller turns them into SVG and
+// wires up dragging. The data is `PostGraph`'s `{ nodes, edges }`, read from a
 // `<script type="application/json">` data island (see the view's own
 // comment for why not a data attribute). Each node carries its own `url`
 // (the post editor, built server-side through the route helper) and

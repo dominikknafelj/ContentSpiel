@@ -5,19 +5,16 @@ import Sortable from "sortablejs"
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::TreeNodeComponent); they all
 // share one `group`, so a node can be dropped under any other page in the
-// tree, not just reordered among its current siblings -- the same nested-
-// list SortableJS pattern as the Avo "Pages tree" tool
-// (app/javascript/controllers/pages_tree_controller.js) this follows.
+// tree, not just reordered among its current siblings -- a nested-list
+// SortableJS setup.
 //
-// It differs from that tool in how a drop is applied: rather than a bare
-// JSON PATCH plus a full page reload, this PATCHes Admin::TreeController
-// and asks for a Turbo Stream back (`Accept: text/vnd.turbo-stream.html`),
-// which it renders itself via `Turbo.renderStreamMessage` -- `fetch` never
-// goes through Turbo Drive, so nothing else applies that response for us.
-// The controller always answers with a full re-render of the tree, success
-// or failure alike (see its own comment for why), so this never has to
-// guess at what the drop actually did -- it only ever displays what the
-// server says happened.
+// A drop PATCHes Admin::TreeController and asks for a Turbo Stream back
+// (`Accept: text/vnd.turbo-stream.html`), which it renders itself via
+// `Turbo.renderStreamMessage` -- `fetch` never goes through Turbo Drive, so
+// nothing else applies that response for us. The controller always answers
+// with a full re-render of the tree, success or failure alike (see its own
+// comment for why), so this never has to guess at what the drop actually
+// did -- it only ever displays what the server says happened.
 export default class extends Controller {
   static targets = ["list"]
   static values = { moveUrl: String }

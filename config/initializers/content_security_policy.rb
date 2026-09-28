@@ -13,8 +13,8 @@
 # cost to anything the app already does.
 #
 # script-src/style-src/default-src are intentionally NOT set here: import
-# maps, Avo's admin, and inline scripts throughout this app all assume an
-# unconstrained policy today, and locking those down is a separate, larger
+# maps and inline scripts throughout this app all assume an unconstrained
+# policy today, and locking those down is a separate, larger
 # roadmap item -- setting them now would break the app, not harden it. No
 # nonce generator is configured for the same reason: nothing here needs one
 # yet.

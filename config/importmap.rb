@@ -9,8 +9,6 @@ pin_all_from "app/javascript/controllers", under: "controllers"
 # `controllers/admin/rich_text_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text"
 
-# Avo custom JS entrypoint
-pin "avo.custom"
 pin "sortablejs", preload: false # @1.15.7
 pin "d3-force", preload: false # @3.0.0
 # Tiptap 3 and its ProseMirror dependencies (tiptap spec §4.1), vendored by

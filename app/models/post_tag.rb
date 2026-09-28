@@ -11,9 +11,10 @@ class PostTag < ApplicationRecord
   # would.
   #
   # `after_commit`, not `after_save`/`after_destroy`: a join row is written
-  # inside whatever transaction its caller opened (an Avo save, a console
-  # `<<`), and syncing before that transaction either commits or rolls back
-  # would announce -- or act on -- a tag change that might still disappear.
+  # inside whatever transaction its caller opened (a CS Studio save, a
+  # console `<<`), and syncing before that transaction either commits or
+  # rolls back would announce -- or act on -- a tag change that might still
+  # disappear.
   after_commit :sync_post_paths, on: [ :create, :destroy ]
 
   private

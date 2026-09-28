@@ -77,8 +77,6 @@ group :test do
   gem "selenium-webdriver"
 end
 
-gem "avo", "~> 4.2"
-
 # Translates model content per locale [https://github.com/shioyama/mobility].
 # Every translated attribute, rich-text bodies included, uses its jsonb
 # backend (config/initializers/mobility.rb).

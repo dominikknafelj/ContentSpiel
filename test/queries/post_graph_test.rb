@@ -2,7 +2,7 @@ require "test_helper"
 
 # `PostGraph` (design spec §6.1): every post as a node, every
 # `PostRelation` row as one undirected edge -- the data behind CS Studio's
-# mind graph, ported from Avo's own tool (spec §6.2).
+# mind graph (spec §6.2).
 class PostGraphTest < ActiveSupport::TestCase
   test "every post is a node with its title, type, registry colour and editor url" do
     post = create_post(title: "My Resume Entry", content_type: "resume_entry")

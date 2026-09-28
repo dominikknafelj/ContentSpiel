@@ -1,7 +1,7 @@
 # Derives and stores every public URL (spec §5.4). Called from model
-# callbacks (HasPublicPaths) rather than from services on purpose: Avo,
-# seeds and fixtures-built data all save through ActiveRecord, and every
-# one of those writes has to leave the URL table correct.
+# callbacks (HasPublicPaths) rather than from services on purpose: CS
+# Studio, seeds and fixtures-built data all save through ActiveRecord, and
+# every one of those writes has to leave the URL table correct.
 module PublicSite
   module Paths
     module_function

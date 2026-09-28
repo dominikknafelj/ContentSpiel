@@ -99,9 +99,8 @@ module ContentModel
         @translations.fetch(@locale, {}).slice(*definition.fields.select(&:translated?).map(&:name))
       end
 
-      # Every locale's translations, unfiltered -- for a caller (a later
-      # task's Avo locale switcher, a full export) that needs more than this
-      # instance's own locale.
+      # Every locale's translations, unfiltered -- for a caller (a full
+      # export, say) that needs more than this instance's own locale.
       def all_translations = @translations
 
       # The nested `FieldSet` instance for a `group` field, or an Array of

@@ -6,9 +6,9 @@ module Fields
   # whose `speakers` group renders through the plain `Posts::DetailComponent`
   # it shares with the built-ins instead. This exists so a type that *does*
   # want a group rendered has a reasonable default without writing its own
-  # component (exercised only by its own Lookbook preview, for now), the same
-  # way `Avo`'s generic settings renderer (spec §6) gives every type a form
-  # for free.
+  # component (exercised only by its own Lookbook preview, for now) -- the
+  # same "every type gets a form for free" idea a generic settings renderer
+  # (spec §6) is for.
   class GroupComponent < ApplicationComponent
     def initialize(value:)
       @value = value

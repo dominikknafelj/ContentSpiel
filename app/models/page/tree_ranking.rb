@@ -44,12 +44,12 @@ module Page::TreeRanking
   # closure_tree's own tie-breaking (by id) instead of the rank `Pages::Move`
   # was actually asked for.
   #
-  # This is also what Avo's page form relies on, without going through
-  # `Pages::Move` at all: reparenting a page there without touching the
-  # `position` field resaves the same number the form was showing, under the
-  # new parent -- and the ruling (see test/integration/avo_page_editing_test.rb)
-  # is that the form's number is always the rank, whichever parent the page
-  # ends up under, not "leave it wherever it lands".
+  # This is also what `Pages::Move` relies on when it reparents a page: the
+  # same submitted `position` means something different once the parent
+  # changes underneath it, and the ruling (see test/services/pages/
+  # move_test.rb) is that the requested number is always the rank under
+  # whichever parent the page ends up under, not "leave it wherever it
+  # lands".
   def remember_requested_position
     @requested_position = position if will_save_change_to_position? || will_save_change_to_parent_id?
   end

@@ -122,15 +122,14 @@ class Post < ApplicationRecord
     self.translated_metadata = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
   end
 
-  # The seam `Avo::Resources::Post`'s typed-fields tool (`app/avo/
-  # resource_tools/typed_fields.rb`) writes through: its `extra_params`
-  # entry (`fields: {}`) makes Avo call `assign_attributes(fields: hash)` on
-  # submit, same as any other attribute, and `assign_attributes` just calls
-  # this. `locale: Locales.default` because that tool has no locale switcher
-  # of its own yet (unlike `title`/`body`, which get one via Mobility's
-  # tabs) -- a translated content-type field isn't editable in Avo until
-  # sub-project 3 gives it one, the same limit a block's own group/groups
-  # settings fields are under (see `_typed_fields.html.erb`).
+  # The plain `attr_writer`-shaped counterpart to `assign_fields`: whatever
+  # calls `assign_attributes(fields: hash)` generically (rather than through
+  # a service) lands here, always at `Locales.default`, since a bare setter
+  # has no locale parameter of its own to take one from. CS Studio's own
+  # typed-fields editor doesn't go through this at all -- `Posts::Save`
+  # calls `assign_fields` directly, once per submitted locale, the same
+  # split a content block's own `settings` gets through
+  # `ContentBlocks::Save`.
   def fields=(hash)
     assign_fields(hash, locale: Locales.default)
   end

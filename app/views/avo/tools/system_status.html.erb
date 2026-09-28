@@ -1,7 +1,0 @@
-<div class="flex flex-col">
-  <%= render ui.panel(title: "System status", description: "The same checks the setup wizard runs. A warning explains what won't work and how to fix it.") do |panel| %>
-    <% panel.with_card do %>
-      <%= render "setup/system_check_results", results: @results %>
-    <% end %>
-  <% end %>
-</div>

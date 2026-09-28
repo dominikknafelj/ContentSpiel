@@ -198,10 +198,10 @@ class SetupController < ApplicationController
 
     def update_review
       Setup.complete!
-      # CS Studio, not Avo, is where every sign-in lands now (cs-studio spec
-      # §3) -- finishing setup is no exception, even though the admin who
-      # just walked through this wizard is still signed in from `update_admin`
-      # above and could just as easily have been sent to Avo directly.
+      # CS Studio is where every sign-in lands now (cs-studio spec §3) --
+      # finishing setup is no exception, even though the admin who just
+      # walked through this wizard is already signed in from `update_admin`
+      # above.
       redirect_to admin_root_path, notice: "Setup complete."
     end
 end

@@ -1,7 +1,6 @@
 require "zlib"
 
-# The mind graph's data (design spec §6.1/§6.2), ported from Avo's own
-# `mind_graph` tool so it can outlive Avo: every post as a node, every
+# The mind graph's data (design spec §6.1/§6.2): every post as a node, every
 # `PostRelation` row as one edge. A plain query object rather than a
 # controller method, so the data itself is testable (and reusable) without
 # rendering the graph screen around it.

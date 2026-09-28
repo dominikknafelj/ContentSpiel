@@ -131,7 +131,7 @@ find_or_create_block!(page: root, block_type: :post_list, position: 1, settings:
 
 about = find_or_create_page!(parent: root, slug: "about", title: "About")
 find_or_create_block!(page: about, block_type: :rich_text, position: 0,
-  body: seed_body("I write about Rails, i18n, and building admin tools Avo Community doesn't ship out of the box.\n\n#{demo_video}"))
+  body: seed_body("I write about Rails, i18n, and building admin tools that don't ship out of the box.\n\n#{demo_video}"))
 
 blog = find_or_create_page!(parent: root, slug: "blog", title: "Blog")
 find_or_create_block!(page: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
