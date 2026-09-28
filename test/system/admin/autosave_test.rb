@@ -16,6 +16,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
   test "typing in the page title autosaves and persists" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     fill_in "Title", with: "About the Studio"
 
@@ -51,6 +52,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # next (and last) one sent.
   test "a second quick edit wins over the first save even while it's still in flight" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     # Slows every `fetch` call by half a second before it's even issued --
     # a JS-side stub (the brief's own suggested approach) rather than a
@@ -114,6 +116,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # since" without touching anything this test doesn't own.
   test "an autosave whose session expired meanwhile shows Signed out, not stuck on Saving forever" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
     users(:one).sessions.destroy_all
 
     title_field = find_field("Title")
@@ -142,6 +145,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # `wait:` below is generous specifically because the real one is real.
   test "a response that isn't a real answer (a 500, not a turbo-stream) retries, then shows check your connection" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     page.execute_script(<<~JS)
       window.fetch = () => Promise.resolve(new Response("Internal Server Error", { status: 500, headers: { "Content-Type": "text/plain" } }))

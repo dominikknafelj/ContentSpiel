@@ -44,27 +44,30 @@ module Admin
     # `locale:`, `id:`, `html_name:` -- is exactly `Admin::Columns::Base`'s.
     # `value`/`original` are a `RichText::Document`, a document Hash, or nil.
     class RichTextColumnComponent < Base
-      # [action, accessible name, visible text]. `action` is the
+      # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text` method the button runs (`data-action` below) and
-      # the key the controller reports active state under
-      # (`aria-pressed`). The order and set are spec §4.1's.
+      # the key the controller reports active state under. Toggle buttons
+      # (a mark, a heading level, a list, a block wrapper) carry
+      # `aria-pressed`; the rest open a popover or insert something, so they
+      # aren't toggles and don't (the controller marks them `data-active`
+      # for the visual state instead). The order and set are spec §4.1's.
       TOOLBAR = [
-        [ "bold", "Bold", "B" ],
-        [ "italic", "Italic", "I" ],
-        [ "strike", "Strikethrough", "S" ],
-        [ "code", "Inline code", "<>" ],
-        [ "heading2", "Heading 2", "H2" ],
-        [ "heading3", "Heading 3", "H3" ],
-        [ "heading4", "Heading 4", "H4" ],
-        [ "bulletList", "Bullet list", "•" ],
-        [ "orderedList", "Numbered list", "1." ],
-        [ "blockquote", "Quote", "❝" ],
-        [ "codeBlock", "Code block", "{ }" ],
-        [ "horizontalRule", "Horizontal rule", "―" ],
-        [ "link", "Link", "Link" ],
-        [ "internalLink", "Internal link", "Page" ],
-        [ "image", "Image", "Image" ],
-        [ "youtube", "YouTube", "YouTube" ]
+        [ "bold", "Bold", "B", true ],
+        [ "italic", "Italic", "I", true ],
+        [ "strike", "Strikethrough", "S", true ],
+        [ "code", "Inline code", "<>", true ],
+        [ "heading2", "Heading 2", "H2", true ],
+        [ "heading3", "Heading 3", "H3", true ],
+        [ "heading4", "Heading 4", "H4", true ],
+        [ "bulletList", "Bullet list", "•", true ],
+        [ "orderedList", "Numbered list", "1.", true ],
+        [ "blockquote", "Quote", "❝", true ],
+        [ "codeBlock", "Code block", "{ }", true ],
+        [ "horizontalRule", "Horizontal rule", "―", false ],
+        [ "link", "Link", "Link", false ],
+        [ "internalLink", "Internal link", "Page", false ],
+        [ "image", "Image", "Image", false ],
+        [ "youtube", "YouTube", "YouTube", false ]
       ].freeze
 
       # The upload's own `accept` -- `MediaAsset`'s content types (spec

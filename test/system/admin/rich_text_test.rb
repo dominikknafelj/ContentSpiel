@@ -65,6 +65,17 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     asset = MediaAsset.find(image.dig("attrs", "asset_id"))
     assert_equal({ "asset_id" => asset.id, "alt" => "A", "caption" => "" }, image["attrs"])
     assert_selector ".ProseMirror img[src='#{asset.url}']"
+
+    # The image is still selected after Done: the Image button now edits it
+    # (the keyboard route to alt text) instead of uploading another.
+    press "Image"
+    within(".admin-rich-text-popover") do
+      assert_field "Alt text", with: "A"
+      fill_in "Caption", with: "C"
+      press "Done"
+    end
+    saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "caption") == "C" } }
+    assert_equal 1, MediaAsset.count
   end
 
   test "a failed upload shows its errors inline and inserts nothing" do
@@ -166,7 +177,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     block = page_record.content_blocks.create!(block_type: "rich_text", position: 0)
     visit "/cs-studio/pages/#{page_record.id}"
     card_id = ActionView::RecordIdentifier.dom_id(block)
-    assert_selector "##{card_id} .ProseMirror", count: 1
+    await_editors(count: 1)
 
     page.execute_script(<<~JS, card_id)
       const id = arguments[0]
@@ -186,22 +197,116 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       window.setTimeout(() => parent.insertBefore(card, next), 50)
     JS
     assert_selector "##{card_id} .ProseMirror", count: 1
-    assert_selector ".ProseMirror", count: 1
+    await_editors(count: 1)
 
     find("##{card_id} .ProseMirror").click
     type_text "Swapped and saved"
 
-    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
-    document = block.reload.body_document(locale: :en)
-    assert_includes doc_text(document), "Swapped and saved"
-    assert_empty document.validate
+    saved_document(block) { |doc| doc_text(doc).include?("Swapped and saved") }
+  end
+
+  # Two rich-text blocks on one page are two independent editors, each
+  # writing only its own card's hidden input.
+  test "typing in one of two editors on a page saves only that block" do
+    page_record = create_page(title: "About")
+    first = page_record.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("First"))
+    second = page_record.content_blocks.create!(block_type: "rich_text", position: 1, body: rich_doc("Second"))
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_editors(count: 2)
+
+    find("##{ActionView::RecordIdentifier.dom_id(first)} .ProseMirror").click
+    type_text " edited"
+
+    saved_document(first) { |doc| doc_text(doc).include?("edited") }
+    assert_equal rich_doc("Second"), second.reload.body_document(locale: :en).to_h
+  end
+
+  test "Escape closes a popover and returns to the editor" do
+    visit_post
+
+    editor.click
+    press "Link"
+    assert_selector ".admin-rich-text-popover"
+    find_field("URL").send_keys(:escape)
+
+    refute_selector ".admin-rich-text-popover"
+    # Tiptap's `focus` command focuses on the next animation frame, so this
+    # polls rather than reading `document.activeElement` once.
+    assert_selector ".ProseMirror:focus"
+  end
+
+  # Task 7 fix round 1 (I1): a unicode URL is stored canonical (punycode
+  # host, percent-encoded path) and the server accepts it.
+  test "a unicode link saves" do
+    visit_post
+
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL", with: "https://münchen.de/über"
+      press "Apply"
+    end
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } }
+    assert_equal "https://münchen.de/über", linked["text"]
+    assert_equal [ { "type" => "link", "attrs" => { "href" => "https://xn--mnchen-3ya.de/%C3%BCber" } } ], linked["marks"]
+  end
+
+  test "a bare email address becomes a mailto link" do
+    visit_post
+
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL", with: "a@b.com"
+      press "Apply"
+    end
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } }
+    assert_equal [ { "type" => "link", "attrs" => { "href" => "mailto:a@b.com" } } ], linked["marks"]
+  end
+
+  # Task 7 fix round 1 (m2/m1): merely focusing the editor (Tiptap's
+  # trailing-node plugin appends an empty paragraph after a final embed on
+  # first focus) and moving focus into a popover are not edits -- neither
+  # may write the hidden input or send a save.
+  test "focusing the editor and opening a popover don't save anything" do
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "youtube", "attrs" => { "id" => YOUTUBE_ID } } ] }, locale: :en)
+    @post.save!
+    visit_post
+    stored = find("input[name='post[body]']", visible: false).value
+    page.execute_script(<<~JS)
+      window.__patches = 0
+      const originalFetch = window.fetch
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+    JS
+
+    editor.click
+    press "Link"
+    assert_selector ".admin-rich-text-popover"
+    sleep 1.5
+
+    assert_equal stored, find("input[name='post[body]']", visible: false).value
+    assert_equal 0, page.evaluate_script("window.__patches")
   end
 
   private
 
   def visit_post
     visit "/cs-studio/posts/#{@post.id}"
-    assert_selector ".ProseMirror"
+    await_editors
+  end
+
+  # Every editor mounted, then `await_admin_controllers` (see
+  # ApplicationSystemTestCase) before any typing.
+  def await_editors(count: nil)
+    count ? assert_selector(".ProseMirror", count: count) : assert_selector(".ProseMirror")
+    await_admin_controllers
   end
 
   def editor = find(".ProseMirror")
@@ -231,11 +336,13 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   # `test/system/admin/autosave_test.rb`'s "second quick edit" comment for
   # why a status line can lie about *which* save landed) until the saved
   # document satisfies `condition`, then asserts it validates.
-  def saved_post_document(timeout: 6, &condition)
+  def saved_post_document(timeout: 6, &condition) = saved_document(@post, timeout: timeout, &condition)
+
+  def saved_document(record, timeout: 6, &condition)
     deadline = Time.current + timeout
     document = nil
     loop do
-      document = @post.reload.body_document(locale: :en)
+      document = record.reload.body_document(locale: :en)
       break if condition.call(document)
       flunk "the saved document never matched: #{document.to_h.to_json}" if Time.current > deadline
       sleep 0.1

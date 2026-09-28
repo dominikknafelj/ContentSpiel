@@ -35,4 +35,46 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   def press(label)
     find(:link_or_button, label).execute_script("this.click()")
   end
+
+  # CS Studio's Stimulus controllers (`controllers/admin/*`) are lazy-loaded
+  # (app/javascript/controllers/index.js): their imports only start once the
+  # page has loaded and an element using one is found. A test that types
+  # right after `visit` can race them -- before `admin--autosave` is
+  # connected its `input` events go nowhere. So this waits until every
+  # `admin--*` controller named on the page is connected.
+  #
+  # Then `await_native_input`: headless Chrome was also observed dropping
+  # *every* native key event of a `send_keys` sent shortly after a page load
+  # (no `keydown` reaches the document at all -- the same class of drop
+  # `#press`'s comment describes for clicks), which the lazy loading made
+  # frequent enough to flake the typing tests.
+  def await_admin_controllers
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      const ready = () => {
+        const app = window.Stimulus
+        if (!app) return false
+        return Array.from(document.querySelectorAll("[data-controller*='admin--']")).every((element) =>
+          element.getAttribute("data-controller").split(" ").filter((name) => name.startsWith("admin--"))
+            .every((name) => app.getControllerForElementAndIdentifier(element, name)))
+      }
+      const poll = () => (ready() ? done(true) : setTimeout(poll, 20))
+      poll()
+    JS
+    await_native_input
+  end
+
+  # A handshake rather than a sleep: presses Shift (which types nothing and
+  # triggers nothing) until the page actually receives a native `keydown`,
+  # i.e. until the browser is accepting WebDriver input on this page.
+  def await_native_input(attempts: 50)
+    page.execute_script("window.__nativeInputSeen = false; document.addEventListener('keydown', () => { window.__nativeInputSeen = true }, { capture: true, once: true })")
+    attempts.times do
+      page.driver.browser.action.send_keys(:shift).perform
+      return if page.evaluate_script("window.__nativeInputSeen")
+
+      sleep 0.05
+    end
+    raise "the browser never accepted native keyboard input"
+  end
 end

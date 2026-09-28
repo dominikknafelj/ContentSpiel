@@ -97,4 +97,31 @@ class RichText::DocumentTest < ActiveSupport::TestCase
       { "type" => "text", "text" => "hey", "marks" => [ { "type" => "bold" }, { "type" => "italic" } ] } ] })
     assert_equal document.to_h, document.normalized.to_h
   end
+
+  # Task 7 fix round 1 (I2): existence checks only block references that
+  # are new relative to `known_references`.
+  test "validate skips existence checks for known references, but not new ones" do
+    dead_link = { "type" => "text", "text" => "x", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => 999_999 } } ] }
+    dead_image = { "type" => "image", "attrs" => { "asset_id" => 888_888, "alt" => "", "caption" => "" } }
+    document = doc({ "type" => "paragraph", "content" => [ dead_link ] }, dead_image)
+
+    assert_equal 2, document.validate.size
+    assert_equal Set.new([ [ "internalLink", "id", 999_999, "page" ], [ "image", "asset_id", 888_888 ] ]), document.references
+    assert_empty document.validate(known_references: document.references)
+
+    # The same id under the other `type` is a different reference.
+    other = doc({ "type" => "paragraph", "content" => [ dead_link.deep_merge("marks" => [ { "type" => "internalLink", "attrs" => { "type" => "post", "id" => 999_999 } } ]) ] })
+    assert_equal [ "internalLink.id is invalid" ], other.validate(known_references: document.references)
+  end
+
+  test "known references never excuse a malformed attribute" do
+    bad = doc({ "type" => "image", "attrs" => { "asset_id" => "42", "alt" => "", "caption" => "" } })
+    assert_equal [ "image.asset_id must be a integer" ], bad.validate(known_references: Set.new([ [ "image", "asset_id", "42" ] ]))
+  end
+
+  test "references tolerates malformed shapes" do
+    document = RichText::Document.new("type" => "doc", "content" => [ nil, "x", { "type" => "image", "attrs" => "nope" },
+      { "type" => "text", "text" => "t", "marks" => [ nil, { "type" => "internalLink" } ] } ])
+    assert_empty document.references
+  end
 end

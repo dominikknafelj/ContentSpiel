@@ -40,7 +40,18 @@ module RichText
     # (`page` vs. `post`), which a single-value signature can't see. See
     # `RichText::Document#run_attribute_validation`, the one place that
     # distinguishes the two by arity.
-    Attribute = Data.define(:name, :type, :required, :in, :format, :validate)
+    #
+    # `reference` (Task 7 fix round 1, I2) marks an attribute whose
+    # `validate` is an *existence* check against another record -- the
+    # `MediaAsset` behind `image.asset_id`, the page/post behind
+    # `internalLink.id`. `true` means the value alone names the record;
+    # an Array of sibling attribute names means those siblings scope it
+    # (`internalLink.id` is scoped by `type`). Such a check only blocks a
+    # reference that's *new*: `RichText::Document#validate(known_references:)`
+    # skips it for a reference the stored document already had, so a
+    # target deleted after the fact never makes the document unsaveable.
+    # See `RichText::Document#references`.
+    Attribute = Data.define(:name, :type, :required, :in, :format, :validate, :reference)
 
     # One directive attribute mapping (`TypeDefinition#directive`'s
     # `**mapping`) -- `node_attr` is the node's own `attribute` name the
@@ -67,19 +78,19 @@ module RichText
         @attributes = []
       end
 
-      # `attribute(name, type = :string, required: false, in: nil, format: nil, validate: nil)`
+      # `attribute(name, type = :string, required: false, in: nil, format: nil, validate: nil, reference: nil)`
       # (design spec §3.2). `type` is one of `:string`/`:integer`/`:boolean`
       # -- just enough to catch "level" being sent as a string, or `alt`
       # being sent as a number -- validated generically by
       # `RichText::Document`, not enforced here at registration time.
-      def attribute(name, type = :string, required: false, in: nil, format: nil, validate: nil)
+      def attribute(name, type = :string, required: false, in: nil, format: nil, validate: nil, reference: nil)
         # `in` is a Ruby keyword (pattern matching, `for x in y`), so it
         # parses fine as a keyword-argument *label* above but not as a bare
         # expression below -- `binding.local_variable_get` is the
         # documented way to read a local variable whose name shadows a
         # keyword.
         allowed_values = binding.local_variable_get(:in)
-        @attributes << Attribute.new(name: name.to_sym, type: type, required: required, in: allowed_values, format: format, validate: validate)
+        @attributes << Attribute.new(name: name.to_sym, type: type, required: required, in: allowed_values, format: format, validate: validate, reference: reference)
       end
 
       def find_attribute(name) = @attributes.find { |attribute| attribute.name == name.to_sym }

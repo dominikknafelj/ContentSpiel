@@ -56,6 +56,11 @@ export default class extends Controller {
     this.aborter = new AbortController()
     this.popover = null
     this.contentInvalid = false
+    this.edited = false
+    // A popover left behind in a Turbo cache snapshot (the page was cached
+    // with one open) is dead DOM -- its listeners belonged to the previous
+    // connection. Same "start from a clean slate" rule as the mount point.
+    this.element.querySelectorAll(".admin-rich-text-popover").forEach((stale) => stale.remove())
     // Copies, not the value objects themselves: the upload and the link
     // picker add to these as the editor is used, and writing a Stimulus
     // value back would re-render nothing useful but cost a data-attribute
@@ -76,11 +81,19 @@ export default class extends Controller {
       }),
       injectCSS: false,
       enableContentCheck: true,
+      // The ProseMirror element is the actual text field, so it carries the
+      // textbox role and the column's label (the mount's own
+      // `aria-labelledby`, rendered by the component).
       editorProps: {
-        attributes: { class: "admin-rich-text-content min-h-40 px-3 py-2 focus:outline-2 focus:outline-accent" }
+        attributes: {
+          class: "admin-rich-text-content min-h-40 px-3 py-2 focus:outline-2 focus:outline-accent",
+          role: "textbox",
+          "aria-multiline": "true",
+          "aria-labelledby": this.editorTarget.dataset.labelledby || ""
+        }
       },
       onContentError: () => this.handleInvalidContent(),
-      onUpdate: () => this.writeDocument(),
+      onUpdate: ({ transaction }) => this.documentChanged(transaction),
       onTransaction: () => this.refreshToolbar()
     })
 
@@ -119,6 +132,28 @@ export default class extends Controller {
     this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => { button.disabled = true })
   }
 
+  // Until the first real edit, an update whose own (root) transaction
+  // didn't change the document is ignored: that's a plugin normalizing the
+  // freshly loaded document in an appended transaction -- Tiptap's trailing
+  // node adding an empty paragraph after a final embed on first focus, say
+  // -- and writing it would make simply clicking into the editor autosave.
+  // After the first edit every update is written (the normalization rides
+  // along with it, harmlessly).
+  documentChanged(transaction) {
+    if (!this.edited && !transaction?.docChanged) return
+
+    this.edited = true
+    this.writeDocument()
+  }
+
+  // Focus moving between the editor, its toolbar and its popovers is still
+  // "inside the field": stop that `focusout` here so the form's
+  // `focusout->admin--autosave#saveNow` only fires when focus actually
+  // leaves this column (the debounced `input` save still runs meanwhile).
+  containFocus(event) {
+    if (event.relatedTarget && this.element.contains(event.relatedTarget)) event.stopPropagation()
+  }
+
   writeDocument() {
     if (this.contentInvalid || !this.editor) return
 
@@ -148,9 +183,19 @@ export default class extends Controller {
   codeBlock() { this.run((chain) => chain.toggleCodeBlock()) }
   horizontalRule() { this.run((chain) => chain.setHorizontalRule()) }
 
+  // With an image node selected (keyboard users get there with the arrow
+  // keys), the Image button edits that image's alt text and caption instead
+  // of uploading another one. Enter on a selected image does the same
+  // (`rich_text/image.js`).
   image() {
     if (!this.editable()) return
     this.showMessage("")
+
+    const { selection } = this.editor.state
+    if (selection.node?.type.name === "image") {
+      this.openImagePopover(selection.from)
+      return
+    }
     this.fileTarget.click()
   }
 
@@ -164,8 +209,12 @@ export default class extends Controller {
     return this.editor && !this.contentInvalid
   }
 
-  // `aria-pressed` on every toolbar button whose command is "on" at the
-  // current selection (the product CSS styles `aria-pressed:` itself).
+  // Active state for every toolbar button whose command is "on" at the
+  // current selection: `aria-pressed` on the toggle buttons (bold, a
+  // heading level, a list, ...), `data-active` on the ones that open a
+  // popover or insert something (link, image, ...), which aren't toggles
+  // and so mustn't announce themselves as pressed/unpressed. The product
+  // CSS styles both.
   refreshToolbar() {
     if (!this.editor) return
 
@@ -189,7 +238,12 @@ export default class extends Controller {
 
     this.element.querySelectorAll("[data-admin--rich-text-command]").forEach((button) => {
       const check = active[button.getAttribute("data-admin--rich-text-command")]
-      button.setAttribute("aria-pressed", check && check() ? "true" : "false")
+      const on = Boolean(check && check())
+      if (button.hasAttribute("aria-pressed")) {
+        button.setAttribute("aria-pressed", on ? "true" : "false")
+      } else {
+        button.toggleAttribute("data-active", on)
+      }
     })
   }
 
@@ -289,7 +343,8 @@ export default class extends Controller {
     popover.body.append(url.wrapper)
 
     const apply = () => {
-      const href = normalizeHref(url.input.value)
+      const typed = url.input.value.trim()
+      const href = normalizeHref(typed)
       if (!safeHref(href)) {
         popover.setError(this.constructor.texts.badLink)
         return
@@ -302,7 +357,9 @@ export default class extends Controller {
       } else if (this.editor.isActive("link")) {
         chain.extendMarkRange("link").setLink({ href })
       } else {
-        chain.unsetMark("internalLink").insertContent({ type: "text", text: href, marks: [ { type: "link", attrs: { href } } ] })
+        // The text is what was typed (`münchen.de`), the href its
+        // canonical form (`https://xn--mnchen-3ya.de/`).
+        chain.unsetMark("internalLink").insertContent({ type: "text", text: typed, marks: [ { type: "link", attrs: { href } } ] })
       }
       chain.run()
       this.closePopover()

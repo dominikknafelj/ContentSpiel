@@ -191,7 +191,10 @@ module RichText
       end
 
       # `image` is also a directive node (`::image{asset="42" alt="..." caption="..."}`).
-      # `asset_id` must name an existing `MediaAsset` (Task 4). `alt`/
+      # `asset_id` must name an existing `MediaAsset` (Task 4) -- when the
+      # reference is new (`reference: true`, see `RichText::Schema::Attribute`:
+      # an asset deleted after the document was saved doesn't block later
+      # edits to it). `alt`/
       # `caption` are both optional: an editor can drop in an image before
       # writing alt text, and the public renderer already has to handle "no
       # caption" for the `<figcaption>` (`RichText::ImageComponent`).
@@ -214,7 +217,7 @@ module RichText
       # what `TypeDefinition#directive`'s `{ attr:, type: }` mapping shape
       # exists for. `alt`/`caption` map to themselves, `:string` (identity).
       RichText::Schema.register_node("image") do |node|
-        node.attribute :asset_id, :integer, required: true, validate: ->(value) { MediaAsset.exists?(value) }
+        node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { MediaAsset.exists?(value) }
         node.attribute :alt, :string
         node.attribute :caption, :string
         node.directive "image", asset: { attr: :asset_id, type: :integer }, alt: :string, caption: :string
@@ -270,6 +273,11 @@ module RichText
         mark.markdown_out { |m, content, ctx| "[#{content}](#{RichText::Markdown.escape_link_destination(m.dig("attrs", "href").to_s)})" }
       end
 
+      # `reference: [ :type ]`: the existence check only applies to a link
+      # that's new to the document (`RichText::Schema::Attribute`'s own
+      # comment) -- a page deleted after it was linked renders as plain
+      # text and never blocks an edit.
+      #
       # `internalLink` needs both attributes together to check existence
       # (`type` says which model `id` names), which is exactly the
       # two-argument `validate:` shape `RichText::Schema::Attribute`
@@ -288,7 +296,7 @@ module RichText
       # `internalLink` mark on the way in.
       RichText::Schema.register_mark("internalLink") do |mark|
         mark.attribute :type, :string, required: true, in: %w[page post]
-        mark.attribute :id, :integer, required: true, validate: ->(value, attrs) {
+        mark.attribute :id, :integer, required: true, reference: [ :type ], validate: ->(value, attrs) {
           case attrs["type"]
           when "page" then Page.exists?(value)
           when "post" then Post.exists?(value)
@@ -300,23 +308,40 @@ module RichText
       end
     end
 
+    # A pure scheme allowlist: `http`/`https`/`mailto`, or no scheme at all
+    # (a relative href). Anything else -- `javascript:`, `data:`, `vbscript:`
+    # -- is refused.
+    #
     # Browsers resolve HTML/numeric-character-reference escapes and discard
-    # embedded control characters *before* they decide what a link's scheme
-    # is -- `javascript&#58;alert(1)` and `&#x6A;avascript:alert(1)` both
-    # execute as a `javascript:` URI despite never containing that literal
-    # substring, and `java\tscript:alert(1)` does too, once the tab is
-    # stripped. A `URI.parse` of the raw, still-encoded String would see
-    # scheme `nil` (no literal `:`) or some other harmless-looking scheme
-    # and wave both straight through -- so this decodes and strips control
-    # characters *before* ever asking `URI` what the scheme is, the same
-    # normalization step a browser performs, rather than trusting the
-    # scheme a hostile String merely *looks* like it doesn't have.
+    # embedded control characters/whitespace *before* they decide what a
+    # link's scheme is -- `javascript&#58;alert(1)` and
+    # `&#x6A;avascript:alert(1)` both execute as a `javascript:` URI despite
+    # never containing that literal substring, and `java\tscript:alert(1)`
+    # does too, once the tab is stripped. So this decodes and strips first,
+    # the same normalization a browser performs, and only then reads the
+    # scheme off the front.
+    #
+    # Deliberately *not* `URI.parse` (Task 7 fix round 1, I1): that's an
+    # RFC 3986 *syntax* check, and real links editors paste every day are
+    # IRIs it rejects -- `https://münchen.de`, `https://example.com/über`,
+    # `https://en.wikipedia.org/wiki/Straße`, a raw `|` in a path. Browsers
+    # follow all of those fine, and the security question here is only ever
+    # "which scheme will the browser run this as", which the regex answers
+    # directly. The editor applies the exact same rule client-side
+    # (`app/javascript/rich_text/schema.js` `safeHref`) so it can never
+    # accept a link this then refuses -- which used to 422 the save and
+    # every later autosave of the same record along with it.
+    SCHEME_PATTERN = /\A([a-z][a-z0-9+.\-]*):/i
+    SAFE_SCHEMES = %w[http https mailto].freeze
+
     def self.safe_href?(value)
       return false unless value.is_a?(String)
 
-      decoded = CGI.unescapeHTML(value).gsub(/[[:cntrl:]]/, "").strip
-      uri = URI.parse(decoded) rescue nil
-      !uri.nil? && (uri.scheme.nil? || %w[http https mailto].include?(uri.scheme))
+      decoded = CGI.unescapeHTML(value).gsub(/[[:cntrl:][:space:]]/, "")
+      return false if decoded.empty?
+
+      scheme = decoded[SCHEME_PATTERN, 1]
+      scheme.nil? || SAFE_SCHEMES.include?(scheme.downcase)
     end
 
     def self.render_youtube(node)

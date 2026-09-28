@@ -33,8 +33,8 @@ module HasRichTextBody
     value.is_a?(Hash) ? RichText::Document.new(value) : RichText::Document.empty
   end
 
-  # Writes `document` as this locale's body, leaving every other locale's
-  # alone. Accepts what the write path actually receives: a document Hash
+  # Writes `document` as this locale's body (marks in canonical order,
+  # `#normalize`), leaving every other locale's alone. Accepts what the write path actually receives: a document Hash
   # (MCP after Markdown conversion, seeds), a `RichText::Document`, or the
   # JSON String the admin's hidden input submits (design spec §4.1).
   #
@@ -57,9 +57,9 @@ module HasRichTextBody
     code = locale.to_s
     value =
       case document
-      when RichText::Document then document.to_h
-      when String then parse_body_json(document)
-      else document
+      when RichText::Document then document.normalized.to_h
+      when String then normalize(parse_body_json(document))
+      else normalize(document)
       end
 
     unassignable_body_locales.delete(code)
@@ -71,6 +71,15 @@ module HasRichTextBody
   private
 
   def unassignable_body_locales = (@unassignable_body_locales ||= Set.new)
+
+  # A document Hash is stored with its marks in `RichText::Schema`'s
+  # canonical order (`RichText::Document#normalized`; Task 7 fix round 1)
+  # -- Tiptap orders marks by its own extension priority, which isn't the
+  # schema's, and a reorder alone must neither read as an edit to
+  # `#body_documents_valid`'s "did this locale change" check nor make the
+  # same content digest differently. Anything that isn't a Hash (a
+  # malformed String, nil) passes through for validation to reject.
+  def normalize(value) = value.is_a?(Hash) ? RichText::Document.new(value).normalized.to_h : value
 
   # A blank String is "nothing", not an unparseable document: stored raw,
   # Mobility's `presence` plugin would turn `""` into nil and delete the
@@ -103,13 +112,22 @@ module HasRichTextBody
     read_attribute(:body).to_h.each do |code, value|
       next if previous[code] == value
 
-      body_errors_for(value).each { |message| errors.add(:body, :invalid, message: "(#{code}) #{message}") }
+      body_errors_for(value, previous[code]).each { |message| errors.add(:body, :invalid, message: "(#{code}) #{message}") }
     end
   end
 
-  def body_errors_for(value)
+  # The same reasoning one level down, *within* a changed document (Task 7
+  # fix round 1, I2): an edit to a body that already held a dead reference
+  # (a link to a since-deleted page, an image whose `MediaAsset` is gone)
+  # must still save -- the editor sends the whole document back, dead
+  # reference included, on every keystroke. So existence checks only
+  # apply to references that are new relative to this locale's stored
+  # document (`RichText::Document#validate(known_references:)`); linking
+  # to a missing record *now* is still an error.
+  def body_errors_for(value, previous)
     return [ "isn't a valid document" ] unless value.is_a?(Hash)
 
-    RichText::Document.new(value).validate
+    known = previous.is_a?(Hash) ? RichText::Document.new(previous).references : nil
+    RichText::Document.new(value).validate(known_references: known)
   end
 end

@@ -454,4 +454,40 @@ class PostTest < ActiveSupport::TestCase
       saved.each { |definition| ContentTypes.registry_put(definition) }
     end
   end
+
+  # Task 7 fix round 1 (I2): the editor resends the whole document on every
+  # edit, dead references included -- a body linking to a since-deleted
+  # page (or showing a since-deleted image) must still save after an edit,
+  # while a *new* link to a missing record is still rejected.
+  test "a body with a dead reference can still be edited; a new dead reference can't be added" do
+    target = create_page(title: "Doomed")
+    asset = create_media_asset
+    post = create_post(title: "Notes")
+    linked = ->(text, id) { { "type" => "text", "text" => text, "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => id } } ] } }
+    image = { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } }
+    body = ->(*paragraph) { { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => paragraph }, image ] } }
+
+    post.assign_body(body.call(linked.call("go", target.id)), locale: :en)
+    assert post.save, post.errors.full_messages.to_sentence
+
+    Pages::Destroy.call(target)
+    asset.destroy!
+
+    post.reload.assign_body(body.call({ "type" => "text", "text" => "Edited " }, linked.call("go", target.id)), locale: :en)
+    assert post.save, post.errors.full_messages.to_sentence
+
+    post.assign_body(body.call(linked.call("go", target.id), linked.call("new", 999_999)), locale: :en)
+    assert_not post.save
+    assert_includes post.errors[:body].join, "internalLink.id is invalid"
+  end
+
+  # The stored document's marks are in the schema's canonical order,
+  # whatever order the editor sent them in.
+  test "assign_body stores marks in canonical order" do
+    post = create_post(title: "Notes")
+    post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "x", "marks" => [ { "type" => "link", "attrs" => { "href" => "/a" } }, { "type" => "bold" } ] } ] } ] }.to_json, locale: :en)
+
+    assert_equal %w[bold link], post.body(locale: :en).dig("content", 0, "content", 0, "marks").map { |mark| mark["type"] }
+  end
 end

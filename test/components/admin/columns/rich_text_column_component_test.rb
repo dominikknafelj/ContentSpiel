@@ -44,6 +44,17 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert page.all("[role=toolbar] button").all? { |button| button["type"] == "button" }
   end
 
+  # Only toggle buttons announce a pressed state; the ones that open a
+  # popover or insert something aren't toggles.
+  test "aria-pressed only on the toggle buttons" do
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
+
+    pressed = page.all("[role=toolbar] button[aria-pressed]").map { |button| button["aria-label"] }
+    assert_equal [ "Bold", "Italic", "Strikethrough", "Inline code", "Heading 2", "Heading 3", "Heading 4", "Bullet list",
+      "Numbered list", "Quote", "Code block" ], pressed
+    assert_selector "[role=toolbar] button[aria-label='Link'][aria-haspopup=dialog]"
+  end
+
   # The upload's file input must never be part of the autosave form's own
   # `FormData` -- the upload goes to its own endpoint by `fetch`.
   test "the image file input has no name" do
@@ -135,6 +146,6 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", id: "post-body", value: nil, errors: [ "Body is invalid" ])
 
     assert_selector "#post-body-errors", text: "Body is invalid"
-    assert_selector "#post-body-editor[data-admin--rich-text-target=editor]"
+    assert_selector "#post-body-editor[data-admin--rich-text-target=editor][data-labelledby=post-body-label]"
   end
 end

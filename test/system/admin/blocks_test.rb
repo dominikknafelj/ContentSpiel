@@ -12,6 +12,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
   test "adding a block through the picker shows the card and persists" do
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     # The end-of-list picker (`after_id` absent) is open by default -- no
     # disclosure click needed before its own type buttons are visible.
@@ -29,6 +30,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     # Stream response) to prove the card is actually persisted, not only
     # reflecting the in-memory DOM this session just built.
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
     assert_selector ".admin-block-card", text: "Rich text"
   end
 
@@ -36,6 +38,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "post_list", position: 1)
     visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
 
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{first.id}']"
 

@@ -222,11 +222,41 @@ module RichText
     # very method before reaching here (an MCP-authored Markdown document,
     # a hand-edited jsonb row) -- "malformed" has to be just another kind
     # of "invalid", not a 500.
-    def validate
+    #
+    # `known_references` (Task 7 fix round 1, I2): the `#references` of the
+    # document this one replaces. An attribute declared `reference:` (an
+    # existence check -- `image.asset_id`, `internalLink.id`) skips that
+    # check for a reference already in the set: a link whose page was
+    # deleted *after* it was saved must not make the whole document
+    # unsaveable on the next, unrelated edit (the renderer already degrades
+    # it). A reference that's new still has to exist. `nil` (the default)
+    # checks everything, which is what every caller without a previous
+    # document -- MCP, seeds, a new record -- wants.
+    def validate(known_references: nil)
       errors = []
       errors << "the document's root node must be \"doc\", got #{@hash["type"].inspect}" unless @hash.is_a?(Hash) && @hash["type"] == "doc"
-      validate_node(@hash, errors, path: "root", depth: 0)
+      validate_node(@hash, errors, path: "root", depth: 0, known: known_references)
       errors
+    end
+
+    # Every reference (`RichText::Schema::Attribute#reference`) this
+    # document makes, as a Set of `[type, attribute, value, *scope values]`
+    # keys -- `["image", "asset_id", 42]`, `["internalLink", "id", 7,
+    # "page"]`. Iterative and shape-tolerant like `#normalized`: this runs on
+    # whatever the column holds, validated or not.
+    def references
+      found = Set.new
+      stack = [ @hash ]
+      until stack.empty?
+        node = stack.pop
+        next unless node.is_a?(Hash)
+
+        type = RichText::Schema.node(node["type"])
+        collect_references(type, node["attrs"], found) if type
+        Array(node["marks"]).each { |mark| collect_references(RichText::Schema.mark(mark["type"]), mark["attrs"], found) if mark.is_a?(Hash) } if node["marks"].is_a?(Array)
+        stack.concat(node["content"]) if node["content"].is_a?(Array)
+      end
+      found
     end
 
     # A new `RichText::Document` with every text node's `"marks"` Array
@@ -418,7 +448,7 @@ module RichText
     # belongs, all land here (this method is what every content-array
     # element gets recursed into) and become one error message instead of
     # a `NoMethodError`/`TypeError` the moment the code below tries `node["type"]`.
-    def validate_node(node, errors, path:, depth:)
+    def validate_node(node, errors, path:, depth:, known:)
       unless node.is_a?(Hash)
         errors << "node at #{path} is not an object"
         return
@@ -433,7 +463,7 @@ module RichText
 
       if type_name == "text"
         errors << "#{path}: a text node needs a String \"text\"" unless node["text"].is_a?(String)
-        validate_marks(node, errors, path)
+        validate_marks(node, errors, path, known)
         return
       end
 
@@ -441,10 +471,10 @@ module RichText
       if type.nil?
         errors << "unknown node type #{type_name.inspect}"
       else
-        validate_attributes(type, node["attrs"], errors)
+        validate_attributes(type, node["attrs"], errors, known)
       end
 
-      validate_children(node["content"], errors, path, depth)
+      validate_children(node["content"], errors, path, depth, known)
     end
 
     # `content`, when present at all, must be an Array of node objects --
@@ -453,7 +483,7 @@ module RichText
     # silently validate something that isn't remotely a list of child
     # nodes rather than reporting the real problem ("content" is the wrong
     # shape entirely).
-    def validate_children(content, errors, path, depth)
+    def validate_children(content, errors, path, depth, known)
       return if content.nil?
 
       unless content.is_a?(Array)
@@ -461,14 +491,14 @@ module RichText
         return
       end
 
-      content.each_with_index { |child, index| validate_node(child, errors, path: "#{path}.content[#{index}]", depth: depth + 1) }
+      content.each_with_index { |child, index| validate_node(child, errors, path: "#{path}.content[#{index}]", depth: depth + 1, known: known) }
     end
 
     # Same "must be an Array, not coerced" rule as `#validate_children`,
     # applied to a text node's `"marks"`, plus the same `node.is_a?(Hash)`
     # guard per mark entry (a `"marks"` array can just as easily hold a
     # stray non-object as `"content"` can).
-    def validate_marks(text_node, errors, path)
+    def validate_marks(text_node, errors, path, known)
       marks = text_node["marks"]
       return if marks.nil?
 
@@ -490,7 +520,7 @@ module RichText
         if mark_type.nil?
           errors << "unknown mark type #{mark_type_name.inspect}"
         else
-          validate_attributes(mark_type, mark_data["attrs"], errors)
+          validate_attributes(mark_type, mark_data["attrs"], errors, known)
         end
       end
     end
@@ -502,7 +532,7 @@ module RichText
     # same class of malformed-shape problem `#validate_children`/
     # `#validate_marks` guard against, and gets the same treatment: an
     # error message, not a `TypeError` from `attrs[attribute.name.to_s]`.
-    def validate_attributes(type, attrs, errors)
+    def validate_attributes(type, attrs, errors, known)
       attrs = {} if attrs.nil?
       unless attrs.is_a?(Hash)
         errors << "#{type.name}.attrs must be an object"
@@ -524,8 +554,29 @@ module RichText
 
         errors << "#{type.name}.#{attribute.name} must be one of #{Array(attribute.in).join(", ")}" if attribute.in && !Array(attribute.in).include?(value)
         errors << "#{type.name}.#{attribute.name} format is invalid" if attribute.format && value.is_a?(String) && !value.match?(attribute.format)
+        next if attribute.reference && known&.include?(reference_key(type, attribute, value, attrs))
+
         errors << "#{type.name}.#{attribute.name} is invalid" if attribute.validate && !run_attribute_validation(attribute, value, attrs)
       end
+    end
+
+    def collect_references(type, attrs, found)
+      return unless type && attrs.is_a?(Hash)
+
+      type.attributes.each do |attribute|
+        next unless attribute.reference
+
+        value = attrs[attribute.name.to_s]
+        found << reference_key(type, attribute, value, attrs) unless value.nil?
+      end
+    end
+
+    # `reference: true` -> the value alone; `reference: [ :type ]` -> scoped
+    # by those sibling attributes' values (`internalLink` page 7 and post 7
+    # are different references).
+    def reference_key(type, attribute, value, attrs)
+      scope = attribute.reference.is_a?(Array) ? attribute.reference.map { |name| attrs[name.to_s] } : []
+      [ type.name, attribute.name.to_s, value, *scope ]
     end
 
     def attribute_type_matches?(type, value)

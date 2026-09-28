@@ -74,6 +74,20 @@ export const Image = Node.create({
     }
   },
 
+  // Enter on a selected image opens its alt/caption popover -- the
+  // keyboard route to what a click on the image does.
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const { selection } = editor.state
+        if (selection.node?.type.name !== this.name) return false
+
+        this.options.onEdit(selection.from)
+        return true
+      }
+    }
+  },
+
   addNodeView() {
     const { resolveUrl, onEdit } = this.options
 
