@@ -251,7 +251,11 @@ module RichText
         return text.empty? ? [] : [ text_node(text, marks) ]
       end
       return [] unless node.element?
-      return [ text_node(plain_text(node), marks) ].reject { |item| item["text"].empty? }.tap { report_element(node, "nested too deeply, flattened to text") } if depth > MAX_DEPTH
+      if depth > MAX_DEPTH
+        report_element(node, "nested too deeply, flattened to text")
+        text = plain_text(node)
+        return text.empty? ? [] : [ text_node(text, marks) ]
+      end
 
       name = node.name
       if MARKS.key?(name)

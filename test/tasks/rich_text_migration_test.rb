@@ -50,8 +50,8 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     assert_equal rich_doc("Hallo Welt"), @post.body_document(locale: "de").to_h
     assert_equal %w[paragraph youtube], @block.reload.body_document(locale: "en").to_h["content"].map { |node| node["type"] }
 
-    assert_match(/Post: 2 imported, 0 skipped, 0 failed/, output)
-    assert_match(/ContentBlock: 1 imported, 0 skipped, 0 failed/, output)
+    assert_match(/Post: 2 imported, 0 blank, 0 skipped, 0 failed/, output)
+    assert_match(/ContentBlock: 1 imported, 0 blank, 0 skipped, 0 failed/, output)
   end
 
   test "reports unmapped fragments with the record and locale they came from" do
@@ -68,10 +68,10 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     output = run_import([ row(@post, "<p>Old ActionText body</p>"), row(@post, "<p>Deutsch</p>", locale: "de") ])
     assert_equal rich_doc("Written in CS Studio"), @post.reload.body_document(locale: "en").to_h
     assert_equal rich_doc("Deutsch"), @post.body_document(locale: "de").to_h
-    assert_match(/Post: 1 imported, 1 skipped, 0 failed/, output)
+    assert_match(/Post: 1 imported, 0 blank, 1 skipped, 0 failed/, output)
 
     again = run_import([ row(@post, "<p>Old ActionText body</p>"), row(@post, "<p>Deutsch</p>", locale: "de") ])
-    assert_match(/Post: 0 imported, 2 skipped, 0 failed/, again)
+    assert_match(/Post: 0 imported, 0 blank, 2 skipped, 0 failed/, again)
   end
 
   test "a failing row is recorded and the rest still import" do
@@ -83,8 +83,8 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     ])
 
     assert_equal rich_doc("fine"), @post.reload.body_document(locale: "en").to_h
-    assert_match(/Post: 1 imported, 0 skipped, 2 failed/, output)
-    assert_match(/Page: 0 imported, 0 skipped, 1 failed/, output)
+    assert_match(/Post: 1 imported, 0 blank, 0 skipped, 2 failed/, output)
+    assert_match(/Page: 0 imported, 0 blank, 0 skipped, 1 failed/, output)
     assert_match(/Failures \(3\)/, output)
     assert_match(/Post#0 \(en\)/, output)
   end
@@ -93,7 +93,33 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     output = run_import([ row(@post, "") ])
 
     assert_equal({}, @post.reload.read_attribute(:body))
-    assert_match(/Post: 0 imported, 1 skipped, 0 failed/, output)
+    assert_match(/Post: 0 imported, 0 blank, 1 skipped, 0 failed/, output)
+  end
+
+  # Fix round 1 (m1/I1): a body with content whose conversion comes out
+  # blank -- here, an attachment with no sgid (a remote file) -- is counted
+  # and listed as blank, and nothing is written.
+  test "a body that converts to a blank document is listed as blank, not written" do
+    output = run_import([ row(@post, %(<action-text-attachment content-type="image/png" url="https://cdn.example/x.png"></action-text-attachment>)) ])
+
+    assert_equal({}, @post.reload.read_attribute(:body))
+    assert_match(/Post: 0 imported, 1 blank, 0 skipped, 0 failed/, output)
+    assert_match(/Imported blank \(1\): check these, then migrate with FORCE_DROP_ACTION_TEXT=1\n  Post##{@post.id} \(en\)/, output)
+  end
+
+  # Fix round 1 (m3): a row that fails after its import already created a
+  # `MediaAsset` rolls that asset back rather than orphaning it.
+  test "a failing row leaves no MediaAsset behind" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    image = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>)
+    source = Source.new([ row(@post, image + %(<action-text-attachment sgid="#{youtube_sgid(1)}"></action-text-attachment>)) ], {})
+    def source.youtube_video_id(_id) = raise("youtube_embeds is unreadable")
+
+    out = StringIO.new
+    assert_no_difference(-> { MediaAsset.count }) { RichText::ActionTextImport.new(source: source, out: out).run }
+
+    assert_match(/Post: 0 imported, 0 blank, 0 skipped, 1 failed/, out.string)
+    assert_match(/youtube_embeds is unreadable/, out.string)
   end
 
   test "the rake task says there is nothing to migrate once ActionText's table is gone" do

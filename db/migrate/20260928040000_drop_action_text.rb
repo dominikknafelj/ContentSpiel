@@ -13,7 +13,16 @@
 # image or youtube node), so a locale an editor left blank in CS Studio
 # still counts as unconverted. Bodies with nothing visible (Trix's empty
 # `<div><br></div>`, markup that's only a script) and rows whose record is
-# gone have nothing to lose and don't block. Plain SQL throughout, not the
+# gone have nothing to lose and don't block.
+#
+# `FORCE_DROP_ACTION_TEXT=1` skips the guard (fix round 1): a body whose
+# only content is something the importer can't map (a remote attachment, a
+# missing blob, text inside a dropped `<script>`) converts to a blank
+# document, which the guard can't tell apart from "not converted yet" -- so
+# without an override `db:migrate` could refuse forever. The task lists
+# those rows under "Imported blank"; check them, then force the drop.
+#
+# Plain SQL throughout, not the
 # app's models -- ActionText's models are already gone from the code this
 # runs with.
 class DropActionText < ActiveRecord::Migration[8.1]
@@ -41,7 +50,7 @@ class DropActionText < ActiveRecord::Migration[8.1]
   SQL
 
   def up
-    if table_exists?(:action_text_rich_texts)
+    if table_exists?(:action_text_rich_texts) && ENV["FORCE_DROP_ACTION_TEXT"] != "1"
       unconverted = RECORD_TABLES.sum do |record_type, table|
         select_value(<<~SQL.squish).to_i
           SELECT COUNT(*) FROM action_text_rich_texts rt
@@ -53,7 +62,8 @@ class DropActionText < ActiveRecord::Migration[8.1]
 
       if unconverted.positive?
         raise "#{unconverted} ActionText #{"body".pluralize(unconverted)} haven't been converted yet: " \
-          "run bin/rails rich_text:migrate_from_action_text first, then bin/rails db:migrate again"
+          "run bin/rails rich_text:migrate_from_action_text first, then bin/rails db:migrate again " \
+          "(if the task lists them as imported blank and you've checked them, migrate with FORCE_DROP_ACTION_TEXT=1)"
       end
     end
 

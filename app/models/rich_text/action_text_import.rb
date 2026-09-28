@@ -12,13 +12,26 @@
 # - **Idempotent.** A locale whose `body` already holds a non-blank
 #   document is skipped, never overwritten -- whether an earlier run wrote
 #   it or an editor did in CS Studio -- so re-running after a partial
-#   failure only converts what's still missing.
+#   failure only converts what's still missing. The flip side (accepted,
+#   fix round 1 m2): until `DropActionText` has run, a locale an editor
+#   *cleared* in CS Studio reads as blank, so a re-run refills it from its
+#   old ActionText body.
+# - **Blank results aren't written.** A body with content whose conversion
+#   comes out blank -- its only content was an attachment that can't be
+#   mapped (a remote file, a missing blob, a YoutubeEmbed whose row is
+#   gone) or text inside dropped tags -- is counted and listed as "blank",
+#   not "imported", and nothing is written, so a re-run lists it again
+#   rather than silently rewriting it. `DropActionText`'s guard still
+#   counts such a row as unconverted (it can't tell "unmappable" from "not
+#   run yet"); once the listed rows are checked, migrate with
+#   `FORCE_DROP_ACTION_TEXT=1`.
 # - **Never aborts.** Each row is converted and written on its own, inside
-#   its own rescue; a failure (orphaned row, unknown record type, a
-#   language this site can't store, a document that fails `#validate`) is
-#   recorded and printed, and the run carries on.
+#   its own transaction and rescue; a failure (orphaned row, unknown record
+#   type, a language this site can't store, a document that fails
+#   `#validate`) is recorded and printed, rolls back anything that row
+#   created (a `MediaAsset`), and the run carries on.
 # - **Reports.** Per-model counts, every unmapped fragment
-#   (`RichText::HtmlImport`), and every failure.
+#   (`RichText::HtmlImport`), every blank result, and every failure.
 #
 # Writes go straight to the column with `jsonb_set` (plus `updated_at`, so
 # `PublicSite.content_version` -- and with it every cached page and
@@ -58,15 +71,16 @@ module RichText
       def connection = ActiveRecord::Base.connection
     end
 
-    Stats = Struct.new(:imported, :skipped, :failed) do
-      def to_s = "#{imported} imported, #{skipped} skipped, #{failed} failed"
+    Stats = Struct.new(:imported, :blank, :skipped, :failed) do
+      def to_s = "#{imported} imported, #{blank} blank, #{skipped} skipped, #{failed} failed"
     end
 
     def initialize(source: SqlSource.new, out: $stdout)
       @source = source
       @out = out
-      @stats = Hash.new { |hash, key| hash[key] = Stats.new(0, 0, 0) }
+      @stats = Hash.new { |hash, key| hash[key] = Stats.new(0, 0, 0, 0) }
       @unmapped = []
+      @blank = []
       @failures = []
     end
 
@@ -82,6 +96,11 @@ module RichText
 
     private
 
+    # Raised inside the row's transaction to roll back whatever the import
+    # already did (a `MediaAsset` created for an image) when the converted
+    # document turns out invalid.
+    class RowFailed < StandardError; end
+
     def import_row(row)
       type, id, locale = row["record_type"], row["record_id"], row["locale"].to_s
       label = "#{type}##{id} (#{locale})"
@@ -94,15 +113,29 @@ module RichText
       return fail_row(stats, label, "the record no longer exists") if record.nil?
       return stats.skipped += 1 if row["body"].to_s.strip.empty? || !record.body_document(locale: locale).blank?
 
-      document, unmapped = RichText::Document.from_html(row["body"], record: record, locale: locale, youtube_video_id: @source.method(:youtube_video_id))
-      errors = document.validate
-      return fail_row(stats, label, "the converted document is invalid: #{errors.to_sentence}") if errors.any?
+      # One transaction per row (fix round 1, m3): converting can create
+      # `MediaAsset`s, and a row that then fails must not leave them behind
+      # as orphans no document references.
+      outcome = ActiveRecord::Base.transaction do
+        document, unmapped = RichText::Document.from_html(row["body"], record: record, locale: locale, youtube_video_id: @source.method(:youtube_video_id))
+        errors = document.validate
+        raise RowFailed, "the converted document is invalid: #{errors.to_sentence}" if errors.any?
 
-      write(model, id, locale, document)
-      @unmapped.concat(unmapped)
-      stats.imported += 1
+        @unmapped.concat(unmapped)
+        next :blank if document.blank?
+
+        write(model, id, locale, document)
+        :imported
+      end
+
+      if outcome == :blank
+        stats.blank += 1
+        @blank << label
+      else
+        stats.imported += 1
+      end
     rescue StandardError => error
-      fail_row(stats, label, "#{error.class}: #{error.message}")
+      fail_row(stats, label, error.is_a?(RowFailed) ? error.message : "#{error.class}: #{error.message}")
     end
 
     def write(model, id, locale, document)
@@ -126,6 +159,8 @@ module RichText
       @stats.each { |type, stats| @out.puts "#{type}: #{stats}" }
       @out.puts "Unmapped fragments (#{@unmapped.size}):"
       @unmapped.each { |fragment| @out.puts "  #{fragment}" }
+      @out.puts "Imported blank (#{@blank.size}): check these, then migrate with FORCE_DROP_ACTION_TEXT=1"
+      @blank.each { |label| @out.puts "  #{label}" }
       @out.puts "Failures (#{@failures.size}):"
       @failures.each { |failure| @out.puts "  #{failure}" }
     end
