@@ -37,7 +37,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert title.disabled?
 
     editor = find(".admin-rich-text-content[contenteditable='false']")
-    page.driver.browser.action.click(editor.native).send_keys("typed ").perform
+    editor.click
+    page.driver.browser.keyboard.type("typed ")
 
     # What the autosave controller would have listened for, fired by hand
     # on the disabled title: with nothing attached, nothing answers.

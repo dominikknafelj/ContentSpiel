@@ -10,8 +10,8 @@ require "application_system_test_case"
 # it can produce must be something the server accepts.
 #
 # Clicks are scripted (`press`), never native, for the reason
-# `ApplicationSystemTestCase#press` gives. Typing goes through a real
-# WebDriver key sequence into the focused ProseMirror element (`type_text`),
+# `ApplicationSystemTestCase#press` gives. Typing goes through real CDP key
+# events (Cuprite's keyboard) into the focused ProseMirror element (`type_text`),
 # since ProseMirror reads its own DOM mutations/`beforeinput` events --
 # setting a value from JS would bypass exactly the code under test.
 class Admin::RichTextSystemTest < ApplicationSystemTestCase
@@ -374,17 +374,18 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
   def editor = find(".ProseMirror")
 
-  # Real key events into whatever currently has focus (the ProseMirror
-  # element, after `editor.click`) -- not `editor.send_keys`, which may
-  # move the caret back to the end of the element and, with it, drop a
-  # stored mark a toolbar button just set.
+  # Real key events (CDP `Input.dispatchKeyEvent`, through Ferrum's
+  # keyboard) into whatever currently has focus (the ProseMirror element,
+  # after `editor.click`) -- not `editor.send_keys`, which focuses the
+  # element first and may, with it, move the caret and drop a stored mark
+  # a toolbar button just set.
   def type_text(text)
-    page.driver.browser.action.send_keys(text).perform
+    page.driver.browser.keyboard.type(text)
   end
 
   # A synthetic `paste` carrying a real `DataTransfer` -- ProseMirror reads
   # `event.clipboardData` exactly as it would for a native paste, and
-  # headless Chrome's own clipboard is not reliably reachable from WebDriver.
+  # headless Chrome's own clipboard is not reliably reachable from the test.
   def paste(text: nil, html: nil)
     page.execute_script(<<~JS, text, html)
       const data = new DataTransfer()

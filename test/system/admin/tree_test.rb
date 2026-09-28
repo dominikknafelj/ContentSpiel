@@ -20,8 +20,8 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
 
     # `admin--tree` drives SortableJS the same way `admin--blocks` does (see
     # that test's own comment for why): native HTML5 drag-and-drop, which
-    # headless Chrome's WebDriver can't reliably synthesize via a mouse
-    # action sequence. Moving Alpha's `<li>` into Beta's own children `<ul>`
+    # a driver's synthesized mouse events can't reliably trigger in
+    # headless Chrome. Moving Alpha's `<li>` into Beta's own children `<ul>`
     # and then calling the Stimulus controller's own `onDrop` directly --
     # with the same `{item, to, newIndex}` shape SortableJS's `onEnd` hands
     # it -- exercises the exact production path (the hand-built `fetch`
