@@ -69,6 +69,20 @@ class Admin::LinkTargetsTest < ActionDispatch::IntegrationTest
     assert_equal PublicSite::Urls.new.path_for(page, "en"), results.first["path"]
   end
 
+  # Fix round 1's I1: a malformed locale isn't an *enabled* one, so this
+  # must fall back to the admin's own current editing locale (same as
+  # `Admin::BaseController#admin_locale`), not reach Mobility with
+  # something it can't parse as a locale code at all and 500.
+  test "a malformed locale falls back to the admin locale instead of raising" do
+    sign_in_as(users(:one))
+    create_page(title: "Fallback Page")
+
+    get "/cs-studio/link_targets", params: { q: "Fallback", locale: "en US" }
+
+    assert_response :success
+    assert_equal "Fallback Page", response.parsed_body.first["title"]
+  end
+
   test "caps results at 20" do
     sign_in_as(users(:one))
     25.times { |i| create_page(title: "Bulk Page #{i}") }

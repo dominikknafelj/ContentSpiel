@@ -74,50 +74,78 @@ class MediaAsset < ApplicationRecord
   # signature, or `application/octet-stream` for anything else -- which is
   # the one answer this validation is willing to trust.
   #
-  # `#attachable_io`, not `file.blob.open`/`file.blob.download`: a `validate`
-  # runs *before* Active Storage's own `after_commit` upload hook fires (see
-  # that method's own comment), so a brand-new, not-yet-saved attachment's
-  # blob has nothing on the storage service yet for `blob.open` to find --
-  # only the in-memory io this record was actually handed still does.
+  # `nil` (never a raise) when `#with_attachable_io` can't get at the bytes
+  # at all -- an attachable this class doesn't know how to read yet (fix
+  # round 1's I3: a signed blob id String, or an `ActiveStorage::Blob`
+  # that's itself still unsaved). `ALLOWED_CONTENT_TYPES.include?(nil)` is
+  # `false`, so that's just an ordinary "must be a PNG, JPEG, GIF, or WEBP
+  # image" validation failure, exactly like a real file of some other type
+  # would produce -- not a distinct error message, since from a caller's
+  # point of view "I can't tell this is an allowed image type" and "this
+  # definitely isn't one" both mean the same thing: don't accept it.
   #
   # Memoized: `image_type_and_size` and `#cache_metadata_from_file` both
   # want this same value for the same validated attachment, and neither
   # should re-read the underlying io to ask twice.
   def sniffed_content_type
-    @sniffed_content_type ||= with_attachable_io { |io| Marcel::MimeType.for(io) }
+    return @sniffed_content_type if defined?(@sniffed_content_type)
+
+    @sniffed_content_type = with_attachable_io { |io| io && Marcel::MimeType.for(io) }
   end
 
-  # Yields the raw io behind this record's `file` attachment to the block,
-  # from whichever of the two places it currently lives.
+  # Yields the raw io behind this record's `file` attachment to the block
+  # (or `nil`, when there's no safe way to get one), from whichever of two
+  # places it currently lives.
   #
-  # While the attachment is still pending -- assigned via `file.attach(...)`
-  # but not yet uploaded to the storage service, which is the case for
-  # *any* record `validate` runs against, new or persisted, since Active
-  # Storage only uploads from an `after_commit` hook that fires strictly
-  # after every `validate` (see below) -- `record.attachment_changes[name]`
-  # is Active Storage's own (`:nodoc:`, but public) handle on it, and
-  # `Attached::Changes::CreateOne#attachable` is exactly the `io:`/
-  # `filename:`/`content_type:` Hash (or `ActionDispatch::Http
-  # ::UploadedFile`) this attachment was actually given -- the same object
-  # `unfurl` already read once, for the blob's own checksum/byte_size, and
-  # rewound back to position 0 (`ActiveStorage::Blob#compute_checksum_in_
-  # chunks`'s own final `io.rewind`), so reading it again here for a
-  # second, independent sniff is exactly as safe as Active Storage's own
-  # eventual upload reading it a third time once this record is actually
-  # saved.
+  # `record.attachment_changes[name]` is Active Storage's own (`:nodoc:`,
+  # but public) handle on a *pending* attachment -- one assigned via
+  # `file.attach(...)` but not yet saved -- and `change.blob` is always the
+  # underlying `ActiveStorage::Blob` that assignment actually resolved to,
+  # for every shape `.attach` accepts (`Attached::Changes::CreateOne
+  # #find_or_build_blob`): a `Hash`/`ActionDispatch::Http::UploadedFile`
+  # each get a brand-new, unfurled-but-not-yet-uploaded `Blob.new`; a
+  # signed id String or an already-persisted `ActiveStorage::Blob` passed
+  # directly instead resolve to an *existing*, already-uploaded blob (found
+  # by `Blob.find_signed!`, or the object itself). `blob.new_record?` is
+  # what tells those two apart, and it's the one check this needs, not a
+  # `case` on the attachable's own class: an existing blob already has real
+  # bytes sitting on the storage service, so `blob.open` (the ordinary,
+  # already-uploaded path below) reads it back exactly the way a persisted
+  # `MediaAsset`, reloaded and re-validated, would.
   #
-  # Once the attachment *has* been uploaded (a persisted `MediaAsset`,
-  # freshly reloaded and re-validated), `attachment_changes` no longer
-  # holds anything for it -- Active Storage clears the pending change the
-  # moment its `after_commit` upload runs -- so this falls back to
-  # `blob.open`, which by then has real bytes on the service to open.
-  def with_attachable_io(&block)
+  # Only a genuinely *new* blob needs the workaround: it has nothing on the
+  # storage service yet (Active Storage only uploads from an `after_commit`
+  # hook that fires strictly after every `validate`), so `blob.open` would
+  # raise `ActiveStorage::FileNotFoundError` there. For that case alone,
+  # this reads `change.attachable` itself -- the literal `io:`/`filename:`/
+  # `content_type:` Hash, or `ActionDispatch::Http::UploadedFile`, this
+  # attachment was actually given -- the same object `unfurl` already read
+  # once, for the blob's own checksum/byte_size, and rewound back to
+  # position 0 (`ActiveStorage::Blob#compute_checksum_in_chunks`'s own
+  # final `io.rewind`), so reading it again here for a second, independent
+  # sniff is exactly as safe as Active Storage's own eventual upload
+  # reading it a third time once this record is actually saved.
+  #
+  # Any *other* attachable shape for a still-new blob (fix round 1's I3: a
+  # bare `File`/`Pathname` passed directly, say -- `.attach` accepts both,
+  # this class just has no reader taught for either yet) has no safe way to
+  # read bytes from at all -- yielding `nil` here, not calling an arbitrary
+  # `.open`/`[:io]` on whatever it turns out to be, is what keeps that "I
+  # don't recognize this" case a validation failure (`#sniffed_content_
+  # type`'s own comment) instead of a `NoMethodError` 500.
+  def with_attachable_io
     change = attachment_changes["file"]
-    return file.blob.open(&block) if change.nil?
+    return yield(nil) if change.nil? && !file.attached?
+
+    blob = change&.blob || file.blob
+    return blob.open { |tempfile| yield(tempfile) } unless blob.new_record?
 
     attachable = change.attachable
-    io = attachable.is_a?(Hash) ? attachable[:io] : attachable.open
-    block.call(io)
+    case attachable
+    when Hash then yield(attachable[:io])
+    when ActionDispatch::Http::UploadedFile, Rack::Test::UploadedFile then yield(attachable.open)
+    else yield(nil)
+    end
   end
 
   # `width`/`height` come from the blob's own `metadata`, written by
@@ -134,6 +162,7 @@ class MediaAsset < ApplicationRecord
   def cache_metadata_from_file
     self.byte_size = file.blob.byte_size
     self.content_type = sniffed_content_type
+    force_blob_content_type
 
     # Merged onto whatever's already there, not overwritten outright: a
     # second save of an already-analyzed asset (nothing about this model
@@ -143,5 +172,35 @@ class MediaAsset < ApplicationRecord
     metadata = file.blob.metadata || {}
     self.width = metadata["width"] if metadata.key?("width")
     self.height = metadata["height"] if metadata.key?("height")
+  end
+
+  # Fix round 1's I4: `file.blob.content_type` -- the column that actually
+  # decides what Content-Type this asset gets *served* with
+  # (`ActiveStorage::Blob#service_metadata`) -- otherwise still comes from
+  # Rails' own `unfurl`, which (by default, `identify: true`) re-derives it
+  # from the upload's declared Content-Type *and* filename, not only its
+  # bytes (`ActiveStorage::Blob#extract_content_type`'s own `Marcel
+  # ::MimeType.for(io, name:, declared_type:)` call -- the exact
+  # attacker-trusting shape `#sniffed_content_type`'s own comment already
+  # refuses to use for *this* model's validation). Two independent sniffs
+  # of the same bytes, by two different rules, can disagree -- so this
+  # forces the one that's actually served to equal the one this class
+  # already validated against, rather than trust they happened to agree.
+  #
+  # Only for a blob this save is *creating* (`new_record?`): an already-
+  # persisted, already-uploaded blob reached via a signed id or a directly-
+  # assigned `ActiveStorage::Blob` (`#with_attachable_io`'s own comment) is
+  # some other record's own already-committed row, not this save's to
+  # silently rewrite -- and nothing here needs to, since `unfurl` never
+  # touches an existing blob's `content_type` in the first place. Guarded
+  # on `sniffed_content_type` being present too: a still-new blob this
+  # class genuinely can't sniff (I3 above) leaves the blob's own `identify`d
+  # guess alone rather than overwriting it with `nil`, though that guess is
+  # moot either way -- an unsniffable attachment is already invalid
+  # (`#image_type_and_size`), so this record is never getting saved with it.
+  def force_blob_content_type
+    return unless sniffed_content_type && file.blob.new_record?
+
+    file.blob.content_type = sniffed_content_type
   end
 end

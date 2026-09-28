@@ -57,4 +57,50 @@ class MediaAssetTest < ActiveSupport::TestCase
 
     assert_equal Rails.application.routes.url_helpers.rails_blob_path(asset.file, only_path: true), asset.url
   end
+
+  # Fix round 1's I3: this class only knows how to sniff bytes out of a
+  # `Hash`/`UploadedFile`-shaped attachable -- a signed blob id String
+  # (Active Storage's own "attach an already-uploaded blob" shape, e.g. a
+  # direct upload) resolves to an *already*-persisted, already-uploaded
+  # blob it never reads bytes from itself at all (`MediaAsset
+  # #with_attachable_io`'s own comment), so this exercises that path
+  # end-to-end: attaching by signed id must never raise, whatever the
+  # already-uploaded blob's own content actually is.
+  test "attaching by signed id gives a validation error for a non-image blob, not a raise" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: StringIO.new("plain text"), filename: "notes.txt", content_type: "text/plain")
+
+    asset = MediaAsset.new
+    asset.file.attach(blob.signed_id)
+
+    assert_not asset.valid?
+    assert_includes asset.errors[:file].join, "PNG, JPEG, GIF, or WEBP"
+  end
+
+  # The signed-id path's happy case: an already-uploaded, already-real PNG
+  # blob is a perfectly valid attachment -- `with_attachable_io`'s
+  # `new_record?` branch reads its real bytes back off the storage service
+  # (it's already there), the same as any already-persisted `MediaAsset`.
+  test "attaching an already-uploaded PNG blob by signed id is valid" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+
+    asset = MediaAsset.new
+    asset.file.attach(blob.signed_id)
+
+    assert asset.valid?
+  end
+
+  # Fix round 1's I4: the served Content-Type (`file.blob.content_type`) --
+  # not just this record's own cached `content_type` column -- must equal
+  # the sniffed type, even when the upload's own declared Content-Type and
+  # filename both lie about it. A `.png` extension with a `text/html`
+  # declared type is Active Storage's own `unfurl`/`identify` trusting the
+  # *opposite* of what this test's PNG magic bytes actually are, if this
+  # class didn't force the blob's own column back to the sniff.
+  test "the blob's own content type is forced to the sniffed type, not the declared one" do
+    asset = MediaAsset.new
+    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "x.html", content_type: "text/html")
+    assert asset.save, asset.errors.full_messages.to_sentence
+
+    assert_equal "image/png", asset.file.blob.content_type
+  end
 end
