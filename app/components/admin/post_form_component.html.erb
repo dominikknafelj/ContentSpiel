@@ -58,6 +58,13 @@
       <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
     <% end %>
 
+    <%# The Activity link (design spec §5 "Audit log module", Task 9): see
+        `Admin::RecordHeaderComponent`'s own comment -- same reasoning,
+        just for a post rather than a page. %>
+    <% if can?("audit.view") %>
+      <%= link_to "Activity", helpers.admin_audit_events_path(subject_type: "Post", subject_id: post.id, **url_options), class: setup_secondary_link_class %>
+    <% end %>
+
     <% if can_publish? %>
       <%= button_to "Publish now", helpers.publish_admin_post_path(post, **url_options), method: :post, class: setup_primary_button_class %>
     <% end %>

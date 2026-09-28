@@ -2,7 +2,16 @@
     change (`Users::Save`'s own doc comment: a blank password/confirmation
     here means "leave it alone", never "clear it"). %>
 <div class="mx-auto max-w-md">
-  <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">Edit user</h1>
+  <div class="mb-4 flex items-center justify-between gap-3">
+    <h1 class="font-cs-mono text-label uppercase tracking-mono text-meta">Edit user</h1>
+    <%# The Activity link (design spec §5 "Audit log module", Task 9):
+        opens the audit log filtered to this user -- visible only with
+        `audit.view`, the same permission `Admin::AuditEventsController`
+        itself requires (access-control design spec §5 "Everywhere"). %>
+    <% if can?("audit.view") %>
+      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), class: setup_secondary_link_class %>
+    <% end %>
+  </div>
 
   <% if @user.errors.any? %>
     <p class="mb-4 text-danger-ink" role="alert"><%= @user.errors.full_messages.to_sentence %></p>

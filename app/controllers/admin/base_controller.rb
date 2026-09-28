@@ -35,7 +35,8 @@ module Admin
       { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage" },
       { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil },
       { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read" },
-      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view" }
+      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view" },
+      { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view" }
     ].freeze
 
     FORBIDDEN_MESSAGE = "You don't have permission to open this."
