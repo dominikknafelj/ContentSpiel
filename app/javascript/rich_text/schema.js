@@ -65,12 +65,17 @@ export function safeHref(value) {
 // in (typed in the Link popover, pasted, autolinked). A relative href is
 // kept as written (resolving it against CS Studio's own origin would
 // store the wrong host), and so is anything `URL` can't parse.
+//
+// Parsed *without* a base (final fix wave, P10): with CS Studio's origin as
+// the base, a same-scheme href missing its slashes (`https:example.com`)
+// counts as relative to that base and came out as a path on the studio's
+// own host; on its own it parses as `https://example.com/`.
 export function canonicalHref(value) {
   const href = (value || "").trim()
   if (!SCHEME.test(href)) return href
 
   try {
-    return new URL(href, window.location.origin).href
+    return new URL(href).href
   } catch {
     return href
   }
@@ -78,14 +83,20 @@ export function canonicalHref(value) {
 
 // What the toolbar's Link popover stores for what an editor typed:
 // - a bare email address (`a@b.com`) becomes `mailto:a@b.com`;
-// - a bare domain (`example.com/docs`) gets `https://`, rather than being
+// - a bare domain (`example.com/docs`, `münchen.de` -- letters and digits
+//   of any script, final fix wave P11) gets `https://`, rather than being
 //   saved as a relative path that would resolve against this site;
-// - then `canonicalHref`.
+// - then `canonicalHref` (which punycodes a unicode host).
+// The bare-domain check comes first: `example.com:8080/x` also has the
+// *shape* of a scheme (`example.com:`), but a dotted name followed by a
+// numeric port is a host, not a scheme anyone uses.
+const BARE_DOMAIN = /^[\p{L}\p{N}_-]+(\.[\p{L}\p{N}_-]+)+(:\d+)?(\/|\?|#|$)/u
+
 export function normalizeHref(value) {
   const href = (value || "").trim()
+  if (BARE_DOMAIN.test(href)) return canonicalHref(`https://${href}`)
   if (SCHEME.test(href)) return canonicalHref(href)
   if (/^[^\s@/:?#]+@[^\s@/:?#]+\.[^\s@/:?#]+$/.test(href)) return canonicalHref(`mailto:${href}`)
-  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/|\?|#|$)/.test(href)) return canonicalHref(`https://${href}`)
   return href
 }
 

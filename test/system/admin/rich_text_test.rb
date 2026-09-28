@@ -270,6 +270,40 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal [ { "type" => "link", "attrs" => { "href" => "mailto:a@b.com" } } ], linked["marks"]
   end
 
+  # Final fix wave (D, P10/P11): `rich_text/schema`'s href normalisation,
+  # run in the browser itself (the functions are the editor's own module,
+  # imported through the page's import map). An absolute href is parsed
+  # without a base -- with CS Studio's origin as base, `https:example.com`
+  # resolved to a path on the studio's own host -- and a bare unicode
+  # domain gets `https://` like an ASCII one, instead of being stored as a
+  # relative path.
+  test "href normalisation handles scheme-relative-looking and unicode input" do
+    visit_post
+
+    results = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("rich_text/schema").then((schema) => done([
+        schema.normalizeHref("https:example.com"),
+        schema.normalizeHref("münchen.de"),
+        schema.normalizeHref("straße.de/über?q=1"),
+        schema.normalizeHref("example.com:8080/x"),
+        schema.normalizeHref("/about"),
+        schema.normalizeHref("a@b.com"),
+        schema.canonicalHref("HTTPS://Example.COM/a b")
+      ])).catch((error) => done(String(error)))
+    JS
+
+    assert_equal [
+      "https://example.com/",
+      "https://xn--mnchen-3ya.de/",
+      "https://xn--strae-oqa.de/%C3%BCber?q=1",
+      "https://example.com:8080/x",
+      "/about",
+      "mailto:a@b.com",
+      "https://example.com/a%20b"
+    ], results
+  end
+
   # Task 7 fix round 1 (m2/m1): merely focusing the editor (Tiptap's
   # trailing-node plugin appends an empty paragraph after a final embed on
   # first focus) and moving focus into a popover are not edits -- neither

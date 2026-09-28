@@ -7,7 +7,7 @@
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
-    <%= javascript_importmap_tags %>
+    <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags -- today only the API token reveal's
         `turbo-cache-control` (admin/api_tokens/create). %>
     <%= yield :head %>

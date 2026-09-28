@@ -36,12 +36,13 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     find(:link_or_button, label).execute_script("this.click()")
   end
 
-  # CS Studio's Stimulus controllers (`controllers/admin/*`) are lazy-loaded
-  # (app/javascript/controllers/index.js): their imports only start once the
-  # page has loaded and an element using one is found. A test that types
-  # right after `visit` can race them -- before `admin--autosave` is
-  # connected its `input` events go nowhere. So this waits until every
-  # `admin--*` controller named on the page is connected.
+  # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
+  # by the `admin` entry point (app/javascript/admin.js) through one dynamic
+  # `import()` each, so they connect a moment *after* the page has loaded,
+  # even though they're modulepreloaded. A test that types right after
+  # `visit` can race them -- before `admin--autosave` is connected its
+  # `input` events go nowhere. So this waits until every `admin--*`
+  # controller named on the page is connected.
   #
   # Then `await_native_input`: headless Chrome was also observed dropping
   # *every* native key event of a `send_keys` sent shortly after a page load
