@@ -57,6 +57,11 @@ module Pages
 
     private
 
+    # Unlike `Posts::Save`, there's no scope-changing field to re-check
+    # `pages.edit`/`pages.publish` against: a page's only scope is its
+    # branch, and `parent` is stripped from an update's attributes (see
+    # `#assign`) -- a page changes branch only through `Pages::Move`,
+    # which checks `pages.create` on the target.
     def refusal_after_assign
       return "pages.create" if @page.new_record? && !authorize!("pages.create", @page)
 

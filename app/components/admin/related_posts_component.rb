@@ -25,13 +25,15 @@ module Admin
   # the actor may read.
   #
   # Nor does this list disclose a post the actor can't read (access-control
-  # design spec §3.3): a forward relation to one keeps its row and hidden
-  # entry -- dropping it would make the next autosave delete a relation the
-  # editor never saw -- but shows no title or link; an "Also related from"
-  # post they can't read is left out.
+  # design spec §3.3, "not found, not forbidden"): a forward relation to one
+  # is left out entirely -- no row, no hidden entry, so not even its id
+  # reaches the page -- and only counted ("+N related posts you can't
+  # open"). Omitting it from the submitted list is safe because
+  # `Posts::Save#assign_related_posts` never removes a relation to a post
+  # the actor can't read: it's outside their say. An "Also related from"
+  # post they can't read is left out the same way.
   class RelatedPostsComponent < AdminComponent
     ID_PREFIX = "post"
-    UNREADABLE_TITLE = "A post you can't open"
 
     def initialize(post:, locale:, url_options: {}, errors: [])
       @post = post
@@ -50,13 +52,14 @@ module Admin
 
     def editor_path(record) = helpers.admin_post_path(record, **url_options)
 
-    def related = post.related_posts.order(:id).to_a
+    def related = readable(post.related_posts).order(:id).to_a
+
+    # Forward relations to posts the actor can't read: counted, never shown.
+    def hidden_related_count = post.related_posts.count - related.size
 
     def related_from
       readable(Post.where(id: PostRelation.where(related_post_id: post.id).select(:post_id))).order(:id).to_a
     end
-
-    def readable?(record) = readable_related_ids.include?(record.id)
 
     def title_for(record) = Locales.read(record, :title, locale: locale).presence || "Untitled"
 
@@ -65,9 +68,5 @@ module Admin
     attr_reader :post, :locale, :url_options, :errors
 
     def readable(relation) = AccessControl.scope(Current.actor, "posts.read", relation)
-
-    def readable_related_ids
-      @readable_related_ids ||= readable(post.related_posts).pluck(:id).to_set
-    end
   end
 end

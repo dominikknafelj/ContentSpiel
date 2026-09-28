@@ -59,7 +59,10 @@ module Posts
         true
       end
 
-      return denied(refused, @post) if refused
+      if refused
+        discard_refused_changes
+        return denied(refused, @post)
+      end
       return failure(@post) unless saved
 
       success(@post)
@@ -74,11 +77,31 @@ module Posts
         @post.author_id ||= actor_user&.id
         return "posts.create" unless authorize!("posts.create", @post)
         return "posts.edit" if foreign_author? && !authorize!("posts.edit", @post)
-      elsif (@post.content_type_changed? || @post.author_id_changed?) && !authorize!("posts.edit", @post)
-        return "posts.edit"
+      elsif @post.content_type_changed? || @post.author_id_changed?
+        return "posts.edit" unless authorize!("posts.edit", @post)
+        # The published-edit rule (pass 1) again, on the new state: pass 1
+        # only proved `posts.publish` for the post as stored. A publish
+        # grant scoped to `blog`, or to `own`, must not let a live blog post
+        # become a live `resume_entry`, or a live post of mine become a
+        # live post of someone else's.
+        return "posts.publish" if @post.published_at.present? && !authorize!("posts.publish", @post)
       end
 
       "posts.publish" if @post.published_at_changed? && !authorize!("posts.publish", @post)
+    end
+
+    # After a pass-2 refusal the transaction has rolled back, but the
+    # in-memory post still holds the refused values -- the attacker's
+    # title would become the `access.denied` row's `subject_label`, and the
+    # refused tags would linger in `@post.tags`. A persisted post is
+    # reloaded to what's stored; a new one only has its join associations
+    # reset (there's nothing stored to go back to, and it's no subject).
+    def discard_refused_changes
+      if @post.persisted?
+        @post.reload
+      else
+        %i[tags post_tags].each { |name| @post.association(name).reset }
+      end
     end
 
     def foreign_author? = @post.author_id.present? && @post.author_id != actor_user&.id
@@ -172,9 +195,11 @@ module Posts
     # `related_post_ids` (design spec §6.1) is the *complete* list of this
     # post's forward relations (`post_relations`, the rows where this post
     # is `post_id`): named ids are kept or added, every other forward row is
-    # removed. The key's presence is the whole contract -- absent means
-    # "leave the relations alone" (MCP, the header's publish buttons, any
-    # PATCH that didn't come from the picker), `[]` means "clear them". The
+    # removed -- except relations to posts the actor can't read, which are
+    # always kept (`#unreadable_related_ids`). The key's presence is the
+    # whole contract -- absent means "leave the relations alone" (MCP, the
+    # header's publish buttons, any PATCH that didn't come from the
+    # picker), `[]` means "clear the ones you can see". The
     # admin picker (`Admin::RelatedPostsComponent`) always submits a blank
     # sentinel entry alongside its real ones, so the key is present exactly
     # when the picker itself was on the page.
@@ -207,13 +232,13 @@ module Posts
       ids = raw.map { |value| Integer(value, 10, exception: false) }
       known = Post.where(id: ids.compact).pluck(:id)
 
-      if ids.any?(&:nil?) || (ids.compact - known).any?
+      if ids.any?(&:nil?) || (ids.compact - known).any? || unreadable_additions?(ids.compact)
         @post.errors.add(:related_post_ids, "include posts that don't exist")
         return false
       end
 
       wanted = ids.uniq - [ @post.id ] - PostRelation.where(related_post_id: @post.id).pluck(:post_id)
-      @post.post_relations.where.not(related_post_id: wanted).destroy_all
+      @post.post_relations.where.not(related_post_id: wanted + unreadable_related_ids).destroy_all
       (wanted - @post.post_relations.pluck(:related_post_id)).each do |id|
         relation = @post.post_relations.create(related_post_id: id)
         next if relation.persisted?
@@ -223,6 +248,33 @@ module Posts
       end
 
       true
+    end
+
+    # Existing forward relations to posts the actor can't read. They're
+    # outside the actor's say (access-control design spec §3.3): kept
+    # whatever the submitted list contains -- the admin picker never
+    # renders them (`Admin::RelatedPostsComponent`), so they're never in
+    # it, and `[]` clears only the readable ones.
+    def unreadable_related_ids
+      forward = Post.where(id: PostRelation.where(post_id: @post.id).select(:related_post_id))
+      forward.pluck(:id) - AccessControl.scope(actor, "posts.read", forward).pluck(:id)
+    end
+
+    # A newly added relation must point at a post the actor may read
+    # (access-control design spec §3.3, "Not found, not forbidden"):
+    # otherwise a forged `related_post_ids` would link -- and on the public
+    # site, list -- a post outside their scope, and the error would confirm
+    # it exists. So an unreadable id is refused exactly like an unknown
+    # one. Relations that already exist (either direction) are kept as
+    # they are: an editor who can't read one mustn't lose it just by
+    # saving the list back.
+    def unreadable_additions?(ids)
+      existing = PostRelation.where(post_id: @post.id).pluck(:related_post_id) +
+        PostRelation.where(related_post_id: @post.id).pluck(:post_id)
+      added = ids.uniq - existing - [ @post.id ]
+      return false if added.empty?
+
+      AccessControl.scope(actor, "posts.read", Post.where(id: added)).count < added.size
     end
 
     # `@post.tags =` on an already-persisted post writes the join rows

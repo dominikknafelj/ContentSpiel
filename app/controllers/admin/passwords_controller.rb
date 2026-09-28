@@ -34,7 +34,7 @@ module Admin
         @user.sessions.destroy_all
         redirect_to admin_sign_in_path, notice: "Password has been reset."
       else
-        redirect_to admin_edit_password_path(params[:token]), alert: "Passwords did not match."
+        redirect_to admin_edit_password_path(params[:token]), alert: result.errors.to_sentence
       end
     end
 

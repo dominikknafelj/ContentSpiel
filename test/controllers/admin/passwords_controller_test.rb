@@ -57,7 +57,18 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     end
 
     follow_redirect!
-    assert_notice "Passwords did not match"
+    assert_notice "Password confirmation doesn't match Password"
+  end
+
+  test "update with a blank password says so" do
+    token = @user.password_reset_token
+    assert_no_changes -> { @user.reload.password_digest } do
+      patch admin_update_password_path(token), params: { password: "", password_confirmation: "" }
+      assert_redirected_to admin_edit_password_path(token)
+    end
+
+    follow_redirect!
+    assert_notice "Password can't be blank"
   end
 
   private

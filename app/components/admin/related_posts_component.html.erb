@@ -12,17 +12,16 @@
   <ul class="flex flex-col gap-1" data-admin--related-posts-target="list">
     <% related.each do |related_post| %>
       <li class="flex items-center justify-between gap-2 rounded-cs border border-line px-3 py-1.5" data-post-id="<%= related_post.id %>">
-        <% if readable?(related_post) %>
-          <span class="truncate text-ink"><%= title_for(related_post) %></span>
-        <% else %>
-          <span class="truncate text-meta"><%= UNREADABLE_TITLE %></span>
-        <% end %>
+        <span class="truncate text-ink"><%= title_for(related_post) %></span>
         <%= tag.input type: "hidden", name: html_name, value: related_post.id, autocomplete: "off" %>
         <button type="button" class="text-sm text-meta underline hover:text-ink" data-action="admin--related-posts#remove">Remove</button>
       </li>
     <% end %>
   </ul>
   <p class="text-sm text-meta" data-admin--related-posts-target="empty" <%= "hidden" if related.any? %>>No related posts yet.</p>
+  <% if (hidden = hidden_related_count).positive? %>
+    <p class="text-sm text-meta">+<%= pluralize(hidden, "related post") %> you can't open</p>
+  <% end %>
 
   <div class="relative mt-2">
     <%= tag.input type: "search", id: search_id, placeholder: "Search posts to add…", autocomplete: "off", class: setup_input_class,

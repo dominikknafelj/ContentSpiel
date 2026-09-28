@@ -24,6 +24,9 @@ class ServiceContractTest < ActiveSupport::TestCase
       source = call_source(service)
       next if source.match?(EXEMPTION)
 
+      # Code only: a comment mentioning `authorize!(` proves nothing.
+      source = source.lines.reject { |line| line.lstrip.start_with?("#") }.join
+
       assert_includes source, "authorize!(", "#{service}#call never calls authorize!"
       assert_includes source, "record_event(", "#{service}#call never calls record_event"
     end

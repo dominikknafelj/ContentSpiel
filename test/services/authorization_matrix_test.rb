@@ -46,6 +46,21 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     end
   end
 
+  def grant(key, scope = {})
+    AccessControl::Grant.find_or_create_by!(group: access_control_groups(:branch_editors), permission: key, scope: scope)
+  end
+
+  # A live post by `editor_branch`, who may edit any post but publish only
+  # within `publish_scope` -- the fix round 1 (I1) setups.
+  def live_post_for_scoped_publisher(publish_scope)
+    grant("posts.edit")
+    grant("posts.publish", publish_scope)
+    as_owner do
+      Posts::Save.call(attributes: { content_type: "blog", author_id: users(:editor_branch).id, published: true },
+        translations: { "en" => { title: "Live post" } }).record
+    end
+  end
+
   def token_for(user, group)
     ApiToken.generate!(user, group: access_control_groups(group)).first
   end
@@ -66,6 +81,15 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     [ "an author hands their draft to someone else", -> { users(:author) }, :admin,
       -> { Posts::Save.call(authors_draft, attributes: { author_id: users(:two).id }) },
       false, "access.denied" ],
+    [ "a blog-only publisher turns a live blog post into a live resume entry", -> { users(:editor_branch) }, :admin,
+      -> { Posts::Save.call(live_post_for_scoped_publisher({ "content_types" => [ "blog" ] }), attributes: { content_type: "resume_entry" }) },
+      false, "access.denied" ],
+    [ "an own-only publisher hands their live post to someone else", -> { users(:editor_branch) }, :admin,
+      -> { Posts::Save.call(live_post_for_scoped_publisher({ "own" => true }), attributes: { author_id: users(:two).id }) },
+      false, "access.denied" ],
+    [ "an own-only publisher edits their own live post", -> { users(:editor_branch) }, :admin,
+      -> { Posts::Save.call(live_post_for_scoped_publisher({ "own" => true }), translations: { "en" => { title: "Still mine" } }) },
+      true, "post.updated" ],
     [ "an author deletes their own draft without posts.delete", -> { users(:author) }, :admin,
       -> { Posts::Destroy.call(authors_draft) },
       false, "access.denied" ],
@@ -210,5 +234,85 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
 
     assert_equal [ "You don't have permission to create pages" ], result.errors
     assert_equal "access.denied", Audit::Event.order(:id).last.action
+  end
+
+  # Fix round 1 (I1): the refused key is the publish one, on the new state.
+  test "changing a live post's content type re-checks publish on the new type" do
+    post = live_post_for_scoped_publisher({ "content_types" => [ "blog" ] })
+    result = as(users(:editor_branch)) { Posts::Save.call(post, attributes: { content_type: "resume_entry" }) }
+
+    assert_equal [ "You don't have permission to publish posts" ], result.errors
+    assert_equal "blog", post.reload.content_type
+  end
+
+  # Fix round 1 (Minor 1): the denial row is labelled with the stored
+  # title, not the one the refused request tried to write.
+  test "a pass-2 denial is labelled with the stored title and drops the refused tags" do
+    draft = authors_draft
+    result = as(users(:author)) do
+      Posts::Save.call(draft, attributes: { published: true, tag_names: [ "refused" ] }, translations: { "en" => { title: "Attacker title" } })
+    end
+
+    assert result.denied?
+    event = Audit::Event.find_by!(action: "access.denied")
+    assert_equal "Author's draft", event.subject_label
+    assert_equal "Author's draft", result.record.title
+    assert_empty result.record.tags
+  end
+
+  # Fix round 1: a related post the actor can't read is refused like an
+  # unknown id -- neither linked nor confirmed to exist. `editor_branch`
+  # gets `posts.edit` on their own posts only, which implies reading those
+  # and nothing else (the Author group's unscoped `posts.create` implies
+  # reading every post, so it can't stand in here).
+  def own_editor_posts
+    grant("posts.edit", { "own" => true })
+    as_owner do
+      2.times.map do |index|
+        Posts::Save.call(attributes: { content_type: "blog", author_id: users(:editor_branch).id },
+          translations: { "en" => { title: "Editor's #{index}" } }).record
+      end
+    end
+  end
+
+  test "a related post outside the actor's read scope is refused like an unknown one" do
+    mine, other_mine = own_editor_posts
+    hidden = owners_post
+
+    refused = as(users(:editor_branch)) { Posts::Save.call(mine, attributes: { related_post_ids: [ hidden.id.to_s ] }) }
+    assert_not refused.ok?
+    assert_includes refused.record.errors[:related_post_ids], "include posts that don't exist"
+    assert_empty PostRelation.where(post: mine)
+
+    allowed = as(users(:editor_branch)) { Posts::Save.call(mine, attributes: { related_post_ids: [ other_mine.id.to_s ] }) }
+    assert allowed.ok?, allowed.errors.inspect
+    assert_equal [ other_mine.id ], PostRelation.where(post: mine).pluck(:related_post_id)
+  end
+
+  test "an existing relation to an unreadable post survives saving the list back" do
+    mine, = own_editor_posts
+    hidden = owners_post
+    PostRelation.create!(post: mine, related_post: hidden)
+
+    result = as(users(:editor_branch)) { Posts::Save.call(mine, attributes: { related_post_ids: [ hidden.id.to_s ] }) }
+    assert result.ok?, result.errors.inspect
+    assert_equal [ hidden.id ], PostRelation.where(post: mine).pluck(:related_post_id)
+
+    # Left out of the list -- as the picker always does -- or cleared: kept.
+    result = as(users(:editor_branch)) { Posts::Save.call(mine, attributes: { related_post_ids: [ "" ] }) }
+    assert result.ok?, result.errors.inspect
+    assert_equal [ hidden.id ], PostRelation.where(post: mine).pluck(:related_post_id)
+  end
+
+  # Fix round 1 (Minor 7), intended: a branch root can't be reordered
+  # among its siblings by an editor scoped to that branch -- `pages.create`
+  # on its parent is outside the branch. Pages inside it still can be.
+  test "a branch editor can't reorder their branch root among its siblings" do
+    pages = branches
+    result = as(users(:editor_branch)) { Pages::Move.call(pages[:a], parent: root_page, position: 5) }
+
+    assert result.denied?
+    assert_equal [ "You don't have permission to create pages" ], result.errors
+    assert as(users(:editor_branch)) { Pages::Move.call(pages[:child], parent: pages[:a], position: 0) }.ok?
   end
 end

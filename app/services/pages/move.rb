@@ -10,7 +10,11 @@ module Pages
   # there, as far as that branch is concerned, so an editor limited to one
   # branch can neither pull pages out of it nor push pages into another.
   # A reorder among the same siblings needs the same `pages.create` on the
-  # current parent, which anyone allowed to move there already has.
+  # current parent. Deliberately, that includes a branch root: an editor
+  # whose grants are scoped to `page_ids: [root_of_branch]` can reorder
+  # pages *inside* the branch, but not the branch root itself among its
+  # siblings -- its parent lies outside the branch, and the siblings'
+  # order is someone else's (the tree above the branch).
   class Move < ApplicationService
     def initialize(page, parent:, position:, actor: Current.actor)
       @page, @parent, @position, @actor = page, parent, position.to_i, actor

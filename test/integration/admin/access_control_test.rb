@@ -250,12 +250,33 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-field-name='related_post_ids']" do
-      assert_select "li[data-post-id='#{@other_post.id}']", text: /A post you can't open/
-      assert_select "li[data-post-id='#{@other_post.id}'] input[type=hidden][value='#{@other_post.id}']"
+      assert_select "li[data-post-id='#{@other_post.id}']", count: 0
+      assert_select "input[type=hidden][value='#{@other_post.id}']", count: 0
       assert_select "a[href='/cs-studio/posts/#{@other_post.id}']", count: 0
+      assert_select "p", text: "+1 related post you can't open"
     end
+    assert_no_match(/data-post-id="#{@other_post.id}"/, response.body)
     assert_not_includes response.body, "Other post"
     assert_not_includes response.body, "Pointing here" # "Also related from"
+  end
+
+  # Task 7 review ruling: the picker never submits a relation it didn't
+  # render, so `Posts::Save` keeps relations to unreadable posts whatever
+  # the list says -- including `[""]` (the sentinel alone, "clear").
+  test "saving the related posts keeps a relation to a post the actor can't read" do
+    narrow_author_reads_to_own
+    second_own = create_post(title: "Second own", published: false)
+    second_own.update_column(:author_id, users(:author).id)
+    PostRelation.create!(post: @own_post, related_post: @other_post)
+    sign_in_as(users(:author))
+
+    patch "/cs-studio/posts/#{@own_post.id}", params: { post: { related_post_ids: [ "", second_own.id.to_s ] } }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ @other_post.id, second_own.id ].sort, PostRelation.where(post: @own_post).pluck(:related_post_id).sort
+
+    patch "/cs-studio/posts/#{@own_post.id}", params: { post: { related_post_ids: [ "" ] } }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ @other_post.id ], PostRelation.where(post: @own_post).pluck(:related_post_id)
   end
 
   # --- Buttons ------------------------------------------------------------------
