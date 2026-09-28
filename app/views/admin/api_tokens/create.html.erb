@@ -1,14 +1,23 @@
 <%# The one-time reveal (design spec §6.1, Task 9) -- rendered straight from
     `Admin::ApiTokensController#create`, served `no-store`; see that
     action's own comment for why nothing else ever holds the raw token.
-    `data-turbo-temporary` on the whole reveal: Turbo removes it from the
-    page snapshot it caches on the way out, so Back shows the list
-    without it rather than restoring it from Turbo's own cache.
+    This is a whole document (the create form posts with
+    `data-turbo="false"`, fix round 1), so its `<head>` can carry
+    `turbo-cache-control: no-cache` from the very first byte: Turbo never
+    snapshots this page, so leaving it (Done, or any link) and coming Back
+    refetches the list instead of restoring the reveal. A frame-rendered
+    reveal couldn't guarantee that -- Turbo's promoted frame visit caches
+    snapshots (and fires `turbo:before-cache`) on its own schedule, which
+    either kept the reveal in the cache or, with `data-turbo-temporary`,
+    removed it from the live page right after it rendered.
     `admin--token-reveal` does the copying (Clipboard API, falling back to
     selecting the text) and blanks the token on `pagehide` for the
     browser's own back/forward cache. %>
 <% content_for :title, "AI assistant" %>
-<div data-controller="admin--token-reveal" data-turbo-temporary class="flex flex-col gap-4">
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+<div data-controller="admin--token-reveal" class="flex flex-col gap-4">
   <div>
     <h1 class="text-h1 text-ink">Your new token</h1>
     <p role="status" class="mt-1 text-warn-ink">Copy it now — it's only shown once. If you lose it, revoke it and create a new one.</p>

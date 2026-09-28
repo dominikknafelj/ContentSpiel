@@ -41,6 +41,15 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, active.token_digest
   end
 
+  # Fix round 1: the create form is a plain POST, so the reveal arrives as
+  # a whole document (see admin/api_tokens/create for why).
+  test "the create form opts out of Turbo" do
+    sign_in_as(users(:one))
+    get "/cs-studio/api_tokens"
+    assert_select "form[action='/cs-studio/api_tokens'][data-turbo='false']"
+    assert_select "head meta[name='turbo-cache-control']", count: 0
+  end
+
   test "the list names the MCP URL and a client config snippet" do
     sign_in_as(users(:one))
     get "/cs-studio/api_tokens"
@@ -57,6 +66,8 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal "no-store", response.headers["Cache-Control"]
+    # Its own document, opted out of Turbo's snapshot cache (fix round 1).
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']"
     raw = raw_token_from(response.body)
     token = ApiToken.order(:id).last
     assert_equal users(:one), token.user
@@ -127,5 +138,39 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
         "Authorization" => "Bearer #{raw}" }
   ensure
     host! admin_host
+  end
+
+  # Fix round 1 (m1): a failed issue never renders the reveal.
+  test "a failed issue redirects to the list with an alert and no token" do
+    sign_in_as(users(:one))
+    failing = ->(*, **) { ApplicationService::Result.failure(ApiToken.new, [ "Tokens are switched off" ]) }
+    ApiTokens::Issue.singleton_class.define_method(:call, &failing)
+    begin
+      assert_no_difference -> { ApiToken.count } do
+        post "/cs-studio/api_tokens"
+      end
+    ensure
+      ApiTokens::Issue.singleton_class.remove_method(:call)
+    end
+
+    assert_redirected_to "/cs-studio/api_tokens"
+    follow_redirect!
+    assert_select "[role=alert]", text: "Tokens are switched off"
+    assert_select "#api-token-value", count: 0
+  end
+
+  # Fix round 1 (m4): a stale tab's Revoke keeps the original revoked_at.
+  test "revoking an already-revoked token keeps its revoked_at and says so" do
+    sign_in_as(users(:one))
+    token, = ApiToken.generate!(users(:one))
+    token.update!(revoked_at: 2.days.ago.change(usec: 0))
+    revoked_at = token.revoked_at
+
+    delete "/cs-studio/api_tokens/#{token.id}"
+
+    assert_redirected_to "/cs-studio/api_tokens"
+    assert_equal revoked_at, token.reload.revoked_at
+    follow_redirect!
+    assert_select "[role=status]", text: "Token was already revoked"
   end
 end

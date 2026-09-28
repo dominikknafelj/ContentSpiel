@@ -10,8 +10,8 @@ import { Controller } from "@hotwired/stimulus"
 //   the copy shortcut. Never `alert()`.
 // - Forget: on `pagehide` every `secret` target is blanked, so a page the
 //   browser puts in its back/forward cache comes back without the raw
-//   token. (Turbo's own snapshot cache is handled by `data-turbo-temporary`
-//   on this controller's element, and the response itself is `no-store`.)
+//   token (the response itself is `no-store` for every HTTP cache, and its
+//   head opts out of Turbo's snapshot cache -- admin/api_tokens/create).
 export default class extends Controller {
   static targets = ["secret", "status"]
 

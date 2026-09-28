@@ -8,6 +8,9 @@
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    <%# Per-screen head tags -- today only the API token reveal's
+        `turbo-cache-control` (admin/api_tokens/create). %>
+    <%= yield :head %>
   </head>
 
   <%# CS Studio's shell (cs-studio spec §4.2): a grid of up to three columns --

@@ -25,23 +25,44 @@ module Admin
     # even have to catch), and Rails never logs a response body.
     #
     # `no-store` keeps the response out of every HTTP cache, the browser's
-    # back/forward cache included. The Turbo side of "never shown again" is
-    # the view's (`data-turbo-temporary` on the reveal, so Turbo's own
-    # snapshot cache drops it before a Back could restore it) and
-    # `admin--token-reveal`'s (which blanks it on `pagehide`). Reloading
-    # after this lands on the list: the form submits inside the `content`
-    # frame, whose `data-turbo-action="advance"` records this action's URL
-    # -- `/api_tokens`, a GET of which is `index` -- not a POST to replay.
+    # back/forward cache included. The Turbo side of "never shown again":
+    # the create form is a plain (non-Turbo) POST, so the reveal is its own
+    # document whose head carries `turbo-cache-control: no-cache` -- Turbo
+    # never snapshots it, and Back from it refetches the list -- and
+    # `admin--token-reveal` blanks the token on `pagehide`. Reloading the
+    # reveal itself can only re-POST (the browser asks first), which mints
+    # a *new* token; it never shows this one again.
+    #
+    # A failed issue (fix round 1, m1) never reaches the reveal: there's no
+    # raw token worth showing, so it's an ordinary redirect back to the list
+    # with the service's own errors -- nothing secret to keep out of the flash.
     def create
       result = ApiTokens::Issue.call(Current.user)
+
+      unless result.ok?
+        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other,
+          alert: result.errors.to_sentence.presence || "The token couldn't be created"
+        return
+      end
+
       @api_token, @raw_token = result.record
 
       response.set_header("Cache-Control", "no-store")
       render :create
     end
 
+    # An already-revoked token (a stale tab's Revoke button, fix round 1,
+    # m4) is answered with a notice and left alone -- revoking it again
+    # would overwrite `revoked_at`, the list's record of *when* it stopped
+    # working.
     def destroy
       api_token = ApiToken.find(params[:id])
+
+      if api_token.revoked_at
+        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: "Token was already revoked"
+        return
+      end
+
       result = ApiTokens::Revoke.call(api_token)
 
       if result.ok?

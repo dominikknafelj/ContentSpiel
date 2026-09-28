@@ -25,6 +25,13 @@
 # type gets starter content the same way a built-in does, with nothing to
 # edit in this module.
 module StarterContent
+  # What `raise!`/`document` raise -- a `RuntimeError` like the bare
+  # `raise "..."` they used before, so nothing that already expected one
+  # changes, but specific enough for CS Studio's "Create starter pages"
+  # (`Admin::StarterContentsController`) to rescue without swallowing every
+  # other RuntimeError.
+  class Error < RuntimeError; end
+
   WELCOME_MARKDOWN = "Welcome to your new site. Sign in to the admin to edit this page.".freeze
 
   module_function
@@ -121,7 +128,7 @@ module StarterContent
   # failed `Result` does (`raise!` below).
   def document(markdown)
     document, warnings = RichText::Document.from_markdown(markdown)
-    raise "StarterContent: #{warnings.to_sentence}" if warnings.any?
+    raise Error, "StarterContent: #{warnings.to_sentence}" if warnings.any?
 
     document.to_h
   end
@@ -132,7 +139,7 @@ module StarterContent
   # and immediate beats a starter site left half-built with no error anyone
   # would see.
   def raise!(result)
-    raise "StarterContent: #{result.errors.to_sentence}" unless result.ok?
+    raise Error, "StarterContent: #{result.errors.to_sentence}" unless result.ok?
 
     result.record
   end

@@ -1,9 +1,11 @@
 <%# "Connect an AI assistant" (design spec §6.1, Task 9): every token,
-    active and revoked, with its owner and last use; "Create token" posts
-    inside the `content` frame -- deliberately *not* `_top`: the one-time
-    reveal is a rendered (200) response, which Turbo only accepts from a
-    frame submission (a Drive form submission must redirect). Revoke is
-    gated behind `Admin::ConfirmDialogComponent`, like every other
+    active and revoked, with its owner and last use. "Create token" is a
+    plain, non-Turbo POST (`data-turbo="false"`, fix round 1): the one-time
+    reveal is a rendered (200) response -- a Drive form submission must
+    redirect, and a frame submission leaves Turbo's snapshot cache free to
+    keep the reveal for Back -- so it arrives as its own document whose
+    head opts out of Turbo's cache (see admin/api_tokens/create). Revoke
+    is gated behind `Admin::ConfirmDialogComponent`, like every other
     destructive action in CS Studio. %>
 <% content_for :title, "AI assistant" %>
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -11,7 +13,7 @@
     <h1 class="text-h1 text-ink">Connect an AI assistant</h1>
     <p class="mt-1 text-meta">An assistant connects over MCP with a token and can then read and write posts as the user who created it.</p>
   </div>
-  <%= form_with url: admin_api_tokens_path(**admin_url_options), method: :post do %>
+  <%= form_with url: admin_api_tokens_path(**admin_url_options), method: :post, data: { turbo: false } do %>
     <%= render Admin::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
   <% end %>
 </div>

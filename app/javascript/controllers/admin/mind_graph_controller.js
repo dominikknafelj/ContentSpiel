@@ -24,6 +24,13 @@ export default class extends Controller {
   static targets = ["data", "svg"]
 
   connect() {
+    // Turbo snapshots the page *before* `disconnect()` below gets to clear
+    // the SVG (fix round 1, I1), so a page restored by Back arrives with
+    // the previous visit's `<g>`/`<line>` elements still inside -- inert
+    // copies with no simulation behind them. Start from an empty canvas
+    // every time rather than drawing a second live set on top.
+    this.svgTarget.replaceChildren()
+
     const { nodes, edges } = JSON.parse(this.dataTarget.textContent)
     this.nodes = nodes
     this.edges = edges
