@@ -14,6 +14,11 @@ module AccessControl
     belongs_to :user
     belongs_to :group, class_name: "AccessControl::Group"
 
+    # Any change can alter what some actor may do: drop every actor's
+    # memoised grants (`AccessControl::ActorGrants`) so a check later in
+    # the same request, or console session, sees it.
+    after_commit { AccessControl::ActorGrants.reset! }
+
     validates :group_id, uniqueness: { scope: :user_id }
   end
 end

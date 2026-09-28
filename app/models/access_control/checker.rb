@@ -1,0 +1,172 @@
+module AccessControl
+  # One `AccessControl.allowed?` decision (design spec §3.3). Built per
+  # call; the grants themselves come from the per-request
+  # `ActorGrants` memo, so constructing one of these costs nothing.
+  #
+  # Order of business:
+  # 1. Resolve the key -- an unknown key raises `UnknownPermission`, even
+  #    for a trusted actor: it's a typo in code, not a denial to route
+  #    around.
+  # 2. A `ContentBlock` record is replaced by its owner (see
+  #    `#resolve_block`), and the record is checked against the
+  #    permission's subject.
+  # 3. Trusted code paths (nil actor on `:setup`/`:console`/`:system`/nil)
+  #    are allowed; any other nil actor is denied.
+  # 4. Owners are allowed; users need a matching grant; tokens need a
+  #    matching grant in their group *and* their user must be allowed.
+  class Checker
+    TRUSTED_CHANNELS = [ nil, :setup, :console, :system ].freeze
+
+    # Design spec §3.3 "Implication": any of these on a subject also
+    # satisfies that subject's `read`, within the same scope.
+    WRITE_ACTIONS = %i[create edit publish move delete].freeze
+
+    # Which permission-key prefix a block's owner maps to (design spec
+    # §3.1 "Blocks").
+    BLOCK_OWNER_PREFIX = { "Page" => "pages", "Post" => "posts" }.freeze
+
+    def self.trusted?(actor, channel)
+      actor.nil? && TRUSTED_CHANNELS.include?(channel.presence&.to_sym)
+    end
+
+    # The page itself plus every ancestor id -- what a `page_ids` scope's
+    # listed roots are matched against. An unsaved page has no closure
+    # rows yet; it will sit under its parent, so it's in exactly the
+    # branches its parent is in (and none, for a new root).
+    def self.page_branch_ids(page)
+      return page.self_and_ancestor_ids unless page.new_record?
+
+      page.parent ? page_branch_ids(page.parent) : []
+    end
+
+    def initialize(actor, key, record, channel)
+      @actor = actor
+      @permission = Permissions.fetch(key)
+      @record = record
+      @channel = channel
+      resolve_block if @record.is_a?(ContentBlock)
+      check_subject!
+    end
+
+    def allowed?
+      return true if self.class.trusted?(@actor, @channel)
+
+      case @actor
+      when User then user_allowed?(@actor)
+      when ApiToken then token_allowed?(@actor)
+      else false # nil actor on :admin/:mcp, a Session, anything else
+      end
+    end
+
+    private
+
+    def user_allowed?(user)
+      user.owner? || matches_any?(ActorGrants.for(user).user_grants, user.id)
+    end
+
+    # The intersection (design spec §3.3): the token's group must allow
+    # the key *and* so must its user. `own` on either side means "the
+    # token's user wrote it". An owner's token is limited by its group
+    # only, since the owner half is always allowed.
+    def token_allowed?(token)
+      return false if token.revoked_at.present? || token.user.nil? || token.group_id.nil?
+
+      grants = ActorGrants.for(token)
+      matches_any?(grants.token_grants, token.user_id) &&
+        (token.user.owner? || matches_any?(grants.user_grants, token.user_id))
+    end
+
+    # Grants combine with OR.
+    def matches_any?(grant_set, user_id)
+      grant_set.for(candidate_keys).any? { |grant| grant_matches?(grant, user_id) }
+    end
+
+    def candidate_keys
+      @candidate_keys ||= begin
+        keys = [ @permission.key ]
+        if @permission.action == :read && @permission.subject
+          prefix = @permission.key.delete_suffix(".read")
+          keys += WRITE_ACTIONS.map { |action| "#{prefix}.#{action}" }.select { |key| Permissions.find(key) }
+        end
+        keys
+      end
+    end
+
+    # Every scope key present on the grant must match (AND). Fail-closed
+    # throughout (Review Focus 3): a key this record can't be matched
+    # against, an empty list, a stale page id or a content type that's no
+    # longer registered all simply match nothing, never raise.
+    #
+    # A nil record asks "does the actor hold this key anywhere?" (a
+    # sidebar entry, a "New page" button whose parent isn't chosen yet),
+    # so any grant for the key matches regardless of its scope. Every
+    # write goes through a service that passes the actual record.
+    def grant_matches?(grant, user_id)
+      return true if @record.nil?
+
+      grant.scope.all? do |scope_key, value|
+        case scope_key
+        when "content_types" then @record.is_a?(Post) && Array(value).include?(@record.content_type)
+        when "page_ids" then @record.is_a?(Page) && Array(value).map(&:to_i).intersect?(branch_ids)
+        when "own" then !grant.scope_own? || own?(user_id)
+        else false
+        end
+      end
+    end
+
+    # Design spec §3.3: "There is no record yet, so `own` always matches on
+    # create" -- the post's author becomes the actor.
+    def own?(user_id)
+      return false unless @record.is_a?(Post)
+
+      @record.new_record? || (user_id.present? && @record.author_id == user_id)
+    end
+
+    # `pages.create` is checked against the branch the new page will join
+    # (design spec §3.3 "Create page"; "Move page" uses the same key for
+    # the target), i.e. its parent's -- the caller passes the new page (or
+    # the page being moved) with `parent` already set to the target. A
+    # nil parent is creating the root: no branch, so only an unscoped
+    # grant matches. Every other key is checked against the page's own
+    # position in the stored tree.
+    def branch_ids
+      @branch_ids ||=
+        if @permission.key == "pages.create"
+          @record.parent ? self.class.page_branch_ids(@record.parent) : []
+        else
+          self.class.page_branch_ids(@record)
+        end
+    end
+
+    # Design spec §3.1: blocks follow their owner's permissions. Only the
+    # *action* of the passed key counts; its subject is replaced by the
+    # owner's -- so `pages.edit` or `posts.edit` on a post-owned block both
+    # check `posts.edit` on the post. Callers never need to branch on the
+    # owner type, and the check is always against the right subject, so
+    # there is no way to pass a key that grants a block through the wrong
+    # owner. An action the owner's subject lacks (`pages.move` on a
+    # post-owned block -> `posts.move`) raises `UnknownPermission`, since
+    # it's a programmer error. Admin-area keys (no subject) leave the
+    # block alone.
+    def resolve_block
+      return unless [ Page, Post ].include?(@permission.subject)
+
+      owner = @record.owner
+      prefix = BLOCK_OWNER_PREFIX[owner.class.name] or
+        raise ArgumentError, "a block owned by #{owner.class} has no permissions to follow"
+      @permission = Permissions.fetch("#{prefix}.#{@permission.action}")
+      @record = owner
+    end
+
+    # A record of the wrong class for the key (a `Page` for `posts.edit`)
+    # is a programmer error: raise rather than deny, so it's caught in a
+    # test instead of showing up as a mysterious refusal. Admin-area keys
+    # (no subject) ignore whatever record a service passes along.
+    def check_subject!
+      return if @record.nil? || @permission.subject.nil?
+      return if @record.is_a?(@permission.subject)
+
+      raise ArgumentError, "#{@permission.key} applies to #{@permission.subject}, not #{@record.class}"
+    end
+  end
+end

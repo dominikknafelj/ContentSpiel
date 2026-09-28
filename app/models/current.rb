@@ -18,6 +18,11 @@ class Current < ActiveSupport::CurrentAttributes
 
   # `PublicSite.current_content_version`'s per-request memo.
   attribute :content_version
+
+  # `AccessControl::ActorGrants`' per-request memo: a Hash keyed by actor
+  # of the grants that actor acts under. Cleared after any grant or
+  # membership commits (see ActorGrants).
+  attribute :access_grants
   delegate :user, to: :session, allow_nil: true
 
   # The site's settings row, loaded at most once per request (spec §6.1) --

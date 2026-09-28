@@ -28,6 +28,11 @@ module AccessControl
 
     belongs_to :group, class_name: "AccessControl::Group"
 
+    # Any change can alter what some actor may do: drop every actor's
+    # memoised grants (`AccessControl::ActorGrants`) so a check later in
+    # the same request, or console session, sees it.
+    after_commit { AccessControl::ActorGrants.reset! }
+
     # Global Constraints: "The grant scope maps permission scopes to JSON
     # keys: content_type -> content_types, branch -> page_ids, own -> own."
     SCOPE_KEY_FOR = { content_type: "content_types", branch: "page_ids", own: "own" }.freeze
