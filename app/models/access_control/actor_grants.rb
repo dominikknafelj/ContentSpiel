@@ -21,6 +21,12 @@ module AccessControl
   # `SiteSetting` clears `Current.site`, so a group edit followed by a
   # check in the same request (or console session, where `Current` never
   # resets on its own) sees the new grants.
+  # Only on *commit*, though: a check inside the same transaction as a
+  # grant or membership change -- before it commits -- still sees the
+  # grants memoised before the change. No caller checks mid-transaction
+  # after changing grants today; a future one (a group editor that
+  # re-checks the editor's own rights after saving) must check after the
+  # commit, or call `ActorGrants.reset!` itself first.
   class ActorGrants
     # One source's grants indexed by permission key, so a check only walks
     # the grants for the key (and its implied keys) it asks about.

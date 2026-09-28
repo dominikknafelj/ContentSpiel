@@ -26,10 +26,21 @@ module AccessControl
     # Design spec §3.3 -- see `AccessControl::Checker` for the rules.
     # `key` is a registry key, a String or Symbol (`"posts.edit"`); an
     # unregistered one raises `UnknownPermission`. `record` is the `Post`,
-    # `Page` or `ContentBlock` acted on (unsaved for a create), or nil for
-    # "anywhere"/an admin-area key.
+    # `Page` or `ContentBlock` acted on (unsaved for a create). It's
+    # required for a subject key (posts.*, pages.*) -- nil raises
+    # ArgumentError, so a service can't get a scope-free allow by
+    # forgetting its record -- and ignored for an admin-area key.
     def allowed?(actor, key, record = nil, channel: Current.channel)
       Checker.new(actor, key, record, channel).allowed?
+    end
+
+    # Does `actor` hold `key` anywhere, under any scope? For navigation
+    # and buttons only (the sidebar's "Pages", a "New post" button before
+    # a content type is chosen) -- never to authorize a write, which must
+    # go through `allowed?` with the record. Owners, trusted code paths,
+    # and the token intersection are decided exactly as in `allowed?`.
+    def holds?(actor, key, channel: Current.channel)
+      Checker.new(actor, key, nil, channel, anywhere: true).allowed?
     end
 
     def trusted?(actor, channel) = Checker.trusted?(actor, channel)
@@ -102,6 +113,14 @@ module AccessControl
     # covered on that dimension. A requested page id that no longer exists
     # has no ancestors, so it's never covered -- harmless to refuse, since
     # it would match nothing anyway.
+    #
+    # Conservative: one held grant must cover the whole request on its
+    # own. A union of grants doesn't count -- holding `{content_types:
+    # ["blog"]}` and `{content_types: ["now_update"]}` doesn't let a user
+    # hand out `{content_types: ["blog", "now_update"]}`, though together
+    # they allow exactly that. Refusing a grant the user could split into
+    # two is safe; merging scopes across grants (and across dimensions)
+    # correctly isn't worth the risk here.
     def can_grant?(user, key, scope = {})
       permission = Permissions.fetch(key)
       return true if user.owner?

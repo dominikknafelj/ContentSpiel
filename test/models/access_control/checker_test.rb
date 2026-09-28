@@ -24,9 +24,11 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
 
   test "an owner is allowed any key" do
     post = create_post(title: "Anything")
+    page = create_page(title: "Anything")
+    records = { "posts." => post, "pages." => page }
 
     AccessControl::Permissions.keys.each do |key|
-      record = key.start_with?("posts.") ? post : nil
+      record = records.find { |prefix, _| key.start_with?(prefix) }&.last
       assert allowed?(@owner, key, record), "owner denied #{key}"
     end
   end
@@ -37,7 +39,7 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
       assert AccessControl.trusted?(nil, channel)
     end
 
-    [ :admin, :mcp, "mcp" ].each do |channel|
+    [ :admin, :mcp, "mcp", "", :"" ].each do |channel|
       assert_not allowed?(nil, "users.manage", channel: channel), "nil actor allowed on #{channel.inspect}"
       assert_not AccessControl.trusted?(nil, channel)
     end
@@ -57,14 +59,16 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
   end
 
   test "an unknown actor is denied" do
-    assert_not allowed?(Object.new, "posts.read")
-    assert_not allowed?(Session.new(user: @owner), "posts.read")
+    post = create_post(title: "Blog")
+
+    assert_not allowed?(Object.new, "posts.read", post)
+    assert_not allowed?(Session.new(user: @owner), "posts.read", post)
   end
 
   test "an unknown key raises and a symbol key is accepted" do
     assert_raises(AccessControl::UnknownPermission) { allowed?(@owner, "posts.frobnicate") }
     assert_raises(AccessControl::UnknownPermission) { allowed?(nil, "posts.frobnicate", channel: :system) }
-    assert allowed?(@reader, :"posts.read")
+    assert allowed?(@reader, :"posts.read", create_post(title: "Blog"))
   end
 
   test "a record of the wrong kind for the key raises" do
@@ -162,12 +166,42 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert_not allowed?(@author, "pages.edit", their_block)
   end
 
-  test "a nil record asks whether the actor holds the key anywhere" do
+  test "a subject key with a nil record raises; an admin-area key doesn't need one" do
+    assert_raises(ArgumentError) { allowed?(@owner, "posts.edit") }
+    assert_raises(ArgumentError) { allowed?(@reader, "pages.read") }
+    assert_raises(ArgumentError) { allowed?(nil, "posts.edit", channel: :system) }
+    assert_not allowed?(@reader, "users.manage")
+    assert allowed?(users(:two), "users.manage")
+  end
+
+  test "holds? asks whether the actor holds the key under any scope" do
     grant!("pages.edit", { "page_ids" => [ create_page(title: "Branch").id ] })
 
-    assert allowed?(@brancher, "pages.edit")
-    assert_not allowed?(@brancher, "posts.edit")
-    assert_not allowed?(@reader, "users.manage")
+    assert AccessControl.holds?(@brancher, "pages.edit", channel: :admin)
+    assert_not AccessControl.holds?(@brancher, "posts.edit", channel: :admin)
+    # The Author fixture group's posts.edit is own-scoped.
+    assert AccessControl.holds?(@author, "posts.edit", channel: :admin)
+    # Write implies read here too.
+    assert AccessControl.holds?(@brancher, "pages.read", channel: :admin)
+    assert_not AccessControl.holds?(@reader, "users.manage", channel: :admin)
+    assert AccessControl.holds?(@owner, "users.manage", channel: :admin)
+    assert AccessControl.holds?(nil, "posts.edit", channel: :console)
+    assert_not AccessControl.holds?(nil, "posts.edit", channel: :mcp)
+    assert_raises(AccessControl::UnknownPermission) { AccessControl.holds?(@owner, "posts.nope") }
+  end
+
+  test "a holds? on a token needs both sides" do
+    token, _ = ApiToken.generate!(@author, group: access_control_groups(:read_only))
+
+    assert_not AccessControl.holds?(token, "posts.edit", channel: :mcp)
+    assert AccessControl.holds?(token, "posts.read", channel: :mcp)
+  end
+
+  test "a create key on a block raises: blocks are created by editing their owner" do
+    block = create_page(title: "Page").content_blocks.create!(block_type: :rich_text, position: 0)
+
+    assert_raises(ArgumentError) { allowed?(@owner, "pages.create", block) }
+    assert_raises(ArgumentError) { allowed?(@owner, "posts.create", block) }
   end
 
   # --- Implication and create -----------------------------------------
@@ -188,6 +222,13 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
 
     assert allowed?(@brancher, "posts.create", Post.new(content_type: "blog"))
     assert_not allowed?(@brancher, "posts.create", Post.new(content_type: "now_update"))
+  end
+
+  test "a new post preset with someone else's author isn't own" do
+    grant!("posts.create", { "own" => true })
+
+    assert allowed?(@brancher, "posts.create", Post.new(content_type: "blog", author: @brancher))
+    assert_not allowed?(@brancher, "posts.create", Post.new(content_type: "blog", author: @author))
   end
 
   test "pages.create is checked against the parent's branch" do
@@ -231,7 +272,7 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
   test "an owner's token is limited to its group" do
     token, _ = ApiToken.generate!(@owner, group: access_control_groups(:read_only))
 
-    assert allowed?(token, "posts.read", channel: :mcp)
+    assert allowed?(token, "posts.read", create_post(title: "Blog"), channel: :mcp)
     assert_not allowed?(token, "users.manage", channel: :mcp)
   end
 
@@ -248,7 +289,8 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     token, _ = ApiToken.generate!(@owner)
     token.revoke!
 
-    assert_not allowed?(token, "posts.read", channel: :mcp)
+    assert_not allowed?(token, "posts.read", create_post(title: "Blog"), channel: :mcp)
+    assert_not AccessControl.holds?(token, "posts.read", channel: :mcp)
   end
 
   # --- Stale scopes (Review Focus 3) -----------------------------------
@@ -350,6 +392,17 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert_queries_count(1) do
       20.times { AccessControl.allowed?(@reader, "posts.read", post, channel: :admin) }
     end
+  end
+
+  test "two actors in one request get their own answers" do
+    post = create_post(title: "Blog").tap { |record| record.update!(author: @author) }
+
+    2.times do
+      assert allowed?(@author, "posts.edit", post)
+      assert_not allowed?(@reader, "posts.edit", post)
+      assert allowed?(users(:two), "posts.edit", post)
+    end
+    assert_equal 3, Current.access_grants.size
   end
 
   test "a grant change clears the memo" do

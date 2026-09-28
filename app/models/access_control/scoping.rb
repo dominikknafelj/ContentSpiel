@@ -89,10 +89,16 @@ module AccessControl
 
       # Design spec §3.3: "There is no record yet, so `own` always matches
       # on create" -- the post's author becomes the actor.
+      #
+      # Only while the new post's author is still unset or already the
+      # actor (fix round 1, M1): a new post preset with someone else's
+      # `author_id` isn't the actor's own, and creating it would hand
+      # them a post that "own" never let them write.
       def own?(record)
         return false unless record.is_a?(Post)
+        return false if @user_id.blank?
 
-        record.new_record? || (@user_id.present? && record.author_id == @user_id)
+        record.new_record? ? record.author_id.nil? || record.author_id == @user_id : record.author_id == @user_id
       end
 
       def nothing(base) = base.where(id: [])
@@ -214,8 +220,9 @@ module AccessControl
     # records to filter.
     def check_subject!(model)
       subject = @permission.subject
+      # A `create` key on blocks raises in both, too (`Checker#resolve_block`).
       valid =
-        if model <= ContentBlock then [ Page, Post ].include?(subject)
+        if model <= ContentBlock then [ Page, Post ].include?(subject) && @permission.action != :create
         else subject.present? && model <= subject
         end
       return if valid

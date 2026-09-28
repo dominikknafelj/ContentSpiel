@@ -68,6 +68,14 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
       next unless [ Post, Page ].include?(permission.subject)
 
       [ permission.subject, ContentBlock ].each do |model|
+        # A create key on a block raises in both (blocks are created by
+        # editing their owner) -- there's nothing to compare.
+        if model == ContentBlock && permission.action == :create
+          assert_raises(ArgumentError) { scoped(actor, permission.key, model.all, channel: channel) }
+          model.all.each { |record| assert_raises(ArgumentError) { allowed?(actor, permission.key, record, channel) } }
+          next
+        end
+
         expected = model.all.select { |record| allowed?(actor, permission.key, record, channel) }.map(&:id).sort
         actual = scoped(actor, permission.key, model.all, channel: channel).pluck(:id).sort
 
@@ -75,7 +83,7 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
         checked += 1
       end
     end
-    assert_operator checked, :>=, 22 # 11 post/page keys x (subject + blocks)
+    assert_operator checked, :>=, 20 # 11 post/page keys x (subject + blocks), minus the 2 create keys on blocks
   end
 
   # --- The property, one actor per grant shape -----------------------
@@ -195,12 +203,12 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     grant!(access_control_groups(:branch_editors), "pages.read", { "page_ids" => [ @a.id ] })
 
     post_sql, post_binds = sql_and_binds(scoped(@brancher, "posts.read", Post.all))
-    assert_no_match(/now_update|#{@brancher.id}/, post_sql)
+    assert_no_match(/now_update|(?<!\$)\b#{@brancher.id}\b/, post_sql)
     assert_includes post_binds, "now_update"
     assert_includes post_binds, @brancher.id
 
     page_sql, page_binds = sql_and_binds(scoped(@brancher, "pages.read", Page.all))
-    assert_no_match(/\b#{@a.id}\b/, page_sql)
+    assert_no_match(/(?<!\$)\b#{@a.id}\b/, page_sql)
     assert_includes page_binds, @a.id
   end
 

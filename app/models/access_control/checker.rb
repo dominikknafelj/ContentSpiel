@@ -10,12 +10,16 @@ module AccessControl
   # 2. A `ContentBlock` record is replaced by its owner (see
   #    `#resolve_block`), and the record is checked against the
   #    permission's subject.
+  #    A subject key (posts.*, pages.*) needs a record: a nil one raises
+  #    `ArgumentError` unless the caller asked `holds?` ("anywhere").
   # 3. Trusted code paths (nil actor on `:setup`/`:console`/`:system`/nil)
   #    are allowed; any other nil actor is denied.
   # 4. Owners are allowed; users need a matching grant; tokens need a
   #    matching grant in their group *and* their user must be allowed.
   class Checker
-    TRUSTED_CHANNELS = [ nil, :setup, :console, :system ].freeze
+    # A nil channel counts as trusted too (a console or rake task where
+    # nothing set one); any other value, a blank string included, doesn't.
+    TRUSTED_CHANNELS = %i[setup console system].freeze
 
     # Design spec §3.3 "Implication": any of these on a subject also
     # satisfies that subject's `read`, within the same scope.
@@ -41,7 +45,7 @@ module AccessControl
     end
 
     def self.trusted?(actor, channel)
-      actor.nil? && TRUSTED_CHANNELS.include?(channel.presence&.to_sym)
+      actor.nil? && (channel.nil? || TRUSTED_CHANNELS.include?(channel.to_sym))
     end
 
     # The page itself plus every ancestor id -- what a `page_ids` scope's
@@ -61,11 +65,16 @@ module AccessControl
       page.parent ? page_branch_ids(page.parent) : []
     end
 
-    def initialize(actor, key, record, channel)
+    # `anywhere: true` is `AccessControl.holds?`: "does the actor hold
+    # this key under any scope at all?" -- no record, every grant for the
+    # key counts whatever its scope. Without it, a subject key must come
+    # with the record it's about (see `#check_subject!`).
+    def initialize(actor, key, record, channel, anywhere: false)
       @actor = actor
       @permission = Permissions.fetch(key)
       @record = record
       @channel = channel
+      @anywhere = anywhere
       resolve_block if @record.is_a?(ContentBlock)
       check_subject!
     end
@@ -112,12 +121,12 @@ module AccessControl
     # empty list, a stale page id or a content type that's no longer
     # registered all simply match nothing, never raise.
     #
-    # A nil record asks "does the actor hold this key anywhere?" (a
-    # sidebar entry, a "New page" button whose parent isn't chosen yet),
-    # so any grant for the key matches regardless of its scope. Every
-    # write goes through a service that passes the actual record.
+    # `holds?` (`@anywhere`) ignores the scope: any grant for the key
+    # counts. A nil record otherwise only reaches here for an admin-area
+    # key, whose grants carry no scope, so `matches?` on an empty scope is
+    # true without ever touching the record.
     def grant_matches?(grant, user_id)
-      return true if @record.nil?
+      return true if @anywhere || @record.nil?
 
       Scoping::Condition.new(grant, user_id, @permission).matches?(@record, -> { branch_ids })
     end
@@ -146,10 +155,16 @@ module AccessControl
     # there is no way to pass a key that grants a block through the wrong
     # owner. An action the owner's subject lacks (`pages.move` on a
     # post-owned block -> `posts.move`) raises `UnknownPermission`, since
-    # it's a programmer error. Admin-area keys (no subject) leave the
-    # block alone.
+    # it's a programmer error. So is a `create` key on a block: a block
+    # is created by editing its owner (`pages.edit`/`posts.edit`), and
+    # `pages.create` on a block would otherwise be matched against the
+    # owning page's *parent* branch. Admin-area keys (no subject) leave
+    # the block alone.
     def resolve_block
       return unless [ Page, Post ].include?(@permission.subject)
+      if @permission.action == :create
+        raise ArgumentError, "#{@permission.key} can't be checked on a block; blocks are created by editing their owner"
+      end
 
       owner = @record.owner
       prefix = BLOCK_OWNER_PREFIX[owner.class.name] or
@@ -162,8 +177,14 @@ module AccessControl
     # is a programmer error: raise rather than deny, so it's caught in a
     # test instead of showing up as a mysterious refusal. Admin-area keys
     # (no subject) ignore whatever record a service passes along.
+    #
+    # A subject key with a nil record raises too (fix round 1, I1):
+    # `ApplicationService#authorize!` hands its record straight through,
+    # and a service that passed nil by mistake must not get a scope-free
+    # allow. "Anywhere" is its own question, `AccessControl.holds?`.
     def check_subject!
-      return if @record.nil? || @permission.subject.nil?
+      return if @permission.subject.nil? || @anywhere
+      raise ArgumentError, "#{@permission.key} needs a record; use AccessControl.holds? for \"anywhere\"" if @record.nil?
       return if @record.is_a?(@permission.subject)
 
       raise ArgumentError, "#{@permission.key} applies to #{@permission.subject}, not #{@record.class}"
