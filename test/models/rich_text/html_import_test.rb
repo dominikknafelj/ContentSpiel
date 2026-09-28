@@ -264,4 +264,20 @@ class RichText::HtmlImportTest < ActiveSupport::TestCase
     assert_empty document.validate
     assert_includes document.to_h.to_json, "deep"
   end
+
+  # Final fix wave (A): imported HTML goes through `RichText::ContentRepair`
+  # too, so a migrated body is one the editor can load -- a code face
+  # inside bold, an empty quote, a list item opening with an embed.
+  test "imported documents satisfy the editor's content model" do
+    html = %(<p><strong><code>x</code></strong> and <a href="https://example.com"><code>y</code></a></p><blockquote></blockquote>) +
+      %(<ul><li><action-text-attachment sgid="#{youtube_sgid}" content-type="application/octet-stream"></action-text-attachment></li></ul>)
+    document, unmapped = RichText::HtmlImport.new(youtube_video_id: ->(_id) { VIDEO_ID }).call(html)
+
+    assert_empty document.validate
+    texts = document.to_h.dig("content", 0, "content")
+    assert_equal [ { "type" => "code" } ], texts.first["marks"]
+    assert_equal [ "link" ], texts.last["marks"].map { |mark| mark["type"] }
+    assert_equal "paragraph", document.to_h.dig("content", 1, "content", 0, "content", 0, "type")
+    assert unmapped.any? { |message| message.include?("code") }
+  end
 end

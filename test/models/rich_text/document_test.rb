@@ -124,4 +124,77 @@ class RichText::DocumentTest < ActiveSupport::TestCase
       { "type" => "text", "text" => "t", "marks" => [ nil, { "type" => "internalLink" } ] } ])
     assert_empty document.references
   end
+
+  # Final fix wave (A): the content model Tiptap/ProseMirror itself enforces
+  # (`content`/`marks`/`excludes` in the vendored extensions, checked by
+  # `enableContentCheck`) is part of `#validate` too. A document that
+  # passes here but that the editor refuses opens read-only in CS Studio --
+  # which is exactly what an MCP-written body used to do.
+  def text(value, *marks) = { "type" => "text", "text" => value }.merge(marks.empty? ? {} : { "marks" => marks.map { |mark| mark.is_a?(Hash) ? mark : { "type" => mark } } })
+  def paragraph(*content) = { "type" => "paragraph", "content" => content }
+  def link(href = "https://example.com") = { "type" => "link", "attrs" => { "href" => href } }
+
+  test "code can't be combined with any other mark" do
+    assert_empty doc(paragraph(text("x", "code"))).validate
+    [ %w[bold code], [ "code", link ], %w[code italic] ].each do |marks|
+      errors = doc(paragraph(text("x", *marks))).validate
+      assert errors.any? { |message| message.include?("can't be combined") }, "expected #{marks.inspect} to be refused, got #{errors.inspect}"
+    end
+  end
+
+  test "a mark type can't appear twice, and link and internalLink exclude each other" do
+    page = create_page(title: "Target")
+    internal = { "type" => "internalLink", "attrs" => { "type" => "page", "id" => page.id } }
+    assert doc(paragraph(text("x", "bold", "bold"))).validate.any? { |message| message.include?("more than once") }
+    assert doc(paragraph(text("x", link, internal))).validate.any? { |message| message.include?("can't be combined") }
+    assert doc(paragraph(text("x", internal, internal))).validate.any? { |message| message.include?("more than once") }
+    assert_empty doc(paragraph(text("x", "bold", "italic", "strike", link))).validate
+  end
+
+  test "text nodes can't be empty" do
+    assert doc(paragraph(text(""))).validate.any? { |message| message.include?("empty") }
+  end
+
+  test "container content follows the editor's content expressions" do
+    empty_paragraph = { "type" => "paragraph", "content" => [] }
+    item = ->(*content) { { "type" => "listItem", "content" => content } }
+    youtube = { "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } }
+
+    valid = [
+      doc,
+      doc(empty_paragraph),
+      doc({ "type" => "paragraph" }),
+      doc({ "type" => "bulletList", "content" => [ item.(paragraph(text("a")), youtube) ] }),
+      doc({ "type" => "blockquote", "content" => [ youtube ] }),
+      doc({ "type" => "codeBlock" }),
+      doc({ "type" => "codeBlock", "content" => [ text("x = 1") ] }),
+      doc(paragraph(text("a"), { "type" => "hardBreak" }, text("b")))
+    ]
+    valid.each { |document| assert_empty document.validate, document.to_h.inspect }
+
+    invalid = [
+      doc({ "type" => "blockquote", "content" => [] }),
+      doc({ "type" => "bulletList", "content" => [] }),
+      doc({ "type" => "orderedList", "attrs" => { "start" => 1 } }),
+      doc({ "type" => "bulletList", "content" => [ item.() ] }),
+      doc({ "type" => "bulletList", "content" => [ item.(youtube) ] }),
+      doc({ "type" => "bulletList", "content" => [ paragraph(text("a")) ] }),
+      doc(text("loose")),
+      doc(paragraph(paragraph(text("a")))),
+      doc({ "type" => "heading", "attrs" => { "level" => 2 }, "content" => [ youtube ] }),
+      doc({ "type" => "codeBlock", "content" => [ { "type" => "hardBreak" } ] }),
+      doc({ "type" => "codeBlock", "content" => [ text("x", "bold") ] }),
+      doc({ "type" => "horizontalRule", "content" => [ paragraph(text("a")) ] }),
+      doc(paragraph(text("a")).merge("marks" => [ { "type" => "bold" } ]))
+    ]
+    invalid.each { |document| assert_not_empty document.validate, "expected #{document.to_h.inspect} to be invalid" }
+  end
+
+  test "validate is total for a root that isn't an object" do
+    [ 42, [], "doc", true ].each do |root|
+      errors = RichText::Document.new(root).validate
+      assert errors.any? { |message| message.include?("root") }, "expected an error for #{root.inspect}"
+    end
+    assert_nothing_raised { RichText::Document.new(42).normalized.to_h }
+  end
 end

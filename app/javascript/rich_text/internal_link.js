@@ -14,9 +14,14 @@ import { Mark } from "@tiptap/core"
 // (`#link_titles_json`) plus whatever the picker added this session. No
 // title means the target is gone: rendered as "missing" (spec §7).
 //
-// `excludes: "link"` -- a run of text links to one place: applying either
-// kind of link replaces the other (the controller unsets the other mark
-// explicitly as well, see `admin--rich-text#applyLink`).
+// `excludes: "link internalLink"` -- a run of text links to one place:
+// applying either kind of link replaces the other (the controller unsets
+// the other mark explicitly as well, see `admin--rich-text#applyLink`), and
+// re-pointing an internal link replaces it. ProseMirror's default (a mark
+// excludes only itself) stops applying once `excludes` is given, so
+// `internalLink` has to name itself: without it, re-pointing added a
+// second `internalLink` mark beside the first, a document the server
+// refuses (`RichText::MarkType#excludes`, `RichText::BuiltIns`).
 
 const TYPES = [ "page", "post" ]
 
@@ -28,7 +33,7 @@ function toId(value) {
 export const InternalLink = Mark.create({
   name: "internalLink",
   inclusive: false,
-  excludes: "link",
+  excludes: "link internalLink",
 
   addOptions() {
     return {

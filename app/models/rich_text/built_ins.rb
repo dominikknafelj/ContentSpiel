@@ -31,6 +31,17 @@ module RichText
       register_marks
     end
 
+    # The content model (final fix wave, A): each registration below states
+    # its ProseMirror `group`/`content`/`marks` exactly as the vendored
+    # Tiptap extension (or our own `app/javascript/rich_text/*.js`) declares
+    # it, so `RichText::Document#validate` accepts only what the editor can
+    # load (`RichText::ContentExpression`'s comment). One deliberate
+    # difference: `doc` is `"block*"` here where Tiptap says `"block+"` --
+    # `{ "type" => "doc", "content" => [] }` is this app's canonical empty
+    # document (`RichText::Document::EMPTY_HASH`, what every new record and
+    # locale starts as), and the editor never sees it as such: the
+    # `admin--rich-text` controller mounts an empty document as no content
+    # at all, which Tiptap turns into one empty paragraph.
     def self.register_nodes
       # "doc" (the document root) and "text" render as themselves plus
       # nothing -- "doc" has no wrapper element (the renderer starts here
@@ -45,6 +56,7 @@ module RichText
       identity_markdown = ->(node, children, ctx) { children }
 
       RichText::Schema.register_node("doc") do |node|
+        node.content "block*"
         node.html(&identity_html)
         # `Dumper::BLOCK_CONTAINER_TYPES` already joins "doc"'s block
         # children with blank lines before this ever runs -- identity here
@@ -53,6 +65,7 @@ module RichText
       end
 
       RichText::Schema.register_node("text") do |node|
+        node.group "inline"
         node.html(&identity_html)
         # `RichText::Markdown::Dumper#render_text_node` has already
         # escaped this node's own text and wrapped every mark around it by
@@ -72,14 +85,25 @@ module RichText
       # older, coarser version of this), "listItem" because numbering/
       # bulleting is the *list's* job (see `bulletList`/`orderedList`
       # below).
-      { "paragraph" => :p, "listItem" => :li }.each do |name, tag_name|
+      #
+      # Content model: a paragraph is `"inline*"` (Tiptap's Paragraph); a
+      # list item is `"paragraph block*"` (Tiptap's ListItem) -- it must
+      # *start* with a paragraph, so an embed can follow a list item's text
+      # but never be its first child -- and belongs to no group of its own
+      # (only a list may hold one).
+      { "paragraph" => [ :p, "inline*", "block" ], "listItem" => [ :li, "paragraph block*", "listItem" ] }.each do |name, (tag_name, content, group)|
         RichText::Schema.register_node(name) do |node|
+          node.group group
+          node.content content
           node.html { |n, children, ctx| TAG.tag.public_send(tag_name, children) }
           node.markdown_out { |n, children, ctx| children }
         end
       end
 
+      # `"block+"` (Tiptap's Blockquote): an empty quote isn't a document
+      # the editor can load.
       RichText::Schema.register_node("blockquote") do |node|
+        node.content "block+"
         node.html { |n, children, ctx| TAG.tag.blockquote(children) }
         node.markdown_out { |n, children, ctx| children.each_line.map { |line| line.chomp.empty? ? ">" : "> #{line.chomp}" }.join("\n") }
       end
@@ -91,7 +115,11 @@ module RichText
       # (`"- "`, or `"1. "`/`"2. "`/... counting up from `start`) and how
       # far to indent that item's own continuation lines underneath it
       # (`RichText::Markdown::Dumper.indent_list_item`).
+      #
+      # Content model: `"listItem+"` for both (Tiptap's BulletList/
+      # OrderedList, `${itemTypeName}+`) -- no empty lists.
       RichText::Schema.register_node("bulletList") do |node|
+        node.content "listItem+"
         node.html { |n, children, ctx| TAG.tag.ul(children) }
         node.markdown_out { |n, children, ctx| children.map { |item| RichText::Markdown::Dumper.indent_list_item("- ", item) }.join("\n\n") }
       end
@@ -105,6 +133,7 @@ module RichText
       # attrs key that would then fail to `assert_equal` a document that
       # always sets it.
       RichText::Schema.register_node("orderedList") do |node|
+        node.content "listItem+"
         node.attribute :start, :integer
         node.html { |n, children, ctx| TAG.tag.ol(children) }
         node.markdown_out do |n, children, ctx|
@@ -116,7 +145,14 @@ module RichText
       # `codeBlock`'s children are "text" nodes carrying no marks -- marks
       # don't make sense inside a code block -- so this always produces
       # `<pre><code>...</code></pre>`, matching CommonMark's own fenced-
-      # code-block shape.
+      # code-block shape. That's also the content model (Tiptap's CodeBlock:
+      # `content: "text*"`, `marks: ""`): no hardBreak, no marked text, and
+      # no content at all for an empty block.
+      #
+      # The fence (final fix wave, P1) is one backtick longer than the
+      # longest backtick run in the code, and never shorter than three --
+      # code that itself contains a ``` line would otherwise close a fixed
+      # three-backtick fence early.
       #
       # `language` (optional; normalized the same way `orderedList.start`
       # is, per Task 3's brief) names the fence's info string
@@ -125,11 +161,13 @@ module RichText
       # `raw: true` (its own comment), so `children` here is the code's
       # literal source text, never backslash-escaped.
       RichText::Schema.register_node("codeBlock") do |node|
+        node.content "text*", marks: false
         node.attribute :language, :string
         node.html { |n, children, ctx| TAG.tag.pre(TAG.tag.code(children)) }
         node.markdown_out do |n, children, ctx|
           language = n.dig("attrs", "language")
-          "```#{language}\n#{children}\n```"
+          fence = "`" * [ 3, (children.scan(/`+/).map(&:length).max || 0) + 1 ].max
+          "#{fence}#{language}\n#{children}\n#{fence}"
         end
       end
 
@@ -149,6 +187,7 @@ module RichText
       # soft break (plain text) on the next round trip; a literal backslash
       # has no such footgun.
       RichText::Schema.register_node("hardBreak") do |node|
+        node.group "inline"
         node.html { |n, children, ctx| TAG.tag.br }
         node.markdown_out { |n, children, ctx| "\\\n" }
       end
@@ -158,6 +197,7 @@ module RichText
       # H1 for the page's own title, so an editor picking a heading level
       # inside body content starts at H2.
       RichText::Schema.register_node("heading") do |node|
+        node.content "inline*"
         node.attribute :level, :integer, required: true, in: 2..4
         node.html { |n, children, ctx| TAG.tag.public_send("h#{n["attrs"]["level"]}", children) }
         node.markdown_out { |n, children, ctx| "#{"#" * n["attrs"]["level"]} #{children}" }
@@ -239,6 +279,10 @@ module RichText
         end
       end
 
+      # `excludes "_"` (Tiptap's Code): a code span carries no other mark, and
+      # no other mark can be added to one -- ProseMirror refuses a document
+      # that pairs them.
+      #
       # A code *span*'s content is raw, unescaped text
       # (`RichText::Markdown::Dumper#render_text_node`'s own comment) --
       # which means a single fixed backtick can't safely delimit it the
@@ -253,6 +297,7 @@ module RichText
       # .wrap_code_span` is that rule, shared with nothing else since no
       # other built-in mark needs a content-dependent delimiter width.
       RichText::Schema.register_mark("code") do |mark|
+        mark.excludes "_"
         mark.html { |m, content, ctx| TAG.tag.code(content) }
         mark.markdown_out { |m, content, ctx| RichText::Markdown.wrap_code_span(content) }
       end
@@ -294,7 +339,12 @@ module RichText
       # §3.4) -- `RichText::Markdown::Loader#link_mark_for` is this
       # format's other half, turning that same `cs:` scheme back into an
       # `internalLink` mark on the way in.
+      #
+      # `excludes "link internalLink"` (`rich_text/internal_link.js`): a run
+      # of text links to one place, so an internal link replaces an
+      # external one and vice versa, and re-pointing one replaces it.
       RichText::Schema.register_mark("internalLink") do |mark|
+        mark.excludes "link internalLink"
         mark.attribute :type, :string, required: true, in: %w[page post]
         mark.attribute :id, :integer, required: true, reference: [ :type ], validate: ->(value, attrs) {
           case attrs["type"]

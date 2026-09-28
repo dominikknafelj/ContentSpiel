@@ -96,8 +96,14 @@ module RichText
       fragment = parse(html.to_s)
       return flattened_document(html.to_s) if fragment.nil?
 
+      # `RichText::ContentRepair` (final fix wave, A): the same repairs the
+      # Markdown loader makes, so a migrated body is one the editor can load
+      # (a `<code>` inside `<strong>`, a list item opening with an embed);
+      # each repair is reported like any other unmapped fragment.
       content = blocks(fragment.children, 0)
-      [ RichText::Document.new("type" => "doc", "content" => content).normalized, @unmapped ]
+      repaired, repairs = RichText::ContentRepair.call({ "type" => "doc", "content" => content })
+      repairs.each { |message| report(message) }
+      [ RichText::Document.new(repaired).normalized, @unmapped ]
     end
 
     private

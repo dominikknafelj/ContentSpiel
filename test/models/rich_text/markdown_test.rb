@@ -165,4 +165,80 @@ class RichText::MarkdownTest < ActiveSupport::TestCase
     assert_equal canonical.to_h, reloaded.to_h
     assert_empty warnings
   end
+
+  # Final fix wave (A): the Loader's output must be something the editor
+  # can load (`RichText::Document#validate` now enforces Tiptap's content
+  # model), so each of these used to come back as a document that saved
+  # fine and then opened read-only in CS Studio.
+  test "code combined with emphasis keeps code and drops the other marks, with a warning" do
+    document, warnings = RichText::Document.from_markdown("**`x`**\n")
+    assert_equal [ { "type" => "text", "text" => "x", "marks" => [ { "type" => "code" } ] } ], document.to_h["content"].first["content"]
+    assert_empty document.validate
+    assert warnings.any? { |warning| warning.include?("code") }
+  end
+
+  test "code inside a link keeps the link and drops code, with a warning" do
+    page = create_page(title: "Target")
+    document, warnings = RichText::Document.from_markdown("[`x`](cs:page/#{page.id}) and [`y`](https://example.com)\n")
+    texts = document.to_h["content"].first["content"]
+    assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => page.id } } ], texts.first["marks"]
+    assert_equal [ { "type" => "link", "attrs" => { "href" => "https://example.com" } } ], texts.last["marks"]
+    assert_empty document.validate
+    assert warnings.any? { |warning| warning.include?("code") }
+  end
+
+  test "an empty fence becomes a code block with no content" do
+    document, warnings = RichText::Document.from_markdown("```\n```\n")
+    assert_equal [ { "type" => "codeBlock" } ], document.to_h["content"]
+    assert_empty document.validate
+    assert_empty warnings
+  end
+
+  test "an empty list item gets an empty paragraph, and an empty quote is dropped" do
+    list, list_warnings = RichText::Document.from_markdown("- \n")
+    assert_equal [ { "type" => "bulletList", "content" => [ { "type" => "listItem", "content" => [ { "type" => "paragraph", "content" => [] } ] } ] } ], list.to_h["content"]
+    assert_empty list.validate
+    assert_empty list_warnings
+
+    quote, quote_warnings = RichText::Document.from_markdown("> \n")
+    assert_equal [], quote.to_h["content"]
+    assert_empty quote.validate
+    assert quote_warnings.any? { |warning| warning.include?("blockquote") }
+  end
+
+  test "a list item that starts with an embed gets an empty paragraph first" do
+    document, warnings = RichText::Document.from_markdown("- ::youtube{id=\"dQw4w9WgXcQ\"}\n")
+    item = document.to_h.dig("content", 0, "content", 0)
+    assert_equal [ { "type" => "paragraph", "content" => [] }, { "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } } ], item["content"]
+    assert_empty document.validate
+    assert_empty warnings
+  end
+
+  # Final fix wave (B): a directive is recognised from the paragraph's own
+  # source, not the whole line -- inside a list item or a quote the line
+  # also holds the container's marker.
+  test "directives nested in a list item or a quote reload as their node" do
+    youtube = { "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } }
+    document, warnings = RichText::Document.from_markdown("- intro\n\n  ::youtube{id=\"dQw4w9WgXcQ\"}\n\n> ::youtube{id=\"dQw4w9WgXcQ\"}\n")
+    assert_equal youtube, document.to_h.dig("content", 0, "content", 0, "content", 1)
+    assert_equal [ youtube ], document.to_h.dig("content", 1, "content")
+    assert_empty warnings
+  end
+
+  test "an image directive whose asset is gone is dropped with a warning, not kept as text" do
+    document, warnings = RichText::Document.from_markdown("before\n\n::image{asset=\"987654\" alt=\"x\"}\n\nafter\n")
+    assert_equal %w[before after], document.to_h["content"].map { |block| block.dig("content", 0, "text") }
+    assert warnings.any? { |warning| warning.include?("987654") }
+  end
+
+  test "an invalid youtube directive is still kept as text" do
+    document, warnings = RichText::Document.from_markdown("::youtube{id=\"nope\"}\n")
+    assert_equal "paragraph", document.to_h.dig("content", 0, "type")
+    assert warnings.any? { |warning| warning.include?("youtube") }
+  end
+
+  test "a table's warning says it was degraded, not dropped" do
+    _document, warnings = RichText::Document.from_markdown("| a | b |\n|---|---|\n| 1 | 2 |\n")
+    assert_includes warnings, "degraded a table to one paragraph per row"
+  end
 end

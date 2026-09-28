@@ -16,6 +16,8 @@ require "application_system_test_case"
 # setting a value from JS would bypass exactly the code under test.
 class Admin::RichTextSystemTest < ApplicationSystemTestCase
   YOUTUBE_ID = "dQw4w9WgXcQ".freeze
+  # The editor's read-only notice (`admin--rich-text`'s `invalidContent`).
+  INVALID_CONTENT = "This text contains something the editor can't show".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -293,6 +295,33 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     assert_equal stored, find("input[name='post[body]']", visible: false).value
     assert_equal 0, page.evaluate_script("window.__patches")
+  end
+
+  # Final fix wave (A): what the Markdown loader (MCP's write path) builds
+  # must be a document the real editor loads -- not just one the server
+  # validates. Each of these used to save fine through MCP and then open
+  # read-only in CS Studio ("contains something the editor can't show").
+  test "documents the Markdown loader builds open editable in the editor" do
+    page_record = create_page(title: "Target")
+    [
+      "**`x`**\n",
+      "[`x`](cs:page/#{page_record.id})\n",
+      "```\n```\n",
+      "- \n",
+      "> \n\nafter the quote\n",
+      "- ::youtube{id=\"#{YOUTUBE_ID}\"}\n\n> ::youtube{id=\"#{YOUTUBE_ID}\"}\n",
+      "a **b `c` d** e\\\n- flour\n\n1. one\n   - nested *x*\n"
+    ].each do |markdown|
+      document, = RichText::Document.from_markdown(markdown)
+      assert_empty document.validate, "loader output for #{markdown.inspect} isn't valid"
+      @post.assign_body(document.to_h, locale: :en)
+      @post.save!
+
+      visit_post
+      assert_selector ".ProseMirror[contenteditable='true']"
+      assert_no_text INVALID_CONTENT, wait: 0.5
+      assert_selector "[data-admin--rich-text-command]:not([disabled])", minimum: 1
+    end
   end
 
   private

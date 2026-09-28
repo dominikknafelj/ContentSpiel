@@ -89,8 +89,22 @@ module RichText
     # backtick/tilde a bare text node contains, at any position including
     # the front, so by the time this ever runs on genuinely unmarked
     # literal text there's no unescaped one left for this to catch.
-    LEADING_BLOCK_CHARS = /\A([#>+-])/
+    #
+    # `=` and `|` (final fix wave, B) matter only at the start of a line
+    # *after a hardBreak*, where a paragraph is already open: `===` would
+    # turn the line before it into a setext heading, and a `|---|` row into
+    # a table. Escaping them at a paragraph's very start too is harmless
+    # (`\=` and `\|` are ordinary backslash escapes).
+    LEADING_BLOCK_CHARS = /\A([#>+=|-])/
     LEADING_ORDERED_MARKER = /\A(\d+)([.)])/
+
+    # Spaces/tabs at the start of a line (a paragraph's, or after a
+    # hardBreak) are stripped by CommonMark -- four of them at a paragraph's
+    # start even make an indented code block -- and so are spaces at a
+    # paragraph's end. Backslash can't escape a space, so they're written
+    # as numeric character references, which CommonMark decodes back to
+    # the same characters without treating them as indentation.
+    EDGE_WHITESPACE_ENTITIES = { " " => "&#32;", "\t" => "&#9;" }.freeze
 
     class << self
       def dump(document) = Dumper.new.dump(document)
@@ -103,6 +117,19 @@ module RichText
       # in the reloaded text) -- see `Dumper#render_text_node`'s own
       # comment for the full "raw" story.
       def escape_text(text) = text.gsub(ESCAPE_CHARS) { |char| "\\#{char}" }
+
+      # The end-of-line counterpart of `#escape_leading`'s whitespace rule:
+      # spaces/tabs ending a paragraph or heading become character
+      # references (see `EDGE_WHITESPACE_ENTITIES`). In a heading, a trailing
+      # run of `#` preceded by a space (or making up the whole text) would
+      # also be read as an ATX closing sequence and dropped, so each `#` in
+      # it is backslash-escaped.
+      def escape_trailing(text, heading: false)
+        text = text.sub(/[ \t]+\z/) { |run| run.gsub(/[ \t]/, EDGE_WHITESPACE_ENTITIES) }
+        return text unless heading
+
+        text.sub(/(\A|[ \t])(#+)\z/) { "#{Regexp.last_match(1)}#{Regexp.last_match(2).gsub("#", "\\#")}" }
+      end
 
       # Escapes whatever's sitting at the very front of a paragraph's bare
       # first child, if (and only if) it would otherwise be read as a block
@@ -119,6 +146,7 @@ module RichText
       # the reloaded text node back its original, unescaped `::...` string.
       def escape_leading(text)
         return text if text.empty?
+        return text.sub(/\A[ \t]+/) { |run| run.gsub(/[ \t]/, EDGE_WHITESPACE_ENTITIES) } if text.match?(/\A[ \t]/)
         return text.sub(LEADING_BLOCK_CHARS) { "\\#{Regexp.last_match(1)}" } if text.match?(LEADING_BLOCK_CHARS)
         return text.sub(LEADING_ORDERED_MARKER) { "#{Regexp.last_match(1)}\\#{Regexp.last_match(2)}" } if text.match?(LEADING_ORDERED_MARKER)
         return "\\#{text}" if text.start_with?("::")
@@ -164,7 +192,12 @@ module RichText
       def wrap_code_span(content)
         longest_run = content.scan(/`+/).map(&:length).max || 0
         fence = "`" * (longest_run + 1)
-        pad = !content.empty? && (content.start_with?("`") || content.end_with?("`")) ? " " : ""
+        # CommonMark also strips one space from each end of a code span
+        # whose content both starts and ends with one (and isn't all
+        # spaces) -- so content shaped like that needs the same padding,
+        # which is then what gets stripped (final fix wave, B).
+        spaced = content.start_with?(" ") && content.end_with?(" ") && content.match?(/[^ ]/)
+        pad = !content.empty? && (content.start_with?("`") || content.end_with?("`") || spaced) ? " " : ""
         "#{fence}#{pad}#{content}#{pad}#{fence}"
       end
     end
@@ -222,8 +255,14 @@ module RichText
       # document with no trailing newline at all would be the one
       # inconsistency, and some Markdown tooling assumes a file-like String
       # always ends in one.
+      #
+      # Dumps `document.normalized` (final fix wave, B), not the raw Hash:
+      # its edge-whitespace rule is what keeps a bold run like `"bold "`
+      # from dumping as `**bold **`, which CommonMark reads as literal
+      # asterisks -- and a stored document from before that rule existed
+      # (or a hand-built one) must dump correctly too.
       def dump(document)
-        text = render_node(document.to_h)
+        text = render_node(document.normalized.to_h)
         text.end_with?("\n") ? text : "#{text}\n"
       end
 
@@ -257,9 +296,9 @@ module RichText
       # #validate_node` both take, for the same reason: this walks
       # `document.to_h` directly, not something `#validate` has necessarily
       # already passed over.
-      def render_node(node, raw: false, leading: false)
+      def render_node(node, raw: false, leading: false, trailing: false, heading: false)
         return "" unless node.is_a?(Hash)
-        return render_text_node(node, raw, leading) if node["type"] == "text"
+        return render_text_node(node, raw, leading, trailing, heading) if node["type"] == "text"
 
         type_name = node["type"]
         type = RichText::Schema.node(type_name)
@@ -285,10 +324,41 @@ module RichText
             # mark's own backtick fence in the process -- indistinguishable,
             # as a plain String, from literal text that merely starts with
             # a backtick).
-            child_nodes.each_with_index.map { |child, index| render_node(child, raw: raw || type_name == "codeBlock", leading: type_name == "paragraph" && index.zero?) }.join
+            render_inline_children(type_name, child_nodes, raw: raw || type_name == "codeBlock")
           end
 
         type.markdown_out.call(node, children, nil)
+      end
+
+      # A paragraph's/heading's (or codeBlock's) inline children, joined.
+      # Line-edge escaping (final fix wave, B) applies to every *line*, not
+      # just the paragraph's first: the text right after a hardBreak starts
+      # a new source line too, where `- flour` would open a list, `# x` a
+      # heading, `---` a setext underline -- so `leading` is set for the
+      # first child and for every child following a hardBreak. `trailing`
+      # is set for the last child, whose trailing spaces CommonMark strips.
+      #
+      # A hardBreak (or run of them) at the very *end* of a paragraph can't
+      # be written at all -- `foo\` at the end of a block is a literal
+      # backslash, not a break -- so trailing hardBreaks are left out: the
+      # same accepted lossiness as an empty paragraph (a trailing empty
+      # line), rather than corrupting the text with a stray backslash.
+      #
+      # An ATX heading is a single line, so a hardBreak inside one is
+      # written as a space -- lossy the same way, but still one heading
+      # with the same words, instead of `## a\` plus a new paragraph.
+      def render_inline_children(type_name, child_nodes, raw:)
+        line_escapes = %w[paragraph heading].include?(type_name)
+        last_content = child_nodes.rindex { |child| !(child.is_a?(Hash) && child["type"] == "hardBreak") }
+        child_nodes = child_nodes.first((last_content || -1) + 1) if line_escapes
+        child_nodes = child_nodes.map { |child| child.is_a?(Hash) && child["type"] == "hardBreak" ? { "type" => "text", "text" => " " } : child } if type_name == "heading"
+
+        child_nodes.each_with_index.map do |child, index|
+          previous = index.zero? ? nil : child_nodes[index - 1]
+          leading = line_escapes && (index.zero? || (previous.is_a?(Hash) && previous["type"] == "hardBreak"))
+          trailing = line_escapes && index == child_nodes.size - 1
+          render_node(child, raw: raw, leading: leading, trailing: trailing, heading: type_name == "heading")
+        end.join
       end
 
       # A "text" node has no `"content"` of its own to recurse into (see
@@ -306,10 +376,11 @@ module RichText
       # ::HtmlRenderer#render_text_node`'s own `reduce` -- one convention
       # for "what does mark order mean", shared by both renderers, rather
       # than two that could drift apart.
-      def render_text_node(node, raw, leading = false)
+      def render_text_node(node, raw, leading = false, trailing = false, heading = false)
         text = node["text"].to_s
         marks = node["marks"].is_a?(Array) ? node["marks"] : []
         text = RichText::Markdown.escape_text(text) unless raw || marks.any? { |mark| mark.is_a?(Hash) && mark["type"] == "code" }
+        text = RichText::Markdown.escape_trailing(text, heading: heading) if trailing && marks.empty?
         text = RichText::Markdown.escape_leading(text) if leading && marks.empty?
         content = marks.reduce(text) { |acc, mark_data| apply_mark(mark_data, acc) }
 
@@ -397,10 +468,17 @@ module RichText
       # if either raises on something none of the guards below
       # anticipated, an MCP write still gets back an empty (valid) document
       # and a warning explaining why, rather than a 500.
+      #
+      # The built document then goes through `RichText::ContentRepair`
+      # (final fix wave, A), so what comes back is always something the
+      # editor can load, not merely something `#validate` used to accept --
+      # its repairs join `warnings` like any other degrade.
       def load
         root = safe_parse
         content = root ? render_children(root, 1) : []
-        [ RichText::Document.new({ "type" => "doc", "content" => content }), @warnings ]
+        repaired, repairs = RichText::ContentRepair.call({ "type" => "doc", "content" => content })
+        repairs.each { |message| record_warning(message) }
+        [ RichText::Document.new(repaired), @warnings ]
       rescue StandardError, SystemStackError => e
         Rails.logger.error("RichText::Markdown::Loader: #{e.class}: #{e.message}")
         [ RichText::Document.empty, [ "failed to parse markdown: #{e.message}" ] ]
@@ -469,14 +547,18 @@ module RichText
         end
 
         case node.type
-        when :paragraph then [ directive_for(node) || paragraph_node(node) ]
+        when :paragraph
+          directive = directive_for(node)
+          return [] if directive == :drop
+
+          [ directive || paragraph_node(node) ]
         when :heading then [ heading_node(node) ]
         when :list then [ list_node(node, depth) ]
         when :block_quote then [ { "type" => "blockquote", "content" => render_children(node, depth + 1) } ]
         when :code_block then [ code_block_node(node) ]
         when :thematic_break then [ { "type" => "horizontalRule" } ]
         when :table
-          record_warning("dropped a table, degraded to one paragraph per row")
+          record_warning("degraded a table to one paragraph per row")
           table_rows_as_paragraphs(node)
         when :html_block
           record_warning("dropped a raw HTML block")
@@ -578,13 +660,17 @@ module RichText
       # includes (every fenced code block's content ends in one, even a
       # single-line one) is stripped so this doesn't add a stray blank line
       # to the reloaded source that the original text node never had.
+      #
+      # An empty fence is a code block with no `"content"` at all -- an
+      # empty text node isn't allowed (final fix wave, A), and that's also
+      # how the editor represents an empty code block.
       def code_block_node(node)
         language = node.fence_info.to_s.strip
         text = node.string_content.to_s.sub(/\n\z/, "")
         attrs = language.empty? ? nil : { "language" => language }
         node_hash = { "type" => "codeBlock" }
         node_hash["attrs"] = attrs if attrs
-        node_hash["content"] = [ { "type" => "text", "text" => text } ]
+        node_hash["content"] = [ { "type" => "text", "text" => text } ] unless text.empty?
         node_hash
       end
 
@@ -731,6 +817,16 @@ module RichText
       # only ever escapes a *literal* paragraph's leading `::`, so a real
       # (unescaped) directive's source always starts with a bare `::`,
       # while an escaped literal's source starts with `\::` instead.
+      #
+      # "Its own source" is the paragraph's own columns, not its whole lines
+      # (final fix wave, B): inside a list item or a quote, the line also
+      # holds the container's marker (`- ::youtube{...}`, `> ::image{...}`),
+      # and the editor puts embeds there. A directive is always a
+      # one-line paragraph, so a multi-line one is never one.
+      #
+      # Returns the node, `nil` (not a directive -- render the paragraph as
+      # text) or `:drop` (a directive whose referenced record is gone, see
+      # `#build_directive`).
       def directive_for(node)
         raw = source_slice(node)
         return nil unless raw
@@ -741,14 +837,18 @@ module RichText
         build_directive(match[1], match[2], raw)
       end
 
+      # Commonmarker's columns are 1-based *byte* offsets, inclusive, so the
+      # slice is a `byteslice`, re-encoded (a slice ending mid-character
+      # can't be a directive anyway -- the pattern needs a closing `}`).
       def source_slice(node)
         pos = node.source_position
-        return nil unless pos.is_a?(Hash)
+        return nil unless pos.is_a?(Hash) && pos[:start_line] == pos[:end_line]
 
-        lines = source_lines[(pos[:start_line] - 1)..(pos[:end_line] - 1)]
-        return nil if lines.blank?
+        line = source_lines[pos[:start_line] - 1]
+        return nil if line.nil?
 
-        lines.join.strip
+        slice = line.byteslice((pos[:start_column] - 1)..(pos[:end_column] - 1)).to_s
+        slice.force_encoding(Encoding::UTF_8).scrub("").strip
       end
 
       def source_lines = @source_lines ||= @source.lines
@@ -774,6 +874,16 @@ module RichText
         node = { "type" => type.name, "attrs" => type.attrs_from_directive(parse_directive_attrs(attrs_string)) }
         return node if valid_node?(node)
 
+        # Valid except that a record it references no longer exists (an
+        # image directive naming a deleted `MediaAsset`, final fix wave, B):
+        # the directive was well-formed, the thing it embeds is gone, so it
+        # goes -- as the public renderer would render it (nothing) -- rather
+        # than turning into a paragraph of directive syntax.
+        if valid_node?(node, known_references: RichText::Document.new(node).references)
+          record_warning("dropped #{raw.inspect}: what it refers to no longer exists")
+          return :drop
+        end
+
         record_warning("invalid #{name} directive #{raw.inspect}, kept as text")
         nil
       end
@@ -792,7 +902,7 @@ module RichText
       # `MediaAsset`/`Page`/`Post`) rather than re-deriving them here, so
       # this loader can never silently drift out of sync with what those
       # declarations actually require.
-      def valid_node?(node) = RichText::Document.new({ "type" => "doc", "content" => [ node ] }).validate.empty?
+      def valid_node?(node, known_references: nil) = RichText::Document.new({ "type" => "doc", "content" => [ node ] }).validate(known_references: known_references).empty?
 
       def valid_mark?(mark)
         text_node = { "type" => "text", "text" => "x", "marks" => [ mark ] }

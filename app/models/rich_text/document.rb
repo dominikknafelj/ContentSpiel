@@ -232,10 +232,23 @@ module RichText
     # it). A reference that's new still has to exist. `nil` (the default)
     # checks everything, which is what every caller without a previous
     # document -- MCP, seeds, a new record -- wants.
+    #
+    # The content model (final fix wave, A) is part of "valid": which
+    # children each node takes (`RichText::NodeType#content`), which marks
+    # can share a text run (`RichText::MarkType#excludes`), no empty text
+    # nodes, no marks outside inline content. These are ProseMirror's own
+    # rules, restated -- the editor refuses to load a document that breaks
+    # any of them, so accepting one here would store a body CS Studio can
+    # then only show read-only.
+    #
+    # A root that isn't even a Hash (`Document.new(42)`, a jsonb value
+    # that's an Array) is one error, not a `TypeError` from `42["type"]`.
     def validate(known_references: nil)
+      return [ "the document's root node must be a \"doc\" object, got #{@hash.class.name}" ] unless @hash.is_a?(Hash)
+
       errors = []
-      errors << "the document's root node must be \"doc\", got #{@hash["type"].inspect}" unless @hash.is_a?(Hash) && @hash["type"] == "doc"
-      validate_node(@hash, errors, path: "root", depth: 0, known: known_references)
+      errors << "the document's root node must be \"doc\", got #{@hash["type"].inspect}" unless @hash["type"] == "doc"
+      validate_node(@hash, errors, path: "root", depth: 0, known: known_references, parent: nil)
       errors
     end
 
@@ -285,9 +298,56 @@ module RichText
     #
     # Iterative, not recursive (`#stringify`'s own comment, same reason):
     # this may run on a document nobody has ever called `#validate` on.
+    #
+    # Also (final fix wave, B): whitespace at either edge of a bold/italic/
+    # strike run moves outside the mark -- `"a"`, `" bold "` (bold), `"b"`
+    # becomes `"a "`, `"bold"` (bold), `" b"` -- and a run that's *only*
+    # whitespace loses those marks. It reads the same, and it's the only
+    # shape Markdown can spell: CommonMark's flanking rules don't let
+    # `**bold **` close (it comes back as literal asterisks), so without
+    # this an ordinary editor habit -- bolding a word along with the space
+    # after it -- corrupts the text on MCP's read/write round trip. Adjacent
+    # text nodes whose marks are then equal are merged into one, as
+    # ProseMirror itself would store them. Links and code keep their edge
+    # whitespace (link text and code spans can hold it).
     def normalized = self.class.new(canonicalize_marks(@hash))
 
+    # The marks whose Markdown delimiters are subject to CommonMark's
+    # flanking rules (`#normalized`).
+    FLANKING_MARKS = %w[bold italic strike].freeze
+
     private
+
+    # One `"content"` Array's inline children, with `#normalized`'s edge-
+    # whitespace rule applied and equal-marked neighbours merged. Anything
+    # that isn't a well-formed text node passes through untouched.
+    def hoist_edge_whitespace(children)
+      pieces = children.flat_map do |child|
+        next [ child ] unless child.is_a?(Hash) && child["type"] == "text" && child["text"].is_a?(String) && child["marks"].is_a?(Array)
+
+        marks = sort_marks(child["marks"])
+        flanking, other = marks.partition { |mark| mark.is_a?(Hash) && FLANKING_MARKS.include?(mark["type"]) }
+        next [ child.merge("marks" => marks) ] if flanking.empty?
+
+        lead, core, trail = child["text"].match(/\A([[:space:]]*)(.*?)([[:space:]]*)\z/m).captures
+        next [ text_piece(child, core.empty? ? child["text"] : core, core.empty? ? other : marks) ] if core.empty? || (lead.empty? && trail.empty?)
+
+        [ (text_piece(child, lead, other) unless lead.empty?), text_piece(child, core, marks), (text_piece(child, trail, other) unless trail.empty?) ].compact
+      end
+
+      pieces.each_with_object([]) do |piece, merged|
+        previous = merged.last
+        if mergeable_text?(previous) && mergeable_text?(piece) && Array(previous["marks"]) == Array(piece["marks"])
+          merged[-1] = previous.merge("text" => previous["text"] + piece["text"])
+        else
+          merged << piece
+        end
+      end
+    end
+
+    def text_piece(node, text, marks) = marks.empty? ? node.except("marks").merge("text" => text) : node.merge("text" => text, "marks" => marks)
+
+    def mergeable_text?(node) = node.is_a?(Hash) && node["type"] == "text" && node["text"].is_a?(String) && node.keys.difference(%w[type text marks]).empty?
 
     # `RichText::Schema.mark_order` (registration order) rather than
     # whatever order a `"marks"` Array already happens to be in -- an
@@ -319,6 +379,9 @@ module RichText
           value.each do |k, v|
             if k == "marks" && v.is_a?(Array)
               out[k] = sort_marks(v)
+            elsif k == "content" && v.is_a?(Array) && v.any? { |child| child.is_a?(Hash) && child["type"] == "text" }
+              hoisted = hoist_edge_whitespace(v)
+              stack << [ hoisted, out, k ]
             else
               stack << [ v, out, k ]
             end
@@ -448,7 +511,11 @@ module RichText
     # belongs, all land here (this method is what every content-array
     # element gets recursed into) and become one error message instead of
     # a `NoMethodError`/`TypeError` the moment the code below tries `node["type"]`.
-    def validate_node(node, errors, path:, depth:, known:)
+    #
+    # `parent` is the enclosing node's `RichText::NodeType` (`nil` at the
+    # root) -- whether this node may carry marks at all depends on it
+    # (`RichText::NodeType#allows_child_marks?`).
+    def validate_node(node, errors, path:, depth:, known:, parent:)
       unless node.is_a?(Hash)
         errors << "node at #{path} is not an object"
         return
@@ -462,8 +529,12 @@ module RichText
       type_name = node["type"]
 
       if type_name == "text"
-        errors << "#{path}: a text node needs a String \"text\"" unless node["text"].is_a?(String)
-        validate_marks(node, errors, path, known)
+        if !node["text"].is_a?(String)
+          errors << "#{path}: a text node needs a String \"text\""
+        elsif node["text"].empty?
+          errors << "#{path}: a text node can't be empty"
+        end
+        validate_marks(node, errors, path, known, parent)
         return
       end
 
@@ -474,7 +545,31 @@ module RichText
         validate_attributes(type, node["attrs"], errors, known)
       end
 
-      validate_children(node["content"], errors, path, depth, known)
+      validate_marks(node, errors, path, known, parent)
+      validate_children(node["content"], errors, path, depth, known, type)
+      validate_content_model(type, node["content"], errors, path) if type
+    end
+
+    # `type`'s own content expression against the types of `content`'s
+    # children (`RichText::ContentExpression#match?`). Skipped when a child
+    # is malformed or of an unknown type -- `#validate_children` already
+    # reported that child, and "the content doesn't match" on top of it
+    # would be noise about the same problem. A type with no `content`
+    # declaration is a leaf and takes no children at all.
+    def validate_content_model(type, content, errors, path)
+      children = content.is_a?(Array) ? content : []
+      expression = type.content
+
+      if expression.nil?
+        errors << "#{path}: #{type.name} can't have content" unless children.empty?
+        return
+      end
+      return unless content.nil? || content.is_a?(Array)
+
+      child_types = children.map { |child| child.is_a?(Hash) ? RichText::Schema.node(child["type"]) : nil }
+      return if child_types.any?(&:nil?)
+
+      errors << "#{path}: #{type.name} content is invalid (expected \"#{expression.source}\")" unless expression.match?(child_types)
     end
 
     # `content`, when present at all, must be an Array of node objects --
@@ -483,7 +578,7 @@ module RichText
     # silently validate something that isn't remotely a list of child
     # nodes rather than reporting the real problem ("content" is the wrong
     # shape entirely).
-    def validate_children(content, errors, path, depth, known)
+    def validate_children(content, errors, path, depth, known, parent)
       return if content.nil?
 
       unless content.is_a?(Array)
@@ -491,21 +586,33 @@ module RichText
         return
       end
 
-      content.each_with_index { |child, index| validate_node(child, errors, path: "#{path}.content[#{index}]", depth: depth + 1, known: known) }
+      content.each_with_index { |child, index| validate_node(child, errors, path: "#{path}.content[#{index}]", depth: depth + 1, known: known, parent: parent) }
     end
 
     # Same "must be an Array, not coerced" rule as `#validate_children`,
     # applied to a text node's `"marks"`, plus the same `node.is_a?(Hash)`
     # guard per mark entry (a `"marks"` array can just as easily hold a
     # stray non-object as `"content"` can).
-    def validate_marks(text_node, errors, path, known)
-      marks = text_node["marks"]
+    #
+    # Runs for any node, not just text (ProseMirror lets an inline node like
+    # `hardBreak` carry marks too). Marks are only allowed where the parent
+    # holds inline content that admits marks (`RichText::NodeType
+    # #allows_child_marks?` -- not on a block, not inside a `codeBlock`),
+    # and a set of marks must be one ProseMirror would build: no type twice,
+    # no pair where either excludes the other (`RichText::MarkType
+    # #excludes?`; `code` excludes everything).
+    def validate_marks(node, errors, path, known, parent)
+      marks = node["marks"]
       return if marks.nil?
 
       unless marks.is_a?(Array)
         errors << "#{path}.marks must be an array"
         return
       end
+      return if marks.empty?
+
+      errors << "#{path}: marks aren't allowed here" unless parent&.allows_child_marks?
+      validate_mark_set(marks, errors, path)
 
       marks.each_with_index do |mark_data, index|
         mark_path = "#{path}.marks[#{index}]"
@@ -557,6 +664,15 @@ module RichText
         next if attribute.reference && known&.include?(reference_key(type, attribute, value, attrs))
 
         errors << "#{type.name}.#{attribute.name} is invalid" if attribute.validate && !run_attribute_validation(attribute, value, attrs)
+      end
+    end
+
+    def validate_mark_set(marks, errors, path)
+      types = marks.filter_map { |mark| RichText::Schema.mark(mark["type"]) if mark.is_a?(Hash) }
+
+      types.map(&:name).tally.each { |name, count| errors << "#{path}: mark #{name} appears more than once" if count > 1 }
+      types.uniq(&:name).combination(2).each do |a, b|
+        errors << "#{path}: marks #{a.name} and #{b.name} can't be combined" if a.excludes?(b) || b.excludes?(a)
       end
     end
 

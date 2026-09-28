@@ -254,8 +254,14 @@ module RichText
         registry[name] = type
       end
 
+      # The content model (`group`/`content` on a node, `excludes` on a
+      # mark -- final fix wave, A) is part of a type's shape too.
       def signature_for(registry)
-        registry.sort.map { |name, type| [ name, type.attributes.map { |attribute| attribute_signature(attribute) } ] }
+        registry.sort.map { |name, type| [ name, type.attributes.map { |attribute| attribute_signature(attribute) }, content_model_signature(type) ] }
+      end
+
+      def content_model_signature(type)
+        type.is_a?(RichText::NodeType) ? [ type.group, type.content&.source, type.allows_child_marks? ] : [ type.excludes ]
       end
 
       def attribute_signature(attribute)
