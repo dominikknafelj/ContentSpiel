@@ -14,6 +14,6 @@ with connection refused if Postgres isn't up.
 
 - App: <http://localhost:3000>
 - Sign in: <http://localhost:3000/session/new>
-- Admin (Avo CMS, behind the same sign-in): <http://localhost:3000/avo>
+- Admin (CS Studio, behind the same sign-in): <http://localhost:3000/cs-studio> (`ContentSpiel::ADMIN_PATH`, configurable via `ADMIN_PATH`)
 
 Run the test suite with `bin/rails test`.

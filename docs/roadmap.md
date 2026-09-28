@@ -36,7 +36,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Item | Priority | Notes |
 |---|---|---|
 | Three-column shell: modules \| page tree \| content | Must | Tree: drag reorder, status per node, add child, open page |
-| Tiptap editor + JSON storage + ActionText migration | Must | Markdown view for MCP; node registry |
+| Tiptap editor + JSON storage + ActionText migration | Must | Markdown view for MCP; node registry — done (sub-project 4, spec `2026-09-27-tiptap-and-avo-removal-design.md`) |
 | Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 |
 | Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 |
 | Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry |
@@ -49,7 +49,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Media library (`MediaAsset`, alt text, reuse, responsive variants) | Must | #46 |
 | Invites (one-time set-password link without mail) | Should | `Users::Invite` |
 | Admin UI in German (admin i18n) | Should | #49 |
-| Port Avo-only invariants, then remove Avo | Must | #40 |
+| Port Avo-only invariants, then remove Avo | Must | #40 — done (sub-project 4) |
 
 ## Phase 3 — after the admin MVP
 
@@ -84,10 +84,13 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Interim state | Since | Closed by |
 |---|---|---|
 | CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
-| Avo still mounted for settings, users, tokens, system status | Sub-project 3 | Sub-project 6 (remaining modules), sub-project 7 (remove Avo) |
 | Deletes are permanent | Sub-project 3 | Trash (Phase 2 / sub-project 6) |
 | CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
 | CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
+| Unreferenced `MediaAsset`s are never cleaned up; image blocks and rich-text images use different storage; there are no responsive variants | Sub-project 4 (Tiptap/Avo removal) | Media library (Phase 2 / sub-project 6, #46) |
+| Blobs referenced only by the old ActionText rich text were left orphaned by the `rich_text:migrate_from_action_text` import (the migrated content re-attaches image blobs to new `MediaAsset`s; the original ActionText blob rows aren't cleaned up) | Sub-project 4 | Media library / a cleanup task (sub-project 6) |
+| MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | A lookup prefix on `ApiToken` (future work) |
+| No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select | Sub-project 4 | Admin polish (sub-project 6), same as the page tree's own typed-position pattern |
 
 ## Out of scope (for now)
 
