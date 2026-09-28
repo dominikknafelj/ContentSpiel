@@ -98,23 +98,36 @@ module RichText
     def blank? = !content?(@hash)
 
     # A stable content hash for the render cache key (spec §3.3) and for
-    # "did this locale's document actually change" checks. `JSON.generate`
-    # of a *key-sorted* deep copy, not of `@hash` directly: Ruby Hashes
-    # preserve insertion order, so two documents that are semantically
-    # identical but built up in a different order (e.g. attrs written
-    # `{"level" => 2, "textAlign" => nil}` vs. the reverse) would otherwise
-    # digest differently. Array element order is left alone -- `"content"`
-    # order is meaningful (it's the document's reading order), unlike Hash
-    # key order.
+    # "did this locale's document actually change" checks -- a canonical,
+    # *key-sorted* serialization fed straight into a running `Digest::SHA256`,
+    # not `JSON.generate` of a canonicalized deep copy. Ruby Hashes preserve
+    # insertion order, so two documents that are semantically identical but
+    # built up in a different order (e.g. attrs written `{"level" => 2,
+    # "textAlign" => nil}` vs. the reverse) would digest differently if this
+    # just hashed `JSON.generate(@hash)` directly; sorting each Hash's keys
+    # before it's written is what makes those two identical again. Array
+    # element order is left alone -- `"content"` order is meaningful (it's
+    # the document's reading order), unlike Hash key order.
     #
     # `#to_html` computes this *before* it ever reaches
-    # `RichText::HtmlRenderer` (it's part of the cache key) -- so
-    # `canonicalize` has to be just as total against a pathologically deep
-    # or malformed document as `#validate`/`RichText::HtmlRenderer` are;
-    # see that method's own comment for why it caps recursion at
-    # `MAX_DEPTH` rather than trusting every document handed to `#digest`
-    # is shallow.
-    def digest = Digest::SHA256.hexdigest(JSON.generate(canonicalize(@hash)))
+    # `RichText::HtmlRenderer` (it's part of the cache key), so it has to be
+    # just as total against a pathologically deep or malformed document as
+    # `#validate`/`RichText::HtmlRenderer` are -- but, unlike those two,
+    # *never* at the cost of treating two distinct documents as the same
+    # one: a cached render is keyed on this digest, and two documents that
+    # collide here would serve each other's cached HTML (see this method's
+    # git history for the exact bug -- an earlier version capped recursion
+    # at `MAX_DEPTH` and replaced anything past it with a fixed placeholder,
+    # which silently collapsed every leaf value past ~25 nesting levels to
+    # that same placeholder, and did produce exactly that collision two
+    # `AAAA`-vs-`BBBB` documents 24 levels deep). So this can't recurse
+    # (Ruby method calls, unlike this loop's Array, share one bounded C
+    # stack) and can't skip content at any depth -- see `#write_canonical`.
+    def digest
+      sha = Digest::SHA256.new
+      write_canonical(@hash, sha)
+      sha.hexdigest
+    end
 
     # Walks the document against `RichText::Schema` and returns every
     # problem found, as plain message Strings -- empty when the document is
@@ -162,45 +175,77 @@ module RichText
       end
     end
 
-    # A stand-in for anything past `MAX_DEPTH` in `#canonicalize` -- see
-    # that method's comment for why this has to be a scalar, not the
-    # original (still arbitrarily deep) Hash/Array it replaces.
-    DEPTH_TRUNCATED = "…depth-truncated…"
-
-    # Recurses through `@hash` sorting Hash keys, same `MAX_DEPTH` ceiling
-    # `#validate_node`/`RichText::HtmlRenderer#render_node` use, for the same
-    # reason: an attacker- or corruption-built document can be an
-    # arbitrarily deep chain of single-child nodes, and `#digest` walks it
-    # (as part of `#to_html`'s cache key, and hence *before* any of the
-    # renderer's own depth guard ever runs) just as eagerly as `#validate`
-    # does.
+    # Writes `value`'s canonical form straight into `sha`
+    # (`Digest::SHA256#update`, called repeatedly rather than building one
+    # giant String first) -- a Hash as `{`, its *sorted* keys each
+    # JSON-encoded and colon-joined to their own canonicalized value,
+    # comma-separated, then `}`; an Array the same shape with `[`/`]` and no
+    # key sorting (element order is meaningful); anything else (String/
+    # Integer/Float/true/false/nil, or a malformed node that's some other
+    # JSON scalar where a Hash/Array belonged) via a single `JSON.generate`
+    # call, which is safe because a scalar has no nesting of its own to
+    # blow up on. None of this needs to round-trip back into a document --
+    # nothing ever parses a digest -- so it doesn't have to *be* valid JSON,
+    # only a stable, order-preserving, effectively-injective-via-SHA-256
+    # encoding of the tree.
     #
-    # Past `MAX_DEPTH`, this doesn't just stop *descending* -- it replaces
-    # whatever's there with `DEPTH_TRUNCATED`, a scalar with no nested
-    # Hash/Array of its own. Merely returning the original (still deeply
-    # nested) sub-tree unchanged would still hand `JSON.generate` a
-    # structure past *its own* default nesting limit (100) a few thousand
-    # levels down, trading a `SystemStackError` for a `JSON::NestingError`
-    # instead of actually fixing anything -- and raising `max_nesting:
-    # false` on the `JSON.generate` call in `#digest` would just move the
-    # crash back to the C extension's own recursion instead of Ruby's,
-    # which is no safer. A flat scalar is the only shape that's guaranteed
-    # safe to hand `JSON.generate` regardless of how deep the original
-    # document went; correct digests for a document this deep were never
-    # achievable anyway, so "stop, don't crash" is the only property that
-    # matters this far down. A non-Hash, non-Array leaf (String/Integer/
-    # nil/true/false, or a malformed node that's an Array where a Hash
-    # belonged, or vice versa) already falls through to `else value`
-    # untouched -- there's nothing to sort inside a scalar, and re-shaping
-    # a wrong-typed value isn't this method's job, `#validate` is what
-    # reports that as an error.
-    def canonicalize(value, depth = 0)
-      return DEPTH_TRUNCATED if depth > MAX_DEPTH
+    # Iterative, not recursive, with an explicit `stack` Array standing in
+    # for the call stack a naive `value.each { ... canonicalize(child) ... }`
+    # would need one Ruby method-call frame per nesting level for -- the
+    # exact same "arbitrarily deep chain of single-child nodes" pathological
+    # document `#validate_node`/`RichText::HtmlRenderer#render_node` guard
+    # against with a hard `MAX_DEPTH` ceiling. This can't use that same
+    # ceiling (see `#digest`'s comment for why truncating past some depth
+    # is a correctness bug here, not just a lossy-but-safe fallback), so it
+    # has to actually *handle* unbounded depth rather than cap it -- an
+    # Array literal living on the heap has no fixed size limit the way
+    # Ruby's C call stack does.
+    #
+    # The stack holds two kinds of work items, popped and processed one at
+    # a time until empty: `[:value, x]` ("canonicalize x next") and
+    # `[:literal, s]` ("write s to `sha` verbatim next") -- expanding a Hash
+    # or Array pushes a whole run of both kinds (`{`, each key/colon/value/
+    # comma, `}`) in one go. Since `stack.pop` takes from the *end*, and
+    # this needs to process a run of ops in the order they were conceived
+    # (open brace first, close brace last), each run is pushed
+    # *reversed* (`ops.reverse`) so the first-conceived op ends up on top.
+    # A nested Hash/Array's own `[:value, ...]` op sits at exactly the
+    # right position in that pushed run -- when it's popped and expands
+    # into its own run, that run lands on top of (and so is fully drained
+    # before) whatever this level had left to do, which is standard
+    # iterative pre-order tree traversal.
+    def write_canonical(value, sha)
+      stack = [ [ :value, value ] ]
 
-      case value
-      when Hash then value.keys.sort.index_with { |key| canonicalize(value[key], depth + 1) }
-      when Array then value.map { |element| canonicalize(element, depth + 1) }
-      else value
+      until stack.empty?
+        kind, payload = stack.pop
+
+        if kind == :literal
+          sha.update(payload)
+          next
+        end
+
+        case payload
+        when Hash
+          ops = [ [ :literal, "{" ] ]
+          payload.keys.sort.each_with_index do |key, index|
+            ops << [ :literal, "," ] if index > 0
+            ops << [ :literal, "#{JSON.generate(key.to_s)}:" ]
+            ops << [ :value, payload[key] ]
+          end
+          ops << [ :literal, "}" ]
+          stack.concat(ops.reverse)
+        when Array
+          ops = [ [ :literal, "[" ] ]
+          payload.each_with_index do |element, index|
+            ops << [ :literal, "," ] if index > 0
+            ops << [ :value, element ]
+          end
+          ops << [ :literal, "]" ]
+          stack.concat(ops.reverse)
+        else
+          sha.update(JSON.generate(payload))
+        end
       end
     end
 
