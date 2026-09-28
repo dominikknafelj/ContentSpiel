@@ -33,7 +33,7 @@ Sub-project 4 of the own-admin roadmap, merged with the Avo removal the user pul
 
 ### 3.1 Storage
 
-- `pages.body`, `posts.body` and `content_blocks.body` become jsonb columns (`{ locale => tiptap_doc }`, not null, default `{}`), declared with `translates :body` on the default jsonb backend.
+- `posts.body` and `content_blocks.body` (the only rich-text fields; pages have none) become jsonb columns (`{ locale => tiptap_doc }`, not null, default `{}`), declared with `translates :body` on the default jsonb backend.
 - `mobility-actiontext` and the ActionText tables are removed after the migration (§5).
 - **`RichText::Document`** (value object around a document Hash):
   - `.new(hash)`, `.empty`
@@ -111,7 +111,7 @@ Models validate every locale's document, with errors on `body`. Services return 
   - `youtube`: a node, plus a paste rule converting a pasted YouTube URL into the node.
   - `image`: a node with an upload button. It POSTs to `<admin>/media_assets`, then inserts `{asset_id, alt: "", caption: ""}`; a popover edits alt and caption.
   - `internal_link`: a mark with a picker that searches `GET <admin>/link_targets?q=` (pages and posts by title in the admin locale) and stores `{type, id}`.
-- **Controllers** (pages, content blocks, posts) parse the hidden JSON and pass it as `translations[locale][:body]`. Services and models validate it (§3.5).
+- **Controllers** (content blocks, posts) parse the hidden JSON and pass it as `translations[locale][:body]`. Services and models validate it (§3.5).
 
 ### 4.2 MediaAsset
 
@@ -134,7 +134,7 @@ Components that render bodies (`Blocks::RichTextComponent`, `Posts::DetailCompon
   - `a href` pointing at this site's public URL → `internalLink` when `PublicSite::Resolver` resolves it;
   - anything else → its text inside a paragraph.
 - **Writing:** it writes `record.body` for that locale directly (bypassing callbacks except path sync, which bodies don't affect). It prints counts per model plus each unmapped fragment, and never aborts midway.
-- **Cleanup:** a follow-up migration drops `action_text_rich_texts` and removes `mobility-actiontext` and ActionText configuration (`config/initializers/action_text.rb`'s allowlist moves onto the renderer/scrubber). It runs after the task in the same deploy sequence; on greenfield, `bin/rails db:reset` with JSON seeds also works.
+- **Cleanup:** a follow-up migration drops `action_text_rich_texts` and the `youtube_embeds` table (the `YoutubeEmbed` attachable is replaced by the `youtube` node; its ID rule moves to `RichText`), and removes `mobility-actiontext` and ActionText configuration (`config/initializers/action_text.rb`'s allowlist moves onto the renderer/scrubber). It runs after the task in the same deploy sequence; on greenfield, `bin/rails db:reset` with JSON seeds also works.
 - **Writers of JSON:** seeds and starter content write JSON documents (built with small `RichText::Document` builders).
 
 ## 6. Replacing Avo
