@@ -99,10 +99,13 @@ module AccessControl
       # The one-time data migration (design spec §6): every existing user
       # becomes an owner, every existing token gets the Admin group, and
       # every existing post gets the first owner (lowest id) as author.
-      # Guarded with `where(...: nil)`/`where(owner: false)` per step, so a
-      # second call (there's no reason to make one, but nothing here
-      # assumes it won't happen) never clobbers a value someone set on
-      # purpose in between.
+      #
+      # Only for that migration -- never call it on a live install: the
+      # first step promotes *every* non-owner, so a second call would make
+      # an owner of every user created or demoted since (final fix wave,
+      # Minor 7). The token and post steps are guarded (`where(...: nil)`)
+      # and leave values set since alone; the owner step can't be, since
+      # "not an owner" is exactly what it changes.
       def backfill!
         User.where(owner: false).update_all(owner: true)
 

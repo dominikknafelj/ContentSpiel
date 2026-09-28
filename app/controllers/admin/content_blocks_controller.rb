@@ -131,7 +131,7 @@ module Admin
     # Duplicate (spec §5.1): copies the type, its settings (both halves --
     # untranslated and every locale's translations), every locale's
     # caption/alt/body and the image attachment (as an independent blob,
-    # not a shared one -- see `attach_duplicate_image`'s own comment), then
+    # not a shared one -- see `duplicate_image`'s own comment), then
     # inserts the copy directly after the source the same way `create`'s
     # own `after_id` does -- `after_id: source.id` here is always present,
     # unlike `create`'s (which is only sometimes given), so this never
@@ -144,10 +144,13 @@ module Admin
       copy = @page.content_blocks.new(block_type: source.block_type, settings: source.settings, translated_settings: source.translated_settings)
       copy_translations(source, copy)
 
-      result = ContentBlocks::Save.call(copy, attributes: {})
+      # The image goes in through the service (final fix wave, Minor 6), so
+      # it's saved in the same authorized, audited write -- and the
+      # `block.created` snapshot shows it.
+      attributes = source.image.attached? ? { image: duplicate_image(source) } : {}
+      result = ContentBlocks::Save.call(copy, attributes: attributes)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      attach_duplicate_image(copy, source) if source.image.attached?
       reposition_after(copy, source.id)
       render turbo_stream: insertion_stream(copy.reload, source.id, previous_last_id: previous_last_id), status: :created
     end
@@ -377,9 +380,10 @@ module Admin
     # blob's own bytes (`blob.download`) gives the copy a brand new blob --
     # its own row, its own file on the storage service -- so the two blocks'
     # lifecycles are fully independent from the moment they're created.
-    def attach_duplicate_image(copy, source)
+    # Returned as an attachable for `ContentBlocks::Save`'s `image:`.
+    def duplicate_image(source)
       blob = source.image.blob
-      copy.image.attach(io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type)
+      { io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type }
     end
 
     # The Turbo Stream `update`/`destroy`/`duplicate` answer with for a

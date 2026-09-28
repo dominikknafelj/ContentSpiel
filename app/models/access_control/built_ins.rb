@@ -60,7 +60,10 @@ module AccessControl
       Permissions.register "groups.manage", label: "Manage groups", area: "Administration", action: :manage
       Permissions.register "tokens.manage", label: "Manage tokens", area: "Administration", action: :manage
       Permissions.register "system_status.view", label: "View system status", area: "Administration", action: :view
-      Permissions.register "audit.view", label: "View audit log", area: "Administration", action: :view
+      # Not content-scoped (final fix wave, Minor 3): the log holds
+      # snapshots of every record, whatever the viewer may read elsewhere,
+      # and the label says so wherever it's offered or denied.
+      Permissions.register "audit.view", label: "View audit log (all content)", area: "Administration", action: :view
     end
   end
 end

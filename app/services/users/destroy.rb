@@ -29,6 +29,7 @@ module Users
       return denied("users.manage", @user) if outranked?
 
       destroyed = User.transaction do
+        revoke_tokens || raise(ActiveRecord::Rollback)
         record_event("user.deleted", subject: @user)
         @user.destroy || raise(ActiveRecord::Rollback)
       end
@@ -36,6 +37,21 @@ module Users
       return failure(@user) unless destroyed
 
       success(@user)
+    end
+
+    private
+
+    # Final fix wave (Minor 5): the user's active tokens are revoked through
+    # `ApiTokens::Revoke` first -- one `token.revoked` each, `"reason" =>
+    # "user deleted"` -- so the log says which assistants stopped working
+    # and why, before `dependent: :destroy` removes the rows. Deleting the
+    # user is what authorizes it (`deleting_user:`), so `users.manage`
+    # without `tokens.manage` is enough. In this transaction: a refused
+    # delete (the last owner) leaves every token active and no event.
+    def revoke_tokens
+      @user.api_tokens.active.find_each.all? do |token|
+        ApiTokens::Revoke.call(token, actor: actor, deleting_user: @user).ok?
+      end
     end
   end
 end

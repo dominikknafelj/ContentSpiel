@@ -135,9 +135,14 @@ module Audit
         }
       when ApiToken
         { "id" => record.id, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
+      when ContentBlock
+        # The attachment isn't a column, so it's named here (final fix wave,
+        # Minor 6): which blob the block showed, by id and filename -- what
+        # a version restore would need to find it again.
+        image = record.image.attached? ? { "blob_id" => record.image.blob_id, "filename" => record.image.filename.to_s } : nil
+        record.attributes.merge("image" => image)
       else
-        # Blocks (attributes include translations and settings), the site
-        # settings, and anything a later task audits before it gets its own
+        # The site settings, and anything a later task audits before it gets its own
         # serializer here -- still scrubbed by `.for`.
         record.attributes
       end

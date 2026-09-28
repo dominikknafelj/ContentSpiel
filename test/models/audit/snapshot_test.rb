@@ -94,12 +94,19 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_equal({ "id" => 1, "title" => "kept" }, scrubbed)
   end
 
+  # Final fix wave (parked T5 item): the fallback dumps `attributes`, so a
+  # secret-looking column added to such a model later must still be
+  # dropped -- simulated here by a tag whose attributes grow two.
   test "the fallback serializer scrubs too" do
     tag = Tag.create!(name: "scrubbed")
+    tag.define_singleton_method(:attributes) { super().merge("webhook_secret" => "s3cret", "token_digest" => "digest") }
 
     snapshot = Audit::Snapshot.for(tag)
 
     assert_equal "scrubbed", snapshot["name"]
+    assert_not snapshot.key?("webhook_secret")
+    assert_not snapshot.key?("token_digest")
+    assert_not_includes snapshot.to_json, "s3cret"
   end
 
   test "translated changes are split per locale and bodies are summarised by digest" do

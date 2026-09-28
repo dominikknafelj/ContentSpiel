@@ -50,6 +50,20 @@ class SessionsTest < ActionDispatch::IntegrationTest
     assert_not_includes event.metadata.keys.join, "passw"
   end
 
+  # Final fix wave (Minor 4): a password typed into the email box (no "@")
+  # isn't stored at all, and a long value is cut to an address's length.
+  test "a failed sign-in stores no email that isn't one, and truncates a long one" do
+    post admin_sign_in_url, params: { email_address: "hunter2-my-password", password: "x" }
+    assert_equal({}, Audit::Event.find_by!(action: "session.failed").metadata)
+    assert_not_includes Audit::Event.find_by!(action: "session.failed").attributes.to_json, "hunter2"
+
+    long = "#{"a" * 400}@example.com"
+    post admin_sign_in_url, params: { email_address: long, password: "x" }
+    stored = Audit::Event.where(action: "session.failed").order(:id).last.metadata["email_address"]
+    assert_equal 254, stored.length
+    assert_equal long.first(254), stored
+  end
+
   test "signing in and out records session.created and session.destroyed as the user" do
     post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password123" }
     created = Audit::Event.find_by!(action: "session.created")

@@ -30,4 +30,9 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
   test "unknown scope names are rejected at registration" do
     assert_raises(ArgumentError) { AccessControl::Permissions.register("shop/x.read", label: "x", area: "x", action: :read, scopes: [ :galaxy ]) }
   end
+  # Final fix wave (Minor 3): audit.view isn't content-scoped -- its
+  # events carry snapshots of every record -- and its label says so.
+  test "the audit log permission says it covers all content" do
+    assert_equal "View audit log (all content)", AccessControl::Permissions.fetch("audit.view").label
+  end
 end
