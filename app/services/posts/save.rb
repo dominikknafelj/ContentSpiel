@@ -12,7 +12,9 @@ module Posts
   #    site (there are no pending revisions until Phase 3), so editing a
   #    published post *is* publishing, and needs the same right. A
   #    scheduled post counts too -- it will go live with whatever it says
-  #    by then, without anyone with `publish` having seen it.
+  #    by then, without anyone with `publish` having seen it. A call that
+  #    asks for nothing but a publish-state change needs `posts.publish`
+  #    alone instead (`#publish_only?`).
   # 2. After assigning, inside the transaction, against the post as it
   #    would be saved -- the only point where a create's content type (the
   #    `content_types` scope), a changed content type or author, and a
@@ -33,6 +35,8 @@ module Posts
   #    so the denial itself survives the rollback.
   class Save < ApplicationService
     TRANSLATED = %i[title slug excerpt body].freeze
+    # The attributes a publish-only call may carry (`#publish_only?`).
+    PUBLISH_STATE = %i[published published_at].freeze
 
     def initialize(post = Post.new, attributes: {}, translations: {}, actor: Current.actor)
       @post = post
@@ -42,7 +46,9 @@ module Posts
     end
 
     def call
-      if @post.persisted?
+      if publish_only?
+        return denied("posts.publish", @post) unless authorize!("posts.publish", @post)
+      elsif @post.persisted?
         return denied("posts.edit", @post) unless authorize!("posts.edit", @post)
         return denied("posts.publish", @post) if @post.published_at.present? && !authorize!("posts.publish", @post)
       end
@@ -69,6 +75,22 @@ module Posts
     end
 
     private
+
+    # Publishing, unpublishing and scheduling need `posts.publish` (design
+    # spec §3.3), not `posts.edit` as well (final fix wave, Important 1):
+    # a call on a stored record whose only request is the publish state --
+    # `published`/`published_at` and nothing else, no translation values
+    # (MCP's `update_post(published:)` sends an empty per-locale hash),
+    # no other attribute -- is judged on `publish` alone, so a
+    # "Publishers" group (read + publish) can use the header's buttons.
+    # Anything more keeps the ordinary rules above: pass 1's edit (+
+    # publish when already published), and pass 2's publish check on the
+    # new `published_at`, which runs here too and is what actually guards
+    # the change.
+    def publish_only?
+      @post.persisted? && @attributes.any? && (@attributes.keys - PUBLISH_STATE).empty? &&
+        @translations.values.all? { |values| values.to_h.empty? }
+    end
 
     # The second pass (see the class comment). Returns the key that was
     # refused, or nil.

@@ -10,7 +10,8 @@ module Pages
   # 1. Before assigning, against the stored page: `pages.edit`, plus
   #    `pages.publish` when it's already published (live or scheduled) --
   #    the spec §8 interim rule that editing live content needs the right
-  #    to publish it, until pending revisions (Phase 3).
+  #    to publish it, until pending revisions (Phase 3). A publish-state-
+  #    only call needs `pages.publish` alone (`#publish_only?`).
   # 2. After assigning, inside the transaction: a new page needs
   #    `pages.create` on its *parent's* branch (the checker reads the
   #    assigned `parent`), and any change to `published_at` needs
@@ -19,6 +20,8 @@ module Pages
   # Pages have no author (design spec §8), so there's no `own` rule here.
   class Save < ApplicationService
     TRANSLATED = %i[title slug subtitle meta_title meta_description hero_alt].freeze
+    # The attributes a publish-only call may carry (`#publish_only?`).
+    PUBLISH_STATE = %i[published published_at].freeze
 
     def initialize(page = Page.new, attributes: {}, translations: {}, actor: Current.actor)
       @page = page
@@ -28,7 +31,9 @@ module Pages
     end
 
     def call
-      if @page.persisted?
+      if publish_only?
+        return denied("pages.publish", @page) unless authorize!("pages.publish", @page)
+      elsif @page.persisted?
         return denied("pages.edit", @page) unless authorize!("pages.edit", @page)
         return denied("pages.publish", @page) if @page.published_at.present? && !authorize!("pages.publish", @page)
       end
@@ -56,6 +61,22 @@ module Pages
     end
 
     private
+
+    # Publishing, unpublishing and scheduling need `pages.publish` (design
+    # spec §3.3), not `pages.edit` as well (final fix wave, Important 1):
+    # a call on a stored record whose only request is the publish state --
+    # `published`/`published_at` and nothing else, no translation values
+    # (MCP's `update_post(published:)` sends an empty per-locale hash),
+    # no other attribute -- is judged on `publish` alone, so a
+    # "Publishers" group (read + publish) can use the header's buttons.
+    # Anything more keeps the ordinary rules above: pass 1's edit (+
+    # publish when already published), and pass 2's publish check on the
+    # new `published_at`, which runs here too and is what actually guards
+    # the change.
+    def publish_only?
+      @page.persisted? && @attributes.any? && (@attributes.keys - PUBLISH_STATE).empty? &&
+        @translations.values.all? { |values| values.to_h.empty? }
+    end
 
     # Unlike `Posts::Save`, there's no scope-changing field to re-check
     # `pages.edit`/`pages.publish` against: a page's only scope is its

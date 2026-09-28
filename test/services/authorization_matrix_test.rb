@@ -315,4 +315,77 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     assert_equal [ "You don't have permission to create pages" ], result.errors
     assert as(users(:editor_branch)) { Pages::Move.call(pages[:child], parent: pages[:a], position: 0) }.ok?
   end
+  # --- Final fix wave (Important 1): publish-only changes need only publish ---
+
+  # A custom "Publishers" group (read + publish, no edit) -- the role spec
+  # §3.3 describes: publishing, unpublishing and scheduling need `publish`.
+  def publisher
+    @publisher ||= begin
+      group = AccessControl::Group.create!(name: "Publishers")
+      %w[posts.read posts.publish pages.read pages.publish].each do |key|
+        AccessControl::Grant.create!(group: group, permission: key, scope: {})
+      end
+      AccessControl::Membership.create!(group: group, user: users(:reader))
+      users(:reader)
+    end
+  end
+
+  test "a publisher without edit publishes, schedules and unpublishes a post" do
+    draft = owners_post
+    as(publisher) do
+      published = Posts::Save.call(draft, attributes: { published: true })
+      assert published.ok?, published.errors.inspect
+      assert draft.reload.live?
+
+      at = 2.days.from_now.change(usec: 0)
+      scheduled = Posts::Save.call(draft, attributes: { published_at: at })
+      assert scheduled.ok?, scheduled.errors.inspect
+      assert_equal at, draft.reload.published_at
+
+      unpublished = Posts::Save.call(draft, attributes: { published: false })
+      assert unpublished.ok?, unpublished.errors.inspect
+      assert_nil draft.reload.published_at
+    end
+    assert_equal %w[post.published post.scheduled post.unpublished],
+      Audit::Event.where(subject: draft, actor: publisher).order(:id).pluck(:action)
+  end
+
+  test "a publisher without edit publishes and unpublishes a page" do
+    root_page
+    page = as_owner { create_page(title: "Draft page", published: false) }
+    as(publisher) do
+      assert Pages::Save.call(page, attributes: { published: true }).ok?
+      assert page.reload.live?
+      assert Pages::Save.call(page, attributes: { published_at: 3.days.from_now }).ok?
+      assert page.reload.published_at.future?
+      assert Pages::Save.call(page, attributes: { published: false }).ok?
+      assert_nil page.reload.published_at
+    end
+  end
+
+  test "a publisher without edit can't change a title, even alongside a publish" do
+    root_page
+    post = owners_post
+    page = as_owner { create_page(title: "Draft page", published: false) }
+
+    as(publisher) do
+      assert_equal [ "You don't have permission to edit posts" ],
+        Posts::Save.call(post, translations: { "en" => { title: "Renamed" } }).errors
+      assert_equal [ "You don't have permission to edit posts" ],
+        Posts::Save.call(post, attributes: { published: true }, translations: { "en" => { title: "Renamed" } }).errors
+      assert_equal [ "You don't have permission to edit posts" ],
+        Posts::Save.call(post, attributes: { published: true, tag_names: [ "x" ] }).errors
+      assert_equal [ "You don't have permission to edit pages" ],
+        Pages::Save.call(page, translations: { "en" => { title: "Renamed" } }).errors
+    end
+    assert_equal "Owner's post", post.reload.title
+    assert_nil post.published_at
+    assert_equal "Draft page", page.reload.title
+  end
+
+  test "a publish-only change still needs publish" do
+    draft = authors_draft
+    result = as(users(:author)) { Posts::Save.call(draft, attributes: { published: true }) }
+    assert_equal [ "You don't have permission to publish posts" ], result.errors
+  end
 end

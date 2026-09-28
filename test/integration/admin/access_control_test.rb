@@ -474,6 +474,40 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_nil @own_post.reload.published_at
   end
 
+  # Final fix wave (Important 1): a "Publishers" group (read + publish, no
+  # edit) sees the header's publish buttons and they work.
+  test "a publisher without edit publishes and unpublishes through the header buttons" do
+    group = AccessControl::Group.create!(name: "Publishers")
+    %w[posts.read posts.publish pages.read pages.publish].each do |key|
+      AccessControl::Grant.create!(group: group, permission: key, scope: {})
+    end
+    AccessControl::Membership.create!(group: group, user: users(:reader))
+    Pages::Save.call(@outside, attributes: { published: false })
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/posts/#{@other_post.id}"
+    assert_select "[data-view-only]", text: "View only"
+    assert_select "button", text: "Publish now"
+    post "/cs-studio/posts/#{@other_post.id}/publish"
+    assert_redirected_to "/cs-studio/posts/#{@other_post.id}"
+    assert @other_post.reload.live?
+    post "/cs-studio/posts/#{@other_post.id}/schedule", params: { published_at: 2.days.from_now.iso8601 }
+    assert @other_post.reload.published_at.future?
+    post "/cs-studio/posts/#{@other_post.id}/unpublish"
+    assert_nil @other_post.reload.published_at
+
+    get "/cs-studio/pages/#{@outside.id}"
+    assert_select "button", text: "Publish now"
+    post "/cs-studio/pages/#{@outside.id}/publish"
+    assert @outside.reload.live?
+    post "/cs-studio/pages/#{@outside.id}/unpublish"
+    assert_nil @outside.reload.published_at
+
+    patch "/cs-studio/posts/#{@other_post.id}", params: { post: { title: "Renamed" } }, as: :turbo_stream
+    assert_response :forbidden
+    assert_equal "Other post", @other_post.reload.title
+  end
+
   # --- Carry-overs ---------------------------------------------------------------
 
   test "a denied media upload is a 403 with JSON errors" do
