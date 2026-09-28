@@ -41,10 +41,28 @@ class LocalesTest < ActiveSupport::TestCase
     assert_nil Locales.read(nil, :title)
   end
 
-  test "read falls back for rich text bodies too" do
+  test "read returns the body as a RichText::Document, falling back when blank" do
     site_settings(:default).update!(default_locale: "de")
-    post = Mobility.with_locale(:de) { Post.create!(content_type: :blog, title: "Hallo", body: "<p>Text</p>") }
+    post = Mobility.with_locale(:de) { Post.create!(content_type: :blog, title: "Hallo", body_doc: rich_doc("Text")) }
 
-    assert_includes Locales.read(post, :body, locale: "es").to_s, "Text"
+    document = Locales.read(post, :body, locale: "es")
+    assert_kind_of RichText::Document, document
+    assert_equal rich_doc("Text"), document.to_h
+  end
+
+  # "Blank" is `RichText::Document#blank?` -- an empty paragraph left behind
+  # by an editor counts as no translation, not as content to render.
+  test "read treats a blank body document as missing" do
+    post = Post.create!(content_type: :blog, title: "Hello", body_doc: rich_doc("English"))
+    post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph" } ] }, locale: "de")
+    post.save!
+
+    assert_equal rich_doc("English"), Locales.read(post, :body, locale: "de").to_h
+  end
+
+  test "read returns an empty document when no locale has a body" do
+    post = Post.create!(content_type: :blog, title: "Hello")
+
+    assert Locales.read(post, :body).blank?
   end
 end

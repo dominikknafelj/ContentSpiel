@@ -70,13 +70,24 @@ module ThemeHelper
   end
 
   # Reads a translated attribute for the public theme -- title, subtitle,
-  # excerpt, caption, alt, meta fields, and (since this task) ActionText
-  # bodies too, since a rich text block left blank in German has exactly the
-  # same "renders nothing" failure mode as a blank title. The fallback order
-  # itself now lives entirely in `Locales.fallback_chain`, so this is a thin
-  # wrapper -- kept as the call sites' entry point rather than inlined, so
-  # every public view keeps reading translated copy through one helper.
+  # excerpt, caption, alt, meta fields. The fallback order itself lives
+  # entirely in `Locales.fallback_chain`, so this is a thin wrapper -- kept
+  # as the call sites' entry point rather than inlined, so every public view
+  # keeps reading translated copy through one helper. Rich-text bodies go
+  # through `#rich_text` below instead, which also renders them.
   def translated(record, attribute)
     ::Locales.read(record, attribute)
+  end
+
+  # A record's rich-text body (tiptap spec §4.3), rendered to scrubbed HTML:
+  # `Locales.read(record, :body)` picks the first non-blank language's
+  # `RichText::Document` (a body left blank in German falls back exactly
+  # like a blank title), and `to_html` renders it for the *request's*
+  # locale -- even when the document itself came from a fallback language,
+  # an internal link should still point at the German page on a German
+  # URL. `urls:` is the controller's own `public_urls`, so `/preview`
+  # renders internal links under `/preview` and the public site doesn't.
+  def rich_text(record, attribute = :body)
+    ::Locales.read(record, attribute).to_html(locale: I18n.locale, urls: public_urls)
   end
 end

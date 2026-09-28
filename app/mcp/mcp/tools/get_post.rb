@@ -14,7 +14,11 @@ module Mcp
       tool_name "get_post_tool"
 
       description "Get a single post by id, including its full body. Read in the given locale " \
-        "(default: the site's current default locale). The response includes both `published` " \
+        "(default: the site's current default locale), without falling back -- a locale with no " \
+        "body of its own returns an empty string. `body` is Markdown in the same format " \
+        "create_post_tool/update_post_tool accept: embeds are directives on their own line " \
+        "(::youtube{id=\"…\"}, ::image{asset=\"42\" alt=\"…\" caption=\"…\"}) and links to this " \
+        "site's own pages/posts are [text](cs:page/<id>) / [text](cs:post/<id>). The response includes both `published` " \
         "(boolean, kept for compatibility) and `status` (\"draft\", \"scheduled\", or \"live\") -- " \
         "a scheduled post (a future published_at) has published: true but status: \"scheduled\", " \
         "and is not yet visible on the public site."

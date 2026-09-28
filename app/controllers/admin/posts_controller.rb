@@ -9,6 +9,7 @@ module Admin
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
+    include RichTextParams
 
     # `Posts::Save`'s own translated-column list, not a second hand-kept
     # copy -- same reasoning `Admin::ContentBlocksController::TRANSLATED_
@@ -65,9 +66,10 @@ module Admin
 
     # The post form's own autosave endpoint (spec §6.1), same shape as
     # `Admin::PagesController#update`/`Admin::ContentBlocksController#update`:
-    # `title`/`slug`/`excerpt`/`body` are Mobility/ActionText columns, split
-    # into `attributes:`/`translations:` the same fixed way every PATCH here
-    # does; the content type's own typed `fields` are split *per field*
+    # `title`/`slug`/`excerpt`/`body` are translated columns, split into
+    # `attributes:`/`translations:` the same fixed way every PATCH here does
+    # (`body` is the rich-text document JSON, or the interim Markdown
+    # textarea's `body_markdown` converted by `Admin::RichTextParams`); the content type's own typed `fields` are split *per field*
     # (`split_fields`, mirroring `Admin::ContentBlocksController
     # #split_settings`) since which of them are translated depends on the
     # registered type, not a fixed allowlist; `tag_names` arrives as one
@@ -99,6 +101,7 @@ module Admin
       end
 
       attributes[:tag_names] = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
+      body_warnings = apply_body_markdown(translated, post_params, @post)
 
       result = Posts::Save.call(@post, attributes: attributes, translations: { admin_locale => translated })
 
@@ -112,6 +115,7 @@ module Admin
       )
 
       streams.concat(group_error_streams(result.record, definition, fields_hash)) if definition && fields_hash
+      streams << body_warnings_stream("#{Admin::PostFormComponent::ID_PREFIX}-body", body_warnings) if body_warnings
 
       render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
     end

@@ -37,7 +37,10 @@ module ContentBlocks
 
       @translations.each do |locale, values|
         values = values.to_h.symbolize_keys
-        Mobility.with_locale(locale) { @block.assign_attributes(values.slice(*TRANSLATED)) }
+        Mobility.with_locale(locale) { @block.assign_attributes(values.slice(*TRANSLATED).except(:body)) }
+        # A rich-text JSON document, Hash or JSON String -- see the same line
+        # in `Posts::Save#assign` for why it bypasses `assign_attributes`.
+        @block.assign_body(values[:body], locale: locale) if values.key?(:body)
         @block.assign_settings(values[:settings], locale: locale) if values.key?(:settings)
       end
 

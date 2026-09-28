@@ -176,6 +176,21 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
   end
 
+  # The interim rich-text editor (tiptap Task 5, until Task 7's Tiptap): the
+  # Markdown textarea autosaves like any other field, the server converts
+  # it into the post's JSON document, and a conversion warning shows inline
+  # under the field.
+  test "typing Markdown into the post body autosaves it as a document, with warnings inline" do
+    post_record = create_post(title: "Engineer")
+    visit "/cs-studio/posts/#{post_record.id}"
+
+    fill_in "Body", with: "Hello **there**\n\n::mystery{a=\"b\"}"
+
+    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-body-warnings", text: /mystery/
+    assert_includes post_record.reload.body_document(locale: "en").to_markdown, "Hello **there**"
+  end
+
   private
 
   # See this test's own comment for why the status line's text alone isn't

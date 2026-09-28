@@ -34,6 +34,17 @@ module ContentHelper
     asset
   end
 
+  # A rich-text body document Hash (design spec §3.1) built from Markdown --
+  # what `posts.body_doc`/`content_blocks.body_doc` store per locale. Fails
+  # loudly on a conversion warning: a test's own fixed Markdown degrading
+  # silently would make it assert against something other than what it
+  # reads as.
+  def rich_doc(markdown)
+    document, warnings = RichText::Document.from_markdown(markdown)
+    assert_empty warnings, "rich_doc(#{markdown.inspect}) produced warnings"
+    document.to_h
+  end
+
   def with_locales(codes, default:)
     site_settings(:default).update!(locales: codes.map { |code| { "code" => code } }, default_locale: default)
     PublicSite::Paths.rebuild!

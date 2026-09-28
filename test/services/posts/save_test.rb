@@ -3,11 +3,32 @@ require "test_helper"
 class Posts::SaveTest < ActiveSupport::TestCase
   test "creates a post with translations in several languages" do
     result = Posts::Save.call(attributes: { content_type: "blog" },
-      translations: { "en" => { title: "Hello", body: "<p>Hi</p>" }, "de" => { title: "Hallo" } })
+      translations: { "en" => { title: "Hello", body: rich_doc("Hi") }, "de" => { title: "Hallo" } })
 
     assert result.ok?
     assert_equal "Hallo", result.record.title(locale: :de)
     assert_equal "hello", result.record.slug(locale: :en)
+    assert_equal rich_doc("Hi"), result.record.reload.body_document(locale: "en").to_h
+  end
+
+  test "a body given as a JSON string is parsed into the locale's document" do
+    result = Posts::Save.call(attributes: { content_type: "blog" },
+      translations: { "de" => { title: "Hallo", body: rich_doc("Text").to_json } })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal rich_doc("Text"), result.record.reload.body_document(locale: "de").to_h
+    assert result.record.body_document(locale: "en").blank?
+  end
+
+  test "an invalid body document fails with an error on body and saves nothing" do
+    post = create_post(title: "Hello")
+    post.update!(body_doc: rich_doc("Kept"))
+
+    result = Posts::Save.call(post, translations: { "en" => { body: { "type" => "paragraph" } } })
+
+    assert_not result.ok?
+    assert result.record.errors[:body].any?
+    assert_equal rich_doc("Kept"), post.reload.body_document(locale: "en").to_h
   end
 
   test "re-publishing a live post keeps its date; scheduled goes live now" do

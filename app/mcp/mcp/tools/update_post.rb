@@ -11,6 +11,7 @@ module Mcp
     class UpdatePost < MCP::Tool
       extend Mcp::ErrorResponse
       extend Mcp::FieldsSplitting
+      extend Mcp::MarkdownBody
 
       # Pinned explicitly -- see the comment on CreatePost#tool_name for why
       # the mcp gem's class-name-derived default ("update_post") would
@@ -19,7 +20,9 @@ module Mcp
 
       description "Update an existing post. Only the fields given are changed; everything else is left alone. " \
         "Translated fields (title/body/excerpt) are written in the given locale " \
-        "(default: the site's current default locale). " \
+        "(default: the site's current default locale). `body` is Markdown -- see its own description " \
+        "for the ::youtube/::image directives and cs:page/cs:post links; conversion warnings, if any, " \
+        "follow the post JSON as a second text item. " \
         "published: true always results in status: \"live\" -- on an already-live post its publish " \
         "date is kept, but on a draft *or a scheduled* post (a future published_at) it is set to now, " \
         "publishing it immediately rather than leaving it scheduled. published: false unpublishes " \
@@ -30,7 +33,7 @@ module Mcp
         properties: {
           id: { type: "integer" },
           title: { type: "string" },
-          body: { type: "string", description: "HTML." },
+          body: { type: "string", description: Mcp::MarkdownBody::DESCRIPTION },
           excerpt: { type: "string" },
           fields: { type: "object", description: "The content type's own typed fields, keyed by field name " \
             "(e.g. {\"company\": \"Acme\"} for resume_entry). See each type's field schema." },
@@ -55,7 +58,9 @@ module Mcp
         # `false` as "unpublish", the same three-way distinction this tool has
         # always made, just delegated now instead of hand-rolled per call.
         attributes = published.nil? ? {} : { published: published }
-        translations = { locale => { title: title, body: body, excerpt: excerpt }.compact }
+        translations = { locale => { title: title, excerpt: excerpt }.compact }
+        warnings = []
+        translations[locale][:body], warnings = markdown_body(body) unless body.nil?
 
         # Split against the post's own (already-persisted) content type --
         # unlike CreatePost there's no candidate `content_type` argument to
@@ -70,7 +75,7 @@ module Mcp
         return error_response(result.errors.to_sentence) unless result.ok?
 
         data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
-        MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
+        post_response(data, warnings)
       end
     end
   end

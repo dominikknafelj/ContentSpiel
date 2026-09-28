@@ -15,10 +15,17 @@ class Post < ApplicationRecord
   # locale; reading or writing them goes through the current Mobility.locale.
   translates :title, :slug, :excerpt
 
-  # Rich text can't live in a jsonb column -- it has attachments and its own
-  # table -- so `body` uses mobility-actiontext, which keeps one
-  # ActionText::RichText row per locale. This replaces `has_rich_text :body`.
+  # The legacy ActionText body (mobility-actiontext, one ActionText::RichText
+  # row per locale). Nothing reads it any more -- the body is the per-locale
+  # JSON document from `HasRichTextBody` below -- but it stays declared until
+  # Task 6's `rich_text:migrate_from_action_text` has converted every row,
+  # after which Task 6 drops it and renames `body_doc` to `body`.
   translates :body, backend: :action_text
+
+  # `body_document(locale:)`/`assign_body` over the jsonb `body_doc` column
+  # (design spec §3.1). Included after `extend Mobility` above -- it calls
+  # `translates` itself.
+  include HasRichTextBody
 
   has_many :post_tags, dependent: :destroy
   has_many :tags, through: :post_tags

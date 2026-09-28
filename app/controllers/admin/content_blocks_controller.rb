@@ -10,6 +10,7 @@ module Admin
   class ContentBlocksController < BaseController
     include AutosaveResponses
     include FileParams
+    include RichTextParams
 
     # Which schema-declared settings fields and `uses_columns` a save
     # actually writes to depends on the block's own registered type (spec
@@ -64,6 +65,7 @@ module Admin
       return render_gone unless block
 
       attributes, translations = split_block_params(block)
+      body_warnings = apply_block_body_markdown(block, translations)
       attributes = drop_blank_file_params(attributes, fields: ATTRIBUTE_COLUMNS)
       attributes[:image] = nil if !attributes.key?(:image) && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
       image_changing = attributes.key?(:image)
@@ -80,6 +82,7 @@ module Admin
       )
 
       streams << image_field_stream(result.record) if result.ok? && image_changing
+      streams << body_warnings_stream("#{Admin::BlockCardComponent.error_prefix(block)}-body", body_warnings) if body_warnings
 
       render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
     end
@@ -150,7 +153,7 @@ module Admin
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
     # fields with `translated?` go to `translations[locale][:settings]`,
     # the rest to `attributes[:settings]`; `caption`/`alt`/`body` are
-    # translated columns, `image` is a plain attribute -- every one of
+    # translated columns (`body` the rich-text document JSON), `image` is a plain attribute -- every one of
     # those gated by whether this block's own type actually `uses` that
     # column at all, the same allowlist reasoning
     # `Admin::PagesController::ATTRIBUTE_FIELDS` uses for its own record.
@@ -176,6 +179,20 @@ module Admin
       ATTRIBUTE_COLUMNS.each { |column| attributes[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
 
       [ attributes, translations ]
+    end
+
+    # The interim Markdown textarea's `block[body_markdown]` (see
+    # `Admin::RichTextParams`), read only for a type that `uses :body` --
+    # the same gate `split_block_params` applies to `block[body]` itself.
+    # `translations` is Symbol-keyed here, unlike the posts controller's
+    # String-keyed permitted Hash, so the body is moved across explicitly.
+    def apply_block_body_markdown(block, translations)
+      return nil unless block.definition&.uses_columns&.include?("body")
+
+      translated = translations.key?(:body) ? { "body" => translations[:body] } : {}
+      warnings = apply_body_markdown(translated, params.fetch(:block, ActionController::Parameters.new), block)
+      translations[:body] = translated["body"] if translated.key?("body")
+      warnings
     end
 
     # A `groups` field's raw params need straightening into an ordered
@@ -317,41 +334,30 @@ module Admin
     # -- fix round 1, same one source `TRANSLATED_COLUMNS` above derives
     # from), copied literally (no fallback) from `source` onto `copy` --
     # `Mobility.with_locale` is what both the reader and the writer need for
-    # a translated column (Locales.default note in `ContentBlocks::Save`
-    # explains why the writer side can't take a `locale:` keyword directly
-    # the way a jsonb reader can). `body` alone gets its own `blank?` guard:
-    # it's an ActionText association, not a jsonb value, so copying a blank
-    # one over would create an empty `ActionText::RichText` row for a
-    # locale that never had one.
+    # a jsonb column (Locales.default note in `ContentBlocks::Save` explains
+    # why the writer side can't take a `locale:` keyword directly the way a
+    # jsonb reader can).
     #
-    # Fix (final-fixes round, finding 3): `column == :body` used to copy
-    # `value.to_s` -- `value` here is the mobility-actiontext backend's own
-    # `RichTextTranslation` record (`Mobility::Backends::ActionText#read`
-    # returns the record, not a String), and *its* `to_s` renders the body
-    # through `action_text/contents/content`'s own layout
-    # (`ActionText::Content#to_rendered_html_with_layout`) -- the same
-    # wrapping `<div class="trix-content">...</div>` Trix itself expects to
-    # generate, not to receive back as more body content. Assigning that
-    # rendered HTML straight back as the *copy's* body nested it inside a
-    # second `trix-content` wrapper every time `duplicate` ran, and ran any
-    # attachment through the *display* renderer first (`to_trix_html` ->
-    # `render_attachments`), which drops the `sgid` an attachment's own
-    # canonical node needs to stay editable in Trix (see `ActionText::
-    # Content#render_attachments`) in favour of a plain `<img>`.
-    # `value.body` is the raw `ActionText::Content` underneath that record
-    # (`ActionText::RichText#body`) -- assigning it back re-canonicalizes
-    # the exact same fragment (attachments' own `sgid`s included) rather
-    # than re-rendering it, so a duplicate's body is byte-for-byte the
-    # source's, and duplicating a duplicate stays that way indefinitely
-    # instead of accumulating another wrapper layer every time.
+    # `body` is the rich-text JSON document (tiptap spec §3.1), copied as
+    # data through `body_document`/`assign_body` rather than the Mobility
+    # reader/writer pair the other columns use: the legacy ActionText `body`
+    # accessor still exists until Task 6, and reading or writing through it
+    # would copy the wrong thing. A document is copied verbatim, so a
+    # duplicate's body is exactly the source's, and duplicating a duplicate
+    # stays that way (the ActionText-era bug this method used to guard
+    # against -- a re-rendered `trix-content` wrapper nesting itself on
+    # every duplicate -- has no equivalent for plain JSON). A blank locale
+    # is skipped rather than copied as an empty document.
     def copy_translations(source, copy)
       Locales.enabled.each do |code|
         Mobility.with_locale(code) do
           ContentBlocks::Save::TRANSLATED.each do |column|
-            value = source.public_send(column)
-            next if column == :body && value.blank?
-
-            copy.public_send("#{column}=", column == :body ? value.body : value)
+            if column == :body
+              document = source.body_document(locale: code)
+              copy.assign_body(document, locale: code) unless document.blank?
+            else
+              copy.public_send("#{column}=", source.public_send(column))
+            end
           end
         end
       end

@@ -52,16 +52,124 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   end
 
   # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
-  # RichTextColumnComponent` fix (`name` -> `html_name`) -- before it, this
-  # form's Trix editor submitted a top-level `body` param instead of
-  # `post[body]`, so `post_params.permit(*TRANSLATED_COLUMNS)` never saw it
-  # and the save silently no-opped on the body itself.
+  # RichTextColumnComponent` fix (`name` -> `html_name`) -- the body has to
+  # arrive nested as `post[body]` or `post_params.permit(*TRANSLATED_COLUMNS)`
+  # never sees it. Since the JSON-document switch the `body` param is the
+  # hidden input's document JSON String (design spec §4.1).
   test "the body autosaves" do
     post_record = create_post(title: "Engineer")
     patch "/cs-studio/posts/#{post_record.id}",
-      params: { post: { body: "<p>Hello there</p>" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { post: { body: rich_doc("Hello there").to_json }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_includes post_record.reload.body(locale: :en).to_s, "Hello there"
+    assert_equal rich_doc("Hello there"), post_record.reload.body_document(locale: "en").to_h
+  end
+
+  test "the body param saves into the locale of the form" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body_doc: rich_doc("English"))
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { locale: "de", post: { body: rich_doc("Deutsch").to_json }, base_updated_at: post_record.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    stored = post_record.reload.read_attribute(:body_doc)
+    assert_equal rich_doc("Deutsch"), stored["de"]
+    assert_equal rich_doc("English"), stored["en"]
+  end
+
+  test "an invalid body document answers 422 and leaves the stored document alone" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body_doc: rich_doc("Kept"))
+    invalid = { "type" => "doc", "content" => [ { "type" => "youtube", "attrs" => { "id" => "nope" } } ] }
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { body: invalid.to_json }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Couldn"
+    assert_select_in_stream "post-body-errors", /youtube/
+    assert_equal rich_doc("Kept"), post_record.reload.body_document(locale: "en").to_h
+  end
+
+  # The interim Markdown textarea (Task 5 -> Task 7): `body_markdown` wins
+  # over the hidden JSON `body`, and its conversion warnings land in the
+  # field's own warnings slot.
+  test "body_markdown is converted server-side and wins over the JSON body" do
+    post_record = create_post(title: "Engineer")
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { body: rich_doc("Stale").to_json, body_markdown: "Fresh **text**\n\n::nope{x=\"1\"}" },
+                base_updated_at: post_record.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    document = post_record.reload.body_document(locale: "en")
+    assert_includes document.to_markdown, "Fresh **text**"
+    assert_not_includes document.to_markdown, "Stale"
+    assert_select_in_stream "post-body-warnings", /nope/
+  end
+
+  # An autosave triggered by some *other* field resends the textarea
+  # unchanged; that must not round-trip the stored document through Markdown
+  # (lossy for e.g. empty spacer paragraphs), so unchanged Markdown keeps the
+  # JSON body instead.
+  test "unchanged body_markdown does not rewrite the stored document" do
+    post_record = create_post(title: "Engineer")
+    spaced = { "type" => "doc", "content" => [
+      { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "One" } ] },
+      { "type" => "paragraph" },
+      { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Two" } ] } ] }
+    post_record.update!(body_doc: spaced)
+    markdown = post_record.body_document(locale: "en").to_markdown.gsub("\n", "\r\n")
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Renamed", body: spaced.to_json, body_markdown: markdown }, base_updated_at: post_record.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    assert_equal spaced, post_record.reload.body_document(locale: "en").to_h
+  end
+
+  # The hidden JSON input is never refreshed by an autosave response, so
+  # once the textarea has been edited it holds a stale document; a later
+  # save that resends the (now unchanged) Markdown must not let that stale
+  # JSON revert the edit.
+  test "a stale JSON body never reverts an earlier Markdown edit" do
+    post_record = create_post(title: "Engineer")
+    stale = RichText::Document.empty.to_h.to_json
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { body: stale, body_markdown: "Typed" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Renamed", body: stale, body_markdown: "Typed" }, base_updated_at: post_record.reload.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    assert_equal rich_doc("Typed"), post_record.reload.body_document(locale: "en").to_h
+  end
+
+  test "the editor shows the body as Markdown with the hidden JSON input" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body_doc: rich_doc("Hello **there**"))
+
+    get "/cs-studio/posts/#{post_record.id}"
+
+    assert_response :success
+    assert_select "textarea[name='post[body_markdown]']", text: /Hello \*\*there\*\*/
+    assert_select "input[type=hidden][name='post[body]']" do |inputs|
+      assert_equal rich_doc("Hello **there**"), JSON.parse(inputs.first["value"])
+    end
+  end
+
+  test "a translation shows the primary language's body rendered read-only" do
+    post_record = create_post(title: "Engineer")
+    post_record.update!(body_doc: rich_doc("Hello **there**"))
+
+    get "/cs-studio/posts/#{post_record.id}", params: { locale: "de" }
+
+    assert_response :success
+    assert_select "[data-original-for=body] strong", text: "there"
   end
 
   # Fix round 1 (minor): a stray double/trailing comma while typing a

@@ -11,6 +11,7 @@ module Mcp
     class CreatePost < MCP::Tool
       extend Mcp::ErrorResponse
       extend Mcp::FieldsSplitting
+      extend Mcp::MarkdownBody
 
       # Pinned explicitly: the mcp gem derives a tool's default name from its
       # *demodulized* class name (MCP::StringUtils.handle_from_class_name --
@@ -22,7 +23,9 @@ module Mcp
 
       description "Create a new post. content_type and title are required; everything else is optional. " \
         "Translated fields (title/body/excerpt) are written in the given locale " \
-        "(default: the site's current default locale). Defaults to a draft (no published_at) unless " \
+        "(default: the site's current default locale). `body` is Markdown -- see its own description " \
+        "for the ::youtube/::image directives and cs:page/cs:post links; conversion warnings, if any, " \
+        "follow the post JSON as a second text item. Defaults to a draft (no published_at) unless " \
         "published: true is given. `fields` holds the content type's own typed fields (open-types " \
         "spec §6), e.g. a resume_entry's company/role_type/start_date/end_date."
       annotations(read_only_hint: false, destructive_hint: false, idempotent_hint: false, open_world_hint: false,
@@ -44,7 +47,7 @@ module Mcp
           properties: {
             content_type: { type: "string", enum: ContentTypes.names },
             title: { type: "string" },
-            body: { type: "string", description: "HTML." },
+            body: { type: "string", description: Mcp::MarkdownBody::DESCRIPTION },
             excerpt: { type: "string" },
             fields: { type: "object", description: "The content type's own typed fields, keyed by field name " \
               "(e.g. {\"company\": \"Acme\"} for resume_entry). See each type's field schema." },
@@ -61,7 +64,9 @@ module Mcp
         return invalid_locale if invalid_locale
 
         attributes = { content_type: content_type, published: published }
-        translations = { locale => { title: title, body: body, excerpt: excerpt }.compact }
+        translations = { locale => { title: title, excerpt: excerpt }.compact }
+        warnings = []
+        translations[locale][:body], warnings = markdown_body(body) unless body.nil?
 
         # Split by the content type's own schema (translated vs. not) rather
         # than handing the whole `fields` hash to both -- a translated key
@@ -79,7 +84,7 @@ module Mcp
         return error_response(result.errors.to_sentence) unless result.ok?
 
         data = Mobility.with_locale(locale) { PostSerializer.call(result.record, locale) }
-        MCP::Tool::Response.new([ { type: "text", text: data.to_json } ], structured_content: data)
+        post_response(data, warnings)
       end
     end
   end

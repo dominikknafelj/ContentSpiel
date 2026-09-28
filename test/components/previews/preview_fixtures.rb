@@ -41,4 +41,8 @@ module PreviewFixtures
   def post(title:, content_type: "blog", **attributes)
     Post.create!(content_type: content_type, title: "#{title} #{SecureRandom.hex(4)}", published_at: 1.day.ago, **attributes)
   end
+
+  # A rich-text body document Hash (design spec §3.1) for `body_doc:` --
+  # previews write fixed Markdown, so conversion warnings can't occur.
+  def rich_doc(markdown) = RichText::Document.from_markdown(markdown).first.to_h
 end

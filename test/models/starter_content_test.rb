@@ -7,7 +7,18 @@ class StarterContentTest < ActiveSupport::TestCase
     assert_nil home.parent_id
     assert home.published_at.present?
     assert_equal [ "rich_text" ], home.content_blocks.map(&:block_type)
-    assert_includes home.content_blocks.first.body.to_s, "Welcome to your new site"
+    document = home.content_blocks.first.body_document(locale: "en")
+    assert_kind_of RichText::Document, document
+    assert_includes document.to_markdown, "Welcome to your new site"
+  end
+
+  test "sample posts get JSON body documents in the given locale" do
+    StarterContent.create_pages_and_posts!(locale: "de")
+
+    Post.find_each do |post|
+      assert_not post.body_document(locale: "de").blank?, "#{post.content_type} sample has no body"
+      assert_empty post.body_document(locale: "de").validate
+    end
   end
 
   test "ensure_home! keeps an existing homepage and its blocks" do

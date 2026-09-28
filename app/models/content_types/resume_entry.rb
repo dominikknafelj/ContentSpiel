@@ -29,7 +29,7 @@ module ContentTypes
         # `Posts::Save`'s `attributes: { fields: ... }`) rather than a raw
         # `metadata:` hash.
         t.starter section: { title: "Resume", slug: "resume" },
-          sample: { title: "Your first role", body: "<p>Describe what you did in this role.</p>",
+          sample: { title: "Your first role", body: "Describe what you did in this role.",
                      fields: { company: "Example Co", role_type: "ic", start_date: "2024-01-01", end_date: "" } }
       end
     end

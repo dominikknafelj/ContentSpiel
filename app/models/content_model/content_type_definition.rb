@@ -11,7 +11,9 @@ module ContentModel
 
     # `section:` names the page/section this type's sample post seeds into;
     # `sample:` is the attributes (including typed `fields:`) `db/seeds.rb`
-    # passes to `Posts::Save`. Read back via `starter_data`, not `starter`,
+    # passes to `Posts::Save`; its `body:` is Markdown (tiptap spec §3.4),
+    # which `StarterContent` converts to the JSON document a post stores --
+    # a plugin's starter sample stays readable prose, not Tiptap JSON. Read back via `starter_data`, not `starter`,
     # since `starter` itself takes the keyword arguments that set it --
     # it isn't a `dsl_attribute` get/set pair.
     def starter(section:, sample:)

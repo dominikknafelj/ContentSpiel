@@ -65,38 +65,41 @@ SiteSetting.instance.tap do |settings|
   settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end
 
-# A YoutubeEmbed pasted into a rich text body renders wherever it's attached
-# (design spec section 8) -- find_or_create_from_url is what reuses the same
-# row when the same video shows up more than once below, exactly as a real
-# editor pasting the same URL twice would.
-def youtube_attachment_html(video_url)
-  embed = YoutubeEmbed.find_or_create_from_url(video_url)
-  %(<action-text-attachment sgid="#{embed.attachable_sgid}"></action-text-attachment>)
+# Bodies are rich-text JSON documents (tiptap spec §3.1/§5 "Writers of
+# JSON"), written here as Markdown and converted the same way MCP's `body`
+# is -- a `::youtube{id="..."}` directive becomes a `youtube` node, which
+# renders the youtube-nocookie embed wherever the body is shown. A warning
+# means this fixed text itself is wrong, so it raises like a failed Result.
+def seed_body(markdown)
+  document, warnings = RichText::Document.from_markdown(markdown)
+  raise "seeds: #{warnings.to_sentence}" if warnings.any?
+
+  document.to_h
 end
 
-demo_video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+demo_video = %(::youtube{id="dQw4w9WgXcQ"})
 
 foundation_post = find_or_create_post!(content_type: :blog, title: "Building ContentSpiel", published_at: 2.weeks.ago,
   excerpt: "Why this site is a page tree of content blocks instead of a handful of fixed routes.",
-  tags: %w[rails ruby], body: <<~HTML)
-    <p>ContentSpiel's public site is a <strong>Page</strong> tree, not a fixed
-    set of routes -- every page is built from an ordered list of content
-    blocks (rich text, images, and post listings), the same way TYPO3 or
-    Craft CMS compose a page from content elements.</p>
-    <p>Here's a talk that shaped how I think about that boundary:</p>
-    #{youtube_attachment_html(demo_video)}
-  HTML
+  tags: %w[rails ruby], body: seed_body(<<~MARKDOWN))
+    ContentSpiel's public site is a **Page** tree, not a fixed set of routes --
+    every page is built from an ordered list of content blocks (rich text,
+    images, and post listings), the same way TYPO3 or Craft CMS compose a page
+    from content elements.
+
+    Here's a talk that shaped how I think about that boundary:
+
+    #{demo_video}
+  MARKDOWN
 
 i18n_post = find_or_create_post!(content_type: :blog, title: "Translating Everything With Mobility",
   published_at: 1.week.ago,
   excerpt: "English, German, and Spanish, from day one -- jsonb columns, not a locale-per-row table.",
-  tags: %w[ruby], body: <<~HTML)
-    <p>Every translatable attribute on <strong>Post</strong> and
-    <strong>Page</strong> is a jsonb column holding one value per locale,
-    via the <code>mobility</code> gem. Rich text uses
-    <code>mobility-actiontext</code> instead, since ActionText needs its own
-    table for attachments.</p>
-  HTML
+  tags: %w[ruby], body: seed_body(<<~MARKDOWN))
+    Every translatable attribute on **Post** and **Page** is a jsonb column
+    holding one value per locale, via the `mobility` gem. Rich-text bodies are
+    jsonb too: one Tiptap JSON document per locale.
+  MARKDOWN
 
 # Undirected in the mind graph (page-tree design spec section 4): one row
 # here shows as one edge, read in either direction.
@@ -104,14 +107,14 @@ PostRelation.find_or_create_by!(post: foundation_post, related_post: i18n_post)
 
 find_or_create_post!(content_type: :resume_entry, title: "Senior Software Engineer", published_at: 3.years.ago,
   fields: { "company" => "Acme Corp", "role_type" => "lead", "start_date" => "2023-01-01", "end_date" => "" },
-  body: "<p>Led the platform team rebuilding Acme's content pipeline.</p>")
+  body: seed_body("Led the platform team rebuilding Acme's content pipeline."))
 
 find_or_create_post!(content_type: :resume_entry, title: "Software Engineer", published_at: 6.years.ago,
   fields: { "company" => "Widgets Inc", "role_type" => "ic", "start_date" => "2020-01-01", "end_date" => "2022-12-31" },
-  body: "<p>Built and maintained Widgets Inc's customer-facing API.</p>")
+  body: seed_body("Built and maintained Widgets Inc's customer-facing API."))
 
 find_or_create_post!(content_type: :now_update, title: "What I'm up to now", published_at: 2.days.ago,
-  body: "<p>Adding rich embeds and a mind-graph view to this very site.</p>")
+  body: seed_body("Adding rich embeds and a mind-graph view to this very site."))
 
 root = Page.find_by(parent_id: nil)
 root ||= begin
@@ -123,13 +126,12 @@ root ||= begin
 end
 
 find_or_create_block!(page: root, block_type: :rich_text, position: 0,
-  body: "<p>Hi, I'm the site owner. This is a demo of ContentSpiel's page tree, content blocks, and rich embeds.</p>")
+  body: seed_body("Hi, I'm the site owner. This is a demo of ContentSpiel's page tree, content blocks, and rich embeds."))
 find_or_create_block!(page: root, block_type: :post_list, position: 1, settings: { "limit" => 5 })
 
 about = find_or_create_page!(parent: root, slug: "about", title: "About")
 find_or_create_block!(page: about, block_type: :rich_text, position: 0,
-  body: "<p>I write about Rails, i18n, and building admin tools Avo Community doesn't ship out of the box.</p>" \
-    "#{youtube_attachment_html(demo_video)}")
+  body: seed_body("I write about Rails, i18n, and building admin tools Avo Community doesn't ship out of the box.\n\n#{demo_video}"))
 
 blog = find_or_create_page!(parent: root, slug: "blog", title: "Blog")
 find_or_create_block!(page: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })

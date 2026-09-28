@@ -23,9 +23,16 @@ class SeedsTest < ActiveSupport::TestCase
       assert_equal 5, Page.count
       assert_equal 5, Post.count
       assert_equal 1, PostRelation.count
-      assert_equal 1, YoutubeEmbed.count
+      # Bodies are JSON documents (design spec §5 "Writers of JSON"); the
+      # demo video is a `youtube` node now, not a `YoutubeEmbed` attachment.
+      assert Post.all.all? { |post| !post.body_document(locale: "en").blank? }
+      assert ContentBlock.where(block_type: "rich_text").all? { |block| !block.body_document(locale: "en").blank? }
+      youtube_ids = (Post.all.to_a + ContentBlock.all.to_a).flat_map do |record|
+        record.body_document(locale: "en").to_h["content"].select { |node| node["type"] == "youtube" }.map { |node| node.dig("attrs", "id") }
+      end
+      assert_equal [ "dQw4w9WgXcQ", "dQw4w9WgXcQ" ], youtube_ids
 
-      assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count", "YoutubeEmbed.count" ] do
+      assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count" ] do
         load Rails.root.join("db/seeds.rb")
       end
     ensure

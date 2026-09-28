@@ -14,7 +14,7 @@ module ContentTypes
         # itself (`db/seeds.rb` / the setup wizard, via `Posts::Save`).
         t.starter section: { title: "Blog", slug: "blog" },
           sample: { title: "Hello, world", excerpt: "The first post on this site.",
-                     body: "<p>This is a sample blog post. Edit or delete it in the admin.</p>" }
+                     body: "This is a sample blog post. Edit or delete it in the admin." }
       end
     end
   end

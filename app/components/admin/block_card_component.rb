@@ -102,14 +102,19 @@ module Admin
 
     def uses_columns = definition.uses_columns
 
+    # `"body"` is the rich-text JSON document (tiptap spec §3.1), read
+    # through `body_document` rather than the legacy ActionText `body`
+    # accessor that still exists until Task 6.
     def column_value(name)
       return block.image if name == "image"
+      return block.body_document(locale: locale) if name == "body"
 
       block.public_send(name, locale: locale)
     end
 
     def column_original(name)
       return nil if name == "image" || locale.to_s == ::Locales.default
+      return block.body_document(locale: ::Locales.default) if name == "body"
 
       block.public_send(name, locale: ::Locales.default)
     end

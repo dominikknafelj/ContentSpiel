@@ -39,17 +39,29 @@ module Locales
   # their own (config/initializers/mobility.rb) -- so a translation left
   # blank in German shows the default language's text rather than nothing.
   #
-  # Works for jsonb attributes and ActionText bodies alike: `present?` on a
-  # rich text is "has non-blank content", and `Mobility.with_locale` reads
-  # literally for both backends the same way, unlike passing `locale:` to the
-  # accessor, which the action_text backend doesn't accept.
+  # `:body` on a record with a rich-text body (`HasRichTextBody`) is the
+  # one special case: it returns a `RichText::Document` (tiptap spec §3.1),
+  # read through `body_document(locale:)` rather than a Mobility reader,
+  # and "present" means `!document.blank?` -- an editor's leftover empty
+  # paragraph counts as no translation, the same as a blank title does.
+  # When no language has a body at all it returns `RichText::Document.empty`
+  # rather than nil, so a renderer can call `#to_html` unconditionally.
   def read(record, attribute, locale: I18n.locale)
     return nil if record.nil?
+    return read_body(record, locale) if attribute.to_s == "body" && record.respond_to?(:body_document)
 
     fallback_chain(locale).each do |code|
       value = Mobility.with_locale(code) { record.public_send(attribute) }
       return value if value.present?
     end
     nil
+  end
+
+  def read_body(record, locale)
+    fallback_chain(locale).each do |code|
+      document = record.body_document(locale: code)
+      return document unless document.blank?
+    end
+    RichText::Document.empty
   end
 end

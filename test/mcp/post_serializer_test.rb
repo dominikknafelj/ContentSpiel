@@ -3,7 +3,7 @@ require "test_helper"
 class Mcp::PostSerializerTest < ActiveSupport::TestCase
   test "serializes a post's translated and structural fields together" do
     post = Post.create!(content_type: :resume_entry, title: "Senior Engineer", excerpt: "Led the team",
-      body: "<p>Details</p>", published_at: Time.current,
+      body_doc: rich_doc("Some **details**"), published_at: Time.current,
       metadata: { "company" => "Acme", "role_type" => "lead" })
 
     data = Mcp::PostSerializer.call(post, :en)
@@ -14,14 +14,9 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
     assert_equal "Senior Engineer", data[:title]
     assert_equal post.slug, data[:slug]
     assert_equal "Led the team", data[:excerpt]
-    # Not just assert_includes: mobility-actiontext's Post#body returns a
-    # Mobility::Backends::ActionText::RichTextTranslation wrapper, and *that*
-    # object's own #to_s renders through the full action_text/contents/_content
-    # view+layout -- Rails' dev-mode "annotate rendered view files" template
-    # comments and the trix-content div wrapper leak straight into the API
-    # response. #body.body is the actual ActionText::Content inside it;
-    # #to_html on that is the raw stored fragment with none of that.
-    assert_equal "<p>Details</p>", data[:body]
+    # The body is Markdown (design spec §3.4), the requested locale's own
+    # document -- not HTML, and not a fallback from another language.
+    assert_equal "Some **details**\n", data[:body]
     assert_equal true, data[:published]
     assert_equal "live", data[:status]
     assert_equal post.published_at.iso8601, data[:published_at]
@@ -106,5 +101,11 @@ class Mcp::PostSerializerTest < ActiveSupport::TestCase
   ensure
     ContentTypes.reset!
     saved.each { |definition| ContentTypes.registry_put(definition) }
+  end
+
+  test "body is the requested locale's own Markdown, without falling back" do
+    post = Post.create!(content_type: :blog, title: "English", body_doc: rich_doc("English body"))
+
+    assert_equal "", Mcp::PostSerializer.call(post, :de)[:body]
   end
 end

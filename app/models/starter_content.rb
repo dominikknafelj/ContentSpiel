@@ -24,7 +24,7 @@
 # type gets starter content the same way a built-in does, with nothing to
 # edit in this module.
 module StarterContent
-  WELCOME_HTML = "<p>Welcome to your new site. Sign in to the admin to edit this page.</p>".freeze
+  WELCOME_MARKDOWN = "Welcome to your new site. Sign in to the admin to edit this page.".freeze
 
   module_function
 
@@ -35,7 +35,7 @@ module StarterContent
 
     if home.content_blocks.none?
       raise!(ContentBlocks::Save.call(ContentBlock.new(owner: home), attributes: { block_type: "rich_text" },
-        translations: { locale => { body: WELCOME_HTML } }))
+        translations: { locale => { body: document(WELCOME_MARKDOWN) } }))
     end
 
     home
@@ -84,7 +84,8 @@ module StarterContent
   def find_or_create_sample_post!(section, locale)
     find_sample_post(section) || begin
       sample = section[:sample]
-      translated = sample.slice(:title, :excerpt, :body)
+      translated = sample.slice(:title, :excerpt)
+      translated[:body] = document(sample[:body]) if sample.key?(:body)
       attributes = sample.except(:title, :excerpt, :body).merge(content_type: section[:content_type], published: true)
 
       raise!(Posts::Save.call(attributes: attributes, translations: { locale => translated }))
@@ -110,6 +111,18 @@ module StarterContent
       return match if match
     end
     nil
+  end
+
+  # The JSON document (tiptap spec §3.1) for a starter body written as
+  # Markdown -- `WELCOME_MARKDOWN` here, or a content type's own
+  # `starter sample: { body: ... }`. Conversion warnings are a bug in that
+  # fixed text, not something to degrade around, so they raise like a
+  # failed `Result` does (`raise!` below).
+  def document(markdown)
+    document, warnings = RichText::Document.from_markdown(markdown)
+    raise "StarterContent: #{warnings.to_sentence}" if warnings.any?
+
+    document.to_h
   end
 
   # Fixed input, not user input (see the module comment above): a failed

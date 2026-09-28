@@ -113,10 +113,76 @@ class PostTest < ActiveSupport::TestCase
     assert_equal({}, post.metadata)
   end
 
-  test "body accepts rich text content" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    assert post.body.present?
-    assert_includes post.body.to_plain_text, "Hi"
+  test "body stores a JSON document per locale" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
+
+    document = post.reload.body_document(locale: Locales.default)
+    assert_kind_of RichText::Document, document
+    assert_equal rich_doc("Hi"), document.to_h
+  end
+
+  test "body_document is an empty document for a locale never written" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    assert post.body_document(locale: "de").blank?
+  end
+
+  test "assign_body writes only the given locale" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
+
+    post.assign_body(rich_doc("Hallo"), locale: "de")
+    post.save!
+    post.reload
+
+    assert_equal rich_doc("Hi"), post.body_document(locale: "en").to_h
+    assert_equal rich_doc("Hallo"), post.body_document(locale: "de").to_h
+  end
+
+  test "assign_body accepts a RichText::Document and a JSON string" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    post.assign_body(RichText::Document.new(rich_doc("Doc")), locale: "en")
+    post.assign_body(rich_doc("Json").to_json, locale: "de")
+    post.save!
+    post.reload
+
+    assert_equal rich_doc("Doc"), post.body_document(locale: "en").to_h
+    assert_equal rich_doc("Json"), post.body_document(locale: "de").to_h
+  end
+
+  test "an invalid body document is a validation error on body and is never saved" do
+    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Kept"))
+
+    post.assign_body({ "type" => "doc", "content" => [ { "type" => "heading", "attrs" => { "level" => 1 },
+      "content" => [ { "type" => "text", "text" => "H1" } ] } ] }, locale: "de")
+
+    assert_not post.save
+    assert post.errors[:body].any? { |message| message.include?("heading.level") }, post.errors.full_messages.inspect
+    assert_equal rich_doc("Kept"), post.reload.body_document(locale: "en").to_h
+    assert post.body_document(locale: "de").blank?
+  end
+
+  test "malformed JSON for a body is a validation error, not an exception" do
+    post = Post.create!(content_type: :blog, title: "Hello World")
+
+    post.assign_body("{not json", locale: "en")
+
+    assert_not post.valid?
+    assert post.errors[:body].any?
+  end
+
+  # A stale reference in a document nobody touched in this save (an
+  # internal link whose target was later deleted) must not block unrelated
+  # edits: only the locales whose document actually changed are validated.
+  test "an unchanged body document is not re-validated" do
+    target = create_post(title: "Target")
+    link = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [
+      { "type" => "text", "text" => "see", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "post", "id" => target.id } } ] } ] } ] }
+    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: link)
+    target.destroy!
+
+    post.reload.title = "Renamed"
+    assert post.save, post.errors.full_messages.inspect
   end
 
   test "title, slug, and excerpt are independently translatable per locale" do
@@ -213,34 +279,18 @@ class PostTest < ActiveSupport::TestCase
     end
   end
 
-  test "body is independently translatable per locale" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-
-    Mobility.with_locale(:de) { post.update!(body: "<p>Hallo</p>") }
-
-    assert_includes post.body.to_plain_text, "Hi"
-    Mobility.with_locale(:de) do
-      assert_includes post.body.to_plain_text, "Hallo"
-    end
-  end
-
   test "translated rich text survives a round trip through the database" do
-    post = Post.create!(content_type: :blog, title: "Hello World", body: "<p>Hi</p>")
-    Mobility.with_locale(:de) { post.update!(body: "<p>Hallo</p>") }
+    post = Post.create!(content_type: :blog, title: "Hello World", body_doc: rich_doc("Hi"))
+    Mobility.with_locale(:de) { post.update!(body_doc: rich_doc("Hallo")) }
 
     reloaded = Post.find(post.id)
 
-    assert_includes reloaded.body.to_plain_text, "Hi"
-    Mobility.with_locale(:de) do
-      assert_includes reloaded.body.to_plain_text, "Hallo"
-    end
-    Mobility.with_locale(:es) do
-      # No Spanish body was ever written, and plain readers no longer fall
-      # back to another locale (see config/initializers/mobility.rb) --
-      # that's `Locales.read`'s job now (see locales_test.rb), not the plain
-      # reader's.
-      assert_not reloaded.body.present?
-    end
+    assert_equal rich_doc("Hi"), reloaded.body_document(locale: "en").to_h
+    assert_equal rich_doc("Hallo"), reloaded.body_document(locale: "de").to_h
+    # No Spanish body was ever written, and `body_document` reads the
+    # literal locale -- falling back is `Locales.read`'s job (see
+    # locales_test.rb), not the model reader's.
+    assert reloaded.body_document(locale: "es").blank?
   end
 
   # The admin form submits every locale's slug in one request, under one
