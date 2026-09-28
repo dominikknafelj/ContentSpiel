@@ -65,6 +65,7 @@ module Admin
       @events = filtered_events.recent.includes(:subject, :user).limit(PER_PAGE + 1).offset(offset).to_a
       @has_next = @events.size > PER_PAGE
       @events = @events.first(PER_PAGE)
+      preload_page_branches(@events)
       @offset = offset
       @users = User.order(:email_address)
       @actions = Audit::Event.distinct.order(:action).pluck(:action)
@@ -73,9 +74,28 @@ module Admin
 
     def show
       @event = Audit::Event.includes(:subject, :user).find(params[:id])
+      preload_page_branches([ @event ])
     end
 
     private
+
+    # Fix round 1 review: `AuditEventsHelper#audit_subject_path` checks
+    # `pages.read` per row for every Page subject the current viewer might
+    # see. For a viewer whose `pages.read` grant is scoped by branch
+    # (`page_ids`), each of those checks would otherwise cost its own
+    # closure-table query (`Checker#branch_ids` -> `Checker.
+    # page_branch_ids`) -- up to `PER_PAGE` per index page. One batched
+    # `AccessControl.preload_branches` call up front (design spec §3.3
+    # "Performance", the same call a page tree or list of pages already
+    # makes elsewhere in CS Studio) leaves every page's branch on the
+    # object itself, so `Checker.page_branch_ids` answers from the preload
+    # instead of querying. Post-subject reads never walk the closure
+    # table at all (a post has no branch), so only `Page` subjects need
+    # this; `filter_map` both selects them and drops the nil `subject`s a
+    # deleted record's event already has.
+    def preload_page_branches(events)
+      AccessControl.preload_branches(events.filter_map { |event| event.subject if event.subject.is_a?(Page) })
+    end
 
     def offset
       raw = params[:offset].to_i

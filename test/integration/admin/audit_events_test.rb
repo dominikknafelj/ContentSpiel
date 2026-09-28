@@ -15,6 +15,16 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  test "needs audit.view on show too" do
+    event = Audit::Event.create!(action: "post.created", subject_label: "Test", channel: "admin",
+      occurred_at: Time.current, last_occurred_at: Time.current)
+    sign_in_as(users(:author))
+
+    get "/cs-studio/audit_events/#{event.id}"
+
+    assert_response :forbidden
+  end
+
   test "the list is newest first, and the sidebar links to it" do
     sign_in_as(users(:one))
     older = travel_to(2.days.ago) { as(users(:one)) { create_post(title: "Older post", published: false) } }
@@ -195,6 +205,55 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='subject_type=User'][href*='subject_id=#{users(:two).id}']", text: "Activity"
   end
 
+  # Fix round 1 review: `Admin::AuditEventsHelper#audit_subject_path` asks
+  # `can?("pages.read", event.subject)` per row for a Page subject -- for
+  # a viewer whose `pages.read` grant is scoped by branch (`page_ids`),
+  # that used to cost its own closure-table query every time
+  # (`Checker#branch_ids`). `Admin::AuditEventsController#preload_page_
+  # branches` batches that into one `AccessControl.preload_branches` call
+  # per index request, so the query count for the same viewer's page
+  # doesn't grow with the number of Page-subject rows on the page --
+  # asserted here by comparing two otherwise-identical requests, one with
+  # 3 rows and one with 30, isolated from each other by date range so
+  # they never share a row.
+  test "a branch-scoped viewer's index costs a constant number of queries regardless of Page-row count" do
+    branch = as(users(:one)) { create_page(title: "Query count branch") }
+    group = AccessControl::Group.create!(name: "Audit branch #{SecureRandom.hex(4)}")
+    group.grants.create!(permission: "audit.view")
+    group.grants.create!(permission: "pages.read", scope: { "page_ids" => [ branch.id ] })
+    viewer = User.create!(email_address: "audit-branch@example.com", password: "password", password_confirmation: "password")
+    AccessControl::Membership.create!(user: viewer, group: group)
+
+    travel_to(Date.new(2026, 3, 1)) do
+      as(users(:one)) { 3.times { |n| create_page(title: "Few #{n}", parent: branch, published: false) } }
+    end
+    travel_to(Date.new(2026, 4, 1)) do
+      as(users(:one)) { 30.times { |n| create_page(title: "Many #{n}", parent: branch, published: false) } }
+    end
+
+    sign_in_as(viewer)
+    # A throwaway request first, uncounted: process-wide caches this
+    # controller touches for the first time ever (site settings, the
+    # permission registry, Postgres' own prepared-statement cache) would
+    # otherwise make the *first* measured request look one query more
+    # expensive than the second regardless of row count, for reasons that
+    # have nothing to do with the fix under test.
+    get "/cs-studio/audit_events", params: { from: "1999-01-01", to: "1999-01-02" }
+    assert_response :success
+
+    few_count = many_count = nil
+    ActiveRecord::Base.uncached do
+      few_count = count_queries { get "/cs-studio/audit_events", params: { from: "2026-03-01", to: "2026-03-02" } }
+      assert_response :success
+      many_count = count_queries { get "/cs-studio/audit_events", params: { from: "2026-04-01", to: "2026-04-02" } }
+      assert_response :success
+    end
+
+    assert_select "tbody tr", 30 # sanity: the last (30-row) request really rendered every row
+    assert_equal few_count, many_count,
+      "expected a constant number of queries regardless of Page-subject row count (3 rows: #{few_count}, 30 rows: #{many_count})"
+  end
+
   test "the Activity link is absent without audit.view" do
     sign_in_as(users(:author))
     # `users(:author)` may edit their own posts (Author group, design spec
@@ -211,4 +270,15 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
   private
 
   def dom_id(record) = ActionView::RecordIdentifier.dom_id(record)
+
+  # Mirrors `Admin::AccessControlTest#count_queries`: every SQL statement
+  # the block issues, cached or not -- the test's shared connection keeps
+  # its query cache across requests, so "not cached" would under-count a
+  # repeat request, but a per-row query shows up here either way.
+  def count_queries(&block)
+    count = 0
+    counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+    count
+  end
 end

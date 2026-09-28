@@ -3,7 +3,13 @@ module Admin
   # module", Task 9): who an event was (`#audit_actor_label`) and where
   # its subject links to, if anywhere (`#audit_subject_path`).
   module AuditEventsHelper
-    CHANNEL_LABELS = { "setup" => "Setup", "console" => "Console", "system" => "System" }.freeze
+    CHANNEL_LABELS = {
+      "admin" => "Admin",
+      "mcp" => "MCP",
+      "setup" => "Setup",
+      "console" => "Console",
+      "system" => "System"
+    }.freeze
 
     # Task 9 controller ruling: "the subject LINK for a post/page only
     # renders if the viewer can read that record (else plain label)".
@@ -43,7 +49,16 @@ module Admin
       return "#{event.user&.email_address || "a deleted user"} via API token ##{event.actor_id}" if event.actor_type == "ApiToken"
       return event.user&.email_address || "a deleted user" if event.user_id
 
-      CHANNEL_LABELS.fetch(event.channel, event.channel.to_s.humanize)
+      audit_channel_label(event.channel)
+    end
+
+    # The Channel column (fix round 1: rendered raw before this), and
+    # `#audit_actor_label`'s own fallback -- one label per stored channel
+    # string, so a reader never sees the bare column value (`"admin"`,
+    # `"mcp"`) in two different casings depending on which part of the
+    # page they're looking at.
+    def audit_channel_label(channel)
+      CHANNEL_LABELS.fetch(channel, channel.to_s.humanize)
     end
   end
 end
