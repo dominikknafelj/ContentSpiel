@@ -80,7 +80,15 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
     loop do
       current = post_record.reload.fields.group(:speakers).map(&:name)
       break if current == names
-      raise Minitest::Assertion, "expected speakers to become #{names.inspect}, got #{current.inspect}" if Time.current > deadline
+      # The raw column and the registry state are in the message because
+      # this assertion once failed intermittently with `got []` while the
+      # server log showed the speakers saved -- the message alone couldn't
+      # tell a save that never landed from a `test/speaker` group type that
+      # had dropped out of `FieldGroups` mid-test.
+      if Time.current > deadline
+        raise Minitest::Assertion, "expected speakers to become #{names.inspect}, got #{current.inspect} " \
+          "(metadata: #{post_record.metadata.inspect}, field groups: #{FieldGroups.names.inspect})"
+      end
 
       sleep 0.1
     end
