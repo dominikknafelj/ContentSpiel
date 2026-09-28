@@ -116,4 +116,59 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     get "/cs-studio/users"
     assert_redirected_to admin_sign_in_path
   end
+
+  # --- Groups and owner (access-control design spec §5 "Users module") ---------
+
+  test "a user's groups are saved from the edit form" do
+    user = users(:reader)
+
+    get "/cs-studio/users/#{user.id}/edit"
+    assert_select "input[type=checkbox][name='user[group_ids][]'][value='#{access_control_groups(:read_only).id}'][checked]"
+
+    patch "/cs-studio/users/#{user.id}", params: { user: {
+      email_address: user.email_address, group_ids: [ "", access_control_groups(:editor).id ]
+    } }
+
+    assert_response :redirect
+    assert_equal [ access_control_groups(:editor).id ], user.reload.group_ids
+  end
+
+  test "the list shows each user's groups and owners" do
+    get "/cs-studio/users"
+
+    assert_select "#" + ActionView::RecordIdentifier.dom_id(users(:one)), text: /Owner/
+    assert_select "#" + ActionView::RecordIdentifier.dom_id(users(:reader)), text: /Read only/
+  end
+
+  test "an owner sees the owner toggle; a non-owner neither sees nor changes it" do
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "input[type=checkbox][name='user[owner]']"
+
+    sign_in_as(users(:two))
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select "input[name='user[owner]']", count: 0
+
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address, owner: "1" } }
+    assert_response :forbidden
+    assert_not users(:reader).reload.owner?
+  end
+
+  test "the toggle is disabled for the last owner, and demoting them is refused" do
+    get "/cs-studio/users/#{users(:one).id}/edit"
+    assert_select "input[type=checkbox][name='user[owner]'][disabled][checked]"
+    assert_select "input[type=hidden][name='user[owner]']", count: 0
+
+    patch "/cs-studio/users/#{users(:one).id}", params: { user: { email_address: users(:one).email_address, owner: "0" } }
+    assert_response :unprocessable_entity
+    assert_includes response.body, "can&#39;t demote the last owner"
+    assert users(:one).reload.owner?
+  end
+
+  test "an owner promotes another user" do
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address, owner: "1" } }
+
+    assert_response :redirect
+    assert users(:reader).reload.owner?
+    assert Audit::Event.exists?(action: "user.owner_changed", subject_type: "User", subject_id: users(:reader).id)
+  end
 end

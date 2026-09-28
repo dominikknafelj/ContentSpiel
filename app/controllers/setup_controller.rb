@@ -193,7 +193,10 @@ class SetupController < ApplicationController
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
     def update_mcp_token
-      _token, @raw_token = ApiTokens::Issue.call(Current.user).record
+      # The first account is an owner, so its token gets the Admin group
+      # (it can be narrowed to another group in CS Studio later).
+      admin = AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME)
+      _token, @raw_token = ApiTokens::Issue.call(Current.user, group: admin).record
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end

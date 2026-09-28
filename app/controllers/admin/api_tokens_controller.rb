@@ -14,9 +14,16 @@ module Admin
   # `tokens.manage` sees -- and so can revoke -- everyone's, e.g. a
   # credential that's leaked. Another user's token is outside the list for
   # anyone else, so revoking it by id is a 404, not a 403.
+  #
+  # Each token is bounded by a group (design spec §3.3 "Tokens"): the form
+  # offers only the groups the user may assign, defaulting to Read only,
+  # and `ApiTokens::Issue` checks the submitted one again -- a forged
+  # `group_id` for a group the user can't assign is refused with the 403
+  # page.
   class ApiTokensController < BaseController
     def index
-      @api_tokens = visible_tokens.includes(:user).order(created_at: :desc)
+      @api_tokens = visible_tokens.includes(:user, :group).order(created_at: :desc)
+      @assignable_groups = AccessControl.permitted_groups_for(Current.user)
     end
 
     # The one-time reveal. *Rendered*, never redirected, the same rule the
@@ -41,7 +48,8 @@ module Admin
     # raw token worth showing, so it's an ordinary redirect back to the list
     # with the service's own errors -- nothing secret to keep out of the flash.
     def create
-      result = ApiTokens::Issue.call(Current.user)
+      group = AccessControl::Group.find_by(id: params[:group_id]) if params[:group_id].present?
+      result = ApiTokens::Issue.call(Current.user, group: group)
 
       unless result.ok?
         forbidden_or(result) do
@@ -82,6 +90,12 @@ module Admin
 
     def visible_tokens
       can?("tokens.manage") ? ApiToken.all : ApiToken.where(user: Current.user)
+    end
+
+    # The form's preselected group (design spec §5: "defaulting to Read
+    # only"), when the user may assign it.
+    helper_method def default_group
+      @assignable_groups.find { |group| group.name == AccessControl::Seeds::READ_ONLY_NAME }
     end
 
     # The endpoint an assistant connects to: the public host (the same

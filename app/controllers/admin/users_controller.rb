@@ -2,8 +2,11 @@ module Admin
   # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
   # edit/update (email, and a password only when one was typed --
   # `Users::Save`'s own doc comment explains why a blank password field
-  # means "leave it alone"), destroy (refused for the last user,
-  # `Users::Destroy` -> `User#ensure_not_last_owner`). Invites stay on the
+  # means "leave it alone"; groups and, for owners, the Owner toggle --
+  # access-control design spec §5), destroy (refused for the last owner,
+  # `Users::Destroy` -> `User#ensure_not_last_owner`). A permission refusal
+  # from `Users::Save` (a forged owner flag, a group the actor can't
+  # assign) is the 403 page. Invites stay on the
   # roadmap (spec §6.1) -- there is no separate "invite" action here, only
   # `new`/`create` with a password set up front.
   #
@@ -18,7 +21,7 @@ module Admin
     before_action :set_user, only: %i[edit update destroy]
 
     def index
-      @users = User.order(:email_address)
+      @users = User.includes(:groups).order(:email_address)
     end
 
     def new
@@ -31,8 +34,10 @@ module Admin
       if result.ok?
         redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User created"
       else
-        @user = result.record
-        render :new, status: :unprocessable_entity
+        forbidden_or(result) do
+          @user = result.record
+          render :new, status: :unprocessable_entity
+        end
       end
     end
 
@@ -45,8 +50,10 @@ module Admin
       if result.ok?
         redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User updated"
       else
-        @user = result.record
-        render :edit, status: :unprocessable_entity
+        forbidden_or(result) do
+          @user = result.record
+          render :edit, status: :unprocessable_entity
+        end
       end
     end
 
@@ -79,8 +86,20 @@ module Admin
       @user = User.find(params[:id])
     end
 
+    # `group_ids` and `owner` pass straight through: `Users::Save` decides
+    # who may change them (a non-owner's form has no owner field at all,
+    # and a forged one is refused there).
     def user_params
-      params.fetch(:user, ActionController::Parameters.new).permit(:email_address, :password, :password_confirmation)
+      params.fetch(:user, ActionController::Parameters.new).permit(:email_address, :password, :password_confirmation, :owner, group_ids: [])
+    end
+
+    # For the forms: every group, and whether the owner toggle is locked
+    # because `@user` is the last owner (demoting them is refused anyway,
+    # by `User`'s own validation).
+    helper_method def all_groups = @all_groups ||= AccessControl::Group.order(:name).to_a
+
+    helper_method def last_owner?(user)
+      user.persisted? && user.owner_in_database && User.where(owner: true).count == 1
     end
   end
 end

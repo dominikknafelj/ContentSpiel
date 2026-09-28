@@ -3,6 +3,9 @@
   <% if body.present? %>
     <p class="mt-2 text-ink"><%= body %></p>
   <% end %>
+  <% if details? %>
+    <div class="mt-2 text-ink"><%= details %></div>
+  <% end %>
   <div class="mt-4 flex justify-end gap-2">
     <%= tag.form method: "dialog" do %>
       <%= render Admin::ButtonComponent.new(label: cancel_label, variant: :secondary, type: "submit") %>

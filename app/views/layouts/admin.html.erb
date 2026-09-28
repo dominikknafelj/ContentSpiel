@@ -54,6 +54,11 @@
 
         <div class="mt-auto flex flex-col gap-2">
           <%= render "shared/theme_toggle" %>
+          <%# The account menu: your own password (open to every user,
+              access-control design spec §5), then sign out. %>
+          <%= link_to admin_account_password_path(**admin_url_options), class: nav_link_classes do %>
+            <%= render "admin/shared/icon", name: :key %><span class="sr-only md:not-sr-only">Change password</span>
+          <% end %>
           <%= button_to admin_sign_out_path, method: :delete, class: nav_link_classes do %>
             <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">Sign out</span>
           <% end %>

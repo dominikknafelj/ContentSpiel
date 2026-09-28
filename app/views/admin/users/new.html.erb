@@ -26,6 +26,8 @@
             autocomplete: "new-password", class: setup_input_class %>
     </div>
 
+    <%= render "admin/users/access_fields", user: @user %>
+
     <div class="flex gap-2">
       <%= render Admin::ButtonComponent.new(label: "Create user", variant: :primary, type: "submit") %>
       <%= link_to "Cancel", admin_users_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>

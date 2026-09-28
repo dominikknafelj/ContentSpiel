@@ -120,7 +120,7 @@ class AuditEventsTest < ActiveSupport::TestCase
   end
 
   test "tokens: issued, revoked, with no digest or raw token" do
-    token, raw = ApiTokens::Issue.call(users(:one)).record
+    token, raw = ApiTokens::Issue.call(users(:one), group: access_control_groups(:admin)).record
     ApiTokens::Revoke.call(token)
 
     assert_equal %w[token.issued token.revoked], actions_for(token)

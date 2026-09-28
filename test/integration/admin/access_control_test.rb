@@ -29,7 +29,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
   test "each group sees only the modules it can open" do
     expectations = {
-      users(:two) => [ "Pages", "Posts", "Tags", "Settings", "Users", "AI assistant", "Mind graph", "System status" ],
+      users(:two) => [ "Pages", "Posts", "Tags", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status" ],
       users(:author) => [ "Pages", "Posts", "AI assistant", "Mind graph" ],
       users(:reader) => [ "Pages", "Posts", "AI assistant", "Mind graph" ]
     }

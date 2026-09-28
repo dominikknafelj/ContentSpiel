@@ -57,11 +57,12 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
   # alone.
   test "tokens are only minted through ApiTokens::Issue -- no route lets a request set the user or digest" do
     sign_in_as(users(:one))
-    other_token, other_raw = ApiTokens::Issue.call(users(:two)).record
+    other_token, other_raw = ApiTokens::Issue.call(users(:two), group: access_control_groups(:admin)).record
 
     assert_difference -> { ApiToken.count }, 1 do
       post "/cs-studio/api_tokens", params: {
-        api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" }
+        api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" },
+        group_id: access_control_groups(:admin).id
       }
     end
 

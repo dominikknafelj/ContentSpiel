@@ -26,8 +26,8 @@ class User < ApplicationRecord
   # Demoting the last owner (`owner: true -> false`) is refused the same
   # way deleting them is (design spec §3.2: "At least one owner must always
   # exist"). "Only owners may change owner" is the other half of that
-  # sentence -- an authorization rule for `Users::Save` (a later task) to
-  # enforce, not something a model validation can see (it has no notion of
+  # sentence -- an authorization rule `Users::Save` enforces, not
+  # something a model validation can see (it has no notion of
   # who's making the change); this validation only guards the invariant
   # itself, regardless of who's doing the demoting.
   validate :at_least_one_owner, if: :demoting_from_owner?

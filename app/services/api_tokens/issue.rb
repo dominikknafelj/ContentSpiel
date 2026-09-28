@@ -8,16 +8,11 @@ module ApiTokens
   # ones; CS Studio's own list is where an admin revokes one it's replacing
   # (`ApiTokens::Revoke`), not this service.
   class Issue < ApplicationService
-    # `group:` defaults to the built-in Admin group, the same interim
-    # default `ApiToken.generate!` itself falls back to (ruling R1, Task 2
-    # brief) -- passed through explicitly rather than left for
-    # `ApiToken.generate!` alone to supply, so a caller that already knows
-    # which group it wants (CS Studio's "Create token" form) can pass one
-    # without this service needing its own separate default logic. A later
-    # task makes this required and checks the caller may actually assign
-    # it (design spec §3.3: "a group only if every grant in it is also
-    # allowed to them").
-    def initialize(user, group: AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME), actor: Current.actor)
+    # `group:` is required: the caller chooses which group bounds the token
+    # (design spec §3.3 "Tokens"). CS Studio's form offers only the groups
+    # the user may assign (`AccessControl.permitted_groups_for`); the setup
+    # wizard passes Admin for the first (owner) account.
+    def initialize(user, group:, actor: Current.actor)
       @user = user
       @group = group
       @actor = actor
@@ -26,10 +21,15 @@ module ApiTokens
     # Who may (access-control design spec §3.3 "Tokens"): anyone signed in
     # may issue a token for *themselves* -- a signed-in `User` actor who is
     # `user`; an API token minting tokens isn't "themselves", and needs
-    # `tokens.manage` like anyone issuing for someone else. Whether the
-    # chosen group is one the user may hand out is Task 8's check
-    # (`AccessControl.can_assign_group?`); until then the token is still
-    # bounded by its user's own rights (the intersection).
+    # `tokens.manage` like anyone issuing for someone else.
+    #
+    # Which group (Review Focus 1): one whose every grant the token's user
+    # could hand out themselves (`AccessControl.can_assign_group?`) --
+    # owners may choose any group. The token would be bounded by its
+    # user's rights anyway (the intersection), but a token labelled
+    # "Admin" that quietly can't do what Admin does is a lie in the list,
+    # and a forged `group_id` is exactly the escalation attempt to refuse
+    # out loud. Trusted code paths (setup, console) choose freely.
     #
     # The event carries the token's id, user and group (`Audit::Snapshot`),
     # never its digest or the raw value (Review Focus 5).
@@ -37,10 +37,14 @@ module ApiTokens
       unless own_token?
         return denied("tokens.manage", @user) unless authorize!("tokens.manage", @user)
       end
+      return failure(ApiToken.new(user: @user), [ "Choose a group for the token" ]) if @group.nil?
+      unless AccessControl.trusted?(actor, Current.channel) || AccessControl.can_assign_group?(@user, @group)
+        return denied("tokens.manage", @user, message: "You don't have permission to give a token the #{@group.name} group")
+      end
 
       token, raw = ApiToken.transaction do
         issued = ApiToken.generate!(@user, group: @group)
-        record_event("token.issued", subject: issued.first, metadata: { "group" => @group&.name })
+        record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name })
         issued
       end
 

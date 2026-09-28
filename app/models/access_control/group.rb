@@ -18,14 +18,15 @@ module AccessControl
     has_many :users, through: :memberships
 
     # No `dependent:` here on purpose. Design spec §3.2: "On group delete
-    # the token is revoked" -- that's an application-level action (a
-    # later task's `Groups::Destroy` service revokes tokens before the
-    # delete), not a cascade. Until that exists, the DB foreign key on
-    # `api_tokens.group_id` (no `on_delete` -- see the migration) simply
-    # refuses to delete a group any active token still points at.
+    # the token is revoked" -- that's an application-level action
+    # (`Groups::Destroy` revokes each token, audited, then removes the
+    # rows), not a cascade. Anything else deleting a group runs into the DB
+    # foreign key on `api_tokens.group_id` (no `on_delete` -- see the
+    # migration), which refuses while any token still points at it.
     has_many :api_tokens, foreign_key: :group_id, inverse_of: :group
 
     validates :name, presence: true, uniqueness: { case_sensitive: false }
+    validate :built_in_name_unchanged, on: :update
 
     # `prepend: true`, same reasoning as `User#ensure_not_last_owner`: the
     # `dependent: :destroy` callbacks above (grants, memberships) already
@@ -35,6 +36,15 @@ module AccessControl
     before_destroy :ensure_not_built_in, prepend: true
 
     private
+
+    # A built-in group's grants and description can change, its name
+    # can't: the four seeded groups are looked up by name (`Seeds::
+    # ADMIN_NAME` for the setup wizard's token, `READ_ONLY_NAME` for the
+    # token form's default, `ApiToken.generate!`'s default), so renaming
+    # one would break those lookups as surely as deleting it.
+    def built_in_name_unchanged
+      errors.add(:name, "of a built-in group can't be changed") if built_in? && name_changed?
+    end
 
     # Built-in groups (design spec §3.2: "Built-in groups can be edited
     # but not deleted") are the ones `AccessControl::Seeds` seeds and every

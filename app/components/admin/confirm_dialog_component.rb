@@ -16,6 +16,9 @@ module Admin
   # for one method call.
   class ConfirmDialogComponent < AdminComponent
     renders_one :confirm_action
+    # Optional markup under `body`, for a confirmation that has to list
+    # what it affects (deleting a group names the tokens it revokes).
+    renders_one :details
 
     def initialize(id:, title:, body: nil, cancel_label: "Cancel")
       @id = id

@@ -20,6 +20,7 @@
   <thead>
     <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
       <th class="py-2 pr-4">Email</th>
+      <th class="py-2 pr-4">Groups</th>
       <th class="py-2"><span class="sr-only">Actions</span></th>
     </tr>
   </thead>
@@ -30,7 +31,9 @@
         <td class="py-2 pr-4 text-ink">
           <%= user.email_address %>
           <% if user == Current.user %><span class="text-meta">(you)</span><% end %>
+          <% if user.owner? %><span class="ml-1 rounded-cs border border-line px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Owner</span><% end %>
         </td>
+        <td class="py-2 pr-4 text-ink"><%= user.groups.map(&:name).sort.join(", ").presence || "—" %></td>
         <td class="py-2 text-right">
           <%= link_to "Edit", edit_admin_user_path(user, **admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
 

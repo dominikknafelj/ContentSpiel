@@ -1,7 +1,7 @@
 module Users
   # Sets a user's password (access-control design spec §3.4, "direct writes
   # are removed"): the reset flow (`Admin::PasswordsController#update`)
-  # today, and "Change my password" (Task 8) next.
+  # and "Change my password" (`Admin::AccountsController`).
   #
   # Who may (design spec §3.3 "Users"): any user may change their *own*
   # password; changing someone else's needs `users.manage`, and an owner's

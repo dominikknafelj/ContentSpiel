@@ -16,6 +16,17 @@ module Users
   #
   # Permissions (access-control design spec §3.3 "Users"): `users.manage`,
   # plus the owner rule in `Users::OwnerProtection`.
+  #
+  # Groups and the owner flag (Task 8), each only when its key is given:
+  # - `group_ids` is the user's whole new list of groups. `users.manage`
+  #   covers memberships, but adding someone to a group hands them its
+  #   grants, so for a non-owner every *added* group must be one they could
+  #   assign (`AccessControl.can_assign_group?` -- no privilege escalation,
+  #   Review Focus 1). Removing groups is never refused.
+  # - `owner` is owner-only (design spec §3.2); a value equal to the stored
+  #   one isn't a change (the form's hidden "0"). Demoting the last owner is
+  #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
+  #   apart from any other change's `user.updated`.
   class Save < ApplicationService
     include OwnerProtection
 
@@ -29,18 +40,25 @@ module Users
       return denied("users.manage", @user) unless authorize!("users.manage", @user)
       return owner_only_denial if owner_protected?
 
+      owner_change = owner_change?
+      return denied("users.manage", @user, message: "Only an owner can change who is an owner") if owner_change && !actor_owner?
+
+      old_group_ids = @user.persisted? ? @user.memberships.pluck(:group_id).sort : []
+      new_group_ids = requested_group_ids || old_group_ids
+      refusal = group_refusal(new_group_ids - old_group_ids)
+      return refusal if refusal
+
       attrs = @attributes.slice(:email_address, :password, :password_confirmation)
       attrs.except!(:password, :password_confirmation) if attrs[:password].blank?
+      attrs[:owner] = !@user.owner if owner_change
 
       @user.assign_attributes(attrs)
       return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
-
-        created = @user.previously_new_record?
-        changes = user_field_changes(@user)
-        record_event(created ? "user.created" : "user.updated", subject: @user, field_changes: changes) if created || changes.any?
+        sync_groups(old_group_ids, new_group_ids)
+        record_changes(old_group_ids, new_group_ids)
         true
       end
       return failure(@user) unless saved
@@ -49,6 +67,54 @@ module Users
     end
 
     private
+
+    def owner_change?
+      @attributes.key?(:owner) && ActiveModel::Type::Boolean.new.cast(@attributes[:owner]) != @user.owner
+    end
+
+    # The existing groups among the submitted ids (unknown ids are
+    # ignored), or nil when `group_ids` wasn't given.
+    def requested_group_ids
+      return unless @attributes.key?(:group_ids)
+
+      AccessControl::Group.where(id: Array(@attributes[:group_ids]).compact_blank).pluck(:id).sort
+    end
+
+    def group_refusal(added_ids)
+      return if added_ids.empty? || actor_owner?
+
+      AccessControl::Group.includes(:grants).where(id: added_ids).order(:name).each do |group|
+        next if AccessControl.can_assign_group?(actor_user, group)
+
+        return denied("users.manage", @user, message: "You don't have permission to add users to the #{group.name} group")
+      end
+      nil
+    end
+
+    # Through `Membership` itself so its `after_commit` drops the memoised
+    # grants (see `Groups::Save#sync_members`).
+    def sync_groups(old_ids, new_ids)
+      AccessControl::Membership.where(user: @user, group_id: old_ids - new_ids).destroy_all
+      (new_ids - old_ids).each { |group_id| AccessControl::Membership.create!(user: @user, group_id: group_id) }
+      @user.groups.reset
+    end
+
+    # `user.created`; otherwise `user.owner_changed` for the owner flag and
+    # `user.updated` for everything else (group ids included), each only
+    # when there's something to say.
+    def record_changes(old_group_ids, new_group_ids)
+      changes = user_field_changes(@user)
+      changes["group_ids"] = [ old_group_ids, new_group_ids ] if old_group_ids != new_group_ids
+
+      if @user.previously_new_record?
+        record_event("user.created", subject: @user, field_changes: changes)
+        return
+      end
+
+      owner = changes.delete("owner")
+      record_event("user.owner_changed", subject: @user, field_changes: { "owner" => owner }) if owner
+      record_event("user.updated", subject: @user, field_changes: changes) if changes.any?
+    end
 
     # Final fix wave (C, P17): a typed password needs a typed confirmation.
     # `has_secure_password` only compares the two when the confirmation is

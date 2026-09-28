@@ -1,0 +1,38 @@
+<%# Groups and the owner flag (access-control design spec §5 "Users
+    module"), shared by new and edit. The group list sends a blank first
+    value so unticking every box still submits `group_ids` (an empty list,
+    not "leave alone"). The Owner toggle is only rendered for owners -- a
+    non-owner can't change it, and `Users::Save` refuses a forged one --
+    and is locked for the last owner: disabled, with no hidden "0" beside
+    it, so the form sends no `owner` at all rather than a demotion the
+    model would refuse. %>
+<% selected_group_ids = params.dig(:user, :group_ids)&.compact_blank&.map(&:to_i) || user.group_ids %>
+<fieldset class="mb-4">
+  <legend class="<%= setup_label_class %>">Groups</legend>
+  <%= hidden_field_tag "user[group_ids][]", "", id: nil %>
+  <% all_groups.each do |group| %>
+    <label class="flex items-start gap-2 py-1 text-ink">
+      <%= check_box_tag "user[group_ids][]", group.id, selected_group_ids.include?(group.id), id: "user_group_ids_#{group.id}", class: "mt-1" %>
+      <span>
+        <%= group.name %>
+        <% if group.description.present? %><span class="block text-sm text-meta"><%= group.description %></span><% end %>
+      </span>
+    </label>
+  <% end %>
+</fieldset>
+
+<% if Current.user.owner? %>
+  <% locked = last_owner?(user) %>
+  <div class="mb-4">
+    <label class="flex items-start gap-2 text-ink">
+      <% unless locked %><%= hidden_field_tag "user[owner]", "0", id: nil %><% end %>
+      <%= check_box_tag "user[owner]", "1", user.owner?, id: "user_owner", disabled: locked, class: "mt-1" %>
+      <span>
+        Owner
+        <span class="block text-sm text-meta">
+          <%= locked ? "The last owner can't be demoted. Make someone else an owner first." : "Owners can do everything, whatever their groups, and are the only ones who can change who is an owner." %>
+        </span>
+      </span>
+    </label>
+  </div>
+<% end %>

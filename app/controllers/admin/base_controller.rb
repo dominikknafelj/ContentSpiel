@@ -32,6 +32,7 @@ module Admin
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
       { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
+      { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage" },
       { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil },
       { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read" },
       { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view" }
