@@ -25,4 +25,13 @@ Rails.application.config.to_prepare do
   # registry from before the reload.
   RichText::Schema.reset!
   RichText::BuiltIns.register
+
+  # The permission registry (access-control design spec §3.1) -- a third,
+  # independent registry, reset-then-register for the exact same reason as
+  # the two above: a code reload in development must re-register the
+  # built-in permissions cleanly instead of raising
+  # `AccessControl::DuplicatePermission` against whatever's still sitting
+  # in the registry from before the reload.
+  AccessControl::Permissions.reset!
+  AccessControl::BuiltIns.register
 end
