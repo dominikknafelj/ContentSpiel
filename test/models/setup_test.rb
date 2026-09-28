@@ -39,7 +39,10 @@ class SetupTest < ActiveSupport::TestCase
 
   test "the backfill leaves a fresh install (no users) in setup" do
     SiteSetting.delete_all
-    User.destroy_all
+    # `delete_all`, not `destroy_all` -- `User#ensure_not_last_owner` (Task
+    # 8's `before_destroy`) would refuse to remove the second fixture user,
+    # leaving this "no users" scenario with one.
+    User.delete_all
 
     run_backfill
 

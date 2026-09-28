@@ -125,6 +125,40 @@ Rails.application.routes.draw do
     # `tag_names` (`Posts::Save`).
     resources :tags, only: %i[index update destroy]
 
+    # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
+    # singleton's own autosaving form (title, tagline, logo, social links,
+    # default language) -- `resource` (singular), like the page tree's own
+    # `resource :tree`, since there's exactly one settings row to show or
+    # update, never a collection or an `:id` to route on.
+    resource :settings, only: %i[show update]
+
+    # The Languages module (cs-studio spec §6.1, Task 8), nested under
+    # "settings" by *path* only (`scope`, not `namespace` -- the brief calls
+    # for a plain `Admin::LanguagesController`, not `Admin::Settings::
+    # LanguagesController`) so its URLs read as part of the Settings module
+    # the way the spec's own module list ("Languages (settings/languages)")
+    # names it. `create`/`destroy` are `Locales::Enable`/`Locales::Disable`
+    # (one language at a time, by its code as `:id`); the bulk `update`
+    # (fallbacks + reorder, `Locales::Configure`) has no `:id` of its own --
+    # the languages screen's one form always submits every enabled
+    # language's row together, the same way `ContentBlocks::Reorder` is
+    # handed a complete order rather than a delta -- so it's a bare `patch`
+    # on the collection path rather than a `resources` member/collection
+    # action.
+    scope "settings", as: "settings" do
+      resources :languages, only: %i[index create destroy]
+      patch "languages", to: "languages#update"
+    end
+
+    # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
+    # edit/update (email, and a password only when one was typed --
+    # `Users::Save`), destroy (refused for the last user, `Users::Destroy`
+    # -- `Admin::UsersController#destroy` is also where deleting *yourself*
+    # ends your own session, since only the controller knows which request
+    # this is). Invites stay on the roadmap (spec §6.1) -- there is no
+    # separate "invite" action here.
+    resources :users, only: %i[index new create edit update destroy]
+
     # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
     # the placeholder `home#show` this task's brief removes.
     root to: "pages#index"

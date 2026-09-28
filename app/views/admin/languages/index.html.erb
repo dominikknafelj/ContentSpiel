@@ -1,0 +1,83 @@
+<%# The Languages module (cs-studio spec §6.1, Task 8): every enabled
+    language, its position and fallbacks (one bulk form, `Locales::
+    Configure`), "Add language" (`Locales::Enable`) and Disable
+    (`Locales::Disable`, refused for the default -- no button is rendered
+    for it at all, matching `Admin::RecordHeaderComponent`'s own "just don't
+    show the control" answer for a page that can't be deleted either).
+    Three separate `<form>`s, not one -- HTML forbids nesting a form inside
+    another, and the reorder/fallbacks form's own table already has one row
+    per language. %>
+<% content_for :title, "Languages" %>
+<h1 class="mb-4 text-h1 text-ink">Languages</h1>
+
+<% if flash[:notice].present? %>
+  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
+<% end %>
+<% if flash[:alert].present? %>
+  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
+<% end %>
+
+<%= form_with url: admin_settings_languages_path(**admin_url_options), method: :patch, class: "mb-6" do %>
+  <table class="admin-languages-table w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <th class="py-2 pr-4">Language</th>
+        <th class="py-2 pr-4">Position</th>
+        <th class="py-2">Fallbacks</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @site_setting.locales.each_with_index do |entry, index| %>
+        <% code = entry["code"] %>
+        <tr id="language-<%= code %>" class="border-b border-line align-top">
+          <td class="py-2 pr-4 text-ink"><%= Locales.name(code, native: true) %> (<%= code %>)<%= " — default" if code == @site_setting.default_locale %></td>
+          <td class="py-2 pr-4">
+            <%= label_tag "language-#{code}-position", "Position", class: "sr-only" %>
+            <%= select_tag "languages[#{code}][position]", options_for_select((1..@site_setting.locales.size).to_a, index + 1),
+                  id: "language-#{code}-position", class: setup_input_class %>
+          </td>
+          <td class="py-2">
+            <% (@site_setting.locale_codes - [ code ]).each do |other| %>
+              <label class="mr-3 inline-flex items-center gap-1 text-sm text-ink">
+                <%= check_box_tag "languages[#{code}][fallbacks][]", other, Array(entry["fallbacks"]).include?(other),
+                      id: "language-#{code}-fallback-#{other}" %>
+                <%= other %>
+              </label>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <div class="mt-4">
+    <%= render Admin::ButtonComponent.new(label: "Save order and fallbacks", variant: :primary, type: "submit") %>
+  </div>
+<% end %>
+
+<h2 class="mb-2 mt-8 font-cs-mono text-label uppercase tracking-mono text-meta">Enabled languages</h2>
+<ul class="mb-6 flex flex-col gap-2">
+  <% @site_setting.locale_codes.each do |code| %>
+    <li class="flex items-center justify-between rounded-cs border border-line bg-surface px-3 py-2">
+      <span class="text-ink"><%= Locales.name(code, native: true) %> (<%= code %>)</span>
+      <% if code == @site_setting.default_locale %>
+        <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger, type: "button", disabled: true,
+              title: "The default language can't be disabled") %>
+      <% else %>
+        <%= form_with url: admin_settings_language_path(code, **admin_url_options), method: :delete do %>
+          <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger, type: "submit") %>
+        <% end %>
+      <% end %>
+    </li>
+  <% end %>
+</ul>
+
+<h2 class="mb-2 mt-8 font-cs-mono text-label uppercase tracking-mono text-meta">Add language</h2>
+<%= form_with url: admin_settings_languages_path(**admin_url_options), method: :post, class: "flex items-end gap-2" do %>
+  <div>
+    <%= label_tag "language_code", "Language", class: setup_label_class %>
+    <%= select_tag "code", options_for_select(language_options.reject { |(_, code)| @site_setting.locale_codes.include?(code) }),
+          id: "language_code", include_blank: "Choose a language…", class: setup_input_class %>
+  </div>
+  <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit") %>
+<% end %>

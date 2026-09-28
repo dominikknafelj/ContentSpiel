@@ -21,6 +21,20 @@ class SiteSetting < ApplicationRecord
     Array(locales).find { |entry| entry["code"].to_s == code.to_s }
   end
 
+  # The row-by-row shape a name/URL fieldset naturally submits (any row can
+  # be left blank) -- this is the one place that shape turns into the plain
+  # `{ name => url }` hash `social_links` itself stores, so every caller
+  # (the setup wizard's own site step, `Admin::SettingsController`) shares
+  # the exact same "drop the empty rows" rule instead of each hand-keeping
+  # its own copy (formerly `SetupController#site_params` alone).
+  def social_link_rows=(rows)
+    links = Array(rows).filter_map do |row|
+      name, url = row[:name].to_s.strip, row[:url].to_s.strip
+      [ name, url ] if name.present? && url.present?
+    end
+    self.social_links = links.to_h
+  end
+
   private
 
   def only_one_record_exists

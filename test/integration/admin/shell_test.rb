@@ -46,7 +46,19 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a", text: "Pages"
     assert_select "nav[aria-label='Modules'] a", text: "Posts"
     assert_select "nav[aria-label='Modules'] a", text: "Tags"
-    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/users']", text: /Users/
+
+    # Settings and Users are CS Studio's own screens now (Task 8), not
+    # "(old admin)" links out to Avo -- the modules column links straight
+    # to them the same way it already does for Pages/Posts/Tags.
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/settings']", text: "Settings"
+    assert_select "nav[aria-label='Modules'] a[href='/cs-studio/users']", text: "Users"
+    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/users']", count: 0
+    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/site_settings']", count: 0
+
+    # API tokens and System status haven't moved yet (later tasks), so the
+    # "(old admin)" group still names them.
+    assert_select "nav[aria-label='Modules'] a[href='/avo/resources/api_tokens']", text: "API tokens"
+    assert_select "nav[aria-label='Modules'] a[href='/avo/system_status']", text: "System status"
   end
 
   test "the old public sign-in routes are gone" do
