@@ -81,7 +81,7 @@ Sub-project 4 of the own-admin roadmap, merged with the Avo removal the user pul
   - `cs:` links become `internalLink`.
   - Unknown directives stay as text, and the tool response lists them as warnings.
 - **Round trip:** JSON → Markdown → JSON is identical for every built-in (tested).
-- **MCP tools:** `body` switches from HTML to Markdown in `create_post`, `update_post` and `get_post`. The descriptions document the directives and `cs:` links. This is a breaking change for MCP clients, noted in the PR.
+- **MCP tools:** `body` switches from HTML to Markdown in `create_post`, `update_post` and `get_post`. The descriptions document the directives and `cs:` links. There are no MCP clients or integrations yet, so nothing needs a compatibility path.
 
 ### 3.5 Validation
 
@@ -201,7 +201,6 @@ Before deleting Avo files, move their behaviour into model, service or CS Studio
 ## 8. Interim states (add to docs/roadmap.md "Known interim states")
 
 - Unreferenced `MediaAsset`s are never cleaned up; image blocks and rich-text images use different storage; there are no responsive variants. All three are closed by the media library (sub-project 6).
-- MCP `body` is Markdown now; the old HTML behaviour is gone. That's a breaking change documented in the PR, not an interim state.
 - The existing interim states stay: autosave writes live, and deletes are permanent. Remove the "Avo still mounted" row.
 
 ## 9. Testing
