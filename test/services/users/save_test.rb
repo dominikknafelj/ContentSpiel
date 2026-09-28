@@ -97,4 +97,52 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_includes result.errors.to_sentence, "can't demote the last owner"
     assert users(:one).reload.owner?
   end
+  # --- Final fix wave (Important 2, Minor 1) ------------------------------------
+
+  test "a non-owner can't remove a user from a group beyond their rights" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each do |key|
+      AccessControl::Grant.create!(group: managers, permission: key, scope: {})
+    end
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    AccessControl::Membership.create!(user: users(:reader), group: managers)
+
+    # The reader's own groups are within the actor's rights, so removing
+    # them is fine...
+    ok = as(users(:editor_branch)) { Users::Save.call(users(:reader), attributes: { group_ids: [ managers.id ] }) }
+    assert ok.ok?, ok.errors.inspect
+
+    # ...but taking the Admin member out of Admin isn't.
+    refused = as(users(:editor_branch)) { Users::Save.call(users(:two), attributes: { group_ids: [] }) }
+    assert refused.denied?
+    assert_includes users(:two).reload.group_ids, access_control_groups(:admin).id
+  end
+
+  test "an owner's token is judged on its group: no owner flags, no groups beyond it" do
+    token_group = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each do |key|
+      AccessControl::Grant.create!(group: token_group, permission: key, scope: {})
+    end
+    token, = ApiToken.generate!(users(:one), group: token_group)
+
+    as(token, channel: :mcp) do
+      promote = Users::Save.call(users(:reader), attributes: { owner: "1" })
+      assert promote.denied?
+      assert_equal [ "Only an owner can change who is an owner" ], promote.errors
+
+      owners_account = Users::Save.call(users(:one), attributes: { email_address: "taken@example.com" })
+      assert owners_account.denied?
+
+      beyond = Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:admin).id ] })
+      assert beyond.denied?
+      assert_equal [ "You don't have permission to add users to the Admin group" ], beyond.errors
+
+      outranked = Users::Save.call(users(:two), attributes: { email_address: "two-new@example.com" })
+      assert outranked.denied?
+    end
+
+    assert_not users(:reader).reload.owner?
+    assert_equal "one@example.com", users(:one).reload.email_address
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).group_ids
+  end
 end

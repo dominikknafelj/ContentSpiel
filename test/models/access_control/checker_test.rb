@@ -381,6 +381,29 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert AccessControl.can_assign_group?(@reader, group.reload)
   end
 
+  # Final fix wave (Minor 1): a token -- even an owner's -- is never an
+  # owner; it grants and assigns within its effective rights only.
+  test "a token grants within its group and its user, never as an owner" do
+    token_group = AccessControl::Group.create!(name: "Token group")
+    grant!("posts.read", group: token_group)
+    owners_token, = ApiToken.generate!(@owner, group: token_group)
+    authors_token, = ApiToken.generate!(@author, group: access_control_groups(:admin))
+
+    assert_not AccessControl.owner?(owners_token)
+    assert AccessControl.can_grant?(owners_token, "posts.read")
+    assert_not AccessControl.can_grant?(owners_token, "posts.edit")
+    assert_not AccessControl.can_assign_group?(owners_token, access_control_groups(:admin))
+    assert AccessControl.can_assign_group?(owners_token, token_group)
+    assert_equal [ "Token group" ], AccessControl.permitted_groups_for(owners_token).map(&:name) & [ "Token group", "Admin" ]
+
+    # The intersection: Admin's group, but only the author's own rights.
+    assert AccessControl.can_grant?(authors_token, "media.upload")
+    assert_not AccessControl.can_grant?(authors_token, "users.manage")
+
+    owners_token.revoke!
+    assert_not AccessControl.can_grant?(owners_token, "posts.read")
+  end
+
   test "permitted_groups_for lists every group for an owner and only covered ones otherwise" do
     assert_equal AccessControl::Group.order(:name).to_a, AccessControl.permitted_groups_for(@owner)
 

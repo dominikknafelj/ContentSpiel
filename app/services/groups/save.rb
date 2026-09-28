@@ -18,7 +18,7 @@ module Groups
   #   group they're a member of" in one rule: a change the actor's own
   #   grants already cover can't give them anything they don't have.
   # - **Unchanged** grants are not re-checked. A non-owner may rename a
-  #   group, or remove grants from it, whatever it holds -- and a stale
+  #   group whatever it holds -- and a stale
   #   grant (a deleted branch root, an unregistered content type, Review
   #   Focus 3) can never block a save, since "unchanged" is judged against
   #   the grants as they stand today (`AccessControl::LiveGrants`), stale
@@ -26,6 +26,9 @@ module Groups
   # - Adding a **member** hands them every grant of the group, so each
   #   added member (the actor included -- "adding yourself to a group is a
   #   widening") needs every resulting grant to pass the same check.
+  # - **Removing** a member or a grant (or narrowing a grant) needs the
+  #   right to manage the group as it stands (`#removal_refusal`, final fix
+  #   wave): every grant it holds must be one the actor could hand out.
   #
   # The editor submits only live values, so saving a group drops its stale
   # values (and its dead grants, which match nothing) for good.
@@ -43,6 +46,9 @@ module Groups
       desired = @attributes.key?(:grants) ? normalize_grants(@attributes[:grants]) : nil
       old_member_ids = @group.persisted? ? @group.memberships.pluck(:user_id).sort : []
       new_member_ids = @attributes.key?(:member_ids) ? User.where(id: Array(@attributes[:member_ids]).compact_blank).pluck(:id).sort : old_member_ids
+
+      refusal = removal_refusal(stored, desired, old_member_ids - new_member_ids)
+      return refusal if refusal
 
       @group.assign_attributes(@attributes.slice(:name, :description))
       grants = (desired || []).map { |attrs| AccessControl::Grant.new(group: @group, **attrs) }
@@ -90,23 +96,42 @@ module Groups
       failure(@group)
     end
 
-    # The first refusal, or nil. Owners and trusted code paths (no user
-    # behind the actor, already let through by `authorize!`) are never
-    # refused.
+    # Taking something away -- a member, a grant (narrowing one is
+    # removing the old version), or the whole group in `Groups::Destroy` --
+    # needs the right to manage the group as it stands (final fix wave,
+    # Important 2, `AccessControl.can_manage_group?`): otherwise
+    # `groups.manage` alone would let a non-owner empty Admin, or strip
+    # its grants, whatever they hold themselves. Judged on the stored
+    # group, before anything is assigned. Stale values and dead grants
+    # (`LiveGrants`) aren't counted as removals -- they match nothing, and
+    # the editor drops them on every save.
+    def removal_refusal(stored, desired, removed_member_ids)
+      return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
+
+      removed_grants = desired ? stored.attributes - desired : []
+      return if removed_member_ids.empty? && removed_grants.empty?
+      return if AccessControl.can_manage_group?(actor, @group)
+
+      denied("groups.manage", @group)
+    end
+
+    # The first refusal, or nil. Owners and trusted code paths (nil actor,
+    # already let through by `authorize!`) are never refused; a token --
+    # even an owner's -- is judged on its effective rights (final fix wave,
+    # Minor 1: `AccessControl.can_grant?` takes the token itself).
     def escalation_refusal(stored, desired, added_member_ids)
-      user = actor_user
-      return if user.nil? || user.owner?
+      return if actor.nil? || AccessControl.owner?(actor)
 
       unchanged = stored.attributes
       Array(desired).each do |grant|
         next if unchanged.include?(grant)
-        return denied(grant[:permission], @group) unless AccessControl.can_grant?(user, grant[:permission], grant[:scope])
+        return denied(grant[:permission], @group) unless AccessControl.can_grant?(actor, grant[:permission], grant[:scope])
       end
 
       return if added_member_ids.empty?
 
       (desired || unchanged).each do |grant|
-        next if AccessControl.can_grant?(user, grant[:permission], grant[:scope])
+        next if AccessControl.can_grant?(actor, grant[:permission], grant[:scope])
 
         label = AccessControl::Permissions.fetch(grant[:permission]).label.downcase
         return denied(grant[:permission], @group, message: "You can't add members to this group: you don't have permission to #{label}")

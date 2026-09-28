@@ -28,6 +28,11 @@ module Groups
 
     def call
       return denied("groups.manage", @group) unless authorize!("groups.manage", @group)
+      # Final fix wave (Important 2): deleting a group is managing it as it
+      # stands -- a non-owner needs every grant it holds themselves
+      # (`AccessControl.can_manage_group?`, shared with `Groups::Save` and
+      # `Users::Save`).
+      return denied("groups.manage", @group) unless AccessControl.can_manage_group?(actor, @group)
       return built_in_refusal if @group.built_in?
 
       destroyed = AccessControl::Group.transaction do

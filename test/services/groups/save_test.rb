@@ -163,18 +163,24 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_not_includes access_control_groups(:admin).users.reload, users(:editor_branch)
   end
 
-  test "a non-owner can edit a group's name and remove grants they don't hold" do
+  # Final fix wave (Important 2) changed the second half: removing a grant
+  # from a group that holds rights the actor lacks is managing that group
+  # as it stands, and is refused; renaming it still isn't.
+  test "a non-owner can rename a group whatever it holds, but not remove grants from one beyond them" do
     group = AccessControl::Group.create!(name: "Writers")
     grant(group, "posts.read")
     grant(group, "users.manage")
+    grants = [ { permission: "posts.read", scope: {} }, { permission: "users.manage", scope: {} } ]
 
-    result = as(users(:editor_branch)) do
-      Groups::Save.call(group, attributes: { name: "Scribes", grants: [ { permission: "posts.read", scope: {} } ] })
-    end
-
-    assert result.ok?, result.errors.inspect
+    renamed = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Scribes", grants: grants }) }
+    assert renamed.ok?, renamed.errors.inspect
     assert_equal "Scribes", group.reload.name
-    assert_equal [ "posts.read" ], group.grants.pluck(:permission)
+
+    stripped = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { grants: [ { permission: "posts.read", scope: {} } ] })
+    end
+    assert stripped.denied?
+    assert_equal %w[posts.read users.manage], group.grants.order(:permission).pluck(:permission)
   end
 
   test "a built-in group can't be renamed" do
@@ -234,5 +240,76 @@ class Groups::SaveTest < ActiveSupport::TestCase
 
   def grant(group, permission, scope = {})
     AccessControl::Grant.create!(group: group, permission: permission, scope: scope)
+  end
+  # --- Final fix wave (Important 2): managing a group as it stands -------------
+
+  test "a group manager can't remove members from or strip grants off a group beyond their rights" do
+    admin = access_control_groups(:admin)
+    members = admin.user_ids.sort
+    grants = admin.grants.map { |g| { permission: g.permission, scope: g.scope } }
+
+    removed = as(users(:editor_branch)) { Groups::Save.call(admin, attributes: { member_ids: [] }) }
+    stripped = as(users(:editor_branch)) do
+      Groups::Save.call(admin, attributes: { grants: grants.reject { |g| g[:permission] == "users.manage" } })
+    end
+
+    [ removed, stripped ].each do |result|
+      assert result.denied?
+      assert_equal [ "You don't have permission to manage groups" ], result.errors
+    end
+    assert_equal members, admin.reload.user_ids.sort
+    assert admin.grants.exists?(permission: "users.manage")
+    # Both refusals, coalesced into one row (same actor, action, subject).
+    assert Audit::Event.exists?(action: "access.denied", subject: admin)
+  end
+
+  test "narrowing a grant counts as removing it" do
+    group = AccessControl::Group.create!(name: "Editors of everything")
+    grant(group, "posts.edit")
+    grant(@manager_group, "posts.edit", { "own" => true })
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { grants: [ { permission: "posts.edit", scope: { own: true } } ] })
+    end
+
+    assert result.denied?
+    assert_equal [ {} ], group.grants.reload.map(&:scope)
+  end
+
+  test "a group manager removes members and grants from a group within their rights" do
+    group = AccessControl::Group.create!(name: "Readers")
+    grant(group, "posts.read")
+    grant(group, "pages.read")
+    grant(@manager_group, "posts.read")
+    grant(@manager_group, "pages.read")
+    AccessControl::Membership.create!(user: users(:reader), group: group)
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { member_ids: [], grants: [ { permission: "posts.read", scope: {} } ] })
+    end
+
+    assert result.ok?, result.errors.inspect
+    assert_empty group.reload.user_ids
+    assert_equal [ "posts.read" ], group.grants.pluck(:permission)
+  end
+
+  # --- Final fix wave (Minor 1): a token is never an owner ----------------------
+
+  test "an owner's token grants only within its own group" do
+    token_group = AccessControl::Group.create!(name: "Token group")
+    grant(token_group, "groups.manage")
+    grant(token_group, "posts.read")
+    token, = ApiToken.generate!(users(:one), group: token_group)
+
+    result = as(token, channel: :mcp) do
+      Groups::Save.call(attributes: { name: "Widened", grants: [ { permission: "posts.edit", scope: {} } ] })
+    end
+    assert result.denied?
+    assert_not AccessControl::Group.exists?(name: "Widened")
+
+    within = as(token, channel: :mcp) do
+      Groups::Save.call(attributes: { name: "Narrow", grants: [ { permission: "posts.read", scope: {} } ] })
+    end
+    assert within.ok?, within.errors.inspect
   end
 end

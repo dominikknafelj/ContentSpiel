@@ -61,4 +61,29 @@ class Groups::DestroyTest < ActiveSupport::TestCase
     assert_equal [ "You don't have permission to manage tokens" ], result.errors
     assert_nil other_token.reload.revoked_at
   end
+  # Final fix wave (Important 2): deleting a group needs the right to
+  # manage it as it stands -- every grant it holds, held by the actor.
+  test "a group manager can't delete a group beyond their rights, but can one within them" do
+    managers = AccessControl::Group.create!(name: "Group managers")
+    AccessControl::Grant.create!(group: managers, permission: "groups.manage", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "posts.read", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    powerful = AccessControl::Group.create!(name: "Powerful")
+    AccessControl::Grant.create!(group: powerful, permission: "users.manage", scope: {})
+    readers = AccessControl::Group.create!(name: "Readers")
+    AccessControl::Grant.create!(group: readers, permission: "posts.read", scope: {})
+
+    as(users(:editor_branch)) do
+      [ powerful, access_control_groups(:admin) ].each do |group|
+        result = Groups::Destroy.call(group)
+        assert result.denied?
+        assert_equal [ "You don't have permission to manage groups" ], result.errors
+        assert AccessControl::Group.exists?(group.id)
+      end
+
+      assert Groups::Destroy.call(readers).ok?
+    end
+    assert_not AccessControl::Group.exists?(readers.id)
+    assert_equal 2, Audit::Event.where(action: "access.denied").count
+  end
 end

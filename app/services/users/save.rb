@@ -22,7 +22,8 @@ module Users
   #   covers memberships, but adding someone to a group hands them its
   #   grants, so for a non-owner every *added* group must be one they could
   #   assign (`AccessControl.can_assign_group?` -- no privilege escalation,
-  #   Review Focus 1). Removing groups is never refused.
+  #   Review Focus 1), and every *removed* one a group they may manage as it
+  #   stands (`AccessControl.can_manage_group?`, final fix wave).
   # - `owner` is owner-only (design spec §3.2); a value equal to the stored
   #   one isn't a change (the form's hidden "0"). Demoting the last owner is
   #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
@@ -46,7 +47,7 @@ module Users
 
       old_group_ids = @user.persisted? ? @user.memberships.pluck(:group_id).sort : []
       new_group_ids = requested_group_ids || old_group_ids
-      refusal = group_refusal(new_group_ids - old_group_ids)
+      refusal = group_refusal(new_group_ids - old_group_ids, old_group_ids - new_group_ids)
       return refusal if refusal
 
       attrs = @attributes.slice(:email_address, :password, :password_confirmation)
@@ -81,13 +82,22 @@ module Users
       AccessControl::Group.where(id: Array(@attributes[:group_ids]).compact_blank).pluck(:id).sort
     end
 
-    def group_refusal(added_ids)
-      return if added_ids.empty? || actor_owner?
+    # Adding someone to a group hands them its grants, so it must be a
+    # group the actor could assign; taking someone out of one is managing
+    # that group as it stands (final fix wave, Important 2) -- the same
+    # test, `AccessControl.can_manage_group?`. For another user `outranked?`
+    # has already required it of every group they're in; this also covers
+    # the actor's own memberships. A token actor is judged on its
+    # effective rights (Minor 1).
+    def group_refusal(added_ids, removed_ids)
+      return if (added_ids + removed_ids).empty? || actor_owner?
 
-      AccessControl::Group.includes(:grants).where(id: added_ids).order(:name).each do |group|
-        next if AccessControl.can_assign_group?(actor_user, group)
+      groups = AccessControl::Group.includes(:grants).where(id: added_ids + removed_ids).order(:name)
+      groups.each do |group|
+        next if AccessControl.can_manage_group?(actor, group)
 
-        return denied("users.manage", @user, message: "You don't have permission to add users to the #{group.name} group")
+        verb = added_ids.include?(group.id) ? "add users to" : "remove users from"
+        return denied("users.manage", @user, message: "You don't have permission to #{verb} the #{group.name} group")
       end
       nil
     end

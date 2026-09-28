@@ -29,7 +29,9 @@ module ApiTokens
     # user's rights anyway (the intersection), but a token labelled
     # "Admin" that quietly can't do what Admin does is a lie in the list,
     # and a forged `group_id` is exactly the escalation attempt to refuse
-    # out loud. Trusted code paths (setup, console) choose freely.
+    # out loud. Issuing for someone else, the actor must be able to assign
+    # the group too (`#assignable_group?`). Trusted code paths (setup,
+    # console) choose freely.
     #
     # The event carries the token's id, user and group (`Audit::Snapshot`),
     # never its digest or the raw value (Review Focus 5).
@@ -38,7 +40,7 @@ module ApiTokens
         return denied("tokens.manage", @user) unless authorize!("tokens.manage", @user)
       end
       return failure(ApiToken.new(user: @user), [ "Choose a group for the token" ]) if @group.nil?
-      unless AccessControl.trusted?(actor, Current.channel) || AccessControl.can_assign_group?(@user, @group)
+      unless assignable_group?
         return denied("tokens.manage", @user, message: "You don't have permission to give a token the #{@group.name} group")
       end
 
@@ -54,5 +56,16 @@ module ApiTokens
     private
 
     def own_token? = actor.is_a?(User) && actor == @user
+
+    # The group must be within the token user's rights, and -- issuing for
+    # someone else, or as a token (final fix wave, Minors 1 and 2) --
+    # within the actor's own too: `tokens.manage` doesn't let anyone hand
+    # out, through somebody else's token, a group they couldn't assign
+    # themselves. A token actor is judged on its effective rights.
+    def assignable_group?
+      return true if AccessControl.trusted?(actor, Current.channel)
+
+      AccessControl.can_assign_group?(@user, @group) && (own_token? || AccessControl.can_assign_group?(actor, @group))
+    end
   end
 end

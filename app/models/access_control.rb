@@ -99,7 +99,13 @@ module AccessControl
 
     def page_branch_ids(page) = Checker.page_branch_ids(page)
 
-    # No privilege escalation (design spec §3.3 "Groups"): may `user` hand
+    # Is `actor` an owner? Only a `User` ever is: an API token -- even an
+    # owner's -- acts within its group (the intersection, design spec §3.3
+    # "Tokens"), so it's judged on those effective rights everywhere an
+    # owner would be waved through (final fix wave, Minor 1).
+    def owner?(actor) = actor.is_a?(User) && actor.owner?
+
+    # No privilege escalation (design spec §3.3 "Groups"): may `actor` hand
     # out `key` with `scope` -- to a group they edit, or through a group
     # they pick for a token? Owners may grant anything. Anyone else needs a
     # grant of their own, for the *same key* (a held `posts.edit` doesn't
@@ -118,6 +124,13 @@ module AccessControl
     # has no ancestors, so it's never covered -- harmless to refuse, since
     # it would match nothing anyway.
     #
+    # An `ApiToken` actor is judged on its effective rights (final fix
+    # wave, Minor 1): the grant must be covered by its group *and* by its
+    # user (an owner's token by its group alone) -- the same intersection
+    # `allowed?` applies. A revoked or orphaned token covers nothing; so
+    # does a nil actor (the trusted code paths are decided by callers,
+    # before they ask this).
+    #
     # Conservative: one held grant must cover the whole request on its
     # own. A union of grants doesn't count -- holding `{content_types:
     # ["blog"]}` and `{content_types: ["now_update"]}` doesn't let a user
@@ -125,16 +138,21 @@ module AccessControl
     # they allow exactly that. Refusing a grant the user could split into
     # two is safe; merging scopes across grants (and across dimensions)
     # correctly isn't worth the risk here.
-    def can_grant?(user, key, scope = {})
+    def can_grant?(actor, key, scope = {})
       permission = Permissions.fetch(key)
-      return true if user.owner?
+      return true if owner?(actor)
 
       requested = scope.to_h.stringify_keys
-      held_grants = ActorGrants.for(user).user_grants.for([ permission.key ])
-      return false if held_grants.empty?
+      case actor
+      when User then grants_cover?(ActorGrants.for(actor).user_grants, permission, requested)
+      when ApiToken
+        return false if actor.revoked_at.present? || actor.user.nil? || actor.group_id.nil?
 
-      requested_branches = branches_of(requested["page_ids"])
-      held_grants.any? { |held| scope_covers?(held, requested, requested_branches) }
+        grants = ActorGrants.for(actor)
+        grants_cover?(grants.token_grants, permission, requested) &&
+          (actor.user.owner? || grants_cover?(grants.user_grants, permission, requested))
+      else false
+      end
     end
 
     # Design spec §3.3 "Tokens" and Review Focus 1: a token's group must be
@@ -145,22 +163,45 @@ module AccessControl
     # unregistered permission, a scope whose every value is stale) is
     # skipped. None of those can widen anyone's rights, so none may make a
     # group unassignable (Review Focus 3: stale is never an error).
-    def can_assign_group?(user, group)
-      return true if user.owner?
+    # `actor` is a `User` or an `ApiToken` (see `can_grant?`).
+    def can_assign_group?(actor, group)
+      return true if owner?(actor)
 
       LiveGrants.new(group.grants.to_a).entries.all? do |entry|
-        can_grant?(user, entry.permission, entry.scope)
+        can_grant?(actor, entry.permission, entry.scope)
       end
     end
 
-    # The groups `user` may choose for a token (`can_assign_group?`), by
+    # May `actor` manage `group` *as it stands* (final fix wave, Important
+    # 2) -- take members out of it, remove or narrow its grants, delete it,
+    # or change the group memberships of a user in it? Only if every grant
+    # it holds is one they could hand out themselves (`can_assign_group?`
+    # on the stored group). Otherwise `groups.manage` or `users.manage`
+    # alone would let a non-owner strip Admin, or empty it, whatever they
+    # hold. Trusted code paths (nil actor on a trusted channel) may.
+    # One rule for `Users::Save`, `Groups::Save` and `Groups::Destroy`.
+    def can_manage_group?(actor, group, channel: Current.channel)
+      return trusted?(actor, channel) if actor.nil?
+
+      can_assign_group?(actor, group)
+    end
+
+    # The groups `actor` may choose for a token (`can_assign_group?`), by
     # name.
-    def permitted_groups_for(user)
+    def permitted_groups_for(actor)
       groups = Group.includes(:grants).order(:name).to_a
-      user.owner? ? groups : groups.select { |group| can_assign_group?(user, group) }
+      owner?(actor) ? groups : groups.select { |group| can_assign_group?(actor, group) }
     end
 
     private
+
+    def grants_cover?(grant_set, permission, requested)
+      held_grants = grant_set.for([ permission.key ])
+      return false if held_grants.empty?
+
+      requested_branches = branches_of(requested["page_ids"])
+      held_grants.any? { |held| scope_covers?(held, requested, requested_branches) }
+    end
 
     def scope_covers?(held, requested, requested_branches)
       held.scope.all? do |scope_key, held_value|

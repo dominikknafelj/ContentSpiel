@@ -20,20 +20,29 @@ module Users
 
     def owner_protected? = @user.persisted? && @user.owner? && !actor_owner?
 
-    def actor_owner? = actor_user.nil? ? AccessControl.trusted?(actor, Current.channel) : actor_user.owner?
+    # An owner, or a trusted code path (nil actor on `:setup`/`:console`/
+    # `:system`). Never an API token, not even an owner's (final fix wave,
+    # Minor 1): a token acts within its group, so an owner's token with
+    # `users.manage` can't flip owner flags or edit an owner's account.
+    def actor_owner?
+      return AccessControl.trusted?(actor, Current.channel) if actor.nil?
+
+      AccessControl.owner?(actor)
+    end
 
     # Fix round 1 (I1), the same idea one level down: a non-owner may only
     # manage users whose rights are a subset of their own -- every group
-    # the target belongs to must be one the actor could assign
-    # (`AccessControl.can_assign_group?`). Otherwise `users.manage` alone
-    # would let them reset an Admin member's password or email, sign in as
-    # them, and hold every right Admin has. Owners (and trusted code
-    # paths) are unaffected; acting on yourself is never "outranked".
+    # the target belongs to must be one the actor may manage as it stands
+    # (`AccessControl.can_manage_group?`, which a token answers on its
+    # effective rights). Otherwise `users.manage` alone would let them
+    # reset an Admin member's password or email, sign in as them, and hold
+    # every right Admin has. Owners (and trusted code paths) are
+    # unaffected; acting on yourself is never "outranked".
     def outranked?
-      return false if @user.new_record? || actor_owner? || actor_user.nil? || @user == actor_user
+      return false if @user.new_record? || actor_owner? || actor.nil? || @user == actor_user
 
       AccessControl::Group.includes(:grants).where(id: @user.memberships.select(:group_id)).any? do |group|
-        !AccessControl.can_assign_group?(actor_user, group)
+        !AccessControl.can_manage_group?(actor, group)
       end
     end
 
