@@ -28,6 +28,30 @@ module RichText
 
     def to_h = @hash
 
+    # Renders this document to a scrubbed, html_safe HTML String (design
+    # spec §3.3), through `RichText::HtmlRenderer`. Defaults match what a
+    # caller with no more specific `locale`/`urls` in hand should get: the
+    # ambient `I18n.locale` and a non-preview `PublicSite::Urls` -- the same
+    # defaults `PagesController`'s own public render path would reach for.
+    #
+    # Caching lives here rather than inside `RichText::HtmlRenderer` itself,
+    # because the cache key (`RichText::Schema.version`, spec §3.3) needs
+    # this document's own `#digest` plus the locale/preview it's being
+    # rendered for -- all of which this method already has -- while the
+    # renderer itself has no reason to know its own output is cacheable at
+    # all; it just walks a document and returns HTML every time it's asked.
+    # `RichText::Schema.version` is folded in so that a schema change (a new
+    # built-in, or a plugin's type shape changing) invalidates every cached
+    # render instead of serving stale HTML for a type whose rendering rules
+    # just changed.
+    def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
+      context = RichText::RenderContext.new(locale: locale, urls: urls)
+
+      Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview ]) do
+        RichText::HtmlRenderer.new(context).render(self)
+      end
+    end
+
     # "No text and no embeds" (spec §3.1) -- an empty paragraph, or a `doc`
     # with no content at all, is blank even though it's technically a valid
     # document; a lone `image` or `youtube` node with no text anywhere else

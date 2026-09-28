@@ -1,0 +1,121 @@
+# Walks a `RichText::Document` (design spec §3.3) and renders it to HTML,
+# driven entirely by what's registered on `RichText::Schema` -- every node
+# and mark's own `html` block (registered in `RichText::BuiltIns`, and by
+# any plugin later) decides how *it* renders; this class only walks the
+# tree, escapes every raw text run before any block ever sees it, and runs
+# the shared safety net every render must go through regardless of which
+# blocks fired.
+#
+# `RichText::Document#to_html` is the entry point everything else calls (it
+# also owns the render cache -- see that method's own comment for why
+# caching lives there and not here); this class is exposed directly
+# (`RichText::HtmlRenderer.new(context).render(document)`) for anything
+# that builds its own `RenderContext` without going through the jsonb-
+# column path a `Document` normally comes from.
+#
+# Components (`RichText::YoutubeComponent`, `RichText::ImageComponent`)
+# render through `ApplicationController.render(component, layout: false)`
+# rather than `ViewComponent::Base#render_in` -- this class isn't a
+# controller action or a component itself, so it has no view context of
+# its own to hand `render_in`, and building one by hand (an
+# `ActionView::Base` instance with a real lookup context) is exactly what
+# `ActionController::Renderer` (mixed into every controller, including
+# `ApplicationController`) already does for you. `ApplicationController
+# .render` is the same mechanism `ComponentPreviewsController`'s own request
+# cycle uses under the hood; this just invokes it directly instead of
+# through a dispatched request.
+#
+# Tag construction goes through `ActionController::Base.helpers` -- a
+# memoized helper proxy that already mixes in `ActionView::Helpers
+# ::TagHelper` -- rather than this class including that module itself, so
+# that the exact same proxy (`HELPERS` below) is reachable from
+# `RichText::BuiltIns`'s `html` blocks too. Those blocks are plain Procs
+# handed to `RichText::Schema.register_node`/`register_mark` at load time,
+# and a Ruby block keeps the `self` (and hence its method lookup) it had at
+# *definition* time -- `RichText::BuiltIns`, not whatever object ends up
+# `.call`-ing it here -- so `include`-ing `TagHelper` into this class alone
+# wouldn't make `tag`/`content_tag` reachable from inside those blocks.
+module RichText
+  class HtmlRenderer
+    HELPERS = ActionController::Base.helpers
+
+    def initialize(context)
+      @context = context
+    end
+
+    # Renders `document` (a `RichText::Document`) to a scrubbed, html_safe
+    # HTML String. Scrubbing happens once, here, against the *whole*
+    # rendered tree, rather than piecemeal per node -- `RichTextScrubber`'s
+    # youtube-nocookie iframe check in particular only makes sense evaluated
+    # against a fully-formed `<iframe>` tag, not a half-built fragment a
+    # single node's `html` block produced in isolation. This is the same
+    # scrubber, and the same `Rails::HTML5::SafeListSanitizer`, that
+    # `ActionText::ContentHelper` installs for every other rich-text render
+    # path (`config/initializers/action_text.rb`) -- one safety net, run at
+    # the very end of every path that turns a document into HTML.
+    def render(document)
+      html = render_node(document.to_h)
+      Rails::HTML5::SafeListSanitizer.new.sanitize(html, scrubber: RichTextScrubber.new).html_safe
+    end
+
+    private
+
+    attr_reader :context
+
+    # Every non-text node ("doc" down to "youtube"/"image") shares this
+    # shape: recursively render whatever's in "content" first, then hand
+    # the node's own registered `html` block the raw node Hash plus that
+    # already-rendered, already-safe children string. A "text" node has no
+    # "content" array at all (it carries a literal "text" String and an
+    # optional "marks" array instead -- see `RichText::Document#validate_node`
+    # for the same structural split), so it gets its own branch rather than
+    # forcing that generic shape onto it.
+    def render_node(node)
+      return render_text_node(node) if node["type"] == "text"
+
+      children = HELPERS.safe_join(Array(node["content"]).map { |child| render_node(child) })
+
+      type = RichText::Schema.node(node["type"])
+      if type.nil?
+        log_unknown("node", node["type"])
+        return children
+      end
+
+      type.html.call(node, children, context)
+    end
+
+    # Escapes the raw "text" *before* any mark ever sees it -- every mark's
+    # `html` block receives already-safe content and only ever wraps it, so
+    # no block anywhere in the schema (built-in or plugin) can forget to
+    # escape a user-authored string; there's simply no unescaped string left
+    # by the time one runs. Marks then nest in their array order -- the
+    # first mark wraps the raw escaped text (innermost), each later mark
+    # wraps the previous result (progressively more outer) -- via `reduce`.
+    def render_text_node(node)
+      content = ERB::Util.html_escape(node["text"].to_s)
+      content = Array(node["marks"]).reduce(content) { |html, mark_data| apply_mark(mark_data, html) }
+      RichText::Schema.node("text").html.call(node, content, context)
+    end
+
+    def apply_mark(mark_data, content)
+      mark = RichText::Schema.mark(mark_data["type"])
+      if mark.nil?
+        log_unknown("mark", mark_data["type"])
+        return content
+      end
+
+      mark.html.call(mark_data, content, context)
+    end
+
+    # Design spec §3.3: an unknown node or mark type is skipped (no wrapper
+    # element, no attempt to interpret its "attrs") but its children's
+    # already-rendered content is kept rather than dropped -- an editor
+    # who authored a plugin-only block that later got uninstalled still
+    # gets their text back, not a silent hole in the page -- and it's
+    # logged, since a document referencing a type this schema doesn't know
+    # about is worth a developer noticing.
+    def log_unknown(kind, name)
+      Rails.logger.warn("RichText::HtmlRenderer: unknown #{kind} type #{name.inspect}, keeping its rendered children")
+    end
+  end
+end
