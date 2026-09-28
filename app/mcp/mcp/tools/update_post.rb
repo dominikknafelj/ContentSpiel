@@ -46,8 +46,12 @@ module Mcp
         title: "Update post")
 
       def self.call(id:, title: nil, body: nil, excerpt: nil, fields: nil, locale: nil, published: nil, server_context:)
-        post = Post.find_by(id: id)
-        return error_response("Post #{id} not found") unless post
+        # Read scope first (spec §3.3): a post the token can't even read is
+        # "not found", never a permission error that would confirm it
+        # exists. One it can read but not edit reaches `Posts::Save`, whose
+        # refusal ("You don't have permission to edit posts") is the error.
+        post = find_readable_post(id)
+        return post_not_found unless post
 
         locale ||= Locales.default
         invalid_locale = reject_unless_enabled(locale)
@@ -60,7 +64,12 @@ module Mcp
         attributes = published.nil? ? {} : { published: published }
         translations = { locale => { title: title, excerpt: excerpt }.compact }
         warnings = []
-        translations[locale][:body], warnings = markdown_body(body) unless body.nil?
+        # The stored document for *this* locale (raw, not Mobility's
+        # fallback-aware reader) supplies the known references -- see
+        # `Mcp::MarkdownBody#markdown_body`. Another locale's links aren't
+        # known here, just as `HasRichTextBody#body_errors_for` compares
+        # each locale only against its own stored document.
+        translations[locale][:body], warnings = markdown_body(body, previous: post.read_attribute(:body).to_h[locale.to_s]) unless body.nil?
 
         # Split against the post's own (already-persisted) content type --
         # unlike CreatePost there's no candidate `content_type` argument to

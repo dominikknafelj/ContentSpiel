@@ -105,7 +105,17 @@ module RichText
     # MCP-authored String is exactly as untrusted as a hand-edited jsonb
     # row, so this degrades what it can't represent instead of failing the
     # whole write.
-    def self.from_markdown(markdown) = RichText::Markdown.load(markdown)
+    #
+    # `known_references` (access-control Task 10) is `#validate`'s own
+    # parameter, passed through to the loader's per-link/per-embed checks:
+    # the `#references` of the document this Markdown replaces. A link or
+    # image already in the stored document is kept even when its target is
+    # gone or unreadable to `Current.actor`, exactly as the admin editor
+    # keeps it (`HasRichTextBody#body_errors_for`) -- otherwise a Markdown
+    # round trip through `update_post` would silently strip every reference
+    # the token can't see. `nil` (the default) checks everything: a new
+    # body has nothing to be known against.
+    def self.from_markdown(markdown, known_references: nil) = RichText::Markdown.load(markdown, known_references: known_references)
 
     # Converts stored ActionText/Trix HTML (design spec §5) into
     # `[RichText::Document, unmapped]` -- `unmapped` being one String per
