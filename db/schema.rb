@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_070000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -82,6 +82,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_060000) do
     t.bigint "group_id", null: false
     t.index ["group_id"], name: "index_api_tokens_on_group_id"
     t.index ["user_id"], name: "index_api_tokens_on_user_id"
+  end
+
+  create_table "audit_events", force: :cascade do |t|
+    t.string "action", null: false
+    t.string "actor_type"
+    t.bigint "actor_id"
+    t.bigint "user_id"
+    t.string "channel"
+    t.string "subject_type"
+    t.bigint "subject_id"
+    t.string "subject_label"
+    t.jsonb "field_changes", default: {}, null: false
+    t.jsonb "snapshot"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "request_id"
+    t.string "ip"
+    t.datetime "occurred_at", null: false
+    t.datetime "last_occurred_at", null: false
+    t.index ["action", "occurred_at"], name: "index_audit_events_on_action_and_occurred_at"
+    t.index ["subject_type", "subject_id", "occurred_at"], name: "idx_on_subject_type_subject_id_occurred_at_92d4f006a6"
+    t.index ["user_id", "occurred_at"], name: "index_audit_events_on_user_id_and_occurred_at"
   end
 
   create_table "content_blocks", force: :cascade do |t|

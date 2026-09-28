@@ -16,6 +16,11 @@ class Current < ActiveSupport::CurrentAttributes
   # present.
   attribute :actor, :channel
 
+  # The request an audit event came from (access-control design spec §4.1),
+  # copied onto every `Audit::Event` by `Audit.record`. Set by
+  # `ApplicationController` and `McpController`; nil outside a request.
+  attribute :request_id, :ip_address
+
   # `PublicSite.current_content_version`'s per-request memo.
   attribute :content_version
 

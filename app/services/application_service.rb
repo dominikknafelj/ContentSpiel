@@ -39,8 +39,25 @@ class ApplicationService
   # Attachment point for policies (sub-project 5). Deliberately permissive.
   def authorize!(_action, _record) = true
 
-  # Attachment point for the audit log (sub-project 5).
-  def record_event(_name, **_data) = nil
+  # Writes to the audit log (access-control design spec §4.2) through
+  # `Audit.record`, with the subject's snapshot taken here -- so every
+  # service logs the full record the same way, and none can forget to.
+  # `action` is an `area.verb` name from the spec's event catalogue (§4.3),
+  # e.g. `"post.updated"`; `field_changes` is usually
+  # `Audit::Snapshot.field_changes_for(record)`. Call it inside the
+  # service's transaction, so a rolled-back write leaves no event.
+  #
+  # `**legacy` and the dot check are a temporary shim until Task 6 rewires
+  # the services: today's call sites still use the placeholder form
+  # `record_event(:post_saved, post: @post)`, from after their transaction
+  # commits. Those are ignored rather than logged half-right (a snake_case
+  # name no catalogue lists, no subject); Task 6 replaces every one and
+  # removes this shim.
+  def record_event(action, subject: nil, field_changes: {}, metadata: {}, **legacy)
+    return nil unless legacy.empty? && action.to_s.include?(".")
+
+    Audit.record(action, subject:, field_changes:, snapshot: Audit::Snapshot.for(subject), metadata:)
+  end
 
   def success(record) = Result.success(record)
   def failure(record, errors = record.errors.full_messages) = Result.failure(record, errors)

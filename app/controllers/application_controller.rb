@@ -23,5 +23,7 @@ class ApplicationController < ActionController::Base
     def set_current_actor
       Current.actor = Current.user
       Current.channel = :admin
+      Current.request_id = request.request_id
+      Current.ip_address = request.remote_ip
     end
 end

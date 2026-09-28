@@ -57,5 +57,7 @@ class McpController < ActionController::API
     # token -- not a session -- is what was actually authenticated here.
     Current.actor = api_token
     Current.channel = :mcp
+    Current.request_id = request.request_id
+    Current.ip_address = request.remote_ip
   end
 end
