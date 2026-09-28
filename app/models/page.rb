@@ -148,7 +148,26 @@ class Page < ApplicationRecord
   # unreachable at its own URL.
   after_save :sync_public_paths
 
+  # `AccessControl.preload_branches` leaves a snapshot of this page's
+  # self-and-ancestor ids on the object (so rendering the tree checks
+  # permissions without a closure query per row). A save can move the page
+  # -- closure_tree rewrites its hierarchy rows in its own `after_save` --
+  # and a reload is the explicit "read me afresh", so both drop the
+  # snapshot: the next permission check reads the closure table again
+  # instead of answering from where the page used to be.
+  after_save :forget_preloaded_branch
+
+  def reload(...)
+    forget_preloaded_branch
+    super
+  end
+
   private
+
+  def forget_preloaded_branch
+    ivar = AccessControl::Checker::PRELOADED_BRANCH_IDS
+    remove_instance_variable(ivar) if instance_variable_defined?(ivar)
+  end
 
   # The homepage's slug is "" by design (see `PublicSite::Paths.page_path`).
   def generates_slugs?

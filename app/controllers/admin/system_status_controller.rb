@@ -3,6 +3,8 @@ module Admin
   # setup wizard runs (`Setup::SystemCheck`), re-run on every request --
   # "Run again" is just a link back here.
   class SystemStatusController < BaseController
+    before_action -> { require_permission("system_status.view") }
+
     def show
       @results = Setup::SystemCheck.run
     end

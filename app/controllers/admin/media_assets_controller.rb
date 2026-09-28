@@ -22,14 +22,17 @@ module Admin
       if result.ok?
         render json: { id: result.record.id, url: result.record.url }, status: :created
       else
-        render_errors(result.errors)
+        render_errors(result.errors, status: result.denied? ? :forbidden : :unprocessable_entity)
       end
     end
 
     private
 
-    def render_errors(messages)
-      render json: { errors: messages }, status: :unprocessable_entity
+    # 403 for a refused upload (no `media.upload`, access-control design
+    # spec §3.4), 422 for a file that isn't acceptable -- both as JSON
+    # `{errors:}`, which the editor shows inline either way.
+    def render_errors(messages, status: :unprocessable_entity)
+      render json: { errors: messages }, status: status
     end
   end
 end

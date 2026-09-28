@@ -16,6 +16,11 @@ module Admin
     TRANSLATED_COLUMNS = Posts::Save::TRANSLATED.map(&:to_s).freeze
 
     before_action :set_post, only: %i[show update destroy publish unpublish schedule]
+    # The list (and the module itself) needs `posts.read` somewhere; the
+    # rows are then narrowed to the readable ones (`filtered_posts`).
+    # "New post" needs `posts.create` for at least one content type.
+    before_action -> { require_permission("posts.read") }, only: :index
+    before_action -> { require_permission("posts.create") }, only: %i[new create]
 
     # Filters as query params (spec §5.2's "filters: content type, status,
     # tag, title search"): `type` is the bare registered name, `status` is
@@ -44,7 +49,7 @@ module Admin
     # settings form.
     def new
       @post = Post.new
-      @content_types = ContentTypes.all
+      @content_types = creatable_content_types
     end
 
     def create
@@ -54,9 +59,11 @@ module Admin
       if result.ok?
         redirect_to admin_post_path(result.record, **admin_url_options), status: :see_other
       else
-        @post = result.record
-        @content_types = ContentTypes.all
-        render :new, status: :unprocessable_entity
+        forbidden_or(result) do
+          @post = result.record
+          @content_types = creatable_content_types
+          render :new, status: :unprocessable_entity
+        end
       end
     end
 
@@ -122,7 +129,7 @@ module Admin
 
       streams.concat(group_error_streams(result.record, definition, fields_hash)) if definition && fields_hash
 
-      render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     def destroy
@@ -131,7 +138,7 @@ module Admin
       if result.ok?
         redirect_to admin_posts_path(**admin_url_options), status: :see_other
       else
-        redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
 
@@ -158,12 +165,22 @@ module Admin
 
     private
 
+    # Through the read scope (design spec §3.3): someone else's post an
+    # author may not read is a 404 -- for show, autosave, publish and delete
+    # alike -- not a 403 that would confirm it exists (Review Focus 2).
     def set_post
-      @post = Post.find(params[:id])
+      @post = admin_scope(Post.all).find(params[:id])
+    end
+
+    # The content types "New post" offers: the registered ones the actor may
+    # create a post of (`posts.create` scoped by `content_types`, design
+    # spec §3.3 "Create post"), checked against an unsaved post of each.
+    def creatable_content_types
+      ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
     end
 
     def filtered_posts
-      scope = Post.all
+      scope = admin_scope(Post.all)
       scope = scope.where(content_type: params[:type]) if params[:type].present?
       scope = filter_by_status(scope, params[:status]) if params[:status].present?
       # A subquery, not `scope.joins(:tags).where(tags: { name: ... })`
@@ -344,7 +361,7 @@ module Admin
       if result.ok?
         redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, notice: success
       else
-        redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
   end

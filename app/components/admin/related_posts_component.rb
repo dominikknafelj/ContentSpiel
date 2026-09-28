@@ -21,9 +21,17 @@ module Admin
   #
   # Searching goes to `<admin>/link_targets?type=post` (the internal-link
   # picker's own endpoint, `Admin::LinkTargetsController`), built through
-  # its route helper, never a hand-written path.
+  # its route helper, never a hand-written path -- which only offers posts
+  # the actor may read.
+  #
+  # Nor does this list disclose a post the actor can't read (access-control
+  # design spec §3.3): a forward relation to one keeps its row and hidden
+  # entry -- dropping it would make the next autosave delete a relation the
+  # editor never saw -- but shows no title or link; an "Also related from"
+  # post they can't read is left out.
   class RelatedPostsComponent < AdminComponent
     ID_PREFIX = "post"
+    UNREADABLE_TITLE = "A post you can't open"
 
     def initialize(post:, locale:, url_options: {}, errors: [])
       @post = post
@@ -45,13 +53,21 @@ module Admin
     def related = post.related_posts.order(:id).to_a
 
     def related_from
-      Post.where(id: PostRelation.where(related_post_id: post.id).select(:post_id)).order(:id).to_a
+      readable(Post.where(id: PostRelation.where(related_post_id: post.id).select(:post_id))).order(:id).to_a
     end
+
+    def readable?(record) = readable_related_ids.include?(record.id)
 
     def title_for(record) = Locales.read(record, :title, locale: locale).presence || "Untitled"
 
     private
 
     attr_reader :post, :locale, :url_options, :errors
+
+    def readable(relation) = AccessControl.scope(Current.actor, "posts.read", relation)
+
+    def readable_related_ids
+      @readable_related_ids ||= readable(post.related_posts).pluck(:id).to_set
+    end
   end
 end

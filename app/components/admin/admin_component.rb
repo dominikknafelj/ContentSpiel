@@ -8,7 +8,12 @@ module Admin
   # constraints). `SetupHelper` is mixed in so every admin input/label/button
   # reuses the exact class strings the setup wizard already established for
   # this same product chrome, rather than a second, drifting copy of them.
+  # `AccessControlHelper` gives every component the same `can?`/`can_edit?`
+  # a CS Studio view has (access-control design spec §5), asked of
+  # `Current.actor` -- so a button's visibility is decided where it's
+  # rendered, not threaded through every constructor as a flag.
   class AdminComponent < ViewComponent::Base
     include SetupHelper
+    include AccessControlHelper
   end
 end

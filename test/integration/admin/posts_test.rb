@@ -257,7 +257,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
     2.times do |attempt|
       patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Forged #{attempt}" } }, as: :turbo_stream
-      assert_response :unprocessable_entity
+      assert_response :forbidden # a permission refusal, not a validation failure (Task 7)
     end
 
     assert_equal "Hands off", post_record.reload.title

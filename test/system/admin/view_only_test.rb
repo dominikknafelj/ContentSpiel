@@ -1,0 +1,59 @@
+require "application_system_test_case"
+
+# The view-only editor (access-control design spec §5 "Everywhere", Review
+# Focus 4): a read-only user opening a post sees "View only", every field
+# disabled -- the Tiptap editor included, which a `<fieldset disabled>`
+# alone wouldn't reach -- and nothing they do sends a PATCH, because
+# `admin--autosave` isn't attached at all. System-level because "sends no
+# request" is only observable in a real browser: PATCHes are counted with
+# the same `window.fetch` hook `Admin::AutosaveSystemTest` uses.
+class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
+  setup do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    @post = create_post(title: "Hands off", published: false)
+    Posts::Save.call(@post, translations: { "en" => { body: rich_doc("Original body") } })
+    sign_in_via_form(users(:reader))
+  end
+
+  test "a read-only user's post editor is view only and never autosaves" do
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__writes = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() !== "GET") window.__writes += 1
+        return originalFetch(url, options)
+      }
+    JS
+
+    assert_selector "[data-view-only]", text: "View only"
+    assert_no_selector "[data-controller~='admin--autosave']"
+    assert_no_button "Publish now"
+    assert_no_button "Delete"
+
+    title = find_field("Title", disabled: true)
+    assert title.disabled?
+
+    editor = find(".admin-rich-text-content[contenteditable='false']")
+    page.driver.browser.action.click(editor.native).send_keys("typed ").perform
+
+    # What the autosave controller would have listened for, fired by hand
+    # on the disabled title: with nothing attached, nothing answers.
+    page.execute_script(<<~JS)
+      const field = document.getElementById("post-title")
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      field.dispatchEvent(new FocusEvent("focusout", { bubbles: true }))
+    JS
+
+    # Past the 1000ms autosave debounce: a queued save would have fired by
+    # now. Asserting an absence needs the wait itself.
+    sleep 1.5
+
+    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_no_text "typed"
+    assert_text "Original body"
+    assert_equal "Hands off", @post.reload.title
+  end
+end

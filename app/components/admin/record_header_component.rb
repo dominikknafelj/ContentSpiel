@@ -45,9 +45,20 @@ module Admin
 
     def preview_path = preview_urls.path_for(page, locale)
 
-    def can_publish? = !page.live?
+    # Access control (design spec §5 "Everywhere"): Publish now, Unpublish
+    # and Schedule… need `pages.publish` on this page, Delete `pages.delete`
+    # -- each absent, not disabled, without it (the disabled Delete below is
+    # only for a user who *may* delete, but not this page right now). A page
+    # the user can read but not edit (`can_edit?`) says "View only".
+    def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
 
-    def can_unpublish? = page.status != "draft"
+    def may_publish? = can?("pages.publish", page)
+
+    def may_delete? = can?("pages.delete", page)
+
+    def can_publish? = !page.live? && may_publish?
+
+    def can_unpublish? = page.status != "draft" && may_publish?
 
     def can_delete? = !page.root? && page.children.empty?
 

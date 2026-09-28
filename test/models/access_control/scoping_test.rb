@@ -221,20 +221,20 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
 
   # --- The tree ------------------------------------------------------------
 
-  test "tree_visibility marks the ancestors of a readable deep page as context" do
+  test "tree_visibility marks the ancestors of a readable deep page as context_only" do
     grant!(access_control_groups(:branch_editors), "pages.read", { "page_ids" => [ @a1a.id ] })
 
     visibility = AccessControl.tree_visibility(@brancher, channel: :admin)
 
     assert_equal Set[@a1a.id], visibility[:readable]
-    assert_equal Set[@root.id, @a.id, @a1.id], visibility[:context]
+    assert_equal Set[@root.id, @a.id, @a1.id], visibility[:context_only]
   end
 
-  test "tree_visibility for a reader and an owner has no context" do
+  test "tree_visibility for a reader and an owner has no context_only pages" do
     [ @reader, @owner ].each do |actor|
       visibility = AccessControl.tree_visibility(actor, channel: :admin)
       assert_equal Page.pluck(:id).to_set, visibility[:readable]
-      assert_empty visibility[:context]
+      assert_empty visibility[:context_only]
     end
   end
 
@@ -271,6 +271,26 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     end
     assert_equal scoped(@brancher, "pages.edit", Page.all).pluck(:id).sort,
       pages.select { |page| AccessControl.allowed?(@brancher, "pages.edit", page, channel: :admin) }.map(&:id).sort
+  end
+
+  # The preload is a snapshot (carry-over from Task 4's review): once a
+  # page is reloaded or saved -- a move rewrites its closure rows -- the
+  # snapshot would answer from where the page used to be, so both drop it
+  # and the next check reads the closure table afresh.
+  test "reloading or saving a page forgets its preloaded branch" do
+    page = Page.find(@a1.id)
+    AccessControl.preload_branches([ page ])
+    assert_equal @a1.self_and_ancestor_ids.sort, AccessControl.page_branch_ids(page).sort
+
+    Pages::Move.call(Page.find(@a1.id), parent: @b, position: 0)
+    page.reload
+    assert_includes AccessControl.page_branch_ids(page), @b.id
+
+    AccessControl.preload_branches([ page ])
+    page.parent = @a
+    page.save!
+    assert_includes AccessControl.page_branch_ids(page), @a.id
+    assert_not_includes AccessControl.page_branch_ids(page), @b.id
   end
 
   test "preload_branches ignores unsaved pages" do

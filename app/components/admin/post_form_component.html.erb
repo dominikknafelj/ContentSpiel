@@ -32,6 +32,9 @@
     </div>
 
     <div class="flex shrink-0 items-center gap-3">
+      <% unless editable? %>
+        <%= render "admin/shared/view_only_badge" %>
+      <% end %>
       <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, url: language_url) %>
       <span data-status="<%= status %>">
         <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
@@ -63,21 +66,25 @@
       <%= button_to "Unpublish", helpers.unpublish_admin_post_path(post, **url_options), method: :post, class: setup_secondary_link_class %>
     <% end %>
 
-    <details class="admin-record-header__schedule">
-      <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
-      <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "mt-2 flex items-center gap-2" do %>
-        <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
-        <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
-      <% end %>
-    </details>
+    <% if may_publish? %>
+      <details class="admin-record-header__schedule">
+        <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
+        <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "mt-2 flex items-center gap-2" do %>
+          <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
+          <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
+        <% end %>
+      </details>
+    <% end %>
 
-    <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
-          onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+    <% if can_delete? %>
+      <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+            onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
 
-    <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this post?", body: "This can't be undone.") do |dialog| %>
-      <% dialog.with_confirm_action do %>
-        <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
-          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this post?", body: "This can't be undone.") do |dialog| %>
+        <% dialog.with_confirm_action do %>
+          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+          <% end %>
         <% end %>
       <% end %>
     <% end %>
@@ -88,13 +95,11 @@
     `Admin::PageSettingsFormComponent`'s own (see that component's own
     comment for why the save-status line, up in the header above rather
     than nested inside this form, needs no Stimulus target here to reach
-    it). %>
-<%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4 rounded-cs border border-line bg-surface p-4",
-      data: {
-        controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-        "admin--autosave-status-id-value": save_status_id
-      } do %>
+    it) -- and only on an editable post (`form_data`). The `<fieldset>`
+    (`contents`, so it doesn't affect the form's layout) disables every
+    field at once for a view-only one. %>
+<%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data do %>
+<%= tag.fieldset disabled: !editable?, class: "contents" do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
@@ -148,4 +153,5 @@
   <%= render Admin::RelatedPostsComponent.new(
         post: post, locale: locale, url_options: url_options, errors: field_errors("related_post_ids")
       ) %>
+<% end %>
 <% end %>

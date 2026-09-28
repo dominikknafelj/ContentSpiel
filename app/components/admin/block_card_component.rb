@@ -21,6 +21,13 @@ module Admin
   # a removed plugin, spec §8 -- has no `definition` to read a schema or
   # columns from: `unavailable?` switches the template to the minimal
   # "Unavailable type" card instead, Delete its only action.
+  #
+  # `editable:` is whether the user may change this page's blocks
+  # (access-control design spec §5, `can_edit?` on the page -- blocks
+  # follow their page's permissions). The page view works it out once and
+  # hands it to every card; left nil, the card asks itself. A view-only
+  # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete), no
+  # "+" picker below it, and its form is disabled without `admin--autosave`.
   class BlockCardComponent < AdminComponent
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
@@ -29,7 +36,8 @@ module Admin
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
-    def initialize(page:, block:, locale:, url_options: {}, last: false)
+    def initialize(page:, block:, locale:, url_options: {}, last: false, editable: nil)
+      @editable = editable
       @page = page
       @block = block
       @locale = locale
@@ -48,6 +56,18 @@ module Admin
     def unavailable_label = "Unavailable type — #{block.block_type}"
 
     def last? = @last
+
+    def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
+
+    def form_data
+      return {} unless editable?
+
+      {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": status_id
+      }
+    end
 
     def error_prefix = self.class.error_prefix(block)
 

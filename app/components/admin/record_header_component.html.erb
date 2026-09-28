@@ -23,6 +23,9 @@
     </div>
 
     <div class="flex shrink-0 items-center gap-3">
+      <% unless editable? %>
+        <%= render "admin/shared/view_only_badge" %>
+      <% end %>
       <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, url: language_url) %>
       <span data-status="<%= status %>">
         <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
@@ -62,16 +65,20 @@
             class: setup_secondary_link_class, form: { data: { turbo_frame: "_top" } } %>
     <% end %>
 
-    <details class="admin-record-header__schedule">
-      <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
-      <%= form_with url: helpers.schedule_admin_page_path(page, **url_options), method: :post, class: "mt-2 flex items-center gap-2",
-            data: { turbo_frame: "_top" } do %>
-        <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
-        <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
-      <% end %>
-    </details>
+    <% if may_publish? %>
+      <details class="admin-record-header__schedule">
+        <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
+        <%= form_with url: helpers.schedule_admin_page_path(page, **url_options), method: :post, class: "mt-2 flex items-center gap-2",
+              data: { turbo_frame: "_top" } do %>
+          <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
+          <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
+        <% end %>
+      </details>
+    <% end %>
 
-    <% if can_delete? %>
+    <%# No Delete at all without `pages.delete`; with it, disabled (with the
+        reason) for the homepage or a page that still has subpages. %>
+    <% if may_delete? && can_delete? %>
       <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
             onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
 
@@ -82,7 +89,7 @@
           <% end %>
         <% end %>
       <% end %>
-    <% else %>
+    <% elsif may_delete? %>
       <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button", disabled: true, title: delete_disabled_reason) %>
     <% end %>
   </div>

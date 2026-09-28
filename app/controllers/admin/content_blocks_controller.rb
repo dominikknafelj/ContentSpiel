@@ -47,7 +47,7 @@ module Admin
         reposition_after(result.record, params[:after_id])
         render turbo_stream: insertion_stream(result.record, params[:after_id], previous_last_id: previous_last_id), status: :created
       else
-        render turbo_stream: picker_error_stream(result.errors), status: :unprocessable_entity
+        render turbo_stream: picker_error_stream(result.errors), status: failure_status(result)
       end
     end
 
@@ -81,18 +81,24 @@ module Admin
 
       streams << image_field_stream(result.record) if result.ok? && image_changing
 
-      render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     # Permanent (spec §7's "No trash" interim state) -- the card simply
     # disappears from the list, no confirmation round trip beyond the
     # `ConfirmDialogComponent` the card's own "⋯" menu already gated this
-    # request behind client-side.
+    # request behind client-side. A refusal (no `pages.edit` -- a view-only
+    # editor never shows the menu, so a stale tab or a forged request) or
+    # any other failure leaves the card in place and says why in the
+    # page's alert slot, instead of removing a card whose block still
+    # exists.
     def destroy
       block = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless block
 
-      ContentBlocks::Destroy.call(block)
+      result = ContentBlocks::Destroy.call(block)
+      return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
+
       render turbo_stream: turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block))
     end
 
@@ -103,14 +109,23 @@ module Admin
     # the status only (spec §5.1's "Interfaces" list): unlike a card's own
     # autosave, a reorder touches no field with its own error slot to
     # refresh.
+    #
+    # A failure also says why in the page's alert slot, and a refusal is a
+    # 403 with the "no permission" status -- the order already on screen is
+    # the client's optimistic one, so leaving it unexplained would look
+    # saved.
     def reorder
       result = ContentBlocks::Reorder.call(@page, params[:ids])
       status_id = "content-blocks-status"
 
-      state = result.ok? ? Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current) :
-        Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
+      state = if result.ok? then Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
+      elsif result.denied? then Admin::SaveStatusComponent.new(id: status_id, state: :forbidden)
+      else Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size)
+      end
 
-      render turbo_stream: turbo_stream.replace(status_id, state), status: (result.ok? ? :ok : :unprocessable_entity)
+      streams = [ turbo_stream.replace(status_id, state) ]
+      streams << picker_error_stream(result.errors) unless result.ok?
+      render turbo_stream: streams, status: (result.ok? ? :ok : failure_status(result))
     end
 
     # Duplicate (spec §5.1): copies the type, its settings (both halves --
@@ -130,7 +145,7 @@ module Admin
       copy_translations(source, copy)
 
       result = ContentBlocks::Save.call(copy, attributes: {})
-      return render(turbo_stream: picker_error_stream(result.errors), status: :unprocessable_entity) unless result.ok?
+      return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
       attach_duplicate_image(copy, source) if source.image.attached?
       reposition_after(copy, source.id)
@@ -139,9 +154,16 @@ module Admin
 
     private
 
+    # Through the read scope (access-control design spec §3.3): blocks of a
+    # page the actor can't read are a 404, whatever the action -- the page
+    # isn't disclosed. Whether they may *change* the blocks of a page they
+    # can read is `ContentBlocks::*`'s call (`pages.edit`, plus `publish`
+    # on a published page), answered 403 below.
     def set_page
-      @page = Page.find(params[:page_id])
+      @page = admin_scope(Page.all).find(params[:page_id])
     end
+
+    def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
     def block_card_component(block, last: false)
       Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: last)

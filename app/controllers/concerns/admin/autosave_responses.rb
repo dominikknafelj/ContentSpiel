@@ -49,9 +49,22 @@ module Admin
       streams
     end
 
+    # The HTTP status an autosave answers with: 200, 403 for a permission
+    # refusal (access-control design spec §3.4 -- a forged or stale-tab
+    # PATCH to a record the user may only read), 422 for anything else.
+    # The Turbo Stream body is sent either way; `admin--autosave` renders a
+    # stream answer whatever its status.
+    def autosave_status(result)
+      if result.ok? then :ok
+      elsif result.denied? then :forbidden
+      else :unprocessable_entity
+      end
+    end
+
     private
 
     def save_status_component(record:, result:, status_id:, base_updated_at:)
+      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden) if result.denied?
       return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size) unless result.ok?
 
       return Admin::SaveStatusComponent.new(id: status_id, state: :stale) if stale_base?(record, base_updated_at)

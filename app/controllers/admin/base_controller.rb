@@ -2,12 +2,94 @@ module Admin
   # Everything in CS Studio (cs-studio spec §4.1): signed-in only (inherited
   # Authentication), the admin layout, the :admin channel for services, and the
   # editing locale every screen reads.
+  #
+  # Access control (design spec §3.4 "Controllers"), three tools every
+  # module controller uses:
+  # - `require_permission(key)` for an admin *area* (Users, Settings, ...):
+  #   without the key anywhere, the 403 page (`forbidden!`);
+  # - `admin_scope(relation)` for *records*: loading through the actor's
+  #   read scope, so an id outside it raises `RecordNotFound` -- a 404,
+  #   never a 403, so a record's existence isn't disclosed (§3.3 "Not
+  #   found, not forbidden", Review Focus 2);
+  # - `can?`/`can_edit?` (`AccessControlHelper`) for what to show.
+  # The services decide every write again; a denial they return is answered
+  # with `forbidden!` (HTML/JSON) or a 403 Turbo Stream by each controller.
   class BaseController < ApplicationController
+    include AccessControlHelper
+    # Helpers for this controller's own use, not actions.
+    private(*AccessControlHelper.public_instance_methods)
+
+    # The modules column (cs-studio spec §4.2), in order: each entry is
+    # shown only when the actor holds its `permission` anywhere (`can?`
+    # without a record); `nil` is open to every signed-in user (the AI
+    # assistant screen lists and manages the user's own tokens, spec §5).
+    # One list for the sidebar (`admin_modules`) and for where the Pages
+    # home sends someone who can't read pages (`first_admin_module_path`),
+    # so the two can never disagree about what a user can open.
+    MODULES = [
+      { label: "Pages", icon: :pages, path: :admin_root_path, permission: "pages.read" },
+      { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
+      { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
+      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
+      { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
+      { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil },
+      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read" },
+      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view" }
+    ].freeze
+
+    FORBIDDEN_MESSAGE = "You don't have permission to open this."
+
     layout "admin"
     before_action { Current.channel = :admin }
-    helper_method :admin_locale, :admin_url_options, :root_page
+    helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules
 
     private
+
+    # The `MODULES` entries this actor may open.
+    def admin_modules
+      @admin_modules ||= MODULES.select { |entry| entry[:permission].nil? || can?(entry[:permission]) }
+    end
+
+    def first_admin_module_path
+      entry = admin_modules.first
+      entry && send(entry[:path], **admin_url_options)
+    end
+
+    # For an area controller's `before_action`: the 403 page unless the
+    # actor holds `key` anywhere. Rendering halts the action chain.
+    def require_permission(key)
+      forbidden! unless can?(key)
+    end
+
+    # `relation` narrowed to what the actor may `key` (by default the
+    # model's own `read`: `Post` -> `posts.read`, `Page` -> `pages.read`),
+    # so a `find` on it 404s for a record out of scope. Reads only --
+    # whether the actor may *change* a loaded record is its service's call.
+    def admin_scope(relation, key = "#{relation.model.table_name}.read")
+      AccessControl.scope(Current.actor, key, relation)
+    end
+
+    # The 403 answer (design spec §5 "The 403 page matches the product
+    # layout"): JSON `{errors:}` for a JSON request (the editor's upload
+    # endpoint), otherwise the forbidden page inside the admin layout --
+    # also for a Turbo form submission, which renders an error response's
+    # HTML in place. `message` is a service's refusal ("You don't have
+    # permission to publish posts") when there is one.
+    def forbidden!(message = nil)
+      message ||= FORBIDDEN_MESSAGE
+
+      if request.format.json?
+        render json: { errors: [ message ] }, status: :forbidden
+      else
+        render "admin/errors/forbidden", status: :forbidden, formats: [ :html ], content_type: "text/html", locals: { message: message }
+      end
+    end
+
+    # A service failure answered in HTML: the 403 page for a permission
+    # refusal, otherwise whatever the block does for any other failure.
+    def forbidden_or(result)
+      result.denied? ? forbidden!(result.errors.to_sentence) : yield
+    end
 
     # The homepage (final-fixes round, finding 12) -- one place for what
     # every Pages view and both of its controllers (`PagesController`'s own
@@ -33,8 +115,5 @@ module Admin
     def admin_url_options
       admin_locale == Locales.default ? {} : { locale: admin_locale }
     end
-
-    # Attachment point for roles/policies (sub-project 5). Permissive for now.
-    def authorize!(_action, _record) = true
   end
 end

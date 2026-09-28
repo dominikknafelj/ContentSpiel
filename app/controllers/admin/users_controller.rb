@@ -12,6 +12,9 @@ module Admin
   # save (an autosaving form's whole point elsewhere) must never touch
   # silently -- an edit here is a deliberate "Save changes" submit.
   class UsersController < BaseController
+    # The whole module is `users.manage` (access-control design spec §3.3
+    # "Users"); `Users::*` check it again, per user, for every write.
+    before_action -> { require_permission("users.manage") }
     before_action :set_user, only: %i[edit update destroy]
 
     def index

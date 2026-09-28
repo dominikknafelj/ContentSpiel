@@ -28,7 +28,7 @@ module Admin
         notice = result.record ? "Starter pages created" : "Starter pages already exist"
         redirect_to admin_root_path(**admin_url_options), status: :see_other, notice: notice
       else
-        redirect_to admin_root_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_root_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
   end

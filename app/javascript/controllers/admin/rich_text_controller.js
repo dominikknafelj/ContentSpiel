@@ -57,6 +57,13 @@ export default class extends Controller {
     this.popover = null
     this.contentInvalid = false
     this.edited = false
+    // A view-only editor (access-control design spec §5): the form wraps
+    // its fields in a `<fieldset disabled>`, which disables every native
+    // control -- the toolbar buttons and the hidden input included -- but
+    // not a contenteditable, so the editor itself is mounted read-only to
+    // match. Nothing is ever written back, and there's no autosave on the
+    // form to send it anyway.
+    this.readOnly = this.element.closest("fieldset[disabled]") !== null
     // A popover left behind in a Turbo cache snapshot (the page was cached
     // with one open) is dead DOM -- its listeners belonged to the previous
     // connection. Same "start from a clean slate" rule as the mount point.
@@ -80,6 +87,7 @@ export default class extends Controller {
         onEditImage: (position) => this.openImagePopover(position)
       }),
       injectCSS: false,
+      editable: !this.readOnly,
       enableContentCheck: true,
       // The ProseMirror element is the actual text field, so it carries the
       // textbox role and the column's label (the mount's own
@@ -206,7 +214,7 @@ export default class extends Controller {
   }
 
   editable() {
-    return this.editor && !this.contentInvalid
+    return this.editor && !this.contentInvalid && !this.readOnly
   }
 
   // Active state for every toolbar button whose command is "on" at the

@@ -47,6 +47,12 @@ module StarterContents
       failure(nil, [ FAILURE_MESSAGE ])
     end
 
+    # Would `call` get past its permission checks? For the Pages home,
+    # which offers "Create starter pages" only when it would (access-control
+    # design spec §5 "Everywhere") -- the same checks, so the button and
+    # the refusal can't disagree. Asks only; records nothing.
+    def permitted? = refusal.nil?
+
     private
 
     # The first `[key, record]` the actor lacks, or nil.

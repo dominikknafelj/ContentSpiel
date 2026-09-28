@@ -18,7 +18,10 @@ module Admin
     # one class the same way every other state's already is -- and so a
     # Lookbook preview or a future server-side use of it has somewhere to
     # read the exact text from.
-    STATES = %i[idle saving saved error stale offline retrying signed_out].freeze
+    # `:forbidden` is a save a service refused for want of permission
+    # (access-control design spec §3.4) -- an editor that's view only never
+    # sends one, so it only shows for a stale tab whose rights changed.
+    STATES = %i[idle saving saved error stale offline retrying signed_out forbidden].freeze
 
     def initialize(id:, state: :idle, at: nil, count: 0)
       raise ArgumentError, "unknown save status state #{state.inspect}" unless STATES.include?(state)
@@ -35,6 +38,7 @@ module Admin
       when :saving then "Saving…"
       when :saved then [ "Saved", at&.strftime("%H:%M") ].compact.join(" ")
       when :error then "Couldn't save — #{count} problems"
+      when :forbidden then "Not saved — you don't have permission to change this"
       when :retrying then "Not saved — retrying"
       when :offline then "Not saved — check your connection"
       when :stale then "Changed elsewhere — reload to see the latest"

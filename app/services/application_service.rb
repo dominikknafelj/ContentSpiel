@@ -5,7 +5,14 @@
 # exception, so every caller branches the same way; anything unexpected
 # propagates.
 class ApplicationService
-  Result = Data.define(:record, :errors) do
+  # `denied` marks a failure that is a missing permission (`#denied`
+  # below) rather than a validation or rule failure -- what lets a CS Studio
+  # controller answer 403 for one and 422 for the other (access-control
+  # design spec §3.4) without matching on the message text, which a
+  # `message:` override (the owner-only user rules) changes anyway.
+  Result = Data.define(:record, :errors, :denied) do
+    def initialize(record:, errors:, denied: false) = super
+
     def self.success(record) = new(record:, errors: [])
 
     # `errors` defaults to `record.errors.full_messages` (see
@@ -30,6 +37,8 @@ class ApplicationService
     end
 
     def ok? = errors.empty?
+
+    def denied? = denied
   end
 
   def self.call(...) = new(...).call
@@ -82,7 +91,7 @@ class ApplicationService
     metadata["subject_type"] = record.class.polymorphic_name if record.is_a?(ActiveRecord::Base) && subject.nil?
 
     as_actor { Audit.record("access.denied", subject:, metadata:) }
-    failure(record, [ message || "You don't have permission to #{permission.label.downcase}" ])
+    Result.new(record:, errors: [ message || "You don't have permission to #{permission.label.downcase}" ], denied: true)
   end
 
   # Writes to the audit log (access-control design spec §4.2) through

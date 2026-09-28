@@ -17,6 +17,10 @@ module Admin
 
     ID_PREFIX = "settings"
 
+    # The module is `settings.manage` (access-control design spec §3.4);
+    # `Settings::Save` checks it again for every write.
+    before_action -> { require_permission("settings.manage") }
+
     def show
       @site_setting = Current.site
     end
@@ -57,7 +61,7 @@ module Admin
 
       streams << logo_field_stream(site) if saved && logo_changing
 
-      render turbo_stream: streams, status: (saved ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     private

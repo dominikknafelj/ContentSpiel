@@ -74,6 +74,15 @@ module Admin
       # §4.2). A hint for the file chooser only; the server decides.
       ACCEPT = "image/png,image/jpeg,image/gif,image/webp".freeze
 
+      # The toolbar actually rendered: `TOOLBAR` without "Image" for someone
+      # who can't upload (`media.upload`, access-control design spec §5's
+      # "Upload" button) -- the button's only way to add an image is an
+      # upload. An image already in the document stays editable by
+      # selecting it.
+      def toolbar
+        can?("media.upload") ? TOOLBAR : TOOLBAR.reject { |action, *| action == "image" }
+      end
+
       def document = self.class.to_document(value)
 
       def original_document = self.class.to_document(original)

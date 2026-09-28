@@ -4,13 +4,11 @@
   <%# `data-controller="admin--autosave"` sits on this form directly (not a
       wrapping element) -- see that controller's own comment for why its
       save-status line, which lives in the record header instead, doesn't
-      need a Stimulus target here to reach it. %>
-  <%= form_with url: form_url, method: :patch, class: "mt-4 flex flex-col gap-4",
-        data: {
-          controller: "admin--autosave",
-          action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-          "admin--autosave-status-id-value": status_id
-        } do %>
+      need a Stimulus target here to reach it. Only on an editable page
+      (`form_data`); the `contents` fieldset disables every field of a
+      view-only one without touching the layout. %>
+  <%= form_with url: form_url, method: :patch, class: "mt-4 flex flex-col gap-4", data: form_data do %>
+  <%= tag.fieldset disabled: !editable?, class: "contents" do %>
 
     <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
@@ -83,5 +81,6 @@
             ) %>
       </div>
     </details>
+  <% end %>
   <% end %>
 </details>

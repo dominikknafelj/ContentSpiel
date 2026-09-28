@@ -19,12 +19,18 @@
     <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
   </div>
 
+  <%# Whether the blocks can be changed at all (access-control design spec
+      §5: blocks follow their page's permissions) -- asked once here for
+      every card, and for "+ Add block". %>
+  <% blocks_editable = can_edit?(@page) %>
   <div id="content-blocks-list" class="flex flex-col gap-3">
     <% blocks = @page.content_blocks.to_a %>
     <% blocks.each_with_index do |block, index| %>
-      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: index == blocks.size - 1) %>
+      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: index == blocks.size - 1, editable: blocks_editable) %>
     <% end %>
   </div>
 
-  <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <% if blocks_editable %>
+    <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+  <% end %>
 </section>

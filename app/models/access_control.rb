@@ -58,17 +58,19 @@ module AccessControl
     end
 
     # The CS Studio page tree (design spec §3.3): the ids of the pages
-    # `actor` may read, plus `context` -- the ancestors of those pages
+    # `actor` may read, plus `context_only` -- the ancestors of those pages
     # that aren't readable themselves, which the tree shows greyed out,
     # without actions, so a readable page deep in the tree still has its
-    # path to the root. Three queries at most, whatever the tree's size:
-    # the grants (memoised), the readable ids, and their ancestors from
-    # the closure table (a subquery on the first, not a list of ids).
+    # path to the root. (`context_only` is the spec's name, used the same
+    # in `Admin::TreeNodeComponent`.) Three queries at most, whatever the
+    # tree's size: the grants (memoised), the readable ids, and their
+    # ancestors from the closure table (a subquery on the first, not a list
+    # of ids).
     def tree_visibility(actor, channel: Current.channel)
       readable_pages = scope(actor, "pages.read", Page.all, channel: channel)
       readable = readable_pages.pluck(:id).to_set
       ancestors = PageHierarchy.where(descendant_id: readable_pages.select(:id)).distinct.pluck(:ancestor_id)
-      { readable: readable, context: ancestors.to_set - readable }
+      { readable: readable, context_only: ancestors.to_set - readable }
     end
 
     # Design spec §3.3 "Performance": `allowed?` over a list of pages (the
@@ -76,8 +78,10 @@ module AccessControl
     # per page for its branch. This loads every listed page's self-and-
     # ancestor ids in one query and keeps them on the page objects, where
     # `Checker.page_branch_ids` finds them. It's a snapshot, like any
-    # preloaded association: a page moved after the preload still answers
-    # from its old position until it's loaded afresh. Only call it on a
+    # preloaded association: a page moved elsewhere (another object, another
+    # request) after the preload still answers from its old position until
+    # it's loaded afresh -- `Page#reload` and a save of the object itself
+    # drop the snapshot (`Page#forget_preloaded_branch`). Only call it on a
     # list about to be rendered; a write service is handed the record its
     # controller loaded for that request, never a preloaded list entry.
     # Returns `pages`.

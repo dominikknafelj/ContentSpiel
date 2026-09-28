@@ -10,6 +10,10 @@ module Admin
   class TagsController < BaseController
     include AutosaveResponses
 
+    # The module is `tags.manage` (access-control design spec §3.4);
+    # `Tags::*` check it again for every write.
+    before_action -> { require_permission("tags.manage") }
+
     # `LOWER(tags.name)`, not the plain column: matches the case-insensitive
     # ordering an editor actually expects from a list of lowercase-stored
     # names, and the same comparison `BlockTypes::PostList` already makes
@@ -44,7 +48,7 @@ module Admin
         fields: { name: [ :name ] }
       )
 
-      render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     # Permanent (spec §7's "No trash" interim state) -- the row's own
@@ -52,9 +56,15 @@ module Admin
     # lose the tag before this request was ever sent. `Tags::Destroy` (not a
     # bare `tag.destroy`) is what re-syncs the same tag-filtered listings
     # `update` above relies on `Tags::Rename` for.
+    #
+    # A refusal (a stale tab whose `tags.manage` was taken away) leaves the
+    # row in place and answers 403, rather than removing a tag that still
+    # exists.
     def destroy
       tag = Tag.find(params[:id])
-      Tags::Destroy.call(tag)
+      result = Tags::Destroy.call(tag)
+      return head(result.denied? ? :forbidden : :unprocessable_entity) unless result.ok?
+
       render turbo_stream: turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag))
     end
 
