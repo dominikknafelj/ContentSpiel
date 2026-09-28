@@ -10,18 +10,30 @@ module Users
   # this service has no opinion on sessions at all; ending the caller's own
   # session and redirecting to sign-in is `Admin::UsersController#destroy`'s
   # job, since only the controller knows which request this is.
+  #
+  # Needs `users.manage`, and deleting an owner is owner-only
+  # (`Users::OwnerProtection`). `user.deleted` is recorded before the
+  # destroy, in its transaction, so a refused one (the last owner) rolls
+  # the event back with it.
   class Destroy < ApplicationService
+    include OwnerProtection
+
     def initialize(user, actor: Current.actor)
       @user = user
       @actor = actor
     end
 
     def call
-      authorize!(:destroy, @user)
+      return denied("users.manage", @user) unless authorize!("users.manage", @user)
+      return owner_only_denial if owner_protected?
 
-      return failure(@user) unless @user.destroy
+      destroyed = User.transaction do
+        record_event("user.deleted", subject: @user)
+        @user.destroy || raise(ActiveRecord::Rollback)
+      end
 
-      record_event(:user_destroyed, user: @user)
+      return failure(@user) unless destroyed
+
       success(@user)
     end
   end

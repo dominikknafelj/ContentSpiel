@@ -23,13 +23,32 @@ module ApiTokens
       @actor = actor
     end
 
+    # Who may (access-control design spec §3.3 "Tokens"): anyone signed in
+    # may issue a token for *themselves* -- a signed-in `User` actor who is
+    # `user`; an API token minting tokens isn't "themselves", and needs
+    # `tokens.manage` like anyone issuing for someone else. Whether the
+    # chosen group is one the user may hand out is Task 8's check
+    # (`AccessControl.can_assign_group?`); until then the token is still
+    # bounded by its user's own rights (the intersection).
+    #
+    # The event carries the token's id, user and group (`Audit::Snapshot`),
+    # never its digest or the raw value (Review Focus 5).
     def call
-      authorize!(:issue, @user)
+      unless own_token?
+        return denied("tokens.manage", @user) unless authorize!("tokens.manage", @user)
+      end
 
-      token, raw = ApiToken.generate!(@user, group: @group)
+      token, raw = ApiToken.transaction do
+        issued = ApiToken.generate!(@user, group: @group)
+        record_event("token.issued", subject: issued.first, metadata: { "group" => @group&.name })
+        issued
+      end
 
-      record_event(:api_token_issued, token:)
       success([ token, raw ])
     end
+
+    private
+
+    def own_token? = actor.is_a?(User) && actor == @user
   end
 end

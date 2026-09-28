@@ -28,6 +28,18 @@ module ActiveSupport
     # the spec calls for, keeps that leak from ever being observable.
     setup { Setup.reset! }
 
+    # Runs the block as `actor` (a User or ApiToken) on `channel`, the way
+    # a CS Studio request would (access-control design spec §3.3) -- so a
+    # service called inside it is authorized and audited for that actor.
+    # Outside one, tests run with a nil actor and nil channel, which the
+    # checker trusts like the console; tests about permissions say who's
+    # acting explicitly instead of leaning on that.
+    def as(actor, channel: :admin, &block)
+      Current.set(actor: actor, channel: channel, &block)
+    end
+
+    def as_owner(&block) = as(users(:one), &block)
+
     # Replaces a singleton method (a module function, a class method) for
     # the block's duration, then restores it -- for forcing a failure out of
     # a collaborator the code under test calls.

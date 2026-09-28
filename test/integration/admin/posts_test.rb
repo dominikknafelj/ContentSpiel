@@ -245,4 +245,27 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select_in_stream "post-related_post_ids-errors", /don.t exist/
   end
+
+  # Review Focus 4: a read-only user's forged autosave PATCH -- the editor
+  # never sends one for them (Task 7), but the service refuses it anyway,
+  # changes nothing, and however often it's repeated logs one coalesced
+  # `access.denied`.
+  test "a forged PATCH by a read-only user is refused and audited once" do
+    post_record = create_post(title: "Hands off")
+    sign_out
+    sign_in_as(users(:reader))
+
+    2.times do |attempt|
+      patch "/cs-studio/posts/#{post_record.id}", params: { post: { title: "Forged #{attempt}" } }, as: :turbo_stream
+      assert_response :unprocessable_entity
+    end
+
+    assert_equal "Hands off", post_record.reload.title
+    denied = Audit::Event.where(action: "access.denied")
+    assert_equal 1, denied.count
+    assert_equal users(:reader), denied.first.actor
+    assert_equal post_record, denied.first.subject
+    assert_equal "posts.edit", denied.first.metadata["permission"]
+    assert_not Audit::Event.exists?(action: "post.updated", subject: post_record)
+  end
 end

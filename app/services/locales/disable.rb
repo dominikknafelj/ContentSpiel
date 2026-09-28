@@ -14,7 +14,9 @@ module Locales
 
     def call
       site = Current.site
-      authorize!(:disable_locale, site)
+      # `languages.manage` (access-control design spec §3.1): an admin area,
+      # with no per-record scope.
+      return denied("languages.manage", site) unless authorize!("languages.manage", site)
 
       # The default language is always the address every unprefixed public
       # URL resolves in (SiteSetting#default_locale_is_enabled requires it to
@@ -35,12 +37,12 @@ module Locales
         next false unless site.save
 
         PublicPath.where(locale: @code).delete_all
+        record_event("language.disabled", subject: site, field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
         true
       end
 
       return failure(site) unless saved
 
-      record_event(:locale_disabled, code: @code)
       success(site)
     end
 

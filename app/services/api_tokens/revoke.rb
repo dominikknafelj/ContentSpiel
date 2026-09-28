@@ -8,12 +8,19 @@ module ApiTokens
       @actor = actor
     end
 
+    # Anyone signed in may revoke their own tokens; anyone else's needs
+    # `tokens.manage` (access-control design spec §3.3 "Tokens" -- the same
+    # rule as `ApiTokens::Issue`).
     def call
-      authorize!(:revoke, @token)
+      unless actor.is_a?(User) && actor.id == @token.user_id
+        return denied("tokens.manage", @token) unless authorize!("tokens.manage", @token)
+      end
 
-      @token.revoke!
+      ApiToken.transaction do
+        @token.revoke!
+        record_event("token.revoked", subject: @token, field_changes: Audit::Snapshot.field_changes_for(@token))
+      end
 
-      record_event(:api_token_revoked, token: @token)
       success(@token)
     end
   end

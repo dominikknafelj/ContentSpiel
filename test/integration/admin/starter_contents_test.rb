@@ -61,7 +61,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "/cs-studio"
     follow_redirect!
-    assert_select "[role=alert]", text: /couldn.t be created/
+    assert_select "[role=alert]", text: /couldn.t be added/
   end
 
   test "a request from a stale tab re-checks and finds the sections another tab created" do

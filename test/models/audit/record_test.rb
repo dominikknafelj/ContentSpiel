@@ -58,7 +58,7 @@ class Audit::RecordTest < ActiveSupport::TestCase
 
     assert_nil event.subject
     assert_equal "Short-lived", event.subject_label
-    assert_equal [ event ], Audit::Event.where(subject_type: "Post", subject_id: post.id).to_a
+    assert_equal [ event ], Audit::Event.where(subject_type: "Post", subject_id: post.id, action: "post.deleted").to_a
   end
 
   test "two updates by the same actor within the window coalesce into one event" do
@@ -100,7 +100,7 @@ class Audit::RecordTest < ActiveSupport::TestCase
       Audit.record("post.updated", subject: post)
     end
 
-    assert_equal [ first.id ], Audit::Event.for_subject(post).pluck(:id)
+    assert_equal [ first.id ], Audit::Event.for_subject(post).where(action: "post.updated").pluck(:id)
   end
 
   test "updates more than ten minutes apart make two events" do
@@ -111,7 +111,7 @@ class Audit::RecordTest < ActiveSupport::TestCase
       Audit.record("post.updated", subject: post)
     end
 
-    assert_equal 2, Audit::Event.for_subject(post).count
+    assert_equal 2, Audit::Event.for_subject(post).where(action: "post.updated").count
   end
 
   test "updates by different actors make two events" do
@@ -121,7 +121,7 @@ class Audit::RecordTest < ActiveSupport::TestCase
     Current.actor = users(:two)
     Audit.record("post.updated", subject: post)
 
-    assert_equal 2, Audit::Event.for_subject(post).count
+    assert_equal 2, Audit::Event.for_subject(post).where(action: "post.updated").count
   end
 
   test "updates to different subjects make two events" do
@@ -132,11 +132,11 @@ class Audit::RecordTest < ActiveSupport::TestCase
   end
 
   test "post.published never coalesces" do
-    post = create_post(title: "Publish twice")
+    post = create_post(title: "Publish twice", published: false)
     Audit.record("post.published", subject: post)
     Audit.record("post.published", subject: post)
 
-    assert_equal 2, Audit::Event.for_subject(post).count
+    assert_equal 2, Audit::Event.for_subject(post).where(action: "post.published").count
   end
 
   test "access.denied coalesces per actor, permission and subject" do
@@ -168,7 +168,7 @@ class Audit::RecordTest < ActiveSupport::TestCase
       raise ActiveRecord::Rollback
     end
 
-    assert_empty Audit::Event.for_subject(post)
+    assert_empty Audit::Event.for_subject(post).where(action: "post.updated")
   end
 
   test "the notification fires only after the transaction commits" do
@@ -224,5 +224,28 @@ class Audit::RecordTest < ActiveSupport::TestCase
 
   test "COALESCE_WINDOW is ten minutes" do
     assert_equal 10.minutes, Audit::COALESCE_WINDOW
+  end
+
+  # A backstop for Review Focus 5: whoever builds `field_changes` or a
+  # snapshot Hash, secrets are dropped before storing -- `metadata` isn't
+  # touched (`session.failed` carries an email there by design).
+  test "caller-supplied field_changes and snapshots are scrubbed; metadata is not" do
+    event = Audit.record("user.updated", subject: users(:two),
+      field_changes: { "password_digest" => [ "a", "b" ], "title" => [ "Old", "New" ], "email_address" => [ "x@example.com", "y@example.com" ] },
+      snapshot: { "token_digest" => "abc", "name" => "kept" },
+      metadata: { "email_address" => "tried@example.com" })
+
+    assert_equal({ "title" => [ "Old", "New" ], "email_address" => [ "x@example.com", "y@example.com" ] }, event.field_changes)
+    assert_equal({ "name" => "kept" }, event.snapshot)
+    assert_equal({ "email_address" => "tried@example.com" }, event.metadata)
+  end
+
+  test "coalescing never replaces a stored snapshot with nil" do
+    post = create_post(title: "Keep my snapshot")
+    first = Audit.record("post.updated", subject: post, snapshot: { "v" => 1 })
+    Audit.record("post.updated", subject: post, field_changes: { "en title" => [ "a", "b" ] })
+
+    assert_equal({ "v" => 1 }, first.reload.snapshot)
+    assert_equal [ "a", "b" ], first.field_changes["en title"]
   end
 end

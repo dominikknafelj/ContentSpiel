@@ -22,10 +22,17 @@ module Audit
   # caller's transaction, if there is one -- so a save that rolls back
   # leaves no trace in the log (spec §4.2). Returns the `Audit::Event`.
   #
-  # `snapshot:` is stored as given (see `Audit::Snapshot.for`, which
-  # `ApplicationService#record_event` calls); `subject_label` is derived
+  # `snapshot:` is usually `Audit::Snapshot.for(subject)` (which
+  # `ApplicationService#record_event` passes); `subject_label` is derived
   # here, from the subject as it is right now, so the event still reads
   # well after the subject is renamed or deleted.
+  #
+  # A backstop for secrets (Review Focus 5): `field_changes` and a Hash
+  # `snapshot` go through `Snapshot.scrub` here too, whoever built them --
+  # a caller hand-assembling either can't leak a `password_digest` or a
+  # `filter_parameters` match. `metadata` is left alone: it's written by
+  # the recording code itself, and `session.failed` carries the tried
+  # email in it by design.
   def self.record(action, subject: nil, field_changes: {}, snapshot: nil, metadata: {})
     action = action.to_s
     now = Time.current
@@ -37,8 +44,8 @@ module Audit
       channel: (Current.channel || default_channel).to_s,
       subject:,
       subject_label: Snapshot.label_for(subject),
-      field_changes: field_changes.to_h.as_json,
-      snapshot: snapshot&.as_json,
+      field_changes: Snapshot.scrub(field_changes.to_h.as_json),
+      snapshot: snapshot.is_a?(Hash) ? Snapshot.scrub(snapshot.as_json) : snapshot&.as_json,
       metadata: metadata.to_h.as_json,
       request_id: Current.request_id,
       ip: Current.ip_address

@@ -34,7 +34,9 @@ module Audit
 
       candidate.update!(
         field_changes: merge(candidate.field_changes, attributes[:field_changes]),
-        snapshot: attributes[:snapshot],
+        # A later event with no snapshot (an `access.denied`, which never
+        # has one) must not wipe the one already stored.
+        snapshot: attributes[:snapshot] || candidate.snapshot,
         last_occurred_at: now
       )
       candidate

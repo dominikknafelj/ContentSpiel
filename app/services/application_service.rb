@@ -36,8 +36,54 @@ class ApplicationService
 
   private
 
-  # Attachment point for policies (sub-project 5). Deliberately permissive.
-  def authorize!(_action, _record) = true
+  # Who the service acts for (access-control design spec §3.3): the
+  # `actor:` its constructor was given, which every service defaults to
+  # `Current.actor`. A service that never stored one falls back to
+  # `Current.actor` directly.
+  def actor = defined?(@actor) ? @actor : Current.actor
+
+  # The person behind `actor`: the user itself, or an API token's user
+  # (what a new post's `author_id` is set to). Nil for a trusted code path.
+  def actor_user = actor.is_a?(ApiToken) ? actor.user : actor
+
+  # The one enforcement point (design spec §3.4): may `actor` do `key`
+  # (`"posts.edit"`, `"tags.manage"`, ...) to `record`? A plain Boolean --
+  # every service pairs it with `denied` below, as
+  #
+  #   return denied("posts.edit", @post) unless authorize!("posts.edit", @post)
+  #
+  # so the refusal is both logged and answered the same way everywhere.
+  # A subject key (posts.*/pages.*) needs its record -- `AccessControl
+  # .allowed?` raises on nil rather than allowing scope-free. The channel
+  # is `Current.channel`: a nil actor is trusted on `:setup`/`:console`/
+  # `:system`/nil and denied on `:admin`/`:mcp`.
+  def authorize!(key, record) = AccessControl.allowed?(actor, key, record)
+
+  # Records `access.denied` (design spec §4.3, the denied permission and
+  # the subject in `metadata`) and answers with the permission failure
+  # every caller shows as-is (Global Constraints' denial message).
+  # `message:` overrides that text for a rule that isn't a missing
+  # permission of its own (the owner-only rules on users).
+  #
+  # Call it *outside* the service's own transaction: a denial is the one
+  # event that must survive the rollback of the write it refused (a
+  # forged PATCH gets one coalesced `access.denied`, Review Focus 4). A
+  # check that can only run after assigning attributes inside the
+  # transaction rolls back first and calls this afterwards (see
+  # `Posts::Save`).
+  #
+  # An unsaved record (a refused create) isn't stored as the subject:
+  # `Audit::Event#subject` would otherwise have to point at a row that
+  # doesn't exist. Its type goes into `metadata` instead.
+  def denied(key, record, message: nil)
+    permission = AccessControl::Permissions.fetch(key)
+    subject = record.is_a?(ActiveRecord::Base) && record.persisted? ? record : nil
+    metadata = { "permission" => permission.key }
+    metadata["subject_type"] = record.class.polymorphic_name if record.is_a?(ActiveRecord::Base) && subject.nil?
+
+    as_actor { Audit.record("access.denied", subject:, metadata:) }
+    failure(record, [ message || "You don't have permission to #{permission.label.downcase}" ])
+  end
 
   # Writes to the audit log (access-control design spec §4.2) through
   # `Audit.record`, with the subject's snapshot taken here -- so every
@@ -46,17 +92,21 @@ class ApplicationService
   # e.g. `"post.updated"`; `field_changes` is usually
   # `Audit::Snapshot.field_changes_for(record)`. Call it inside the
   # service's transaction, so a rolled-back write leaves no event.
-  #
-  # `**legacy` and the dot check are a temporary shim until Task 6 rewires
-  # the services: today's call sites still use the placeholder form
-  # `record_event(:post_saved, post: @post)`, from after their transaction
-  # commits. Those are ignored rather than logged half-right (a snake_case
-  # name no catalogue lists, no subject); Task 6 replaces every one and
-  # removes this shim.
-  def record_event(action, subject: nil, field_changes: {}, metadata: {}, **legacy)
-    return nil unless legacy.empty? && action.to_s.include?(".")
+  def record_event(action, subject: nil, field_changes: {}, metadata: {})
+    as_actor do
+      Audit.record(action, subject:, field_changes:, snapshot: Audit::Snapshot.for(subject), metadata:)
+    end
+  end
 
-    Audit.record(action, subject:, field_changes:, snapshot: Audit::Snapshot.for(subject), metadata:)
+  # `Audit.record` reads the actor from `Current` (so a caller can't forge
+  # one), but a service may be handed an explicit `actor:` that differs --
+  # `Users::UpdatePassword` from the reset flow, where nobody is signed in
+  # and the reset token itself authenticated the user. The event is
+  # attributed to the actor the service actually acted for.
+  def as_actor(&block)
+    return yield if actor.equal?(Current.actor)
+
+    Current.set(actor: actor, &block)
   end
 
   def success(record) = Result.success(record)

@@ -34,4 +34,32 @@ class SessionsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to admin_sign_in_url
   end
+
+  # Access-control design spec §4.3 "Sessions" and Review Focus 5: a
+  # failed sign-in names the email that was tried and no user, and nothing
+  # of the password -- not under any key, not as a value.
+  test "a failed sign-in records session.failed with the email and no password" do
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "wrong-secret" }
+
+    event = Audit::Event.find_by!(action: "session.failed")
+    assert_equal({ "email_address" => "admin@example.com" }, event.metadata)
+    assert_nil event.user_id
+    assert_nil event.actor
+    assert_equal "admin", event.channel
+    assert_not_includes event.attributes.to_json, "wrong-secret"
+    assert_not_includes event.metadata.keys.join, "passw"
+  end
+
+  test "signing in and out records session.created and session.destroyed as the user" do
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password123" }
+    created = Audit::Event.find_by!(action: "session.created")
+    assert_equal @user, created.actor
+    assert_equal @user, created.subject
+    assert_not_includes created.attributes.to_json, "password123"
+
+    delete admin_sign_out_url
+    destroyed = Audit::Event.find_by!(action: "session.destroyed")
+    assert_equal @user, destroyed.actor
+    assert_equal @user, destroyed.subject
+  end
 end

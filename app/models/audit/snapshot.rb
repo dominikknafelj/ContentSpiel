@@ -50,10 +50,15 @@ module Audit
     #   for a locale that didn't exist on that side) -- the full document
     #   lives in the snapshot, and a whole-document diff in every changes
     #   row would bloat the log for no reader's benefit.
-    def field_changes_for(record)
+    #
+    # `changes` defaults to `saved_changes`; pass `changes_to_save` captured
+    # *before* the save for a record whose own callbacks reload it after
+    # saving -- a `Page`, whose closure_tree `after_save` does, leaving
+    # `saved_changes` empty by the time the caller could read it.
+    def field_changes_for(record, changes = record.saved_changes)
       translated = record.class.respond_to?(:mobility_attributes) ? record.class.mobility_attributes.map(&:to_s) : []
 
-      changes = record.saved_changes.except(*IGNORED_CHANGES).each_with_object({}) do |(field, (old, new)), result|
+      changes = changes.except(*IGNORED_CHANGES).each_with_object({}) do |(field, (old, new)), result|
         next unless keep?(field)
 
         if field == "body" && record.is_a?(HasRichTextBody)
@@ -109,10 +114,15 @@ module Audit
     def serialize(record)
       case record
       when Post
+        # `pluck`, not `map`: taking a snapshot mustn't load these
+        # associations onto the caller's record, where a later write
+        # through the same object (`Posts::Save#assign_related_posts`)
+        # would read the stale copy instead of the table.
+        tags = record.tags.pluck(:id, :name)
         record.attributes.merge(
-          "tag_ids" => record.tags.map(&:id).sort,
-          "tag_names" => record.tags.map(&:name).sort,
-          "related_post_ids" => record.post_relations.map(&:related_post_id).sort
+          "tag_ids" => tags.map(&:first).sort,
+          "tag_names" => tags.map(&:last).sort,
+          "related_post_ids" => record.post_relations.pluck(:related_post_id).sort
         )
       when Page
         record.attributes.merge("content_block_ids" => record.content_blocks.reorder(:position, :id).ids)

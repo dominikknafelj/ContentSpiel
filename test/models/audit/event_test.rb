@@ -60,8 +60,11 @@ class Audit::EventTest < ActiveSupport::TestCase
       @newer = Audit.record("post.published", subject: other_post)
     end
 
-    assert_equal [ @event ], Audit::Event.for_subject(@event.subject).to_a
+    # `create_post` goes through `Posts::Save`, which records its own
+    # `post.created`/`post.published` -- only this test's own events count.
+    ours = Audit::Event.where(id: [ @event.id, @newer.id ])
+    assert_equal [ @event ], ours.for_subject(@event.subject).to_a
     assert_equal [ @newer ], Audit::Event.by_user(users(:two)).to_a
-    assert_equal [ @newer, @event ], Audit::Event.recent.to_a
+    assert_equal [ @newer, @event ], ours.recent.to_a
   end
 end

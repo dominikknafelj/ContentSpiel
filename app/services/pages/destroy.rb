@@ -4,6 +4,11 @@ module Pages
   # children" check is `Page#ensure_no_children` (`before_destroy, prepend:
   # true`) instead, so any caller that destroys a Page directly gets that
   # refusal too, not just this service.
+  #
+  # Needs `pages.delete` on the page (access-control design spec §3.3).
+  # `page.deleted` is recorded before the destroy, in its transaction, so
+  # the snapshot is the page's last state and a refused destroy (children,
+  # say) rolls the event back with it.
   class Destroy < ApplicationService
     def initialize(page, actor: Current.actor)
       @page = page
@@ -11,12 +16,16 @@ module Pages
     end
 
     def call
-      authorize!(:destroy, @page)
+      return denied("pages.delete", @page) unless authorize!("pages.delete", @page)
       return failure(@page, [ "The homepage can't be deleted" ]) if @page.root?
 
-      return failure(@page) unless @page.destroy
+      destroyed = Page.transaction do
+        record_event("page.deleted", subject: @page)
+        @page.destroy || raise(ActiveRecord::Rollback)
+      end
 
-      record_event(:page_destroyed, page: @page)
+      return failure(@page) unless destroyed
+
       success(@page)
     end
   end

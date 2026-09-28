@@ -15,7 +15,9 @@ module Locales
 
     def call
       site = Current.site
-      authorize!(:enable_locale, site)
+      # `languages.manage` (access-control design spec §3.1): an admin area,
+      # with no per-record scope.
+      return denied("languages.manage", site) unless authorize!("languages.manage", site)
       return success(site) if site.locale_codes.include?(@code)
 
       entry = { "code" => @code }
@@ -24,6 +26,8 @@ module Locales
 
       SiteSetting.transaction do
         raise ActiveRecord::Rollback unless site.save
+
+        changes = Audit::Snapshot.field_changes_for(site)
 
         [ Page, Post ].each do |model|
           model.find_each do |record|
@@ -44,11 +48,12 @@ module Locales
         root = Page.find_by(parent_id: nil)
         PublicSite::Paths.sync_subtree(root) if root
         PublicSite::Paths.sync_posts(nil)
+
+        record_event("language.enabled", subject: site, field_changes: changes, metadata: { "code" => @code })
       end
 
       return failure(site) if site.errors.any?
 
-      record_event(:locale_enabled, code: @code)
       success(site)
     end
   end

@@ -13,7 +13,12 @@ module Users
   # "a blank value is a no-op, not a write" rule `Admin::FileParams` applies
   # to an untouched file input. A typed password, though, always needs its
   # confirmation (`#unconfirmed_password`).
+  #
+  # Permissions (access-control design spec §3.3 "Users"): `users.manage`,
+  # plus the owner rule in `Users::OwnerProtection`.
   class Save < ApplicationService
+    include OwnerProtection
+
     def initialize(user = User.new, attributes:, actor: Current.actor)
       @user = user
       @attributes = attributes.to_h.symbolize_keys
@@ -21,17 +26,25 @@ module Users
     end
 
     def call
-      authorize!(@user.persisted? ? :update : :create, @user)
+      return denied("users.manage", @user) unless authorize!("users.manage", @user)
+      return owner_only_denial if owner_protected?
 
       attrs = @attributes.slice(:email_address, :password, :password_confirmation)
       attrs.except!(:password, :password_confirmation) if attrs[:password].blank?
 
-      creating = !@user.persisted?
       @user.assign_attributes(attrs)
       return unconfirmed_password if attrs.key?(:password) && attrs[:password_confirmation].blank?
-      return failure(@user) unless @user.save
 
-      record_event(creating ? :user_created : :user_updated, user: @user)
+      saved = User.transaction do
+        @user.save || raise(ActiveRecord::Rollback)
+
+        created = @user.previously_new_record?
+        changes = user_field_changes(@user)
+        record_event(created ? "user.created" : "user.updated", subject: @user, field_changes: changes) if created || changes.any?
+        true
+      end
+      return failure(@user) unless saved
+
       success(@user)
     end
 

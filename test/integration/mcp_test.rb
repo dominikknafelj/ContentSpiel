@@ -9,6 +9,10 @@ require "test_helper"
 class McpTest < ActionDispatch::IntegrationTest
   setup do
     @user = User.create!(email_address: "agent@example.com", password: "password123")
+    # The token acts within the intersection of its group and its user's
+    # own rights (access-control design spec §3.3), so the user needs some
+    # of their own -- a user in no group can't write anything, token or not.
+    AccessControl::Membership.create!(user: @user, group: access_control_groups(:admin))
     @token, @raw_token = ApiToken.generate!(@user)
 
     # StreamableHTTPTransport rejects any Host header outside its own
@@ -119,6 +123,7 @@ class McpTest < ActionDispatch::IntegrationTest
     result = response.parsed_body["result"]
     assert_equal false, result["isError"]
     assert_equal "Via MCP", Post.last.title
+    assert_equal @user, Post.last.author
   end
 
   test "a malformed tool call (missing a required argument) returns a tool error, not a 500" do

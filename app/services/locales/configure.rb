@@ -24,7 +24,9 @@ module Locales
 
     def call
       site = Current.site
-      authorize!(:configure_locales, site)
+      # `languages.manage` (access-control design spec §3.1): an admin area,
+      # with no per-record scope.
+      return denied("languages.manage", site) unless authorize!("languages.manage", site)
 
       # A code this call doesn't already recognize as enabled -- an
       # attempt to sneak `Enable`/`Disable` in through this endpoint
@@ -40,9 +42,15 @@ module Locales
       end
 
       site.locales = @entries
-      return failure(site) unless site.save
+      saved = SiteSetting.transaction do
+        site.save || raise(ActiveRecord::Rollback)
 
-      record_event(:locales_configured)
+        changes = Audit::Snapshot.field_changes_for(site)
+        record_event("language.configured", subject: site, field_changes: changes) if changes.any?
+        true
+      end
+      return failure(site) unless saved
+
       success(site)
     end
 

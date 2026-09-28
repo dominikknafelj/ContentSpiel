@@ -119,6 +119,10 @@ class SetupController < ApplicationController
     # the second is sent to sign in.
     def update_admin
       @user = User.new(params.expect(user: [ :email_address, :password, :password_confirmation ]))
+      # The first account is the site's owner (access-control design spec
+      # §6): every later setup step writes through permission-checked
+      # services as this user, and a user in no group may do nothing.
+      @user.owner = true
 
       created = User.transaction do
         User.connection.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
@@ -139,7 +143,7 @@ class SetupController < ApplicationController
     def update_site
       @site_setting = Current.site
 
-      if @site_setting.update(site_params)
+      if Settings::Save.call(@site_setting, attributes: site_params.to_h).ok?
         redirect_to setup_step_path("languages")
       else
         render :site, status: :unprocessable_entity
@@ -173,7 +177,10 @@ class SetupController < ApplicationController
       permitted = params.expect(site_setting: [ :default_locale, extra_locales: [] ])
       codes = ([ permitted[:default_locale] ] + Array(permitted[:extra_locales])).uniq.compact_blank
 
-      if @site_setting.update(default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } })
+      result = Settings::Save.call(@site_setting,
+        attributes: { default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } } })
+
+      if result.ok?
         PublicSite::Paths.rebuild!
         redirect_to setup_step_path("mcp_token")
       else
@@ -191,17 +198,20 @@ class SetupController < ApplicationController
       render :mcp_token_created
     end
 
-    # `StarterContent.add_once!` (final fix wave, P23): the same locked,
-    # re-checked path CS Studio's "Create starter pages" takes, so a double
-    # submit can't race itself into a duplicate-slug 500. A failure is shown
-    # on this step (422), like any other step's form error.
+    # `StarterContents::Add` (`StarterContent.add_once!`, final fix wave,
+    # P23): the same locked, re-checked path CS Studio's "Create starter
+    # pages" takes, so a double submit can't race itself into a
+    # duplicate-slug 500. A failure is shown on this step (422), like any
+    # other step's form error.
     def update_starter_content
-      created = StarterContent.add_once!(locale: Current.site.default_locale)
-      redirect_to setup_step_path("review"), notice: created ? "Starter content added." : "Starter content was already there."
-    rescue StarterContent::Error => error
-      Rails.logger.warn("[setup starter content] #{error.class}: #{error.message}")
-      flash.now[:alert] = "Starter content couldn't be added — a page may already use one of its addresses."
-      render :starter_content, status: :unprocessable_entity
+      result = StarterContents::Add.call
+
+      if result.ok?
+        redirect_to setup_step_path("review"), notice: result.record ? "Starter content added." : "Starter content was already there."
+      else
+        flash.now[:alert] = "#{result.errors.to_sentence}."
+        render :starter_content, status: :unprocessable_entity
+      end
     end
 
     def update_review

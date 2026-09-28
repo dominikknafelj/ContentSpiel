@@ -17,14 +17,20 @@ module Tags
       @actor = actor
     end
 
+    # Needs `tags.manage`, like `Tags::Rename`. `tag.deleted` is recorded
+    # before the destroy, in its transaction (the snapshot is the tag's last
+    # state); the resync runs after it commits, as before.
     def call
-      authorize!(:destroy, @tag)
+      return denied("tags.manage", @tag) unless authorize!("tags.manage", @tag)
 
       content_types = affected_content_types
-      return failure(@tag) unless @tag.destroy
+      destroyed = Tag.transaction do
+        record_event("tag.deleted", subject: @tag)
+        @tag.destroy || raise(ActiveRecord::Rollback)
+      end
+      return failure(@tag) unless destroyed
 
       content_types.each { |content_type| PublicSite::Paths.sync_posts(content_type) }
-      record_event(:tag_destroyed, tag: @tag)
       success(@tag)
     end
 

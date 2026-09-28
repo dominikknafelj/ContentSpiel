@@ -13,19 +13,24 @@ module Tags
       @actor = actor
     end
 
+    # Needs `tags.manage` (access-control design spec §3.1): tags are shared
+    # across every post, so there's no per-record scope to check.
     def call
-      authorize!(:rename, @tag)
+      return denied("tags.manage", @tag) unless authorize!("tags.manage", @tag)
 
       old_name = @tag.name
       saved = Tag.transaction do
         @tag.name = @name
         @tag.save || raise(ActiveRecord::Rollback)
+
+        changes = Audit::Snapshot.field_changes_for(@tag)
+        record_event("tag.renamed", subject: @tag, field_changes: changes) if changes.any?
+        true
       end
 
       return failure(@tag) unless saved
 
       resync(old_name, @tag.name)
-      record_event(:tag_renamed, tag: @tag)
       success(@tag)
     end
 

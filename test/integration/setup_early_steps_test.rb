@@ -23,6 +23,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to setup_step_path("site")
     assert_equal "owner@example.com", User.last.email_address
+    assert User.last.owner?, "the first account is the owner"
   end
 
   test "a password confirmation mismatch is shown, nothing is created" do
