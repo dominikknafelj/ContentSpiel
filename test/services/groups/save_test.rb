@@ -122,6 +122,27 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal({ "own" => true }, group.grants.reload.sole.scope)
   end
 
+  # Fix round 1 (M6): a forged branch outside the actor's own root.
+  test "a non-owner can't widen a branch scope with a forged page id outside their root" do
+    mine = as_owner { create_page(title: "Mine") }
+    below = as_owner { create_page(title: "Below", parent: mine) }
+    elsewhere = as_owner { create_page(title: "Elsewhere") }
+    grant(@manager_group, "pages.edit", "page_ids" => [ mine.id ])
+    group = AccessControl::Group.create!(name: "Others")
+    grant(group, "pages.edit", "page_ids" => [ below.id ])
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { grants: [ { permission: "pages.edit", scope: { page_ids: [ below.id, elsewhere.id ] } } ] })
+    end
+    assert result.denied?
+    assert_equal({ "page_ids" => [ below.id ] }, group.grants.reload.sole.scope)
+
+    widened_within = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { grants: [ { permission: "pages.edit", scope: { page_ids: [ mine.id ] } } ] })
+    end
+    assert widened_within.ok?, widened_within.errors.inspect
+  end
+
   test "a non-owner can't widen a group they're a member of" do
     result = as(users(:editor_branch)) do
       Groups::Save.call(@manager_group, attributes: {

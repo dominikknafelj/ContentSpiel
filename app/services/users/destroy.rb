@@ -26,6 +26,7 @@ module Users
     def call
       return denied("users.manage", @user) unless authorize!("users.manage", @user)
       return owner_only_denial if owner_protected?
+      return denied("users.manage", @user) if outranked?
 
       destroyed = User.transaction do
         record_event("user.deleted", subject: @user)

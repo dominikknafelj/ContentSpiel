@@ -138,14 +138,18 @@ module AccessControl
     end
 
     # Design spec §3.3 "Tokens" and Review Focus 1: a token's group must be
-    # one whose every grant the user could hand out themselves. A grant
-    # whose permission is no longer registered is skipped -- it matches
-    # nothing, so it can't widen anyone's rights (Review Focus 3).
+    # one whose every grant the user could hand out themselves. Judged on
+    # the group's *live* grants (`LiveGrants`, fix round 1 M3): stale
+    # values -- a deleted branch root, an unregistered content type -- are
+    # left out first, and a grant that matches nothing any more (an
+    # unregistered permission, a scope whose every value is stale) is
+    # skipped. None of those can widen anyone's rights, so none may make a
+    # group unassignable (Review Focus 3: stale is never an error).
     def can_assign_group?(user, group)
       return true if user.owner?
 
-      group.grants.all? do |grant|
-        grant.permission_definition.nil? || can_grant?(user, grant.permission, grant.scope)
+      LiveGrants.new(group.grants.to_a).entries.all? do |entry|
+        can_grant?(user, entry.permission, entry.scope)
       end
     end
 

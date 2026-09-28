@@ -365,6 +365,22 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert AccessControl.can_assign_group?(@author, access_control_groups(:read_only))
   end
 
+  # Fix round 1 (M3): judged on the live grants -- a grant whose only
+  # branch root was deleted, or scoped to a retired content type, matches
+  # nothing and doesn't make its group unassignable.
+  test "can_assign_group? ignores grants that went stale" do
+    page = as_owner { create_page(title: "Doomed") }
+    group = AccessControl::Group.create!(name: "Stale")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ page.id ] })
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
+    assert_not AccessControl.can_assign_group?(@reader, group)
+
+    as_owner { Pages::Destroy.call(page) }
+
+    assert AccessControl.can_assign_group?(@reader, group.reload)
+  end
+
   test "permitted_groups_for lists every group for an owner and only covered ones otherwise" do
     assert_equal AccessControl::Group.order(:name).to_a, AccessControl.permitted_groups_for(@owner)
 

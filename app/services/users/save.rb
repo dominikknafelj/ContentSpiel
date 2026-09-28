@@ -39,6 +39,7 @@ module Users
     def call
       return denied("users.manage", @user) unless authorize!("users.manage", @user)
       return owner_only_denial if owner_protected?
+      return denied("users.manage", @user) if outranked?
 
       owner_change = owner_change?
       return denied("users.manage", @user, message: "Only an owner can change who is an owner") if owner_change && !actor_owner?

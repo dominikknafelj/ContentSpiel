@@ -53,6 +53,9 @@
                       <span data-admin--branch-picker-target="summary"><%= branch_summary(permission) %></span>
                     </summary>
                     <p class="mt-1 text-sm text-dim">Tick a page to include it and everything below it. None ticked: all pages.</p>
+                    <% if hidden_page_ids(permission).any? %>
+                      <p class="admin-unreadable-branches mt-1 text-sm text-warn-ink">Some of these branches are pages you can't open. Only someone who can open them can change this permission.</p>
+                    <% end %>
                     <% hidden_page_ids(permission).each do |page_id| %>
                       <%= hidden_field_tag field_name(permission, "page_ids") + "[]", page_id, id: nil, data: { admin__branch_picker_target: "kept" } %>
                       <p class="text-sm text-dim">A page you can't open (kept)</p>

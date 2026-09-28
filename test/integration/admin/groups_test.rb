@@ -183,6 +183,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "input[type=hidden][name='group[grants][pages.edit][page_ids][]'][value='#{hidden.id}']"
     assert_select "*", text: "A page you can't open (kept)"
+    assert_select ".admin-unreadable-branches", text: /Only someone who can open them can change this permission/
     assert_not_includes response.body, "Secret area"
 
     patch "/cs-studio/groups/#{group.id}", params: { group: {

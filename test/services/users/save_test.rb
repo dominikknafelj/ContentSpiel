@@ -56,6 +56,9 @@ class Users::SaveTest < ActiveSupport::TestCase
   test "a non-owner can't add someone to a group holding permissions they lack" do
     managers = AccessControl::Group.create!(name: "User managers")
     AccessControl::Grant.create!(group: managers, permission: "users.manage", scope: {})
+    # Enough to manage the reader at all (their Read only group, fix round 1 I1).
+    AccessControl::Grant.create!(group: managers, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "pages.read", scope: {})
     AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
 
     result = as(users(:editor_branch)) do

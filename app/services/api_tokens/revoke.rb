@@ -3,12 +3,15 @@ module ApiTokens
   # raw value that authenticated it no longer does. Called by the list's own
   # "Revoke" button, and by `Groups::Destroy` for a deleted group's tokens.
   class Revoke < ApplicationService
-    # `group_deleted: true` is `Groups::Destroy` revoking every token of
-    # the group it deletes (design spec §3.2).
-    def initialize(token, actor: Current.actor, group_deleted: false)
+    # `deleting_group:` is `Groups::Destroy` revoking every token of the
+    # group it deletes (design spec §3.2) -- honoured only for a token of
+    # *that* group (fix round 1, M2), so it can't be used to revoke an
+    # arbitrary token on the strength of `groups.manage`.
+    def initialize(token, actor: Current.actor, deleting_group: nil)
       @token = token
       @actor = actor
-      @group_deleted = group_deleted
+      @group_deleted = deleting_group.present? && deleting_group.persisted? && @token.group_id == deleting_group.id
+      @deleting_group = deleting_group
     end
 
     # Anyone signed in may revoke their own tokens; anyone else's needs
@@ -19,7 +22,7 @@ module ApiTokens
     # permission being exercised.
     def call
       if @group_deleted
-        return denied("groups.manage", @token.group) unless authorize!("groups.manage", @token.group)
+        return denied("groups.manage", @deleting_group) unless authorize!("groups.manage", @deleting_group)
       elsif !(actor.is_a?(User) && actor.id == @token.user_id)
         return denied("tokens.manage", @token) unless authorize!("tokens.manage", @token)
       end

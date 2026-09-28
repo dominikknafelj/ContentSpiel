@@ -63,4 +63,24 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     result = as(token, channel: :mcp) { change(users(:reader), actor: token) }
     assert_not result.ok?
   end
+
+  # Fix round 1 (I1): a non-owner can't reset the password of someone whose
+  # rights exceed theirs.
+  test "a user manager can't reset a more privileged user's password" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    AccessControl::Grant.create!(group: managers, permission: "users.manage", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "pages.read", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+
+    as(users(:editor_branch)) do
+      refused = Users::UpdatePassword.call(users(:two), password: "taken-over-1", password_confirmation: "taken-over-1")
+      assert refused.denied?
+      assert_equal [ "You don't have permission to manage users" ], refused.errors
+
+      assert Users::UpdatePassword.call(users(:reader), password: "reset-pass-1", password_confirmation: "reset-pass-1").ok?
+    end
+    assert users(:two).reload.authenticate("password")
+    assert users(:reader).reload.authenticate("reset-pass-1")
+  end
 end

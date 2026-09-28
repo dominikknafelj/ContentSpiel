@@ -37,6 +37,7 @@ module Users
       unless own_password?
         return denied("users.manage", @user) unless authorize!("users.manage", @user)
         return owner_only_denial if owner_protected?
+        return denied("users.manage", @user) if outranked?
       end
 
       return current_password_mismatch if !@current_password.nil? && !@user.authenticate(@current_password)

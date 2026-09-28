@@ -10,6 +10,12 @@ module Admin
   # out every *other* session of the user -- a password change is what
   # someone does when they think it leaked -- and keeps this one.
   class AccountsController < BaseController
+    # The current-password check is a password oracle; throttled like
+    # sign-in and the reset flow.
+    rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
+      redirect_to admin_account_password_path(**admin_url_options), status: :see_other, alert: "Try again later."
+    }
+
     def edit
     end
 

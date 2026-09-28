@@ -11,8 +11,14 @@
   <legend class="<%= setup_label_class %>">Groups</legend>
   <%= hidden_field_tag "user[group_ids][]", "", id: nil %>
   <% all_groups.each do |group| %>
-    <label class="flex items-start gap-2 py-1 text-ink">
-      <%= check_box_tag "user[group_ids][]", group.id, selected_group_ids.include?(group.id), id: "user_group_ids_#{group.id}", class: "mt-1" %>
+    <% locked = !assignable_group_ids.include?(group.id) %>
+    <% checked = selected_group_ids.include?(group.id) %>
+    <label class="flex items-start gap-2 py-1 <%= locked ? "text-dim" : "text-ink" %>">
+      <%# A group the actor can't assign is locked (fix round 1, M5), like the
+          token form: a disabled box sends nothing, so a ticked one keeps
+          its membership through a hidden input instead. %>
+      <% if locked && checked %><%= hidden_field_tag "user[group_ids][]", group.id, id: nil %><% end %>
+      <%= check_box_tag "user[group_ids][]", group.id, checked, id: "user_group_ids_#{group.id}", disabled: locked, class: "mt-1" %>
       <span>
         <%= group.name %>
         <% if group.description.present? %><span class="block text-sm text-meta"><%= group.description %></span><% end %>

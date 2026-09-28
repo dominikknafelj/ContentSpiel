@@ -98,6 +98,12 @@ module Admin
     # by `User`'s own validation).
     helper_method def all_groups = @all_groups ||= AccessControl::Group.order(:name).to_a
 
+    # The groups the actor may put someone into (`Users::Save` checks
+    # added groups the same way); owners may assign any.
+    helper_method def assignable_group_ids
+      @assignable_group_ids ||= AccessControl.permitted_groups_for(Current.user).map(&:id).to_set
+    end
+
     helper_method def last_owner?(user)
       user.persisted? && user.owner_in_database && User.where(owner: true).count == 1
     end

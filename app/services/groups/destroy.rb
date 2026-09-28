@@ -9,7 +9,8 @@ module Groups
   # which assistants stopped working and why (`"reason" => "group
   # deleted"`). Deleting the group is what authorizes that: someone with
   # `groups.manage` but not `tokens.manage` may still delete a group other
-  # people's tokens use (`ApiTokens::Revoke`'s `group_deleted:`).
+  # people's tokens use (`ApiTokens::Revoke`'s `deleting_group:`, which
+  # only applies to tokens of that group).
   #
   # Then the token rows themselves go. `api_tokens.group_id` is not null
   # (design spec §3.2), so a token -- even one revoked long ago -- can't
@@ -31,7 +32,7 @@ module Groups
 
       destroyed = AccessControl::Group.transaction do
         @group.api_tokens.active.find_each do |token|
-          ApiTokens::Revoke.call(token, actor: actor, group_deleted: true).ok? || raise(ActiveRecord::Rollback)
+          ApiTokens::Revoke.call(token, actor: actor, deleting_group: @group).ok? || raise(ActiveRecord::Rollback)
         end
         ApiToken.where(group_id: @group.id).delete_all
 

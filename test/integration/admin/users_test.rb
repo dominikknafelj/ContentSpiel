@@ -171,4 +171,53 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert users(:reader).reload.owner?
     assert Audit::Event.exists?(action: "user.owner_changed", subject_type: "User", subject_id: users(:reader).id)
   end
+
+  # --- Fix round 1 (I1): only users whose rights are a subset of yours ------
+
+  test "a user manager can't take over an Admin member, but can manage an Author member" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read posts.create media.upload pages.read].each do |key|
+      AccessControl::Grant.create!(group: managers, permission: key, scope: {})
+    end
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: { "own" => true })
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    sign_in_as(users(:editor_branch))
+
+    admin_member = users(:two)
+    digest = admin_member.password_digest
+    patch "/cs-studio/users/#{admin_member.id}", params: { user: { email_address: admin_member.email_address, password: "taken-over-1", password_confirmation: "taken-over-1" } }
+    assert_response :forbidden
+    patch "/cs-studio/users/#{admin_member.id}", params: { user: { email_address: "mine@example.com" } }
+    assert_response :forbidden
+    assert_no_difference -> { User.count } do
+      delete "/cs-studio/users/#{admin_member.id}"
+    end
+    admin_member.reload
+    assert_equal digest, admin_member.password_digest
+    assert_equal "two@example.com", admin_member.email_address
+    assert Audit::Event.exists?(action: "access.denied", subject_type: "User", subject_id: admin_member.id)
+
+    author = users(:author)
+    patch "/cs-studio/users/#{author.id}", params: { user: { email_address: "author2@example.com", password: "reset-pass-1", password_confirmation: "reset-pass-1" } }
+    assert_response :redirect
+    assert_equal "author2@example.com", author.reload.email_address
+    assert author.authenticate("reset-pass-1")
+    assert_difference -> { User.count }, -1 do
+      delete "/cs-studio/users/#{author.id}"
+    end
+  end
+
+  test "group boxes the actor can't assign are disabled, keeping a ticked one" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    AccessControl::Grant.create!(group: managers, permission: "users.manage", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "pages.read", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+
+    assert_select "input[type=checkbox][name='user[group_ids][]'][value='#{access_control_groups(:admin).id}'][disabled]"
+    assert_select "input[type=checkbox][name='user[group_ids][]'][value='#{access_control_groups(:read_only).id}']:not([disabled])"
+  end
 end
