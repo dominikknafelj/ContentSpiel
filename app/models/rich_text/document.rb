@@ -20,6 +20,21 @@ module RichText
     # all".
     EMPTY_HASH = { "type" => "doc", "content" => [] }.freeze
 
+    # A ceiling on how deep `#validate`/`#blank?` will recurse into
+    # `"content"` nesting. Nothing a real editor produces gets remotely
+    # close to this -- even a pathological amount of nested lists/quotes
+    # tops out at a handful of levels -- so 50 is purely a safety valve
+    # against a hostile or corrupted document (there's no schema-level
+    # limit on Tiptap/ProseMirror nesting, and both `posts.body`/
+    # `content_blocks.body` and MCP's Markdown-writer path can hand this
+    # class a document that never went through the editor at all). Without
+    # it, a document built as one long chain of nested nodes (worst case:
+    # hundreds of `blockquote`s each wrapping the next) blows Ruby's call
+    # stack with `SystemStackError` instead of failing `#validate` the same
+    # way any other malformed document does -- see the regression test with
+    # 500 nested `blockquote`s.
+    MAX_DEPTH = 50
+
     def self.empty = new(EMPTY_HASH.deep_dup)
 
     def initialize(hash)
@@ -85,22 +100,38 @@ module RichText
     # callers and tests alike need to know not just *that* something's
     # wrong but which node or mark caused it, especially once a document
     # nests several of the same type.
+    #
+    # Never raises, even for a document shape that isn't just "wrong" but
+    # actively malformed -- a `"content"`/`"marks"` array holding a
+    # non-object, a `nil` slipped into `"content"`, `"content"`/`"marks"`
+    # given as a Hash instead of an Array, nesting deep enough to blow the
+    # stack. Every one of those is now an error message, not a `TypeError`/
+    # `NoMethodError`/`SystemStackError` -- a Post or ContentBlock's model
+    # validation (Task 4+) needs `#validate` to behave like any other
+    # ActiveModel validation (return problems, don't crash the request),
+    # and this document may never have passed through the editor or this
+    # very method before reaching here (an MCP-authored Markdown document,
+    # a hand-edited jsonb row) -- "malformed" has to be just another kind
+    # of "invalid", not a 500.
     def validate
       errors = []
-      errors << "the document's root node must be \"doc\", got #{@hash["type"].inspect}" unless @hash["type"] == "doc"
-      validate_node(@hash, errors)
+      errors << "the document's root node must be \"doc\", got #{@hash["type"].inspect}" unless @hash.is_a?(Hash) && @hash["type"] == "doc"
+      validate_node(@hash, errors, path: "root", depth: 0)
       errors
     end
 
     private
 
-    def content?(node)
-      return false if node.nil?
+    def content?(node, depth = 0)
+      return false unless node.is_a?(Hash)
+      return false if depth > MAX_DEPTH
 
       case node["type"]
       when "text" then node["text"].present?
       when "image", "youtube" then true
-      else Array(node["content"]).any? { |child| content?(child) }
+      else
+        content = node["content"]
+        content.is_a?(Array) && content.any? { |child| content?(child, depth + 1) }
       end
     end
 
@@ -122,12 +153,38 @@ module RichText
     # look up its renderer slots in Task 2), but nothing about validating a
     # text node depends on that registration, so this branch never
     # consults it.
-    def validate_node(node, errors)
+    #
+    # `path` is a breadcrumb string ("root.content[2].content[0]") used
+    # only for the structural errors below -- it has nothing to do with
+    # `RichText::Schema` lookups, it just gives a human something to look
+    # at when a document has more than one node of the same type. `depth`
+    # is the recursion guard (`MAX_DEPTH`, see its comment); every call
+    # into a child bumps it by exactly one, so a document that's a long
+    # chain of single-child nodes (the pathological case) still terminates
+    # instead of recursing until the stack blows.
+    #
+    # The very first check -- `node.is_a?(Hash)` -- is what makes every
+    # other malformed-input case below safe: a `nil` that slipped into a
+    # `"content"` array, a bare String or Integer where a node object
+    # belongs, all land here (this method is what every content-array
+    # element gets recursed into) and become one error message instead of
+    # a `NoMethodError`/`TypeError` the moment the code below tries `node["type"]`.
+    def validate_node(node, errors, path:, depth:)
+      unless node.is_a?(Hash)
+        errors << "node at #{path} is not an object"
+        return
+      end
+
+      if depth > MAX_DEPTH
+        errors << "#{path} exceeds the maximum nesting depth (#{MAX_DEPTH})"
+        return
+      end
+
       type_name = node["type"]
 
       if type_name == "text"
-        errors << "a text node needs a String \"text\"" unless node["text"].is_a?(String)
-        validate_marks(node, errors)
+        errors << "#{path}: a text node needs a String \"text\"" unless node["text"].is_a?(String)
+        validate_marks(node, errors, path)
         return
       end
 
@@ -135,25 +192,74 @@ module RichText
       if type.nil?
         errors << "unknown node type #{type_name.inspect}"
       else
-        validate_attributes(type, node["attrs"] || {}, errors)
+        validate_attributes(type, node["attrs"], errors)
       end
 
-      Array(node["content"]).each { |child| validate_node(child, errors) }
+      validate_children(node["content"], errors, path, depth)
     end
 
-    def validate_marks(text_node, errors)
-      Array(text_node["marks"]).each do |mark_data|
+    # `content`, when present at all, must be an Array of node objects --
+    # deliberately *checked*, not coerced with `Array(...)`: `Array({"a" =>
+    # 1})` reshapes a Hash into `[["a", 1]]` instead of raising, which would
+    # silently validate something that isn't remotely a list of child
+    # nodes rather than reporting the real problem ("content" is the wrong
+    # shape entirely).
+    def validate_children(content, errors, path, depth)
+      return if content.nil?
+
+      unless content.is_a?(Array)
+        errors << "#{path}.content must be an array"
+        return
+      end
+
+      content.each_with_index { |child, index| validate_node(child, errors, path: "#{path}.content[#{index}]", depth: depth + 1) }
+    end
+
+    # Same "must be an Array, not coerced" rule as `#validate_children`,
+    # applied to a text node's `"marks"`, plus the same `node.is_a?(Hash)`
+    # guard per mark entry (a `"marks"` array can just as easily hold a
+    # stray non-object as `"content"` can).
+    def validate_marks(text_node, errors, path)
+      marks = text_node["marks"]
+      return if marks.nil?
+
+      unless marks.is_a?(Array)
+        errors << "#{path}.marks must be an array"
+        return
+      end
+
+      marks.each_with_index do |mark_data, index|
+        mark_path = "#{path}.marks[#{index}]"
+
+        unless mark_data.is_a?(Hash)
+          errors << "mark at #{mark_path} is not an object"
+          next
+        end
+
         mark_type_name = mark_data["type"]
         mark_type = RichText::Schema.mark(mark_type_name)
         if mark_type.nil?
           errors << "unknown mark type #{mark_type_name.inspect}"
         else
-          validate_attributes(mark_type, mark_data["attrs"] || {}, errors)
+          validate_attributes(mark_type, mark_data["attrs"], errors)
         end
       end
     end
 
+    # `attrs` is `nil` for the ordinary "this type declares no attributes,
+    # or declares some but the document omits them all" case -- treated as
+    # `{}` so the `required` check below still fires. Anything present but
+    # not a Hash (an `"attrs"` given as an Array or a String, say) is the
+    # same class of malformed-shape problem `#validate_children`/
+    # `#validate_marks` guard against, and gets the same treatment: an
+    # error message, not a `TypeError` from `attrs[attribute.name.to_s]`.
     def validate_attributes(type, attrs, errors)
+      attrs = {} if attrs.nil?
+      unless attrs.is_a?(Hash)
+        errors << "#{type.name}.attrs must be an object"
+        return
+      end
+
       type.attributes.each do |attribute|
         value = attrs[attribute.name.to_s]
 
