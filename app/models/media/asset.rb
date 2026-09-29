@@ -48,6 +48,31 @@ class Media::Asset < ApplicationRecord
 
   belongs_to :created_by, class_name: "User", optional: true
 
+  # Where this asset is actually used (design spec §3.2) -- entirely
+  # derived, rebuilt wholesale by `Media::UsageIndex.refresh(owner)`
+  # whenever an owner's own state might have changed, never written to
+  # directly. `dependent:` is deliberately left unset: the database's own
+  # `on_delete: :restrict` FK is what actually backs "can't delete an
+  # asset that's in use" (global constraints, Review Focus 4) -- an
+  # `:restrict_with_exception` here would only intercept an ordinary
+  # `#destroy` with a *different* exception (`DeleteRestrictionError`)
+  # before the query ever reaches Postgres, which would both duplicate the
+  # database's own guarantee and hide the `ActiveRecord::InvalidForeignKey`
+  # a bypassed or racing delete (`Media::Destroy`'s own service-level check
+  # losing a race, or a raw `delete`) is still expected to surface.
+  #
+  # `foreign_key:` is explicit for the same reason `self.table_name` is:
+  # Rails' default `has_many` foreign key is derived from this class's
+  # *demodulized* name (`"Media::Asset".foreign_key` -> `"asset_id"`), not
+  # the real `media_usages.media_asset_id` column.
+  has_many :usages, class_name: "Media::Usage", foreign_key: :media_asset_id
+
+  # The "Unused" filter (design spec §6): an asset with no `usages` row at
+  # all. `where.missing`, not a `left_joins` + `where(usages: { id: nil })`
+  # by hand -- same result, the query planner just gets to see the intent
+  # directly.
+  scope :unused, -> { where.missing(:usages) }
+
   has_one_attached :file do |attachable|
     # Every responsive width the public site can ever ask for, preprocessed
     # right after upload (`preprocessed: true` enqueues one `ActiveStorage
@@ -176,6 +201,31 @@ class Media::Asset < ApplicationRecord
   # <figcaption> at all", not "render an empty one".
   def caption_text(override:, locale: I18n.locale)
     override.presence || Locales.read(self, :caption, locale: locale)
+  end
+
+  # Whether anything currently references this asset -- the same question
+  # the database's own `on_delete: :restrict` FK answers at delete time,
+  # asked ahead of that (design spec §5.1: `Media::Destroy`'s own usage
+  # check, the "Unused" filter's inverse).
+  def used?
+    usages.exists?
+  end
+
+  # One entry per distinct place this asset is used -- grouped by owner,
+  # not one entry per `media_usages` row: a post whose `en` and `de` bodies
+  # both embed this image is one link in "Used on" (design spec §6), not
+  # two, even though it's two `rich_text` rows internally. `roles`/
+  # `locales` fold each group's rows back together for a caller that wants
+  # to say *how* it's used there (e.g. "rich text, in en, de") without
+  # re-querying.
+  def usages_summary
+    usages.includes(:owner).group_by { |usage| [ usage.owner_type, usage.owner_id ] }.map do |_key, group|
+      {
+        owner: group.first.owner,
+        roles: group.map(&:role).uniq,
+        locales: group.filter_map(&:locale).uniq
+      }
+    end
   end
 
   private

@@ -76,6 +76,15 @@ class Page < ApplicationRecord
 
   has_one_attached :hero_image
 
+  # `pages.hero_media_asset_id` (design spec §3.3), added early by Task 3's
+  # own migration so `Media::UsageIndex` has something real to index and
+  # test against now -- Task 4 is what actually migrates existing
+  # `hero_image` attachments onto this column, removes `has_one_attached
+  # :hero_image` above, and starts writing it from CS Studio. Until then
+  # this is reachable but unused by any save path. `optional: true`: a page
+  # need not have a hero at all.
+  belongs_to :hero_media_asset, class_name: "Media::Asset", optional: true
+
   enum :page_type, { standard: 0, landing: 1 }
 
   # "Titled" means *some* locale has a title, not "the locale that happens to

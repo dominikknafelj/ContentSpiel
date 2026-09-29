@@ -28,6 +28,14 @@ class ContentBlock < ApplicationRecord
 
   has_one_attached :image
 
+  # `content_blocks.media_asset_id` (design spec §3.3), added early by
+  # Task 3's own migration for the same reason as `Page#hero_media_asset`
+  # above -- Task 4 migrates existing `image` block attachments onto it,
+  # removes `has_one_attached :image`, and starts writing it from CS
+  # Studio. `optional: true` here too: only an `image` block ever sets it,
+  # and even that block type can be created before an image is chosen.
+  belongs_to :media_asset, class_name: "Media::Asset", optional: true
+
   validates :block_type, presence: true
 
   # `position` is NOT NULL with a database default, which covers a block
