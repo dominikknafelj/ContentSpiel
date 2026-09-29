@@ -95,14 +95,14 @@ class Media::UsageIndex
     def insert_rows(rows)
       return if rows.empty?
 
-      # Note this only actually protects a `rich_text` row (a real, non-null
-      # `locale`): Postgres never considers two `locale IS NULL` rows
-      # conflicting under a plain unique index (`NULL <> NULL`, including
-      # under `ON CONFLICT`), so racing `hero`/`block_image` refreshes were
-      # never able to *raise* here in the first place -- worst case, one
-      # loses the race and leaves a harmless extra row, cleaned up by
-      # either side's next ordinary refresh. Not worth a `COALESCE`-backed
-      # index for a duplicate that's this cheap to self-heal.
+      # Covers every role, including `hero`/`block_image` (whose `locale`
+      # is always nil): the unique index itself is `NULLS NOT DISTINCT`
+      # (fix round 1's own follow-up migration,
+      # `MediaUsagesNullsNotDistinct`) -- without that, Postgres would
+      # treat two `locale IS NULL` rows as non-conflicting (`NULL <> NULL`,
+      # true under `ON CONFLICT` too), and a racing `hero`/`block_image`
+      # refresh could leave a duplicate row behind instead of being
+      # skipped here.
       Media::Usage.insert_all(rows, unique_by: UNIQUE_BY)
     end
 

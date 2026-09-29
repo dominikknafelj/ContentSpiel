@@ -155,14 +155,10 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
   # `.refresh` call, so its own insert collides with a row already sitting
   # there from an earlier refresh.
   #
-  # Uses a `rich_text` usage (a real, non-null `locale`), not `hero`/
-  # `block_image`: Postgres never treats two `locale IS NULL` rows as
-  # conflicting on a plain unique index (`NULL <> NULL`, even under
-  # `ON CONFLICT`), so a `hero`/`block_image` duplicate was never able to
-  # raise `RecordNotUnique` in the first place -- it just silently left an
-  # extra row for the next ordinary refresh to clean up. A non-null
-  # `locale` is the case that actually did raise before this fix, and is
-  # what `unique_by:` now genuinely skips.
+  # Uses a `rich_text` usage (a real, non-null `locale`) as the base case;
+  # the `hero`/`block_image` case (`locale` always nil) gets its own test
+  # right below, since it depends on a second, separate fix -- see that
+  # test's own comment.
   test "refresh doesn't raise when its insert collides with a row a racing refresh already wrote" do
     post = create_post(title: "Race post")
     asset = create_media_asset
@@ -181,6 +177,36 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
     end
 
     assert_equal [ [ asset.id, "Post", post.id, "rich_text", "en" ] ], usage_tuples(Media::Usage.where(owner: post))
+  end
+
+  # Fix round 1's I1 follow-up: a `hero`/`block_image` row's `locale` is
+  # always nil, and Postgres's *default* unique index treats two `NULL`s as
+  # non-equal (`NULL <> NULL`), so this exact race -- provable by the test
+  # above for `rich_text` -- used to leave a silent duplicate `hero` row
+  # behind instead of being skipped: `ON CONFLICT` never even recognised it
+  # as a conflict. `MediaUsagesNullsNotDistinct`
+  # (`db/migrate/20260929040000_media_usages_nulls_not_distinct.rb`) adds
+  # `NULLS NOT DISTINCT` to the same unique index, which makes two `NULL`
+  # locales compare equal for uniqueness purposes -- so this is now exactly
+  # as protected as the `rich_text` case above, and stays that way (exactly
+  # one row, not a silent duplicate).
+  test "refresh doesn't leave a duplicate hero row when it collides with a racing refresh" do
+    page = create_page(title: "Race page")
+    asset = create_media_asset
+    page.update!(hero_media_asset: asset)
+    Media::UsageIndex.refresh(page)
+    assert_equal 1, Media::Usage.where(owner: page).count
+
+    original_where = Media::Usage.method(:where)
+    where_with_inert_delete = lambda do |*args|
+      original_where.call(*args).tap { |relation| relation.define_singleton_method(:delete_all) { 0 } }
+    end
+
+    assert_nothing_raised do
+      with_singleton_override(Media::Usage, :where, where_with_inert_delete) { Media::UsageIndex.refresh(page) }
+    end
+
+    assert_equal [ [ asset.id, "Page", page.id, "hero", nil ] ], usage_tuples(Media::Usage.where(owner: page))
   end
 
   test "a rich-text block owned by a page gives a rich_text row owned by the block, not the page" do
