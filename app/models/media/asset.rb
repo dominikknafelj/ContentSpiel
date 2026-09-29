@@ -73,27 +73,48 @@ class Media::Asset < ApplicationRecord
   # directly.
   scope :unused, -> { where.missing(:usages) }
 
+  # Fix round 1 (I2/I3): every list that calls `#srcset` on more than one
+  # asset -- a library listing, a picker -- must load through this scope.
+  # `#srcset` answers "is this variant processed" by reading `file.blob
+  # .variant_records` (`#processed_variant_digests`'s own comment); without
+  # this preload that's one query per asset, and `.variant_records` itself
+  # nested three associations deep (`file_attachment` -> `blob` ->
+  # `variant_records`) isn't something `includes` infers on its own from a
+  # bare `Media::Asset.all`. This is deliberately narrower than the
+  # `with_attached_file` scope `has_one_attached` already generates (which
+  # also preloads each variant's own attached image, `image_attachment:
+  # :blob` -- a second N+1 `#srcset` has no use for, since all it ever reads
+  # off a `variant_records` row is `variation_digest`).
+  scope :with_variants, -> { includes(file_attachment: { blob: :variant_records }) }
+
   has_one_attached :file do |attachable|
     # Every responsive width the public site can ever ask for, preprocessed
-    # right after upload (`preprocessed: true` enqueues one `ActiveStorage
-    # ::TransformJob` per variant as soon as this attachment's blob finishes
-    # uploading) so a variant is normally already sitting on the storage
-    # service by the time a page first requests it -- but never something a
-    # page *waits* on: `#srcset` below only ever lists a variant Active
-    # Storage has already finished (`Variant#processed?`), so a slow,
-    # still-queued or failed job just means fewer `srcset` entries for this
-    # request, never a request that blocks on -- or 500s over -- one.
+    # right after upload (a truthy `preprocessed:` enqueues one `ActiveStorage
+    # ::TransformJob` per variant, from `ActiveStorage::Attachment`'s own
+    # `after_create_commit :transform_variants_later`, as soon as this
+    # attachment's blob finishes uploading) so a variant is normally already
+    # sitting on the storage service by the time a page first requests it --
+    # but never something a page *waits* on: `#srcset` below only ever lists
+    # a variant that's already finished (`#processed_variant_digests`), so a
+    # slow, still-queued or failed job just means fewer `srcset` entries for
+    # this request, never a request that blocks on -- or 500s over -- one.
     #
-    # Declared unconditionally for every attached file: this block-form DSL
-    # only lets a variant be conditioned on its *name*, not on the
-    # attachment's own content type, so a GIF gets these same `w480`..
-    # `w2400` WebP names declared (and, wastefully, preprocessed) too.
-    # `#srcset`/`#variable_image?` are what actually keep a GIF from ever
-    # showing one (global constraints: "GIFs get no variants") -- resized
-    # WebP stills would throw away the one thing a GIF has that a still
-    # image doesn't, its animation.
+    # `preprocessed:` takes a `Proc` (`ActiveStorage::NamedVariant
+    # #preprocessed?`: `Proc` gets `.call(record)`, `Symbol` gets `record
+    # .send(...)`) called with the owning `Media::Asset` itself -- fix round
+    # 1's I1 (a plain `true` here doesn't condition on content type at all,
+    # so a GIF's `w480`..`w2400` were being enqueued and processed every
+    # upload, wastefully generating four resized-still WebPs of an
+    # animation no page has ever shown -- `#variable_image?` already exists
+    # for exactly this check, but nothing read it before enqueuing). Called
+    # from `transform_variants_later`'s own `after_create_commit`, strictly
+    # after this record's `before_save :cache_metadata_from_file` has run
+    # and that whole save has committed, so `record.content_type` -- what
+    # `#variable_image?` actually reads -- is always the real, sniffed
+    # value by the time this proc runs, never the pre-save `nil`.
     VARIANT_WIDTHS.each do |name, target_width|
-      attachable.variant name, resize_to_limit: [ target_width, nil ], format: :webp, preprocessed: true
+      attachable.variant name, resize_to_limit: [ target_width, nil ], format: :webp,
+        preprocessed: ->(asset) { asset.variable_image? }
     end
   end
 
@@ -147,9 +168,10 @@ class Media::Asset < ApplicationRecord
   #   target_width >= width`) -- `resize_to_limit` already refuses to
   #   *upscale*, so a variant no bigger than the original would just be a
   #   redundant re-encode of it, not a smaller file a `srcset` should offer;
-  # - a variant that hasn't *finished* processing (`Variant#processed?`) --
-  #   preprocessing is a best-effort head start (the `has_one_attached`
-  #   block's own comment), never something this waits on;
+  # - a variant that hasn't *finished* processing (`#processed_variant_
+  #   digests`) -- preprocessing is a best-effort head start (the
+  #   `has_one_attached` block's own comment), never something this waits
+  #   on;
   # - a variant whose processing blew up (a corrupt upload, a `vips`
   #   error) -- caught and logged per variant, not left to bubble up and
   #   break the page around it.
@@ -158,23 +180,17 @@ class Media::Asset < ApplicationRecord
   # itself be nil -- analysis hasn't run, or failed (`MediaAssets::Create
   # #analyze_dimensions`'s own comment) -- in which case the "never upscale"
   # check is simply skipped for lack of anything to compare against; the
-  # `processed?` check below still applies.
+  # processed check below still applies.
   def srcset
     return [] unless variable_image?
+
+    digests = processed_variant_digests
 
     VARIANT_WIDTHS.filter_map do |name, target_width|
       next if width.present? && target_width >= width
 
       variant = file.variant(name)
-      # `Variant#processed?`/`VariantWithRecord#processed?` (`ActiveStorage
-      # .track_variants`, on by default since `config.load_defaults 8.1`)
-      # are both `private` -- on purpose, so nothing casually asks "is this
-      # done yet" without also being tempted to reach for the public
-      # `#processed`, which *runs* the transformation inline (a `vips` call
-      # this method must never trigger; see the `has_one_attached` block's
-      # own comment). `send` is the one way to ask the question without
-      # triggering the answer.
-      next unless variant.send(:processed?)
+      next unless digests.include?(variant.variation.digest)
 
       [ Rails.application.routes.url_helpers.rails_representation_path(variant, only_path: true), target_width ]
     rescue StandardError => e
@@ -229,6 +245,30 @@ class Media::Asset < ApplicationRecord
   end
 
   private
+
+  # The `ActiveStorage::VariantRecord#variation_digest` for every variant of
+  # this asset's blob that's already been processed -- fix round 1's I2/I3:
+  # `Variant#processed?`/`VariantWithRecord#processed?` are both `private`
+  # (deliberately: the public alternative, `#processed`, *runs* the
+  # transformation inline the moment it isn't done yet, a `vips` call
+  # `#srcset` must never trigger -- see the `has_one_attached` block's own
+  # comment), so this reads the same thing those private methods themselves
+  # read (`VariantWithRecord#record`'s own `blob.variant_records.find_by
+  # (variation_digest: ...)`) through the public, documented `variant_
+  # records` association instead.
+  #
+  # One query total for *all four* widths, not one per width and not one
+  # per asset: `variant_records.loaded?` is true when a caller preloaded it
+  # (`Media::Asset.with_variants`, which every multi-asset list must use),
+  # in which case this reads the already-loaded rows in memory; otherwise
+  # `pluck` issues the one query itself. Either way, comparing a `Set` of
+  # digests against each variant's own `variation.digest` (`#srcset`) never
+  # queries per variant.
+  def processed_variant_digests
+    variant_records = file.blob.variant_records
+    digests = variant_records.loaded? ? variant_records.map(&:variation_digest) : variant_records.pluck(:variation_digest)
+    digests.to_set
+  end
 
   # `hero-photo.jpg` -> "hero-photo": the title an editor never has to type
   # before an upload is usable in a listing or a picker. `ActiveStorage

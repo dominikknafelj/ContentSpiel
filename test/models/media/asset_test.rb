@@ -232,6 +232,30 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal [], asset.srcset
   end
 
+  # Fix round 1's I1: `preprocessed:` used to be a plain `true`, which
+  # doesn't condition on content type at all -- `ActiveStorage.variable_
+  # content_types` includes `image/gif`, so every GIF upload was enqueuing
+  # (and a background worker would then actually run) four resized-still
+  # WebP transforms of an image `#srcset`/`#variable_image?` were always
+  # going to refuse to ever list. `preprocessed: ->(asset) { asset
+  # .variable_image? }` is read from `ActiveStorage::Attachment`'s own
+  # `after_create_commit`, strictly after this record's save (including
+  # `before_save :cache_metadata_from_file`, which is what makes
+  # `#variable_image?`'s `content_type` read meaningful) has committed.
+  test "uploading a GIF enqueues no TransformJob, but a PNG enqueues one per variant" do
+    assert_enqueued_jobs(4, only: ActiveStorage::TransformJob) do
+      png = Media::Asset.new
+      png.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+      png.save!
+    end
+
+    assert_no_enqueued_jobs(only: ActiveStorage::TransformJob) do
+      gif = Media::Asset.new
+      gif.file.attach(io: File.open(file_fixture("small.gif")), filename: "small.gif", content_type: "image/gif")
+      gif.save!
+    end
+  end
+
   # Review Focus 3 (global constraints): a variant job that fails or is slow
   # -- a corrupt image, a `vips` error -- must never take the public page
   # down with it. Stubbing `file.variant` itself to blow up stands in for
@@ -253,6 +277,57 @@ class Media::AssetTest < ActiveSupport::TestCase
 
     assert_equal 4, logged_messages.size
     assert logged_messages.all? { |message| message.include?("vips blew up") }
+  end
+
+  # Fix round 1's I2/I3: `#srcset` reads `file.blob.variant_records` to
+  # answer "is this variant processed" (`#processed_variant_digests`'s own
+  # comment) instead of the private `Variant#processed?`/`VariantWithRecord
+  # #processed?`. Read one asset at a time that's one query per asset (a
+  # library listing's own N+1); `Media::Asset.with_variants` exists so a
+  # caller doesn't have to pay it -- `#srcset` over every asset in a
+  # preloaded batch must cost nothing further at all, not "fewer" queries.
+  test "srcset over many assets preloaded via .with_variants issues no further queries" do
+    assets = Array.new(20) do |index|
+      asset = Media::Asset.new
+      asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide-#{index}.png", content_type: "image/png")
+      asset.save!
+      analyze(asset)
+      asset
+    end
+    perform_enqueued_jobs
+
+    loaded = Media::Asset.with_variants.where(id: assets.map(&:id)).to_a
+
+    ActiveRecord::Base.uncached do
+      assert_no_queries do
+        loaded.each { |asset| assert_equal [ 480, 960, 1600, 2400 ], asset.srcset.map(&:last) }
+      end
+    end
+  end
+
+  # The other half of I2/I3: the processed check itself -- `#processed_
+  # variant_digests` -- costs exactly one query total for all four widths,
+  # not one per variant (the bug it fixes: plucking every digest for this
+  # asset's blob once, up front, rather than asking Active Storage's own
+  # `variant_records.find_by` once per width). Warms `file.blob` first,
+  # the same as any earlier read in a real request (`#url`, `#src`) would
+  # already have done before `#srcset` ever runs, so the one query this
+  # asserts is only the digest lookup, not the attachment/blob association
+  # loading for the first time -- a cost this fix has no way to remove and
+  # isn't what I2/I3 are about.
+  test "srcset's processed check costs exactly one query, not one per variant" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
+    asset.save!
+    analyze(asset)
+    perform_enqueued_jobs
+
+    reloaded = Media::Asset.find(asset.id)
+    reloaded.file.blob
+
+    ActiveRecord::Base.uncached do
+      assert_queries_count(1) { assert_equal [ 480, 960, 1600, 2400 ], reloaded.srcset.map(&:last) }
+    end
   end
 
   private
