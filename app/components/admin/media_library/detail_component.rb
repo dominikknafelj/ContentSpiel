@@ -115,7 +115,7 @@ module Admin
           place = place_for(entry[:owner])
           next if place.nil?
 
-          role_label = ROLE_LABELS.fetch(entry[:roles].first, entry[:roles].first)
+          role_label = role_label(entry[:roles])
           locale_suffix = entry[:locales].any? ? " (#{entry[:locales].join(", ")})" : ""
           kind = place.is_a?(Post) ? "post" : "page"
 
@@ -144,6 +144,15 @@ module Admin
       end
 
       def place_path(place, kind) = kind == "post" ? helpers.admin_post_path(place, **url_options) : helpers.admin_page_path(place, **url_options)
+
+      # Fix round 1 (review of `0695e7a`): every role this owner's group
+      # actually has, not just the first -- `Media::UsageIndex`'s own
+      # comment on `#rows_for` is explicit that a single `ContentBlock` can
+      # in principle contribute both a `block_image` and a `rich_text` row
+      # (nothing there assumes the two only ever come from different block
+      # types), so `entry[:roles]` isn't guaranteed to be a single-element
+      # Array the way it usually is in practice.
+      def role_label(roles) = roles.map { |role| ROLE_LABELS.fetch(role, role) }.join(", ")
     end
   end
 end

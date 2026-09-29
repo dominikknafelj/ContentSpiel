@@ -60,7 +60,15 @@ module Media
     # the actor can't read isn't disclosed ("not found, not forbidden"):
     # it's "a page you can't open" instead of its title.
     def in_use_message
-      places = @asset.usages.includes(:owner).order(:id).map { |usage| place_of(usage.owner) }.compact.uniq
+      usages = @asset.usages.includes(:owner).order(:id).to_a
+      # Fix round 1 (review of `0695e7a`): batches the `ContentBlock#owner`
+      # second hop for every block-owned row in one shot, one query per
+      # owner type (Page, Post) -- see `Media::Asset.preload_usage_places`'s
+      # own comment for why this can't just share `#usages_summary`'s own
+      # query (this needs the strict `.order(:id)` above, which that method
+      # doesn't promise).
+      Media::Asset.preload_usage_places(usages.map(&:owner))
+      places = usages.map { |usage| place_of(usage.owner) }.compact.uniq
       # Only rows whose owner is already gone (a stale index): still refused.
       return "This image is still in use and can't be deleted" if places.empty?
 

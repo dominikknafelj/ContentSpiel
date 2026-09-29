@@ -189,6 +189,43 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       "expected a constant number of queries regardless of asset count (10 assets: #{few_count}, 60 assets: #{many_count})"
   end
 
+  # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
+  # `owner.owner` second hop -- a block-owned usage is named by its page or
+  # post, never the block itself (`Admin::MediaLibrary::DetailComponent
+  # #place_for`) -- used to cost one query per block-owned usage. `Media
+  # ::Asset.preload_usage_places` batches it, one query per owner type, so
+  # this stays flat whether the image sits on one block or six.
+  test "the detail panel issues a constant number of queries whether an image is used on 1 block or 6" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "used.png")
+    add_image_block(asset, page_title: "Solo page")
+
+    # A throwaway request first (same reasoning as the grid's own
+    # constant-query-count test above): the very first request of a
+    # session pays a one-off query `Setup::RedirectConstraint` only ever
+    # runs once, which would otherwise make whichever count below happens
+    # to go first look one query more expensive than the other.
+    get "/cs-studio/media/#{asset.id}"
+    assert_response :success
+
+    one_count = many_count = nil
+    ActiveRecord::Base.uncached do
+      one_count = count_queries { get "/cs-studio/media/#{asset.id}" }
+      assert_response :success
+    end
+
+    5.times { |i| add_image_block(asset, page_title: "Page #{i}") }
+
+    ActiveRecord::Base.uncached do
+      many_count = count_queries { get "/cs-studio/media/#{asset.id}" }
+      assert_response :success
+    end
+
+    assert_select "a", text: /Image block/, count: 6 # sanity: the 6-block request really rendered every usage
+    assert_equal one_count, many_count,
+      "expected a constant number of queries regardless of how many blocks use this image (1 block: #{one_count}, 6 blocks: #{many_count})"
+  end
+
   test "the detail panel lists where an image is used, linking to what the viewer can read" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")
@@ -373,6 +410,17 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: filename, content_type: "image/png")
     asset.save!
     asset
+  end
+
+  # A real image block, on a fresh page, pointing at `asset` -- for tests
+  # that need several distinct block-owned usages of the same asset (the
+  # query-count test above; a block's usage is always named by its own
+  # page, `Admin::MediaLibrary::DetailComponent#place_for`).
+  def add_image_block(asset, page_title:)
+    page = create_page(title: page_title)
+    result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: asset.id })
+    assert result.ok?, result.errors.to_sentence
+    result.record
   end
 
   def count_queries(&block)

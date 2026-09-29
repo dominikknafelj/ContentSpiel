@@ -241,13 +241,50 @@ class Media::Asset < ApplicationRecord
   # to say *how* it's used there (e.g. "rich text, in en, de") without
   # re-querying.
   def usages_summary
-    usages.includes(:owner).group_by { |usage| [ usage.owner_type, usage.owner_id ] }.map do |_key, group|
+    loaded = usages.includes(:owner).to_a
+    self.class.preload_usage_places(loaded.map(&:owner))
+
+    loaded.group_by { |usage| [ usage.owner_type, usage.owner_id ] }.map do |_key, group|
       {
         owner: group.first.owner,
         roles: group.map(&:role).uniq,
         locales: group.filter_map(&:locale).uniq
       }
     end
+  end
+
+  # Batches the second hop every caller of a `media_usages` row's owner
+  # needs for a `block_image`/`rich_text` usage: which page or post the
+  # owning `ContentBlock` actually sits on (`ContentBlock#owner`, itself
+  # polymorphic). Fix round 1 (review of `0695e7a`): `#usages_summary`'s
+  # own `owner: group.first.owner` and `Media::Destroy#in_use_message`'s
+  # own `place_of` both used to call that bare `.owner` once per
+  # `ContentBlock`-owned usage -- fine for the "and 2 more" case `#in_use_
+  # message` truncates to, but a real N+1 once an asset (or a delete
+  # attempt's own full count) is used on a page full of image blocks
+  # (Admin::MediaLibrary::DetailComponent's own "Used on" list, unlike
+  # `#in_use_message`, never truncates at all).
+  #
+  # A public class method, not a private instance one: `Media::Destroy
+  # #in_use_message` runs its own separate `@asset.usages.includes(:owner)
+  # .order(:id)` query (it needs a strict id order `#usages_summary`
+  # doesn't promise, so the two can't simply share one query) and calls
+  # this directly on its own loaded batch, rather than duplicating the
+  # preload logic or bending its own ordering to reuse `#usages_summary`.
+  #
+  # `ActiveRecord::Associations::Preloader`, not a bare `.owner` call per
+  # block (this app's own established pattern for exactly this shape --
+  # see `Admin::PagesController#show`/`PublicPageRendering
+  # #preload_page_images`): `owner` is itself polymorphic (Page or Post),
+  # and the preloader groups each block by its own already-known
+  # `owner_type` before querying, so this is one query per owner *type*
+  # actually present among `owners` (at most two: Page, Post), never one
+  # per block -- the ruling's own "one query per owner type" shape.
+  def self.preload_usage_places(owners)
+    blocks = owners.select { |owner| owner.is_a?(ContentBlock) }.uniq
+    return if blocks.empty?
+
+    ActiveRecord::Associations::Preloader.new(records: blocks, associations: :owner).call
   end
 
   private
