@@ -29,8 +29,13 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
   test "each group sees only the modules it can open" do
     expectations = {
-      users(:two) => [ "Pages", "Posts", "Tags", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Pages", "Posts", "AI assistant", "Mind graph" ],
+      # Media library Task 7: the Media module needs only `media.upload`
+      # (design spec §6, `Admin::BaseController::MODULES`), which `two`
+      # (Admin, every permission) and `author` (`media.upload` is one of
+      # its own seeded grants, test/fixtures/access_control/grants.yml)
+      # both hold, and `reader` (Read only) doesn't.
+      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
+      users(:author) => [ "Pages", "Posts", "Media", "AI assistant", "Mind graph" ],
       users(:reader) => [ "Pages", "Posts", "AI assistant", "Mind graph" ]
     }
 

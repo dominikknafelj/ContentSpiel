@@ -32,9 +32,16 @@ module Admin
         return value unless attached?
 
         asset = value.record
-        return value unless asset.is_a?(Media::Asset)
+        # `::Media::Asset`, not a bare `Media::Asset` (media library Task 7):
+        # `Admin::Media::GridComponent`/`DetailComponent` made `Admin::Media`
+        # a real namespace, which shadows the top-level `Media` module for
+        # any bare `Media::` reference lexically nested under `Admin` --
+        # this component's own `module Admin; module Columns` included.
+        # Left bare, this would resolve to (nonexistent) `Admin::Media
+        # ::Asset` instead of the library's own `::Media::Asset`.
+        return value unless asset.is_a?(::Media::Asset)
 
-        w480_url, = asset.srcset.find { |_url, width| width == Media::Asset::VARIANT_WIDTHS[:w480] }
+        w480_url, = asset.srcset.find { |_url, width| width == ::Media::Asset::VARIANT_WIDTHS[:w480] }
         w480_url || asset.url
       end
     end

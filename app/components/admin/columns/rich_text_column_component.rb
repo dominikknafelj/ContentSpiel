@@ -112,7 +112,10 @@ module Admin
       # `asset_id` that still names a `Media::Asset` (see the class comment).
       def asset_urls_json
         ids = self.class.collect(document) { |node| node["type"] == "image" ? node.dig("attrs", "asset_id") : nil }
-        Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
+        # `::Media::Asset` (media library Task 7's own `Admin::Media`
+        # namespace shadows the bare top-level name here -- see `Admin
+        # ::Columns::ImageColumnComponent#thumbnail_source`'s own comment).
+        ::Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
       end
 
       # `{ "page:12" => "Contact" }` for every `internalLink` target that

@@ -100,7 +100,11 @@ module Admin
       if result.ok? && image_changing
         streams << image_field_stream(block, result.record.media_asset)
       elsif upload
-        streams.insert(1, image_field_stream(block, Media::Asset.find_by(id: block.attribute_in_database("media_asset_id"))))
+        # `::Media::Asset`, not bare `Media::Asset` -- media library Task
+        # 7's `Admin::Media` namespace shadows the top-level `Media` module
+        # here too (`Admin::Columns::ImageColumnComponent#thumbnail_source`
+        # has the fuller explanation).
+        streams.insert(1, image_field_stream(block, ::Media::Asset.find_by(id: block.attribute_in_database("media_asset_id"))))
       end
 
       render turbo_stream: streams, status: autosave_status(result)

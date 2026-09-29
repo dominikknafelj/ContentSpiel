@@ -1,0 +1,16 @@
+<% if assets.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No images", description: "Upload one above, or clear the current filters.") %>
+<% else %>
+  <ul class="admin-media-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    <% assets.each do |asset| %>
+      <li id="media-asset-<%= asset.id %>">
+        <%= link_to show_path(asset), class: "group block rounded-cs border border-line bg-surface p-2 hover:border-line-strong" do %>
+          <span class="block aspect-square overflow-hidden rounded-cs bg-sunken">
+            <%= image_tag thumbnail_url(asset), alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
+          </span>
+          <span class="mt-2 block truncate text-sm text-ink"><%= asset.title %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

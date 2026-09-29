@@ -30,6 +30,7 @@ module Admin
       { label: "Pages", icon: :pages, path: :admin_root_path, permission: "pages.read" },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
+      { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload" },
       { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
       { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage" },
