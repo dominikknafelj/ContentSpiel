@@ -5,7 +5,7 @@ require_relative "supported_locales"
 # as per-locale JSON documents (`HasRichTextBody`, `RichText::Document`),
 # and ActionText's engine would otherwise still boot its models, routes,
 # helpers and the Trix/actiontext importmap assets. Active Storage stays --
-# `MediaAsset` and image blocks use it directly, and it never depended on
+# `Media::Asset` and image blocks use it directly, and it never depended on
 # ActionText.
 require "rails"
 require "active_record/railtie"

@@ -35,7 +35,18 @@ module Admin
       "User" => "User",
       "SiteSetting" => "Settings",
       "ApiToken" => "API token",
-      "MediaAsset" => "Media asset"
+      # Media library Task 1 renamed the model from the bare `MediaAsset` to
+      # `Media::Asset`; the key here is today's name, since new events only
+      # ever store that. A pre-rename row's `subject_type` still reads
+      # `"MediaAsset"` (append-only, never rewritten -- `Audit::Event`'s own
+      # comment) and so never matches this whitelist -- same as any other
+      # unrecognised `subject_type`, it's silently dropped from the filter
+      # rather than raising, and the row still lists and shows fine (its
+      # `subject_label` was captured at write time, not derived from the
+      # constant, and `Audit::Event.polymorphic_class_for` maps the legacy
+      # string so `event.subject` itself doesn't raise `NameError` loading a
+      # class that no longer exists under that name).
+      "Media::Asset" => "Media asset"
     }.freeze
 
     before_action -> { require_permission("audit.view") }

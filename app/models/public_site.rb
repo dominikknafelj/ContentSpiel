@@ -13,17 +13,17 @@
 # It also keys the rich-text render cache (`RichText::Document#to_html`,
 # tiptap Task 5 fix round 1): a rendered body bakes in its internal links'
 # hrefs (slug renames, a target published or deleted) and its images'
-# `MediaAsset` URLs, none of which change the document's own digest. The
-# `MediaAsset` maximum/count are here for that reason.
+# `Media::Asset` URLs, none of which change the document's own digest. The
+# `Media::Asset` maximum/count are here for that reason.
 module PublicSite
   module_function
 
   def content_version
     [
       Page.maximum(:updated_at), Post.maximum(:updated_at), ContentBlock.maximum(:updated_at),
-      PublicPath.maximum(:updated_at), MediaAsset.maximum(:updated_at), Current.site.updated_at,
+      PublicPath.maximum(:updated_at), Media::Asset.maximum(:updated_at), Current.site.updated_at,
       Page.published.maximum(:published_at), Post.published.maximum(:published_at),
-      Page.count, Post.count, ContentBlock.count, PublicPath.count, MediaAsset.count
+      Page.count, Post.count, ContentBlock.count, PublicPath.count, Media::Asset.count
     ].map { |value| value.is_a?(Integer) ? value : value&.to_f }.join("-")
   end
 

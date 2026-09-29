@@ -96,7 +96,7 @@ module HasRichTextBody
   # (every locale, for a new record) -- not every stored locale on every
   # save. A document that validated when it was written can go stale later
   # through no edit of its own (an internal link's target page deleted, an
-  # image's `MediaAsset` removed); re-validating it on every unrelated save
+  # image's `Media::Asset` removed); re-validating it on every unrelated save
   # would make a post whose English body links to a since-deleted page
   # impossible to retitle, or to edit in German. Stale references are the
   # renderer's job to degrade (spec §7: "renders nothing or plain text"),
@@ -125,7 +125,7 @@ module HasRichTextBody
 
   # The same reasoning one level down, *within* a changed document (Task 7
   # fix round 1, I2): an edit to a body that already held a dead reference
-  # (a link to a since-deleted page, an image whose `MediaAsset` is gone)
+  # (a link to a since-deleted page, an image whose `Media::Asset` is gone)
   # must still save -- the editor sends the whole document back, dead
   # reference included, on every keystroke. So existence checks only
   # apply to references that are new relative to this locale's stored

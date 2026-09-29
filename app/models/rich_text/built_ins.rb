@@ -231,7 +231,7 @@ module RichText
       end
 
       # `image` is also a directive node (`::image{asset="42" alt="..." caption="..."}`).
-      # `asset_id` must name an existing `MediaAsset` (Task 4) -- when the
+      # `asset_id` must name an existing `Media::Asset` (Task 4) -- when the
       # reference is new (`reference: true`, see `RichText::Schema::Attribute`:
       # an asset deleted after the document was saved doesn't block later
       # edits to it). `alt`/
@@ -243,11 +243,11 @@ module RichText
       # that already passed `RichText::Document#validate` -- same "hostile
       # documents render inert" posture `render_youtube`/`render_internal_
       # link` already take (a never-validated MCP/hand-edited document, or
-      # an `asset_id` naming a `MediaAsset` deleted after this document was
+      # an `asset_id` naming a `Media::Asset` deleted after this document was
       # saved, must degrade to rendering nothing at all, not raise or leak
       # a broken `<img>`). `RichText::ImageComponent` itself doesn't know or
-      # care what a `MediaAsset` is (it takes a plain `src:` String) -- this
-      # is the one place that translates "a `MediaAsset` id" into "a public
+      # care what a `Media::Asset` is (it takes a plain `src:` String) -- this
+      # is the one place that translates "a `Media::Asset` id" into "a public
       # URL" for it.
       #
       # `directive "image", asset: { attr: :asset_id, type: :integer }, ...`
@@ -257,7 +257,7 @@ module RichText
       # what `TypeDefinition#directive`'s `{ attr:, type: }` mapping shape
       # exists for. `alt`/`caption` map to themselves, `:string` (identity).
       RichText::Schema.register_node("image") do |node|
-        node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { MediaAsset.exists?(value) }
+        node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { Media::Asset.exists?(value) }
         node.attribute :alt, :string
         node.attribute :caption, :string
         node.directive "image", asset: { attr: :asset_id, type: :integer }, alt: :string, caption: :string
@@ -430,7 +430,7 @@ module RichText
       ApplicationController.render(RichText::YoutubeComponent.new(id: id), layout: false)
     end
 
-    # A missing/deleted `MediaAsset` (`asset_id` present but `MediaAsset
+    # A missing/deleted `Media::Asset` (`asset_id` present but `Media::Asset
     # .find_by` comes up empty -- a never-validated document, or one
     # validated before the asset was later deleted) renders nothing at all,
     # the same as `render_youtube`'s own malformed-id case above: no broken
@@ -438,7 +438,7 @@ module RichText
     # editor deleting the embed outright would leave behind.
     def self.render_image(node)
       attrs = node["attrs"] || {}
-      asset = MediaAsset.find_by(id: attrs["asset_id"])
+      asset = Media::Asset.find_by(id: attrs["asset_id"])
       return "".html_safe if asset.nil?
 
       ApplicationController.render(RichText::ImageComponent.new(src: asset.url, alt: attrs["alt"], caption: attrs["caption"]), layout: false)

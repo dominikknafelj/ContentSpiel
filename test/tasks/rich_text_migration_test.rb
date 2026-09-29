@@ -108,15 +108,15 @@ class RichTextMigrationTest < ActiveSupport::TestCase
   end
 
   # Fix round 1 (m3): a row that fails after its import already created a
-  # `MediaAsset` rolls that asset back rather than orphaning it.
-  test "a failing row leaves no MediaAsset behind" do
+  # `Media::Asset` rolls that asset back rather than orphaning it.
+  test "a failing row leaves no Media::Asset behind" do
     blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
     image = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>)
     source = Source.new([ row(@post, image + %(<action-text-attachment sgid="#{youtube_sgid(1)}"></action-text-attachment>)) ], {})
     def source.youtube_video_id(_id) = raise("youtube_embeds is unreadable")
 
     out = StringIO.new
-    assert_no_difference(-> { MediaAsset.count }) { RichText::ActionTextImport.new(source: source, out: out).run }
+    assert_no_difference(-> { Media::Asset.count }) { RichText::ActionTextImport.new(source: source, out: out).run }
 
     assert_match(/Post: 0 imported, 0 blank, 0 skipped, 1 failed/, out.string)
     assert_match(/youtube_embeds is unreadable/, out.string)

@@ -154,7 +154,7 @@ module RichText
     # covers the document itself, but its HTML also depends on the world
     # around it -- an internal link renders as text until its target is
     # published, points at the target's *current* slug, and degrades to text
-    # once the target is deleted; an image renders its `MediaAsset`'s URL, or
+    # once the target is deleted; an image renders its `Media::Asset`'s URL, or
     # nothing once the asset is gone. Without it, Solid Cache would keep
     # serving the first render of each of those forever.
     #

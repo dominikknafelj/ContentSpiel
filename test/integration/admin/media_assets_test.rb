@@ -10,23 +10,23 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     site_settings(:default).update!(setup_completed_at: Time.current)
   end
 
-  test "signed in, a real image upload creates a MediaAsset and returns its id and url" do
+  test "signed in, a real image upload creates a Media::Asset and returns its id and url" do
     sign_in_as(users(:one))
 
-    assert_difference -> { MediaAsset.count }, 1 do
+    assert_difference -> { Media::Asset.count }, 1 do
       post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
     end
 
     assert_response :created
     body = response.parsed_body
-    asset = MediaAsset.last
+    asset = Media::Asset.last
     assert_equal asset.id, body["id"]
     assert_equal asset.url, body["url"]
     assert asset.file.attached?
   end
 
   test "signed out is redirected to sign in, and creates nothing" do
-    assert_no_difference -> { MediaAsset.count } do
+    assert_no_difference -> { Media::Asset.count } do
       post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
     end
 
@@ -41,7 +41,7 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
   test "a text file renamed .png with an image/png content type is rejected" do
     sign_in_as(users(:one))
 
-    assert_no_difference -> { MediaAsset.count } do
+    assert_no_difference -> { Media::Asset.count } do
       post "/cs-studio/media_assets", params: { file: fixture_file_upload("fake.png", "image/png") }
     end
 
@@ -57,7 +57,7 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
       tempfile.write("\x00" * (10.megabytes + 1))
       tempfile.rewind
 
-      assert_no_difference -> { MediaAsset.count } do
+      assert_no_difference -> { Media::Asset.count } do
         post "/cs-studio/media_assets", params: { file: Rack::Test::UploadedFile.new(tempfile.path, "image/png") }
       end
     end

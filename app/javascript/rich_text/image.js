@@ -1,7 +1,7 @@
 import { Node } from "@tiptap/core"
 
 // The `image` node (tiptap spec §3.2/§4.1) -- `RichText::BuiltIns`'
-// `image{asset_id, alt, caption}`: `asset_id` an existing `MediaAsset`'s id
+// `image{asset_id, alt, caption}`: `asset_id` an existing `Media::Asset`'s id
 // (an Integer, required), `alt`/`caption` optional Strings, inserted as
 // `""` (spec §4.1). Exactly those three attrs and nothing else -- in
 // particular no `src`: the document stores which asset, never where it
@@ -57,7 +57,7 @@ export const Image = Node.create({
   },
 
   // Only our own serialization (copy/paste between CS Studio editors). A
-  // pasted `<img>` from anywhere else has no `MediaAsset` behind it, so it
+  // pasted `<img>` from anywhere else has no `Media::Asset` behind it, so it
   // matches nothing and the schema drops it -- uploading is the one way an
   // image gets in.
   parseHTML() {

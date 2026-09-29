@@ -19,7 +19,7 @@
 #   literal href); anything else passing `RichText::BuiltIns.safe_href?`
 #   → `link`; anything failing it (`javascript:` & co.) → just the text;
 # - `<action-text-attachment>`: a `YoutubeEmbed` sgid → `youtube`; an image
-#   `ActiveStorage::Blob` sgid → a `MediaAsset` re-attaching that same blob
+#   `ActiveStorage::Blob` sgid → a `Media::Asset` re-attaching that same blob
 #   plus an `image` node; the paste handler's offline fallback (a
 #   `text/html` content attachment holding the embed iframe) → `youtube`.
 #
@@ -445,7 +445,7 @@ module RichText
       end
     end
 
-    # One `MediaAsset` per blob, however many bodies (or languages) embed
+    # One `Media::Asset` per blob, however many bodies (or languages) embed
     # it: an existing asset already holding this blob is reused, and one
     # created earlier in this run is remembered in `@assets`. The asset's
     # own validation (bytes sniffed, png/jpeg/gif/webp, 10 MB) decides
@@ -463,11 +463,11 @@ module RichText
     end
 
     def existing_asset(blob)
-      MediaAsset.joins(:file_attachment).find_by(active_storage_attachments: { blob_id: blob.id })
+      Media::Asset.joins(:file_attachment).find_by(active_storage_attachments: { blob_id: blob.id })
     end
 
     def create_asset(element, blob)
-      asset = MediaAsset.new
+      asset = Media::Asset.new
       asset.file.attach(blob)
       return asset if asset.save
 

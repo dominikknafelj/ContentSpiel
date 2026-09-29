@@ -29,6 +29,26 @@ module Audit
     before_update :only_coalescing_columns_changed
     before_destroy { throw :abort }
 
+    # A polymorphic `actor_type`/`subject_type` column stores a class name,
+    # and reading `actor`/`subject` back constantizes whatever string is on
+    # the row -- fine for a type that still exists, but this table is
+    # append-only (this class's own comment) and can never be rewritten to
+    # follow a model that's later renamed. Media library Task 1 renamed
+    # `MediaAsset` to `Media::Asset`; without this override, `event.subject`
+    # on a row recorded before that (`subject_type: "MediaAsset"`) would
+    # raise `NameError` loading a constant that no longer exists -- crashing
+    # `Admin::AuditEventsController#index`'s `includes(:subject, :user)` the
+    # moment one such row appears on a page. One entry per rename, added
+    # here as they happen; `Admin::AuditEventsController::SUBJECT_TYPES`
+    # carries the equivalent for the filter whitelist and index/show
+    # <select>, since that's a distinct, UI-only concern this append-only
+    # model shouldn't otherwise depend on.
+    LEGACY_POLYMORPHIC_TYPES = { "MediaAsset" => "Media::Asset" }.freeze
+
+    def self.polymorphic_class_for(name)
+      super(LEGACY_POLYMORPHIC_TYPES.fetch(name, name))
+    end
+
     private
 
     def only_coalescing_columns_changed

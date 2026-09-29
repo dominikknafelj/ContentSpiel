@@ -75,7 +75,7 @@ Rails.application.routes.draw do
     # The Tiptap editor's own upload button (design spec §4.1/§4.2): POSTs
     # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
     # (422) -- `create` only, there is no listing/edit/destroy screen for a
-    # `MediaAsset` yet (design spec §4.2's "Relation to open types": that
+    # `Media::Asset` yet (design spec §4.2's "Relation to open types": that
     # arrives with the media library sub-project).
     resources :media_assets, only: :create
 

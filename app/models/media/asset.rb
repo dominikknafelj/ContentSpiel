@@ -8,7 +8,16 @@
 # attachment uses (`ContentBlock#image`, an open type) -- design spec §4.2's
 # "Relation to open types": unifying the two storage paths is that same
 # future sub-project's job, not this one's.
-class MediaAsset < ApplicationRecord
+class Media::Asset < ApplicationRecord
+  # Zeitwerk infers a namespaced model's table name by demodulizing it
+  # (`Media::Asset` -> `assets`), so this has to be explicit: Task 1 (media
+  # library sub-project) renamed the bare `MediaAsset` to `Media::Asset` for
+  # the constant alone, keeping the existing `media_assets` table (global
+  # constraints: "the table `media_assets` is unchanged") -- the data, and
+  # every foreign key/polymorphic `record_type`/`subject_type` string that
+  # already points at that table, are untouched by a Ruby-side rename.
+  self.table_name = "media_assets"
+
   # Exactly png/jpeg/gif/webp (global constraints) -- no SVG (an SVG's
   # "image" bytes are actually executable markup: inline `<script>`, and
   # external resource loads a browser will happily follow) and nothing else,
@@ -124,7 +133,7 @@ class MediaAsset < ApplicationRecord
   # `case` on the attachable's own class: an existing blob already has real
   # bytes sitting on the storage service, so `blob.open` (the ordinary,
   # already-uploaded path below) reads it back exactly the way a persisted
-  # `MediaAsset`, reloaded and re-validated, would.
+  # `Media::Asset`, reloaded and re-validated, would.
   #
   # Only a genuinely *new* blob needs the workaround: it has nothing on the
   # storage service yet (Active Storage only uploads from an `after_commit`

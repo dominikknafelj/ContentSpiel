@@ -530,7 +530,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   test "a denied media upload is a 403 with JSON errors" do
     sign_in_as(users(:reader))
 
-    assert_no_difference -> { MediaAsset.count } do
+    assert_no_difference -> { Media::Asset.count } do
       post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
     end
 

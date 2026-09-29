@@ -30,7 +30,7 @@ module Admin
         render Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, locale: "de", original: document("Some *rich* text in the primary language."))
       end
 
-      # An `image` node whose `MediaAsset` doesn't exist and an
+      # An `image` node whose `Media::Asset` doesn't exist and an
       # `internalLink` to a missing post -- both render as "missing" (spec §7).
       def with_missing_references
         render Admin::Columns::RichTextColumnComponent.new(name: "body", value: {

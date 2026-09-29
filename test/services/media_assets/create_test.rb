@@ -17,7 +17,7 @@ class MediaAssets::CreateTest < ActiveSupport::TestCase
 
   test "needs media.upload" do
     result = nil
-    assert_no_difference "MediaAsset.count" do
+    assert_no_difference "Media::Asset.count" do
       result = as(users(:reader)) { MediaAssets::Create.call(file: upload) }
     end
 

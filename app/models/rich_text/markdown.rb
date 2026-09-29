@@ -879,7 +879,7 @@ module RichText
         return node if valid_node?(node, known_references: @known_references)
 
         # Valid except that a record it references no longer exists (an
-        # image directive naming a deleted `MediaAsset`, final fix wave, B):
+        # image directive naming a deleted `Media::Asset`, final fix wave, B):
         # the directive was well-formed, the thing it embeds is gone, so it
         # goes -- as the public renderer would render it (nothing) -- rather
         # than turning into a paragraph of directive syntax.
@@ -903,7 +903,7 @@ module RichText
       # contain one and asking `RichText::Document#validate` -- deliberately
       # reusing the exact same rules `RichText::BuiltIns`' attribute
       # declarations already enforce (a real YouTube id, an existing
-      # `MediaAsset`/`Page`/`Post`) rather than re-deriving them here, so
+      # `Media::Asset`/`Page`/`Post`) rather than re-deriving them here, so
       # this loader can never silently drift out of sync with what those
       # declarations actually require.
       def valid_node?(node, known_references: nil) = RichText::Document.new({ "type" => "doc", "content" => [ node ] }).validate(known_references: known_references).empty?

@@ -1,5 +1,5 @@
 module MediaAssets
-  # Stores one uploaded image as a `MediaAsset` (design spec §4.1/§4.2) --
+  # Stores one uploaded image as a `Media::Asset` (design spec §4.1/§4.2) --
   # the Tiptap editor's upload button, through `Admin::MediaAssetsController`,
   # which used to save it itself (access-control design spec §3.4, "direct
   # writes are removed"). `file` is an uploaded file
@@ -16,13 +16,13 @@ module MediaAssets
     end
 
     def call
-      asset = MediaAsset.new(created_by: actor_user)
+      asset = Media::Asset.new(created_by: actor_user)
       return denied("media.upload", asset) unless authorize!("media.upload", asset)
       return failure(asset, [ "file must be attached" ]) unless @file.respond_to?(:tempfile)
 
       asset.file.attach(io: @file.tempfile, filename: @file.original_filename, content_type: @file.content_type)
 
-      saved = MediaAsset.transaction do
+      saved = Media::Asset.transaction do
         asset.save || raise(ActiveRecord::Rollback)
 
         record_event("media.uploaded", subject: asset, metadata: { "filename" => asset.file.filename.to_s })
@@ -43,7 +43,7 @@ module MediaAssets
     # the pixels), and those bytes aren't there yet until Active Storage's
     # own `after_commit` upload hook has run, which doesn't happen until
     # this record's save actually commits. Calling it any earlier is
-    # exactly the "blob not yet uploaded" trap `MediaAsset#with_attachable_
+    # exactly the "blob not yet uploaded" trap `Media::Asset#with_attachable_
     # io`'s own comment works around for content-type sniffing -- there's
     # no equivalent workaround here, since an analyzer needs the *whole*
     # file, not a quick prefix peek, so this simply waits for the real
@@ -68,7 +68,7 @@ module MediaAssets
       metadata = asset.file.blob.metadata || {}
       asset.update_columns(width: metadata["width"], height: metadata["height"])
     rescue StandardError => e
-      Rails.logger.warn("[media_assets] MediaAsset##{asset.id} analysis failed: #{e.class}: #{e.message}")
+      Rails.logger.warn("[media_assets] Media::Asset##{asset.id} analysis failed: #{e.class}: #{e.message}")
     end
   end
 end

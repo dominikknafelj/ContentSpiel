@@ -9,7 +9,7 @@ module Admin
     # `params[:file]` missing entirely (no multipart part at all -- not the
     # same as an empty one, which `ActionDispatch::Http::UploadedFile`
     # would still answer to) is the one shape this can't hand straight to
-    # `MediaAsset#file_is_attached` and get a normal validation error back:
+    # `Media::Asset#file_is_attached` and get a normal validation error back:
     # there's nothing to `.attach`, so this reports the same "must be
     # attached" message as a matter of form rather than crash trying to
     # call `.original_filename` on `nil`.

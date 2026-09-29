@@ -32,7 +32,7 @@ module Admin
     # endpoints (never a hardcoded `/cs-studio`: the admin path is
     # configurable, `ContentSpiel::ADMIN_PATH`), the editing locale the
     # link picker searches in, and two lookups for what the document
-    # already references: `MediaAsset` URLs for its `image` nodes (the node
+    # already references: `Media::Asset` URLs for its `image` nodes (the node
     # itself stores only `asset_id`, schema fidelity, so the editor can't
     # show a picture without being told where it lives) and titles for its
     # `internalLink` targets. A referenced asset or record that no longer
@@ -70,7 +70,7 @@ module Admin
         [ "youtube", "YouTube", "YouTube", false ]
       ].freeze
 
-      # The upload's own `accept` -- `MediaAsset`'s content types (spec
+      # The upload's own `accept` -- `Media::Asset`'s content types (spec
       # §4.2). A hint for the file chooser only; the server decides.
       ACCEPT = "image/png,image/jpeg,image/gif,image/webp".freeze
 
@@ -109,10 +109,10 @@ module Admin
       def editor_locale = (locale.presence || ::Locales.default).to_s
 
       # `{ "42" => "/rails/active_storage/..." }` for every `image` node's
-      # `asset_id` that still names a `MediaAsset` (see the class comment).
+      # `asset_id` that still names a `Media::Asset` (see the class comment).
       def asset_urls_json
         ids = self.class.collect(document) { |node| node["type"] == "image" ? node.dig("attrs", "asset_id") : nil }
-        MediaAsset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
+        Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
       end
 
       # `{ "page:12" => "Contact" }` for every `internalLink` target that

@@ -29,7 +29,7 @@
 #   its own transaction and rescue; a failure (orphaned row, unknown record
 #   type, a language this site can't store, a document that fails
 #   `#validate`) is recorded and printed, rolls back anything that row
-#   created (a `MediaAsset`), and the run carries on.
+#   created (a `Media::Asset`), and the run carries on.
 # - **Reports.** Per-model counts, every unmapped fragment
 #   (`RichText::HtmlImport`), every blank result, and every failure.
 #
@@ -97,7 +97,7 @@ module RichText
     private
 
     # Raised inside the row's transaction to roll back whatever the import
-    # already did (a `MediaAsset` created for an image) when the converted
+    # already did (a `Media::Asset` created for an image) when the converted
     # document turns out invalid.
     class RowFailed < StandardError; end
 
@@ -114,7 +114,7 @@ module RichText
       return stats.skipped += 1 if row["body"].to_s.strip.empty? || !record.body_document(locale: locale).blank?
 
       # One transaction per row (fix round 1, m3): converting can create
-      # `MediaAsset`s, and a row that then fails must not leave them behind
+      # `Media::Asset`s, and a row that then fails must not leave them behind
       # as orphans no document references.
       outcome = ActiveRecord::Base.transaction do
         document, unmapped = RichText::Document.from_html(row["body"], record: record, locale: locale, youtube_video_id: @source.method(:youtube_video_id))
