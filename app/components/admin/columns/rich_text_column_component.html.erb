@@ -8,11 +8,10 @@
     <%= tag.div class: "admin-rich-text relative min-w-0",
           data: {
             controller: "admin--rich-text",
-            action: "focusout->admin--rich-text#containFocus",
-            "admin--rich-text-upload-url-value": upload_url,
+            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked",
             "admin--rich-text-link-targets-url-value": link_targets_url,
             "admin--rich-text-locale-value": editor_locale,
-            "admin--rich-text-asset-urls-value": asset_urls_json,
+            "admin--rich-text-assets-value": assets_json,
             "admin--rich-text-link-titles-value": link_titles_json
           } do %>
       <%# The document JSON under `html_name` (e.g. `post[body]`) -- see the
@@ -27,16 +26,11 @@
            data-action="mousedown->admin--rich-text#keepFocus">
         <% toolbar.each do |action, label, text, toggle| %>
           <%= tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
-                "aria-haspopup": (%w[link internalLink youtube].include?(action) ? "dialog" : nil),
+                "aria-haspopup": (%w[link internalLink image youtube].include?(action) ? "dialog" : nil),
                 class: "admin-rich-text-button min-w-8 cursor-pointer rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent",
                 data: { action: "admin--rich-text##{action}", "admin--rich-text-command": action } %>
         <% end %>
       </div>
-
-      <%# No `name`: the chosen file goes to the upload endpoint by `fetch`,
-          never with the autosave form's own `FormData`. %>
-      <%= tag.input type: "file", accept: ACCEPT, class: "hidden", tabindex: -1, "aria-label": "Upload image",
-            data: { "admin--rich-text-target": "file", action: "change->admin--rich-text#upload" } %>
 
       <%# The ProseMirror element Tiptap mounts inside this is the actual
           textbox; the controller gives *it* `aria-labelledby` from

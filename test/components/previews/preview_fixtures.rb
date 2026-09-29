@@ -45,4 +45,14 @@ module PreviewFixtures
   # A rich-text body document Hash (design spec §3.1) for `body:` --
   # previews write fixed Markdown, so conversion warnings can't occur.
   def rich_doc(markdown) = RichText::Document.from_markdown(markdown).first.to_h
+
+  # A library image (media library design spec §3.1) -- what a page hero or
+  # an image block references since Task 4. `public/icon.png` is a real PNG,
+  # so it passes `Media::Asset`'s byte-sniffing validation.
+  def media_asset
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+    asset.save!
+    asset
+  end
 end

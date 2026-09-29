@@ -65,21 +65,20 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert block.errors[:body].any?
   end
 
-  test "an image block accepts an attached image and a caption" do
-    block = ContentBlock.new(owner: @page, block_type: :image, position: 0, caption: "A photo")
-    block.image.attach(
-      io: StringIO.new("fake image data"),
-      filename: "photo.jpg",
-      content_type: "image/jpeg"
-    )
-    block.save!
+  # Media library Task 4: the image is a reference to a library asset.
+  test "an image block references a library image and keeps its own caption" do
+    asset = create_media_asset
+    block = ContentBlock.create!(owner: @page, block_type: :image, position: 0, caption: "A photo", media_asset: asset)
 
     reloaded = ContentBlock.find(block.id)
 
-    assert reloaded.image.attached?
-    assert_equal "photo.jpg", reloaded.image.filename.to_s
-    assert_equal "fake image data", reloaded.image.download
+    assert_equal asset, reloaded.media_asset
     assert_equal "A photo", reloaded.caption
+    assert_not reloaded.respond_to?(:image)
+  end
+
+  test "an image block can be saved before its image is chosen" do
+    assert ContentBlock.new(owner: @page, block_type: :image, position: 0).valid?
   end
 
   test "caption is independently translatable per locale" do

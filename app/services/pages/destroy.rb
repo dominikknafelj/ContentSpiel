@@ -21,7 +21,18 @@ module Pages
 
       destroyed = Page.transaction do
         record_event("page.deleted", subject: @page)
+        # Loaded *before* the destroy, so these are the very objects the
+        # page's `dependent: :destroy` goes on to destroy (it destroys the
+        # loaded association target) -- each is then `destroyed?`, which is
+        # what makes `Media::UsageIndex.refresh` drop its rows rather than
+        # recompute them from stale attributes.
+        blocks = @page.content_blocks.to_a
         @page.destroy || raise(ActiveRecord::Rollback)
+        # The page's hero row and every destroyed block's rows go with them
+        # (media library design spec §5.1) -- `media_usages.owner` is
+        # polymorphic, so no FK cascade would ever remove them.
+        [ @page, *blocks ].each { |owner| Media::UsageIndex.refresh(owner) }
+        true
       end
 
       return failure(@page) unless destroyed

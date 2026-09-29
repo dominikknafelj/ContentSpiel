@@ -17,13 +17,22 @@
 # different host, a missing src, or any `srcdoc`, which carries its own
 # inline HTML document and would bypass this whole sanitizer if allowed
 # through) is scrubbed like any other disallowed element.
+#
+# Media library Task 5: `srcset`/`sizes`/`loading`/`decoding` are added for
+# `Media::PictureComponent`'s own `<img>` -- the built-in safe-list already
+# has `src`/`width`/`height`/`alt` (every plain `<img>` this app ever
+# rendered before needed only those), but a responsive image's extra
+# attributes aren't ordinary HTML anyone hand-writes into rich text, so
+# Rails never had reason to allow them by default. All four are inert
+# outside an `img`/`source` element and carry no URL scheme of their own to
+# smuggle anything past the rest of this allow-list.
 class RichTextScrubber < Rails::HTML::PermitScrubber
   YOUTUBE_NOCOOKIE_EMBED_SRC = %r{\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}\z}
 
   def initialize
     super
     self.tags = Rails::HTML5::SafeListSanitizer.allowed_tags + %w[figure figcaption iframe]
-    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy]
+    self.attributes = Rails::HTML5::SafeListSanitizer.allowed_attributes + %w[frameborder allow allowfullscreen referrerpolicy srcset sizes loading decoding]
   end
 
   private

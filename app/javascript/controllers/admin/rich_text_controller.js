@@ -28,24 +28,26 @@ import { createPopover, createField, createSelect, createButton } from "rich_tex
 // - a Turbo cache snapshot captures the rendered ProseMirror DOM; restoring
 //   it connects again, and the same "empty the mount point first" rule is
 //   what keeps that from becoming a second, dead editor beside the live one.
-// Pending fetches (upload, link search) are aborted on disconnect, and
-// their handlers check the editor is still the one they started with.
+// Pending fetches (the link search) are aborted on disconnect, and their
+// handlers check the editor is still the one they started with.
+//
+// Images come from the library (media library Task 8): the Image button
+// opens the one picker (`admin--media-picker`, `Media::PickerComponent`)
+// and the picked asset is inserted as `image{asset_id}` (`#picked`). The
+// editor has no upload of its own; the picker's Upload tab covers it.
 export default class extends Controller {
-  static targets = [ "input", "editor", "file", "message" ]
+  static targets = [ "input", "editor", "message" ]
 
   static values = {
-    uploadUrl: String,
     linkTargetsUrl: String,
     locale: String,
-    assetUrls: Object,
+    assets: Object,
     linkTitles: Object
   }
 
   static texts = {
     badLink: "Use an http(s), mailto or relative link",
     badYoutube: "That isn't a YouTube URL or video ID",
-    uploadFailed: "Upload failed — check your connection",
-    uploadRejected: "Upload failed",
     invalidContent: "This text contains something the editor can't show, so it's read-only here. Nothing has been changed.",
     searchFailed: "Search failed — check your connection",
     noResults: "No pages or posts match",
@@ -68,11 +70,11 @@ export default class extends Controller {
     // with one open) is dead DOM -- its listeners belonged to the previous
     // connection. Same "start from a clean slate" rule as the mount point.
     this.element.querySelectorAll(".admin-rich-text-popover").forEach((stale) => stale.remove())
-    // Copies, not the value objects themselves: the upload and the link
-    // picker add to these as the editor is used, and writing a Stimulus
-    // value back would re-render nothing useful but cost a data-attribute
-    // round trip per upload.
-    this.assetUrls = { ...this.assetUrlsValue }
+    // Copies, not the value objects themselves: the media picker and the
+    // link picker add to these as the editor is used, and writing a
+    // Stimulus value back would re-render nothing useful but cost a
+    // data-attribute round trip per pick.
+    this.assets = { ...this.assetsValue }
     this.linkTitles = { ...this.linkTitlesValue }
 
     const mount = document.createElement("div")
@@ -82,7 +84,7 @@ export default class extends Controller {
       element: mount,
       content: this.initialContent(),
       extensions: extensions({
-        resolveAssetUrl: (id) => this.assetUrls[id] || null,
+        resolveAssetUrl: (id) => this.assets[id]?.url || null,
         resolveLinkTitle: (type, id) => this.linkTitles[`${type}:${id}`] || null,
         onEditImage: (position) => this.openImagePopover(position)
       }),
@@ -193,9 +195,10 @@ export default class extends Controller {
 
   // With an image node selected (keyboard users get there with the arrow
   // keys), the Image button edits that image's alt text and caption instead
-  // of uploading another one. Enter on a selected image does the same
-  // (`rich_text/image.js`).
-  image() {
+  // of adding another one. Enter on a selected image does the same
+  // (`rich_text/image.js`). Otherwise it opens the media picker, with this
+  // button as the opener focus returns to on Cancel/Escape.
+  image(event) {
     if (!this.editable()) return
     this.showMessage("")
 
@@ -204,7 +207,8 @@ export default class extends Controller {
       this.openImagePopover(selection.from)
       return
     }
-    this.fileTarget.click()
+    this.closePopover({ refocus: false })
+    window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener: event.currentTarget } }))
   }
 
   run(build) {
@@ -255,64 +259,44 @@ export default class extends Controller {
     })
   }
 
-  // --- Upload (spec §4.1/§7) ---------------------------------------------
+  // --- Media picker (media library Task 8) ---------------------------------
   //
-  // POSTs the chosen file to `<admin>/media_assets` (multipart `file`, the
-  // CSRF token from the layout's meta tag) and inserts
-  // `image{asset_id, alt: "", caption: ""}` on a 201, then opens the image
-  // popover so alt text can be written straight away. A 422's `errors` are
-  // shown inline in the message slot; nothing is inserted.
-  async upload(event) {
-    event.stopPropagation()
-    const file = this.fileTarget.files[0]
-    this.fileTarget.value = ""
-    if (!file || !this.editable()) return
-
-    const editor = this.editor
-    const body = new FormData()
-    body.append("file", file)
-
-    let response
-    try {
-      response = await fetch(this.uploadUrlValue, {
-        method: "POST",
-        body,
-        signal: this.aborter.signal,
-        headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
-      })
-    } catch (error) {
-      if (error.name !== "AbortError" && editor === this.editor) this.showMessage(this.constructor.texts.uploadFailed)
-      return
-    }
-
-    const json = await response.json().catch(() => ({}))
-    if (editor !== this.editor) return
-
-    if (response.status !== 201 || !Number.isInteger(json.id)) {
-      const errors = Array.isArray(json.errors) && json.errors.length ? json.errors : [ this.constructor.texts.uploadRejected ]
-      this.showMessage(errors.join(". "))
-      return
-    }
+  // `media-picker:picked` from the picker, bubbling up from the Image
+  // button: inserts `image{asset_id, alt: "", caption: ""}` at the
+  // selection the editor still holds from before the picker opened, then
+  // opens the image popover so alt text can be written straight away (the
+  // picker has already handed focus back by now). The picked `url` is only
+  // for showing the image here, and its `alt`/`caption` defaults only for
+  // the popover's placeholders -- the node stores the id alone.
+  picked(event) {
+    const { id, url } = event.detail || {}
+    if (!Number.isInteger(id) || !this.editable()) return
 
     this.showMessage("")
-    this.assetUrls[json.id] = json.url
-    this.editor.chain().focus().insertImage({ asset_id: json.id }).run()
+    if (url) this.assets[id] = { url, alt: event.detail.alt || "", caption: event.detail.caption || "" }
+    this.editor.chain().focus().insertImage({ asset_id: id }).run()
 
-    const position = this.findNode((node) => node.type.name === "image" && node.attrs.asset_id === json.id)
+    const position = this.insertedImagePosition(id)
     if (position !== null) this.openImagePopover(position)
   }
 
-  findNode(predicate) {
+  // The image just inserted -- not simply the first `image` node for this
+  // asset in the document, since the same library image may already
+  // appear earlier in it. `insertContent` leaves the selection either *on*
+  // the new node (a NodeSelection, when it replaced an empty paragraph) or
+  // just after it; in the second case it's the last such node starting
+  // before the selection.
+  insertedImagePosition(assetId) {
+    const { selection } = this.editor.state
+    if (selection.node?.type.name === "image" && selection.node.attrs.asset_id === assetId) return selection.from
+
+    const { from } = selection
     let found = null
     this.editor.state.doc.descendants((node, position) => {
-      if (found === null && predicate(node)) found = position
-      return found === null
+      if (position < from && node.type.name === "image" && node.attrs.asset_id === assetId) found = position
+      return position < from
     })
     return found
-  }
-
-  csrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.content || ""
   }
 
   showMessage(text) {
@@ -488,8 +472,8 @@ export default class extends Controller {
     this.closePopover()
   }
 
-  // Image: alt text and caption for the `image` node at `position` (just
-  // uploaded, or clicked). Applied on Done -- re-checking the node is still
+  // Image: the per-use alt text and caption for the `image` node at
+  // `position` (just picked, or clicked). Applied on Done -- re-checking the node is still
   // an image there, since the document may have changed meanwhile.
   openImagePopover(position) {
     if (!this.editable()) return
@@ -498,8 +482,12 @@ export default class extends Controller {
     if (!node || node.type.name !== "image") return
 
     const popover = createPopover({ title: "Image", onSubmit: () => done(), onClose: () => this.closePopover() })
-    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: "Describe the image" })
-    const caption = createField("Caption", { value: node.attrs.caption || "" })
+    // Blank fields fall back to the image's own defaults in this language
+    // (`#assets`), which is what their placeholders show -- the generic
+    // hint only when the image has no default of its own.
+    const defaults = this.assets[node.attrs.asset_id] || {}
+    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: defaults.alt || "Describe the image" })
+    const caption = createField("Caption", { value: node.attrs.caption || "", placeholder: defaults.caption || "" })
     popover.body.append(alt.wrapper, caption.wrapper)
 
     const done = () => {

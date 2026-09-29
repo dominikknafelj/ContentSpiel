@@ -7,8 +7,18 @@ module ContentBlocks
   # owner) -- see `ContentBlocks::OwnerPermissions`. A block's owner never
   # changes through here, so the check runs once, before anything is
   # assigned.
+  #
+  # An image block's library image (media library design spec §5.1):
+  # `media_asset_id` in `attributes` sets, changes or (nil/"") clears it --
+  # CS Studio's image field after a pick in the media picker, or Duplicate
+  # copying the source's. Choosing one also needs `media.upload` and
+  # an existing asset (`Media::Choosing`), so a duplicate of an image block
+  # does too. Every save then refreshes the block's `media_usages` rows
+  # (its image and its rich-text body's images) inside the transaction; an
+  # image deleted in the meantime fails the save as "doesn't exist".
   class Save < ApplicationService
     include OwnerPermissions
+    include Media::Choosing
 
     TRANSLATED = %i[caption alt body].freeze
 
@@ -23,9 +33,15 @@ module ContentBlocks
       refused = owner_refusal(@block.owner) { |key| authorize!(key, @block) }
       return denied(refused, @block) if refused
 
-      saved = ContentBlock.transaction do
+      image_refusal = media_choice_result(@block, :media_asset_id, :image)
+      return image_refusal if image_refusal
+
+      # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
+      # (rescued below) mustn't abort the caller's transaction.
+      saved = ContentBlock.transaction(requires_new: true) do
         assign
         @block.save || raise(ActiveRecord::Rollback)
+        Media::UsageIndex.refresh(@block)
 
         created = @block.previously_new_record?
         changes = Audit::Snapshot.field_changes_for(@block)
@@ -36,6 +52,10 @@ module ContentBlocks
       return failure(@block) unless saved
 
       success(@block)
+    rescue ActiveRecord::InvalidForeignKey => e
+      # The image, or an image the body embeds, was deleted between its
+      # existence check and the write (final fix wave, M1; `Media::Choosing`).
+      vanished_media_failure(e, @block, :media_asset_id, :image)
     end
 
     private
@@ -43,7 +63,9 @@ module ContentBlocks
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.
-      @block.assign_attributes(@attributes.slice(:block_type, :image, :position))
+      # `media_asset_id` is an image block's library image, already
+      # checked by `#media_choice_result` (see the class comment).
+      @block.assign_attributes(@attributes.slice(:block_type, :media_asset_id, :position))
 
       @block.assign_settings(@attributes[:settings], locale: Locales.default) if @attributes.key?(:settings)
 

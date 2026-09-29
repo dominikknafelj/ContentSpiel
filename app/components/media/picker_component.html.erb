@@ -1,0 +1,47 @@
+<%= tag.dialog id: DIALOG_ID,
+      class: "admin-media-picker w-[min(56rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] rounded-cs border border-line-strong bg-surface p-6 text-ink shadow-menu backdrop:bg-black/40",
+      "aria-labelledby": part_id("title"),
+      data: {
+        controller: "admin--media-picker",
+        action: "media-picker:open@window->admin--media-picker#open close->admin--media-picker#closed",
+        "admin--media-picker-library-url-value": library_url,
+        "admin--media-picker-upload-url-value": upload_url
+      } do %>
+  <div class="mb-4 flex items-center justify-between gap-4">
+    <h2 id="<%= part_id("title") %>" class="text-h2 text-ink">Choose an image</h2>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, type: "submit") %>
+    <% end %>
+  </div>
+
+  <div role="tablist" aria-label="Image source" class="mb-4 flex gap-1 border-b border-line">
+    <% [ [ "library", "Library" ], [ "upload", "Upload" ] ].each_with_index do |(key, label), index| %>
+      <%= tag.button label, type: "button", role: "tab", id: part_id("#{key}-tab"),
+            "aria-controls": part_id("#{key}-panel"), "aria-selected": (index.zero? ? "true" : "false"),
+            tabindex: (index.zero? ? nil : "-1"),
+            class: "-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-meta aria-selected:border-accent aria-selected:text-ink",
+            data: { "admin--media-picker-target": "tab", action: "admin--media-picker#selectTab keydown->admin--media-picker#tabKey", tab: key } %>
+    <% end %>
+  </div>
+
+  <div role="tabpanel" id="<%= part_id("library-panel") %>" aria-labelledby="<%= part_id("library-tab") %>"
+       data-admin--media-picker-target="panel" data-tab="library">
+    <%# Loaded by `admin--media-picker#open` every time the picker opens
+        (so a library changed meanwhile -- an upload in another tab, a
+        delete -- is never stale), then navigated in place by its own
+        search form and pagination links. %>
+    <turbo-frame id="media-picker-library" data-admin--media-picker-target="frame"></turbo-frame>
+  </div>
+
+  <div role="tabpanel" id="<%= part_id("upload-panel") %>" aria-labelledby="<%= part_id("upload-tab") %>" hidden
+       data-admin--media-picker-target="panel" data-tab="upload">
+    <%= label_tag part_id("file"), "Image file", class: setup_label_class %>
+    <%# No `name`: the file goes to the upload endpoint by `fetch`, never
+        with any form's own data. %>
+    <%= tag.input type: "file", id: part_id("file"), accept: accept, class: "mt-1 block text-sm text-ink",
+          data: { "admin--media-picker-target": "file", action: "change->admin--media-picker#upload" } %>
+    <p class="mt-1 text-sm text-meta">PNG, JPEG, GIF or WEBP, up to 10 MB. It's added to the library and chosen straight away.</p>
+    <p class="mt-2 text-sm text-meta" aria-live="polite" data-admin--media-picker-target="status"></p>
+    <p class="mt-2 text-sm text-danger-ink" role="alert" data-admin--media-picker-target="error"></p>
+  </div>
+<% end %>

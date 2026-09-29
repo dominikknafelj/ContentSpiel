@@ -43,7 +43,7 @@ module RichText
     #
     # `reference` (Task 7 fix round 1, I2) marks an attribute whose
     # `validate` is an *existence* check against another record -- the
-    # `MediaAsset` behind `image.asset_id`, the page/post behind
+    # `Media::Asset` behind `image.asset_id`, the page/post behind
     # `internalLink.id`. `true` means the value alone names the record;
     # an Array of sibling attribute names means those siblings scope it
     # (`internalLink.id` is scoped by `type`). Such a check only blocks a

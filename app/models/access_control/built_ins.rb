@@ -48,9 +48,19 @@ module AccessControl
     # (a tag applies across posts, a media asset across any rich-text
     # document), so, like the administration permissions below, they carry
     # no `subject` and no scopes.
+    #
+    # The media library (media library design spec §5.1) has two:
+    # `media.upload` -- upload, browse the library and choose an image for
+    # a hero, an image block or a rich-text image -- and `media.manage` --
+    # edit any image's title/alt/caption and delete any image. The uploader
+    # of an image may edit or delete that one image without `media.manage`
+    # (`Media::Save`/`Media::Destroy`'s own "ownership" rule); the library
+    # itself isn't read-scoped, so there's no `own` scope here to express
+    # that with -- ownership is decided in those two services instead.
     def self.register_content
       Permissions.register "tags.manage", label: "Manage tags", area: "Content", action: :manage
       Permissions.register "media.upload", label: "Upload media", area: "Content", action: :upload
+      Permissions.register "media.manage", label: "Manage media", area: "Content", action: :manage
     end
 
     def self.register_administration

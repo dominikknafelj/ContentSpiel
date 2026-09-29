@@ -16,15 +16,71 @@
 # the same reason as `preview`: the render cache key needs it, because a
 # rendered body bakes in link hrefs and image URLs that change without the
 # document itself changing (see `RichText::Document#to_html`).
+#
+# `document:` (media library Task 5) is the whole `RichText::Document`
+# being rendered -- handed through so `#media_asset` can preload every
+# `image` node's `Media::Asset` in one query, rather than
+# `RichText::BuiltIns.render_image` running `Media::Asset.find_by` once per
+# image node while `RichText::HtmlRenderer` walks the tree. Optional (`nil`
+# default): this class is exposed directly for a caller that builds its own
+# context without going through `RichText::Document#to_html` (this file's
+# own top comment), and `#media_asset` degrades to a plain per-id lookup
+# rather than requiring every such caller to also hand over a document.
 module RichText
   class RenderContext
     attr_reader :locale, :urls, :preview, :content_version
 
-    def initialize(locale:, urls:, content_version: PublicSite.current_content_version)
+    def initialize(locale:, urls:, document: nil, content_version: PublicSite.current_content_version)
       @locale = locale
       @urls = urls
       @preview = urls.preview?
       @content_version = content_version
+      @document = document
+    end
+
+    # The `Media::Asset` an `image` node's `asset_id` names, or `nil` for a
+    # missing/deleted one -- `RichText::BuiltIns.render_image`'s own lookup,
+    # centralized here so the whole document's assets load in one query
+    # (`#preloaded_media_assets`) instead of one per node. `id` may be
+    # anything a hostile/never-validated document hands it (the built-in's
+    # own comment on "hostile documents render inert") -- `Hash#[]`/`fetch`
+    # against a `nil` or malformed key just misses, same as a `find_by`
+    # would.
+    #
+    # Normalised to an Integer first (final fix wave, M6), the same way
+    # `Media::UsageIndex#normalize_asset_id` reads it: an id stored as a
+    # String (`"42"` -- an older import, a hand edit) is a usage there, so
+    # it has to render here too, and the preload's Integer keys would
+    # otherwise miss it. Anything that isn't an id is nil.
+    def media_asset(id)
+      id = self.class.normalize_asset_id(id)
+      return nil if id.nil?
+      return Media::Asset.find_by(id: id) if @document.nil?
+
+      preloaded_media_assets[id]
+    end
+
+    def self.normalize_asset_id(value) = Integer(value, exception: false)
+
+    private
+
+    # `Media::Asset.with_variants` (not a bare `where`): every asset this
+    # loads is about to have `#srcset` called on it by
+    # `Media::PictureComponent`, and that scope is exactly what lets
+    # `#srcset` answer "is this variant processed" without a second query
+    # per asset (`Media::Asset.with_variants`'s own comment) -- the same
+    # N+1 this preload exists to close in the first place, just one join
+    # deeper.
+    #
+    # `return {} if ids.empty?` (fix round 1): most documents have no
+    # `image` node at all, and `Media::Asset.with_variants.where(id: [])`
+    # would still be a real (if trivially empty) query -- every document
+    # without an image shouldn't pay for one.
+    def preloaded_media_assets
+      @preloaded_media_assets ||= begin
+        ids = @document.references.filter_map { |type, attribute, value| self.class.normalize_asset_id(value) if type == "image" && attribute == "asset_id" }
+        ids.empty? ? {} : Media::Asset.with_variants.where(id: ids).index_by(&:id)
+      end
     end
   end
 end

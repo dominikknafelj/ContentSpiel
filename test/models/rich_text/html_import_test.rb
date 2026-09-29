@@ -142,34 +142,34 @@ class RichText::HtmlImportTest < ActiveSupport::TestCase
     assert_includes unmapped.first, "YoutubeEmbed"
   end
 
-  test "an image blob attachment becomes a MediaAsset re-attaching the same blob, plus an image node" do
+  test "an image blob attachment becomes a Media::Asset re-attaching the same blob, plus an image node" do
     blob = upload_blob
     html = %(<div><action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png" url="http://localhost:3000/rails/active_storage/blobs/redirect/x/tiny.png" filename="tiny.png" filesize="#{blob.byte_size}" width="1" height="1" presentation="gallery" caption="A tiny dot"></action-text-attachment></div>)
 
-    document, unmapped = assert_difference(-> { MediaAsset.count }, 1) { import(html) }
+    document, unmapped = assert_difference(-> { Media::Asset.count }, 1) { import(html) }
 
     assert_empty unmapped
     assert_empty document.validate
-    asset = MediaAsset.last
+    asset = Media::Asset.last
     assert_equal blob, asset.file.blob
     assert_equal [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "caption" => "A tiny dot" } } ], document.to_h["content"]
   end
 
-  test "the same blob in a second body (or locale) reuses its MediaAsset" do
+  test "the same blob in a second body (or locale) reuses its Media::Asset" do
     blob = upload_blob
     html = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>)
 
     first, = import(html)
-    second, = assert_no_difference(-> { MediaAsset.count }) { import(html) }
+    second, = assert_no_difference(-> { Media::Asset.count }) { import(html) }
 
     assert_equal first.to_h, second.to_h
   end
 
-  test "a blob that isn't an allowed image is reported and gets no MediaAsset, its caption kept" do
+  test "a blob that isn't an allowed image is reported and gets no Media::Asset, its caption kept" do
     blob = ActiveStorage::Blob.create_and_upload!(io: StringIO.new("%PDF-1.4 not an image"), filename: "notes.pdf", content_type: "application/pdf")
     html = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="application/pdf" filename="notes.pdf" caption="My notes"></action-text-attachment>)
 
-    document, unmapped = assert_no_difference(-> { MediaAsset.count }) { import(html) }
+    document, unmapped = assert_no_difference(-> { Media::Asset.count }) { import(html) }
 
     assert_equal [ paragraph(text("My notes")) ], document.to_h["content"]
     assert_equal 1, unmapped.size

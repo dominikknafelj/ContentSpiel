@@ -11,12 +11,15 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     assert_equal %i[content_type own], edit.scopes
     assert_equal %i[branch], AccessControl::Permissions.fetch("pages.move").scopes
     assert_nil AccessControl::Permissions.fetch("users.manage").subject
+
+    manage = AccessControl::Permissions.fetch("media.manage")
+    assert_equal [ "Manage media", "Content", nil ], [ manage.label, manage.area, manage.subject ]
   end
 
   test "every spec key exists" do
     keys = %w[posts.read posts.create posts.edit posts.publish posts.delete
               pages.read pages.create pages.edit pages.publish pages.move pages.delete
-              tags.manage media.upload settings.manage languages.manage users.manage
+              tags.manage media.upload media.manage settings.manage languages.manage users.manage
               groups.manage tokens.manage system_status.view audit.view]
     assert_equal keys.sort, AccessControl::Permissions.keys.sort
   end

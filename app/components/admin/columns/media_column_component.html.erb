@@ -1,0 +1,26 @@
+<%= tag.div id: section_id, class: "admin-column mb-4 focus:outline-none", role: "group", tabindex: "-1", "aria-labelledby": label_id, data: root_data do %>
+  <p id="<%= label_id %>" class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></p>
+
+  <%= tag.input type: "hidden", name: html_name, id: id, value: asset&.id.to_s, data: { "admin--media-field-target": "input" } %>
+
+  <div class="mb-2 flex items-center gap-3">
+    <%= tag.img src: thumbnail_url, alt: "", hidden: !chosen?, class: "max-h-32 rounded-cs border border-line object-cover",
+          data: { "admin--media-field-target": "thumbnail" } %>
+    <%= tag.span(chosen? ? asset.title : "No image chosen", class: "text-sm text-meta", data: { "admin--media-field-target": "title" }) %>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    <% if can_choose? %>
+      <%= render Admin::ButtonComponent.new(label: choose_label, variant: :secondary, type: "button", "aria-haspopup": "dialog",
+            data: { "admin--media-field-target": "choose", action: "admin--media-field#choose" }) %>
+    <% end %>
+    <%= render Admin::ButtonComponent.new(label: "Remove image", variant: :secondary, type: "button", hidden: !chosen?,
+          data: { "admin--media-field-target": "remove", action: "admin--media-field#remove" }) %>
+  </div>
+
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink" aria-live="polite">
+    <% errors.each do |message| %>
+      <p><%= message %></p>
+    <% end %>
+  </div>
+<% end %>

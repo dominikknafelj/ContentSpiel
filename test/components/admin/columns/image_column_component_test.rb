@@ -2,23 +2,27 @@ require "test_helper"
 
 class Admin::Columns::ImageColumnComponentTest < ViewComponent::TestCase
   test "renders a file input named after the column" do
-    render_inline Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: nil)
+    render_inline Admin::Columns::ImageColumnComponent.new(name: "logo", value: nil)
 
-    assert_selector "input[type=file][name=hero_image]"
-  end
-
-  test "renders a preview of the current image when one is attached" do
-    page = root_page
-    page.hero_image.attach(io: StringIO.new("fake"), filename: "hero.png", content_type: "image/png")
-
-    render_inline Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: page.hero_image)
-
-    assert_selector "img"
+    assert_selector "input[type=file][name=logo]"
   end
 
   test "no preview when nothing is attached" do
-    render_inline Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: nil)
+    render_inline Admin::Columns::ImageColumnComponent.new(name: "logo", value: nil)
 
     refute_selector "img"
+  end
+
+  # `SiteSetting#logo` is the one field left on this component since media
+  # library Task 8 (heroes and image blocks moved to
+  # `Admin::Columns::MediaColumnComponent`) -- its thumbnail is simply the
+  # original.
+  test "the site logo renders its original file" do
+    site = site_settings(:default)
+    site.logo.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+
+    render_inline Admin::Columns::ImageColumnComponent.new(name: "logo", value: site.logo)
+
+    assert_selector "img[src*='tiny.png']"
   end
 end

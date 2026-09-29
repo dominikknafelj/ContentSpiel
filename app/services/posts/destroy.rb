@@ -14,7 +14,8 @@ module Posts
   # `post.deleted` is recorded *before* the destroy, in the same
   # transaction: its snapshot is the post's last state, tags and relations
   # included, which are gone once the destroy has run -- and a refused
-  # destroy rolls the event back with it.
+  # destroy rolls the event back with it. The post's `media_usages` rows
+  # are removed in the same transaction.
   class Destroy < ApplicationService
     def initialize(post, actor: Current.actor)
       @post = post
@@ -27,6 +28,10 @@ module Posts
       destroyed = Post.transaction do
         record_event("post.deleted", subject: @post)
         @post.destroy || raise(ActiveRecord::Rollback)
+        # A destroyed owner's `media_usages` rows go with it (media library
+        # design spec §5.1) -- `refresh` computes none for a destroyed record.
+        Media::UsageIndex.refresh(@post)
+        true
       end
 
       return failure(@post) unless destroyed

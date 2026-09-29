@@ -364,15 +364,21 @@ class PageTest < ActiveSupport::TestCase
     assert_equal({ "en" => "About", "de" => "Ueber uns" }, JSON.parse(raw["title"]))
   end
 
-  test "hero_image is an Active Storage attachment" do
-    page = Page.create!(page_type: :standard, title: "About", slug: "about")
+  # Media library Task 4: the hero is a reference to a library asset, not
+  # an attachment of the page's own.
+  test "the hero is a library asset reference" do
+    asset = create_media_asset
+    page = Page.create!(page_type: :standard, title: "About", slug: "about", hero_media_asset: asset)
 
-    page.hero_image.attach(
-      io: StringIO.new("not really a jpeg"), filename: "hero.jpg", content_type: "image/jpeg"
-    )
+    assert_equal asset, page.reload.hero_media_asset
+    assert_not page.respond_to?(:hero_image)
+  end
 
-    assert page.hero_image.attached?
-    assert_equal "hero.jpg", page.reload.hero_image.filename.to_s
+  test "a library asset a page still shows as its hero can't be deleted" do
+    asset = create_media_asset
+    Page.create!(page_type: :standard, title: "About", slug: "about", hero_media_asset: asset)
+
+    assert_raises(ActiveRecord::InvalidForeignKey) { asset.destroy }
   end
 
   test "published_at records when a page went live" do

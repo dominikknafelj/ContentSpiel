@@ -31,8 +31,7 @@ module Admin
   class BlockCardComponent < AdminComponent
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
-    # image section's own post-save re-render, mirroring
-    # `Admin::PageSettingsFormComponent::ID_PREFIX`'s reasoning) without a
+    # save status and error slots its autosave stream targets) without a
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
@@ -126,7 +125,8 @@ module Admin
     # through `body_document` (a `RichText::Document`) rather than the raw
     # Mobility accessor.
     def column_value(name)
-      return block.image if name == "image"
+      # The block's library image (`Admin::Columns::MediaColumnComponent`).
+      return block.media_asset if name == "image"
       return block.body_document(locale: locale) if name == "body"
 
       block.public_send(name, locale: locale)
@@ -141,7 +141,35 @@ module Admin
 
     def column_errors(name) = block.errors.full_messages_for(name)
 
-    def image_section_id = "#{error_prefix}-image-section"
+    # The caption/alt fields are this block's per-use overrides of its
+    # image's own defaults (media library design spec §6): blank, the
+    # public page falls back to the image's default in this language, which
+    # is what they show as their placeholder (kept current after a pick by
+    # `admin--media-field`, through the `placeholder_ids:` that
+    # `.image_field` below hands the image column).
+    def column_placeholder(name)
+      case name
+      when "alt" then Admin::Columns::MediaColumnComponent.default_alt(block.media_asset, locale)
+      when "caption" then Admin::Columns::MediaColumnComponent.default_caption(block.media_asset, locale)
+      end
+    end
+
+    # The image column itself -- a class method so `Admin
+    # ::ContentBlocksController` re-renders a refused choice from exactly
+    # what this card renders (`asset` passed in: after a refusal that's the
+    # *stored* image). Its placeholder ids are whichever override fields
+    # the block's type actually renders -- a type that `uses :image`
+    # without `:alt` or `:caption` has none to update.
+    def self.image_field(block:, asset:, locale:, errors: [])
+      prefix = error_prefix(block)
+      uses = block.definition&.uses_columns || []
+
+      Admin::Columns::MediaColumnComponent.new(
+        name: "image", id: "#{prefix}-image", html_name: "block[media_asset_id]",
+        value: asset, errors: errors, locale: locale, section_id: "#{prefix}-image-section",
+        placeholder_ids: (%w[alt caption] & uses).to_h { |column| [ column, "#{prefix}-#{column}" ] }
+      )
+    end
 
     private
 

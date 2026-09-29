@@ -154,7 +154,7 @@ module RichText
     # covers the document itself, but its HTML also depends on the world
     # around it -- an internal link renders as text until its target is
     # published, points at the target's *current* slug, and degrades to text
-    # once the target is deleted; an image renders its `MediaAsset`'s URL, or
+    # once the target is deleted; an image renders its `Media::Asset`'s URL, or
     # nothing once the asset is gone. Without it, Solid Cache would keep
     # serving the first render of each of those forever.
     #
@@ -163,7 +163,7 @@ module RichText
     # *attributes* do; a changed `html` block or component template doesn't
     # touch it, and Solid Cache outlives a deploy.
     def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
-      context = RichText::RenderContext.new(locale: locale, urls: urls)
+      context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
 
       Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]) do
         RichText::HtmlRenderer.new(context).render(self)

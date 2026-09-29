@@ -18,7 +18,16 @@ module Pages
   #    `pages.publish`. A refusal rolls back and is recorded afterwards.
   #
   # Pages have no author (design spec §8), so there's no `own` rule here.
+  #
+  # The hero is a library image (media library design spec §5.1):
+  # `hero_media_asset_id` in `attributes` sets, changes or (nil) clears
+  # it. Choosing one also needs `media.upload` and an existing asset
+  # (`Media::Choosing`). Every save then refreshes the page's own
+  # `media_usages` rows inside the transaction (`Media::UsageIndex`). A
+  # hero deleted in the meantime fails the save as "doesn't exist".
   class Save < ApplicationService
+    include Media::Choosing
+
     TRANSLATED = %i[title slug subtitle meta_title meta_description hero_alt].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
@@ -38,8 +47,14 @@ module Pages
         return denied("pages.publish", @page) if @page.published_at.present? && !authorize!("pages.publish", @page)
       end
 
+      hero_refusal = media_choice_result(@page, :hero_media_asset_id, :hero_image)
+      return hero_refusal if hero_refusal
+
       refused = nil
-      saved = Page.transaction do
+      # `requires_new`: a nested call (starter content) gets its own
+      # savepoint, so the FK refusal rescued below can't leave a caller's
+      # transaction aborted.
+      saved = Page.transaction(requires_new: true) do
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
@@ -50,6 +65,7 @@ module Pages
         creating = @page.new_record?
         pending = @page.changes_to_save
         @page.save || raise(ActiveRecord::Rollback)
+        Media::UsageIndex.refresh(@page)
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end
@@ -58,6 +74,10 @@ module Pages
       return failure(@page) unless saved
 
       success(@page)
+    rescue ActiveRecord::InvalidForeignKey => e
+      # The hero was deleted between `#media_choice_result`'s check and the
+      # save (final fix wave, M1; `Media::Choosing`).
+      vanished_media_failure(e, @page, :hero_media_asset_id, :hero_image)
     end
 
     private

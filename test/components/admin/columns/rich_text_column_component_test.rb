@@ -55,20 +55,21 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert_selector "[role=toolbar] button[aria-label='Link'][aria-haspopup=dialog]"
   end
 
-  # The upload's file input must never be part of the autosave form's own
-  # `FormData` -- the upload goes to its own endpoint by `fetch`.
-  test "the image file input has no name" do
+  # Media library Task 8: the Image button opens the media picker (a
+  # dialog) and the picked asset arrives as `media-picker:picked` -- the
+  # editor has no file input or upload endpoint of its own any more.
+  test "the Image button opens the media picker instead of a file input" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    file = page.find("input[type=file]", visible: false)
-    assert_nil file["name"]
-    assert_equal "image/png,image/jpeg,image/gif,image/webp", file["accept"]
+    assert_selector "[role=toolbar] button[aria-label='Image'][aria-haspopup=dialog]"
+    assert_no_selector "input[type=file]", visible: :all
+    assert_includes controller_element["data-action"], "media-picker:picked->admin--rich-text#picked"
+    assert_nil controller_element["data-admin--rich-text-upload-url-value"]
   end
 
   test "endpoint URLs come from the route helpers, and the editing locale is passed along" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil, locale: "de")
 
-    assert_equal "/#{ContentSpiel::ADMIN_PATH}/media_assets", controller_element["data-admin--rich-text-upload-url-value"]
     assert_equal "/#{ContentSpiel::ADMIN_PATH}/link_targets", controller_element["data-admin--rich-text-link-targets-url-value"]
     assert_equal "de", controller_element["data-admin--rich-text-locale-value"]
   end
@@ -81,8 +82,9 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
   # Only what still exists is listed -- a deleted asset or link target is
   # absent, which the editor shows as "missing" (spec §7).
-  test "passes URLs for the document's images and titles for its internal links" do
+  test "passes URLs and default alt/caption for the document's images and titles for its internal links" do
     asset = create_media_asset
+    asset.update!(alt: "A dog", caption: "Our dog")
     target = create_page(title: "Contact")
     document = { "type" => "doc", "content" => [
       { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } },
@@ -95,8 +97,23 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document)
 
-    assert_equal({ asset.id.to_s => asset.url }, JSON.parse(controller_element["data-admin--rich-text-asset-urls-value"]))
+    assert_equal({ asset.id.to_s => { "url" => asset.url, "alt" => "A dog", "caption" => "Our dog" } },
+      JSON.parse(controller_element["data-admin--rich-text-assets-value"]))
     assert_equal({ "page:#{target.id}" => "Contact" }, JSON.parse(controller_element["data-admin--rich-text-link-titles-value"]))
+  end
+
+  # The image defaults are read in the column's editing locale, falling
+  # back the way the public page does (no German caption: the English one).
+  test "image defaults are resolved in the editing locale" do
+    asset = create_media_asset
+    asset.update!(alt: "A dog", caption: "Our dog")
+    Mobility.with_locale(:de) { asset.update!(alt: "Ein Hund") }
+    document = { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } } ] }
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document, locale: "de")
+
+    assert_equal({ "url" => asset.url, "alt" => "Ein Hund", "caption" => "Our dog" },
+      JSON.parse(controller_element["data-admin--rich-text-assets-value"])[asset.id.to_s])
   end
 
   test "renders the default-locale original as html, labelled, with the translate slot" do

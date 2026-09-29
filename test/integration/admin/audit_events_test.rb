@@ -164,6 +164,62 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(event)}", text: /#{Regexp.escape(label)}/
   end
 
+  # Media library Task 1: `MediaAsset` was renamed to `Media::Asset`, but
+  # `audit_events.subject_type` is append-only and never rewritten (`Audit
+  # ::Event`'s own comment) -- a row recorded before the rename still reads
+  # `subject_type: "MediaAsset"` forever. `Audit::Event.polymorphic_class_for`
+  # maps that legacy string so `event.subject` (and this index's own
+  # `includes(:subject, :user)`, which resolves every row's association up
+  # front) doesn't raise `NameError` loading a constant that no longer
+  # exists. The label itself needs no mapping at all: `subject_label` was
+  # captured onto the row at write time (`Audit::Snapshot.label_for`), not
+  # re-derived from today's model name -- so it reads back exactly as
+  # recorded, same as a deleted subject's event above.
+  test "a legacy MediaAsset-typed event still shows its label, without a link, and doesn't raise" do
+    sign_in_as(users(:one))
+    asset = create_media_asset
+    event = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
+      subject_label: "Media asset ##{asset.id}", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+
+    get "/cs-studio/audit_events"
+
+    assert_response :success
+    assert_select "##{dom_id(event)}", text: /Media asset ##{asset.id}/
+    assert_select "##{dom_id(event)}" do
+      assert_select "a", text: /Media asset/, count: 0
+    end
+
+    get "/cs-studio/audit_events/#{event.id}"
+
+    assert_response :success
+    assert_includes response.body, "Media asset ##{asset.id}"
+  end
+
+  # Final fix wave (M3): filtering by "Media asset" includes the rows
+  # recorded under the legacy `"MediaAsset"` type -- the same image's
+  # history shouldn't split at the rename -- and a subject filter matches
+  # its legacy rows too.
+  test "the Media asset filter includes legacy MediaAsset rows" do
+    sign_in_as(users(:one))
+    asset = create_media_asset
+    legacy = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
+      subject_label: "Media asset ##{asset.id}", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+    current = Audit::Event.create!(action: "media.updated", subject_type: "Media::Asset", subject_id: asset.id,
+      subject_label: "tiny", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+    other = as(users(:one)) { create_post(title: "Not media", published: false) }
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset" }
+    assert_select "##{dom_id(legacy)}"
+    assert_select "##{dom_id(current)}"
+    assert_select "##{dom_id(Audit::Event.find_by!(action: "post.created", subject: other))}", count: 0
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset", subject_id: asset.id + 1 }
+    assert_select "##{dom_id(legacy)}", count: 0
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset", subject_id: asset.id }
+    assert_select "##{dom_id(legacy)}"
+  end
+
   test "a subject link only renders when the current viewer can read that record" do
     group = AccessControl::Group.create!(name: "Audit only #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "audit.view")

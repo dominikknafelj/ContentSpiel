@@ -39,4 +39,99 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     # type ..." -- humanized with a space, not the raw field name.
     assert result.errors.any? { |message| message.match?(/content.type/i) }
   end
+
+  # --- An image block's library image (media library design spec §5.1) ---
+
+  def image_block(page = create_page(title: "Page", published: false))
+    as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image" }).record }
+  end
+
+  def block_usages(block) = Media::Usage.where(owner: block, role: "block_image").pluck(:media_asset_id)
+
+  test "a media_asset_id sets the block's image and indexes its usage" do
+    asset = create_media_asset
+    block = image_block
+
+    result = as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal asset, block.reload.media_asset
+    assert_equal [ asset.id ], block_usages(block)
+    assert_equal asset.id, Audit::Event.where(action: "block.updated").last.snapshot["media_asset_id"]
+  end
+
+  test "an unknown media_asset_id fails validation" do
+    block = image_block
+
+    result = as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: 0 }, translations: { "en" => { caption: "Changed" } }) }
+
+    assert_not result.ok?
+    assert_equal [ "Image doesn't exist" ], result.errors
+    assert_nil block.reload.media_asset_id
+    assert_nil block.caption
+  end
+
+  # Final fix wave (M1): the choose/delete race (see the same test in
+  # `Pages::SaveTest`).
+  test "an image deleted between the check and the save fails validation" do
+    asset = create_media_asset
+    block = image_block
+    racing = ->(*) { Media::Asset.where(id: asset.id).delete_all.positive? }
+
+    result = with_singleton_override(Media::Asset, :exists?, racing) do
+      as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }, translations: { "en" => { caption: "Changed" } }) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Image doesn't exist" ], result.errors
+    assert_nil block.reload.media_asset_id
+    assert_nil block.caption
+  end
+
+  # Final fix wave (M1): the rich-text side of the race -- the body's image
+  # passes validation and `UsageIndex`'s existence check, then goes before
+  # the usage row is written (the FK on `media_usages`).
+  test "a body image deleted before its usage row is written fails validation" do
+    asset = create_media_asset
+    block = as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: create_page(title: "Page", published: false)), attributes: { block_type: "rich_text" }).record }
+    insert_all = Media::Usage.method(:insert_all)
+    racing = ->(rows, **options) { Media::Asset.where(id: asset.id).delete_all && insert_all.call(rows, **options) }
+
+    result = with_singleton_override(Media::Usage, :insert_all, racing) do
+      as_owner { ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("::image{asset=\"#{asset.id}\"}") } }) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Body has an image that doesn't exist" ], result.errors
+    assert block.reload.body_document(locale: "en").blank?
+  end
+
+  test "an actor without media.upload can't set the image, but can clear it" do
+    asset = create_media_asset
+    block = image_block
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})
+
+    refused = as(users(:editor_branch)) { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }) }
+    assert refused.denied?
+    assert_equal [ "You don't have permission to upload media" ], refused.errors
+    assert_nil block.reload.media_asset_id
+
+    as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }) }
+    cleared = as(users(:editor_branch)) { ContentBlocks::Save.call(block, attributes: { media_asset_id: "" }) }
+    assert cleared.ok?, cleared.errors.inspect
+    assert_nil block.reload.media_asset_id
+    assert_empty block_usages(block)
+  end
+
+  test "a rich-text block's body images are indexed per locale, and deleting the block removes them" do
+    asset = create_media_asset
+    page = create_page(title: "Page")
+
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" },
+      translations: { "de" => { body: rich_doc("::image{asset=\"#{asset.id}\"}") } }).record
+    assert_equal [ [ asset.id, "de" ] ], Media::Usage.where(owner: block, role: "rich_text").pluck(:media_asset_id, :locale)
+
+    assert ContentBlocks::Destroy.call(block).ok?
+    assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: block.id)
+  end
 end

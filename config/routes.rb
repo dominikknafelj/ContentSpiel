@@ -74,10 +74,24 @@ Rails.application.routes.draw do
 
     # The Tiptap editor's own upload button (design spec §4.1/§4.2): POSTs
     # a multipart `file`, gets back `{ id, url }` (201) or `{ errors }`
-    # (422) -- `create` only, there is no listing/edit/destroy screen for a
-    # `MediaAsset` yet (design spec §4.2's "Relation to open types": that
-    # arrives with the media library sub-project).
+    # (422) -- `create` only, kept separate from the Media module's own
+    # `media` resource just below: there's no page or post this upload
+    # belongs to yet at editing time, so it has no id to nest under, and
+    # `Admin::MediaAssetsController#create` is the editor's own, narrower
+    # JSON-in-JSON-out contract, not the module's own browse/edit screens.
     resources :media_assets, only: :create
+
+    # The Media module (media library design spec §6, Task 7): browse,
+    # upload, edit and delete library images, all through `Media::Upload`/
+    # `Save`/`Destroy`. `index` is the grid (search, filters, pagination);
+    # `show` is one image's detail panel; `create` is the grid's own
+    # multi-file upload (`admin--media-upload`, one request per file, per
+    # the global constraints' own ruling); `update`/`destroy` save/delete.
+    # `resources :media` singularizes to "medium" for its member routes
+    # (`admin_medium_path`) -- the plain, if slightly odd-looking, Rails
+    # default for this one English word, left as-is rather than overridden
+    # with an `:as` this app has no other resource needing.
+    resources :media, only: %i[index show create update destroy]
 
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at

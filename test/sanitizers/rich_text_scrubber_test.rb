@@ -48,4 +48,20 @@ class RichTextScrubberTest < ActiveSupport::TestCase
   test "script tags are removed" do
     assert_not_includes scrub(%(<p>ok</p><script>alert(1)</script>)), "<script"
   end
+
+  # Media library Task 5: `Media::PictureComponent`'s own `<img>` carries
+  # four attributes the built-in Rails safe-list never had reason to allow
+  # (`src`/`width`/`height`/`alt` were already there) -- all four must
+  # survive the scrub, or every responsive image on the site would render
+  # `src` alone the instant it went through `RichText::HtmlRenderer`.
+  test "an img's srcset, sizes, loading and decoding attributes survive the scrub" do
+    html = scrub(%(<img src="/a.webp" srcset="/a-480.webp 480w, /a-960.webp 960w" sizes="100vw" width="480" height="320" loading="lazy" decoding="async" alt="x">))
+
+    assert_includes html, %(srcset="/a-480.webp 480w, /a-960.webp 960w")
+    assert_includes html, %(sizes="100vw")
+    assert_includes html, %(width="480")
+    assert_includes html, %(height="320")
+    assert_includes html, %(loading="lazy")
+    assert_includes html, %(decoding="async")
+  end
 end

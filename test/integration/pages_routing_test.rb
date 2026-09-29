@@ -552,16 +552,63 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # back.
   test "a landing page renders its title, subtitle, and hero image" do
     root = Page.create!(page_type: :landing, title: "Welcome", subtitle: "A warm welcome", slug: "",
-      published_at: Time.current)
-    root.hero_image.attach(io: StringIO.new("fake image data"), filename: "hero.jpg", content_type: "image/jpeg")
-    root.save!
+      published_at: Time.current, hero_media_asset: create_media_asset(filename: "tiny.png"))
 
     get "/"
 
     assert_response :success
     assert_includes response.body, ">Welcome</h1>"
     assert_includes response.body, "A warm welcome"
-    assert_match(/<img[^>]*src="[^"]*hero/, response.body)
+    assert_select "header img[src*='tiny.png']"
+  end
+
+  # Media library Task 5 fix round 1 (I2): the hero's alt text is
+  # `Media::Asset#alt_text(override:, locale:)`'s own "override, then the
+  # asset's default" chain (`app/views/pages/show.html.erb`), same as an
+  # image block's -- pinned here at the public HTTP layer since no
+  # integration test covered either half of it.
+  test "the hero image's alt text uses the page's hero_alt, falling back to the asset's own default" do
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update!(alt: "Library default alt")
+    root = Page.create!(page_type: :landing, title: "Welcome", slug: "",
+      published_at: Time.current, hero_media_asset: asset, hero_alt: "Custom hero alt")
+
+    get "/"
+    assert_select "header img[alt='Custom hero alt']"
+
+    root.update!(hero_alt: "")
+    get "/"
+    assert_select "header img[alt='Library default alt']"
+  end
+
+  # Final fix wave (I1): the override counts only in the locale it's written
+  # in. On a `de` page, a `hero_alt` set only in `en` must not beat the
+  # asset's own `de` default -- per locale, the override and then the
+  # asset, walking the fallback chain.
+  test "an English-only hero_alt doesn't beat the asset's German default on a German page" do
+    asset = create_media_asset(filename: "tiny.png")
+    Mobility.with_locale(:de) { asset.update!(alt: "Deutscher Standard") }
+    Page.create!(page_type: :landing, title: "Welcome", slug: "", published_at: Time.current,
+      hero_media_asset: asset, hero_alt: "English override")
+
+    get "/de"
+    assert_select "header img[alt='Deutscher Standard']"
+
+    get "/"
+    assert_select "header img[alt='English override']"
+  end
+
+  # Final fix wave (M4): the hero is the first thing a landing page shows,
+  # so it loads eagerly at high priority; every other image stays lazy.
+  test "the hero image loads eagerly with a high fetch priority" do
+    root = Page.create!(page_type: :landing, title: "Welcome", slug: "", published_at: Time.current,
+      hero_media_asset: create_media_asset(filename: "tiny.png"))
+    root.content_blocks.create!(block_type: :image, position: 0, media_asset: create_media_asset(filename: "wide.png"))
+
+    get "/"
+
+    assert_select "header img[loading='eager'][fetchpriority='high']"
+    assert_select "figure img[loading='lazy']:not([fetchpriority])"
   end
 
   # `page_type` gates the hero fields defensively rather than trusting that a

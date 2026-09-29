@@ -60,30 +60,23 @@
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
-                  value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale
+                  value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale,
+                  placeholder: column_placeholder("caption")
                 ) %>
           <% when "alt" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
-                  value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale
+                  value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale,
+                  placeholder: column_placeholder("alt")
                 ) %>
           <% when "image" %>
-            <%# Same shared partial (and the same "Remove image"/new-upload-
-                wins pattern) as the page settings form's own hero image
-                section, Task 4 fix rounds 1/2 -- re-rendered here on a
-                normal GET and again by
-                `Admin::ContentBlocksController#image_field_stream` after
-                any save that touches the attachment. `name: "image"` (fix
-                round 1) is what keeps this column's label reading "Image"
-                rather than the partial's own default "hero_image" ->
-                "Hero image", which never described a block's own image
-                column. %>
-            <%= render partial: "admin/shared/hero_image_field", locals: {
-                  section_id: image_section_id, name: "image",
-                  image_id: field_id("image"), image_html_name: field_html_name("image"), image_value: column_value("image"),
-                  checkbox_id: field_id("remove_image"), checkbox_html_name: field_html_name("remove_image"),
-                  show_checkbox: block.image.attached?
-                } %>
+            <%# A library image, chosen through the picker (media library
+                Task 8) into a hidden `media_asset_id` the card's own
+                autosave sends -- see `Admin::Columns::MediaColumnComponent`.
+                Its id is `<prefix>-image` so a refused choice lands in
+                this column's error slot (`ContentBlocks::Save` reports it
+                under `image`). %>
+            <%= render self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image")) %>
           <% end %>
         <% end %>
       <% end %>

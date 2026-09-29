@@ -16,7 +16,7 @@
           name: "tagline", id: field_id("tagline"), html_name: field_html_name("tagline"), value: site_setting.tagline
         ) %>
 
-    <%= render partial: "admin/shared/hero_image_field", locals: {
+    <%= render partial: "admin/shared/image_upload_field", locals: {
           section_id: logo_section_id, name: "logo",
           image_id: field_id("logo"), image_html_name: field_html_name("logo"), image_value: site_setting.logo,
           checkbox_id: field_id("remove_logo"), checkbox_html_name: field_html_name("remove_logo"),

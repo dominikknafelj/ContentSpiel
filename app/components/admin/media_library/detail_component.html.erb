@@ -1,0 +1,86 @@
+<div class="admin-media-detail flex flex-col gap-6">
+  <%= link_to "← Back to media", index_path, class: "text-sm text-meta hover:text-ink" %>
+
+  <div class="grid gap-6 md:grid-cols-[16rem_1fr]">
+    <div class="flex flex-col gap-2">
+      <span class="block overflow-hidden rounded-cs border border-line bg-sunken">
+        <%= image_tag preview_url, alt: "", class: "w-full" %>
+      </span>
+      <dl class="text-sm text-meta">
+        <div class="flex justify-between"><dt>Type</dt><dd><%= asset.content_type %></dd></div>
+        <div class="flex justify-between"><dt>Size</dt><dd><%= byte_size %></dd></div>
+        <% if dimensions %>
+          <div class="flex justify-between"><dt>Dimensions</dt><dd><%= dimensions %></dd></div>
+        <% end %>
+      </dl>
+    </div>
+
+    <div class="flex flex-col gap-4">
+      <div class="flex items-center justify-between gap-3">
+        <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, url: language_url) %>
+        <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+      </div>
+
+      <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4", data: form_data do %>
+        <%= tag.fieldset disabled: !editable?, class: "contents" do %>
+          <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+          <%= render Admin::Columns::PlainColumnComponent.new(
+                name: "title", id: "media-title", html_name: "media_asset[title]",
+                value: title_value, errors: title_errors
+              ) %>
+
+          <%= render Admin::Columns::PlainColumnComponent.new(
+                name: "alt", id: "media-alt", html_name: "media_asset[alt]",
+                value: alt_value, errors: alt_errors, locale: locale
+              ) %>
+
+          <%= render Admin::Columns::PlainColumnComponent.new(
+                name: "caption", id: "media-caption", html_name: "media_asset[caption]",
+                value: caption_value, errors: caption_errors, locale: locale, multiline: true
+              ) %>
+        <% end %>
+      <% end %>
+
+      <div>
+        <h2 class="mb-2 font-semibold text-ink">Used on</h2>
+        <% if unresolved_usage? %>
+          <p class="text-sm text-meta">Used somewhere that can’t be shown — the record of where may be out of date.</p>
+        <% elsif usage_entries.empty? %>
+          <p class="text-sm text-meta">Not used anywhere yet.</p>
+        <% else %>
+          <ul class="flex flex-col gap-1 text-sm">
+            <% usage_entries.each do |entry| %>
+              <li>
+                <% if entry[:path] %>
+                  <%= link_to entry[:label], entry[:path], class: "text-ink hover:underline" %>
+                <% else %>
+                  <span class="text-ink"><%= entry[:label] %></span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </div>
+
+      <% if can_delete? %>
+        <div>
+          <% if used? %>
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button", disabled: true) %>
+            <p class="mt-1 text-sm text-meta">Can't delete — this image is used. See “Used on” above.</p>
+          <% else %>
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+                  onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+            <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this image?", body: "This can't be undone.") do |dialog| %>
+              <% dialog.with_confirm_action do %>
+                <%= form_with url: destroy_path, method: :delete do %>
+                  <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+                <% end %>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

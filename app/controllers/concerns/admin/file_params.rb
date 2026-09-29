@@ -9,22 +9,25 @@ module Admin
   # `has_one_attached`'s writer treats an explicit blank attachable as
   # "detach the current one" (`ActiveStorage::Attached::One#attach`), the
   # same as an editor deliberately clearing the field. Left unguarded, that
-  # means autosaving *any other* field on a record with an attached image
-  # silently deletes the image the moment the form's next debounced save
-  # fires -- the blank file param rides along with everything else a
-  # service like `Pages::Save` assigns.
+  # means autosaving *any other* field on a record with an attachment would
+  # silently clear it the moment the form's next debounced save fires --
+  # the blank file param rides along with everything else the controller
+  # hands on.
   #
   # `fields:` names which keys are attachment columns for the caller's own
-  # record (`hero_image` for a page today; a block's own image column once
-  # Task 5 reuses this) -- "blank means leave the attachment alone" is the
-  # one rule every `has_one_attached` field shares, so this never needs to
-  # know anything else about the record it's filtering for.
+  # record -- "blank means leave the attachment alone" is the one rule
+  # every such field shares, so this never needs to know anything else
+  # about the record it's filtering for. Only the site logo
+  # (`Admin::SettingsController`) is such a field since media library
+  # Task 8: a page's hero and an image block's image are library images
+  # chosen through the picker, sent as a plain asset id where "" *does*
+  # mean "clear it" (`Admin::Columns::MediaColumnComponent`).
   #
   # A *real* upload is never blank (an `ActionDispatch::Http::UploadedFile`
   # has no `#empty?` of its own, so `Object#blank?`'s `!self` fallback is
   # always false for one), so this only ever drops the "nobody touched
   # this field" case -- a deliberate removal has to go through an explicit
-  # signal instead (`Admin::PagesController#update`'s `remove_hero_image`),
+  # signal instead (`Admin::SettingsController#update`'s `remove_logo`),
   # never just "leave the file field blank".
   module FileParams
     def drop_blank_file_params(attributes, fields:)

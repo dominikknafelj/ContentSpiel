@@ -51,11 +51,20 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal({ "id" => YOUTUBE_ID }, youtube["attrs"])
   end
 
-  test "an image uploaded through the Image button is inserted and its alt text saved" do
+  # Media library Task 8: the Image button opens the media picker; an
+  # upload through its Upload tab is inserted after the text already typed
+  # (not over it), and the alt-text popover opens on the new image.
+  test "an image uploaded through the picker from the Image button is inserted and its alt text saved" do
     visit_post
 
     editor.click
-    attach_file(file_fixture("tiny.png").to_s) { press "Image" }
+    type_text "Intro"
+    press "Image"
+    within("dialog[open]") do
+      click_on "Upload"
+      attach_file "Image file", file_fixture("tiny.png").to_s
+    end
+    refute_selector "dialog[open]"
 
     within(".admin-rich-text-popover") do
       fill_in "Alt text", with: "A"
@@ -64,31 +73,37 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "alt") == "A" } }
     image = nodes(document).find { |node| node["type"] == "image" }
-    asset = MediaAsset.find(image.dig("attrs", "asset_id"))
+    asset = Media::Asset.find(image.dig("attrs", "asset_id"))
     assert_equal({ "asset_id" => asset.id, "alt" => "A", "caption" => "" }, image["attrs"])
+    assert_equal "Intro", doc_text(document).strip
     assert_selector ".ProseMirror img[src='#{asset.url}']"
 
     # The image is still selected after Done: the Image button now edits it
-    # (the keyboard route to alt text) instead of uploading another.
+    # (the keyboard route to alt text) instead of opening the picker.
     press "Image"
+    refute_selector "dialog[open]"
     within(".admin-rich-text-popover") do
       assert_field "Alt text", with: "A"
       fill_in "Caption", with: "C"
       press "Done"
     end
     saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "caption") == "C" } }
-    assert_equal 1, MediaAsset.count
+    assert_equal 1, Media::Asset.count
   end
 
-  test "a failed upload shows its errors inline and inserts nothing" do
+  test "a failed upload in the picker shows its errors inline and inserts nothing" do
     visit_post
 
     editor.click
-    attach_file(file_fixture("fake.png").to_s) { press "Image" }
+    press "Image"
+    within("dialog[open]") do
+      click_on "Upload"
+      attach_file "Image file", file_fixture("fake.png").to_s
+      assert_selector "[role=alert]", text: /File/
+    end
 
-    assert_selector "[data-admin--rich-text-target='message']", text: /File/
     refute_selector ".ProseMirror img"
-    assert_equal 0, MediaAsset.count
+    assert_equal 0, Media::Asset.count
   end
 
   test "the internal link picker inserts an internalLink mark to an existing page" do
@@ -129,7 +144,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
   # Pasted HTML is parsed against the editor's own schema, so anything
   # outside `RichText::Schema` (underline, tables, H1, a `javascript:` link,
-  # a bare `<img>` with no `MediaAsset` behind it) is dropped or flattened
+  # a bare `<img>` with no `Media::Asset` behind it) is dropped or flattened
   # to what the schema does have, never smuggled into the saved document.
   test "pasted HTML is constrained to the schema" do
     visit_post

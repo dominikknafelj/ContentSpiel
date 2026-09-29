@@ -1,7 +1,7 @@
 import { Node } from "@tiptap/core"
 
 // The `image` node (tiptap spec §3.2/§4.1) -- `RichText::BuiltIns`'
-// `image{asset_id, alt, caption}`: `asset_id` an existing `MediaAsset`'s id
+// `image{asset_id, alt, caption}`: `asset_id` an existing `Media::Asset`'s id
 // (an Integer, required), `alt`/`caption` optional Strings, inserted as
 // `""` (spec §4.1). Exactly those three attrs and nothing else -- in
 // particular no `src`: the document stores which asset, never where it
@@ -10,7 +10,7 @@ import { Node } from "@tiptap/core"
 // The editor still has to *show* the picture, so `resolveUrl(assetId)` (an
 // option the `admin--rich-text` controller supplies) looks the URL up in
 // what the column rendered (`Admin::Columns::RichTextColumnComponent
-// #asset_urls_json`) plus whatever this session uploaded. No URL means the
+// #assets_json`) plus whatever this session picked. No URL means the
 // asset is gone: the node view shows a "missing" placeholder (spec §7) --
 // the public renderer draws nothing for it at all.
 //
@@ -57,9 +57,9 @@ export const Image = Node.create({
   },
 
   // Only our own serialization (copy/paste between CS Studio editors). A
-  // pasted `<img>` from anywhere else has no `MediaAsset` behind it, so it
-  // matches nothing and the schema drops it -- uploading is the one way an
-  // image gets in.
+  // pasted `<img>` from anywhere else has no `Media::Asset` behind it, so it
+  // matches nothing and the schema drops it -- the media picker is the one
+  // way an image gets in.
   parseHTML() {
     return [ { tag: "figure[data-asset-id]", getAttrs: (element) => (toAssetId(element.getAttribute("data-asset-id")) ? null : false) } ]
   },

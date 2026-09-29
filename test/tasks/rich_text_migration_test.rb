@@ -108,18 +108,33 @@ class RichTextMigrationTest < ActiveSupport::TestCase
   end
 
   # Fix round 1 (m3): a row that fails after its import already created a
-  # `MediaAsset` rolls that asset back rather than orphaning it.
-  test "a failing row leaves no MediaAsset behind" do
+  # `Media::Asset` rolls that asset back rather than orphaning it.
+  test "a failing row leaves no Media::Asset behind" do
     blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
     image = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>)
     source = Source.new([ row(@post, image + %(<action-text-attachment sgid="#{youtube_sgid(1)}"></action-text-attachment>)) ], {})
     def source.youtube_video_id(_id) = raise("youtube_embeds is unreadable")
 
     out = StringIO.new
-    assert_no_difference(-> { MediaAsset.count }) { RichText::ActionTextImport.new(source: source, out: out).run }
+    assert_no_difference(-> { Media::Asset.count }) { RichText::ActionTextImport.new(source: source, out: out).run }
 
     assert_match(/Post: 0 imported, 0 blank, 0 skipped, 1 failed/, out.string)
     assert_match(/youtube_embeds is unreadable/, out.string)
+  end
+
+  # Final fix wave (C1): the import writes bodies past the services, so it
+  # refreshes each written owner's usage rows itself -- an imported image
+  # would otherwise read as "Unused" and could be deleted from under it.
+  test "an imported image is indexed as a rich_text usage of its record and locale" do
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    image = %(<action-text-attachment sgid="#{blob.to_sgid(for: "attachable")}" content-type="image/png"></action-text-attachment>)
+
+    run_import([ row(@post, image, locale: "de"), row(@block, image) ])
+
+    asset = Media::Asset.joins(:file_blob).find_by!(active_storage_blobs: { id: blob.id })
+    rows = Media::Usage.where(role: "rich_text").pluck(:media_asset_id, :owner_type, :owner_id, :locale)
+    assert_equal [ [ asset.id, "ContentBlock", @block.id, "en" ], [ asset.id, "Post", @post.id, "de" ] ], rows.sort_by { |row| row[1] }
+    assert_not_includes Media::Asset.unused, asset
   end
 
   test "the rake task says there is nothing to migrate once ActionText's table is gone" do

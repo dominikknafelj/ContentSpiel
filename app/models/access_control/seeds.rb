@@ -50,7 +50,11 @@ module AccessControl
           { permission: "pages.move", scope: {} },
           { permission: "pages.delete", scope: {} },
           { permission: "tags.manage", scope: {} },
-          { permission: "media.upload", scope: {} }
+          { permission: "media.upload", scope: {} },
+          # Added with the media library (design spec §5.1); an install
+          # seeded before that gets it from a data migration instead
+          # (`GrantMediaManageToBuiltInGroups`).
+          { permission: "media.manage", scope: {} }
         ]
       },
       AUTHOR_NAME => {

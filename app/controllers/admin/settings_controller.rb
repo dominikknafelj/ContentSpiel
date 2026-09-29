@@ -68,14 +68,14 @@ module Admin
 
     def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
 
-    # Mirrors `Admin::PagesController#hero_image_stream`: the logo section
+    # The logo section
     # (preview + "Remove image" checkbox) is the one part of this form a
     # plain autosave doesn't otherwise bring back in sync with what was
     # actually saved.
     def logo_field_stream(site)
       section_id = "#{ID_PREFIX}-logo-section"
 
-      turbo_stream.replace(section_id, partial: "admin/shared/hero_image_field", locals: {
+      turbo_stream.replace(section_id, partial: "admin/shared/image_upload_field", locals: {
         section_id: section_id, name: "logo",
         image_id: "#{ID_PREFIX}-logo", image_html_name: "site_setting[logo]", image_value: site.logo,
         checkbox_id: "#{ID_PREFIX}-remove_logo", checkbox_html_name: "site_setting[remove_logo]",

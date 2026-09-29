@@ -1,28 +1,36 @@
-module MediaAssets
-  # Stores one uploaded image as a `MediaAsset` (design spec §4.1/§4.2) --
-  # the Tiptap editor's upload button, through `Admin::MediaAssetsController`,
-  # which used to save it itself (access-control design spec §3.4, "direct
-  # writes are removed"). `file` is an uploaded file
+module Media
+  # Stores one uploaded image as a library `Media::Asset` (media library
+  # design spec §5.1) -- every way an image enters the library goes through
+  # here: the picker's Upload tab (`Media::PickerComponent`, through
+  # `Admin::MediaAssetsController` -- the one upload for a page's hero, an
+  # image block and the Tiptap editor, which then set their reference to
+  # the new asset's id like any library pick) and the Media module's own
+  # multi-file upload (`Admin::MediaController#create`). It replaced the editor's original
+  # `MediaAssets::Create` (media library Task 6). `file` is an uploaded file
   # (`ActionDispatch::Http::UploadedFile`, or anything with `tempfile`,
   # `original_filename` and `content_type`).
+  #
+  # Never deduplicated: uploading a file that's already in the library makes
+  # a second asset (design spec Review Focus 1) -- only the one-off data
+  # migration collapses identical files.
   #
   # Needs `media.upload`: an asset isn't attached to any page or post when
   # it's uploaded (the editor only inserts its id afterwards), so there's
   # no record to scope by. Recorded as `media.uploaded`.
-  class Create < ApplicationService
+  class Upload < ApplicationService
     def initialize(file:, actor: Current.actor)
       @file = file
       @actor = actor
     end
 
     def call
-      asset = MediaAsset.new(created_by: actor_user)
+      asset = Media::Asset.new(created_by: actor_user)
       return denied("media.upload", asset) unless authorize!("media.upload", asset)
       return failure(asset, [ "file must be attached" ]) unless @file.respond_to?(:tempfile)
 
       asset.file.attach(io: @file.tempfile, filename: @file.original_filename, content_type: @file.content_type)
 
-      saved = MediaAsset.transaction do
+      saved = Media::Asset.transaction do
         asset.save || raise(ActiveRecord::Rollback)
 
         record_event("media.uploaded", subject: asset, metadata: { "filename" => asset.file.filename.to_s })
@@ -43,7 +51,7 @@ module MediaAssets
     # the pixels), and those bytes aren't there yet until Active Storage's
     # own `after_commit` upload hook has run, which doesn't happen until
     # this record's save actually commits. Calling it any earlier is
-    # exactly the "blob not yet uploaded" trap `MediaAsset#with_attachable_
+    # exactly the "blob not yet uploaded" trap `Media::Asset#with_attachable_
     # io`'s own comment works around for content-type sniffing -- there's
     # no equivalent workaround here, since an analyzer needs the *whole*
     # file, not a quick prefix peek, so this simply waits for the real
@@ -68,7 +76,7 @@ module MediaAssets
       metadata = asset.file.blob.metadata || {}
       asset.update_columns(width: metadata["width"], height: metadata["height"])
     rescue StandardError => e
-      Rails.logger.warn("[media_assets] MediaAsset##{asset.id} analysis failed: #{e.class}: #{e.message}")
+      Rails.logger.warn("[media] Media::Asset##{asset.id} analysis failed: #{e.class}: #{e.message}")
     end
   end
 end

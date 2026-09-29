@@ -53,6 +53,25 @@ class Audit::EventTest < ActiveSupport::TestCase
     assert_equal({ "v" => 2 }, @event.snapshot)
   end
 
+  # Media library Task 1 renamed `MediaAsset` to `Media::Asset`; a row
+  # recorded before that still stores the legacy class name in
+  # `subject_type`/`actor_type`, and this table can never rewrite it
+  # (append-only). `polymorphic_class_for`'s own override is what keeps
+  # `event.subject`/`event.actor` resolving such a row instead of raising
+  # `NameError` for a constant that no longer exists.
+  test "polymorphic_class_for maps the legacy MediaAsset type to Media::Asset" do
+    assert_equal Media::Asset, Audit::Event.polymorphic_class_for("MediaAsset")
+    assert_equal Media::Asset, Audit::Event.polymorphic_class_for("Media::Asset")
+  end
+
+  test "subject resolves for a legacy MediaAsset-typed row instead of raising" do
+    asset = create_media_asset
+    legacy_event = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
+      subject_label: "Media asset ##{asset.id}", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+
+    assert_equal asset, legacy_event.subject
+  end
+
   test "scopes: for_subject, by_user and recent" do
     other_post = create_post(title: "Other")
     travel 1.minute do

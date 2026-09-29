@@ -13,7 +13,7 @@
 #
 # They're gated rather than removed (`draw_routes = false` would also take
 # away `rails_blob_path` and the other `direct` routes Active Storage
-# defines in the same file, which `MediaAsset#url` and the site's images
+# defines in the same file, which `Media::Asset#url` and the site's images
 # depend on -- re-declaring those means copying Rails internals). The same
 # session check CS Studio uses, answering a signed-out request with a bare
 # 401 (`ActiveStorageWriteAuthentication`, which says why not a redirect).

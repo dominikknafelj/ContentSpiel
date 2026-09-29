@@ -15,12 +15,37 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "an image block renders its alt text and caption" do
-    block = @root.content_blocks.create!(block_type: :image, position: 0, caption: "Our studio", alt: "A bright room")
-    block.image.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+    @root.content_blocks.create!(block_type: :image, position: 0, caption: "Our studio", alt: "A bright room", media_asset: create_media_asset)
     get "/"
 
     assert_select "img[alt='A bright room']"
     assert_select "figcaption", text: /Our studio/
+  end
+
+  # Task 4 review, addressed in Task 5: an image block's own `media_asset`
+  # was one query per block (`Blocks::ImageComponent#asset` ->
+  # `block.media_asset`) until `PublicPageRendering#preload_page_images`
+  # started preloading every block's asset (and the page's hero) in one
+  # batch before the page ever renders. The `media_assets` query count for
+  # a page render must not grow with how many image blocks it has.
+  test "a page with more image blocks doesn't query media_assets once per block" do
+    @root.content_blocks.create!(block_type: :image, position: 0, media_asset: create_media_asset)
+
+    one_block_queries = 0
+    ActiveSupport::Notifications.subscribed(lambda { |name, started, finished, unique_id, payload|
+      one_block_queries += 1 if payload[:sql].include?("media_assets")
+    }, "sql.active_record") { get "/" }
+
+    4.times { |i| @root.content_blocks.create!(block_type: :image, position: i + 1, media_asset: create_media_asset) }
+
+    five_block_queries = 0
+    ActiveSupport::Notifications.subscribed(lambda { |name, started, finished, unique_id, payload|
+      five_block_queries += 1 if payload[:sql].include?("media_assets")
+    }, "sql.active_record") { get "/" }
+
+    assert_equal one_block_queries, five_block_queries,
+      "Adding more image blocks should not increase media_assets query count (N+1 issue). " \
+      "1 block: #{one_block_queries} queries, 5 blocks: #{five_block_queries} queries"
   end
 
   test "blog rows show date, excerpt and first tag" do

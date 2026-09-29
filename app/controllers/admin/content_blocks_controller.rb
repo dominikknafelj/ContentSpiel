@@ -9,7 +9,7 @@ module Admin
   # from PATCHing a block that belongs to a page they don't have open.
   class ContentBlocksController < BaseController
     include AutosaveResponses
-    include FileParams
+    include MediaFields
 
     # Which schema-declared settings fields and `uses_columns` a save
     # actually writes to depends on the block's own registered type (spec
@@ -18,9 +18,12 @@ module Admin
     # since a different block on the same page can have an entirely
     # different schema. `TRANSLATED_COLUMNS`/`ATTRIBUTE_COLUMNS` below are
     # the one thing that *is* fixed: which of the columns a type can `uses`
-    # at all are translated (Mobility) versus a plain attribute
-    # (the attachment) -- `block.definition.uses_columns` still gates which
-    # of these a given type's own params are actually read from.
+    # at all are translated (Mobility) versus a plain attribute -- the
+    # image, whose column (`uses :image`) is saved as `media_asset_id`, the
+    # id the image field's hidden input (`Admin::Columns
+    # ::MediaColumnComponent`, media library Task 8) sends after a pick,
+    # or "" after Remove -- `block.definition.uses_columns` still gates
+    # which of these a given type's own params are actually read from.
     #
     # `TRANSLATED_COLUMNS` is derived from `ContentBlocks::Save::TRANSLATED`
     # (fix round 1) rather than a second, hand-kept `%w[caption alt body]`
@@ -28,7 +31,8 @@ module Admin
     # gets assigned, so this controller's own idea of "which columns are
     # translated" can never drift out of sync with it.
     TRANSLATED_COLUMNS = ContentBlocks::Save::TRANSLATED.map(&:to_s).freeze
-    ATTRIBUTE_COLUMNS = %w[image].freeze
+    # `uses` column => the param (and attribute) it's sent as.
+    ATTRIBUTE_COLUMNS = { "image" => "media_asset_id" }.freeze
 
     GONE_MESSAGE = "This block was deleted"
 
@@ -64,10 +68,6 @@ module Admin
       return render_gone unless block
 
       attributes, translations = split_block_params(block)
-      attributes = drop_blank_file_params(attributes, fields: ATTRIBUTE_COLUMNS)
-      attributes[:image] = nil if !attributes.key?(:image) && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
-      image_changing = attributes.key?(:image)
-
       result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
       streams = autosave_stream(
@@ -79,7 +79,13 @@ module Admin
         fields: block_error_fields(block)
       )
 
-      streams << image_field_stream(result.record) if result.ok? && image_changing
+      # A refused image choice puts the field back to the stored image (and
+      # shows why) -- see `Admin::MediaFields`.
+      refused = refused_media_field_stream(result, attribute: :media_asset_id, error_attribute: :image,
+        sent: attributes[:media_asset_id]) do |stored, errors|
+        Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
+      end
+      streams << refused if refused
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -130,8 +136,9 @@ module Admin
 
     # Duplicate (spec §5.1): copies the type, its settings (both halves --
     # untranslated and every locale's translations), every locale's
-    # caption/alt/body and the image attachment (as an independent blob,
-    # not a shared one -- see `duplicate_image`'s own comment), then
+    # caption/alt/body and the image reference (the copy shows the same
+    # library asset -- media library Task 4; nothing is copied, and the
+    # asset can't be deleted while either block uses it), then
     # inserts the copy directly after the source the same way `create`'s
     # own `after_id` does -- `after_id: source.id` here is always present,
     # unlike `create`'s (which is only sometimes given), so this never
@@ -144,10 +151,10 @@ module Admin
       copy = @page.content_blocks.new(block_type: source.block_type, settings: source.settings, translated_settings: source.translated_settings)
       copy_translations(source, copy)
 
-      # The image goes in through the service (final fix wave, Minor 6), so
-      # it's saved in the same authorized, audited write -- and the
-      # `block.created` snapshot shows it.
-      attributes = source.image.attached? ? { image: duplicate_image(source) } : {}
+      # The image reference goes in through the service (final fix wave,
+      # Minor 6), so it's saved in the same authorized, audited write -- and
+      # the `block.created` snapshot shows it.
+      attributes = source.media_asset_id ? { media_asset_id: source.media_asset_id } : {}
       result = ContentBlocks::Save.call(copy, attributes: attributes)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
@@ -175,7 +182,8 @@ module Admin
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
     # fields with `translated?` go to `translations[locale][:settings]`,
     # the rest to `attributes[:settings]`; `caption`/`alt`/`body` are
-    # translated columns (`body` the rich-text document JSON), `image` is a plain attribute -- every one of
+    # translated columns (`body` the rich-text document JSON), `image` is a
+    # plain attribute (`media_asset_id`) -- every one of
     # those gated by whether this block's own type actually `uses` that
     # column at all, the same allowlist reasoning
     # `Admin::PagesController::ATTRIBUTE_FIELDS` uses for its own record.
@@ -198,7 +206,7 @@ module Admin
 
       uses = definition&.uses_columns || []
       TRANSLATED_COLUMNS.each { |column| translations[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
-      ATTRIBUTE_COLUMNS.each { |column| attributes[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
+      ATTRIBUTE_COLUMNS.each { |column, param| attributes[param.to_sym] = block_params[param] if uses.include?(column) && block_params.key?(param) }
 
       [ attributes, translations ]
     end
@@ -371,21 +379,6 @@ module Admin
       end
     end
 
-    # `attach(source.image.blob)` would point the copy at the very same
-    # `ActiveStorage::Blob` row the source uses -- fine to read, but
-    # `has_one_attached`'s default `dependent: :purge_later` means
-    # destroying *either* block later purges that shared blob out from
-    # under whichever one is left, silently breaking its image (fix round
-    # 1, flagged in review of the original commit). Re-attaching from the
-    # blob's own bytes (`blob.download`) gives the copy a brand new blob --
-    # its own row, its own file on the storage service -- so the two blocks'
-    # lifecycles are fully independent from the moment they're created.
-    # Returned as an attachable for `ContentBlocks::Save`'s `image:`.
-    def duplicate_image(source)
-      blob = source.image.blob
-      { io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type }
-    end
-
     # The Turbo Stream `update`/`destroy`/`duplicate` answer with for a
     # block that's already gone (spec §5.1's "Interfaces" list: "A PATCH to
     # a destroyed block answers 410 with the status 'This block was
@@ -396,18 +389,6 @@ module Admin
     def render_gone
       render turbo_stream: turbo_stream.replace("content-blocks-alert",
         partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: [ GONE_MESSAGE ] }), status: :gone
-    end
-
-    def image_field_stream(block)
-      prefix = Admin::BlockCardComponent.error_prefix(block)
-
-      turbo_stream.replace("#{prefix}-image-section", partial: "admin/shared/hero_image_field", locals: {
-        section_id: "#{prefix}-image-section", name: "image",
-        image_id: "#{prefix}-image", image_html_name: "block[image]",
-        image_value: block.image,
-        checkbox_id: "#{prefix}-remove_image", checkbox_html_name: "block[remove_image]",
-        show_checkbox: block.image.attached?
-      })
     end
   end
 end

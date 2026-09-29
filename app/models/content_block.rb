@@ -6,7 +6,7 @@
 # registry-backed shape `Post#content_type` uses for its own types (open-types
 # spec §3). Which columns matter depends on the type: `body` (per-locale JSON
 # documents, see `HasRichTextBody`) for rich_text,
-# `image` + `caption` for image, `settings`/`translated_settings` for
+# `media_asset` + `caption`/`alt` for image, `settings`/`translated_settings` for
 # post_list.
 class ContentBlock < ApplicationRecord
   extend Mobility
@@ -26,7 +26,14 @@ class ContentBlock < ApplicationRecord
 
   belongs_to :owner, polymorphic: true
 
-  has_one_attached :image
+  # An `image` block's image (design spec §3.3): a reference to a library
+  # `Media::Asset` -- Task 4's data migration moved every former
+  # `has_one_attached :image` onto this column, re-using the same blobs.
+  # The block keeps its own per-use `alt`/`caption` overrides (translated,
+  # above). `optional: true` here too: only an `image` block ever sets it,
+  # and even that block type can be created before an image is chosen (the
+  # block picker adds an empty card first).
+  belongs_to :media_asset, class_name: "Media::Asset", optional: true
 
   validates :block_type, presence: true
 

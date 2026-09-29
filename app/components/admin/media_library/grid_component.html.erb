@@ -1,0 +1,23 @@
+<% if assets.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No images", description: pick? ? "Upload one in the Upload tab, or try another search." : "Upload one above, or clear the current filters.") %>
+<% else %>
+  <ul class="admin-media-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+    <% assets.each do |asset| %>
+      <li id="<%= pick? ? "media-picker-asset-#{asset.id}" : "media-asset-#{asset.id}" %>">
+        <% card_class = "group block w-full rounded-cs border border-line bg-surface p-2 text-left hover:border-line-strong focus:outline-2 focus:outline-accent" %>
+        <% card = capture do %>
+          <span class="block aspect-square overflow-hidden rounded-cs bg-sunken">
+            <%= image_tag thumbnail_url(asset), alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
+          </span>
+          <span class="mt-2 block truncate text-sm text-ink"><%= asset.title %></span>
+        <% end %>
+        <% if pick? %>
+          <%= tag.button card, type: "button", class: card_class,
+                data: { action: "admin--media-picker#pick", "admin--media-picker-asset-param": pick_payload(asset) } %>
+        <% else %>
+          <%= link_to card, show_path(asset), class: card_class %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

@@ -1,15 +1,22 @@
 module Admin
-  # The Tiptap editor's own image upload button (design spec §4.1/§4.2)
-  # POSTs a multipart `file` straight here -- there's no page or post this
-  # belongs to yet at upload time (the editor doesn't know which document
-  # it'll end up referenced from until the `asset_id` it gets back is
-  # inserted into one), so this is its own top-level resource, `create`
-  # only, JSON in and out.
+  # `Media::PickerComponent`'s Upload tab (media library Task 8 -- the one
+  # way to upload from a hero field, an image block or the Tiptap editor's
+  # Image button, which used to POST here directly) POSTs a multipart
+  # `file` straight here -- there's no page or post this belongs to yet at
+  # upload time (the picker doesn't know which field or document the id it
+  # gets back will end up in), so this is its own top-level resource, `create`
+  # only, JSON in and out. Task 7's Media module (`Admin::MediaController`,
+  # `resources :media`) is the library's own browse/edit/delete home, but
+  # this controller keeps its own separate route and its own narrower
+  # `{id, url, title}`/`{errors}` JSON contract rather than folding into it --
+  # `admin--media-picker` and `admin--media-upload` are two unrelated callers
+  # that happen to share the same underlying `Media::Upload`, not one
+  # feature split across two endpoints.
   class MediaAssetsController < BaseController
     # `params[:file]` missing entirely (no multipart part at all -- not the
     # same as an empty one, which `ActionDispatch::Http::UploadedFile`
     # would still answer to) is the one shape this can't hand straight to
-    # `MediaAsset#file_is_attached` and get a normal validation error back:
+    # `Media::Asset#file_is_attached` and get a normal validation error back:
     # there's nothing to `.attach`, so this reports the same "must be
     # attached" message as a matter of form rather than crash trying to
     # call `.original_filename` on `nil`.
@@ -17,10 +24,10 @@ module Admin
       upload = params[:file]
       return render_errors([ "file must be attached" ]) unless upload.respond_to?(:tempfile)
 
-      result = MediaAssets::Create.call(file: upload)
+      result = Media::Upload.call(file: upload)
 
       if result.ok?
-        render json: { id: result.record.id, url: result.record.url }, status: :created
+        render json: { id: result.record.id, url: result.record.url, title: result.record.title }, status: :created
       else
         render_errors(result.errors, status: result.denied? ? :forbidden : :unprocessable_entity)
       end
@@ -30,7 +37,9 @@ module Admin
 
     # 403 for a refused upload (no `media.upload`, access-control design
     # spec §3.4), 422 for a file that isn't acceptable -- both as JSON
-    # `{errors:}`, which the editor shows inline either way.
+    # `{errors:}`, which the picker shows inline either way. `title` on
+    # success is what the picker hands on with the new id (the same
+    # `{id, url, title}` a Library-tab pick carries).
     def render_errors(messages, status: :unprocessable_entity)
       render json: { errors: messages }, status: status
     end

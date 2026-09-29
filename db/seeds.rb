@@ -167,4 +167,24 @@ find_or_create_block!(page: resume, block_type: :post_list, position: 0, setting
 now_page = find_or_create_page!(parent: root, slug: "now", title: "Now")
 find_or_create_block!(page: now_page, block_type: :post_list, position: 0, settings: { "content_type" => "now_update" })
 
+# The media library's own dev seed data (media library Task 10): at least
+# one library image, actually used as a hero, so a fresh dev database
+# exercises `#srcset`/`Media::PictureComponent`/the Media module's "Used
+# on" without an editor having to upload something first.
+# `public/icon.png` -- a real image already checked into the repo, not a
+# test fixture -- stands in for a real upload, through the same
+# `Media::Upload`/`Pages::Save` write path CS Studio itself uses. Skipped
+# once the root page already has a hero: `Media::Upload` never dedupes
+# (design spec Review Focus 1), so re-running `db:seed` would otherwise
+# pile up a fresh, unused asset every time.
+if root.hero_media_asset_id.blank?
+  icon = ActionDispatch::Http::UploadedFile.new(tempfile: File.open(Rails.root.join("public/icon.png")),
+    filename: "icon.png", type: "image/png")
+  upload_result = Media::Upload.call(file: icon)
+  raise "seeds: #{upload_result.errors.to_sentence}" unless upload_result.ok?
+
+  hero_result = Pages::Save.call(root, attributes: { hero_media_asset_id: upload_result.record.id })
+  raise "seeds: #{hero_result.errors.to_sentence}" unless hero_result.ok?
+end
+
 PublicSite::Paths.rebuild!

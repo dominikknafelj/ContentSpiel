@@ -1,0 +1,31 @@
+<%# locals: section_id, name, image_id, image_html_name, image_value,
+    checkbox_id, checkbox_html_name, show_checkbox -- an attachment's
+    preview, its file input and a "Remove image" checkbox (cs-studio spec
+    §5.1), wrapped in one `id="<%= section_id %>"` element so a single Turbo
+    Stream `replace` can bring all three back in sync with the record after
+    a save that touched the attachment (`Admin::SettingsController
+    #logo_field_stream`) -- rendered from this one partial on the initial
+    GET (`Admin::SettingsFormComponent`) and again from that stream, so
+    there is exactly one "what does this section look like right now"
+    template.
+    `show_checkbox` is always the record's *current* `attached?`, not "was
+    this section just touched" -- an unattached record has nothing to
+    remove either way.
+
+    Only the site logo uses this since media library Task 8: a page's hero
+    and an image block's image are library images now, chosen through the
+    picker (`Admin::Columns::MediaColumnComponent`), and the logo stays a
+    `SiteSetting` attachment of its own (global constraints). %>
+<div id="<%= section_id %>">
+  <%= render Admin::Columns::ImageColumnComponent.new(name: name, id: image_id, html_name: image_html_name, value: image_value) %>
+
+  <% if show_checkbox %>
+    <div class="mb-4 -mt-2">
+      <label class="inline-flex items-center gap-2 text-sm text-meta">
+        <%= check_box_tag checkbox_html_name, "1", false, id: checkbox_id,
+              class: "size-4 rounded-cs border-line-strong text-accent focus:outline-2 focus:outline-accent" %>
+        Remove image
+      </label>
+    </div>
+  <% end %>
+</div>

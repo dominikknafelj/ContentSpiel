@@ -168,31 +168,29 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Unavailable type — gone/thing"
   end
 
-  # Fix round 1 (critical): the original `duplicate` re-attached the
-  # source's own blob (`copy.image.attach(source.image.blob)`), so both
-  # blocks pointed at one `ActiveStorage::Blob` row -- destroying *either*
-  # block purges that shared blob (`has_one_attached`'s default `dependent:
-  # :purge_later`) out from under the other one.
-  test "duplicating an image block gives the copy its own independent blob" do
+  # Media library Task 4: an image block's image is a library asset, so a
+  # duplicate points at the same asset -- nothing is copied, and the asset
+  # can't be deleted while either block uses it (the FK restricts), which
+  # is what the old "independent blob" copy (fix round 1) was protecting.
+  test "duplicating an image block shares the library asset" do
     source = image_block_with_image
 
-    post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    assert_no_difference "Media::Asset.count" do
+      post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    end
     assert_response :success
 
     copy = @page.content_blocks.order(:position).last
     assert_not_equal source.id, copy.id
-    assert copy.image.attached?
-    assert_not_equal source.image.blob_id, copy.image.blob_id, "the copy must not share the source's blob"
+    assert_equal source.media_asset, copy.media_asset
 
-    perform_enqueued_jobs { source.destroy! }
-
-    assert copy.reload.image.attached?
-    assert_equal "tiny.png", copy.image.filename.to_s
-    assert copy.image.blob.download.present?, "the copy's own blob must still be downloadable"
+    source.destroy!
+    assert copy.reload.media_asset.file.attached?
   end
 
-  # Final fix wave (Minor 6): the copy's image is attached inside
-  # `ContentBlocks::Save`, so the `block.created` event's snapshot has it.
+  # Final fix wave (Minor 6): the copy's image is set inside
+  # `ContentBlocks::Save`, so the `block.created` event's snapshot has it --
+  # as `media_asset_id` since media library Task 4.
   test "duplicating an image block records block.created with the image in its snapshot" do
     source = image_block_with_image
 
@@ -201,8 +199,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     copy = @page.content_blocks.order(:position).last
     event = Audit::Event.find_by!(action: "block.created", subject: copy)
-    assert_equal "tiny.png", event.snapshot.dig("image", "filename")
-    assert_equal copy.image.blob_id, event.snapshot.dig("image", "blob_id")
+    assert_equal source.media_asset_id, event.snapshot["media_asset_id"]
+    assert_not event.snapshot.key?("image")
   end
 
   # Duplicating copies every locale's JSON body document verbatim (the
@@ -227,76 +225,153 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal original, copy2.read_attribute(:body)
   end
 
-  # Fix round 2 (this task's own label bug, spotted alongside round 1's
-  # review): the shared `admin/shared/_hero_image_field` partial used to
-  # hard-code `name: "hero_image"`, so a block's own image column's label
-  # always read "Hero image" -- unrelated to the field it actually is.
-  test "a block's own image column labels itself Image, not Hero image" do
+  # The image column is a library image field (media library Task 8):
+  # labelled "Image" (never the page's "Hero image"), a hidden
+  # `media_asset_id` the card's autosave sends, and the image's own default
+  # alt/caption as the per-use overrides' placeholders.
+  test "an image block's card shows the picker field and the image's defaults as the overrides' placeholders" do
     block = image_block_with_image
-    get "/cs-studio/pages/#{@page.id}"
+    block.media_asset.update!(alt: "A dog", caption: "Our dog")
+    prefix = Admin::BlockCardComponent.error_prefix(block)
 
-    assert_select "label", text: "Image"
-    assert_select "label", text: "Hero image", count: 0
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+
+    assert_select "##{prefix}-image-section[data-controller='admin--media-field']" do
+      assert_select "p", text: "Image"
+      assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
+      assert_select "button", text: "Change image"
+    end
+    assert_select "p", text: "Hero image", count: 0
+    assert_select "input[name='block[alt]'][placeholder='A dog']"
+    assert_select "input[name='block[caption]'][placeholder='Our dog']"
+    assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },
+      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media-field-placeholder-ids-value"]))
   end
 
-  # The next four mirror `Admin::PageEditorTest`'s own hero-image cases
-  # (Task 4 fix rounds 1/2) for a block's own `image` column -- same bugs,
-  # same fixes, same shared code path (`Admin::FileParams
-  # #drop_blank_file_params`, the "Remove image" checkbox, the shared
-  # partial), just reached through the block card's own autosave endpoint
-  # instead of the page settings form's.
-  test "autosaving another field doesn't clear an already-attached block image" do
+  # Every autosave resends the hidden input's stored id -- a no-op.
+  test "autosaving another field resends the stored image id and keeps the image" do
     block = image_block_with_image
+    asset = block.media_asset
 
     patch "#{blocks_path}/#{block.id}",
-      params: { block: { caption: "A caption", image: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { block: { caption: "A caption", media_asset_id: asset.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
     block.reload
     assert_equal "A caption", block.caption(locale: :en)
-    assert block.image.attached?
+    assert_equal asset, block.media_asset
   end
 
-  test "the explicit remove-image checkbox detaches a block's image" do
+  test "choosing a library image sets the block's image" do
+    block = image_block_with_image
+    chosen = create_media_asset(filename: "medium.png")
+
+    assert_no_difference "Media::Asset.count" do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    end
+    assert_response :success
+
+    assert_equal chosen, block.reload.media_asset
+    assert Media::Usage.exists?(media_asset: chosen, owner: block, role: "block_image")
+  end
+
+  test "an empty image id (Remove) clears a block's image" do
     block = image_block_with_image
 
     patch "#{blocks_path}/#{block.id}",
-      params: { block: { remove_image: "1" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { block: { media_asset_id: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
-    assert_not block.reload.image.attached?
+    assert_nil block.reload.media_asset
   end
 
-  test "a new upload wins over a stale remove flag in the same save" do
+  test "an image id naming no asset is refused into the image column's error slot" do
     block = image_block_with_image
+    previous = block.media_asset
 
     patch "#{blocks_path}/#{block.id}",
-      params: {
-        block: { image: fixture_file_upload("tiny.png", "image/png"), remove_image: "1" },
-        base_updated_at: block.updated_at.iso8601(6)
-      }, as: :turbo_stream
-    assert_response :success
+      params: { block: { media_asset_id: (Media::Asset.maximum(:id) + 1).to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
 
-    assert block.reload.image.attached?
+    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-errors")
+    assert_includes response.body, "Image doesn&#39;t exist"
+    assert_equal previous, block.reload.media_asset
+
+    # Fix round 1 (I2): the field comes back with the stored image and the
+    # message inside it.
+    section = response.body.index(%(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section"))
+    assert section, "expected a stream replacing the image field"
+    field = response.body[section..]
+    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
+    assert_includes field, "Image doesn&#39;t exist"
   end
 
-  test "the success stream after an image change re-renders the image section without a checked remove box" do
+  # Review Focus 5 for a block: choosing needs `media.upload` on top of the
+  # page's edit right.
+  test "choosing a block image without media.upload is a 403 and changes nothing" do
     block = image_block_with_image
+    stored = block.media_asset
+    chosen = create_media_asset(filename: "medium.png")
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
 
     patch "#{blocks_path}/#{block.id}",
-      params: { block: { remove_image: "1" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :forbidden
+
+    assert_equal stored, block.reload.media_asset
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section")
+  end
+
+  # Final fix wave (T6), pinning the Task 6 ruling: a duplicate chooses its
+  # image again (through `ContentBlocks::Save`), so copying an image block
+  # needs `media.upload` too -- the page's edit right alone is refused, and
+  # no copy is made.
+  test "duplicating an image block needs media.upload" do
+    source = image_block_with_image
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+
+    assert_no_difference -> { @page.content_blocks.count } do
+      post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+  end
+
+  # Only a type that `uses :image` takes an image id at all.
+  test "a media_asset_id sent to a block type without an image is ignored" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    patch "#{blocks_path}/#{block.id}",
+      params: { block: { media_asset_id: create_media_asset.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
-    assert_includes response.body, "#{Admin::BlockCardComponent.error_prefix(block)}-image-section"
-    assert_not_includes response.body, "block[remove_image]"
+    assert_nil block.reload.media_asset_id
+  end
+
+  # The interim upload field (media library Task 4) is gone.
+  test "an image file param is ignored and uploads nothing" do
+    block = image_block_with_image
+    previous = block.media_asset
+
+    assert_no_difference "Media::Asset.count" do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :success
+    assert_equal previous, block.reload.media_asset
   end
 
   private
 
   def image_block_with_image
-    block = @page.content_blocks.create!(block_type: "image", position: 0)
-    block.image.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    assert block.image.attached?
-    block
+    @page.content_blocks.create!(block_type: "image", position: 0, media_asset: create_media_asset)
   end
 end
