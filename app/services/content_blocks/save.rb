@@ -52,10 +52,10 @@ module ContentBlocks
       return failure(@block) unless saved
 
       success(@block)
-    rescue ActiveRecord::InvalidForeignKey
+    rescue ActiveRecord::InvalidForeignKey => e
       # The image, or an image the body embeds, was deleted between its
       # existence check and the write (final fix wave, M1; `Media::Choosing`).
-      vanished_media_failure(@block, :media_asset_id, :image)
+      vanished_media_failure(e, @block, :media_asset_id, :image)
     end
 
     private

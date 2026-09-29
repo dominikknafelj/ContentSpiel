@@ -85,8 +85,8 @@ module Posts
       return failure(@post) unless saved
 
       success(@post)
-    rescue ActiveRecord::InvalidForeignKey
-      vanished_media_failure(@post, nil, nil)
+    rescue ActiveRecord::InvalidForeignKey => e
+      vanished_media_failure(e, @post, nil, nil)
     end
 
     private

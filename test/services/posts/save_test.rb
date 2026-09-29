@@ -213,4 +213,19 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal [ "Body has an image that doesn't exist" ], result.errors
     assert_equal "Pictures", post.reload.title
   end
+
+  # Only a `media_assets` FK is answered as a missing image; any other
+  # refused FK (a tag or author deleted mid-save) must not be misreported
+  # as "Body has an image that doesn't exist" -- it propagates.
+  test "a foreign key violation unrelated to media is not reported as a missing image" do
+    post = create_post(title: "Pictures")
+    unrelated = ->(*) { raise ActiveRecord::InvalidForeignKey, "insert or update on table \"taggings\" violates foreign key constraint \"fk_rails_tag\"" }
+
+    assert_raises(ActiveRecord::InvalidForeignKey) do
+      with_singleton_override(Media::UsageIndex, :refresh, unrelated) do
+        Posts::Save.call(post, translations: { "en" => { title: "Changed" } })
+      end
+    end
+    assert_equal "Pictures", post.reload.title
+  end
 end

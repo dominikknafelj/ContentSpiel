@@ -60,8 +60,13 @@ module Media
     # `reference_attribute` naming an asset that's gone is reported on
     # `error_attribute` (the field the editor sees), anything else was a
     # body's image on its way into `media_usages`. Pass nil for an owner
-    # with no reference column of its own (a post).
-    def vanished_media_failure(record, reference_attribute, error_attribute)
+    # with no reference column of its own (a post). Only a violation of a
+    # `media_assets` FK is answered here: any other refused FK (a parent
+    # page, tag or author deleted mid-save) re-raises rather than being
+    # misreported as a missing image on a field the form may not even show.
+    def vanished_media_failure(error, record, reference_attribute, error_attribute)
+      raise error unless error.message.include?("media_assets")
+
       id = reference_attribute && record.public_send(reference_attribute)
       if id && !Media::Asset.exists?(id)
         record.errors.add(error_attribute, "doesn't exist")

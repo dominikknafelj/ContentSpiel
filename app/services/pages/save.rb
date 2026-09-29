@@ -74,10 +74,10 @@ module Pages
       return failure(@page) unless saved
 
       success(@page)
-    rescue ActiveRecord::InvalidForeignKey
+    rescue ActiveRecord::InvalidForeignKey => e
       # The hero was deleted between `#media_choice_result`'s check and the
       # save (final fix wave, M1; `Media::Choosing`).
-      vanished_media_failure(@page, :hero_media_asset_id, :hero_image)
+      vanished_media_failure(e, @page, :hero_media_asset_id, :hero_image)
     end
 
     private
