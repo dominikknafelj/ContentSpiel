@@ -127,7 +127,7 @@ class Media::Asset < ApplicationRecord
   before_validation :set_default_title
 
   validate :file_is_attached
-  validate :image_type_and_size, if: -> { file.attached? }
+  validate :image_type_and_size, if: :file_changing?
 
   # Cache the *validated* content type/size onto their own columns right
   # before a valid record is written -- never in a `before_validation`,
@@ -137,7 +137,13 @@ class Media::Asset < ApplicationRecord
   # plain column read, not a re-open of the blob to re-sniff bytes that
   # were already sniffed once, at save time, for the validation this
   # callback is piggybacking on.
-  before_save :cache_metadata_from_file, if: -> { file.attached? }
+  #
+  # Both this and `image_type_and_size` run only when a file is being
+  # attached (`#file_changing?`, final fix wave I2): the file never changes
+  # after upload, so re-checking it on an edit of the title or alt text
+  # re-read it from the storage service -- a download of up to 10 MB per
+  # autosave, and a failed save whenever the stored file was unreachable.
+  before_save :cache_metadata_from_file, if: :file_changing?
 
   # The public URL an `image` node's `html` render (`RichText::BuiltIns`)
   # points an `<img>` at -- `rails_blob_path`, not `rails_blob_url`: this is
@@ -218,22 +224,35 @@ class Media::Asset < ApplicationRecord
 
   # The alt text a placement actually shows (global constraints: "override
   # .presence, then the asset's default in the locale, then the Mobility
-  # fallback"): an explicit per-placement `override` always wins, then this
-  # asset's own literal `alt` in `locale`, then the same cross-locale
-  # fallback chain every other translated attribute reads through
-  # (`Locales.read` -- plain Mobility readers no longer fall back on their
-  # own, config/initializers/mobility.rb). Always a String, never nil: an
-  # `<img alt="">` with nothing set anywhere is still valid HTML, and a
-  # renderer should never have to guard against a nil alt attribute.
+  # fallback"). `override` comes in one of two shapes:
+  #
+  # - a String (or nil) -- a rich-text `image` node's own `alt` attr, which
+  #   is single-valued (it lives inside one locale's document already): it
+  #   wins when present, else this asset's default walks the fallback
+  #   chain (`Locales.read` -- plain Mobility readers no longer fall back
+  #   on their own, config/initializers/mobility.rb);
+  # - a `{locale => value}` Hash -- a *translated* override column read
+  #   whole (`block.read_attribute(:alt)`, `page.read_attribute(:hero_alt)`).
+  #   Final fix wave (I1): the two are interleaved per locale -- the
+  #   override in a locale, then this asset in that locale, then the next
+  #   locale in `Locales.fallback_chain`. Resolving the override through the
+  #   chain first (what `translated(block, :alt)` did) let an `en`-only
+  #   block alt beat the asset's own `de` default on a `de` page: the
+  #   override is only "the editor's choice" in the language it was
+  #   written in.
+  #
+  # Always a String, never nil: an `<img alt="">` with nothing set anywhere
+  # is still valid HTML, and a renderer should never have to guard against
+  # a nil alt attribute.
   def alt_text(override:, locale: I18n.locale)
-    override.presence || Locales.read(self, :alt, locale: locale) || ""
+    resolve_translated(:alt, override, locale) || ""
   end
 
   # The same resolution order as `#alt_text`, but nil (not `""`) when
   # nothing is set anywhere -- an absent caption means "don't render a
   # <figcaption> at all", not "render an empty one".
   def caption_text(override:, locale: I18n.locale)
-    override.presence || Locales.read(self, :caption, locale: locale)
+    resolve_translated(:caption, override, locale)
   end
 
   # Whether anything currently references this asset -- the same question
@@ -300,6 +319,20 @@ class Media::Asset < ApplicationRecord
 
   private
 
+  # `#alt_text`/`#caption_text`'s shared walk (see `#alt_text` for the two
+  # shapes `override` takes). Each step reads a literal per-locale value,
+  # the same way `Locales.read` does.
+  def resolve_translated(attribute, override, locale)
+    return override.presence || Locales.read(self, attribute, locale: locale) unless override.is_a?(Hash)
+
+    overrides = override.transform_keys(&:to_s)
+    Locales.fallback_chain(locale).each do |code|
+      value = overrides[code].presence || Mobility.with_locale(code) { public_send(attribute) }.presence
+      return value if value
+    end
+    nil
+  end
+
   # The `ActiveStorage::VariantRecord#variation_digest` for every variant of
   # this asset's blob that's already been processed -- fix round 1's I2/I3:
   # `Variant#processed?`/`VariantWithRecord#processed?` are both `private`
@@ -338,6 +371,13 @@ class Media::Asset < ApplicationRecord
 
   def file_is_attached
     errors.add(:file, "must be attached") unless file.attached?
+  end
+
+  # A pending attachment (`file.attach(...)` not yet saved) -- Active
+  # Storage's own handle on it, `attachment_changes` (see
+  # `#with_attachable_io`). Present only on the save that attaches a file.
+  def file_changing?
+    attachment_changes["file"].present? && file.attached?
   end
 
   # The one rule design spec §4.2 states (global constraints: "png/jpeg/gif/

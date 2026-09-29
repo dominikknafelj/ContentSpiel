@@ -33,6 +33,26 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
     assert_selector "figcaption", text: "Block caption"
   end
 
+  # Final fix wave (I1): a block's alt/caption override only the locale
+  # they're written in -- an `en`-only override must not beat the asset's
+  # own `de` default on a `de` page, but still beats the asset's `en` one
+  # when `de` has nothing at all.
+  test "an override in another locale doesn't beat the asset's default in this one" do
+    asset = create_media_asset
+    Mobility.with_locale(:de) { asset.update!(alt: "Deutscher Alt-Text", caption: "Deutsche Bildunterschrift") }
+    Mobility.with_locale(:en) { asset.update!(alt: "English default alt") }
+    block = root_page.content_blocks.create!(block_type: :image, position: 0, media_asset: asset,
+      alt: "English block alt", caption: "English block caption")
+
+    I18n.with_locale(:de) { render_inline(Blocks::ImageComponent.new(block: block, page: root_page)) }
+    assert_selector "img[alt='Deutscher Alt-Text']"
+    assert_selector "figcaption", text: "Deutsche Bildunterschrift"
+
+    I18n.with_locale(:es) { render_inline(Blocks::ImageComponent.new(block: block, page: root_page)) }
+    assert_selector "img[alt='English block alt']"
+    assert_selector "figcaption", text: "English block caption"
+  end
+
   test "renders nothing without an image" do
     block = root_page.content_blocks.create!(block_type: :image, position: 0, alt: "Unused")
 

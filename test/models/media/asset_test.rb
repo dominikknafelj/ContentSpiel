@@ -168,6 +168,24 @@ class Media::AssetTest < ActiveSupport::TestCase
     assert_equal "", asset.alt_text(override: nil, locale: "de")
   end
 
+  # Final fix wave (I1): a translated override (a block's `alt`, a page's
+  # `hero_alt`) arrives as its `{locale => value}` hash and is interleaved
+  # per locale -- the override in a locale, then the asset in that locale,
+  # then the next locale in the fallback chain -- so another locale's
+  # override never beats this locale's asset default.
+  test "#alt_text interleaves a per-locale override with the asset's defaults along the fallback chain" do
+    asset = create_media_asset
+    Mobility.with_locale(:de) { asset.update!(alt: "Deutscher Alt-Text") }
+    Mobility.with_locale(:en) { asset.update!(alt: "English alt") }
+
+    assert_equal "Deutscher Alt-Text", asset.alt_text(override: { "en" => "Override en" }, locale: "de")
+    assert_equal "Override de", asset.alt_text(override: { "en" => "Override en", "de" => "Override de" }, locale: "de")
+    assert_equal "Override en", asset.alt_text(override: { "en" => "Override en", "de" => "" }, locale: "es")
+    assert_equal "English alt", asset.alt_text(override: {}, locale: "es")
+    assert_nil asset.caption_text(override: { "de" => "" }, locale: "de")
+    assert_equal "Caption en", asset.caption_text(override: { en: "Caption en" }, locale: "de")
+  end
+
   # Same order as `#alt_text`, but nil (not `""`) with nothing set anywhere --
   # an absent caption means "render no <figcaption>", not an empty one.
   test "#caption_text follows the same order as #alt_text, but nil rather than blank" do

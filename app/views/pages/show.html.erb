@@ -22,10 +22,17 @@
           content-width `sizes` (`Blocks::ImageComponent::SIZES`), since the
           hero always spans the full viewport width, not the `max-w-3xl`
           content column. `Media::PictureComponent#render?` already handles
-          a missing hero or a reference whose file is somehow gone. %>
+          a missing hero or a reference whose file is somehow gone.
+          `hero_alt` goes in whole, as its {locale => value} jsonb (final fix
+          wave, I1): `Media::Asset#alt_text` interleaves it with the asset's
+          own defaults locale by locale, so an override written in another
+          language never beats the asset's default in this one. Eager and
+          `fetchpriority="high"` (M4): the hero is the first thing a landing
+          page shows, usually its largest paint; every other image stays
+          lazy. %>
       <% hero = @page.hero_media_asset %>
-      <%= render Media::PictureComponent.new(asset: hero, alt: hero&.alt_text(override: translated(@page, :hero_alt)).to_s,
-            sizes: "100vw", css_class: "mt-8 w-full rounded-cs") %>
+      <%= render Media::PictureComponent.new(asset: hero, alt: hero&.alt_text(override: @page.read_attribute(:hero_alt)).to_s,
+            sizes: "100vw", css_class: "mt-8 w-full rounded-cs", loading: "eager", fetchpriority: "high") %>
     <% end %>
   </header>
 <% end %>

@@ -21,17 +21,19 @@ module Media
   # and a variant that's missing, slow, or failed to process never breaks
   # the page around it (Review Focus 3).
   #
-  # `loading="lazy" decoding="async"` are unconditional, not a `priority:`
-  # flag toggling them off for e.g. the hero -- nothing on this site is
-  # currently above-the-fold enough to need eager loading to matter, and
-  # adding that distinction is easy to do later without touching every
-  # existing caller if it ever does.
+  # `loading="lazy"` by default, with `decoding="async"` always. The page
+  # hero (`app/views/pages/show.html.erb`) passes `loading: "eager",
+  # fetchpriority: "high"` instead (final fix wave, M4): it's the first
+  # thing a landing page shows and usually its largest paint, so lazy-
+  # loading it only delays it. `fetchpriority` is omitted unless given.
   class PictureComponent < ApplicationComponent
-    def initialize(asset:, alt:, sizes: "100vw", css_class: nil)
+    def initialize(asset:, alt:, sizes: "100vw", css_class: nil, loading: "lazy", fetchpriority: nil)
       @asset = asset
       @alt = alt
       @sizes = sizes
       @css_class = css_class
+      @loading = loading
+      @fetchpriority = fetchpriority
     end
 
     # A missing asset, or one whose file is somehow gone (Review Focus 4's
@@ -45,7 +47,7 @@ module Media
 
     private
 
-    attr_reader :asset, :alt, :sizes, :css_class
+    attr_reader :asset, :alt, :sizes, :css_class, :loading, :fetchpriority
 
     # The `srcset` attribute's own `"url widthw, url widthw"` shape, built
     # from `Media::Asset#srcset` -- already just the variants that exist,
@@ -54,11 +56,21 @@ module Media
     # offer, so the template omits the attribute outright rather than
     # rendering an empty one -- an unprocessed asset, or a GIF (design spec:
     # "GIFs get no variants"), then renders `src` alone (Review Focus 3).
+    #
+    # The original is appended as the widest candidate when its width is
+    # known (final fix wave, I3): once a `srcset` carries `w` descriptors, a
+    # browser picks only among them and never falls back to `src`, so
+    # without it a screen that wants more than the largest variant
+    # (`#srcset` skips widths at or above the original's) would be capped
+    # at a downscaled copy of a larger image. Without a known width there's
+    # no descriptor to give it, and the variants alone still beat nothing.
+    # Memoized: the template reads it twice (`srcset` and `sizes`).
     def srcset_attribute
-      pairs = asset.srcset
-      return nil if pairs.empty?
+      return @srcset_attribute if defined?(@srcset_attribute)
 
-      pairs.map { |url, width| "#{url} #{width}w" }.join(", ")
+      pairs = asset.srcset
+      pairs += [ [ asset.src, asset.width ] ] if pairs.any? && asset.width.present?
+      @srcset_attribute = pairs.empty? ? nil : pairs.map { |url, width| "#{url} #{width}w" }.join(", ")
     end
 
     # `sizes` only means anything paired with a real `srcset` -- a browser

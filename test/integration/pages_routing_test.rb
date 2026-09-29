@@ -581,6 +581,36 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_select "header img[alt='Library default alt']"
   end
 
+  # Final fix wave (I1): the override counts only in the locale it's written
+  # in. On a `de` page, a `hero_alt` set only in `en` must not beat the
+  # asset's own `de` default -- per locale, the override and then the
+  # asset, walking the fallback chain.
+  test "an English-only hero_alt doesn't beat the asset's German default on a German page" do
+    asset = create_media_asset(filename: "tiny.png")
+    Mobility.with_locale(:de) { asset.update!(alt: "Deutscher Standard") }
+    Page.create!(page_type: :landing, title: "Welcome", slug: "", published_at: Time.current,
+      hero_media_asset: asset, hero_alt: "English override")
+
+    get "/de"
+    assert_select "header img[alt='Deutscher Standard']"
+
+    get "/"
+    assert_select "header img[alt='English override']"
+  end
+
+  # Final fix wave (M4): the hero is the first thing a landing page shows,
+  # so it loads eagerly at high priority; every other image stays lazy.
+  test "the hero image loads eagerly with a high fetch priority" do
+    root = Page.create!(page_type: :landing, title: "Welcome", slug: "", published_at: Time.current,
+      hero_media_asset: create_media_asset(filename: "tiny.png"))
+    root.content_blocks.create!(block_type: :image, position: 0, media_asset: create_media_asset(filename: "wide.png"))
+
+    get "/"
+
+    assert_select "header img[loading='eager'][fetchpriority='high']"
+    assert_select "figure img[loading='lazy']:not([fetchpriority])"
+  end
+
   # `page_type` gates the hero fields defensively rather than trusting that a
   # `standard` page's `subtitle`/`hero_image` are blank: the columns aren't
   # otherwise enforced empty outside `landing`, and the view is the last place

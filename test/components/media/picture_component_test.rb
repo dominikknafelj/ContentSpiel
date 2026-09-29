@@ -28,6 +28,40 @@ class Media::PictureComponentTest < ActiveSupport::TestCase
     asset.srcset.each { |url, width| assert_includes srcset, "#{url} #{width}w" }
   end
 
+  # Final fix wave (I3): once `srcset` has `w` descriptors a browser never
+  # falls back to `src`, so without the original as a candidate a wide
+  # screen would top out at the largest variant (2400px) of a larger image.
+  test "the original is the widest srcset candidate once there are variants" do
+    asset = processed_asset
+
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    candidates = page.find("img")["srcset"].split(", ")
+    assert_equal "#{asset.url} #{asset.width}w", candidates.last
+    assert_equal asset.srcset.size + 1, candidates.size
+  end
+
+  test "without a known width the original isn't offered as a candidate" do
+    asset = processed_asset
+    asset.update_columns(width: nil, height: nil)
+
+    render_inline(Media::PictureComponent.new(asset: asset, alt: "x"))
+
+    assert_not_includes page.find("img")["srcset"], "#{asset.url} "
+  end
+
+  # Final fix wave (M4): lazy by default; a caller (the hero) can ask for
+  # eager loading at a high fetch priority.
+  test "loading and fetchpriority can be set, and default to lazy and none" do
+    render_inline(Media::PictureComponent.new(asset: create_media_asset, alt: "x"))
+    assert_equal "lazy", page.find("img")["loading"]
+    assert_nil page.find("img")["fetchpriority"]
+
+    render_inline(Media::PictureComponent.new(asset: create_media_asset, alt: "x", loading: "eager", fetchpriority: "high"))
+    assert_equal "eager", page.find("img")["loading"]
+    assert_equal "high", page.find("img")["fetchpriority"]
+  end
+
   test "sizes is only rendered alongside a real srcset" do
     render_inline(Media::PictureComponent.new(asset: processed_asset, alt: "x", sizes: "(min-width: 768px) 768px, 100vw"))
 

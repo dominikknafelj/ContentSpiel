@@ -25,6 +25,30 @@ class Media::SaveTest < ActiveSupport::TestCase
     assert_equal "Das Studio", asset.alt(locale: :de)
   end
 
+  # Final fix wave (I2): the type sniff and the metadata cache belong to a
+  # new file, not to every save -- editing a title or alt text must not
+  # download the original (a 10 MB fetch from the storage service per
+  # autosave), let alone fail when that file is unreachable.
+  test "editing the details never opens the stored file" do
+    asset = Media::Asset.find(upload_by(users(:one)).id)
+    with_singleton_override(asset.file.blob, :open, ->(*) { raise "the file was downloaded" }) do
+      result = as_owner { Media::Save.call(asset, attributes: { title: "Studio" }, translations: { "en" => { alt: "The studio" } }) }
+
+      assert result.ok?, result.errors.inspect
+    end
+    assert_equal "Studio", asset.reload.title
+  end
+
+  test "editing the details succeeds even when the stored file is missing" do
+    asset = Media::Asset.find(upload_by(users(:one)).id)
+    asset.file.blob.service.delete(asset.file.blob.key)
+
+    result = as_owner { Media::Save.call(asset, attributes: { title: "Still editable" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "Still editable", asset.reload.title
+  end
+
   test "someone else without media.manage is denied and nothing changes" do
     asset = upload_by(users(:one))
 
