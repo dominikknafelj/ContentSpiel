@@ -127,7 +127,7 @@ class Media::UsageIndex
     # per-locale (a page has exactly one hero image, whatever locale it's
     # viewed in -- only its alt text, `hero_alt`, is translated), so `locale`
     # is nil. A plain FK column, kept valid by Postgres itself
-    # (`on_delete: :restrict`), so unlike a rich-text `image` node's
+    # (a plain FK; see `MediaForeignKeysNoAction`), so unlike a rich-text `image` node's
     # `asset_id` (`#rich_text_rows` below) this never needs an existence
     # check of its own.
     def hero_rows(page, now)

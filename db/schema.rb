@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_070000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -272,9 +272,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_070000) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_tokens", "access_control_groups", column: "group_id"
   add_foreign_key "api_tokens", "users"
-  add_foreign_key "content_blocks", "media_assets", on_delete: :restrict
-  add_foreign_key "media_usages", "media_assets", on_delete: :restrict
-  add_foreign_key "pages", "media_assets", column: "hero_media_asset_id", on_delete: :restrict
+  add_foreign_key "content_blocks", "media_assets"
+  add_foreign_key "media_usages", "media_assets"
+  add_foreign_key "pages", "media_assets", column: "hero_media_asset_id"
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"

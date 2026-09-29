@@ -61,7 +61,7 @@ This sub-project gives CS Studio **one media library** that every image use poin
 
 | Column | Notes |
 |---|---|
-| `media_asset_id` | FK, not null, `on_delete: :restrict` |
+| `media_asset_id` | FK, not null, blocks deleting a referenced asset (NO ACTION, see Amendments) |
 | `owner_type` / `owner_id` | `Page`, `ContentBlock` or `Post` |
 | `role` | `hero`, `block_image` or `rich_text` |
 | `locale` | nil for hero and block image; the document's locale for `rich_text` |
@@ -79,8 +79,8 @@ Nobody edits `media_usages` directly. `Media::UsageIndex.refresh(owner)` recompu
 
 | Record | Reference | Per-use override fields |
 |---|---|---|
-| `Page` | `hero_media_asset_id` (FK, restrict, nullable) | existing translated `hero_alt` |
-| `ContentBlock` (image type) | `media_asset_id` (FK, restrict, nullable) | existing translated `alt`, `caption` |
+| `Page` | `hero_media_asset_id` (FK, blocks delete, nullable) | existing translated `hero_alt` |
+| `ContentBlock` (image type) | `media_asset_id` (FK, blocks delete, nullable) | existing translated `alt`, `caption` |
 | Rich-text `image` node | `asset_id` attribute (unchanged) | the node's `alt`, `caption` |
 
 `has_one_attached :hero_image` on `Page` and `has_one_attached :image` on `ContentBlock` are removed after the migration.
@@ -124,7 +124,7 @@ The migration is reversible in structure. On `down`, the attachments are restore
 - **Services:**
   - `Media::Upload`: replaces `MediaAssets::Create`. Records `media.uploaded`.
   - `Media::Save`: edits title and translations. Records `media.updated`, with field changes.
-  - `Media::Destroy`: refuses while any `media_usages` row exists, with an error message that lists where the image is used, and records `media.deleted`. The database's `restrict` foreign keys back this up.
+  - `Media::Destroy`: refuses while any `media_usages` row exists, with an error message that lists where the image is used, and records `media.deleted`. The database's foreign keys back this up.
   - `Pages::Save` and `ContentBlocks::Save` accept `hero_media_asset_id` and `media_asset_id`. Choosing an image requires `media.upload` and an existing asset.
   - `Pages::Save`, `ContentBlocks::Save`, `Posts::Save` and all destroy services call `Media::UsageIndex.refresh(owner)` inside their transaction. A destroyed owner's rows are removed.
   - The contract test covers the new services.
@@ -191,3 +191,7 @@ The migration is reversible in structure. On `down`, the attachments are restore
 - moving the logo into the library, which would need SVG sanitising.
 
 **Interim state:** until a variant has been processed, a page serves the original file.
+
+## Amendments
+
+- **Foreign keys use NO ACTION, not RESTRICT** (found on CI, 2026-09-29). Postgres 18 reports a violated `ON DELETE RESTRICT` with SQLSTATE 23001, which Rails raises as a plain `StatementInvalid` rather than `ActiveRecord::InvalidForeignKey`. The default NO ACTION blocks the same deletes (the constraints aren't deferrable) and raises 23503 on every version. Migration: `MediaForeignKeysNoAction`.

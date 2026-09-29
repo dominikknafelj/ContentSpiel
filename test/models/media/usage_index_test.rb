@@ -304,6 +304,20 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
     assert_raises(ActiveRecord::InvalidForeignKey) { asset.delete }
   end
 
+  # Postgres 18 reports a violated `ON DELETE RESTRICT` as SQLSTATE 23001,
+  # which Rails raises as a plain `StatementInvalid`, so every `rescue
+  # ActiveRecord::InvalidForeignKey` would miss it; only the default (NO
+  # ACTION) raises 23503 on every version (`MediaForeignKeysNoAction`).
+  # Local Postgres 17 can't reproduce that, so pin the action itself.
+  test "foreign keys into media_assets use the default action, not RESTRICT" do
+    keys = %i[media_usages pages content_blocks].flat_map do |table|
+      ActiveRecord::Base.connection.foreign_keys(table).select { |key| key.to_table == "media_assets" }
+    end
+
+    assert_equal 3, keys.size
+    assert_equal [ nil ] * 3, keys.map(&:on_delete)
+  end
+
   test "refresh is a no-op for an owner class it doesn't manage" do
     setting = site_settings(:default)
 

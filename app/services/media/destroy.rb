@@ -7,7 +7,7 @@ module Media
   #   out first.
   # - The index can be behind -- a reference written outside the services,
   #   or a save racing this delete between the check and the `DELETE`
-  #   (Review Focus 4). The `on_delete: :restrict` FKs on `pages`/
+  #   (Review Focus 4). The FKs on `pages`/
   #   `content_blocks` still refuse the row, and that
   #   `ActiveRecord::InvalidForeignKey` becomes an ordinary failure here,
   #   never a 500. (A rich-text `image` node has no FK -- a document that

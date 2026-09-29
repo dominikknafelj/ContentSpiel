@@ -13,7 +13,9 @@
 # `block_image`, which aren't per-locale at all -- a page has one hero, a
 # block has one image, full stop.
 #
-# `on_delete: :restrict` on `media_asset_id` is the actual backstop: even if
+# The FK on `media_asset_id` is the actual backstop (created `on_delete:
+# :restrict` here, switched to NO ACTION by `MediaForeignKeysNoAction` so
+# Postgres 18 still raises `InvalidForeignKey`): even if
 # `Media::Destroy`'s own usage check (a later task) were ever bypassed --
 # a race, a forged request, a bug -- Postgres itself refuses to delete an
 # asset a usage row still points at, turning what would otherwise be a

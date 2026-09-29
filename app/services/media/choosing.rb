@@ -12,7 +12,7 @@ module Media
   #   stored id need nothing beyond the edit right the service already
   #   checked.
   # - The id must name an existing asset. Without this check a forged id
-  #   would reach Postgres as an `on_delete: :restrict` FK violation --
+  #   would reach Postgres as an FK violation --
   #   a 500 -- and a non-numeric one would be cast to nil, silently
   #   clearing the image instead. It's refused as a validation failure on
   #   the field the editor sees (`hero_image`/`image`), with nothing

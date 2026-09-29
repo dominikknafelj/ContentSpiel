@@ -3,7 +3,7 @@
 # a rich-text `image` node's `asset_id` (`RichText::BuiltIns`) all reference
 # -- since Task 4 there is one storage path for all three. Uploaded through
 # `Media::Upload`; where it's used is indexed in `media_usages`
-# (`Media::UsageIndex`), and the `on_delete: :restrict` FKs keep a used
+# (`Media::UsageIndex`), and the FKs into `media_assets` keep a used
 # asset from being deleted. Cleanup of unused assets is manual only.
 class Media::Asset < ApplicationRecord
   extend Mobility
@@ -49,7 +49,7 @@ class Media::Asset < ApplicationRecord
   # derived, rebuilt wholesale by `Media::UsageIndex.refresh(owner)`
   # whenever an owner's own state might have changed, never written to
   # directly. `dependent:` is deliberately left unset: the database's own
-  # `on_delete: :restrict` FK is what actually backs "can't delete an
+  # FK (NO ACTION, see `MediaForeignKeysNoAction`) is what actually backs "can't delete an
   # asset that's in use" (global constraints, Review Focus 4) -- an
   # `:restrict_with_exception` here would only intercept an ordinary
   # `#destroy` with a *different* exception (`DeleteRestrictionError`)
@@ -256,7 +256,7 @@ class Media::Asset < ApplicationRecord
   end
 
   # Whether anything currently references this asset -- the same question
-  # the database's own `on_delete: :restrict` FK answers at delete time,
+  # the database's own FK answers at delete time,
   # asked ahead of that (design spec §5.1: `Media::Destroy`'s own usage
   # check, the "Unused" filter's inverse).
   def used?
