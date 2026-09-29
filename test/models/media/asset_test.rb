@@ -9,6 +9,8 @@ require "test_helper"
 # might set by hand: those columns exist to cache what validation already
 # found, not to be trusted as input to it.
 class Media::AssetTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   test "a png under 10 MB is valid" do
     asset = Media::Asset.new
     asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
@@ -120,5 +122,147 @@ class Media::AssetTest < ActiveSupport::TestCase
 
     assert_not asset.valid?
     assert_includes asset.errors[:file], "doesn't match its stored content type"
+  end
+
+  # Task 2 (media library sub-project): `title` is the one field a library
+  # listing/picker always has *something* to show, so it defaults from the
+  # upload's own filename the moment it's blank -- but only then, so an
+  # editor's own title (or a deliberate rename) always sticks.
+  test "title defaults from the file name, and stays editable" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "hero-photo.jpg", content_type: "image/png")
+    asset.save!
+
+    assert_equal "hero-photo", asset.title
+
+    asset.update!(title: "Team offsite")
+    assert_equal "Team offsite", asset.reload.title
+  end
+
+  test "an explicit blank title on create still defaults from the file name" do
+    asset = Media::Asset.new(title: "")
+    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "picnic.png", content_type: "image/png")
+    asset.save!
+
+    assert_equal "picnic", asset.title
+  end
+
+  # `#alt_text`'s resolution order (global constraints: "override.presence,
+  # then the asset's default in the locale, then the Mobility fallback"),
+  # against the default test site (en default, de/en/es enabled, no
+  # configured fallbacks -- `Locales.fallback_chain("de")` is `de, en, es`).
+  test "#alt_text returns the override, then the asset's own locale, then the fallback chain, then blank" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    Mobility.with_locale(:en) { asset.alt = "English alt" }
+    Mobility.with_locale(:de) { asset.alt = "Deutscher Alt-Text" }
+    asset.save!
+
+    assert_equal "Override alt", asset.alt_text(override: "Override alt", locale: "de")
+    assert_equal "Deutscher Alt-Text", asset.alt_text(override: nil, locale: "de")
+
+    Mobility.with_locale(:de) { asset.update!(alt: "") }
+    assert_equal "English alt", asset.alt_text(override: "", locale: "de")
+
+    Mobility.with_locale(:en) { asset.update!(alt: "") }
+    assert_equal "", asset.alt_text(override: nil, locale: "de")
+  end
+
+  # Same order as `#alt_text`, but nil (not `""`) with nothing set anywhere --
+  # an absent caption means "render no <figcaption>", not an empty one.
+  test "#caption_text follows the same order as #alt_text, but nil rather than blank" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    asset.save!
+
+    assert_nil asset.caption_text(override: nil, locale: "de")
+
+    Mobility.with_locale(:en) { asset.update!(caption: "English caption") }
+    assert_equal "English caption", asset.caption_text(override: nil, locale: "de")
+
+    Mobility.with_locale(:de) { asset.update!(caption: "Deutsche Bildunterschrift") }
+    assert_equal "Deutsche Bildunterschrift", asset.caption_text(override: nil, locale: "de")
+
+    assert_equal "Override caption", asset.caption_text(override: "Override caption", locale: "de")
+  end
+
+  # `wide.png` (test/fixtures/files) is a real 3000x2000 PNG -- every
+  # declared variant width (480/960/1600/2400) is smaller than that, so all
+  # four should eventually process and appear in `srcset`.
+  test "srcset is empty before the preprocessing jobs run, then lists all four widths once they do" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
+    asset.save!
+    analyze(asset)
+
+    assert_equal [], asset.srcset
+
+    perform_enqueued_jobs
+
+    srcset = asset.srcset
+    assert_equal [ 480, 960, 1600, 2400 ], srcset.map(&:last)
+    srcset.each do |path, _width|
+      assert_match %r{\A/rails/active_storage/representations/}, path
+    end
+  end
+
+  # `medium.png` is a real 800x600 PNG: `resize_to_limit` never upscales, so
+  # only the one variant narrower than the original (w480) should ever
+  # appear -- w960/w1600/w2400 are all >= the original's own 800px width.
+  test "srcset skips variants that would upscale the original" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("medium.png")), filename: "medium.png", content_type: "image/png")
+    asset.save!
+    analyze(asset)
+
+    perform_enqueued_jobs
+
+    assert_equal [ 480 ], asset.srcset.map(&:last)
+  end
+
+  test "a GIF is never variable, and never gets a srcset entry" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("small.gif")), filename: "small.gif", content_type: "image/gif")
+    asset.save!
+    analyze(asset)
+
+    perform_enqueued_jobs
+
+    assert_not asset.variable_image?
+    assert_equal [], asset.srcset
+  end
+
+  # Review Focus 3 (global constraints): a variant job that fails or is slow
+  # -- a corrupt image, a `vips` error -- must never take the public page
+  # down with it. Stubbing `file.variant` itself to blow up stands in for
+  # "processing this variant failed": `#srcset` must still return normally,
+  # with the error logged instead of raised, once per variant it skipped.
+  test "a variant that fails to process is caught, logged, and srcset still returns without raising" do
+    asset = Media::Asset.new
+    asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
+    asset.save!
+    analyze(asset)
+
+    logged_messages = []
+
+    with_singleton_override(Rails.logger, :error, ->(message) { logged_messages << message }) do
+      with_singleton_override(asset.file, :variant, ->(*) { raise "vips blew up" }) do
+        assert_equal [], asset.srcset
+      end
+    end
+
+    assert_equal 4, logged_messages.size
+    assert logged_messages.all? { |message| message.include?("vips blew up") }
+  end
+
+  private
+
+  # Mirrors `MediaAssets::Create#analyze_dimensions`: `file.analyze` needs the
+  # blob's real bytes on the storage service, which only exist once this
+  # record's save has actually committed.
+  def analyze(asset)
+    asset.file.analyze
+    metadata = asset.file.blob.metadata || {}
+    asset.update_columns(width: metadata["width"], height: metadata["height"])
   end
 end

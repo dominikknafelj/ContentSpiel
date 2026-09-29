@@ -9,6 +9,8 @@
 # "Relation to open types": unifying the two storage paths is that same
 # future sub-project's job, not this one's.
 class Media::Asset < ApplicationRecord
+  extend Mobility
+
   # Zeitwerk infers a namespaced model's table name by demodulizing it
   # (`Media::Asset` -> `assets`), so this has to be explicit: Task 1 (media
   # library sub-project) renamed the bare `MediaAsset` to `Media::Asset` for
@@ -26,9 +28,51 @@ class Media::Asset < ApplicationRecord
 
   MAX_BYTE_SIZE = 10.megabytes
 
+  # The exact responsive widths this app ever serves (global constraints:
+  # "Variant names are exactly w480, w960, w1600 and w2400"). Doubles as
+  # both the variant *name* Active Storage keys each transformation under
+  # (the `has_one_attached` block below, `#srcset`'s own `file.variant
+  # (name)`) and the target width `#srcset` compares against the original
+  # to decide whether that variant would ever upscale.
+  VARIANT_WIDTHS = { w480: 480, w960: 960, w1600: 1600, w2400: 2400 }.freeze
+
+  # This asset's own translated defaults for alt text and caption -- jsonb,
+  # same shape and backend as every other translated attribute in this app
+  # (config/initializers/mobility.rb). A *placement* (a rich-text image
+  # node, an image content block) can still override either of these per
+  # use, which is exactly what `#alt_text`/`#caption_text` below resolve --
+  # reading `alt`/`caption` directly only ever gets this asset's own literal
+  # default in the ambient locale, never an override or a cross-locale
+  # fallback.
+  translates :alt, :caption
+
   belongs_to :created_by, class_name: "User", optional: true
 
-  has_one_attached :file
+  has_one_attached :file do |attachable|
+    # Every responsive width the public site can ever ask for, preprocessed
+    # right after upload (`preprocessed: true` enqueues one `ActiveStorage
+    # ::TransformJob` per variant as soon as this attachment's blob finishes
+    # uploading) so a variant is normally already sitting on the storage
+    # service by the time a page first requests it -- but never something a
+    # page *waits* on: `#srcset` below only ever lists a variant Active
+    # Storage has already finished (`Variant#processed?`), so a slow,
+    # still-queued or failed job just means fewer `srcset` entries for this
+    # request, never a request that blocks on -- or 500s over -- one.
+    #
+    # Declared unconditionally for every attached file: this block-form DSL
+    # only lets a variant be conditioned on its *name*, not on the
+    # attachment's own content type, so a GIF gets these same `w480`..
+    # `w2400` WebP names declared (and, wastefully, preprocessed) too.
+    # `#srcset`/`#variable_image?` are what actually keep a GIF from ever
+    # showing one (global constraints: "GIFs get no variants") -- resized
+    # WebP stills would throw away the one thing a GIF has that a still
+    # image doesn't, its animation.
+    VARIANT_WIDTHS.each do |name, target_width|
+      attachable.variant name, resize_to_limit: [ target_width, nil ], format: :webp, preprocessed: true
+    end
+  end
+
+  before_validation :set_default_title
 
   validate :file_is_attached
   validate :image_type_and_size, if: -> { file.attached? }
@@ -54,7 +98,99 @@ class Media::Asset < ApplicationRecord
     Rails.application.routes.url_helpers.rails_blob_path(file, only_path: true)
   end
 
+  # An `<img src>` always points at the original -- whatever `#srcset`
+  # comes back with (including empty, Review Focus 3: a page never fails
+  # to render just because every variant is missing, slow, or broken) is
+  # additive, never a replacement for this.
+  def src
+    url
+  end
+
+  # Whether this asset can have size variants at all: every allowed type
+  # except GIF (global constraints: "GIFs get no variants") -- an animated
+  # GIF is served as-is, its frames intact, rather than resized down into a
+  # handful of static WebP stills.
+  def variable_image?
+    file.attached? && content_type != "image/gif"
+  end
+
+  # `[url_path, width]` pairs for every variant that's actually usable right
+  # now (design spec §3.1, global constraints, Review Focus 3) -- skipping:
+  #
+  # - a GIF entirely (`#variable_image?`);
+  # - any width at or above the original's own (`width.present? &&
+  #   target_width >= width`) -- `resize_to_limit` already refuses to
+  #   *upscale*, so a variant no bigger than the original would just be a
+  #   redundant re-encode of it, not a smaller file a `srcset` should offer;
+  # - a variant that hasn't *finished* processing (`Variant#processed?`) --
+  #   preprocessing is a best-effort head start (the `has_one_attached`
+  #   block's own comment), never something this waits on;
+  # - a variant whose processing blew up (a corrupt upload, a `vips`
+  #   error) -- caught and logged per variant, not left to bubble up and
+  #   break the page around it.
+  #
+  # `width` (this asset's *own* dimensions column, from `file.analyze`) may
+  # itself be nil -- analysis hasn't run, or failed (`MediaAssets::Create
+  # #analyze_dimensions`'s own comment) -- in which case the "never upscale"
+  # check is simply skipped for lack of anything to compare against; the
+  # `processed?` check below still applies.
+  def srcset
+    return [] unless variable_image?
+
+    VARIANT_WIDTHS.filter_map do |name, target_width|
+      next if width.present? && target_width >= width
+
+      variant = file.variant(name)
+      # `Variant#processed?`/`VariantWithRecord#processed?` (`ActiveStorage
+      # .track_variants`, on by default since `config.load_defaults 8.1`)
+      # are both `private` -- on purpose, so nothing casually asks "is this
+      # done yet" without also being tempted to reach for the public
+      # `#processed`, which *runs* the transformation inline (a `vips` call
+      # this method must never trigger; see the `has_one_attached` block's
+      # own comment). `send` is the one way to ask the question without
+      # triggering the answer.
+      next unless variant.send(:processed?)
+
+      [ Rails.application.routes.url_helpers.rails_representation_path(variant, only_path: true), target_width ]
+    rescue StandardError => e
+      Rails.logger.error("[media_assets] Media::Asset##{id} srcset variant #{name} failed: #{e.class}: #{e.message}")
+      nil
+    end
+  end
+
+  # The alt text a placement actually shows (global constraints: "override
+  # .presence, then the asset's default in the locale, then the Mobility
+  # fallback"): an explicit per-placement `override` always wins, then this
+  # asset's own literal `alt` in `locale`, then the same cross-locale
+  # fallback chain every other translated attribute reads through
+  # (`Locales.read` -- plain Mobility readers no longer fall back on their
+  # own, config/initializers/mobility.rb). Always a String, never nil: an
+  # `<img alt="">` with nothing set anywhere is still valid HTML, and a
+  # renderer should never have to guard against a nil alt attribute.
+  def alt_text(override:, locale: I18n.locale)
+    override.presence || Locales.read(self, :alt, locale: locale) || ""
+  end
+
+  # The same resolution order as `#alt_text`, but nil (not `""`) when
+  # nothing is set anywhere -- an absent caption means "don't render a
+  # <figcaption> at all", not "render an empty one".
+  def caption_text(override:, locale: I18n.locale)
+    override.presence || Locales.read(self, :caption, locale: locale)
+  end
+
   private
+
+  # `hero-photo.jpg` -> "hero-photo": the title an editor never has to type
+  # before an upload is usable in a listing or a picker. `ActiveStorage
+  # ::Filename#base` already strips the extension the same way the
+  # migration's own backfill does in SQL. Only fills a *blank* title --
+  # editable ever after, the same "presence decides, not overwrite" rule
+  # `alt`/`caption`'s Mobility `presence` plugin use throughout this app.
+  def set_default_title
+    return if title.present? || !file.attached?
+
+    self.title = file.filename.base
+  end
 
   def file_is_attached
     errors.add(:file, "must be attached") unless file.attached?
