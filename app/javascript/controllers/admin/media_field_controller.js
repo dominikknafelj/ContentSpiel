@@ -13,7 +13,15 @@ import { Controller } from "@hotwired/stimulus"
 // saves anything itself.
 export default class extends Controller {
   static targets = [ "input", "thumbnail", "title", "choose", "remove" ]
-  static values = { placeholderIds: Object }
+  static values = { placeholderIds: Object, defaults: Object }
+
+  // The override fields' placeholders follow the image this field was
+  // rendered with -- which matters after a refused choice, when the server
+  // re-renders this field with the stored image (`Admin::MediaFields`)
+  // and the placeholders still show the refused pick's defaults.
+  connect() {
+    this.setPlaceholders(this.defaultsValue)
+  }
 
   static texts = {
     choose: "Choose image",
@@ -45,8 +53,14 @@ export default class extends Controller {
     this.setPlaceholders({})
     this.showChosen(false)
     // The Remove button just hid itself; focus goes to Choose rather than
-    // being dropped on the page body.
-    if (this.hasChooseTarget) this.chooseTarget.focus()
+    // being dropped on the page body -- or, for someone who can't choose
+    // (no `media.upload`, so no Choose button), to the field itself
+    // (`tabindex="-1"` on the component's wrapper).
+    if (this.hasChooseTarget) {
+      this.chooseTarget.focus()
+    } else {
+      this.element.focus()
+    }
   }
 
   write(value) {

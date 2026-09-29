@@ -41,7 +41,7 @@ export default class extends Controller {
   static values = {
     linkTargetsUrl: String,
     locale: String,
-    assetUrls: Object,
+    assets: Object,
     linkTitles: Object
   }
 
@@ -74,7 +74,7 @@ export default class extends Controller {
     // link picker add to these as the editor is used, and writing a
     // Stimulus value back would re-render nothing useful but cost a
     // data-attribute round trip per pick.
-    this.assetUrls = { ...this.assetUrlsValue }
+    this.assets = { ...this.assetsValue }
     this.linkTitles = { ...this.linkTitlesValue }
 
     const mount = document.createElement("div")
@@ -84,7 +84,7 @@ export default class extends Controller {
       element: mount,
       content: this.initialContent(),
       extensions: extensions({
-        resolveAssetUrl: (id) => this.assetUrls[id] || null,
+        resolveAssetUrl: (id) => this.assets[id]?.url || null,
         resolveLinkTitle: (type, id) => this.linkTitles[`${type}:${id}`] || null,
         onEditImage: (position) => this.openImagePopover(position)
       }),
@@ -266,13 +266,14 @@ export default class extends Controller {
   // selection the editor still holds from before the picker opened, then
   // opens the image popover so alt text can be written straight away (the
   // picker has already handed focus back by now). The picked `url` is only
-  // for showing the image here -- the node stores the id alone.
+  // for showing the image here, and its `alt`/`caption` defaults only for
+  // the popover's placeholders -- the node stores the id alone.
   picked(event) {
     const { id, url } = event.detail || {}
     if (!Number.isInteger(id) || !this.editable()) return
 
     this.showMessage("")
-    if (url) this.assetUrls[id] = url
+    if (url) this.assets[id] = { url, alt: event.detail.alt || "", caption: event.detail.caption || "" }
     this.editor.chain().focus().insertImage({ asset_id: id }).run()
 
     const position = this.insertedImagePosition(id)
@@ -471,8 +472,8 @@ export default class extends Controller {
     this.closePopover()
   }
 
-  // Image: alt text and caption for the `image` node at `position` (just
-  // picked, or clicked). Applied on Done -- re-checking the node is still
+  // Image: the per-use alt text and caption for the `image` node at
+  // `position` (just picked, or clicked). Applied on Done -- re-checking the node is still
   // an image there, since the document may have changed meanwhile.
   openImagePopover(position) {
     if (!this.editable()) return
@@ -481,8 +482,12 @@ export default class extends Controller {
     if (!node || node.type.name !== "image") return
 
     const popover = createPopover({ title: "Image", onSubmit: () => done(), onClose: () => this.closePopover() })
-    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: "Describe the image" })
-    const caption = createField("Caption", { value: node.attrs.caption || "" })
+    // Blank fields fall back to the image's own defaults in this language
+    // (`#assets`), which is what their placeholders show -- the generic
+    // hint only when the image has no default of its own.
+    const defaults = this.assets[node.attrs.asset_id] || {}
+    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: defaults.alt || "Describe the image" })
+    const caption = createField("Caption", { value: node.attrs.caption || "", placeholder: defaults.caption || "" })
     popover.body.append(alt.wrapper, caption.wrapper)
 
     const done = () => {

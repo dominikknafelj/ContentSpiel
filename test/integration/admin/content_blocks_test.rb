@@ -298,6 +298,33 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-errors")
     assert_includes response.body, "Image doesn&#39;t exist"
     assert_equal previous, block.reload.media_asset
+
+    # Fix round 1 (I2): the field comes back with the stored image and the
+    # message inside it.
+    section = response.body.index(%(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section"))
+    assert section, "expected a stream replacing the image field"
+    field = response.body[section..]
+    assert_includes field, %(name="block[media_asset_id]" id="#{Admin::BlockCardComponent.error_prefix(block)}-image" value="#{previous.id}")
+    assert_includes field, "Image doesn&#39;t exist"
+  end
+
+  # Review Focus 5 for a block: choosing needs `media.upload` on top of the
+  # page's edit right.
+  test "choosing a block image without media.upload is a 403 and changes nothing" do
+    block = image_block_with_image
+    stored = block.media_asset
+    chosen = create_media_asset(filename: "medium.png")
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+
+    patch "#{blocks_path}/#{block.id}",
+      params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :forbidden
+
+    assert_equal stored, block.reload.media_asset
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section")
   end
 
   # Only a type that `uses :image` takes an image id at all.

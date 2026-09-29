@@ -13,6 +13,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include MediaFields
 
     # Which of `params[:page]`'s keys are translated columns (`Pages::Save`'s
     # own `TRANSLATED`, kept in sync by hand rather than referencing that
@@ -132,6 +133,14 @@ module Admin
         base_updated_at: params[:base_updated_at],
         fields: page_error_fields
       )
+
+      # A refused hero choice puts the field back to the stored hero (and
+      # shows why) -- see `Admin::MediaFields`.
+      refused = refused_media_field_stream(result, attribute: :hero_media_asset_id, error_attribute: :hero_image,
+        sent: page_params[:hero_media_asset_id]) do |stored, errors|
+        Admin::PageSettingsFormComponent.hero_image_field(asset: stored, locale: admin_locale, errors: errors)
+      end
+      streams << refused if refused
 
       # The tree column lives outside this form entirely (the layout's own
       # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream

@@ -179,6 +179,30 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     landing.reload
     assert_equal asset, landing.hero_media_asset
     assert_equal "Landing", landing.title(locale: :en)
+
+    # Fix round 1 (I2): the whole field is re-rendered with the *stored*
+    # hero -- its id in the hidden input, so the next autosave doesn't
+    # resend the refused one -- and the message inside it, after the error
+    # slot's own replace (which the section replace then supersedes).
+    section = response.body.index(%(target="page-hero-image-section"))
+    assert section, "expected a stream replacing the hero field"
+    assert_operator response.body.index(%(target="page-hero_image-errors")), :<, section
+    field = response.body[section..]
+    assert_includes field, %(name="page[hero_media_asset_id]" id="page-hero_image" value="#{asset.id}")
+    assert_includes field, "Hero image doesn&#39;t exist"
+  end
+
+  # A save that failed only because of another field leaves a valid pick
+  # alone -- it's resent with the next autosave like any other field.
+  test "a failed save for another field doesn't re-render a valid hero choice" do
+    landing = landing_page_with_hero_image
+    chosen = create_media_asset(filename: "medium.png")
+
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { title: "", hero_media_asset_id: chosen.id.to_s }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+
+    assert_not_includes response.body, %(target="page-hero-image-section")
   end
 
   test "choosing a hero without media.upload is a 403 and changes nothing" do
@@ -195,6 +219,8 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
     assert_equal stored, landing.reload.hero_media_asset
     assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+    assert_includes response.body, %(target="page-hero-image-section")
+    assert_includes response.body, %(value="#{stored.id}")
   end
 
   # The interim upload field (media library Task 4) is gone: a `hero_image`

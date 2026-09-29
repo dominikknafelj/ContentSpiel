@@ -153,11 +153,22 @@ module Admin
       end
     end
 
-    # Which of the override fields this card actually renders -- a type
-    # that `uses :image` without `:alt` or `:caption` has none to update.
-    def image_placeholder_ids = (%w[alt caption] & uses_columns).to_h { |column| [ column, field_id(column) ] }
+    # The image column itself -- a class method so `Admin
+    # ::ContentBlocksController` re-renders a refused choice from exactly
+    # what this card renders (`asset` passed in: after a refusal that's the
+    # *stored* image). Its placeholder ids are whichever override fields
+    # the block's type actually renders -- a type that `uses :image`
+    # without `:alt` or `:caption` has none to update.
+    def self.image_field(block:, asset:, locale:, errors: [])
+      prefix = error_prefix(block)
+      uses = block.definition&.uses_columns || []
 
-    def image_section_id = "#{error_prefix}-image-section"
+      Admin::Columns::MediaColumnComponent.new(
+        name: "image", id: "#{prefix}-image", html_name: "block[media_asset_id]",
+        value: asset, errors: errors, locale: locale, section_id: "#{prefix}-image-section",
+        placeholder_ids: (%w[alt caption] & uses).to_h { |column| [ column, "#{prefix}-#{column}" ] }
+      )
+    end
 
     private
 

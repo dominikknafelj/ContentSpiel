@@ -10,7 +10,7 @@ import { Node } from "@tiptap/core"
 // The editor still has to *show* the picture, so `resolveUrl(assetId)` (an
 // option the `admin--rich-text` controller supplies) looks the URL up in
 // what the column rendered (`Admin::Columns::RichTextColumnComponent
-// #asset_urls_json`) plus whatever this session picked. No URL means the
+// #assets_json`) plus whatever this session picked. No URL means the
 // asset is gone: the node view shows a "missing" placeholder (spec §7) --
 // the public renderer draws nothing for it at all.
 //

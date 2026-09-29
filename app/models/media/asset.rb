@@ -158,6 +158,17 @@ class Media::Asset < ApplicationRecord
     url
   end
 
+  # CS Studio's thumbnail for this image (design spec §6: the Media grid,
+  # the picker, a hero/image-block field): the `w480` variant once it's
+  # processed, else the original. `#srcset` only ever lists a finished
+  # variant, so "processed" is just "present in that list" -- and it
+  # skips GIFs and anything narrower than 480px, which fall back to the
+  # original. Load through `with_variants` when rendering several.
+  def thumbnail_url
+    w480_url, = srcset.find { |_url, width| width == VARIANT_WIDTHS[:w480] }
+    w480_url || src
+  end
+
   # Whether this asset can have size variants at all: every allowed type
   # except GIF (global constraints: "GIFs get no variants") -- an animated
   # GIF is served as-is, its frames intact, rather than resized down into a

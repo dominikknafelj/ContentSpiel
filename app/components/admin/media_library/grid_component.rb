@@ -39,15 +39,8 @@ module Admin
 
       def pick? = @pick
 
-      # The thumbnail ruling (design spec §6): the `w480` variant once
-      # it's processed, else the original -- `#srcset` already only ever
-      # lists a variant that's finished (`Media::Asset#srcset`'s own
-      # comment), so "processed" here just means "present in the list this
-      # returns", not a second check of its own.
-      def thumbnail_url(asset)
-        entry = asset.srcset.find { |_path, width| width == 480 }
-        entry ? entry.first : asset.src
-      end
+      # The thumbnail ruling (design spec §6): `Media::Asset#thumbnail_url`.
+      def thumbnail_url(asset) = asset.thumbnail_url
 
       def show_path(asset) = helpers.admin_medium_path(asset, **url_options)
 
@@ -65,7 +58,7 @@ module Admin
           id: asset.id,
           url: thumbnail_url(asset),
           title: asset.title,
-          alt: asset.alt_text(override: nil, locale: locale),
+          alt: asset.alt_text(override: nil, locale: locale).to_s,
           caption: asset.caption_text(override: nil, locale: locale).to_s
         }.to_json
       end

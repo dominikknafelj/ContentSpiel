@@ -83,6 +83,12 @@ export default class extends Controller {
   // native `cancel` closes it too). Hands focus back to the opener, then
   // tells it what was picked, if anything.
   closed() {
+    // Aborting only stops the browser waiting for an upload still in
+    // flight -- if the request already reached the server, the asset is
+    // created anyway (`Media::Upload` has no way to know the picker went
+    // away). Nothing references it, so it shows up under the Media
+    // module's "Unused" filter, where it can be deleted (cleanup is manual
+    // only, global constraints).
     this.aborter?.abort()
     const opener = this.opener
     const detail = this.pending

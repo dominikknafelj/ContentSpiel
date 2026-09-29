@@ -51,11 +51,7 @@
           own per-use override -- its placeholder is the image's own
           default alt in this language, kept current by
           `admin--media-field` when the image changes. %>
-      <%= render Admin::Columns::MediaColumnComponent.new(
-            name: "hero_image", id: field_id("hero_image"), html_name: field_html_name("hero_media_asset_id"),
-            value: page.hero_media_asset, locale: locale, section_id: hero_image_section_id,
-            placeholder_ids: { alt: field_id("hero_alt") }
-          ) %>
+      <%= render self.class.hero_image_field(asset: page.hero_media_asset, locale: locale) %>
 
       <%= render Admin::Columns::PlainColumnComponent.new(
             name: "hero_alt", id: field_id("hero_alt"), html_name: field_html_name("hero_alt"),

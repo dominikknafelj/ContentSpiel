@@ -82,8 +82,9 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
   # Only what still exists is listed -- a deleted asset or link target is
   # absent, which the editor shows as "missing" (spec §7).
-  test "passes URLs for the document's images and titles for its internal links" do
+  test "passes URLs and default alt/caption for the document's images and titles for its internal links" do
     asset = create_media_asset
+    asset.update!(alt: "A dog", caption: "Our dog")
     target = create_page(title: "Contact")
     document = { "type" => "doc", "content" => [
       { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } },
@@ -96,8 +97,23 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document)
 
-    assert_equal({ asset.id.to_s => asset.url }, JSON.parse(controller_element["data-admin--rich-text-asset-urls-value"]))
+    assert_equal({ asset.id.to_s => { "url" => asset.url, "alt" => "A dog", "caption" => "Our dog" } },
+      JSON.parse(controller_element["data-admin--rich-text-assets-value"]))
     assert_equal({ "page:#{target.id}" => "Contact" }, JSON.parse(controller_element["data-admin--rich-text-link-titles-value"]))
+  end
+
+  # The image defaults are read in the column's editing locale, falling
+  # back the way the public page does (no German caption: the English one).
+  test "image defaults are resolved in the editing locale" do
+    asset = create_media_asset
+    asset.update!(alt: "A dog", caption: "Our dog")
+    Mobility.with_locale(:de) { asset.update!(alt: "Ein Hund") }
+    document = { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } } ] }
+
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: document, locale: "de")
+
+    assert_equal({ "url" => asset.url, "alt" => "Ein Hund", "caption" => "Our dog" },
+      JSON.parse(controller_element["data-admin--rich-text-assets-value"])[asset.id.to_s])
   end
 
   test "renders the default-locale original as html, labelled, with the translate slot" do

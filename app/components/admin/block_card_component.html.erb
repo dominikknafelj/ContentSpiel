@@ -76,11 +76,7 @@
                 Its id is `<prefix>-image` so a refused choice lands in
                 this column's error slot (`ContentBlocks::Save` reports it
                 under `image`). %>
-            <%= render Admin::Columns::MediaColumnComponent.new(
-                  name: "image", id: field_id("image"), html_name: field_html_name("media_asset_id"),
-                  value: column_value("image"), errors: column_errors("image"), locale: locale,
-                  section_id: image_section_id, placeholder_ids: image_placeholder_ids
-                ) %>
+            <%= render self.class.image_field(block: block, asset: column_value("image"), locale: locale, errors: column_errors("image")) %>
           <% end %>
         <% end %>
       <% end %>

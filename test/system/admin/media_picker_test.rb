@@ -32,12 +32,15 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   test "one library image as hero, image block and rich text is listed under Used on, and removing the hero drops its usage" do
     block = @landing.content_blocks.create!(block_type: "image", position: 0)
     post = create_post(title: "Notes")
+    @asset.update!(alt: "A wide view", caption: "Wide")
 
-    # Hero: choose the library image.
+    # Hero: choose the library image. The hero's alt override now shows the
+    # image's own default as its placeholder.
     visit_editor
     within("#page-hero-image-section") { click_on "Choose image" }
     pick_from_library(@asset)
     within("#page-hero-image-section") { assert_button "Change image" }
+    assert_selector "#page-hero_alt[placeholder='A wide view']"
     assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
 
     # The public page renders it responsively.
@@ -57,7 +60,13 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     find(".ProseMirror").click
     find("[role=toolbar] button[aria-label='Image']").click
     pick_from_library(@asset)
-    within(".admin-rich-text-popover") { click_on "Done" }
+    # The per-use fields show the image's own defaults as placeholders
+    # (fix round 1, I1).
+    within(".admin-rich-text-popover") do
+      assert_field "Alt text", with: "", placeholder: "A wide view"
+      assert_field "Caption", with: "", placeholder: "Wide"
+      click_on "Done"
+    end
     assert_eventually do
       post.reload.body_document(locale: :en).to_h.to_json.include?(%("asset_id":#{@asset.id}))
     end
@@ -99,6 +108,34 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     uploaded = Media::Asset.where.not(id: @asset.id).sole
     assert_equal "tiny", uploaded.title
     assert_eventually { block.reload.media_asset_id == uploaded.id }
+  end
+
+  # Fix round 1 (I2), with a realistic trigger: the image is deleted
+  # between opening the picker and picking it. The save is refused
+  # ("doesn't exist"), the field goes back to the stored hero with the
+  # message showing, and the next autosave doesn't resend the refused id.
+  test "picking an image deleted meanwhile is refused and the field shows the stored hero again" do
+    stored = create_media_asset(filename: "tiny.png")
+    assert Pages::Save.call(@landing, attributes: { hero_media_asset_id: stored.id }).ok?
+    doomed = create_media_asset(filename: "medium.png")
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Change image" }
+    within("dialog[open]") { assert_button doomed.title }
+    assert Media::Destroy.call(doomed).ok?
+    pick_from_library(doomed)
+
+    within("#page-hero-image-section") do
+      assert_text "Hero image doesn't exist"
+      assert_text stored.title
+      assert_button "Change image"
+      assert_selector "input[type=hidden][value='#{stored.id}']", visible: :all
+    end
+
+    # The next autosave -- another field -- goes through.
+    fill_in "Title", with: "Landing v2"
+    assert_eventually { @landing.reload.title(locale: :en) == "Landing v2" }
+    assert_equal stored.id, @landing.hero_media_asset_id
   end
 
   test "Escape closes the picker and returns focus to the button that opened it" do

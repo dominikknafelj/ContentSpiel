@@ -27,7 +27,16 @@ module Admin
     # pick their placeholders become the new image's own defaults, and
     # after Remove they're emptied, so the placeholder always shows what a
     # blank override would fall back to. Their server-rendered placeholders
-    # are the caller's job (`#default_alt`/`#default_caption` below).
+    # are the caller's job (`#default_alt`/`#default_caption` below); the
+    # controller also re-applies them on connect (`#defaults`).
+    #
+    # A refused choice (a forged or since-deleted id, no `media.upload`)
+    # is answered by re-rendering this whole component with the *stored*
+    # image and the refusal in its error slot (`Admin::MediaFields
+    # #refused_media_field_stream`) -- the client had already swapped the
+    # thumbnail, title and button over to the refused pick, and left alone
+    # the hidden input would resend the refused id on every later
+    # autosave.
     #
     # `value` is the chosen `Media::Asset` or nil. Load it through
     # `Media::Asset.with_variants` when several of these are rendered at
@@ -42,21 +51,18 @@ module Admin
 
       def asset = value
 
+      # The wrapper's id -- what a stream replacing this whole field targets.
+      def section_dom_id = section_id
+
       def chosen? = asset.present?
 
       def can_choose? = can?("media.upload")
 
       def label_id = "#{id}-label"
 
-      # The `w480` variant once it's processed, else the original -- the
-      # same thumbnail rule as the Media module's own grid
-      # (`Admin::MediaLibrary::GridComponent#thumbnail_url`).
-      def thumbnail_url
-        return nil unless chosen?
-
-        w480_url, = asset.srcset.find { |_url, width| width == Media::Asset::VARIANT_WIDTHS[:w480] }
-        w480_url || asset.src
-      end
+      # The same thumbnail rule as the Media module's own grid
+      # (`Media::Asset#thumbnail_url`).
+      def thumbnail_url = asset&.thumbnail_url
 
       def choose_label = chosen? ? "Change image" : "Choose image"
 
@@ -65,9 +71,24 @@ module Admin
           field_name: name,
           controller: "admin--media-field",
           action: "media-picker:picked->admin--media-field#picked",
-          "admin--media-field-placeholder-ids-value": placeholder_ids.to_json
+          "admin--media-field-placeholder-ids-value": placeholder_ids.to_json,
+          "admin--media-field-defaults-value": defaults.to_json
         }
       end
+
+      # The rendered image's own alt/caption defaults, which
+      # `admin--media-field` writes into the override fields' placeholders
+      # on connect -- so when this component is re-rendered by a stream
+      # after a refused choice (`Admin::PagesController#update`,
+      # `Admin::ContentBlocksController#update`), the placeholders the
+      # client had already switched to the refused image's go back to the
+      # stored one's too, without the stream having to know which override
+      # fields sit beside this one.
+      def defaults = { alt: self.class.default_alt(asset, editing_locale), caption: self.class.default_caption(asset, editing_locale) }
+
+      # nil only for a caller that passes none (a Lookbook preview), which
+      # edits the primary language.
+      def editing_locale = locale.presence || ::Locales.default
 
       # The chosen image's own defaults in `locale` (`Media::Asset
       # #alt_text`/`#caption_text` with no override -- what the public page

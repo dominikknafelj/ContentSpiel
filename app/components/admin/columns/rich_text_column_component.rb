@@ -31,7 +31,8 @@ module Admin
     # (never a hardcoded `/cs-studio`: the admin path is configurable,
     # `ContentSpiel::ADMIN_PATH`), the editing locale the
     # link picker searches in, and two lookups for what the document
-    # already references: `Media::Asset` URLs for its `image` nodes (the node
+    # already references: `Media::Asset` URLs (and default alt/caption,
+    # `#assets_json`) for its `image` nodes (the node
     # itself stores only `asset_id`, schema fidelity, so the editor can't
     # show a picture without being told where it lives) and titles for its
     # `internalLink` targets. A referenced asset or record that no longer
@@ -109,11 +110,23 @@ module Admin
       # (a Lookbook preview), which edits the primary language.
       def editor_locale = (locale.presence || ::Locales.default).to_s
 
-      # `{ "42" => "/rails/active_storage/..." }` for every `image` node's
-      # `asset_id` that still names a `Media::Asset` (see the class comment).
-      def asset_urls_json
+      # `{ "42" => { url:, alt:, caption: } }` for every `image` node's
+      # `asset_id` that still names a `Media::Asset` (see the class comment):
+      # where the picture lives, plus the asset's own alt text and caption
+      # in this column's editing locale (`Media::Asset#alt_text`/
+      # `#caption_text` with no override -- what the public page shows when
+      # the node's own `alt`/`caption` are blank). The image popover shows
+      # those defaults as its fields' placeholders (media library design
+      # spec §6: per-use overrides show the image's default).
+      def assets_json
         ids = self.class.collect(document) { |node| node["type"] == "image" ? node.dig("attrs", "asset_id") : nil }
-        Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h { |asset| [ asset.id.to_s, asset.url ] }.compact.to_json
+        Media::Asset.where(id: ids.grep(Integer)).with_attached_file.to_h do |asset|
+          [ asset.id.to_s, {
+            url: asset.url,
+            alt: asset.alt_text(override: nil, locale: editor_locale).to_s,
+            caption: asset.caption_text(override: nil, locale: editor_locale).to_s
+          } ]
+        end.to_json
       end
 
       # `{ "page:12" => "Contact" }` for every `internalLink` target that

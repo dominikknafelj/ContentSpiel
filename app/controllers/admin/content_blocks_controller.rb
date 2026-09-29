@@ -9,6 +9,7 @@ module Admin
   # from PATCHing a block that belongs to a page they don't have open.
   class ContentBlocksController < BaseController
     include AutosaveResponses
+    include MediaFields
 
     # Which schema-declared settings fields and `uses_columns` a save
     # actually writes to depends on the block's own registered type (spec
@@ -77,6 +78,14 @@ module Admin
         base_updated_at: params[:base_updated_at],
         fields: block_error_fields(block)
       )
+
+      # A refused image choice puts the field back to the stored image (and
+      # shows why) -- see `Admin::MediaFields`.
+      refused = refused_media_field_stream(result, attribute: :media_asset_id, error_attribute: :image,
+        sent: attributes[:media_asset_id]) do |stored, errors|
+        Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
+      end
+      streams << refused if refused
 
       render turbo_stream: streams, status: autosave_status(result)
     end

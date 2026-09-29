@@ -31,8 +31,17 @@ module Admin
 
     def base_updated_at_value = page.updated_at.iso8601(6)
 
-    # The hero field's wrapper (`Admin::Columns::MediaColumnComponent`).
-    def hero_image_section_id = "#{ID_PREFIX}-hero-image-section"
+    # The hero field itself -- a class method so `Admin::PagesController`
+    # re-renders a refused choice from exactly what this form renders
+    # (`asset` passed in: after a refusal that's the *stored* hero, not
+    # whatever the page now holds in memory).
+    def self.hero_image_field(asset:, locale:, errors: [])
+      Admin::Columns::MediaColumnComponent.new(
+        name: "hero_image", id: "#{ID_PREFIX}-hero_image", html_name: "page[hero_media_asset_id]",
+        value: asset, locale: locale, errors: errors, section_id: "#{ID_PREFIX}-hero-image-section",
+        placeholder_ids: { alt: "#{ID_PREFIX}-hero_alt" }
+      )
+    end
 
     # `hero_alt` is the page's per-use override of the hero image's own
     # alt text (media library design spec §6): blank, the public page
