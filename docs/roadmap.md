@@ -46,7 +46,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
 | Trash / soft delete + restore | Must | #43 |
-| Media library (`MediaAsset`, alt text, reuse, responsive variants) | Must | #46 |
+| Media library (`Media::Asset`, alt text, reuse, responsive variants) | Must | #46 — done (sub-project 6a, spec `2026-09-29-media-library-design.md`) |
 | Invites (one-time set-password link without mail) | Should | `Users::Invite` |
 | Admin UI in German (admin i18n) | Should | #49 |
 | Port Avo-only invariants, then remove Avo | Must | #40 — done (sub-project 4) |
@@ -76,6 +76,12 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Runtime-configurable languages (define N in setup, add later) | Should | Locale decision in Phase 1 |
 | In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Provider/API key + opt-in; audit AI edits |
 | Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
+| Media library: video and document files, not only images | Could | Out of scope for sub-project 6a, spec `2026-09-29-media-library-design.md` §8 |
+| Media library: cropping and a focal point | Could | Same spec §8 |
+| Media library: folders and tags for organizing assets | Could | Same spec §8 |
+| Media library: automatic cleanup of unused assets | Could | Needs Trash first (Phase 2's own "Trash / soft delete + restore" row); today cleanup is manual only, by design — an editor deletes an unused asset by hand, or runs `bin/rails media:orphans` for orphaned blobs (same spec §8) |
+| Media library: uploads through MCP | Could | MCP is read-only over the library today (`list_media_tool`/`get_media_tool`); same spec §8 |
+| Move the site logo into the media library | Could | Needs SVG sanitising the library doesn't have (SVG stays refused everywhere else); the logo stays its own separate `SiteSetting` attachment until then (same spec §8) |
 
 ## Known interim states
 
@@ -87,8 +93,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Deletes are permanent | Sub-project 3 | Trash (Phase 2 / sub-project 6) |
 | CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
 | CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
-| Unreferenced `MediaAsset`s are never cleaned up; image blocks and rich-text images use different storage; there are no responsive variants | Sub-project 4 (Tiptap/Avo removal) | Media library (Phase 2 / sub-project 6, #46) |
-| Blobs referenced only by the old ActionText rich text were left orphaned by the `rich_text:migrate_from_action_text` import (the migrated content re-attaches image blobs to new `MediaAsset`s; the original ActionText blob rows aren't cleaned up) | Sub-project 4 | Media library / a cleanup task (sub-project 6) |
+| Until a variant (`w480`/`w960`/`w1600`/`w2400`) has actually been processed, a page serves the original file at full size instead | Sub-project 6a (media library) | Preprocessing catches up on its own shortly after upload; `bin/rails media:variants` re-enqueues any still missing (design spec §8) |
 | MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | A lookup prefix on `ApiToken` (future work) |
 | No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select | Sub-project 4 | Admin polish (sub-project 6), same as the page tree's own typed-position pattern |
 | Editing an already-published page/post/block requires `publish`, not just `edit`, because autosave writes straight to the live record | Sub-project 5 (access control) | Versioning with pending revisions (Phase 3) |
