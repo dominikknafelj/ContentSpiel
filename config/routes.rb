@@ -141,6 +141,18 @@ Rails.application.routes.draw do
     # separate "invite" action here.
     resources :users, only: %i[index new create edit update destroy]
 
+    # The Groups module (access-control design spec §5): the list, the
+    # editor (name, description, members, the permission matrix) and
+    # delete (`Groups::Destroy`, which revokes the group's tokens). No
+    # `:show` -- the editor is the group's page.
+    resources :groups, only: %i[index new create edit update destroy]
+
+    # "Change my password" (access-control design spec §5): the signed-in
+    # user's own account, open to every user -- unlike the Users module,
+    # which needs `users.manage`. Singular: it's always *your* account.
+    get "account/password", to: "accounts#edit", as: :account_password
+    patch "account/password", to: "accounts#update"
+
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list
     # that POSTs straight to `create`, and `create` *renders* the one-time
@@ -157,6 +169,14 @@ Rails.application.routes.draw do
     # of `show` -- `Setup::SystemCheck` runs on every request.
     resource :system_status, only: :show, controller: :system_status
     resource :mind_graph, only: :show, controller: :mind_graph
+
+    # The audit log (access-control design spec §5 "Audit log module",
+    # Task 9): a paginated, filterable list plus one event's own page.
+    # `resources` (plural, unlike `system_status`/`mind_graph` above) since
+    # each row has its own `:id` to route `show` on -- but only `:index`/
+    # `:show`: `Audit::Event` is append-only (its own class comment), never
+    # created, edited or destroyed through a CS Studio form.
+    resources :audit_events, only: %i[index show]
 
     # "Create starter pages" on the Pages home (design spec §6.1, Task 9):
     # one POST, `StarterContent.create_pages_and_posts!`, idempotent.

@@ -1,0 +1,14 @@
+<%# The 403 page (access-control design spec §5: "The 403 page matches the
+    product layout"): rendered by `Admin::BaseController#forbidden!` inside
+    the admin layout, so the modules column -- already narrowed to what this
+    user can open -- is right there as the way on. Only for an *area* the
+    user lacks, or an action a service refused; a record outside their read
+    scope is a plain 404 instead, so its existence isn't disclosed (§3.3). %>
+<% content_for :title, "No access · CS Studio" %>
+
+<section class="admin-forbidden mx-auto flex max-w-xl flex-col gap-3 rounded-cs border border-line bg-surface p-6">
+  <p class="font-cs-mono text-label uppercase tracking-mono text-meta">403</p>
+  <h1 class="text-h1 text-ink">No access</h1>
+  <p role="alert" class="text-ink"><%= message %></p>
+  <p class="text-sm text-meta">If you need this, ask an owner or an admin to add you to a group that has it.</p>
+</section>

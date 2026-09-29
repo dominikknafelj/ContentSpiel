@@ -10,12 +10,13 @@ require "test_helper"
 # Several of the six invariants the brief names were already fully ported
 # by earlier tasks (CS Studio's own build), so they're cross-referenced
 # below rather than duplicated:
-#   - "the last user can't be deleted" -- User#ensure_not_last_owner
-#     (test/models/user_test.rb "the last user can't be destroyed"),
-#     Users::Destroy (test/services/users/destroy_test.rb "refuses to
-#     delete the last user") and the CS Studio screen itself
-#     (test/integration/admin/users_test.rb "refuses to delete the last
-#     user").
+#   - "the last user can't be deleted" -- since the access-control migration
+#     (Task 2), scoped to owners rather than every user:
+#     User#ensure_not_last_owner (test/models/user_test.rb "the last owner
+#     can't be destroyed"), Users::Destroy (test/services/users/destroy_test
+#     .rb "refuses to delete the last owner") and the CS Studio screen
+#     itself (test/integration/admin/users_test.rb "refuses to delete the
+#     last owner").
 #   - "the site settings singleton" -- SiteSetting's own uniqueness
 #     validation (test/models/site_setting_test.rb "a second record cannot
 #     be created") and the settings screen's own form
@@ -56,11 +57,12 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
   # alone.
   test "tokens are only minted through ApiTokens::Issue -- no route lets a request set the user or digest" do
     sign_in_as(users(:one))
-    other_token, other_raw = ApiTokens::Issue.call(users(:two)).record
+    other_token, other_raw = ApiTokens::Issue.call(users(:two), group: access_control_groups(:admin)).record
 
     assert_difference -> { ApiToken.count }, 1 do
       post "/cs-studio/api_tokens", params: {
-        api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" }
+        api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" },
+        group_id: access_control_groups(:admin).id
       }
     end
 

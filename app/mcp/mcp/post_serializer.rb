@@ -52,8 +52,28 @@ module Mcp
         # nil for a post nothing currently lists (spec §6.2) -- a client asking
         # for a post's URL is told there isn't one yet, rather than being handed
         # a guess built from the post's own attributes.
-        url: PublicSite::Urls.new.url_for(post, locale)
+        url: url(post, locale)
       }
+    end
+
+    # The post's URL is its listing page's path plus its slug, so it would
+    # disclose that page's address. Withheld (nil) unless the listing page
+    # is on the public site already or the caller may read it (final fix
+    # wave, parked T10 item) -- an unpublished listing page outside the
+    # token's `pages.read` stays unnamed. The listing page is the `Page`
+    # whose current path is the post's minus its last segment, one indexed
+    # lookup rather than `PublicSite::Paths.canonical_page`'s walk over
+    # every listing block. Not found (shouldn't happen) fails closed.
+    def url(post, locale, actor: Current.actor)
+      path = PublicSite::Paths.current_path(post, locale)
+      return nil if path.nil?
+
+      listing_path = File.dirname(path)
+      listing = PublicPath.current.find_by(record_type: "Page", locale: locale.to_s, path: listing_path)&.record
+      return nil unless listing
+      return nil unless PublicSite::Resolver.visible?(listing) || AccessControl.allowed?(actor, "pages.read", listing)
+
+      PublicSite::Urls.new.url_for(post, locale)
     end
   end
 end

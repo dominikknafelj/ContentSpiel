@@ -17,18 +17,19 @@ module Admin
   #
   # Two tabs clicking at once (fix round 1, m3) are handled by
   # `StarterContent.add_once!` -- the same locked, re-checked path the setup
-  # wizard takes (final fix wave, P23); a failure it raises becomes an alert
+  # wizard takes (final fix wave, P23) -- through `StarterContents::Add`,
+  # which checks permissions first and turns a failure into an alert
   # instead of a 500.
   class StarterContentsController < BaseController
     def create
-      created = StarterContent.add_once!(locale: Locales.default)
+      result = StarterContents::Add.call
 
-      notice = created ? "Starter pages created" : "Starter pages already exist"
-      redirect_to admin_root_path(**admin_url_options), status: :see_other, notice: notice
-    rescue StarterContent::Error => error
-      Rails.logger.warn("[starter pages] #{error.class}: #{error.message}")
-      redirect_to admin_root_path(**admin_url_options), status: :see_other,
-        alert: "Starter pages couldn't be created — a page may already use one of their addresses"
+      if result.ok?
+        notice = result.record ? "Starter pages created" : "Starter pages already exist"
+        redirect_to admin_root_path(**admin_url_options), status: :see_other, notice: notice
+      else
+        forbidden_or(result) { redirect_to admin_root_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
+      end
     end
   end
 end

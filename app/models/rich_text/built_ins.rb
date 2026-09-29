@@ -346,10 +346,21 @@ module RichText
       RichText::Schema.register_mark("internalLink") do |mark|
         mark.excludes "link internalLink"
         mark.attribute :type, :string, required: true, in: %w[page post]
+        #
+        # "Exists" means exists *for the acting user* (access-control design
+        # spec §3.3): the target must be in `Current.actor`'s read scope,
+        # with the same "invalid" message whether it's missing or merely
+        # unreadable -- otherwise saving links to ids one by one would tell
+        # an editor which pages exist, and the editor would then show their
+        # titles. A trusted code path (nil actor: console, seeds, setup)
+        # sees everything. Like every existence check here, it only runs
+        # for a reference new to the stored document
+        # (`HasRichTextBody#body_errors_for`), so a link that was already
+        # there -- even to a page the editor can't read -- still saves.
         mark.attribute :id, :integer, required: true, reference: [ :type ], validate: ->(value, attrs) {
           case attrs["type"]
-          when "page" then Page.exists?(value)
-          when "post" then Post.exists?(value)
+          when "page" then AccessControl.scope(Current.actor, "pages.read", Page.where(id: value)).exists?
+          when "post" then AccessControl.scope(Current.actor, "posts.read", Post.where(id: value)).exists?
           else true
           end
         }

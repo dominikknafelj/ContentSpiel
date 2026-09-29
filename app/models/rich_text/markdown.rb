@@ -108,7 +108,7 @@ module RichText
 
     class << self
       def dump(document) = Dumper.new.dump(document)
-      def load(markdown) = Loader.new(markdown).load
+      def load(markdown, known_references: nil) = Loader.new(markdown, known_references: known_references).load
 
       # Escapes a single text node's literal content (see `ESCAPE_CHARS`).
       # Shared between `Dumper#render_text_node` and `BuiltIns`' `code`
@@ -449,7 +449,11 @@ module RichText
       # how much further the real nesting actually goes.
       MAX_DEPTH = RichText::Document::MAX_DEPTH
 
-      def initialize(markdown)
+      # `known_references`: see `RichText::Document.from_markdown`. Only
+      # `#valid_node?`/`#valid_mark?` read it -- the existence/readability
+      # checks are the only rules a known reference is exempt from.
+      def initialize(markdown, known_references: nil)
+        @known_references = known_references
         source = markdown.is_a?(String) ? markdown : markdown.to_s
         @source = source.encode(Encoding::UTF_8, invalid: :replace, undef: :replace, replace: "")
       rescue StandardError
@@ -872,7 +876,7 @@ module RichText
         end
 
         node = { "type" => type.name, "attrs" => type.attrs_from_directive(parse_directive_attrs(attrs_string)) }
-        return node if valid_node?(node)
+        return node if valid_node?(node, known_references: @known_references)
 
         # Valid except that a record it references no longer exists (an
         # image directive naming a deleted `MediaAsset`, final fix wave, B):
@@ -906,7 +910,8 @@ module RichText
 
       def valid_mark?(mark)
         text_node = { "type" => "text", "text" => "x", "marks" => [ mark ] }
-        RichText::Document.new({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text_node ] } ] }).validate.empty?
+        RichText::Document.new({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text_node ] } ] })
+          .validate(known_references: @known_references).empty?
       end
     end
   end

@@ -31,60 +31,34 @@
     <div class="grid min-h-screen grid-cols-[auto_1fr] md:grid-cols-[16rem_1fr]<%= " lg:grid-cols-[16rem_18rem_1fr]" if content_for?(:tree) %>">
       <nav aria-label="Modules" class="flex flex-col gap-6 border-r border-line bg-surface p-4">
         <ul class="flex flex-col gap-2">
-          <%# `admin_url_options` on every one of these (final-fixes round,
-              finding 5): without it, following a modules link while editing
-              a non-default language silently dropped back to
-              `Locales.default` -- these three are the one navigation in
-              the whole shell that doesn't already run through a component
-              (`Admin::TreeNodeComponent#path`, `Admin::LanguageSwitcherComponent`,
-              ...) that threads it through for its own links already. %>
-          <li>
-            <%= link_to admin_root_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :pages %><span class="sr-only md:not-sr-only">Pages</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_posts_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :posts %><span class="sr-only md:not-sr-only">Posts</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_tags_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :tags %><span class="sr-only md:not-sr-only">Tags</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_settings_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :settings %><span class="sr-only md:not-sr-only">Settings</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_users_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :users %><span class="sr-only md:not-sr-only">Users</span>
-            <% end %>
-          </li>
-          <%# The last three screens the old admin still had, CS Studio's own
-              since Task 9 -- nothing in this column links out of CS Studio
-              any more. %>
-          <li>
-            <%= link_to admin_api_tokens_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :assistant %><span class="sr-only md:not-sr-only">AI assistant</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_mind_graph_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :graph %><span class="sr-only md:not-sr-only">Mind graph</span>
-            <% end %>
-          </li>
-          <li>
-            <%= link_to admin_system_status_path(**admin_url_options), class: nav_link_classes do %>
-              <%= render "admin/shared/icon", name: :status %><span class="sr-only md:not-sr-only">System status</span>
-            <% end %>
-          </li>
+          <%# `Admin::BaseController::MODULES`, narrowed to what this user can
+              open (`admin_modules`, access-control design spec §5: sidebar
+              modules are shown only when `can?`) -- a module they lack is
+              simply absent, not greyed out; opening its URL anyway gets the
+              403 page. `admin_url_options` on every one (final-fixes round,
+              finding 5): without it, following a modules link while
+              editing a non-default language silently dropped back to
+              `Locales.default` -- these are the one navigation in the
+              shell that doesn't already run through a component
+              (`Admin::TreeNodeComponent#path`,
+              `Admin::LanguageSwitcherComponent`, ...) that threads it
+              through for its own links. %>
+          <% admin_modules.each do |entry| %>
+            <li>
+              <%= link_to public_send(entry[:path], **admin_url_options), class: nav_link_classes do %>
+                <%= render "admin/shared/icon", name: entry[:icon] %><span class="sr-only md:not-sr-only"><%= entry[:label] %></span>
+              <% end %>
+            </li>
+          <% end %>
         </ul>
 
         <div class="mt-auto flex flex-col gap-2">
           <%= render "shared/theme_toggle" %>
+          <%# The account menu: your own password (open to every user,
+              access-control design spec §5), then sign out. %>
+          <%= link_to admin_account_password_path(**admin_url_options), class: nav_link_classes do %>
+            <%= render "admin/shared/icon", name: :key %><span class="sr-only md:not-sr-only">Change password</span>
+          <% end %>
           <%= button_to admin_sign_out_path, method: :delete, class: nav_link_classes do %>
             <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">Sign out</span>
           <% end %>

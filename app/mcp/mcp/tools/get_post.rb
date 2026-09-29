@@ -33,8 +33,8 @@ module Mcp
         title: "Get post")
 
       def self.call(id:, locale: nil, server_context:)
-        post = Post.find_by(id: id)
-        return error_response("Post #{id} not found") unless post
+        post = find_readable_post(id)
+        return post_not_found unless post
 
         locale ||= Locales.default
         invalid_locale = reject_unless_enabled(locale)

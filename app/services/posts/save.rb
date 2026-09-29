@@ -2,33 +2,180 @@ module Posts
   # Creates or updates a post (spec §7.2). Translations arrive per locale so an
   # admin form can save every language tab at once; publishing follows the
   # rules 8a established for MCP.
+  #
+  # Permissions (access-control design spec §3.3), checked in two passes:
+  #
+  # 1. Before anything is assigned, against the post as stored: `posts.edit`
+  #    to touch an existing post at all, plus `posts.publish` when it's
+  #    already published (live or scheduled). The second is the spec §8
+  #    interim rule: autosave writes live content straight to the public
+  #    site (there are no pending revisions until Phase 3), so editing a
+  #    published post *is* publishing, and needs the same right. A
+  #    scheduled post counts too -- it will go live with whatever it says
+  #    by then, without anyone with `publish` having seen it. A call that
+  #    asks for nothing but a publish-state change needs `posts.publish`
+  #    alone instead (`#publish_only?`).
+  # 2. After assigning, inside the transaction, against the post as it
+  #    would be saved -- the only point where a create's content type (the
+  #    `content_types` scope), a changed content type or author, and a
+  #    change of publish state are known:
+  #    - a new post needs `posts.create` for its content type, with
+  #      `author_id` set to the actor's user first, so an `own`-scoped
+  #      create matches;
+  #    - a changed `content_type` or `author_id` needs `posts.edit` on the
+  #      post as it would be saved too -- which is what makes "changing the
+  #      author needs `posts.edit` without an `own` scope" hold: an `own`
+  #      grant can't match a post whose new author isn't the actor, and the
+  #      first pass already refused a post they didn't author. A new post
+  #      given someone else's `author_id` is checked the same way;
+  #    - any change to `published_at` (publishing, unpublishing,
+  #      scheduling) needs `posts.publish`.
+  #    A refusal here rolls the transaction back (tag rows `assign_tags`
+  #    wrote included) and only then records `access.denied`, outside it,
+  #    so the denial itself survives the rollback.
   class Save < ApplicationService
     TRANSLATED = %i[title slug excerpt body].freeze
+    # The attributes a publish-only call may carry (`#publish_only?`).
+    PUBLISH_STATE = %i[published published_at].freeze
 
     def initialize(post = Post.new, attributes: {}, translations: {}, actor: Current.actor)
       @post = post
       @attributes = attributes.to_h.symbolize_keys
       @translations = translations.to_h
-      # Not read anywhere yet -- the attachment point for `authorize!`/
-      # `record_event` once those grow teeth (sub-project 5).
       @actor = actor
     end
 
     def call
-      authorize!(:save, @post)
-
-      saved = Post.transaction do
-        assign
-        (@post.save && assign_related_posts) || raise(ActiveRecord::Rollback)
+      if publish_only?
+        return denied("posts.publish", @post) unless authorize!("posts.publish", @post)
+      elsif @post.persisted?
+        return denied("posts.edit", @post) unless authorize!("posts.edit", @post)
+        return denied("posts.publish", @post) if @post.published_at.present? && !authorize!("posts.publish", @post)
       end
 
+      refused = nil
+      saved = Post.transaction do
+        related_before = related_state
+        assign
+        refused = refusal_after_assign
+        raise ActiveRecord::Rollback if refused
+
+        (@post.save && assign_related_posts) || raise(ActiveRecord::Rollback)
+        record_events(related_before)
+        true
+      end
+
+      if refused
+        discard_refused_changes
+        return denied(refused, @post)
+      end
       return failure(@post) unless saved
 
-      record_event(:post_saved, post: @post)
       success(@post)
     end
 
     private
+
+    # Publishing, unpublishing and scheduling need `posts.publish` (design
+    # spec §3.3), not `posts.edit` as well (final fix wave, Important 1):
+    # a call on a stored record whose only request is the publish state --
+    # `published`/`published_at` and nothing else, no translation values
+    # (MCP's `update_post(published:)` sends an empty per-locale hash),
+    # no other attribute -- is judged on `publish` alone, so a
+    # "Publishers" group (read + publish) can use the header's buttons.
+    # Anything more keeps the ordinary rules above: pass 1's edit (+
+    # publish when already published), and pass 2's publish check on the
+    # new `published_at`, which runs here too and is what actually guards
+    # the change.
+    def publish_only?
+      @post.persisted? && @attributes.any? && (@attributes.keys - PUBLISH_STATE).empty? &&
+        @translations.values.all? { |values| values.to_h.empty? }
+    end
+
+    # The second pass (see the class comment). Returns the key that was
+    # refused, or nil.
+    def refusal_after_assign
+      if @post.new_record?
+        @post.author_id ||= actor_user&.id
+        return "posts.create" unless authorize!("posts.create", @post)
+        return "posts.edit" if foreign_author? && !authorize!("posts.edit", @post)
+      elsif @post.content_type_changed? || @post.author_id_changed?
+        return "posts.edit" unless authorize!("posts.edit", @post)
+        # The published-edit rule (pass 1) again, on the new state: pass 1
+        # only proved `posts.publish` for the post as stored. A publish
+        # grant scoped to `blog`, or to `own`, must not let a live blog post
+        # become a live `resume_entry`, or a live post of mine become a
+        # live post of someone else's.
+        return "posts.publish" if @post.published_at.present? && !authorize!("posts.publish", @post)
+      end
+
+      "posts.publish" if @post.published_at_changed? && !authorize!("posts.publish", @post)
+    end
+
+    # After a pass-2 refusal the transaction has rolled back, but the
+    # in-memory post still holds the refused values -- the attacker's
+    # title would become the `access.denied` row's `subject_label`, and the
+    # refused tags would linger in `@post.tags`. A persisted post is
+    # reloaded to what's stored; a new one only has its join associations
+    # reset (there's nothing stored to go back to, and it's no subject).
+    def discard_refused_changes
+      if @post.persisted?
+        @post.reload
+      else
+        %i[tags post_tags].each { |name| @post.association(name).reset }
+      end
+    end
+
+    def foreign_author? = @post.author_id.present? && @post.author_id != actor_user&.id
+
+    # Tags and relations are join rows, invisible to `saved_changes`, so
+    # their before/after is captured by hand for the event's
+    # `field_changes` -- only when this call was asked to change them.
+    def related_state
+      state = {}
+      state["tag_names"] = tag_names if @attributes.key?(:tag_names)
+      state["related_post_ids"] = related_post_ids if @attributes.key?(:related_post_ids)
+      state
+    end
+
+    # Queried, never loaded into the associations: `assign_related_posts`
+    # reads `@post.post_relations` afresh, and a copy loaded here would be
+    # stale by then.
+    def tag_names = @post.new_record? ? [] : Tag.joins(:post_tags).where(post_tags: { post_id: @post.id }).pluck(:name).sort
+
+    def related_post_ids = @post.new_record? ? [] : PostRelation.where(post_id: @post.id).pluck(:related_post_id).sort
+
+    # One event for the save (`post.created`/`post.updated`) and, when
+    # `published_at` changed, one for the publish state -- `post.published`,
+    # `post.unpublished` or `post.scheduled` -- which never coalesces, so a
+    # publish stays findable on its own however much editing surrounds it.
+    # An update that changed nothing but the publish state (the header's
+    # Publish button) records only the latter; one that changed nothing at
+    # all records nothing.
+    def record_events(related_before)
+      changes = Audit::Snapshot.field_changes_for(@post)
+      related_before.each do |field, before|
+        after = send(field)
+        changes[field] = [ before, after ] unless before == after
+      end
+
+      if @post.previously_new_record?
+        record_event("post.created", subject: @post, field_changes: changes)
+        record_event(publish_action, subject: @post, field_changes: changes.slice("published_at")) if @post.published_at
+      else
+        publishing = changes.slice("published_at")
+        rest = changes.except("published_at")
+        record_event("post.updated", subject: @post, field_changes: rest) if rest.any?
+        record_event(publish_action, subject: @post, field_changes: publishing) if publishing.any?
+      end
+    end
+
+    def publish_action
+      if @post.published_at.nil? then "post.unpublished"
+      elsif @post.published_at > Time.current then "post.scheduled"
+      else "post.published"
+      end
+    end
 
     def assign
       # `content_type` is assigned first: `fields`/`assign_fields` below both
@@ -70,9 +217,11 @@ module Posts
     # `related_post_ids` (design spec §6.1) is the *complete* list of this
     # post's forward relations (`post_relations`, the rows where this post
     # is `post_id`): named ids are kept or added, every other forward row is
-    # removed. The key's presence is the whole contract -- absent means
-    # "leave the relations alone" (MCP, the header's publish buttons, any
-    # PATCH that didn't come from the picker), `[]` means "clear them". The
+    # removed -- except relations to posts the actor can't read, which are
+    # always kept (`#unreadable_related_ids`). The key's presence is the
+    # whole contract -- absent means "leave the relations alone" (MCP, the
+    # header's publish buttons, any PATCH that didn't come from the
+    # picker), `[]` means "clear the ones you can see". The
     # admin picker (`Admin::RelatedPostsComponent`) always submits a blank
     # sentinel entry alongside its real ones, so the key is present exactly
     # when the picker itself was on the page.
@@ -105,13 +254,13 @@ module Posts
       ids = raw.map { |value| Integer(value, 10, exception: false) }
       known = Post.where(id: ids.compact).pluck(:id)
 
-      if ids.any?(&:nil?) || (ids.compact - known).any?
+      if ids.any?(&:nil?) || (ids.compact - known).any? || unreadable_additions?(ids.compact)
         @post.errors.add(:related_post_ids, "include posts that don't exist")
         return false
       end
 
       wanted = ids.uniq - [ @post.id ] - PostRelation.where(related_post_id: @post.id).pluck(:post_id)
-      @post.post_relations.where.not(related_post_id: wanted).destroy_all
+      @post.post_relations.where.not(related_post_id: wanted + unreadable_related_ids).destroy_all
       (wanted - @post.post_relations.pluck(:related_post_id)).each do |id|
         relation = @post.post_relations.create(related_post_id: id)
         next if relation.persisted?
@@ -121,6 +270,33 @@ module Posts
       end
 
       true
+    end
+
+    # Existing forward relations to posts the actor can't read. They're
+    # outside the actor's say (access-control design spec §3.3): kept
+    # whatever the submitted list contains -- the admin picker never
+    # renders them (`Admin::RelatedPostsComponent`), so they're never in
+    # it, and `[]` clears only the readable ones.
+    def unreadable_related_ids
+      forward = Post.where(id: PostRelation.where(post_id: @post.id).select(:related_post_id))
+      forward.pluck(:id) - AccessControl.scope(actor, "posts.read", forward).pluck(:id)
+    end
+
+    # A newly added relation must point at a post the actor may read
+    # (access-control design spec §3.3, "Not found, not forbidden"):
+    # otherwise a forged `related_post_ids` would link -- and on the public
+    # site, list -- a post outside their scope, and the error would confirm
+    # it exists. So an unreadable id is refused exactly like an unknown
+    # one. Relations that already exist (either direction) are kept as
+    # they are: an editor who can't read one mustn't lose it just by
+    # saving the list back.
+    def unreadable_additions?(ids)
+      existing = PostRelation.where(post_id: @post.id).pluck(:related_post_id) +
+        PostRelation.where(related_post_id: @post.id).pluck(:post_id)
+      added = ids.uniq - existing - [ @post.id ]
+      return false if added.empty?
+
+      AccessControl.scope(actor, "posts.read", Post.where(id: added)).count < added.size
     end
 
     # `@post.tags =` on an already-persisted post writes the join rows

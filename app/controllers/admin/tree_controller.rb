@@ -8,12 +8,22 @@ module Admin
   # trustworthy afterward. See `app/javascript/controllers/admin/
   # tree_controller.js` for the client side this answers.
   class TreeController < BaseController
+    #
+    # Both pages are loaded through the read scope (access-control design
+    # spec §3.3), so naming one the actor can't read lands in the same
+    # "no longer exists" answer below as a deleted one -- a 404 that
+    # discloses nothing. `Pages::Move` decides the move itself (`pages.move`
+    # on the page, `pages.create` under the target); a refusal is a 403.
     def update
-      page = Page.find(params[:page_id])
-      parent = Page.find(params[:parent_id])
+      pages = admin_scope(Page.all)
+      page = pages.find(params[:page_id])
+      parent = pages.find(params[:parent_id])
       result = Pages::Move.call(page, parent: parent, position: params[:position])
 
-      status = result.ok? ? :ok : :unprocessable_entity
+      status = if result.ok? then :ok
+      elsif result.denied? then :forbidden
+      else :unprocessable_entity
+      end
       message = result.ok? ? nil : result.errors.to_sentence
       render turbo_stream: tree_stream(selected: page, message: message), status: status
     rescue ActiveRecord::RecordNotFound

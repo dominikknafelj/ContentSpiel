@@ -80,6 +80,23 @@ module Admin
 
     def landing? = page.landing?
 
+    # A page the user can read but not edit (access-control design spec §5,
+    # `can_edit?`: `pages.edit`, plus `pages.publish` once published): every
+    # field disabled by one `<fieldset disabled>`, and no `admin--autosave`,
+    # so nothing is ever sent (Review Focus 4). `Admin::RecordHeaderComponent`
+    # shows the "View only" badge above.
+    def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
+
+    def form_data
+      return {} unless editable?
+
+      {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": status_id
+      }
+    end
+
     private
 
     attr_reader :page, :locale, :url_options

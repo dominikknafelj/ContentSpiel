@@ -43,8 +43,8 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 |
 | "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 |
 | Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
-| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 |
-| Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 |
+| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
+| Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
 | Trash / soft delete + restore | Must | #43 |
 | Media library (`MediaAsset`, alt text, reuse, responsive variants) | Must | #46 |
 | Invites (one-time set-password link without mail) | Should | `Users::Invite` |
@@ -91,6 +91,12 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Blobs referenced only by the old ActionText rich text were left orphaned by the `rich_text:migrate_from_action_text` import (the migrated content re-attaches image blobs to new `MediaAsset`s; the original ActionText blob rows aren't cleaned up) | Sub-project 4 | Media library / a cleanup task (sub-project 6) |
 | MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | A lookup prefix on `ApiToken` (future work) |
 | No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select | Sub-project 4 | Admin polish (sub-project 6), same as the page tree's own typed-position pattern |
+| Editing an already-published page/post/block requires `publish`, not just `edit`, because autosave writes straight to the live record | Sub-project 5 (access control) | Versioning with pending revisions (Phase 3) |
+| Pages have no author, so there is no `own` scope for pages the way posts have one | Sub-project 5 | Page authorship (out of scope for now, spec §9) |
+| The audit log (`audit_events`) has no export or retention setting and grows without limit; the append-only trigger blocks `DELETE`/`UPDATE`/raw SQL but deliberately not `TRUNCATE`, so `db:truncate_all` still works in development | Sub-project 5 | Audit export/retention (not yet scheduled) |
+| The seeded Author group's `posts.read`/`posts.create` are unscoped by spec §5, so an Author reads every post, not only their own (only `posts.edit` is `own`-scoped) | Sub-project 5 | Revisit the seeded Author grants if this proves surprising in practice |
+| The Tags list shows each tag's total post count across every post, not scoped to what the viewer can read (the module itself is gated by `tags.manage`) | Sub-project 5 | Scope tag counts to `AccessControl.scope` (future work) |
+| A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
 
 ## Out of scope (for now)
 

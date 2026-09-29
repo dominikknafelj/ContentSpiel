@@ -17,7 +17,7 @@ class McpController < ActionController::API
       name: "contentspiel",
       title: "ContentSpiel",
       version: "1.0.0",
-      instructions: "Manage ContentSpiel's blog/resume/now-update posts across locales.",
+      instructions: instructions,
       tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost ],
       server_context: { user: @current_api_user }
     )
@@ -40,6 +40,20 @@ class McpController < ActionController::API
 
   private
 
+  # Access-control design spec §3.4: the server tells the client whose
+  # rights it acts with -- the token's own user and group, so an agent
+  # can explain a refusal ("You don't have permission to …") instead of
+  # retrying. Only this token's own facts: never another user, token or
+  # group, and not the group's grants (an agent learns what it may do by
+  # doing it; the list tools already show only what it may read).
+  def instructions
+    "Manage ContentSpiel's blog/resume/now-update posts across locales. " \
+      "This token acts as #{@api_token.user.email_address} limited to the #{@api_token.group.name} group: " \
+      "it can only see and change what both that user and that group are allowed to. " \
+      "A post outside that scope is reported as not found; a change it isn't allowed to make " \
+      "is refused with a \"You don't have permission to …\" error."
+  end
+
   def authenticate
     raw_token = request.authorization.to_s[/\ABearer\s+(.+)\z/i, 1]
     api_token = raw_token && ApiToken.authenticate(raw_token)
@@ -47,6 +61,7 @@ class McpController < ActionController::API
     return render(json: { error: "Unauthorized" }, status: :unauthorized) unless api_token
 
     api_token.record_usage!(request.remote_ip)
+    @api_token = api_token
     @current_api_user = api_token.user
 
     # This controller is an `ActionController::API`, not an
@@ -57,5 +72,7 @@ class McpController < ActionController::API
     # token -- not a session -- is what was actually authenticated here.
     Current.actor = api_token
     Current.channel = :mcp
+    Current.request_id = request.request_id
+    Current.ip_address = request.remote_ip
   end
 end

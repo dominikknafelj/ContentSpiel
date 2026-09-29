@@ -2,9 +2,15 @@
     params (`type`/`status`/`tag`/`q`, `Admin::PostsController#index`) and a
     flat table -- no tree column, a post has no parent/child structure of
     its own the way a page does. %>
+<%# "New post" only with `posts.create` somewhere (access-control design
+    spec §5); the rows are already narrowed to readable posts
+    (`Admin::PostsController#filtered_posts`). %>
+<% may_create = can?("posts.create") %>
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
   <h1 class="text-h1 text-ink">Posts</h1>
-  <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <% if may_create %>
+    <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <% end %>
 </div>
 
 <%= form_with url: admin_posts_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
@@ -38,9 +44,11 @@
 <% end %>
 
 <% if @posts.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Choose a content type to create your first post.") do |empty_state| %>
-    <% empty_state.with_action do %>
-      <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: (may_create ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
+    <% if may_create %>
+      <% empty_state.with_action do %>
+        <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+      <% end %>
     <% end %>
   <% end %>
 <% else %>

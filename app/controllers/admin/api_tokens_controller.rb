@@ -8,11 +8,22 @@ module Admin
   # Tokens belong to whoever creates them (`Current.user`): an MCP client
   # holding one inherits that user's authoring identity (`ApiToken`'s own
   # comment), so nobody mints a token that authenticates as someone else.
-  # The list shows every user's tokens, though, so any admin can revoke a
-  # credential that's leaked, whoever it belongs to.
+  #
+  # Open to every signed-in user (access-control design spec §5 "AI
+  # assistant tokens"): everyone sees and revokes their own tokens; only
+  # `tokens.manage` sees -- and so can revoke -- everyone's, e.g. a
+  # credential that's leaked. Another user's token is outside the list for
+  # anyone else, so revoking it by id is a 404, not a 403.
+  #
+  # Each token is bounded by a group (design spec §3.3 "Tokens"): the form
+  # offers only the groups the user may assign, defaulting to Read only,
+  # and `ApiTokens::Issue` checks the submitted one again -- a forged
+  # `group_id` for a group the user can't assign is refused with the 403
+  # page.
   class ApiTokensController < BaseController
     def index
-      @api_tokens = ApiToken.includes(:user).order(created_at: :desc)
+      @api_tokens = visible_tokens.includes(:user, :group).order(created_at: :desc)
+      @assignable_groups = AccessControl.permitted_groups_for(Current.user)
     end
 
     # The one-time reveal. *Rendered*, never redirected, the same rule the
@@ -37,11 +48,14 @@ module Admin
     # raw token worth showing, so it's an ordinary redirect back to the list
     # with the service's own errors -- nothing secret to keep out of the flash.
     def create
-      result = ApiTokens::Issue.call(Current.user)
+      group = AccessControl::Group.find_by(id: params[:group_id]) if params[:group_id].present?
+      result = ApiTokens::Issue.call(Current.user, group: group)
 
       unless result.ok?
-        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other,
-          alert: result.errors.to_sentence.presence || "The token couldn't be created"
+        forbidden_or(result) do
+          redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other,
+            alert: result.errors.to_sentence.presence || "The token couldn't be created"
+        end
         return
       end
 
@@ -56,7 +70,7 @@ module Admin
     # would overwrite `revoked_at`, the list's record of *when* it stopped
     # working.
     def destroy
-      api_token = ApiToken.find(params[:id])
+      api_token = visible_tokens.find(params[:id])
 
       if api_token.revoked_at
         redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: "Token was already revoked"
@@ -68,11 +82,21 @@ module Admin
       if result.ok?
         redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, notice: "Token revoked"
       else
-        redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
 
     private
+
+    def visible_tokens
+      can?("tokens.manage") ? ApiToken.all : ApiToken.where(user: Current.user)
+    end
+
+    # The form's preselected group (design spec §5: "defaulting to Read
+    # only"), when the user may assign it.
+    helper_method def default_group
+      @assignable_groups.find { |group| group.name == AccessControl::Seeds::READ_ONLY_NAME }
+    end
 
     # The endpoint an assistant connects to: the public host (the same
     # `PublicSite::Urls.default_host` every absolute public URL is built

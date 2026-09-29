@@ -58,9 +58,35 @@ module Admin
 
     def preview_path = preview_urls.path_for(post, locale)
 
-    def can_publish? = !post.live?
+    # Access control (design spec §5 "Everywhere"): Publish now, Unpublish
+    # and Schedule… need `posts.publish` on this post, Delete `posts.delete`
+    # -- each absent, not disabled, without it. `editable?` is whether the
+    # form itself is live: without it the header says "View only", every
+    # field is disabled (one `<fieldset disabled>` around the form's
+    # contents, which also makes the rich-text editor read-only) and
+    # `admin--autosave` isn't attached, so typing sends nothing at all
+    # (Review Focus 4).
+    def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
 
-    def can_unpublish? = post.status != "draft"
+    def may_publish? = can?("posts.publish", post)
+
+    def can_publish? = !post.live? && may_publish?
+
+    def can_unpublish? = post.status != "draft" && may_publish?
+
+    def can_delete? = can?("posts.delete", post)
+
+    # The form's `data-*`: the autosave wiring only when the post is
+    # editable (see `editable?`).
+    def form_data
+      return {} unless editable?
+
+      {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": save_status_id
+      }
+    end
 
     def delete_dialog_id = "delete-post-#{post.id}"
 

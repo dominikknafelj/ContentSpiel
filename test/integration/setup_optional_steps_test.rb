@@ -12,16 +12,19 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "a[href=?]", setup_step_path("starter_content"), text: "Skip"
+    assert_match(/Admin group/, response.body)
   end
 
-  test "generating an MCP token shows it once, bound to the admin, and never in flash" do
+  test "generating an MCP token shows it once, bound to the admin and the Admin group, and never in flash" do
     assert_difference "ApiToken.count", 1 do
       patch setup_step_path("mcp_token")
     end
 
     assert_response :success
     raw = css_select("#mcp-token").first.text.strip
-    assert_equal User.find_by(email_address: "owner@example.com"), ApiToken.authenticate(raw).user
+    token = ApiToken.authenticate(raw)
+    assert_equal User.find_by(email_address: "owner@example.com"), token.user
+    assert_equal AccessControl::Seeds::ADMIN_NAME, token.group.name
     assert_empty flash.to_h
     assert_includes response.headers["Cache-Control"], "no-store"
   end

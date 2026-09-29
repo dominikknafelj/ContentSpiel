@@ -8,9 +8,20 @@ class ApiToken < ApplicationRecord
   # even with a single admin today.
   belongs_to :user
 
-  def self.generate!(user)
+  # Access-control design spec §3.2: "a foreign key to access_control_
+  # groups, not null." `belongs_to` alone would already require it on save;
+  # named explicitly (`class_name:`, not just `belongs_to :group`) since
+  # the association points at a namespaced model, and there's no
+  # `AccessControl` prefix on the association name itself to infer it from.
+  belongs_to :group, class_name: "AccessControl::Group"
+
+  # `group:` defaults to the built-in Admin group (ruling R1, Task 2 brief)
+  # for tests and the console that just want *a* token. The app itself
+  # always goes through `ApiTokens::Issue`, where the group is required and
+  # checked (design spec §3.3 "Tokens").
+  def self.generate!(user, group: AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME))
     raw_token = SecureRandom.hex(32)
-    token = create!(user: user, token: raw_token)
+    token = create!(user: user, group: group, token: raw_token)
     [ token, raw_token ]
   end
 

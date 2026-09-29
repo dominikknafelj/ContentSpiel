@@ -121,7 +121,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
       after = read.call
       before.any? && before.size == after.size && before.zip(after).all? { |a, b| (a - b).abs < 0.5 }
     end
-    page.driver.browser.action.move_to(find(selector).native).click.perform
+    find(selector).click
   end
 
   def wait_until(timeout: 5)

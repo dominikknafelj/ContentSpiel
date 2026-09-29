@@ -1,0 +1,20 @@
+# Task 2 brief ruling R3: `users(:two)` isn't an owner, but is a member of
+# Admin, so every existing test that already relies on it having full run
+# of the admin keeps its powers once `AccessControl.allowed?` is actually
+# consulted (a later task). `users(:one)` needs no membership at all --
+# it's an owner (test/fixtures/users.yml), which bypasses grants entirely.
+two_in_admin:
+  user: two
+  group: admin
+
+author_in_author:
+  user: author
+  group: author
+
+editor_branch_in_branch_editors:
+  user: editor_branch
+  group: branch_editors
+
+reader_in_read_only:
+  user: reader
+  group: read_only

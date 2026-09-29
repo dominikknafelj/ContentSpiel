@@ -10,9 +10,38 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_070000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "access_control_grants", force: :cascade do |t|
+    t.bigint "group_id", null: false
+    t.string "permission", null: false
+    t.jsonb "scope", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["group_id", "permission"], name: "index_access_control_grants_on_group_id_and_permission"
+    t.index ["group_id"], name: "index_access_control_grants_on_group_id"
+  end
+
+  create_table "access_control_groups", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.boolean "built_in", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((name)::text)", name: "index_access_control_groups_on_lower_name", unique: true
+  end
+
+  create_table "access_control_memberships", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "group_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["group_id"], name: "index_access_control_memberships_on_group_id"
+    t.index ["user_id", "group_id"], name: "index_access_control_memberships_on_user_id_and_group_id", unique: true
+    t.index ["user_id"], name: "index_access_control_memberships_on_user_id"
+  end
 
   create_table "active_storage_attachments", force: :cascade do |t|
     t.bigint "blob_id", null: false
@@ -50,7 +79,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_040000) do
     t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.bigint "group_id", null: false
+    t.index ["group_id"], name: "index_api_tokens_on_group_id"
     t.index ["user_id"], name: "index_api_tokens_on_user_id"
+  end
+
+  create_table "audit_events", force: :cascade do |t|
+    t.string "action", null: false
+    t.string "actor_type"
+    t.bigint "actor_id"
+    t.bigint "user_id"
+    t.string "channel"
+    t.string "subject_type"
+    t.bigint "subject_id"
+    t.string "subject_label"
+    t.jsonb "field_changes", default: {}, null: false
+    t.jsonb "snapshot"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "request_id"
+    t.string "ip"
+    t.datetime "occurred_at", null: false
+    t.datetime "last_occurred_at", null: false
+    t.index ["action", "occurred_at"], name: "index_audit_events_on_action_and_occurred_at"
+    t.index ["subject_type", "subject_id", "occurred_at"], name: "idx_on_subject_type_subject_id_occurred_at_92d4f006a6"
+    t.index ["user_id", "occurred_at"], name: "index_audit_events_on_user_id_and_occurred_at"
   end
 
   create_table "content_blocks", force: :cascade do |t|
@@ -134,6 +186,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_040000) do
     t.jsonb "translated_metadata", default: {}, null: false
     t.datetime "updated_at", null: false
     t.jsonb "body", default: {}, null: false
+    t.bigint "author_id"
+    t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
   end
 
@@ -182,16 +236,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_040000) do
     t.string "email_address", null: false
     t.string "password_digest", null: false
     t.datetime "updated_at", null: false
+    t.boolean "owner", default: false, null: false
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  add_foreign_key "access_control_grants", "access_control_groups", column: "group_id", on_delete: :cascade
+  add_foreign_key "access_control_memberships", "access_control_groups", column: "group_id", on_delete: :cascade
+  add_foreign_key "access_control_memberships", "users", on_delete: :cascade
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "api_tokens", "access_control_groups", column: "group_id"
   add_foreign_key "api_tokens", "users"
   add_foreign_key "pages", "pages", column: "parent_id"
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"
   add_foreign_key "post_tags", "tags"
+  add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
 end

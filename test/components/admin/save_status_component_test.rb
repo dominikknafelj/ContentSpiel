@@ -40,6 +40,9 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
     # future edit here is actually being kept in sync with.
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :signed_out)
     assert_text "Signed out — sign in again to keep saving"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :forbidden)
+    assert_text "Not saved — you don't have permission to change this"
   end
 
   test "rejects an unknown state" do

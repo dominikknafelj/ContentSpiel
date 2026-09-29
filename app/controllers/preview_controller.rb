@@ -16,9 +16,17 @@ class PreviewController < ApplicationController
     response.set_header("Cache-Control", "private, no-store")
     response.set_header("X-Robots-Tag", "noindex")
 
+    # Every answer that says anything about a record -- its content, or
+    # (for a redirect from an old address) where it lives now -- needs the
+    # record readable first; anything else is the same 404 as no record.
+    return render("pages/not_found", status: :not_found) if result.record && !readable?(result.record)
+
     case result.status
     when :found
       return render("pages/not_found", status: :not_found) unless assign_record(result.record)
+      # A post is shown on its listing page -- that page's title, SEO meta
+      # and other blocks -- so the page must be readable too.
+      return render("pages/not_found", status: :not_found) if @post && !readable?(@page)
 
       @preview_record = @post || @page
       render "pages/show"
@@ -30,6 +38,17 @@ class PreviewController < ApplicationController
   end
 
   private
+
+  # Preview reads go through the actor's read scope (access-control design
+  # spec §3.3 "Scopes for reading"): a draft page outside a branch editor's
+  # branch, or a post an author may not read, is the same 404 as a path
+  # that resolves to nothing -- not its content, and not a 403 that would
+  # confirm it exists (Review Focus 2). One indexed query, after the
+  # resolver has found the record by its path.
+  def readable?(record)
+    key = record.is_a?(Post) ? "posts.read" : "pages.read"
+    AccessControl.scope(Current.actor, key, record.class.where(id: record.id)).exists?
+  end
 
   # One `PublicSite::Urls` per request, `preview: true` so every link this
   # response renders (nav, listing, hreflang alternates) stays under

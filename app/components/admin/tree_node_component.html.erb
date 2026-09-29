@@ -1,34 +1,46 @@
-<li data-page-id="<%= page.id %>" data-parent-id="<%= page.parent_id %>" class="admin-tree-node">
-  <div class="group/node flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
-    <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
-        grab. Every other node's handle is the only part of the row that
-        starts a drag (admin--tree's `handle:` option), so the title link
-        below stays a plain, clickable link. %>
-    <% unless root? %>
-      <span class="admin-tree-node__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
-    <% end %>
+<li data-page-id="<%= page.id %>" data-parent-id="<%= page.parent_id %>" class="admin-tree-node"<%= " data-context-only" if context_only? %>>
+  <% if context_only? %>
+    <%# Shown only as the path to a readable page below it (access-control
+        design spec §3.3): greyed out, not a link, no status or actions. %>
+    <div class="flex items-center gap-1.5 rounded-cs px-1.5 py-1">
+      <span class="flex-1 truncate text-meta" title="You can't open this page"><%= title %></span>
+    </div>
+  <% else %>
+    <div class="group/node flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
+      <%# The homepage can't be moved (Pages::Move) -- no handle, nothing to
+          grab; nor can a page the actor may not move. Every other node's
+          handle is the only part of the row that starts a drag (admin--tree's
+          `handle:` option), so the title link below stays a plain, clickable
+          link. %>
+      <% if movable? %>
+        <span class="admin-tree-node__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+      <% end %>
 
-    <%= link_to title, path, data: { turbo_frame: "content" },
-          aria: (selected? ? { current: "page" } : {}),
-          class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
+      <%= link_to title, path, data: { turbo_frame: "content" },
+            aria: (selected? ? { current: "page" } : {}),
+            class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
-    <span data-status="<%= status %>" class="shrink-0">
-      <%= render Admin::StatusBadgeComponent.new(status: status, at: page.published_at) %>
-    </span>
+      <span data-status="<%= status %>" class="shrink-0">
+        <%= render Admin::StatusBadgeComponent.new(status: status, at: page.published_at) %>
+      </span>
 
-    <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+      <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
 
-    <%= link_to "+", new_child_path, data: { turbo_frame: "content" },
-          class: "shrink-0 rounded-cs px-1 text-meta opacity-0 hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover/node:opacity-100",
-          aria: { label: "Add a page under #{title}" } %>
-  </div>
+      <% if can_add_child? %>
+        <%= link_to "+", new_child_path, data: { turbo_frame: "content" },
+              class: "shrink-0 rounded-cs px-1 text-meta opacity-0 hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover/node:opacity-100",
+              aria: { label: "Add a page under #{title}" } %>
+      <% end %>
+    </div>
+  <% end %>
 
   <%# Always rendered, even with no children -- every node's children list is
       a real SortableJS drop target (`data-admin--tree-target="list"`), so a
-      currently-childless page can still receive a dropped page. %>
-  <ul data-admin--tree-target="list" data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
+      currently-childless page can still receive a dropped page. Except under
+      a context-only page (see the component's comment). %>
+  <ul <%= tag.attributes("data-admin--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
     <% children.each do |child| %>
-      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, selected: selected, locale: locale, url_options: url_options) %>
+      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>
   </ul>
 </li>

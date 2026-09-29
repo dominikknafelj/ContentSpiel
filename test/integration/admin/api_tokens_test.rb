@@ -31,6 +31,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
       assert_select "*", text: /#{Regexp.escape(users(:one).email_address)}/
       assert_select "*", text: /203\.0\.113\.5/
       assert_select "*", text: /Active/
+      assert_select "*", text: /Admin/ # the token's group
       assert_select "button", text: "Revoke"
     end
     assert_select "#" + ActionView::RecordIdentifier.dom_id(revoked) do
@@ -61,7 +62,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   test "creating a token reveals it once, no-store, in the response itself" do
     sign_in_as(users(:one))
     assert_difference -> { ApiToken.count }, 1 do
-      post "/cs-studio/api_tokens"
+      post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
     end
 
     assert_response :success
@@ -71,6 +72,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     raw = raw_token_from(response.body)
     token = ApiToken.order(:id).last
     assert_equal users(:one), token.user
+    assert_equal access_control_groups(:read_only), token.group
     assert token.authenticate_token(raw)
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
     assert_includes response.body, "#{PublicSite::Urls.default_host}/mcp"
@@ -90,7 +92,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     Rails.logger = ActiveSupport::Logger.new(io)
     ActionController::Base.logger = Rails.logger
 
-    post "/cs-studio/api_tokens"
+    post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
     raw = raw_token_from(response.body)
 
     assert_not_includes io.string, raw
@@ -147,7 +149,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     ApiTokens::Issue.singleton_class.define_method(:call, &failing)
     begin
       assert_no_difference -> { ApiToken.count } do
-        post "/cs-studio/api_tokens"
+        post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
       end
     ensure
       ApiTokens::Issue.singleton_class.remove_method(:call)
@@ -172,5 +174,56 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_equal revoked_at, token.reload.revoked_at
     follow_redirect!
     assert_select "[role=status]", text: "Token was already revoked"
+  end
+
+  # --- Token groups (access-control design spec §3.3 "Tokens", §5) -------------
+
+  test "an author may choose only Read only or Author, defaulting to Read only" do
+    # The fixture group is empty (so trivially assignable); a real branch
+    # editors group edits pages, which an author can't.
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})
+    sign_in_as(users(:author))
+    get "/cs-studio/api_tokens"
+
+    options = css_select("select[name=group_id] option").map { |option| option.text.strip }
+    assert_equal [ "Author", "Read only" ], options
+    assert_select "select[name=group_id] option[selected]", text: "Read only"
+  end
+
+  test "an author forging group_id = Admin is refused" do
+    sign_in_as(users(:author))
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:admin).id }
+    end
+
+    assert_response :forbidden
+    assert_includes response.body, "You don&#39;t have permission to give a token the Admin group"
+  end
+
+  test "a missing group is an alert, not a token" do
+    sign_in_as(users(:author))
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens"
+    end
+
+    assert_redirected_to "/cs-studio/api_tokens"
+    follow_redirect!
+    assert_select "[role=alert]", text: "Choose a group for the token"
+  end
+
+  test "users see only their own tokens unless they have tokens.manage" do
+    mine, = ApiToken.generate!(users(:author), group: access_control_groups(:read_only))
+    theirs, = ApiToken.generate!(users(:reader), group: access_control_groups(:read_only))
+
+    sign_in_as(users(:author))
+    get "/cs-studio/api_tokens"
+    assert_select "#" + ActionView::RecordIdentifier.dom_id(mine)
+    assert_select "#" + ActionView::RecordIdentifier.dom_id(theirs), count: 0
+
+    sign_in_as(users(:two))
+    get "/cs-studio/api_tokens"
+    assert_select "#" + ActionView::RecordIdentifier.dom_id(theirs)
   end
 end

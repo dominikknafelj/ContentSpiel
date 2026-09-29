@@ -29,8 +29,19 @@ module Mcp
       "plain text and reported as warnings in the response.".freeze
 
     # `[document_hash, warnings]` for `translations[locale][:body]`.
-    def markdown_body(markdown)
-      document, warnings = RichText::Document.from_markdown(markdown)
+    #
+    # `previous` is the document this body replaces (`update_post`: the
+    # post's stored body for the locale being written; nil for a new body).
+    # Its references are known ones (`RichText::Document.from_markdown`):
+    # a link or image that was already there survives the Markdown round
+    # trip even when its target was deleted or is outside the token's read
+    # scope -- the same rule `HasRichTextBody#body_errors_for` applies to an
+    # admin save. Only a reference that's new has to exist and be readable;
+    # one that isn't is dropped with the same "missing" warning either way,
+    # so a token can't probe which ids exist by linking to them.
+    def markdown_body(markdown, previous: nil)
+      known = previous.is_a?(Hash) ? RichText::Document.new(previous).references : nil
+      document, warnings = RichText::Document.from_markdown(markdown, known_references: known)
       [ document.to_h, warnings ]
     end
 

@@ -2,7 +2,14 @@ module ContentBlocks
   # Creates or updates a content block (spec §7.2): the same translate-then-
   # assign shape as `Posts::Save`/`Pages::Save`, plus the append-on-create
   # rule a brand new block's `position` needs.
+  #
+  # Permissions: `<owner>.edit` (and `<owner>.publish` on a published
+  # owner) -- see `ContentBlocks::OwnerPermissions`. A block's owner never
+  # changes through here, so the check runs once, before anything is
+  # assigned.
   class Save < ApplicationService
+    include OwnerPermissions
+
     TRANSLATED = %i[caption alt body].freeze
 
     def initialize(block, attributes: {}, translations: {}, actor: Current.actor)
@@ -13,16 +20,21 @@ module ContentBlocks
     end
 
     def call
-      authorize!(:save, @block)
+      refused = owner_refusal(@block.owner) { |key| authorize!(key, @block) }
+      return denied(refused, @block) if refused
 
       saved = ContentBlock.transaction do
         assign
         @block.save || raise(ActiveRecord::Rollback)
+
+        created = @block.previously_new_record?
+        changes = Audit::Snapshot.field_changes_for(@block)
+        record_event(created ? "block.created" : "block.updated", subject: @block, field_changes: changes) if created || changes.any?
+        true
       end
 
       return failure(@block) unless saved
 
-      record_event(:content_block_saved, block: @block)
       success(@block)
     end
 

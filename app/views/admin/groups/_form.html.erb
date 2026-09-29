@@ -1,0 +1,43 @@
+<%# The group editor (access-control design spec §5): name, description,
+    members and the permission matrix. Members send a blank first value so
+    an empty list still arrives as one. %>
+<% if group.errors.any? %>
+  <p class="mb-4 text-danger-ink" role="alert"><%= group.errors.full_messages.to_sentence %></p>
+<% end %>
+
+<%= form_with url: url, method: method do %>
+  <div class="mb-4 max-w-md">
+    <%= label_tag "group_name", "Name", class: setup_label_class %>
+    <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
+    <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?, class: setup_input_class %>
+  </div>
+
+  <div class="mb-6 max-w-md">
+    <%= label_tag "group_description", "Description", class: setup_label_class %>
+    <%= text_field_tag "group[description]", group.description, id: "group_description", class: setup_input_class %>
+  </div>
+
+  <fieldset class="mb-6 max-w-md">
+    <legend class="<%= setup_label_class %>">Members</legend>
+    <%= hidden_field_tag "group[member_ids][]", "", id: nil %>
+    <div class="flex flex-col gap-1">
+      <% all_users.each do |user| %>
+        <label class="flex items-center gap-2 text-ink">
+          <%= check_box_tag "group[member_ids][]", user.id, selected_member_ids.include?(user.id), id: "group_member_#{user.id}" %>
+          <%= user.email_address %>
+          <% if user.owner? %><span class="text-sm text-meta">(owner: has every permission anyway)</span><% end %>
+        </label>
+      <% end %>
+    </div>
+  </fieldset>
+
+  <h2 class="mb-2 text-h2 text-ink">Permissions</h2>
+  <div class="mb-6">
+    <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale) %>
+  </div>
+
+  <div class="flex gap-2">
+    <%= render Admin::ButtonComponent.new(label: "Save group", variant: :primary, type: "submit") %>
+    <%= link_to "Cancel", admin_groups_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+  </div>
+<% end %>

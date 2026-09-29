@@ -1,0 +1,102 @@
+<%# The audit log's own list (design spec §5 "Audit log module", Task 9):
+    newest first, filterable by user/action/subject/date -- every event
+    `audit.view` holders may see (`Admin::AuditEventsController`'s own
+    comment: this module is never content-scoped the way Posts/Pages are),
+    with a subject link only where the current viewer can still read that
+    record (`audit_subject_path`). %>
+<h1 class="mb-4 text-h1 text-ink">Audit log</h1>
+
+<%= form_with url: admin_audit_events_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
+  <% if admin_locale != Locales.default %>
+    <%= hidden_field_tag :locale, admin_locale %>
+  <% end %>
+
+  <div>
+    <%= label_tag :user_id, "User", class: setup_label_class %>
+    <%= select_tag :user_id, options_for_select(@users.map { |user| [ user.email_address, user.id ] }, params[:user_id]),
+          include_blank: "All users", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%# Named `event_action`, not `action` -- `Admin::AuditEventsController`'s
+        own comment explains why `params[:action]` can't be reused here
+        (it's Rails' own routing parameter). %>
+    <%= label_tag :event_action, "Action", class: setup_label_class %>
+    <%= select_tag :event_action, options_for_select(@actions, params[:event_action]), include_blank: "All actions", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :subject_type, "Subject type", class: setup_label_class %>
+    <%= select_tag :subject_type, options_for_select(@subject_types.map { |type, label| [ label, type ] }, params[:subject_type]),
+          include_blank: "All types", class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :subject_id, "Subject id", class: setup_label_class %>
+    <%= number_field_tag :subject_id, params[:subject_id], class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :from, "From", class: setup_label_class %>
+    <%= date_field_tag :from, params[:from], class: setup_input_class %>
+  </div>
+
+  <div>
+    <%= label_tag :to, "To", class: setup_label_class %>
+    <%= date_field_tag :to, params[:to], class: setup_input_class %>
+  </div>
+
+  <%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %>
+  <%= link_to "Clear", admin_audit_events_path(**admin_url_options), class: setup_secondary_link_class %>
+<% end %>
+
+<% if @events.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "No events", description: "Nothing matches these filters yet.") %>
+<% else %>
+  <table class="admin-audit-events-table w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <th class="py-2 pr-4">Time</th>
+        <th class="py-2 pr-4">Who</th>
+        <th class="py-2 pr-4">Channel</th>
+        <th class="py-2 pr-4">Action</th>
+        <th class="py-2">Subject</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @events.each do |event| %>
+        <tr id="<%= dom_id(event) %>" class="border-b border-line align-top">
+          <td class="py-2 pr-4">
+            <%= link_to event.occurred_at.strftime("%b %-d, %Y %H:%M"), admin_audit_event_path(event, **admin_url_options), class: "hover:underline" %>
+          </td>
+          <td class="py-2 pr-4"><%= audit_actor_label(event) %></td>
+          <td class="py-2 pr-4 text-meta"><%= audit_channel_label(event.channel) %></td>
+          <td class="py-2 pr-4"><%= event.action %></td>
+          <td class="py-2">
+            <% if (path = audit_subject_path(event)) %>
+              <%= link_to event.subject_label, path, class: "hover:underline" %>
+            <% else %>
+              <%= event.subject_label %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <%# Plain limit/offset pagination (`Admin::AuditEventsController`'s own
+      comment: no other CS Studio list paginates, so there's no existing
+      pattern to reuse) -- every other filter param carries over via
+      `request.query_parameters`, which already includes `offset` when
+      one was submitted, so `merge` here always wins over a stale one. %>
+  <div class="mt-4 flex items-center gap-3">
+    <% if @offset.positive? %>
+      <%= link_to "Previous", admin_audit_events_path(request.query_parameters.merge("offset" => [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max)),
+            class: setup_secondary_link_class %>
+    <% end %>
+    <% if @has_next %>
+      <%= link_to "Next", admin_audit_events_path(request.query_parameters.merge("offset" => @offset + Admin::AuditEventsController::PER_PAGE)),
+            class: setup_secondary_link_class %>
+    <% end %>
+  </div>
+<% end %>

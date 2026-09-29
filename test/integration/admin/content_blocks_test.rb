@@ -191,6 +191,20 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert copy.image.blob.download.present?, "the copy's own blob must still be downloadable"
   end
 
+  # Final fix wave (Minor 6): the copy's image is attached inside
+  # `ContentBlocks::Save`, so the `block.created` event's snapshot has it.
+  test "duplicating an image block records block.created with the image in its snapshot" do
+    source = image_block_with_image
+
+    post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    assert_response :success
+
+    copy = @page.content_blocks.order(:position).last
+    event = Audit::Event.find_by!(action: "block.created", subject: copy)
+    assert_equal "tiny.png", event.snapshot.dig("image", "filename")
+    assert_equal copy.image.blob_id, event.snapshot.dig("image", "blob_id")
+  end
+
   # Duplicating copies every locale's JSON body document verbatim (the
   # ActionText-era version of this test guarded against a re-rendered
   # `trix-content` wrapper nesting itself on every duplicate; a JSON

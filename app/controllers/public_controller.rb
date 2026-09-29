@@ -19,6 +19,13 @@ class PublicController < ActionController::Base
   # would otherwise reach a missing template and a 500.
   before_action { request.format = :html }
 
+  # The public site's own channel (final fix wave, Minor 9). Nothing here
+  # calls a service or asks access control today, but a nil actor on a nil
+  # channel is the *trusted* console case (`AccessControl::Checker`), so a
+  # future public code path that did would silently act with every right.
+  # `:public` is untrusted: a nil actor on it is denied everything.
+  before_action { Current.channel = :public }
+
   helper_method :public_urls
 
   private

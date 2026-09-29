@@ -37,7 +37,12 @@ module Mcp
         invalid_locale = reject_unless_enabled(locale)
         return invalid_locale if invalid_locale
 
-        scope = content_type.present? ? Post.where(content_type: content_type) : Post.all
+        # Only what the token may read (access-control spec §3.3) -- the
+        # token's group intersected with its user's rights. An unreadable
+        # post isn't listed, and nothing here reports a total that would
+        # count it.
+        readable = AccessControl.scope(Current.actor, "posts.read", Post.all)
+        scope = content_type.present? ? readable.where(content_type: content_type) : readable
 
         # A summary, not the full record: a body-per-post dump would bloat every
         # listing for content an agent can ask for individually via Mcp::Tools::GetPost.

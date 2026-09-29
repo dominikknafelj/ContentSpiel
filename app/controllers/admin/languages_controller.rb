@@ -11,6 +11,10 @@ module Admin
   # admin screen mid-session, which a Turbo Stream partial-page swap has no
   # natural way to reflect -- a full reload is exactly what's wanted here.
   class LanguagesController < BaseController
+    # `languages.manage` (access-control design spec §3.4), checked again
+    # by `Locales::*` for every write.
+    before_action -> { require_permission("languages.manage") }
+
     def index
       @site_setting = Current.site
     end
@@ -73,7 +77,7 @@ module Admin
       if result.ok?
         redirect_to admin_settings_languages_path(**admin_url_options), status: :see_other, notice: "Saved"
       else
-        redirect_to admin_settings_languages_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_settings_languages_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
   end

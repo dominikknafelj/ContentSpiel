@@ -32,6 +32,13 @@ class SetupController < ApplicationController
   before_action :require_setup_pending
   before_action :load_step, only: %i[show update]
   before_action :require_step_access, only: %i[show update]
+  # Final fix wave (Important 3): once the owner exists every step runs
+  # signed in (`require_step_access`), and its writes are attributed to
+  # that owner -- `ApplicationController#set_current_actor` ran before the
+  # session was resumed, so `Current.actor` is still nil here. Before the
+  # admin step there's nobody to attribute to: those writes stay the
+  # trusted nil actor on `:setup`.
+  before_action :act_as_signed_in_user, only: %i[show update]
 
   rate_limit to: 10, within: 3.minutes, only: :update, store: RATE_LIMIT_STORE,
     if: -> { params[:step] == "token" },
@@ -90,6 +97,10 @@ class SetupController < ApplicationController
       end
     end
 
+    def act_as_signed_in_user
+      Current.actor = Current.user if Current.user
+    end
+
     def first_step
       return "site" if User.exists?
 
@@ -117,21 +128,31 @@ class SetupController < ApplicationController
     # The lock closes the window between two browsers submitting this step at
     # the same moment: only the first sees `User.none?` and becomes the admin;
     # the second is sent to sign in.
+    #
+    # The first account is the site's owner (access-control design spec
+    # §6): every later setup step writes through permission-checked services
+    # as this user, and a user in no group may do nothing. It's created
+    # through `Users::Save` like any other account (final fix wave,
+    # Important 3), so it gets its `user.created` event -- by the trusted
+    # nil actor on `:setup`, since nobody is signed in yet. `Users::Save`'s
+    # own transaction joins this one, inside the lock.
     def update_admin
-      @user = User.new(params.expect(user: [ :email_address, :password, :password_confirmation ]))
+      attributes = params.expect(user: [ :email_address, :password, :password_confirmation ]).to_h.merge(owner: true)
+      result = nil
 
-      created = User.transaction do
+      User.transaction do
         User.connection.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
-        User.none? && @user.save
+        result = Users::Save.call(User.new, attributes: attributes, actor: nil) if User.none?
       end
 
-      if created
-        start_new_session_for(@user)
+      if result&.ok?
+        start_new_session_for(result.record)
         session.delete(:setup_token_verified)
         redirect_to setup_step_path("site")
-      elsif User.exists?
+      elsif result.nil?
         redirect_to admin_sign_in_path, alert: "An admin account already exists. Sign in to continue setup."
       else
+        @user = result.record
         render :admin, status: :unprocessable_entity
       end
     end
@@ -139,7 +160,7 @@ class SetupController < ApplicationController
     def update_site
       @site_setting = Current.site
 
-      if @site_setting.update(site_params)
+      if Settings::Save.call(@site_setting, attributes: site_params.to_h).ok?
         redirect_to setup_step_path("languages")
       else
         render :site, status: :unprocessable_entity
@@ -173,7 +194,10 @@ class SetupController < ApplicationController
       permitted = params.expect(site_setting: [ :default_locale, extra_locales: [] ])
       codes = ([ permitted[:default_locale] ] + Array(permitted[:extra_locales])).uniq.compact_blank
 
-      if @site_setting.update(default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } })
+      result = Settings::Save.call(@site_setting,
+        attributes: { default_locale: permitted[:default_locale], locales: codes.map { |code| { "code" => code } } })
+
+      if result.ok?
         PublicSite::Paths.rebuild!
         redirect_to setup_step_path("mcp_token")
       else
@@ -186,22 +210,28 @@ class SetupController < ApplicationController
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
     def update_mcp_token
-      _token, @raw_token = ApiTokens::Issue.call(Current.user).record
+      # The first account is an owner, so its token gets the Admin group
+      # (it can be narrowed to another group in CS Studio later).
+      admin = AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME)
+      _token, @raw_token = ApiTokens::Issue.call(Current.user, group: admin).record
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end
 
-    # `StarterContent.add_once!` (final fix wave, P23): the same locked,
-    # re-checked path CS Studio's "Create starter pages" takes, so a double
-    # submit can't race itself into a duplicate-slug 500. A failure is shown
-    # on this step (422), like any other step's form error.
+    # `StarterContents::Add` (`StarterContent.add_once!`, final fix wave,
+    # P23): the same locked, re-checked path CS Studio's "Create starter
+    # pages" takes, so a double submit can't race itself into a
+    # duplicate-slug 500. A failure is shown on this step (422), like any
+    # other step's form error.
     def update_starter_content
-      created = StarterContent.add_once!(locale: Current.site.default_locale)
-      redirect_to setup_step_path("review"), notice: created ? "Starter content added." : "Starter content was already there."
-    rescue StarterContent::Error => error
-      Rails.logger.warn("[setup starter content] #{error.class}: #{error.message}")
-      flash.now[:alert] = "Starter content couldn't be added — a page may already use one of its addresses."
-      render :starter_content, status: :unprocessable_entity
+      result = StarterContents::Add.call
+
+      if result.ok?
+        redirect_to setup_step_path("review"), notice: result.record ? "Starter content added." : "Starter content was already there."
+      else
+        flash.now[:alert] = "#{result.errors.to_sentence}."
+        render :starter_content, status: :unprocessable_entity
+      end
     end
 
     def update_review

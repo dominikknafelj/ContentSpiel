@@ -19,6 +19,9 @@
     <% end %>
   </ul>
   <p class="text-sm text-meta" data-admin--related-posts-target="empty" <%= "hidden" if related.any? %>>No related posts yet.</p>
+  <% if (hidden = hidden_related_count).positive? %>
+    <p class="text-sm text-meta">+<%= pluralize(hidden, "related post") %> you can't open</p>
+  <% end %>
 
   <div class="relative mt-2">
     <%= tag.input type: "search", id: search_id, placeholder: "Search posts to add…", autocomplete: "off", class: setup_input_class,

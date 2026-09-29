@@ -29,7 +29,13 @@ module Admin
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule]
 
+    # CS Studio's home. Someone who can't read any page (a group with only
+    # tags or settings, say) is sent on to the first module they *can*
+    # open rather than shown a 403 the moment they sign in -- there's
+    # always one, the AI assistant screen being open to everyone.
     def index
+      return redirect_to(first_admin_module_path) unless can?("pages.read")
+
       @page = nil
     end
 
@@ -40,8 +46,17 @@ module Admin
     # `@page.parent_id` nil is what tells the hidden field (and, if the
     # title turns out blank, the re-rendered form) to show no parent chosen
     # rather than silently pre-filling the homepage's id.
+    #
+    # The parent is looked up through the read scope (a parent id outside
+    # it is a 404, like any other out-of-scope record), and the form is
+    # only offered where the page could actually be created -- `pages
+    # .create` on the parent's branch (design spec §3.3 "Create page"),
+    # or on the homepage's when none was named, which is where `create`
+    # puts it.
     def new
-      @page = Page.new(parent_id: params[:parent_id])
+      parent = params[:parent_id].present? ? admin_scope(Page.all).find(params[:parent_id]) : nil
+      @page = Page.new(parent: parent)
+      forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
     end
 
     # Every field but the title goes through the same defaults regardless of
@@ -56,8 +71,10 @@ module Admin
       if result.ok?
         redirect_to admin_page_path(result.record, **admin_url_options), status: :see_other
       else
-        @page = result.record
-        render :new, status: :unprocessable_entity
+        forbidden_or(result) do
+          @page = result.record
+          render :new, status: :unprocessable_entity
+        end
       end
     end
 
@@ -67,7 +84,15 @@ module Admin
     # alike -- there's exactly one "what does this page's editor look like"
     # template, same reasoning as `Admin::TreeComponent` being the one
     # thing "what does the tree look like" can mean.
+    #
+    # The editor asks `can?` about this one page many times (header
+    # buttons, settings, every block card); its branch is loaded once, up
+    # front (final fix wave, Minor 10), so no check pays for a closure
+    # query. Only here: a write action hands `@page` to a service, which
+    # must judge the page's position as stored, not a snapshot
+    # (`AccessControl.preload_branches`).
     def show
+      AccessControl.preload_branches([ @page ])
     end
 
     # The settings form's own autosave endpoint (spec §6.1): every field in
@@ -147,7 +172,7 @@ module Admin
       # happened to be the one that mattered to it.
       streams << tree_replace_stream if result.ok?
 
-      render turbo_stream: streams, status: (result.ok? ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     # Deleting is permanent (spec §7's own "No trash" interim state) and
@@ -163,9 +188,11 @@ module Admin
       if result.ok?
         redirect_to admin_root_path(**admin_url_options), status: :see_other
       else
-        @page = result.record
-        flash.now[:alert] = result.errors.to_sentence
-        render :show, status: :unprocessable_entity
+        forbidden_or(result) do
+          @page = result.record
+          flash.now[:alert] = result.errors.to_sentence
+          render :show, status: :unprocessable_entity
+        end
       end
     end
 
@@ -200,8 +227,11 @@ module Admin
 
     private
 
+    # Through the read scope (design spec §3.3): a page the actor can't
+    # read is a 404 here -- show, autosave, publish and delete alike --
+    # never a 403 that would confirm it exists.
     def set_page
-      @page = Page.find(params[:id])
+      @page = admin_scope(Page.all).find(params[:id])
     end
 
     # `slug`'s error key isn't `:slug` -- `LocalizedSlug` reports it against
@@ -261,18 +291,20 @@ module Admin
       if result.ok?
         redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, notice: success
       else
-        redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
+        forbidden_or(result) { redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
 
-    # `find_by`, not `find`: an absent or stale `parent_id` (the empty
-    # state's "Add a page" names none at all) is "use the homepage," not a
-    # 404 -- only an *invalid* choice should ever be a hard error, and
-    # `Pages::Save` has no rule of its own to catch that distinction since a
-    # blank `parent:` there just means "make a new root," which `Page`'s own
-    # `only_one_root_page` validation already refuses whenever one exists.
+    # No `parent_id` at all (the empty state's "Add a page" names none) is
+    # "use the homepage". A named one is looked up through the read scope
+    # like every other record here, the same way `new` does: an id the
+    # actor can't read -- or one that no longer exists -- is a 404, never a
+    # silent fallback to the homepage that would put the page somewhere
+    # the editor didn't choose. `Pages::Save` then decides `pages.create`
+    # against the parent's branch.
     def requested_parent
-      Page.find_by(id: params.dig(:page, :parent_id)) || root_page
+      parent_id = params.dig(:page, :parent_id)
+      parent_id.present? ? admin_scope(Page.all).find(parent_id) : root_page
     end
   end
 end

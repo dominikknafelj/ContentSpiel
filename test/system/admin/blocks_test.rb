@@ -45,8 +45,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     # `admin--blocks` drives SortableJS with no `forceFallback` option (see
     # that controller's own source), so a drag here is the browser's native
     # HTML5 drag-and-drop under the hood -- `dragstart`/`dragover`/`drop`
-    # events a WebDriver mouse-action sequence (Capybara's `drag_to`) can't
-    # reliably synthesize in headless Chrome, native DnD being a
+    # events a synthesized mouse sequence (Capybara's `drag_to`) can't
+    # reliably trigger in headless Chrome, native DnD being a
     # browser-internal mechanism rather than a sequence of ordinary mouse
     # events. Driving the Stimulus controller's own `reorder()` directly,
     # right after moving the two cards' DOM nodes into the order a real

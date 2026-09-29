@@ -8,18 +8,18 @@ module Admin
   # screen is the one place that value is itself being *set*).
   #
   # There's only ever one `SiteSetting` row (`SiteSetting#only_one_record_
-  # exists`), so this writes straight to `Current.site` the same way
-  # `SetupController#update_site` already does, rather than introducing a
-  # service purely to wrap a single `save` call -- Task 8's own "Produces"
-  # list names `Locales::Configure`/`Users::Save`/`Users::Destroy`, not a
-  # settings-specific service, and every one of those already has real
-  # cross-record behaviour (fallback/order validation, password handling,
-  # the last-owner rule) a bare `save` doesn't.
+  # exists`); it's written through `Settings::Save`, like the setup
+  # wizard's site step -- which is where the permission check and the
+  # `settings.updated` event live (access-control design spec §3.4).
   class SettingsController < BaseController
     include AutosaveResponses
     include FileParams
 
     ID_PREFIX = "settings"
+
+    # The module is `settings.manage` (access-control design spec §3.4);
+    # `Settings::Save` checks it again for every write.
+    before_action -> { require_permission("settings.manage") }
 
     def show
       @site_setting = Current.site
@@ -45,12 +45,10 @@ module Admin
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_logo))
       logo_changing = attributes.key?("logo")
+      attributes["social_link_rows"] = permitted[:social_links] if permitted.key?(:social_links)
 
-      site.assign_attributes(attributes)
-      site.social_link_rows = permitted[:social_links] if permitted.key?(:social_links)
-
-      saved = site.save
-      result = saved ? ApplicationService::Result.success(site) : ApplicationService::Result.failure(site)
+      result = Settings::Save.call(site, attributes: attributes)
+      saved = result.ok?
 
       streams = autosave_stream(
         record: site,
@@ -63,10 +61,12 @@ module Admin
 
       streams << logo_field_stream(site) if saved && logo_changing
 
-      render turbo_stream: streams, status: (saved ? :ok : :unprocessable_entity)
+      render turbo_stream: streams, status: autosave_status(result)
     end
 
     private
+
+    def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
 
     # Mirrors `Admin::PagesController#hero_image_stream`: the logo section
     # (preview + "Remove image" checkbox) is the one part of this form a

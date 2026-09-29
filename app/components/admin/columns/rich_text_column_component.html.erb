@@ -25,7 +25,7 @@
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
            class="flex flex-wrap gap-1 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
            data-action="mousedown->admin--rich-text#keepFocus">
-        <% TOOLBAR.each do |action, label, text, toggle| %>
+        <% toolbar.each do |action, label, text, toggle| %>
           <%= tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
                 "aria-haspopup": (%w[link internalLink youtube].include?(action) ? "dialog" : nil),
                 class: "admin-rich-text-button min-w-8 cursor-pointer rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent",

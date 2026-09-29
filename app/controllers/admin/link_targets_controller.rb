@@ -10,6 +10,13 @@ module Admin
   # public HTML renderer already degrades a non-visible target's link to
   # plain text (`RichText::BuiltIns#render_internal_link`) rather than ever
   # exposing it, so there's no leak in offering it here too.
+  #
+  # Only what the actor may *read* is offered (access-control design spec
+  # §3.3 "Scopes for reading"), for the link picker and the related-posts
+  # picker (`?type=post`) alike: both candidate queries start from
+  # `admin_scope`, so a page outside a branch editor's branch, or a post an
+  # author can't read, never appears -- not even its title. Someone with
+  # neither `pages.read` nor `posts.read` simply gets an empty list.
   class LinkTargetsController < BaseController
     LIMIT = 20
     TYPES = %w[page post].freeze
@@ -72,13 +79,13 @@ module Admin
     # these, so this is deliberately cheaper than a full result: an id
     # lookup and an ordering, nothing translated or path-resolved yet.
     def page_candidates
-      scope = Page.all
+      scope = admin_scope(Page.all)
       scope = scope.where("pages.title ->> ? ILIKE ?", locale, "%#{Page.sanitize_sql_like(query)}%") if query.present?
       scope.order(:id).limit(LIMIT).map { |page| [ "page", page ] }
     end
 
     def post_candidates
-      scope = Post.all
+      scope = admin_scope(Post.all)
       scope = scope.where("posts.title ->> ? ILIKE ?", locale, "%#{Post.sanitize_sql_like(query)}%") if query.present?
       scope.order(:id).limit(LIMIT).map { |post| [ "post", post ] }
     end

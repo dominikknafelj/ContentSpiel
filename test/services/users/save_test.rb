@@ -37,4 +37,112 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not result.ok?
     assert_not User.exists?(email_address: "fresh@example.com")
   end
+
+  # --- Groups and owner (access-control design spec §3.3 "Users", Task 8) ------
+
+  test "a user's groups are saved and recorded in user.updated" do
+    user = users(:reader)
+    groups = [ access_control_groups(:author), access_control_groups(:read_only) ]
+
+    result = as_owner { Users::Save.call(user, attributes: { group_ids: [ "", *groups.map(&:id) ] }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal groups.map(&:id).sort, user.reload.group_ids.sort
+    event = Audit::Event.find_by!(action: "user.updated", subject: user)
+    assert_equal [ [ access_control_groups(:read_only).id ], groups.map(&:id).sort ], event.field_changes["group_ids"]
+    assert_equal groups.map(&:id).sort, event.snapshot["group_ids"]
+  end
+
+  test "a non-owner can't add someone to a group holding permissions they lack" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    AccessControl::Grant.create!(group: managers, permission: "users.manage", scope: {})
+    # Enough to manage the reader at all (their Read only group, fix round 1 I1).
+    AccessControl::Grant.create!(group: managers, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "pages.read", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+
+    result = as(users(:editor_branch)) do
+      Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:admin).id ] })
+    end
+
+    assert result.denied?
+    assert_equal [ "You don't have permission to add users to the Admin group" ], result.errors
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+  end
+
+  test "only an owner may change owner" do
+    result = as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "1" }) }
+    assert result.denied?
+    assert_equal [ "Only an owner can change who is an owner" ], result.errors
+    assert_not users(:reader).reload.owner?
+
+    # An unchanged value (the form's hidden "0") isn't a change.
+    assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "0", email_address: "r@example.com" }) }.ok?
+  end
+
+  test "an owner promotes a user, recorded as user.owner_changed" do
+    result = as_owner { Users::Save.call(users(:reader), attributes: { owner: "1" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert users(:reader).reload.owner?
+    event = Audit::Event.find_by!(action: "user.owner_changed", subject: users(:reader))
+    assert_equal({ "owner" => [ false, true ] }, event.field_changes)
+    assert_not Audit::Event.exists?(action: "user.updated", subject: users(:reader))
+  end
+
+  test "the last owner can't be demoted" do
+    result = as_owner { Users::Save.call(users(:one), attributes: { owner: "0" }) }
+
+    assert_not result.ok?
+    assert_includes result.errors.to_sentence, "can't demote the last owner"
+    assert users(:one).reload.owner?
+  end
+  # --- Final fix wave (Important 2, Minor 1) ------------------------------------
+
+  test "a non-owner can't remove a user from a group beyond their rights" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each do |key|
+      AccessControl::Grant.create!(group: managers, permission: key, scope: {})
+    end
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    AccessControl::Membership.create!(user: users(:reader), group: managers)
+
+    # The reader's own groups are within the actor's rights, so removing
+    # them is fine...
+    ok = as(users(:editor_branch)) { Users::Save.call(users(:reader), attributes: { group_ids: [ managers.id ] }) }
+    assert ok.ok?, ok.errors.inspect
+
+    # ...but taking the Admin member out of Admin isn't.
+    refused = as(users(:editor_branch)) { Users::Save.call(users(:two), attributes: { group_ids: [] }) }
+    assert refused.denied?
+    assert_includes users(:two).reload.group_ids, access_control_groups(:admin).id
+  end
+
+  test "an owner's token is judged on its group: no owner flags, no groups beyond it" do
+    token_group = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each do |key|
+      AccessControl::Grant.create!(group: token_group, permission: key, scope: {})
+    end
+    token, = ApiToken.generate!(users(:one), group: token_group)
+
+    as(token, channel: :mcp) do
+      promote = Users::Save.call(users(:reader), attributes: { owner: "1" })
+      assert promote.denied?
+      assert_equal [ "Only an owner can change who is an owner" ], promote.errors
+
+      owners_account = Users::Save.call(users(:one), attributes: { email_address: "taken@example.com" })
+      assert owners_account.denied?
+
+      beyond = Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:admin).id ] })
+      assert beyond.denied?
+      assert_equal [ "You don't have permission to add users to the Admin group" ], beyond.errors
+
+      outranked = Users::Save.call(users(:two), attributes: { email_address: "two-new@example.com" })
+      assert outranked.denied?
+    end
+
+    assert_not users(:reader).reload.owner?
+    assert_equal "one@example.com", users(:one).reload.email_address
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).group_ids
+  end
 end

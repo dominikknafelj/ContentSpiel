@@ -35,7 +35,7 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
 
       # `admin--groups` drives SortableJS the same way `admin--blocks`/
       # `admin--tree` do (see those tests' own comments for why native
-      # drag-and-drop isn't driven through Selenium here): moving the two
+      # drag-and-drop isn't driven through the browser here): moving the two
       # rows' DOM nodes and calling the controller's own `renumber()`
       # directly leaves the DOM in exactly the shape a real drop's `onEnd`
       # would -- reindexed `name`/`id` attributes included -- and fires the

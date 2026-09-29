@@ -1,7 +1,9 @@
 <div id="<%= dom_id %>" data-block-id="<%= block.id %>" data-admin--blocks-target="card"
      class="admin-block-card rounded-cs border border-line bg-surface">
   <div class="flex items-center gap-2 border-b border-line p-3">
-    <span class="admin-block-card__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+    <% if editable? %>
+      <span class="admin-block-card__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+    <% end %>
 
     <% if unavailable? %>
       <span class="flex-1 font-semibold text-danger-ink"><%= unavailable_label %></span>
@@ -16,6 +18,7 @@
         "Schedule…" already uses -- not nested inside the collapse toggle
         above, so a click inside it never also fires that button's own
         `data-action`. %>
+    <% if editable? %>
     <details class="admin-block-card__menu relative shrink-0">
       <summary class="cursor-pointer list-none rounded-cs px-2 py-1 text-meta hover:bg-sunken" aria-label="Block actions">⋯</summary>
       <div class="absolute right-0 z-10 mt-1 flex w-40 flex-col gap-1 rounded-cs border border-line-strong bg-surface p-1 shadow-menu">
@@ -28,18 +31,15 @@
                 onclick="document.getElementById('<%= delete_dialog_id %>').showModal()">Delete</button>
       </div>
     </details>
+    <% end %>
   </div>
 
   <% unless unavailable? %>
     <div data-block-body class="flex flex-col gap-3 p-3">
       <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
 
-      <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
-            data: {
-              controller: "admin--autosave",
-              action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-              "admin--autosave-status-id-value": status_id
-            } do %>
+      <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4", data: form_data do %>
+      <%= tag.fieldset disabled: !editable?, class: "contents" do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
         <% schema_fields.each do |field| %>
@@ -87,13 +87,16 @@
           <% end %>
         <% end %>
       <% end %>
+      <% end %>
     </div>
   <% end %>
 
-  <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this block?", body: "This can't be undone.") do |dialog| %>
-    <% dialog.with_confirm_action do %>
-      <%= form_with url: destroy_path, method: :delete do %>
-        <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+  <% if editable? %>
+    <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this block?", body: "This can't be undone.") do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: destroy_path, method: :delete do %>
+          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+        <% end %>
       <% end %>
     <% end %>
   <% end %>
@@ -110,7 +113,7 @@
       direct child of the sortable list to begin with. The very last card
       renders none of its own; the page-level "add at the end" picker
       already covers that same slot. %>
-  <% unless unavailable? || last? %>
+  <% if editable? && !(unavailable? || last?) %>
     <%= render Admin::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, after_id: block.id) %>
   <% end %>
 </div>

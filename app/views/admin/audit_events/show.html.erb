@@ -1,0 +1,51 @@
+<%# One audit event (design spec §5 "Audit log module": "the event page
+    shows the changes table (old/new; bodies as 'changed') and a
+    collapsible pretty-printed snapshot"). %>
+<div class="mb-4">
+  <%= link_to "← Back to audit log", admin_audit_events_path(**admin_url_options), class: "text-sm text-meta hover:underline" %>
+</div>
+
+<h1 class="mb-1 text-h1 text-ink"><%= @event.action %></h1>
+<p class="mb-6 text-sm text-meta">
+  <%= @event.occurred_at.strftime("%B %-d, %Y at %H:%M") %>
+  <% if @event.last_occurred_at != @event.occurred_at %>
+    (last updated <%= @event.last_occurred_at.strftime("%B %-d, %Y at %H:%M") %>)
+  <% end %>
+  · <%= audit_actor_label(@event) %> · <%= audit_channel_label(@event.channel) %>
+</p>
+
+<dl class="mb-6 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-4">
+  <div>
+    <dt class="font-cs-mono text-label uppercase tracking-mono text-meta">Subject</dt>
+    <dd class="mt-1">
+      <% if (path = audit_subject_path(@event)) %>
+        <%= link_to @event.subject_label, path, class: "hover:underline" %>
+      <% else %>
+        <%= @event.subject_label.presence || "—" %>
+      <% end %>
+    </dd>
+  </div>
+  <div>
+    <dt class="font-cs-mono text-label uppercase tracking-mono text-meta">Request</dt>
+    <dd class="mt-1"><%= @event.request_id.presence || "—" %></dd>
+  </div>
+  <div>
+    <dt class="font-cs-mono text-label uppercase tracking-mono text-meta">IP</dt>
+    <dd class="mt-1"><%= @event.ip.presence || "—" %></dd>
+  </div>
+</dl>
+
+<h2 class="mb-2 text-h2 text-ink">Changes</h2>
+<%= render Admin::AuditChangesComponent.new(field_changes: @event.field_changes) %>
+
+<% if @event.snapshot.present? %>
+  <details class="mt-6">
+    <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Snapshot</summary>
+    <%# `JSON.pretty_generate` returns a plain (not `html_safe`) String --
+        ERB's own `<%= %>` escaping is what keeps a stored value that
+        looks like markup (a title of literal `<script>`) rendering as
+        text here, the same rule `Admin::AuditChangesComponent` follows
+        for the changes table above (Task 9 controller ruling). %>
+    <pre class="mt-2 overflow-x-auto rounded-cs border border-line bg-sunken p-3 text-xs"><%= JSON.pretty_generate(@event.snapshot) %></pre>
+  </details>
+<% end %>

@@ -23,11 +23,18 @@ module Admin
     end
 
     def update
-      if @user.update(params.permit(:password, :password_confirmation))
+      # `actor: @user`: nobody is signed in here (a nil actor on `:admin`
+      # is denied), but the emailed reset token `set_user_by_token` just
+      # verified authenticated this request as @user -- so it's their own
+      # password change, which `Users::UpdatePassword` allows and records
+      # as theirs.
+      result = Users::UpdatePassword.call(@user, password: params[:password], password_confirmation: params[:password_confirmation], actor: @user)
+
+      if result.ok?
         @user.sessions.destroy_all
         redirect_to admin_sign_in_path, notice: "Password has been reset."
       else
-        redirect_to admin_edit_password_path(params[:token]), alert: "Passwords did not match."
+        redirect_to admin_edit_password_path(params[:token]), alert: result.errors.to_sentence
       end
     end
 

@@ -1,12 +1,35 @@
 require "test_helper"
+require "capybara/cuprite"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
-  driven_by :selenium, using: :headless_chrome, screen_size: [ 1400, 1400 ]
+  # Cuprite drives headless Chrome over the DevTools protocol (via Ferrum),
+  # dispatching clicks and key events straight to the page with
+  # `Input.dispatch*Event`. It replaced Selenium (PR #30): WebDriver's
+  # keyboard actions intermittently never reached a fully rendered, focused
+  # page on CI -- one unrelated system test per run, never locally -- and a
+  # handshake that waited for native input couldn't make them arrive.
+  #
+  # `js_errors: false`: with `true`, any uncaught exception or unhandled
+  # rejection in the page fails the test, and Turbo itself produces a
+  # harmless one -- a `<turbo-frame>` disconnected mid-load (e.g. by a
+  # back-navigation's snapshot render) cancels its fetch and the resulting
+  # `AbortError` escapes Turbo unhandled. That flaked the API-token test's
+  # `go_back` about every other run. Tests assert on what the page shows and
+  # saves instead, which is where a broken controller shows up anyway.
+  # `no-sandbox` because GitHub's runners (and most containers) can't give
+  # Chrome its user-namespace sandbox.
+  driven_by :cuprite, screen_size: [ 1400, 1400 ], options: {
+    headless: true,
+    js_errors: false,
+    process_timeout: 30,
+    timeout: 15,
+    browser_options: { "no-sandbox" => nil }
+  }
 
   # Signs in through the real sign-in form (cs-studio spec §3/§9). `Session
   # TestHelper#sign_in_as` -- what every integration test uses -- only ever
   # sets cookies on the test process's own internal Rack::Test session; a
-  # system test's browser is a *separate* HTTP client Selenium drives, so
+  # system test's browser is a *separate* HTTP client Cuprite drives, so
   # cookies set that way never reach it. Signing in has to happen the way a
   # real editor would: an actual POST the browser itself sends.
   def sign_in_via_form(user, password: "password")
@@ -26,12 +49,15 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert_selector "nav[aria-label='Modules']"
   end
 
-  # Clicks through JavaScript (`element.click()`) instead of a native
-  # WebDriver click -- see `test/system/setup_wizard_test.rb`'s own comment
-  # for why: on a loaded machine headless Chrome intermittently drops native
-  # clicks made right after a page load. Shared here (carried out of that
-  # test, cs-studio Task 9) since every CS Studio system test needs the same
-  # workaround for its own sign-in and navigation clicks.
+  # Clicks through JavaScript (`element.click()`) instead of a native click.
+  # Under Selenium this first worked around headless Chrome intermittently
+  # dropping native WebDriver clicks made right after a page load. It stays
+  # under Cuprite because switching `press` to Cuprite's native `click` (a
+  # real pointer sequence -- mousedown, focus change, mouseup -- aimed at the
+  # element's centre) failed the related-posts picker test on every run when
+  # this was tried: its autosave landed without the picked post. A scripted
+  # click fires just the `click` these tests mean to exercise. Tests that are
+  # *about* a real pointer (the mind graph) click natively.
   def press(label)
     find(:link_or_button, label).execute_script("this.click()")
   end
@@ -44,11 +70,10 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # `input` events go nowhere. So this waits until every `admin--*`
   # controller named on the page is connected.
   #
-  # Then `await_native_input`: headless Chrome was also observed dropping
-  # *every* native key event of a `send_keys` sent shortly after a page load
-  # (no `keydown` reaches the document at all -- the same class of drop
-  # `#press`'s comment describes for clicks), which the lazy loading made
-  # frequent enough to flake the typing tests.
+  # Cuprite needs no further wait before typing: its key events go to the
+  # page through CDP rather than through a WebDriver input queue, so there
+  # is no separate "accepting native input" state to wait for (Selenium
+  # needed an `await_native_input` handshake here, which is what flaked).
   def await_admin_controllers
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
@@ -62,20 +87,5 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
       const poll = () => (ready() ? done(true) : setTimeout(poll, 20))
       poll()
     JS
-    await_native_input
-  end
-
-  # A handshake rather than a sleep: presses Shift (which types nothing and
-  # triggers nothing) until the page actually receives a native `keydown`,
-  # i.e. until the browser is accepting WebDriver input on this page.
-  def await_native_input(attempts: 50)
-    page.execute_script("window.__nativeInputSeen = false; document.addEventListener('keydown', () => { window.__nativeInputSeen = true }, { capture: true, once: true })")
-    attempts.times do
-      page.driver.browser.action.send_keys(:shift).perform
-      return if page.evaluate_script("window.__nativeInputSeen")
-
-      sleep 0.05
-    end
-    raise "the browser never accepted native keyboard input"
   end
 end

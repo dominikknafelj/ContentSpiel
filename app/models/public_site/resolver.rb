@@ -7,7 +7,9 @@ module PublicSite
   class Resolver
     Result = Data.define(:status, :record, :location, :http_status) do
       def self.found(record) = new(status: :found, record:, location: nil, http_status: 200)
-      def self.redirect(location, http_status = 301) = new(status: :redirect, record: nil, location:, http_status:)
+      # `record` is what the redirect points at -- the preview checks the
+      # actor may read it before disclosing where it lives now.
+      def self.redirect(location, http_status = 301, record: nil) = new(status: :redirect, record:, location:, http_status:)
       def self.not_found = new(status: :not_found, record: nil, location: nil, http_status: 404)
     end
 
@@ -48,7 +50,7 @@ module PublicSite
       return Result.found(row.record) if row.current
 
       target = @urls.path_for(row.record, locale)
-      target ? Result.redirect(target) : Result.not_found
+      target ? Result.redirect(target, record: row.record) : Result.not_found
     end
 
     # "A listing page's path + a post slug" where the post lives canonically
@@ -63,7 +65,7 @@ module PublicSite
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)
-      target && Result.redirect(target)
+      target && Result.redirect(target, record: post)
     end
 
     # `:preview` (signed-in editors) never gates on publication state --

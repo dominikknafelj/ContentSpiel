@@ -19,6 +19,19 @@ module Mcp
       MCP::Tool::Response.new([ { type: "text", text: message } ], error: true)
     end
 
+    # Access-control design spec §3.3, "not found, not forbidden": a post
+    # outside the token's read scope (`AccessControl.scope`, the token's
+    # group intersected with its user's rights) gets exactly this response,
+    # the same text and shape as an id that doesn't exist -- no id echoed
+    # back, no "forbidden" -- so a token can't tell the two apart and learn
+    # which posts exist.
+    def post_not_found = error_response("Post not found")
+
+    # The post `id` names, if the acting token may read it; nil otherwise.
+    def find_readable_post(id)
+      AccessControl.scope(Current.actor, "posts.read", Post.all).find_by(id: id)
+    end
+
     # `Locales::SUPPORTED` (all ~40 codes ContentSpiel can ever serve) is what
     # every tool's `locale` schema enum has to list, because `input_schema` is
     # built once at class load and can't read a per-site runtime setting --
