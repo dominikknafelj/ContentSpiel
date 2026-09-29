@@ -22,26 +22,26 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 
 | Item | Why (roadmap it unblocks) | Priority | Ref |
 |---|---|---|---|
-| Locale model decision: supported vs enabled locales, how slugs/indexes scale | Runtime languages, admin i18n; decides admin form shape | Must | #44, #17 |
-| `PublicUrls` (one URL builder, absolute URLs) + `Current.site` | SEO/hreflang, feeds, API, navigation, CDN purge, "view on site" | Must | #27, #51, #12, §4.1, §4.7 |
-| `PublicSite::Resolver` (published vs preview scope) + cookie-less public controller | Preview, workflow, caching/CDN, GDPR | Must | #19, #48, §4.2 |
-| Path-change events + automatic redirects | SEO redirects, CDN purge, content quality | Must | #45 |
-| Open types: string `content_type`/`block_type` + registries | Custom content types, plugin API, reusable content | Must | #50, #6, #47, §8 |
-| Canonical post URL + posts in the sitemap | SEO, feeds | Should | #8 |
-| Service layer: `Posts::Save`, `Pages::Save/Move/Destroy`, `ContentBlocks::Save/Reorder`, `ApiToken.issue!` | The single write path roles, audit, versioning, webhooks, search and plugins attach to; MCP switches first | Must | §4.3–4.6, #25 |
-| Test helpers for content setup | Makes everything after cheaper | Should | #39, #41 |
+| Locale model decision: supported vs enabled locales, how slugs/indexes scale | Runtime languages, admin i18n; decides admin form shape | Must | #44, #17 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| `PublicUrls` (one URL builder, absolute URLs) + `Current.site` | SEO/hreflang, feeds, API, navigation, CDN purge, "view on site" | Must | #27, #51, #12, §4.1, §4.7 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| `PublicSite::Resolver` (published vs preview scope) + cookie-less public controller | Preview, workflow, caching/CDN, GDPR | Must | #19, #48, §4.2 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| Path-change events + automatic redirects | SEO redirects, CDN purge, content quality | Must | #45 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| Open types: string `content_type`/`block_type` + registries | Custom content types, plugin API, reusable content | Must | #50, #6, #47, §8 — done (sub-project 2, spec `2026-09-27-open-types-design.md`) |
+| Canonical post URL + posts in the sitemap | SEO, feeds | Should | #8 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| Service layer: `Posts::Save`, `Pages::Save/Move/Destroy`, `ContentBlocks::Save/Reorder`, `ApiToken.issue!` | The single write path roles, audit, versioning, webhooks, search and plugins attach to; MCP switches first | Must | §4.3–4.6, #25 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
+| Test helpers for content setup | Makes everything after cheaper | Should | #39, #41 — done (sub-project 1, spec `2026-09-26-foundations-design.md`, `test/support/content_helper.rb`) |
 
 ## Phase 2 — own admin (replaces Avo)
 
 | Item | Priority | Notes |
 |---|---|---|
-| Three-column shell: modules \| page tree \| content | Must | Tree: drag reorder, status per node, add child, open page |
+| Three-column shell: modules \| page tree \| content | Must | Tree: drag reorder, status per node, add child, open page — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Tiptap editor + JSON storage + ActionText migration | Must | Markdown view for MCP; node registry — done (sub-project 4, spec `2026-09-27-tiptap-and-avo-removal-design.md`) |
-| Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 |
-| Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 |
-| Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry |
+| Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
+| Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
+| Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 |
-| "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 |
+| "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
 | Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
