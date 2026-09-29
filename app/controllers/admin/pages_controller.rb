@@ -185,13 +185,7 @@ module Admin
       if result.ok? && hero_image_changing
         streams << hero_image_stream(result.record.hero_media_asset)
       elsif upload
-        # `::Media::Asset`, not bare `Media::Asset`: media library Task 7's
-        # `Admin::Media` namespace (`Admin::Media::GridComponent`/
-        # `DetailComponent`) shadows the top-level `Media` module for a
-        # bare reference lexically nested under `Admin`, this controller
-        # included (`Admin::Columns::ImageColumnComponent#thumbnail_source`
-        # has the same fix, with the fuller explanation).
-        streams.insert(1, hero_image_stream(::Media::Asset.find_by(id: @page.attribute_in_database("hero_media_asset_id"))))
+        streams.insert(1, hero_image_stream(Media::Asset.find_by(id: @page.attribute_in_database("hero_media_asset_id"))))
       end
 
       # The tree column lives outside this form entirely (the layout's own

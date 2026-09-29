@@ -1,5 +1,18 @@
 module Admin
-  module Media
+  # `MediaLibrary`, not `Media`: a real `Admin::Media` module would shadow
+  # the top-level `Media` module (`app/models/media/*`,
+  # `app/services/media/*`) for every *bare* `Media::` reference lexically
+  # nested under `module Admin` elsewhere in this app -- Ruby's constant
+  # lookup checks a class's own lexical scope, `Admin` included, before it
+  # ever falls back to the top level. That trap briefly existed mid-task
+  # (see the git history) and broke the hero-image and image-block upload
+  # paths (`NameError: uninitialized constant Admin::Media::Upload`)
+  # without touching a single line of this module's own code -- named
+  # `MediaLibrary` instead, so `Admin.const_defined?(:Media, false)` never
+  # becomes true and no other `Admin::*` file ever has to remember to
+  # write `::Media::` on its own account. `test/lib/admin_media_namespace_
+  # test.rb` guards against this regressing.
+  module MediaLibrary
     # The Media module's own grid (media library design spec §6): one
     # thumbnail card per asset, each linking to its own detail panel
     # (`Admin::MediaController#show`). Every asset this renders must be

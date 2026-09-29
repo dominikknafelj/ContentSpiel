@@ -1,10 +1,10 @@
 <%# The Media module's own grid (media library design spec §6): search,
     filters, the multi-file upload dropzone, and the grid itself
-    (`Admin::Media::GridComponent`). No tree column (a library image has
-    no tree position of its own, the same reason Tags/Posts render plain
-    content frames) and no language switcher (title/alt/caption per locale
-    only exist once an image is open -- `Admin::Media::DetailComponent`'s
-    own). %>
+    (`Admin::MediaLibrary::GridComponent`). No tree column (a library image
+    has no tree position of its own, the same reason Tags/Posts render
+    plain content frames) and no language switcher (title/alt/caption per
+    locale only exist once an image is open -- `Admin::MediaLibrary
+    ::DetailComponent`'s own). %>
 <h1 class="mb-4 text-h1 text-ink">Media</h1>
 
 <div class="mb-6 rounded-cs border border-dashed border-line-strong p-4"
@@ -39,7 +39,7 @@
   <%= link_to "Clear", admin_media_path(**admin_url_options), class: setup_secondary_link_class %>
 <% end %>
 
-<%= render Admin::Media::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
+<%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
 
 <% if @has_next || @offset.positive? %>
   <div class="mt-4 flex items-center gap-3">

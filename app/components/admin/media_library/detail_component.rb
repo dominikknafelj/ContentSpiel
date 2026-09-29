@@ -1,5 +1,7 @@
 module Admin
-  module Media
+  # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
+  # this namespace is `MediaLibrary`, not `Media`.
+  module MediaLibrary
     # One image's detail panel (media library design spec §6): preview,
     # type/size/dimensions, an autosaving title/alt/caption form (`Media
     # ::Save`, alt/caption per locale via the standard language switcher),

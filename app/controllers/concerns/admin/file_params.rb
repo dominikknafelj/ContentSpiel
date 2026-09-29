@@ -47,13 +47,7 @@ module Admin
     # shows them in that field's own error slot -- the caller answers with
     # it instead of saving, the same as any other failed save.
     def upload_to_library(file, record:, field:)
-      # `::Media::Upload`, not bare `Media::Upload`: media library Task 7's
-      # `Admin::Media` namespace (`Admin::Media::GridComponent`/
-      # `DetailComponent`) shadows the top-level `Media` module for a bare
-      # reference lexically nested under `Admin`, this concern included
-      # (`Admin::Columns::ImageColumnComponent#thumbnail_source` has the
-      # fuller explanation).
-      uploaded = ::Media::Upload.call(file: file)
+      uploaded = Media::Upload.call(file: file)
       return uploaded if uploaded.ok?
 
       if uploaded.denied?

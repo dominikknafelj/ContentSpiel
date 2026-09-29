@@ -23,13 +23,7 @@ module Admin
       upload = params[:file]
       return render_errors([ "file must be attached" ]) unless upload.respond_to?(:tempfile)
 
-      # `::Media::Upload`, not bare `Media::Upload`: `Admin::Media
-      # ::GridComponent`/`DetailComponent` (Task 7) made `Admin::Media` a
-      # real namespace, which shadows the top-level `Media` module for
-      # every bare `Media::` reference lexically nested under `Admin` --
-      # this controller's own included. Left bare, this would resolve to
-      # (nonexistent) `Admin::Media::Upload`.
-      result = ::Media::Upload.call(file: upload)
+      result = Media::Upload.call(file: upload)
 
       if result.ok?
         render json: { id: result.record.id, url: result.record.url }, status: :created

@@ -15,15 +15,6 @@ module Admin
   # `media.manage`, or the asset's own uploader) -- a denial from either
   # comes back as an ordinary 403/422, exactly like every other module's
   # write.
-  #
-  # Every `Media::*` reference below is written `::Media::*`, with the
-  # leading `::`, deliberately: this controller lives in the very
-  # `Admin::Media` namespace `Admin::Media::GridComponent`/
-  # `DetailComponent` also occupy, so a *bare* `Media::Asset` here would
-  # resolve to (nonexistent) `Admin::Media::Asset` -- Ruby's constant
-  # lookup checks this class's own lexical scope (which now includes a
-  # real `Admin::Media` module) before it ever falls back to the top-level
-  # `::Media` the library's models/services actually live in.
   class MediaController < BaseController
     include AutosaveResponses
 
@@ -41,7 +32,7 @@ module Admin
     # queries whether the page holds 10 assets or 60 -- see that scope's
     # own comment; every grid render (this action, and every filtered
     # re-render of it) must load through it, never a bare `Media::Asset
-    # .all`, or `Admin::Media::GridComponent#thumbnail_url`'s own `#srcset`
+    # .all`, or `Admin::MediaLibrary::GridComponent#thumbnail_url`'s own `#srcset`
     # call turns straight back into the N+1 the scope exists to prevent.
     def index
       @assets = filtered_assets.order(id: :desc).limit(PER_PAGE + 1).offset(offset).to_a
@@ -64,7 +55,7 @@ module Admin
     # deliberately not merged into one endpoint, per that resource's own
     # routing comment).
     def create
-      result = ::Media::Upload.call(file: params[:file])
+      result = Media::Upload.call(file: params[:file])
 
       if result.ok?
         render json: { id: result.record.id, title: result.record.title }, status: :created
@@ -78,7 +69,7 @@ module Admin
     # edited, through `Media::Save` -- which itself falls back to 403 for
     # anyone but `media.manage` or this asset's own uploader (`Media
     # ::Ownership`). The view only ever renders an editable form for
-    # someone `Admin::Media::DetailComponent#editable?` already agrees can
+    # someone `Admin::MediaLibrary::DetailComponent#editable?` already agrees can
     # save -- a denial here is therefore only ever a stale tab (rights
     # taken away, or someone else's upload) resending a form it should no
     # longer be able to submit, exactly the same "forged/stale PATCH" case
@@ -87,7 +78,7 @@ module Admin
       asset_params = params.fetch(:media_asset, ActionController::Parameters.new).permit(:title, :alt, :caption)
       translated = asset_params.slice(:alt, :caption).to_h
 
-      result = ::Media::Save.call(@asset, attributes: { title: asset_params[:title] }, translations: { admin_locale => translated })
+      result = Media::Save.call(@asset, attributes: { title: asset_params[:title] }, translations: { admin_locale => translated })
 
       streams = autosave_stream(
         record: result.record,
@@ -104,13 +95,13 @@ module Admin
     # Permanent, same "no trash yet" interim state every other delete in
     # CS Studio is (`Admin::TagsController`'s own comment) -- `Media
     # ::Destroy` itself is what actually refuses this while the image is
-    # still used (design spec §5.1), which `Admin::Media::DetailComponent`
+    # still used (design spec §5.1), which `Admin::MediaLibrary::DetailComponent`
     # already disables the button for ahead of time; this is only ever hit
     # for real through a forged request, a race, or an actor whose rights
     # just changed, and any of those come back as the ordinary redirect-
     # with-alert every other module's own `destroy` already gives.
     def destroy
-      result = ::Media::Destroy.call(@asset)
+      result = Media::Destroy.call(@asset)
 
       if result.ok?
         redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Deleted"
@@ -128,11 +119,11 @@ module Admin
     # page/post does -- `media.upload` alone (checked above, for every
     # action this is `before_action`ed on) is what CS Studio's whole
     # library-browsing story ever gates on. `with_variants` here (not just
-    # on the grid's own `filtered_assets`) is what lets `Admin::Media
+    # on the grid's own `filtered_assets`) is what lets `Admin::MediaLibrary
     # ::DetailComponent`'s own preview/thumbnail read `#srcset` without an
     # extra query either.
     def set_asset
-      @asset = ::Media::Asset.with_variants.find(params[:id])
+      @asset = Media::Asset.with_variants.find(params[:id])
     end
 
     def offset
@@ -141,7 +132,7 @@ module Admin
     end
 
     def filtered_assets
-      scope = ::Media::Asset.with_variants
+      scope = Media::Asset.with_variants
       scope = scope.unused if params[:filter] == "unused"
       scope = scope.where(created_by_id: Current.user&.id) if params[:filter] == "mine"
       scope = search(scope, params[:q]) if params[:q].present?
@@ -168,7 +159,7 @@ module Admin
     # #file_is_attached`), so the inner join can't drop or duplicate a row
     # the way joining a one-to-many association could.
     def search(scope, q)
-      like = "%#{::Media::Asset.sanitize_sql_like(q)}%"
+      like = "%#{Media::Asset.sanitize_sql_like(q)}%"
 
       scope.joins(file_attachment: :blob).where(
         "media_assets.title ILIKE :q " \
