@@ -125,6 +125,10 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert Media::Destroy.call(doomed).ok?
     pick_from_library(doomed)
 
+    # Waited for outside `within` first (final fix wave): the refusal
+    # replaces the whole section, and a `within` scope found before that
+    # stream lands goes stale (Cuprite's ObsoleteNode) instead of retrying.
+    assert_selector "#page-hero-image-section", text: "Hero image doesn't exist"
     within("#page-hero-image-section") do
       assert_text "Hero image doesn't exist"
       assert_text stored.title

@@ -194,4 +194,23 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert Posts::Destroy.call(post).ok?
     assert_empty usages.call
   end
+
+  # Final fix wave (M1): an image deleted after the body validated and
+  # after `UsageIndex` checked it, before its usage row is written, hits
+  # the FK on `media_usages` -- a validation failure, not a 500, and the
+  # post is unchanged.
+  test "a body image deleted before its usage row is written fails validation" do
+    asset = create_media_asset
+    post = create_post(title: "Pictures")
+    insert_all = Media::Usage.method(:insert_all)
+    racing = ->(rows, **options) { Media::Asset.where(id: asset.id).delete_all && insert_all.call(rows, **options) }
+
+    result = with_singleton_override(Media::Usage, :insert_all, racing) do
+      Posts::Save.call(post, translations: { "en" => { title: "Changed", body: rich_doc("::image{asset=\"#{asset.id}\"}") } })
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Body has an image that doesn't exist" ], result.errors
+    assert_equal "Pictures", post.reload.title
+  end
 end

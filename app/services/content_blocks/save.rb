@@ -14,7 +14,8 @@ module ContentBlocks
   # copying the source's. Choosing one also needs `media.upload` and
   # an existing asset (`Media::Choosing`), so a duplicate of an image block
   # does too. Every save then refreshes the block's `media_usages` rows
-  # (its image and its rich-text body's images) inside the transaction.
+  # (its image and its rich-text body's images) inside the transaction; an
+  # image deleted in the meantime fails the save as "doesn't exist".
   class Save < ApplicationService
     include OwnerPermissions
     include Media::Choosing
@@ -35,7 +36,9 @@ module ContentBlocks
       image_refusal = media_choice_result(@block, :media_asset_id, :image)
       return image_refusal if image_refusal
 
-      saved = ContentBlock.transaction do
+      # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
+      # (rescued below) mustn't abort the caller's transaction.
+      saved = ContentBlock.transaction(requires_new: true) do
         assign
         @block.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@block)
@@ -49,6 +52,10 @@ module ContentBlocks
       return failure(@block) unless saved
 
       success(@block)
+    rescue ActiveRecord::InvalidForeignKey
+      # The image, or an image the body embeds, was deleted between its
+      # existence check and the write (final fix wave, M1; `Media::Choosing`).
+      vanished_media_failure(@block, :media_asset_id, :image)
     end
 
     private

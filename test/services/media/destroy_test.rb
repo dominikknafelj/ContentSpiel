@@ -114,4 +114,18 @@ class Media::DestroyTest < ActiveSupport::TestCase
     assert_not Audit::Event.exists?(action: "media.deleted")
     assert_no_enqueued_jobs(only: ActiveStorage::PurgeJob)
   end
+
+  # Final fix wave (T6b): a destroy halted by a callback without adding an
+  # error (`throw :abort`) still answers with a message about deleting --
+  # not the generic "could not be saved".
+  test "a destroy halted without errors fails with a deletion message" do
+    asset = upload_by(users(:author))
+
+    result = with_singleton_override(asset, :destroy, -> { false }) { as(users(:two)) { Media::Destroy.call(asset) } }
+
+    assert_not result.ok?
+    assert_equal [ "This image couldn't be deleted" ], result.errors
+    assert Media::Asset.exists?(asset.id)
+    assert_not Audit::Event.exists?(action: "media.deleted")
+  end
 end

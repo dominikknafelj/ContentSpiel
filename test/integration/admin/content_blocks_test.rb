@@ -327,6 +327,23 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-section")
   end
 
+  # Final fix wave (T6), pinning the Task 6 ruling: a duplicate chooses its
+  # image again (through `ContentBlocks::Save`), so copying an image block
+  # needs `media.upload` too -- the page's edit right alone is refused, and
+  # no copy is made.
+  test "duplicating an image block needs media.upload" do
+    source = image_block_with_image
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+
+    assert_no_difference -> { @page.content_blocks.count } do
+      post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+  end
+
   # Only a type that `uses :image` takes an image id at all.
   test "a media_asset_id sent to a block type without an image is ignored" do
     block = @page.content_blocks.create!(block_type: "rich_text", position: 0)

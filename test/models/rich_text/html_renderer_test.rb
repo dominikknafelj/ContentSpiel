@@ -58,6 +58,20 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_includes html, "C</figcaption>"
   end
 
+  # Final fix wave (M6): an id stored as a String (an older import, a hand
+  # edit) renders -- `Media::UsageIndex` already counts it as a usage, so
+  # the page must show it too -- both through the document's preload and
+  # through a context built without a document.
+  test "an image whose asset_id is stored as a String still renders" do
+    asset = create_media_asset
+    html = render({ "type" => "image", "attrs" => { "asset_id" => asset.id.to_s, "alt" => "A" } })
+    assert_includes html, %(src="#{asset.url}")
+
+    context = RichText::RenderContext.new(locale: "en", urls: PublicSite::Urls.new)
+    assert_equal asset, context.media_asset(asset.id.to_s)
+    assert_nil context.media_asset("abc")
+  end
+
   # Media library Task 5: an image node's alt/caption fall back to the
   # asset's own defaults (`Media::Asset#alt_text`/`#caption_text`) when the
   # node doesn't override them -- the same "override, then the asset's

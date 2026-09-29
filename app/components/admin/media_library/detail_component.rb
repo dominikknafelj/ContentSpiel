@@ -95,7 +95,7 @@ module Admin
       # or a `media.manage` holder, same gate as every field above.
       def can_delete? = editable?
 
-      def used? = asset.used?
+      def used? = defined?(@used) ? @used : (@used = asset.used?)
 
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw
@@ -110,8 +110,12 @@ module Admin
       # reapplied here since neither that helper nor `Media::Destroy`'s own
       # (private, text-only) `#in_use_message` is built to hand back a
       # clickable link.
+      #
+      # Memoized (final fix wave, M7): the template reads it twice (the
+      # empty check and the list), and each call ran `#usages_summary`'s
+      # queries again.
       def usage_entries
-        asset.usages_summary.filter_map do |entry|
+        @usage_entries ||= asset.usages_summary.filter_map do |entry|
           place = place_for(entry[:owner])
           next if place.nil?
 
@@ -126,6 +130,12 @@ module Admin
           end
         end
       end
+
+      # Used, but by nothing this panel can name (final fix wave, M7): every
+      # usage row's owner is gone, or is a block with no page/post of its
+      # own -- a stale index entry. Delete stays disabled (`#used?`), so
+      # "Used on" must not say "Not used anywhere yet" beside it.
+      def unresolved_usage? = usage_entries.empty? && used?
 
       private
 

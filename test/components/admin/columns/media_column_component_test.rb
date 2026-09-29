@@ -23,6 +23,13 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_selector "input[type=file]", visible: :all
   end
 
+  # Final fix wave (M12): a refused choice's message is announced.
+  test "the error slot is a polite live region" do
+    render_column(nil, errors: [ "Hero image doesn't exist" ])
+
+    assert_selector "[aria-live='polite']", text: "Hero image doesn't exist"
+  end
+
   test "a chosen image shows its thumbnail, title, Change and Remove" do
     asset = create_media_asset
 

@@ -40,7 +40,13 @@ module Mcp
         title: "List media")
 
       def self.call(query: nil, unused: false, locale: nil, page: 1, server_context:)
-        return permission_denied("media.upload") unless AccessControl.holds?(Current.actor, "media.upload")
+        # `allowed?`, not `holds?` (final fix wave, M9): `holds?` answers
+        # "anywhere, under any scope" for navigation and buttons only
+        # (`AccessControl.holds?`'s own comment); an authorization check
+        # goes through `allowed?`. `media.upload` is an admin-area key with
+        # no record to scope by, so the two answer identically here -- this
+        # only keeps the call on the one sanctioned path.
+        return permission_denied("media.upload") unless AccessControl.allowed?(Current.actor, "media.upload")
 
         locale ||= Locales.default
         invalid_locale = reject_unless_enabled(locale)

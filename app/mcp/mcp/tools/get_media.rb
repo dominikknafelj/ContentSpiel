@@ -16,7 +16,7 @@ module Mcp
       # otherwise differ from the name this tool is actually called by.
       tool_name "get_media_tool"
 
-      description "Get a single library image by id: title, alt text, dimensions, and every place it's " \
+      description "Get a single library image by id: title, default alt text and caption, dimensions, and every place it's " \
         "currently used. Use its id in a rich-text image directive: " \
         "::image{asset=\"ID\" alt=\"…\" caption=\"…\"}. A `usages` entry is only named (type/id/title) " \
         "when this token can also read that page or post; usages it can't are folded into " \
@@ -24,7 +24,7 @@ module Mcp
       input_schema(
         properties: {
           id: { type: "integer" },
-          locale: { type: "string", enum: Locales::SUPPORTED.keys, description: "Which language's alt text to show (default: the site's current default locale)." }
+          locale: { type: "string", enum: Locales::SUPPORTED.keys, description: "Which language's alt text and caption to show (default: the site's current default locale)." }
         },
         required: [ "id" ]
       )
@@ -32,7 +32,13 @@ module Mcp
         title: "Get media")
 
       def self.call(id:, locale: nil, server_context:)
-        return permission_denied("media.upload") unless AccessControl.holds?(Current.actor, "media.upload")
+        # `allowed?`, not `holds?` (final fix wave, M9): `holds?` answers
+        # "anywhere, under any scope" for navigation and buttons only
+        # (`AccessControl.holds?`'s own comment); an authorization check
+        # goes through `allowed?`. `media.upload` is an admin-area key with
+        # no record to scope by, so the two answer identically here -- this
+        # only keeps the call on the one sanctioned path.
+        return permission_denied("media.upload") unless AccessControl.allowed?(Current.actor, "media.upload")
 
         # No per-asset "read" scope to fold a forbidden id into (unlike
         # `find_readable_post`): the media library has none (`Admin::Media
@@ -58,6 +64,9 @@ module Mcp
           id: asset.id,
           title: asset.title,
           alt: asset.alt_text(override: nil, locale: locale),
+          # The default caption (final fix wave, M5), nil when there's none
+          # in any language -- what a directive without `caption=` shows.
+          caption: asset.caption_text(override: nil, locale: locale),
           width: asset.width,
           height: asset.height,
           usage_count: places.size,

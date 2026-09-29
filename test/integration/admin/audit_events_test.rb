@@ -195,6 +195,31 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Media asset ##{asset.id}"
   end
 
+  # Final fix wave (M3): filtering by "Media asset" includes the rows
+  # recorded under the legacy `"MediaAsset"` type -- the same image's
+  # history shouldn't split at the rename -- and a subject filter matches
+  # its legacy rows too.
+  test "the Media asset filter includes legacy MediaAsset rows" do
+    sign_in_as(users(:one))
+    asset = create_media_asset
+    legacy = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
+      subject_label: "Media asset ##{asset.id}", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+    current = Audit::Event.create!(action: "media.updated", subject_type: "Media::Asset", subject_id: asset.id,
+      subject_label: "tiny", channel: "admin", occurred_at: Time.current, last_occurred_at: Time.current)
+    other = as(users(:one)) { create_post(title: "Not media", published: false) }
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset" }
+    assert_select "##{dom_id(legacy)}"
+    assert_select "##{dom_id(current)}"
+    assert_select "##{dom_id(Audit::Event.find_by!(action: "post.created", subject: other))}", count: 0
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset", subject_id: asset.id + 1 }
+    assert_select "##{dom_id(legacy)}", count: 0
+
+    get "/cs-studio/audit_events", params: { subject_type: "Media::Asset", subject_id: asset.id }
+    assert_select "##{dom_id(legacy)}"
+  end
+
   test "a subject link only renders when the current viewer can read that record" do
     group = AccessControl::Group.create!(name: "Audit only #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "audit.view")

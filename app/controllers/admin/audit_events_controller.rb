@@ -39,9 +39,9 @@ module Admin
       # `Media::Asset`; the key here is today's name, since new events only
       # ever store that. A pre-rename row's `subject_type` still reads
       # `"MediaAsset"` (append-only, never rewritten -- `Audit::Event`'s own
-      # comment) and so never matches this whitelist -- same as any other
-      # unrecognised `subject_type`, it's silently dropped from the filter
-      # rather than raising, and the row still lists and shows fine (its
+      # comment); filtering by "Media asset" matches those rows too
+      # (`#stored_subject_types`, final fix wave M3), and the row lists and
+      # shows fine (its
       # `subject_label` was captured at write time, not derived from the
       # constant, and `Audit::Event.polymorphic_class_for` maps the legacy
       # string so `event.subject` itself doesn't raise `NameError` loading a
@@ -117,7 +117,7 @@ module Admin
       scope = Audit::Event.all
       scope = scope.where(user_id: params[:user_id]) if params[:user_id].present?
       scope = scope.where(action: params[:event_action]) if params[:event_action].present?
-      scope = scope.where(subject_type: params[:subject_type]) if SUBJECT_TYPES.key?(params[:subject_type])
+      scope = scope.where(subject_type: stored_subject_types(params[:subject_type])) if SUBJECT_TYPES.key?(params[:subject_type])
       # `subject_id` alone, without a valid `subject_type`, is ambiguous
       # (a `Post` and a `Page` can share the same id) -- ignored rather
       # than matched against every type at once.
@@ -125,6 +125,14 @@ module Admin
       scope = scope.where(occurred_at: from_date..) if from_date
       scope = scope.where(occurred_at: ..to_date) if to_date
       scope
+    end
+
+    # A known type plus every legacy name stored for it before a rename
+    # (`Audit::Event::LEGACY_POLYMORPHIC_TYPES`, final fix wave M3) -- the
+    # "Media asset" filter also finds the rows written as `"MediaAsset"`,
+    # so one image's history doesn't split at the rename.
+    def stored_subject_types(type)
+      [ type, *Audit::Event::LEGACY_POLYMORPHIC_TYPES.filter_map { |legacy, current| legacy if current == type } ]
     end
 
     def from_date = @from_date ||= parsed_date(params[:from])&.beginning_of_day

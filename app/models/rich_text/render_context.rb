@@ -46,12 +46,21 @@ module RichText
     # own comment on "hostile documents render inert") -- `Hash#[]`/`fetch`
     # against a `nil` or malformed key just misses, same as a `find_by`
     # would.
+    #
+    # Normalised to an Integer first (final fix wave, M6), the same way
+    # `Media::UsageIndex#normalize_asset_id` reads it: an id stored as a
+    # String (`"42"` -- an older import, a hand edit) is a usage there, so
+    # it has to render here too, and the preload's Integer keys would
+    # otherwise miss it. Anything that isn't an id is nil.
     def media_asset(id)
+      id = self.class.normalize_asset_id(id)
       return nil if id.nil?
       return Media::Asset.find_by(id: id) if @document.nil?
 
       preloaded_media_assets[id]
     end
+
+    def self.normalize_asset_id(value) = Integer(value, exception: false)
 
     private
 
@@ -69,7 +78,7 @@ module RichText
     # without an image shouldn't pay for one.
     def preloaded_media_assets
       @preloaded_media_assets ||= begin
-        ids = @document.references.filter_map { |type, attribute, value| value if type == "image" && attribute == "asset_id" }
+        ids = @document.references.filter_map { |type, attribute, value| self.class.normalize_asset_id(value) if type == "image" && attribute == "asset_id" }
         ids.empty? ? {} : Media::Asset.with_variants.where(id: ids).index_by(&:id)
       end
     end

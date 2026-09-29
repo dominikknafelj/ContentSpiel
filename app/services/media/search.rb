@@ -12,9 +12,12 @@
 class Media::Search
   def self.call(scope, query) = new(scope, query).call
 
+  # Only a String is a query (final fix wave, M8): a forged `?q[]=x` or
+  # `?q[a]=x` arrives as an Array/Parameters, which `sanitize_sql_like`
+  # can't take -- it's no search at all rather than a 500.
   def initialize(scope, query)
     @scope = scope
-    @query = query
+    @query = query.is_a?(String) ? query : nil
   end
 
   def call

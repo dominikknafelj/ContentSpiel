@@ -123,6 +123,21 @@ class McpMediaTest < ActionDispatch::IntegrationTest
 
   # --- get_media -------------------------------------------------------------
 
+  # Final fix wave (M5): the caption default is part of what an agent needs
+  # to decide whether to override it in a directive.
+  test "get_media returns the image's default caption in the requested locale" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    asset = create_media_asset
+    Mobility.with_locale(:en) { asset.update!(caption: "The studio at dusk") }
+    Mobility.with_locale(:de) { asset.update!(caption: "Das Studio am Abend") }
+
+    english = call_tool(raw, "get_media_tool", id: asset.id, locale: "en")
+    german = call_tool(raw, "get_media_tool", id: asset.id, locale: "de")
+
+    assert_equal "The studio at dusk", english["structuredContent"]["caption"]
+    assert_equal "Das Studio am Abend", german["structuredContent"]["caption"]
+  end
+
   test "get_media reports an unknown id as Image not found" do
     raw = token_for(users(:one), access_control_groups(:admin))
 

@@ -23,7 +23,14 @@ module Media
   # The service's own transaction then saves the reference and refreshes
   # the owner's `media_usages` (`Media::UsageIndex.refresh`). A delete
   # racing this between the existence check and the save still can't
-  # leave a dangling reference: the FK refuses the save.
+  # leave a dangling reference: the FK refuses the save. That refusal
+  # (`ActiveRecord::InvalidForeignKey`) is rescued by the service and
+  # answered by `#vanished_media_failure` (final fix wave, M1) -- the same
+  # "doesn't exist" failure as a forged id, never a 500. It also covers the
+  # rich-text side, which is why `Posts::Save` includes this module too: an
+  # image a body embeds can go between the body's own existence check (or
+  # `UsageIndex`'s) and the insert of its `media_usages` row, whose FK
+  # then refuses it.
   module Choosing
     private
 
@@ -36,11 +43,31 @@ module Media
       return if raw.blank?
 
       id = Integer(raw.to_s, 10, exception: false)
-      return if id && id == record.public_send(attribute)
+      # "Resending the stored id" means the *stored* one (final fix wave,
+      # M2): an id someone already assigned in memory isn't stored, and
+      # comparing with it would skip the permission check below.
+      return if id && id == record.attribute_in_database(attribute)
       return denied("media.upload", record) unless authorize!("media.upload", record)
       return if id && Media::Asset.exists?(id)
 
       record.errors.add(error_attribute, "doesn't exist")
+      failure(record)
+    end
+
+    # The failure for a save the FK refused (see the module comment). The
+    # transaction has rolled back; the refused reference is still assigned
+    # in memory, so it tells the two cases apart: the record's own
+    # `reference_attribute` naming an asset that's gone is reported on
+    # `error_attribute` (the field the editor sees), anything else was a
+    # body's image on its way into `media_usages`. Pass nil for an owner
+    # with no reference column of its own (a post).
+    def vanished_media_failure(record, reference_attribute, error_attribute)
+      id = reference_attribute && record.public_send(reference_attribute)
+      if id && !Media::Asset.exists?(id)
+        record.errors.add(error_attribute, "doesn't exist")
+      else
+        record.errors.add(:body, "has an image that doesn't exist")
+      end
       failure(record)
     end
   end

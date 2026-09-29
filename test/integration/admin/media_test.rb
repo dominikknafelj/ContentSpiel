@@ -189,6 +189,45 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       "expected a constant number of queries regardless of asset count (10 assets: #{few_count}, 60 assets: #{many_count})"
   end
 
+  # Final fix wave (M12): each file's upload status is announced.
+  test "the upload status list is a polite live region" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/media"
+
+    assert_select "ul[data-admin--media-upload-target='list'][aria-live='polite']"
+  end
+
+  # Final fix wave (M8): a forged non-String `q` (`?q[]=x`, `?q[a]=x`)
+  # is no search at all, never a 500.
+  test "a non-string search query is ignored" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+
+    get "/cs-studio/media?q[]=x"
+    assert_response :success
+    assert_select "#media-asset-#{asset.id}"
+
+    get "/cs-studio/media?q[a]=x"
+    assert_response :success
+  end
+
+  # Final fix wave (M7): a usage row whose owner is gone (a stale index)
+  # still keeps Delete disabled, so "Used on" must not claim the image is
+  # "Not used anywhere yet" -- it says the use can't be shown instead.
+  test "a usage that resolves to no page or post says so rather than 'not used'" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "stale.png")
+    Media::Usage.insert_all([ { media_asset_id: asset.id, owner_type: "Page", owner_id: 0, role: "hero", locale: nil } ])
+
+    get "/cs-studio/media/#{asset.id}"
+
+    assert_response :success
+    assert_not_includes response.body, "Not used anywhere yet."
+    assert_includes response.body, "Used somewhere that can’t be shown"
+    assert_select "button[disabled]", text: "Delete"
+  end
+
   # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
   # `owner.owner` second hop -- a block-owned usage is named by its page or
   # post, never the block itself (`Admin::MediaLibrary::DetailComponent

@@ -33,7 +33,14 @@ module Posts
   #    A refusal here rolls the transaction back (tag rows `assign_tags`
   #    wrote included) and only then records `access.denied`, outside it,
   #    so the denial itself survives the rollback.
+  #
+  # Every save refreshes the post's `media_usages` rows for its body images
+  # (media library design spec §5.1). An image deleted between the body's
+  # existence check and that write fails the save as "has an image that
+  # doesn't exist" (`Media::Choosing#vanished_media_failure`), not a 500.
   class Save < ApplicationService
+    include Media::Choosing
+
     TRANSLATED = %i[title slug excerpt body].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
@@ -54,7 +61,9 @@ module Posts
       end
 
       refused = nil
-      saved = Post.transaction do
+      # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
+      # (rescued below) mustn't abort the caller's transaction.
+      saved = Post.transaction(requires_new: true) do
         related_before = related_state
         assign
         refused = refusal_after_assign
@@ -76,6 +85,8 @@ module Posts
       return failure(@post) unless saved
 
       success(@post)
+    rescue ActiveRecord::InvalidForeignKey
+      vanished_media_failure(@post, nil, nil)
     end
 
     private

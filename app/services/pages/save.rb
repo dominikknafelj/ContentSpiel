@@ -23,7 +23,8 @@ module Pages
   # `hero_media_asset_id` in `attributes` sets, changes or (nil) clears
   # it. Choosing one also needs `media.upload` and an existing asset
   # (`Media::Choosing`). Every save then refreshes the page's own
-  # `media_usages` rows inside the transaction (`Media::UsageIndex`).
+  # `media_usages` rows inside the transaction (`Media::UsageIndex`). A
+  # hero deleted in the meantime fails the save as "doesn't exist".
   class Save < ApplicationService
     include Media::Choosing
 
@@ -50,7 +51,10 @@ module Pages
       return hero_refusal if hero_refusal
 
       refused = nil
-      saved = Page.transaction do
+      # `requires_new`: a nested call (starter content) gets its own
+      # savepoint, so the FK refusal rescued below can't leave a caller's
+      # transaction aborted.
+      saved = Page.transaction(requires_new: true) do
         assign
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
@@ -70,6 +74,10 @@ module Pages
       return failure(@page) unless saved
 
       success(@page)
+    rescue ActiveRecord::InvalidForeignKey
+      # The hero was deleted between `#media_choice_result`'s check and the
+      # save (final fix wave, M1; `Media::Choosing`).
+      vanished_media_failure(@page, :hero_media_asset_id, :hero_image)
     end
 
     private

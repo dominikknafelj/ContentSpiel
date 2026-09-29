@@ -47,7 +47,8 @@ module PublicSite
   end
 
   # `content_version`, computed at most once per request (or job, or MCP
-  # call): it's ~13 queries, and a single page render can reach for it once
+  # call): it's 15 queries (plus `Current.site`, usually already loaded),
+  # and a single page render can reach for it once
   # for its ETag plus once per rich-text body it renders. Memoised on
   # `Current`, which Rails resets around every request and job -- so a
   # write made *during* a request (an autosave, an MCP update) isn't seen

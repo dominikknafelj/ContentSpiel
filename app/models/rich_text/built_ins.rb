@@ -257,6 +257,16 @@ module RichText
       # coercing (a directive attribute is always a raw String) -- exactly
       # what `TypeDefinition#directive`'s `{ attr:, type: }` mapping shape
       # exists for. `alt`/`caption` map to themselves, `:string` (identity).
+      #
+      # The existence check is the whole rule -- deliberately no permission
+      # check (final fix wave, M10): embedding an image that's already in
+      # the library is content editing, covered by the right to edit the
+      # post or block (`posts.edit`/`pages.edit`), unlike an image block's
+      # or a hero's reference, which needs `media.upload`
+      # (`Media::Choosing`). *Uploading* a new image does need `media.upload`
+      # (`Media::Upload`), and so does browsing the library in the picker.
+      # MCP clients rely on this: `update_post` can embed an id they were
+      # given.
       RichText::Schema.register_node("image") do |node|
         node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { Media::Asset.exists?(value) }
         node.attribute :alt, :string

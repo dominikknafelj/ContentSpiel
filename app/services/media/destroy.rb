@@ -44,7 +44,10 @@ module Media
         @asset.destroy || raise(ActiveRecord::Rollback)
       end
 
-      return failure(@asset) unless destroyed
+      # A destroy halted by a callback may add no error of its own (final
+      # fix wave, T6b) -- `Result.failure`'s generic fallback would then
+      # say "could not be saved", which is the wrong verb here.
+      return failure(@asset, @asset.errors.full_messages.presence || [ "This image couldn't be deleted" ]) unless destroyed
 
       success(@asset)
     rescue ActiveRecord::InvalidForeignKey

@@ -101,6 +101,40 @@ class Pages::SaveTest < ActiveSupport::TestCase
     end
   end
 
+  # Final fix wave (M1): an asset deleted between the existence check and
+  # the save (the check here deletes it and then answers "yes") hits the
+  # FK -- a validation failure, not a 500, and the page is unchanged.
+  test "a hero deleted between the check and the save fails validation" do
+    asset = create_media_asset
+    page = create_page(title: "Hero")
+    racing = ->(*) { Media::Asset.where(id: asset.id).delete_all.positive? }
+
+    result = with_singleton_override(Media::Asset, :exists?, racing) do
+      as_owner { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }, translations: { "en" => { title: "Changed" } }) }
+    end
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ "Hero image doesn't exist" ], result.errors
+    assert_nil page.reload.hero_media_asset_id
+    assert_equal "Hero", page.title
+    assert_empty hero_usages(page)
+  end
+
+  # Final fix wave (M2): the "resending the stored id" shortcut compares
+  # with what's stored, not with an attribute someone already assigned in
+  # memory -- otherwise a pre-assigned id skipped the `media.upload` check.
+  test "a hero id already assigned in memory still needs media.upload" do
+    asset = create_media_asset
+    page = create_page(title: "Hero", published: false)
+    page.hero_media_asset_id = asset.id
+
+    result = as(page_editor_without_media) { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }) }
+
+    assert result.denied?
+    assert_nil page.reload.hero_media_asset_id
+  end
+
   # Review Focus 5: choosing an image needs `media.upload`.
   test "an actor without media.upload can't set the hero" do
     asset = create_media_asset

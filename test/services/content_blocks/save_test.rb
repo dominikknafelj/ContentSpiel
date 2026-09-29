@@ -71,6 +71,41 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_nil block.caption
   end
 
+  # Final fix wave (M1): the choose/delete race (see the same test in
+  # `Pages::SaveTest`).
+  test "an image deleted between the check and the save fails validation" do
+    asset = create_media_asset
+    block = image_block
+    racing = ->(*) { Media::Asset.where(id: asset.id).delete_all.positive? }
+
+    result = with_singleton_override(Media::Asset, :exists?, racing) do
+      as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }, translations: { "en" => { caption: "Changed" } }) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Image doesn't exist" ], result.errors
+    assert_nil block.reload.media_asset_id
+    assert_nil block.caption
+  end
+
+  # Final fix wave (M1): the rich-text side of the race -- the body's image
+  # passes validation and `UsageIndex`'s existence check, then goes before
+  # the usage row is written (the FK on `media_usages`).
+  test "a body image deleted before its usage row is written fails validation" do
+    asset = create_media_asset
+    block = as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: create_page(title: "Page", published: false)), attributes: { block_type: "rich_text" }).record }
+    insert_all = Media::Usage.method(:insert_all)
+    racing = ->(rows, **options) { Media::Asset.where(id: asset.id).delete_all && insert_all.call(rows, **options) }
+
+    result = with_singleton_override(Media::Usage, :insert_all, racing) do
+      as_owner { ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("::image{asset=\"#{asset.id}\"}") } }) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Body has an image that doesn't exist" ], result.errors
+    assert block.reload.body_document(locale: "en").blank?
+  end
+
   test "an actor without media.upload can't set the image, but can clear it" do
     asset = create_media_asset
     block = image_block

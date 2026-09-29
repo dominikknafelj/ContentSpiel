@@ -18,7 +18,7 @@
           data: { "admin--media-field-target": "remove", action: "admin--media-field#remove" }) %>
   </div>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
+  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink" aria-live="polite">
     <% errors.each do |message| %>
       <p><%= message %></p>
     <% end %>
