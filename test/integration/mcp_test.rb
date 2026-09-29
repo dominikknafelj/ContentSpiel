@@ -52,19 +52,22 @@ class McpTest < ActionDispatch::IntegrationTest
   end
 
   # Doubles as the regression guard for the app/tools -> Mcp:: namespace move
-  # (Task 12): these four names are what MCP clients already call the tools
-  # by, and the mcp gem derives a tool's default name from its demodulized
-  # class name -- so `Mcp::Tools::CreatePost` would default to "create_post",
-  # not "create_post_tool", if each tool didn't pin its name explicitly with
-  # `tool_name`. This test was green before that move (the baseline) and
-  # must stay green after it, unchanged, precisely because the names it
+  # (Task 12): the four post-tool names are what MCP clients already call
+  # those tools by, and the mcp gem derives a tool's default name from its
+  # demodulized class name -- so `Mcp::Tools::CreatePost` would default to
+  # "create_post", not "create_post_tool", if each tool didn't pin its name
+  # explicitly with `tool_name`. This test was green before that move (the
+  # baseline) and must stay green after it, precisely because the names it
   # asserts are the ones clients depend on, not the classes' own names.
-  test "a valid request lists all four post tools" do
+  # `list_media_tool`/`get_media_tool` (media library Task 9) joined the
+  # same registered set afterwards, pinned the same way.
+  test "a valid request lists all six tools" do
     mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
 
     assert_response :success
     names = response.parsed_body["result"]["tools"].map { |tool| tool["name"] }
-    assert_equal %w[list_posts_tool get_post_tool create_post_tool update_post_tool].sort, names.sort
+    assert_equal %w[list_posts_tool get_post_tool create_post_tool update_post_tool list_media_tool get_media_tool].sort,
+      names.sort
   end
 
   # `create_post_tool`'s `content_type` enum has to be read fresh on every

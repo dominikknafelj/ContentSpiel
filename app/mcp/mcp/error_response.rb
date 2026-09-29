@@ -1,9 +1,10 @@
-# Shared by every Post MCP tool (list/get/create/update): one place to turn
-# a user-facing failure -- a missing id, an unsupported locale, a failed
-# `Posts::Save` -- into the MCP error-response shape, rather than each tool
-# repeating the `MCP::Tool::Response.new([...], error: true)` literal.
-# `extend`ed (not `include`d) because every tool's `.call` is itself a class
-# method.
+# Shared by every MCP tool (Post: list/get/create/update; Media library
+# Task 9: list_media/get_media): one place to turn a user-facing failure --
+# a missing id, an unsupported locale, a failed `Posts::Save`, a permission
+# a token doesn't hold at all -- into the MCP error-response shape, rather
+# than each tool repeating the `MCP::Tool::Response.new([...], error: true)`
+# literal. `extend`ed (not `include`d) because every tool's `.call` is
+# itself a class method.
 #
 # Lives at app/mcp/mcp/error_response.rb, not app/mcp/error_response.rb:
 # Rails autoloads every app/* subdirectory as its own Zeitwerk root, so
@@ -30,6 +31,26 @@ module Mcp
     # The post `id` names, if the acting token may read it; nil otherwise.
     def find_readable_post(id)
       AccessControl.scope(Current.actor, "posts.read", Post.all).find_by(id: id)
+    end
+
+    # Media library Task 9: `get_media_tool`'s "unknown id" answer. Unlike
+    # `post_not_found`, there's no read scope to fold an out-of-scope id
+    # into here -- the media library has no per-asset "read" permission
+    # (`Admin::MediaController`'s own comment: `media.upload` alone gates
+    # browsing the whole thing) -- so a missing id is the only "not found"
+    # this ever needs to report.
+    def image_not_found = error_response("Image not found")
+
+    # A tool call from a token that doesn't hold `key` at all (media
+    # library design spec §5.2's ruling: both media tools require
+    # `media.upload`) -- reuses the permission's own registered label, the
+    # same "You don't have permission to <label>" shape `ApplicationService
+    # ::Result.failure`/`#denied` already gives every admin/service
+    # refusal (see e.g. `Media::Upload#call`), so an agent sees one
+    # consistent phrasing wherever a whole permission, not a per-record
+    # scope, is what's missing.
+    def permission_denied(key)
+      error_response("You don't have permission to #{AccessControl::Permissions.fetch(key).label.downcase}")
     end
 
     # `Locales::SUPPORTED` (all ~40 codes ContentSpiel can ever serve) is what

@@ -18,7 +18,8 @@ class McpController < ActionController::API
       title: "ContentSpiel",
       version: "1.0.0",
       instructions: instructions,
-      tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost ],
+      tools: [ Mcp::Tools::ListPosts, Mcp::Tools::GetPost, Mcp::Tools::CreatePost, Mcp::Tools::UpdatePost,
+        Mcp::Tools::ListMedia, Mcp::Tools::GetMedia ],
       server_context: { user: @current_api_user }
     )
 
@@ -47,7 +48,8 @@ class McpController < ActionController::API
   # group, and not the group's grants (an agent learns what it may do by
   # doing it; the list tools already show only what it may read).
   def instructions
-    "Manage ContentSpiel's blog/resume/now-update posts across locales. " \
+    "Manage ContentSpiel's blog/resume/now-update posts across locales, and browse its media library " \
+      "for images to reference from a post/page's rich text (::image{asset=\"ID\" alt=\"…\"}). " \
       "This token acts as #{@api_token.user.email_address} limited to the #{@api_token.group.name} group: " \
       "it can only see and change what both that user and that group are allowed to. " \
       "A post outside that scope is reported as not found; a change it isn't allowed to make " \

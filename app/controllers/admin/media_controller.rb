@@ -145,38 +145,13 @@ module Admin
       scope = Media::Asset.with_variants
       scope = scope.unused if params[:filter] == "unused"
       scope = scope.where(created_by_id: Current.user&.id) if params[:filter] == "mine"
-      scope = search(scope, params[:q]) if params[:q].present?
+      # Title, alt (any locale) and filename (global constraints: "search
+      # matches title, alt (any locale's jsonb values -- use a safe jsonb
+      # text search, bind params only) and filename") -- `Media::Search`
+      # (Task 9), shared with the MCP `list_media_tool` rather than
+      # duplicated here; see that class's own comment for the query itself.
+      scope = Media::Search.call(scope, params[:q]) if params[:q].present?
       scope
-    end
-
-    # Title, alt (any locale) and filename (global constraints: "search
-    # matches title, alt (any locale's jsonb values -- use a safe jsonb
-    # text search, bind params only) and filename"). One `:q` bind, reused
-    # for all three ILIKEs -- there is no string interpolation of the
-    # search term anywhere in the SQL this builds, only the named bind
-    # Postgres substitutes safely.
-    #
-    # `jsonb_each_text(media_assets.alt)` unnests the translated `{locale
-    # => text}` hash into rows so ILIKE can test every language's value,
-    # not just the one the editor happens to be viewing in -- an `EXISTS`
-    # correlated subquery, not a join, so it can't multiply a matching
-    # asset's own row for however many locales matched.
-    #
-    # `file_attachment: :blob` is the same association `Media::Asset
-    # ::VARIANT_INCLUDES`/`#with_variants` already preload, joined here
-    # (not `includes`d) purely to filter on `active_storage_blobs.filename`
-    # -- every asset has exactly one `file` attachment (`Media::Asset
-    # #file_is_attached`), so the inner join can't drop or duplicate a row
-    # the way joining a one-to-many association could.
-    def search(scope, q)
-      like = "%#{Media::Asset.sanitize_sql_like(q)}%"
-
-      scope.joins(file_attachment: :blob).where(
-        "media_assets.title ILIKE :q " \
-        "OR EXISTS (SELECT 1 FROM jsonb_each_text(media_assets.alt) AS alt(locale, value) WHERE alt.value ILIKE :q) " \
-        "OR active_storage_blobs.filename ILIKE :q",
-        q: like
-      )
     end
   end
 end
