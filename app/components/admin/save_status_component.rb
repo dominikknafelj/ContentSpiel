@@ -8,6 +8,14 @@ module Admin
   # `idle` -- nothing has changed yet, or the record just loaded -- renders
   # an empty element rather than an empty string with visible chrome around
   # it, so the header note it sits in doesn't visibly flash on load.
+  #
+  # That empty element still keeps one line's height (`min-h-[1lh]`), so
+  # the first save doesn't push everything below it down a line. It used
+  # to collapse to nothing, and a first save started by a click's own
+  # mousedown (the `focusout` that blurring a field sends straight to
+  # `admin--autosave#saveNow`) moved the page between that mousedown and
+  # its mouseup: the mouseup landed beside the button, the browser fired
+  # no `click`, and the related-posts picker silently dropped the pick.
   class SaveStatusComponent < AdminComponent
     # `signed_out` (final-fixes round, finding 4) is never rendered by any
     # server response -- `autosave_controller.js` sets this text itself, the

@@ -1,1 +1,3 @@
-<p id="<%= id %>" role="status" class="text-sm text-meta"><%= text %></p>
+<%# `min-h-[1lh]`: the line's height is reserved even while `idle` renders it
+    empty -- see this component's class comment for why. %>
+<p id="<%= id %>" role="status" class="min-h-[1lh] text-sm text-meta"><%= text %></p>

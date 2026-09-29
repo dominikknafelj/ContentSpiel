@@ -52,12 +52,12 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Clicks through JavaScript (`element.click()`) instead of a native click.
   # Under Selenium this first worked around headless Chrome intermittently
   # dropping native WebDriver clicks made right after a page load. It stays
-  # under Cuprite because switching `press` to Cuprite's native `click` (a
-  # real pointer sequence -- mousedown, focus change, mouseup -- aimed at the
-  # element's centre) failed the related-posts picker test on every run when
-  # this was tried: its autosave landed without the picked post. A scripted
-  # click fires just the `click` these tests mean to exercise. Tests that are
-  # *about* a real pointer (the mind graph) click natively.
+  # under Cuprite: a scripted click fires just the `click` these tests mean
+  # to exercise. Tests that are *about* a real pointer click natively (the
+  # mind graph, and the related-posts picker -- a native click there once
+  # lost the pick, because the autosave its mousedown started grew the
+  # empty save-status line and moved the button out from under the
+  # mouseup; `Admin::SaveStatusComponent` now reserves that line).
   def press(label)
     find(:link_or_button, label).execute_script("this.click()")
   end
