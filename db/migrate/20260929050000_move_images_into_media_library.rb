@@ -33,13 +33,23 @@
 # attachment row is left in place (the model no longer reads it, but the
 # blob stays owned and restorable) and the migration says so.
 #
-# Then the `hero`/`block_image` rows of `media_usages` are rebuilt from the
-# new references (design spec §3.4 step 3) -- in SQL rather than through
-# `Media::UsageIndex.rebuild_all`, since those two roles are all this
-# migration can have changed (rich-text rows are untouched: nothing here
-# edits a body), and a data migration mustn't depend on app models that may
-# change long after it's written. The result is exactly what `UsageIndex`
-# computes for those roles (the migration test checks the two agree).
+# Then `media_usages` is filled in (design spec §3.4 step 3) -- in SQL
+# rather than through `Media::UsageIndex.rebuild_all`, since a data
+# migration mustn't depend on app models that may change long after it's
+# written. The result is exactly what `UsageIndex` computes (the migration
+# test checks the two agree):
+#
+# - the `hero`/`block_image` rows are rebuilt from the new references;
+# - the `rich_text` rows are added for every body that already embeds a
+#   library image (final fix wave, C1). Nothing here edits a body, but no
+#   body has ever been indexed either: the table is new, and the rich-text
+#   uploads that predate the library (and the ActionText import's images)
+#   are already assets. Without these rows such an image reads as "Unused"
+#   and can be deleted -- and since a rich-text reference has no FK, that
+#   purges a file a live page still shows. Additive only (`ON CONFLICT DO
+#   NOTHING`, no delete), so running it again -- which the follow-up
+#   `BackfillRichTextMediaUsages` does for databases that ran this
+#   migration before the fix -- never removes a row.
 #
 # Plain lightweight models (`MigrationAttachment` etc. below) and SQL, not
 # `Media::Asset`/`Page`: the same "don't depend on today's app classes"
@@ -143,6 +153,7 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
     end
 
     rebuild_usages
+    add_rich_text_usages
     say "Created #{created_asset_ids.size} media asset(s)"
     enqueue_variants(created_asset_ids)
   end
@@ -229,6 +240,36 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
         SELECT #{source[:column]}, '#{source[:record_type]}', id, '#{source[:role]}', NULL, now(), now()
         FROM #{source[:table]}
         WHERE #{source[:column]} IS NOT NULL
+        ON CONFLICT DO NOTHING
+      SQL
+    end
+  end
+
+  # One `rich_text` row per (asset, owner, locale) for every `image` node
+  # in every locale of every post's and block's body -- `Media::UsageIndex
+  # #rich_text_rows` in SQL:
+  #
+  # - `jsonb_each` splits the Mobility `{locale => document}` hash (a
+  #   non-object document is skipped, like the model's `doc.is_a?(Hash)`);
+  # - the jsonpath finds each `image` node's `attrs.asset_id` at any depth
+  #   (a list item, a quote), and only there -- `RichText::Document
+  #   #references` counts that attribute alone. `lax $.**` can visit a node
+  #   twice (it also unwraps arrays), hence the `DISTINCT`;
+  # - the value is cast only when it's a plain decimal id -- a JSON number
+  #   or a numeric String (an older import), never "abc" or something that
+  #   would overflow a bigint -- the same leniency as `#normalize_asset_id`;
+  # - the join on `media_assets` drops a reference to a deleted asset, which
+  #   would otherwise fail the FK.
+  def add_rich_text_usages
+    { "Post" => "posts", "ContentBlock" => "content_blocks" }.each do |owner_type, table|
+      execute <<~SQL
+        INSERT INTO media_usages (media_asset_id, owner_type, owner_id, role, locale, created_at, updated_at)
+        SELECT DISTINCT media_assets.id, '#{owner_type}', owners.id, 'rich_text', bodies.locale, now(), now()
+        FROM #{table} owners
+        CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(owners.body) = 'object' THEN owners.body ELSE '{}'::jsonb END) AS bodies(locale, document)
+        CROSS JOIN LATERAL jsonb_path_query(bodies.document, 'lax $.** ? (@.type == "image").attrs.asset_id') AS refs(value)
+        JOIN media_assets ON media_assets.id = CASE WHEN refs.value #>> '{}' ~ '^(0|[1-9][0-9]{0,17})$' THEN (refs.value #>> '{}')::bigint END
+        WHERE jsonb_typeof(bodies.document) = 'object'
         ON CONFLICT DO NOTHING
       SQL
     end

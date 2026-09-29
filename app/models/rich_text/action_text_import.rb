@@ -38,7 +38,9 @@
 # rendered body -- moves on), bypassing model callbacks and validations
 # (spec §5: "bypassing callbacks except path sync, which bodies don't
 # affect"). The document is checked with `#validate` first instead, which is
-# exactly the body validation `HasRichTextBody` would have run.
+# exactly the body validation `HasRichTextBody` would have run. Each written
+# record's `media_usages` rows are then refreshed (`Media::UsageIndex`),
+# which a save service would otherwise have done.
 #
 # ActionText rows come from `source` -- `SqlSource` by default, which reads
 # `action_text_rich_texts` with plain SQL. Not `ActionText::RichText`: this
@@ -125,6 +127,12 @@ module RichText
         next :blank if document.blank?
 
         write(model, id, locale, document)
+        # The body was written past the services, so the owner's usage rows
+        # are refreshed here, in the row's transaction (final fix wave, C1):
+        # without a `rich_text` row an imported image reads as "Unused" and
+        # can be deleted -- a rich-text reference has no FK to stop it.
+        # Reloaded, since `UsageIndex` reads every locale's stored body.
+        Media::UsageIndex.refresh(record.reload)
         :imported
       end
 

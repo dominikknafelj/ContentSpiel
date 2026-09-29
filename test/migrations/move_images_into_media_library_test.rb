@@ -97,6 +97,47 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
       Media::Usage.where(role: %w[hero block_image]).pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale).sort_by { |row| [ row[1], row[2] ] }
   end
 
+  # Final fix wave (C1): a rich-text upload that predates the library is
+  # already an asset, embedded by `asset_id` in a body -- which has no FK,
+  # so only its `rich_text` usage row keeps it out of "Unused" (and out of
+  # reach of Delete, whose purge is permanent). Bodies are written here
+  # with `save!` (no service, so no `UsageIndex.refresh`) and the index is
+  # emptied, which is what an install upgrading into this branch holds.
+  test "rich-text bodies that already embed an asset get their usage rows" do
+    embedded = create_media_asset(filename: "wide.png")
+    other = create_media_asset(filename: "tiny.png")
+    gone_id = create_media_asset(filename: "tiny.png").tap(&:destroy!).id
+
+    image = ->(asset_id) { { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset_id } } ] } }
+
+    post = create_post(title: "Embeds it")
+    post.assign_body(rich_doc(%(::image{asset="#{embedded.id}"})), locale: "en")
+    post.assign_body(rich_doc(%(::image{asset="#{embedded.id}"})), locale: "de")
+    post.save!
+    block = @first.content_blocks.create!(block_type: :rich_text, position: 1)
+    junk = @first.content_blocks.create!(block_type: :rich_text, position: 2)
+    # Raw writes, as an older import or a hand edit leaves them: an id
+    # stored as a String, a dead reference and something that isn't an id.
+    ContentBlock.where(id: block.id).update_all(body: { "es" => image.(other.id.to_s) })
+    ContentBlock.where(id: junk.id).update_all(body: { "en" => image.(gone_id), "de" => image.("abc"), "es" => image.("99999999999999999999999") })
+    Media::Usage.delete_all
+
+    migrate(:up)
+
+    assert_not_includes Media::Asset.unused, embedded
+    assert_not_includes Media::Asset.unused, other
+    expected = [
+      [ embedded.id, "Post", post.id, "rich_text", "de" ],
+      [ embedded.id, "Post", post.id, "rich_text", "en" ],
+      [ other.id, "ContentBlock", block.id, "rich_text", "es" ]
+    ]
+    assert_equal expected, Media::Usage.where(role: "rich_text").order(:locale).pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale).sort_by(&:last)
+
+    # The same rows `Media::UsageIndex` itself computes.
+    Media::UsageIndex.rebuild_all
+    assert_equal expected, Media::Usage.where(role: "rich_text").pluck(:media_asset_id, :owner_type, :owner_id, :role, :locale).sort_by(&:last)
+  end
+
   test "an existing library asset with the same checksum is reused rather than duplicated" do
     library = create_media_asset(filename: "medium.png")
 
