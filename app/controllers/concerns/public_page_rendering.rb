@@ -45,7 +45,34 @@ module PublicPageRendering
     else
       @page = record
     end
+    preload_page_images(@page)
     true
+  end
+
+  # A page's rendered body (`pages/show.html.erb`) reads its hero and every
+  # image block's own `media_asset` -- one association access each, per
+  # block, that `Blocks::ImageComponent`/the hero render would otherwise
+  # send to the database one at a time (Task 4 review: a page with N image
+  # blocks cost N queries just to find each block's asset, before
+  # `Media::PictureComponent` even asks that asset for its `srcset`).
+  # `ActiveRecord::Associations::Preloader`, not `.includes(...)` on a fresh
+  # query, because `page` here is already the exact record `PublicSite
+  # ::Resolver` resolved (and, for a post permalink, the one `PublicSite
+  # ::Paths.canonical_page` found) -- re-querying it with `.includes` would
+  # just be a second, redundant fetch of the same row. `Media::Asset
+  # ::VARIANT_INCLUDES` nested under each association is what lets
+  # `Media::PictureComponent#srcset_attribute` (`Media::Asset#srcset`) read
+  # each asset's processed-variant digests without a further query per
+  # image, the same reasoning `Media::Asset.with_variants` documents for a
+  # plain asset listing.
+  def preload_page_images(page)
+    ActiveRecord::Associations::Preloader.new(
+      records: [ page ],
+      associations: [
+        { hero_media_asset: Media::Asset::VARIANT_INCLUDES },
+        { content_blocks: { media_asset: Media::Asset::VARIANT_INCLUDES } }
+      ]
+    ).call
   end
 
   def render_in_requested_locale(&block)

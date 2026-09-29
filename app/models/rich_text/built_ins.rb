@@ -239,16 +239,17 @@ module RichText
       # writing alt text, and the public renderer already has to handle "no
       # caption" for the `<figcaption>` (`RichText::ImageComponent`).
       #
-      # `html` looks the asset up itself rather than trusting a document
-      # that already passed `RichText::Document#validate` -- same "hostile
-      # documents render inert" posture `render_youtube`/`render_internal_
-      # link` already take (a never-validated MCP/hand-edited document, or
-      # an `asset_id` naming a `Media::Asset` deleted after this document was
-      # saved, must degrade to rendering nothing at all, not raise or leak
-      # a broken `<img>`). `RichText::ImageComponent` itself doesn't know or
-      # care what a `Media::Asset` is (it takes a plain `src:` String) -- this
-      # is the one place that translates "a `Media::Asset` id" into "a public
-      # URL" for it.
+      # `html` looks the asset up itself (through `ctx.media_asset`, not
+      # trusting a document that already passed `RichText::Document
+      # #validate` -- same "hostile documents render inert" posture
+      # `render_youtube`/`render_internal_link` already take (a
+      # never-validated MCP/hand-edited document, or an `asset_id` naming a
+      # `Media::Asset` deleted after this document was saved, must degrade
+      # to rendering nothing at all, not raise or leak a broken `<img>`).
+      # Since media library Task 5, `RichText::ImageComponent` takes the
+      # resolved `Media::Asset` itself (plus this node's own `alt`/
+      # `caption` as overrides), the same shape `Blocks::ImageComponent`
+      # already used for a block's image.
       #
       # `directive "image", asset: { attr: :asset_id, type: :integer }, ...`
       # is the one place the directive's own key (`asset`) and the node's
@@ -261,7 +262,7 @@ module RichText
         node.attribute :alt, :string
         node.attribute :caption, :string
         node.directive "image", asset: { attr: :asset_id, type: :integer }, alt: :string, caption: :string
-        node.html { |n, children, ctx| render_image(n) }
+        node.html { |n, children, ctx| render_image(n, ctx) }
         node.markdown_out { |n, children, ctx| node.directive_markdown(n) }
       end
     end
@@ -430,18 +431,28 @@ module RichText
       ApplicationController.render(RichText::YoutubeComponent.new(id: id), layout: false)
     end
 
-    # A missing/deleted `Media::Asset` (`asset_id` present but `Media::Asset
-    # .find_by` comes up empty -- a never-validated document, or one
-    # validated before the asset was later deleted) renders nothing at all,
-    # the same as `render_youtube`'s own malformed-id case above: no broken
-    # `<img>`, no empty `<figure>` either, just an absence exactly like an
-    # editor deleting the embed outright would leave behind.
-    def self.render_image(node)
+    # A missing/deleted `Media::Asset` (`asset_id` present but `ctx.media_
+    # asset` comes up empty -- a never-validated document, or one validated
+    # before the asset was later deleted) renders nothing at all, the same
+    # as `render_youtube`'s own malformed-id case above: no broken `<img>`,
+    # no empty `<figure>` either, just an absence exactly like an editor
+    # deleting the embed outright would leave behind.
+    #
+    # `ctx.media_asset(id)` (media library Task 5), not `Media::Asset.find_
+    # by` directly -- `RichText::RenderContext#media_asset` is what lets a
+    # document with several `image` nodes load all of their assets in one
+    # query rather than one per node; see that method's own comment.
+    # `RichText::ImageComponent` takes the asset itself (plus this node's
+    # own `alt`/`caption` as *overrides*) rather than a bare `src:` String,
+    # so it can resolve alt/caption through `Media::Asset#alt_text`/
+    # `#caption_text` the same way `Blocks::ImageComponent` does, and render
+    # the asset through `Media::PictureComponent` for a real `srcset`.
+    def self.render_image(node, ctx)
       attrs = node["attrs"] || {}
-      asset = Media::Asset.find_by(id: attrs["asset_id"])
+      asset = ctx.media_asset(attrs["asset_id"])
       return "".html_safe if asset.nil?
 
-      ApplicationController.render(RichText::ImageComponent.new(src: asset.url, alt: attrs["alt"], caption: attrs["caption"]), layout: false)
+      ApplicationController.render(RichText::ImageComponent.new(asset: asset, alt_override: attrs["alt"], caption_override: attrs["caption"], locale: ctx.locale), layout: false)
     end
 
     def self.render_link(mark_data, content)

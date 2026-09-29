@@ -2,7 +2,7 @@
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
 
   <% if attached? %>
-    <%= image_tag value, class: "mb-2 max-h-32 rounded-cs border border-line object-cover" %>
+    <%= image_tag thumbnail_source, class: "mb-2 max-h-32 rounded-cs border border-line object-cover" %>
   <% end %>
 
   <%= tag.input(**html.merge(type: "file", name: html_name, id: id, accept: "image/*", class: setup_input_class)) %>

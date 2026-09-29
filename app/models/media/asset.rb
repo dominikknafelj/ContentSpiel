@@ -82,7 +82,16 @@ class Media::Asset < ApplicationRecord
   # also preloads each variant's own attached image, `image_attachment:
   # :blob` -- a second N+1 `#srcset` has no use for, since all it ever reads
   # off a `variant_records` row is `variation_digest`).
-  scope :with_variants, -> { includes(file_attachment: { blob: :variant_records }) }
+  # The `includes` shape itself, pulled out to a constant (media library
+  # Task 5) so a caller that can't just call `.with_variants` on a
+  # `Media::Asset` relation -- because it's preloading *through* another
+  # model's association instead, e.g. `PublicPageRendering`'s `belongs_to
+  # :hero_media_asset`/`has_many :content_blocks -> belongs_to :media_asset`
+  # via `ActiveRecord::Associations::Preloader` -- can still ask for exactly
+  # this same shape rather than hand-copying it.
+  VARIANT_INCLUDES = { file_attachment: { blob: :variant_records } }.freeze
+
+  scope :with_variants, -> { includes(VARIANT_INCLUDES) }
 
   has_one_attached :file do |attachable|
     # Every responsive width the public site can ever ask for, preprocessed
@@ -402,8 +411,11 @@ class Media::Asset < ApplicationRecord
   # analysis needs the real file on the storage service, which isn't there
   # yet at `before_save` time (`#with_attachable_io`'s own comment). So
   # this callback leaves both nil on every ordinary save; that's fine,
-  # neither is a NOT NULL column, and `RichText::ImageComponent`'s own
-  # `<img>` render never reads either.
+  # neither is a NOT NULL column, and `Media::PictureComponent` (media
+  # library Task 5, the one place every image render reads these) just
+  # omits the `<img width height>` attributes it would otherwise set from
+  # them -- `image_tag` drops a `nil` attribute rather than rendering it
+  # empty.
   def cache_metadata_from_file
     self.byte_size = file.blob.byte_size
     self.content_type = sniffed_content_type

@@ -56,6 +56,57 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     assert_includes html, "C</figcaption>"
   end
 
+  # Media library Task 5: an image node's alt/caption fall back to the
+  # asset's own defaults (`Media::Asset#alt_text`/`#caption_text`) when the
+  # node doesn't override them -- the same "override, then the asset's
+  # default" chain `Blocks::ImageComponentTest` already covers for a block's
+  # image.
+  test "an image node with no alt/caption override falls back to the asset's own defaults" do
+    asset = create_media_asset
+    asset.update!(alt: "Library alt", caption: "Library caption")
+
+    html = render({ "type" => "image", "attrs" => { "asset_id" => asset.id } })
+
+    assert_includes html, %(alt="Library alt")
+    assert_includes html, "Library caption</figcaption>"
+  end
+
+  # `RichText::RenderContext#media_asset` preloads every `image` node's
+  # `Media::Asset` for the whole document in one query
+  # (`Media::Asset.with_variants`), rather than `RichText::BuiltIns
+  # .render_image` running `Media::Asset.find_by` once per node while the
+  # tree is walked -- the number of `media_assets` queries a document costs
+  # must not grow with how many image nodes it has.
+  #
+  # `Current.reset` between the two renders: `PublicSite.current_content_
+  # version` (part of `#to_html`'s own cache key) memoizes onto `Current`,
+  # which a real request only ever computes once -- resetting it here is
+  # what keeps the *second* render in this test from getting that
+  # memoized value's queries for free and understating its own count,
+  # rather than the two renders being compared on equal footing the way
+  # two separate requests would be.
+  test "a document with many image nodes doesn't query media_assets once per node" do
+    one_image = [ { "type" => "image", "attrs" => { "asset_id" => create_media_asset.id } } ]
+    five_images = Array.new(5) { { "type" => "image", "attrs" => { "asset_id" => create_media_asset.id } } }
+
+    Current.reset
+    one_image_queries = count_media_asset_queries { render(*one_image) }
+
+    Current.reset
+    five_image_queries = count_media_asset_queries { render(*five_images) }
+
+    assert_equal one_image_queries, five_image_queries,
+      "adding more image nodes to one document shouldn't add media_assets queries (N+1). " \
+      "1 image: #{one_image_queries} queries, 5 images: #{five_image_queries} queries"
+  end
+
+  def count_media_asset_queries
+    count = 0
+    callback = lambda { |*, payload| count += 1 if payload[:sql].include?("media_assets") }
+    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { yield }
+    count
+  end
+
   test "youtube renders the nocookie embed" do
     assert_includes render({ "type" => "youtube", "attrs" => { "id" => "dQw4w9WgXcQ" } }), "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
   end

@@ -1,7 +1,6 @@
 <% if asset&.file&.attached? %>
   <figure class="content-block content-block--image my-10">
-    <%= image_tag helpers.url_for(asset.file), alt: asset.alt_text(override: translated(block, :alt)), class: "w-full rounded-cs" %>
-    <% caption = asset.caption_text(override: translated(block, :caption)) %>
+    <%= render Media::PictureComponent.new(asset: asset, alt: alt, sizes: SIZES, css_class: "w-full rounded-cs") %>
     <% if caption.present? %>
       <figcaption class="mt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= caption %></figcaption>
     <% end %>

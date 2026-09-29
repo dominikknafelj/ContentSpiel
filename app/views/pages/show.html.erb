@@ -17,13 +17,15 @@
       <% end %>
       <%# The hero is a library image (media library design spec §3.3); the
           page's own translated `hero_alt` overrides the image's default alt.
-          `url_for(asset.file)` serves the original for now -- Task 5 swaps
-          in `Media::PictureComponent` (srcset, dimensions). A reference to
-          an asset whose file is somehow gone renders nothing (spec §4). %>
+          Rendered through `Media::PictureComponent` (Task 5) for a real
+          `srcset` -- `sizes: "100vw"`, unlike a block/rich-text image's own
+          content-width `sizes` (`Blocks::ImageComponent::SIZES`), since the
+          hero always spans the full viewport width, not the `max-w-3xl`
+          content column. `Media::PictureComponent#render?` already handles
+          a missing hero or a reference whose file is somehow gone. %>
       <% hero = @page.hero_media_asset %>
-      <% if hero&.file&.attached? %>
-        <%= image_tag url_for(hero.file), alt: hero.alt_text(override: translated(@page, :hero_alt)), class: "mt-8 w-full rounded-cs" %>
-      <% end %>
+      <%= render Media::PictureComponent.new(asset: hero, alt: hero&.alt_text(override: translated(@page, :hero_alt)).to_s,
+            sizes: "100vw", css_class: "mt-8 w-full rounded-cs") %>
     <% end %>
   </header>
 <% end %>
