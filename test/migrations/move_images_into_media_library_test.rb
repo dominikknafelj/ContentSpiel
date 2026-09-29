@@ -161,6 +161,52 @@ class MoveImagesIntoMediaLibraryMigrationTest < ActiveSupport::TestCase
     assert ActiveStorage::Attachment.exists?(record_type: "Page", record_id: @first.id, name: "hero_image", blob_id: @hero_a.id)
   end
 
+  # Fix round 1 (M1): `down` removes only what `up` created (its ledger).
+  test "down keeps a pre-existing library asset up deduped onto, and a later upload" do
+    library = create_media_asset(filename: "medium.png")
+    migrate(:up)
+    assert_equal library, @block.reload.media_asset
+    hero_asset_id = @first.reload.hero_media_asset_id
+
+    later = create_media_asset(filename: "wide.png")
+    third = create_page(title: "Third")
+    third.update!(hero_media_asset: later)
+
+    migrate(:down)
+
+    assert Media::Asset.exists?(library.id), "a pre-existing library asset survives a rollback"
+    assert Media::Asset.exists?(later.id), "an upload made after the migration survives a rollback"
+    assert_not Media::Asset.exists?(hero_asset_id), "the asset up created is removed"
+    assert_equal 2, Media::Asset.count
+    assert_equal library.file.blob_id,
+      ActiveStorage::Attachment.find_by!(record_type: "ContentBlock", record_id: @block.id, name: "image").blob_id
+    assert_not ActiveRecord::Base.connection.table_exists?(:media_library_migrated_assets)
+  end
+
+  # Fix round 1 (M3).
+  test "an attachment whose owner no longer exists gets no asset" do
+    gone = create_page(title: "Gone")
+    legacy_attach(gone, "hero_image", blob_for("wide.png", filename: "gone.png"))
+    Page.where(id: gone.id).delete_all
+
+    assert_difference "Media::Asset.count", 2 do
+      migrate(:up)
+    end
+    assert ActiveStorage::Attachment.exists?(record_type: "Page", record_id: gone.id, name: "hero_image")
+  end
+
+  # Fix round 1 (M4): a database error while queueing variants is rescued
+  # inside its own savepoint, so the migration's transaction -- and the
+  # data it already moved -- stays usable.
+  test "a database error while queueing variants doesn't abort the migration" do
+    boom = ->(*) { ActiveRecord::Base.connection.execute("SELECT 1/0") }
+
+    with_singleton_override(Media::Asset, :where, boom) { migrate(:up) }
+
+    assert @first.reload.hero_media_asset_id.present?
+    assert_empty legacy_attachments
+  end
+
   test "up, down, up round-trips to the same references" do
     migrate(:up)
     migrate(:down)
@@ -200,6 +246,25 @@ class MediaOrphansTaskTest < ActiveSupport::TestCase
     assert_includes output, "leftover.png"
     assert_not_includes output, @kept.file.filename.to_s
     assert ActiveStorage::Blob.exists?(@orphan.id)
+  end
+
+  # Fix round 1 (M5): only a purge confirmed by the row being gone counts.
+  test "CONFIRM=1 doesn't count a purge that failed" do
+    ActiveStorage::Blob.class_eval do
+      alias_method :__original_purge, :purge
+      define_method(:purge) { raise "storage unavailable" }
+    end
+
+    output = run_task("CONFIRM" => "1")
+
+    assert_includes output, "purge failed: RuntimeError: storage unavailable"
+    assert_includes output, "purged 0 blob(s), 1 could not be purged"
+    assert ActiveStorage::Blob.exists?(@orphan.id)
+  ensure
+    ActiveStorage::Blob.class_eval do
+      alias_method :purge, :__original_purge
+      remove_method :__original_purge
+    end
   end
 
   test "CONFIRM=1 purges it and leaves attached blobs alone" do

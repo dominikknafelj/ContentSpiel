@@ -147,6 +147,54 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "page-hero-image-section"
   end
 
+  # Fix round 1 (I1): an accepted upload whose save then fails (here,
+  # another field's validation error) must still clear the file input --
+  # otherwise every later autosave resends the file and uploads a
+  # duplicate asset.
+  test "an accepted hero upload with a failed save uploads once and clears the file input" do
+    landing = landing_page_with_hero_image
+    stored = landing.hero_media_asset
+
+    assert_difference "Media::Asset.count", 1 do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { title: "", hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+    assert_equal stored, landing.reload.hero_media_asset
+
+    # The section comes back showing the *stored* hero, with a fresh,
+    # empty file input.
+    assert_includes response.body, "page-hero-image-section"
+    assert_includes response.body, stored.file.filename.to_s
+    assert_not_includes response.body, "medium.png"
+
+    # What the browser sends next: the cleared input is blank again.
+    assert_no_difference "Media::Asset.count" do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { title: "Landing", hero_image: "" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    end
+    assert_response :success
+  end
+
+  # Fix round 1 (M7): the denied branch of `Admin::FileParams
+  # #upload_to_library` -- an editor who may edit pages but not upload.
+  test "a hero upload without media.upload is a 403 and creates no asset" do
+    landing = landing_page_with_hero_image
+    group = access_control_groups(:branch_editors)
+    %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
+    sign_in_as(users(:editor_branch))
+
+    assert_no_difference "Media::Asset.count" do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_includes response.body, "Hero image can&#39;t be uploaded without permission to upload media"
+    assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
+  end
+
   test "a refused hero upload fails the save, shows why and keeps the current hero" do
     landing = landing_page_with_hero_image
     asset = landing.hero_media_asset

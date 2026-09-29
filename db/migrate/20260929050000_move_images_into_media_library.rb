@@ -20,6 +20,11 @@
 #    `bin/rails media:orphans` to list and, with CONFIRM=1, purge; this
 #    migration never deletes stored files.
 #
+# A legacy attachment whose owner (page or block) no longer exists -- an
+# orphaned row left behind by a raw delete -- gets no asset: there is no
+# reference to set, and an asset made for it would only be an unused
+# library entry nobody uploaded. It's reported and left in place.
+#
 # A blob whose stored `content_type` isn't one the library accepts (`Media
 # ::Asset::ALLOWED_CONTENT_TYPES` at the time of writing: png/jpeg/gif/webp
 # -- a hero was never type-checked, so an SVG could be sitting there) is
@@ -53,11 +58,26 @@
 #
 # `down` (design spec §3.4: "reversible in structure") re-creates each
 # page's/block's attachment on its asset's blob, clears the references and
-# their usage rows, and removes every asset it just turned back into an
-# attachment -- its `file` attachment row and its own row, never the blob,
-# which the restored attachment now owns alone -- *unless* rich text still
-# embeds it (`asset_id` anywhere in a post's or block's body), in which case
-# the asset stays and shares the blob with the restored attachment.
+# their usage rows. A record that `up` deduped onto another record's asset
+# is restored onto that asset's (canonical) blob, not the byte-identical
+# duplicate blob it had before -- that one was left unattached by `up`
+# (and may have been purged by `media:orphans` since), and the bytes are
+# the same.
+#
+# It then removes the assets `up` itself created -- their `file` attachment
+# row and their own row, never the blob, which the restored attachment now
+# owns alone -- and nothing else: a pre-existing library asset (a rich-text
+# upload `up` deduped onto) and anything uploaded after the migration
+# survive a rollback, even when a hero points at them (the restored
+# attachment then shares the blob). Which assets `up` created is recorded
+# in a ledger table, `media_library_migrated_assets`, created by `up` and
+# dropped by `down`. A table rather than a rule like "`created_by_id IS
+# NULL` and no `media.uploaded` event": assets uploaded before the audit
+# log existed match that rule too, and a temporary table wouldn't survive
+# from the `db:migrate` session to a later `db:rollback`. No FK on the
+# ledger, so it never blocks deleting an asset in the meantime. An asset
+# `up` created that rich text now also embeds (`asset_id` anywhere in a
+# post's or block's body) is kept as well.
 class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
   # Which legacy attachments move, and onto which reference column.
   SOURCES = [
@@ -70,6 +90,8 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
   ALLOWED_CONTENT_TYPES = %w[image/png image/jpeg image/gif image/webp].freeze
 
   ASSET_RECORD_TYPE = "Media::Asset".freeze
+
+  LEDGER = :media_library_migrated_assets
 
   class MigrationAttachment < ActiveRecord::Base
     self.table_name = "active_storage_attachments"
@@ -84,6 +106,8 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
   end
 
   def up
+    create_table(LEDGER, id: false, if_not_exists: true) { |t| t.bigint :media_asset_id, null: false, index: { unique: true } }
+
     created_asset_ids = []
     asset_ids_by_checksum = existing_asset_ids_by_checksum
 
@@ -97,11 +121,17 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
           next
         end
 
+        unless select_value(sanitize("SELECT 1 FROM #{source[:table]} WHERE id = ?", attachment.record_id))
+          say "Skipped #{source[:record_type]}##{attachment.record_id} #{source[:name]}: the #{source[:record_type]} no longer exists (attachment left in place)"
+          next
+        end
+
         # A blob with no checksum (Active Storage allows one) is never
         # deduped: `nil` would otherwise collapse every such blob into one.
         asset_id = asset_ids_by_checksum[blob.checksum] if blob.checksum.present?
         unless asset_id
           asset_id = create_asset(blob, created_at: attachment.created_at)
+          execute sanitize("INSERT INTO #{LEDGER} (media_asset_id) VALUES (?)", asset_id)
           asset_ids_by_checksum[blob.checksum] = asset_id if blob.checksum.present?
           created_asset_ids << asset_id
         end
@@ -134,15 +164,24 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
 
     execute "DELETE FROM media_usages WHERE role IN ('hero', 'block_image')"
 
+    migrated = table_exists?(LEDGER) ? select_values("SELECT media_asset_id FROM #{LEDGER}").map(&:to_i) : []
+    restored = restored_asset_ids.uniq
     embedded = rich_text_asset_ids
-    removable = restored_asset_ids.uniq - embedded
-    (restored_asset_ids.uniq & embedded).each { |id| say "Kept Media::Asset##{id}: rich text still embeds it (its blob is now shared with the restored attachment)" }
-    return if removable.empty?
+    removable = (restored & migrated) - embedded
 
-    execute sanitize("DELETE FROM media_usages WHERE media_asset_id IN (?)", removable)
-    MigrationAttachment.where(record_type: ASSET_RECORD_TYPE, record_id: removable, name: "file").delete_all
-    MigrationAsset.where(id: removable).delete_all
-    say "Removed #{removable.size} media asset(s)"
+    (restored - removable).each do |id|
+      reason = migrated.include?(id) ? "rich text still embeds it" : "the migration didn't create it"
+      say "Kept Media::Asset##{id}: #{reason} (its blob is now shared with the restored attachment)"
+    end
+
+    if removable.any?
+      execute sanitize("DELETE FROM media_usages WHERE media_asset_id IN (?)", removable)
+      MigrationAttachment.where(record_type: ASSET_RECORD_TYPE, record_id: removable, name: "file").delete_all
+      MigrationAsset.where(id: removable).delete_all
+      say "Removed #{removable.size} media asset(s)"
+    end
+
+    drop_table LEDGER, if_exists: true
   end
 
   private
@@ -208,12 +247,19 @@ class MoveImagesIntoMediaLibrary < ActiveRecord::Migration[8.1]
     end.filter_map { |value| Integer(value, exception: false) }.uniq
   end
 
+  # In its own savepoint (fix round 1, M4): the rescue below is only safe
+  # if a database error raised in here can't leave the migration's own
+  # transaction aborted ("current transaction is aborted, commands ignored
+  # until end of transaction block") -- rolling back to the savepoint
+  # first, before the rescue runs, keeps the data changes above intact.
   def enqueue_variants(asset_ids)
     return if asset_ids.empty?
 
-    Media::Asset.where(id: asset_ids).find_each do |asset|
-      Media::Asset.reflect_on_attachment(:file).named_variants.each_value do |variant|
-        ActiveStorage::TransformJob.perform_later(asset.file.blob, variant.transformations) if variant.preprocessed?(asset)
+    ActiveRecord::Base.transaction(requires_new: true) do
+      Media::Asset.where(id: asset_ids).find_each do |asset|
+        Media::Asset.reflect_on_attachment(:file).named_variants.each_value do |variant|
+          ActiveStorage::TransformJob.perform_later(asset.file.blob, variant.transformations) if variant.preprocessed?(asset)
+        end
       end
     end
   rescue StandardError => e

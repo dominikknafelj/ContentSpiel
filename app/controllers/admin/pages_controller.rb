@@ -169,17 +169,24 @@ module Admin
       # just typed into, but a removed or replaced image has nothing
       # equivalent: the checkbox would stay checked (or the file input
       # would still show the just-picked file) with nothing in the DOM
-      # reflecting what actually got saved. Only re-rendered when this
-      # save actually touched the attachment, and only on success -- a
-      # failed save never reaches `Pages::Save`'s attachment writer at all.
-      streams << hero_image_stream(result.record) if result.ok? && hero_image_changing
-
-      # A refused upload re-renders the hero section too -- *before* the
-      # error slot `autosave_stream` just filled (which lives inside that
-      # section), so the message survives -- to clear the file input:
-      # otherwise every later autosave of this form would resend the same
-      # refused file and fail again.
-      streams.insert(1, hero_image_stream(@page)) if upload_failure
+      # reflecting what actually got saved. Re-rendered whenever this save
+      # touched the hero and succeeded, showing the saved image.
+      #
+      # And whenever a file was uploaded, *whatever* happened next (Task 4
+      # fix round 1, I1): a refused upload, or an accepted one followed by
+      # a failed save (another field's validation error, a denial). The
+      # section is what holds the file input, so re-rendering it is what
+      # clears the file -- otherwise every later autosave of this form
+      # would resend it, uploading a duplicate asset (and another
+      # `media.uploaded`) each time. On failure it shows the hero as
+      # *stored* (the reference `Pages::Save` never wrote), and goes in
+      # *before* the error slots `autosave_stream` just filled, since the
+      # hero's own error slot lives inside that section.
+      if result.ok? && hero_image_changing
+        streams << hero_image_stream(result.record.hero_media_asset)
+      elsif upload
+        streams.insert(1, hero_image_stream(Media::Asset.find_by(id: @page.attribute_in_database("hero_media_asset_id"))))
+      end
 
       # The tree column lives outside this form entirely (the layout's own
       # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream
@@ -284,17 +291,21 @@ module Admin
     # `Admin::PageSettingsFormComponent` renders on a normal GET, built off
     # `Admin::PageSettingsFormComponent::ID_PREFIX` rather than a second,
     # hand-kept copy of "page", so the two can never drift apart.
-    def hero_image_stream(record)
+    #
+    # `asset` is the hero to show (or nil) -- passed in rather than read off
+    # the page, since after a failed save the page still holds the
+    # unsaved reference.
+    def hero_image_stream(asset)
       prefix = Admin::PageSettingsFormComponent::ID_PREFIX
 
       turbo_stream.replace("#{prefix}-hero-image-section", partial: "admin/shared/hero_image_field", locals: {
         section_id: "#{prefix}-hero-image-section",
         image_id: "#{prefix}-hero_image",
         image_html_name: "#{prefix}[hero_image]",
-        image_value: record.hero_media_asset&.file,
+        image_value: asset&.file,
         checkbox_id: "#{prefix}-remove_hero_image",
         checkbox_html_name: "#{prefix}[remove_hero_image]",
-        show_checkbox: record.hero_media_asset_id.present?
+        show_checkbox: asset.present?
       })
     end
 

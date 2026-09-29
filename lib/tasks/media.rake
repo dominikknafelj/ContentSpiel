@@ -32,14 +32,30 @@ namespace :media do
     confirmed = ENV["CONFIRM"] == "1"
 
     count = 0
+    purged = 0
+    failed = 0
     orphans.find_each do |blob|
       count += 1
       puts "  blob ##{blob.id}  #{blob.filename}  #{blob.content_type}  #{blob.byte_size} bytes  created #{blob.created_at.iso8601}"
-      blob.purge if confirmed
+      next unless confirmed
+
+      # Counted as purged only once the row is confirmed gone (fix round 1,
+      # M5) -- a purge that raised, or one a concurrent attach raced, is
+      # reported instead of silently counted.
+      begin
+        blob.purge
+      rescue StandardError => e
+        puts "    purge failed: #{e.class}: #{e.message}"
+      end
+      if ActiveStorage::Blob.exists?(blob.id)
+        failed += 1
+      else
+        purged += 1
+      end
     end
 
     if confirmed
-      puts "media:orphans: purged #{count} blob(s)"
+      puts "media:orphans: purged #{purged} blob(s)#{", #{failed} could not be purged" if failed.positive?}"
     else
       puts "media:orphans: #{count} blob(s) with no attachments#{" -- run with CONFIRM=1 to purge them" if count.positive?}"
     end

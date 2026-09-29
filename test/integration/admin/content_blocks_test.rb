@@ -280,6 +280,33 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "medium", block.media_asset.title
   end
 
+  # Fix round 1 (I1), the block twin of the page editor's test: an accepted
+  # upload whose save then fails still clears the file input.
+  test "an accepted block image upload with a failed save uploads once and clears the file input" do
+    block = image_block_with_image
+    stored = block.media_asset
+    failing_save = ->(record, **) { ApplicationService::Result.failure(record, [ "Nope" ]) }
+
+    with_singleton_override(ContentBlocks::Save, :call, failing_save) do
+      assert_difference "Media::Asset.count", 1 do
+        patch "#{blocks_path}/#{block.id}",
+          params: { block: { image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
+          as: :turbo_stream
+      end
+    end
+    assert_response :unprocessable_entity
+    assert_equal stored, block.reload.media_asset
+
+    assert_includes response.body, "#{Admin::BlockCardComponent.error_prefix(block)}-image-section"
+    assert_not_includes response.body, "medium.png"
+
+    assert_no_difference "Media::Asset.count" do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { caption: "Later", image: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    end
+    assert_response :success
+  end
+
   test "a refused block image upload fails the save and keeps the current image" do
     block = image_block_with_image
     previous = block.media_asset

@@ -136,6 +136,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_050000) do
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
   end
 
+  create_table "media_library_migrated_assets", id: false, force: :cascade do |t|
+    t.bigint "media_asset_id", null: false
+    t.index ["media_asset_id"], name: "index_media_library_migrated_assets_on_media_asset_id", unique: true
+  end
+
   create_table "media_usages", force: :cascade do |t|
     t.bigint "media_asset_id", null: false
     t.string "owner_type", null: false

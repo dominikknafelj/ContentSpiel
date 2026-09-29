@@ -93,10 +93,15 @@ module Admin
         fields: block_error_fields(block)
       )
 
-      streams << image_field_stream(result.record) if result.ok? && image_changing
-      # Before the error slot inside that section, to clear the refused
-      # file -- see `Admin::PagesController#update`.
-      streams.insert(1, image_field_stream(block)) if upload_failure
+      # Re-rendered after a successful image change, and after *any*
+      # upload whatever the save's outcome, so the file input never keeps
+      # a file the next autosave would upload again (fix round 1, I1) --
+      # see `Admin::PagesController#update`.
+      if result.ok? && image_changing
+        streams << image_field_stream(block, result.record.media_asset)
+      elsif upload
+        streams.insert(1, image_field_stream(block, Media::Asset.find_by(id: block.attribute_in_database("media_asset_id"))))
+      end
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -401,15 +406,18 @@ module Admin
         partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: [ GONE_MESSAGE ] }), status: :gone
     end
 
-    def image_field_stream(block)
+    # `asset` is the image to show (or nil) -- after a failed save the
+    # block still holds the unsaved reference, so the caller passes the
+    # stored one.
+    def image_field_stream(block, asset)
       prefix = Admin::BlockCardComponent.error_prefix(block)
 
       turbo_stream.replace("#{prefix}-image-section", partial: "admin/shared/hero_image_field", locals: {
         section_id: "#{prefix}-image-section", name: "image",
         image_id: "#{prefix}-image", image_html_name: "block[image]",
-        image_value: block.media_asset&.file,
+        image_value: asset&.file,
         checkbox_id: "#{prefix}-remove_image", checkbox_html_name: "block[remove_image]",
-        show_checkbox: block.media_asset_id.present?
+        show_checkbox: asset.present?
       })
     end
   end
