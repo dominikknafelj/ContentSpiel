@@ -1,6 +1,8 @@
 require "test_helper"
 
 class RichText::HtmlRendererTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   def render(*content, preview: false)
     RichText::Document.new("type" => "doc", "content" => content).to_html(locale: "en", urls: PublicSite::Urls.new(preview: preview))
   end
@@ -206,6 +208,50 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     ensure
       Rails.cache = original_cache
       RichText.code_revision = original_revision
+    end
+  end
+
+  # Media library Task 5 fix round 1 (I1): a rendered body's `<img>` bakes
+  # in which of its image's variants exist yet (`Media::PictureComponent`'s
+  # `srcset`, built from `Media::Asset#srcset`'s own "only variants that
+  # have actually finished processing" rule) -- and a `TransformJob`
+  # finishing can change that well after the asset's own `updated_at` was
+  # last touched, with no `Media::Asset` row changing at all. Without
+  # `ActiveStorage::VariantRecord` maximum/count folded into `PublicSite
+  # .content_version` (`app/models/public_site.rb`), a body rendered (and
+  # cached, real cache store required -- same reasoning as every other
+  # render-cache test here) before its image's variants finished would keep
+  # serving `src`-only HTML forever, until some unrelated edit happened to
+  # bump the version.
+  #
+  # `Current.reset` before each render: `content_version` memoizes on
+  # `Current`, which a real request only ever computes once -- without
+  # resetting it here, the second render would just reuse the first
+  # render's memoized (now-stale) version and never see the variants that
+  # finished in between, the same reasoning the N+1 test above needs it for.
+  test "the render cache picks up an image's srcset once its variants finish processing" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    begin
+      asset = create_media_asset(filename: "wide.png")
+      asset.file.analyze
+      metadata = asset.file.blob.metadata || {}
+      asset.update_columns(width: metadata["width"], height: metadata["height"])
+
+      document = RichText::Document.new("type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id } } ])
+
+      Current.reset
+      before_html = document.to_html(locale: "en", urls: PublicSite::Urls.new)
+      assert_not_includes before_html, "srcset"
+
+      perform_enqueued_jobs
+      Current.reset
+
+      after_html = document.to_html(locale: "en", urls: PublicSite::Urls.new)
+      assert_includes after_html, "srcset"
+    ensure
+      Rails.cache = original_cache
     end
   end
 

@@ -62,10 +62,15 @@ module RichText
     # per asset (`Media::Asset.with_variants`'s own comment) -- the same
     # N+1 this preload exists to close in the first place, just one join
     # deeper.
+    #
+    # `return {} if ids.empty?` (fix round 1): most documents have no
+    # `image` node at all, and `Media::Asset.with_variants.where(id: [])`
+    # would still be a real (if trivially empty) query -- every document
+    # without an image shouldn't pay for one.
     def preloaded_media_assets
       @preloaded_media_assets ||= begin
         ids = @document.references.filter_map { |type, attribute, value| value if type == "image" && attribute == "asset_id" }
-        Media::Asset.with_variants.where(id: ids).index_by(&:id)
+        ids.empty? ? {} : Media::Asset.with_variants.where(id: ids).index_by(&:id)
       end
     end
   end

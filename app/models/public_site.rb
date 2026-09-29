@@ -15,6 +15,23 @@
 # hrefs (slug renames, a target published or deleted) and its images'
 # `Media::Asset` URLs, none of which change the document's own digest. The
 # `Media::Asset` maximum/count are here for that reason.
+#
+# `ActiveStorage::VariantRecord` maximum/count (media library Task 5 fix
+# round 1) close a related gap: a rendered body's `<img>` also bakes in
+# which of its image's variants exist yet (`Media::PictureComponent`'s
+# `srcset`, built from `Media::Asset#srcset`'s own "only variants that have
+# actually finished processing" rule), and that can change -- a
+# `TransformJob` finishing, well after the asset itself was uploaded and
+# `Media::Asset#updated_at` last touched -- without the `Media::Asset` row
+# itself changing at all. Without this, a body rendered (and cached) before
+# its image's variants existed would keep serving `src`-only HTML forever,
+# until some *unrelated* edit happened to bump the version. `variant_
+# records` has no `updated_at` of its own (`db/schema.rb`: just `id`/
+# `blob_id`/`variation_digest`, an insert-only join table Active Storage
+# never updates in place), so `maximum(:id)` is this table's own stand-in
+# for "newest row" -- the same role `updated_at` plays for every other
+# table here -- and `count` covers a row disappearing (a purged blob) the
+# same way it does everywhere else in this list.
 module PublicSite
   module_function
 
@@ -23,7 +40,9 @@ module PublicSite
       Page.maximum(:updated_at), Post.maximum(:updated_at), ContentBlock.maximum(:updated_at),
       PublicPath.maximum(:updated_at), Media::Asset.maximum(:updated_at), Current.site.updated_at,
       Page.published.maximum(:published_at), Post.published.maximum(:published_at),
-      Page.count, Post.count, ContentBlock.count, PublicPath.count, Media::Asset.count
+      ActiveStorage::VariantRecord.maximum(:id),
+      Page.count, Post.count, ContentBlock.count, PublicPath.count, Media::Asset.count,
+      ActiveStorage::VariantRecord.count
     ].map { |value| value.is_a?(Integer) ? value : value&.to_f }.join("-")
   end
 

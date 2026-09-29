@@ -562,6 +562,25 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
     assert_select "header img[src*='tiny.png']"
   end
 
+  # Media library Task 5 fix round 1 (I2): the hero's alt text is
+  # `Media::Asset#alt_text(override:, locale:)`'s own "override, then the
+  # asset's default" chain (`app/views/pages/show.html.erb`), same as an
+  # image block's -- pinned here at the public HTTP layer since no
+  # integration test covered either half of it.
+  test "the hero image's alt text uses the page's hero_alt, falling back to the asset's own default" do
+    asset = create_media_asset(filename: "tiny.png")
+    asset.update!(alt: "Library default alt")
+    root = Page.create!(page_type: :landing, title: "Welcome", slug: "",
+      published_at: Time.current, hero_media_asset: asset, hero_alt: "Custom hero alt")
+
+    get "/"
+    assert_select "header img[alt='Custom hero alt']"
+
+    root.update!(hero_alt: "")
+    get "/"
+    assert_select "header img[alt='Library default alt']"
+  end
+
   # `page_type` gates the hero fields defensively rather than trusting that a
   # `standard` page's `subtitle`/`hero_image` are blank: the columns aren't
   # otherwise enforced empty outside `landing`, and the view is the last place
