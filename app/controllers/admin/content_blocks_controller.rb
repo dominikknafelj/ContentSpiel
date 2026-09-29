@@ -9,7 +9,6 @@ module Admin
   # from PATCHing a block that belongs to a page they don't have open.
   class ContentBlocksController < BaseController
     include AutosaveResponses
-    include FileParams
 
     # Which schema-declared settings fields and `uses_columns` a save
     # actually writes to depends on the block's own registered type (spec
@@ -18,9 +17,12 @@ module Admin
     # since a different block on the same page can have an entirely
     # different schema. `TRANSLATED_COLUMNS`/`ATTRIBUTE_COLUMNS` below are
     # the one thing that *is* fixed: which of the columns a type can `uses`
-    # at all are translated (Mobility) versus a plain attribute
-    # (the attachment) -- `block.definition.uses_columns` still gates which
-    # of these a given type's own params are actually read from.
+    # at all are translated (Mobility) versus a plain attribute -- the
+    # image, whose column (`uses :image`) is saved as `media_asset_id`, the
+    # id the image field's hidden input (`Admin::Columns
+    # ::MediaColumnComponent`, media library Task 8) sends after a pick,
+    # or "" after Remove -- `block.definition.uses_columns` still gates
+    # which of these a given type's own params are actually read from.
     #
     # `TRANSLATED_COLUMNS` is derived from `ContentBlocks::Save::TRANSLATED`
     # (fix round 1) rather than a second, hand-kept `%w[caption alt body]`
@@ -28,7 +30,8 @@ module Admin
     # gets assigned, so this controller's own idea of "which columns are
     # translated" can never drift out of sync with it.
     TRANSLATED_COLUMNS = ContentBlocks::Save::TRANSLATED.map(&:to_s).freeze
-    ATTRIBUTE_COLUMNS = %w[image].freeze
+    # `uses` column => the param (and attribute) it's sent as.
+    ATTRIBUTE_COLUMNS = { "image" => "media_asset_id" }.freeze
 
     GONE_MESSAGE = "This block was deleted"
 
@@ -64,25 +67,7 @@ module Admin
       return render_gone unless block
 
       attributes, translations = split_block_params(block)
-      # An image upload goes into the library first and the block is saved
-      # pointing at the new asset -- the same interim path, and the same
-      # "a refused upload is a failed save" rule, as the page hero
-      # (`Admin::PagesController#update`'s own comment); Task 8's picker
-      # replaces it.
-      attributes = drop_blank_file_params(attributes, fields: ATTRIBUTE_COLUMNS)
-      upload = attributes.delete(:image)
-      removing = upload.nil? && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
-      image_changing = upload.present? || removing
-
-      if upload
-        uploaded = upload_to_library(upload, record: block, field: :image)
-        upload_failure = uploaded unless uploaded.ok?
-        attributes[:media_asset_id] = uploaded.record.id if uploaded.ok?
-      elsif removing
-        attributes[:media_asset_id] = nil
-      end
-
-      result = upload_failure || ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
+      result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
       streams = autosave_stream(
         record: result.record,
@@ -92,16 +77,6 @@ module Admin
         base_updated_at: params[:base_updated_at],
         fields: block_error_fields(block)
       )
-
-      # Re-rendered after a successful image change, and after *any*
-      # upload whatever the save's outcome, so the file input never keeps
-      # a file the next autosave would upload again (fix round 1, I1) --
-      # see `Admin::PagesController#update`.
-      if result.ok? && image_changing
-        streams << image_field_stream(block, result.record.media_asset)
-      elsif upload
-        streams.insert(1, image_field_stream(block, Media::Asset.find_by(id: block.attribute_in_database("media_asset_id"))))
-      end
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -198,7 +173,8 @@ module Admin
     # Splits `params[:block]` by the exact rule spec §5.1 lays out: schema
     # fields with `translated?` go to `translations[locale][:settings]`,
     # the rest to `attributes[:settings]`; `caption`/`alt`/`body` are
-    # translated columns (`body` the rich-text document JSON), `image` is a plain attribute -- every one of
+    # translated columns (`body` the rich-text document JSON), `image` is a
+    # plain attribute (`media_asset_id`) -- every one of
     # those gated by whether this block's own type actually `uses` that
     # column at all, the same allowlist reasoning
     # `Admin::PagesController::ATTRIBUTE_FIELDS` uses for its own record.
@@ -221,7 +197,7 @@ module Admin
 
       uses = definition&.uses_columns || []
       TRANSLATED_COLUMNS.each { |column| translations[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
-      ATTRIBUTE_COLUMNS.each { |column| attributes[column.to_sym] = block_params[column] if uses.include?(column) && block_params.key?(column) }
+      ATTRIBUTE_COLUMNS.each { |column, param| attributes[param.to_sym] = block_params[param] if uses.include?(column) && block_params.key?(param) }
 
       [ attributes, translations ]
     end
@@ -404,21 +380,6 @@ module Admin
     def render_gone
       render turbo_stream: turbo_stream.replace("content-blocks-alert",
         partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: [ GONE_MESSAGE ] }), status: :gone
-    end
-
-    # `asset` is the image to show (or nil) -- after a failed save the
-    # block still holds the unsaved reference, so the caller passes the
-    # stored one.
-    def image_field_stream(block, asset)
-      prefix = Admin::BlockCardComponent.error_prefix(block)
-
-      turbo_stream.replace("#{prefix}-image-section", partial: "admin/shared/hero_image_field", locals: {
-        section_id: "#{prefix}-image-section", name: "image",
-        image_id: "#{prefix}-image", image_html_name: "block[image]",
-        image_value: asset&.file,
-        checkbox_id: "#{prefix}-remove_image", checkbox_html_name: "block[remove_image]",
-        show_checkbox: asset.present?
-      })
     end
   end
 end

@@ -31,8 +31,7 @@ module Admin
   class BlockCardComponent < AdminComponent
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
-    # image section's own post-save re-render, mirroring
-    # `Admin::PageSettingsFormComponent::ID_PREFIX`'s reasoning) without a
+    # save status and error slots its autosave stream targets) without a
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
@@ -126,9 +125,8 @@ module Admin
     # through `body_document` (a `RichText::Document`) rather than the raw
     # Mobility accessor.
     def column_value(name)
-      # The block's library image's file (media library Task 4) -- what the
-      # upload field previews, until Task 8's picker replaces it.
-      return block.media_asset&.file if name == "image"
+      # The block's library image (`Admin::Columns::MediaColumnComponent`).
+      return block.media_asset if name == "image"
       return block.body_document(locale: locale) if name == "body"
 
       block.public_send(name, locale: locale)
@@ -142,6 +140,22 @@ module Admin
     end
 
     def column_errors(name) = block.errors.full_messages_for(name)
+
+    # The caption/alt fields are this block's per-use overrides of its
+    # image's own defaults (media library design spec §6): blank, the
+    # public page falls back to the image's default in this language, which
+    # is what they show as their placeholder (kept current after a pick by
+    # `admin--media-field`, `#image_placeholder_ids`).
+    def column_placeholder(name)
+      case name
+      when "alt" then Admin::Columns::MediaColumnComponent.default_alt(block.media_asset, locale)
+      when "caption" then Admin::Columns::MediaColumnComponent.default_caption(block.media_asset, locale)
+      end
+    end
+
+    # Which of the override fields this card actually renders -- a type
+    # that `uses :image` without `:alt` or `:caption` has none to update.
+    def image_placeholder_ids = (%w[alt caption] & uses_columns).to_h { |column| [ column, field_id(column) ] }
 
     def image_section_id = "#{error_prefix}-image-section"
 

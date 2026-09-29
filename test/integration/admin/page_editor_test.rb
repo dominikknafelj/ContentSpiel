@@ -97,173 +97,119 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert Page.exists?(parent.id)
   end
 
-  # Fix round 1: `new FormData(form)` (`admin--autosave`) resends *every*
-  # field on *every* save, including a `<input type="file">` nobody
-  # touched -- which Rack parses as a blank string, exactly like the empty
-  # `hero_image:` param below simulates. Before `drop_blank_file_params`,
-  # that blank rode along into `Pages::Save`'s `attributes:` and
-  # `has_one_attached`'s writer read it as "detach the current file" (and
-  # the library upload path since media library Task 4 would read it as a
-  # file to upload).
-  test "autosaving another field doesn't clear an already-attached hero image" do
+  # Media library Task 8: the hero is chosen through the picker into a
+  # hidden `hero_media_asset_id`, with `hero_alt` as the page's own
+  # override -- its placeholder is the image's own default alt.
+  test "a landing page's editor shows the hero picker field and the image's default alt as the override's placeholder" do
     landing = landing_page_with_hero_image
+    asset = landing.hero_media_asset
+    asset.update!(alt: "A dog on a beach")
+
+    get "/cs-studio/pages/#{landing.id}"
+    assert_response :success
+
+    assert_select "#page-hero-image-section[data-controller='admin--media-field']" do
+      assert_select "input[type=hidden][name='page[hero_media_asset_id]'][value='#{asset.id}']"
+      assert_select "button", text: "Change image"
+      assert_select "button", text: "Remove image"
+    end
+    assert_select "input[name='page[hero_alt]'][placeholder='A dog on a beach']"
+    # No upload field of its own any more; the one file input is the
+    # picker's Upload tab, rendered once by the layout.
+    assert_select "form[data-controller~='admin--autosave'] input[type=file]", count: 0
+    assert_select "dialog#media-picker[data-controller='admin--media-picker']", count: 1
+  end
+
+  # `new FormData(form)` (`admin--autosave`) resends *every* field on
+  # *every* save -- the hero's hidden input included, carrying the stored
+  # id, which is a no-op (no `media.upload` check, no change).
+  test "autosaving another field resends the stored hero id and keeps the hero" do
+    landing = landing_page_with_hero_image
+    asset = landing.hero_media_asset
 
     patch "/cs-studio/pages/#{landing.id}",
-      params: { page: { title: "Landing v2", hero_image: "" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { page: { title: "Landing v2", hero_media_asset_id: asset.id.to_s }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
     landing.reload
     assert_equal "Landing v2", landing.title(locale: :en)
-    assert landing.hero_media_asset.present?
+    assert_equal asset, landing.hero_media_asset
   end
 
-  test "the explicit remove-image checkbox clears the hero, leaving the image in the library" do
+  test "choosing a library image sets the hero and indexes its usage" do
+    landing = landing_page_with_hero_image
+    chosen = create_media_asset(filename: "medium.png")
+
+    assert_no_difference "Media::Asset.count" do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { hero_media_asset_id: chosen.id.to_s }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+    end
+    assert_response :success
+
+    assert_equal chosen, landing.reload.hero_media_asset
+    assert Media::Usage.exists?(media_asset: chosen, owner: landing, role: "hero")
+  end
+
+  test "an empty hero id (Remove) clears the hero, leaving the image in the library" do
     landing = landing_page_with_hero_image
     asset = landing.hero_media_asset
 
     patch "/cs-studio/pages/#{landing.id}",
-      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { page: { hero_media_asset_id: "" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
     assert_nil landing.reload.hero_media_asset
     assert Media::Asset.exists?(asset.id)
+    assert_not Media::Usage.exists?(owner: landing, role: "hero")
   end
 
-  # Media library Task 4: the interim upload field puts the file into the
-  # library through `Media::Upload` and points the page at the new asset.
-  test "uploading a hero image creates a library asset and references it" do
+  # Review Focus 5: a forged id is a validation failure shown in the hero
+  # field's own error slot, with the page unchanged -- not a 500.
+  test "a hero id naming no asset is refused into the hero field's error slot" do
     landing = landing_page_with_hero_image
+    asset = landing.hero_media_asset
 
-    assert_difference -> { Media::Asset.count } => 1, -> { Audit::Event.where(action: "media.uploaded").count } => 1 do
-      patch "/cs-studio/pages/#{landing.id}",
-        params: { page: { hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
-        as: :turbo_stream
-    end
-    assert_response :success
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { title: "Not saved", hero_media_asset_id: (Media::Asset.maximum(:id) + 1).to_s }, base_updated_at: landing.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :unprocessable_entity
 
-    asset = landing.reload.hero_media_asset
-    assert_equal "medium", asset.title
-    assert_equal users(:one), asset.created_by
-    assert_includes response.body, "page-hero-image-section"
+    assert_includes response.body, %(target="page-hero_image-errors")
+    assert_includes response.body, "Hero image doesn&#39;t exist"
+    landing.reload
+    assert_equal asset, landing.hero_media_asset
+    assert_equal "Landing", landing.title(locale: :en)
   end
 
-  # Fix round 1 (I1): an accepted upload whose save then fails (here,
-  # another field's validation error) must still clear the file input --
-  # otherwise every later autosave resends the file and uploads a
-  # duplicate asset.
-  test "an accepted hero upload with a failed save uploads once and clears the file input" do
+  test "choosing a hero without media.upload is a 403 and changes nothing" do
     landing = landing_page_with_hero_image
     stored = landing.hero_media_asset
-
-    assert_difference "Media::Asset.count", 1 do
-      patch "/cs-studio/pages/#{landing.id}",
-        params: { page: { title: "", hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
-        as: :turbo_stream
-    end
-    assert_response :unprocessable_entity
-    assert_equal stored, landing.reload.hero_media_asset
-
-    # The section comes back showing the *stored* hero, with a fresh,
-    # empty file input.
-    assert_includes response.body, "page-hero-image-section"
-    assert_includes response.body, stored.file.filename.to_s
-    assert_not_includes response.body, "medium.png"
-
-    # What the browser sends next: the cleared input is blank again.
-    assert_no_difference "Media::Asset.count" do
-      patch "/cs-studio/pages/#{landing.id}",
-        params: { page: { title: "Landing", hero_image: "" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
-    end
-    assert_response :success
-  end
-
-  # Fix round 1 (M7): the denied branch of `Admin::FileParams
-  # #upload_to_library` -- an editor who may edit pages but not upload.
-  test "a hero upload without media.upload is a 403 and creates no asset" do
-    landing = landing_page_with_hero_image
+    chosen = create_media_asset(filename: "medium.png")
     group = access_control_groups(:branch_editors)
     %w[pages.read pages.edit pages.publish].each { |key| AccessControl::Grant.create!(group: group, permission: key, scope: {}) }
     sign_in_as(users(:editor_branch))
 
-    assert_no_difference "Media::Asset.count" do
-      patch "/cs-studio/pages/#{landing.id}",
-        params: { page: { hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
-        as: :turbo_stream
-    end
+    patch "/cs-studio/pages/#{landing.id}",
+      params: { page: { hero_media_asset_id: chosen.id.to_s }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :forbidden
-    assert_includes response.body, "Hero image can&#39;t be uploaded without permission to upload media"
+
+    assert_equal stored, landing.reload.hero_media_asset
     assert_equal "media.upload", Audit::Event.where(action: "access.denied").last.metadata["permission"]
   end
 
-  test "a refused hero upload fails the save, shows why and keeps the current hero" do
+  # The interim upload field (media library Task 4) is gone: a `hero_image`
+  # file param is no longer permitted, so nothing is uploaded through it.
+  test "a hero_image file param is ignored and uploads nothing" do
     landing = landing_page_with_hero_image
     asset = landing.hero_media_asset
 
     assert_no_difference "Media::Asset.count" do
       patch "/cs-studio/pages/#{landing.id}",
-        params: { page: { title: "Not saved", hero_image: fixture_file_upload("fake.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+        params: { page: { hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
         as: :turbo_stream
     end
-    assert_response :unprocessable_entity
-
-    assert_includes response.body, "Hero image must be a PNG, JPEG, GIF, or WEBP image"
-    landing.reload
-    assert_equal asset, landing.hero_media_asset
-    assert_equal "Landing", landing.title(locale: :en)
-    # The section is re-rendered before its error slot, so the message
-    # isn't wiped and the refused file isn't resent by the next autosave.
-    assert_operator response.body.index("page-hero-image-section"), :<, response.body.index("Hero image must be")
-  end
-
-  # Fix round 2: the "Remove image" checkbox stays checked in the DOM after
-  # a removal (nothing else re-renders it) unless the success stream itself
-  # brings the hero section back in sync -- checked here directly, since a
-  # stale checked box left unfixed is exactly what the next two tests guard
-  # against in practice (a later save that still carries `remove_hero_image
-  # =1` alongside a freshly picked file).
-  test "removing the hero image re-renders the hero section without the checkbox" do
-    landing = landing_page_with_hero_image
-
-    patch "/cs-studio/pages/#{landing.id}",
-      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-
-    assert_includes response.body, "page-hero-image-section"
-    assert_not_includes response.body, "page[remove_hero_image]"
-  end
-
-  test "removing then uploading a new hero image in a later save keeps the new image" do
-    landing = landing_page_with_hero_image
-
-    patch "/cs-studio/pages/#{landing.id}",
-      params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
-    assert_response :success
-    landing.reload
-    assert_nil landing.hero_media_asset
-
-    patch "/cs-studio/pages/#{landing.id}",
-      params: { page: { hero_image: fixture_file_upload("tiny.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
-      as: :turbo_stream
-    assert_response :success
-
-    assert landing.reload.hero_media_asset.present?
-  end
-
-  # The scenario the coordinator's review actually named: an editor ticks
-  # Remove, then picks a new file before the (only just-added) re-render
-  # lands, so both `hero_image` and a still-stale `remove_hero_image=1`
-  # arrive in the same request.
-  test "a new upload wins over a stale remove flag in the same save" do
-    landing = landing_page_with_hero_image
-
-    patch "/cs-studio/pages/#{landing.id}",
-      params: {
-        page: { hero_image: fixture_file_upload("tiny.png", "image/png"), remove_hero_image: "1" },
-        base_updated_at: landing.updated_at.iso8601(6)
-      }, as: :turbo_stream
-    assert_response :success
-
-    assert landing.reload.hero_media_asset.present?
+    assert_equal asset, landing.reload.hero_media_asset
   end
 
   private

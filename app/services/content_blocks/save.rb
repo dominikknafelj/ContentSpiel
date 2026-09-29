@@ -9,9 +9,9 @@ module ContentBlocks
   # assigned.
   #
   # An image block's library image (media library design spec §5.1):
-  # `media_asset_id` in `attributes` sets, changes or (nil) clears it --
-  # CS Studio's upload field after `Media::Upload`, Duplicate copying the
-  # source's, later the picker. Choosing one also needs `media.upload` and
+  # `media_asset_id` in `attributes` sets, changes or (nil/"") clears it --
+  # CS Studio's image field after a pick in the media picker, or Duplicate
+  # copying the source's. Choosing one also needs `media.upload` and
   # an existing asset (`Media::Choosing`), so a duplicate of an image block
   # does too. Every save then refreshes the block's `media_usages` rows
   # (its image and its rich-text body's images) inside the transaction.

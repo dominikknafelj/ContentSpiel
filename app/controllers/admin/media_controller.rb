@@ -34,11 +34,21 @@ module Admin
     # re-render of it) must load through it, never a bare `Media::Asset
     # .all`, or `Admin::MediaLibrary::GridComponent#thumbnail_url`'s own `#srcset`
     # call turns straight back into the N+1 the scope exists to prevent.
+    #
+    # `picker=1` (Task 8) is the same listing for `Media::PickerComponent`'s
+    # Library tab: the grid, search and pagination, rendered on their own
+    # inside the picker's `<turbo-frame>` (`admin/media/picker`, no layout)
+    # with pick buttons instead of detail links. Deliberately this endpoint
+    # rather than a second one: one search, one set of filters, one
+    # constant-query load (`filtered_assets`), and the same `media.upload`
+    # gate -- the picker's only permission is "may browse and choose".
     def index
       @assets = filtered_assets.order(id: :desc).limit(PER_PAGE + 1).offset(offset).to_a
       @has_next = @assets.size > PER_PAGE
       @assets = @assets.first(PER_PAGE)
       @offset = offset
+
+      render :picker, layout: false if params[:picker].present?
     end
 
     def show

@@ -49,6 +49,67 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{unrelated.id}", count: 0
   end
 
+  # Media library Task 8: `Media::PickerComponent`'s Library tab is this
+  # same listing with `picker=1` -- no layout, just the picker's frame,
+  # each card a pick button carrying the asset's id, thumbnail, title and
+  # its own alt/caption defaults in the editing language.
+  test "picker mode renders the grid alone in the picker's frame, with pick buttons" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+    Mobility.with_locale(:de) { asset.update!(alt: "Ein Hund", caption: "Unser Hund") }
+
+    get "/cs-studio/media", params: { picker: 1, locale: "de" }
+
+    assert_response :success
+    assert_not_includes response.body, "<html"
+    assert_select "nav[aria-label='Modules']", count: 0
+    assert_select "turbo-frame#media-picker-library" do
+      assert_select "form input[type=hidden][name=picker][value='1']"
+      assert_select "form input[type=hidden][name=locale][value='de']"
+      assert_select "button[data-action='admin--media-picker#pick']", count: 1
+      assert_select "a[href='/cs-studio/media/#{asset.id}']", count: 0
+    end
+    payload = JSON.parse(css_select("button[data-action='admin--media-picker#pick']").first["data-admin--media-picker-asset-param"])
+    assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
+  end
+
+  test "picker mode searches and paginates like the grid, staying in picker mode" do
+    sign_in_as(users(:one))
+    49.times { |i| build_asset(filename: "many-#{i}.png") }
+    upload_asset(filename: "needle.png")
+
+    get "/cs-studio/media", params: { picker: 1, q: "needle" }
+    assert_select "button[data-action='admin--media-picker#pick']", count: 1
+
+    get "/cs-studio/media", params: { picker: 1 }
+    assert_select "button[data-action='admin--media-picker#pick']", count: 48
+    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='offset=48']", text: "Next"
+  end
+
+  test "picker mode needs media.upload" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/media", params: { picker: 1 }
+
+    assert_response :forbidden
+  end
+
+  test "picker mode issues a constant number of queries for 10 assets and for 60" do
+    sign_in_as(users(:one))
+    10.times { |i| build_asset(filename: "few-#{i}.png") }
+    get "/cs-studio/media", params: { picker: 1 }
+    assert_response :success
+
+    few_count = ActiveRecord::Base.uncached { count_queries { get "/cs-studio/media", params: { picker: 1 } } }
+
+    Media::Asset.delete_all
+    60.times { |i| build_asset(filename: "many-#{i}.png") }
+    many_count = ActiveRecord::Base.uncached { count_queries { get "/cs-studio/media", params: { picker: 1 } } }
+
+    assert_select "button[data-action='admin--media-picker#pick']", 48
+    assert_equal few_count, many_count, "10 assets: #{few_count} queries, 60 assets: #{many_count}"
+  end
+
   test "the unused filter hides an asset that's in use" do
     sign_in_as(users(:one))
     unused_asset = upload_asset(filename: "unused.png")

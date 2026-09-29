@@ -1,6 +1,7 @@
 module Admin
   # The page editor's "Page settings" panel (cs-studio spec §5.1): title,
-  # slug + a live URL preview, page type, subtitle, hero image + alt
+  # slug + a live URL preview, page type, subtitle, hero image (a library
+  # image, chosen through `Media::PickerComponent`) + alt
   # (landing pages only), and meta title/description under "SEO" -- one
   # autosaving `<form>` (spec §6.1), PATCHing `Admin::PagesController#update`
   # on every field's `input`/`change` (debounced) or `focusout` (immediate).
@@ -30,13 +31,14 @@ module Admin
 
     def base_updated_at_value = page.updated_at.iso8601(6)
 
-    # The one `id` `Admin::PagesController#hero_image_stream` (Task 4 fix
-    # round 2) needs to know ahead of time, since it re-renders this
-    # section from a plain controller method rather than this component --
-    # `ID_PREFIX` is public for exactly that: the two builders of this id
-    # (this component's normal GET render, that controller's post-save
-    # stream) share the one constant rather than each hand-keeping "page".
+    # The hero field's wrapper (`Admin::Columns::MediaColumnComponent`).
     def hero_image_section_id = "#{ID_PREFIX}-hero-image-section"
+
+    # `hero_alt` is the page's per-use override of the hero image's own
+    # alt text (media library design spec §6): blank, the public page
+    # falls back to the image's default in this language, which is what
+    # the field shows as its placeholder.
+    def hero_alt_placeholder = Admin::Columns::MediaColumnComponent.default_alt(page.hero_media_asset, locale)
 
     def field_id(field) = "#{ID_PREFIX}-#{field}"
 

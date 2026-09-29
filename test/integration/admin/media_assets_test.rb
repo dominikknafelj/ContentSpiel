@@ -1,10 +1,10 @@
 require "test_helper"
 
-# `Admin::MediaAssetsController#create` (design spec §4.1/§4.2): the
-# Tiptap editor's own image upload button POSTs here directly (no page or
-# post owns this upload -- the editor inserts `{asset_id}` into whichever
-# document is open once this answers), and gets back `{ id, url }` or
-# `{ errors }`.
+# `Admin::MediaAssetsController#create` (design spec §4.1/§4.2): the media
+# picker's Upload tab (media library Task 8) POSTs here directly (no page
+# or post owns this upload -- the picker hands the id to whichever field or
+# editor opened it once this answers), and gets back `{ id, url, title }`
+# or `{ errors }`.
 class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -22,6 +22,7 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     asset = Media::Asset.last
     assert_equal asset.id, body["id"]
     assert_equal asset.url, body["url"]
+    assert_equal "tiny", body["title"]
     assert asset.file.attached?
   end
 

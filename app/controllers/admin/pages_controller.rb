@@ -13,7 +13,6 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
-    include FileParams
 
     # Which of `params[:page]`'s keys are translated columns (`Pages::Save`'s
     # own `TRANSLATED`, kept in sync by hand rather than referencing that
@@ -21,11 +20,16 @@ module Admin
     # the settings form, not `Pages::Save`'s; the two only happen to agree
     # today) versus plain attributes. Split here, not left to `Pages::Save`,
     # because `attributes:` there is assigned with no allowlist of its own
-    # (`page_type`/`hero_image` are the only two attributes an editor's own
-    # PATCH may ever set -- anything else, e.g. `published`/`parent_id`,
-    # must never arrive by way of a form field with that name).
+    # (`page_type`/`hero_media_asset_id` are the only two attributes an
+    # editor's own PATCH may ever set -- anything else, e.g.
+    # `published`/`parent_id`, must never arrive by way of a form field with
+    # that name). `hero_media_asset_id` is the hero field's hidden input
+    # (`Admin::Columns::MediaColumnComponent`, media library Task 8): an id
+    # chosen in the picker, or "" to clear it -- `Pages::Save`
+    # (`Media::Choosing`) checks `media.upload` and that the asset exists
+    # for a new one.
     TRANSLATED_FIELDS = %w[title slug subtitle meta_title meta_description hero_alt].freeze
-    ATTRIBUTE_FIELDS = %w[page_type hero_image].freeze
+    ATTRIBUTE_FIELDS = %w[page_type hero_media_asset_id].freeze
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule]
 
@@ -91,8 +95,17 @@ module Admin
     # query. Only here: a write action hands `@page` to a service, which
     # must judge the page's position as stored, not a snapshot
     # (`AccessControl.preload_branches`).
+    #
+    # The hero and every image block's image are preloaded with their
+    # variant records (`Media::Asset::VARIANT_INCLUDES`): each image field
+    # reads `#srcset` for its thumbnail, which would otherwise be a query
+    # per block (media library Task 8: every list of assets loads that way).
     def show
       AccessControl.preload_branches([ @page ])
+      ActiveRecord::Associations::Preloader.new(records: [ @page ], associations: [
+        { hero_media_asset: Media::Asset::VARIANT_INCLUDES },
+        { content_blocks: { media_asset: Media::Asset::VARIANT_INCLUDES } }
+      ]).call
     end
 
     # The settings form's own autosave endpoint (spec §6.1): every field in
@@ -109,49 +122,7 @@ module Admin
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
-      # `drop_blank_file_params` (Task 4 fix round 1, see its own doc
-      # comment) is what keeps this same PATCH -- resent in full on *every*
-      # autosave, whichever field an editor actually touched -- from
-      # silently detaching an already-attached hero image the moment a
-      # blank `hero_image` file input rides along with it. Removing one on
-      # purpose is a separate, explicit signal (`remove_hero_image`, read
-      # straight off `params` rather than the permitted/translated split
-      # above -- it's a flag this controller consumes itself, never a
-      # column `Pages::Save` assigns).
-      #
-      # A real upload always wins over that flag (fix round 2): the
-      # checkbox stays checked in the DOM until this same response
-      # re-renders the hero section further down (nothing else in this
-      # form's markup gets rebuilt on autosave), so an editor who ticks
-      # Remove, then picks a new file *before* that re-render lands, would
-      # otherwise resend both in one request -- and without this guard, the
-      # stale `remove_hero_image=1` would win and silently drop the very
-      # upload they just made. `attributes.key?("hero_image")` here is
-      # exactly "a non-blank file survived the drop above", since a blank
-      # one never reaches this hash at all.
-      #
-      # The hero is a library image now (media library Task 4): an upload
-      # goes into the library through `Media::Upload` first
-      # (`FileParams#upload_to_library`) and the page is then saved pointing
-      # at the new asset (`hero_media_asset_id`); removing just clears that
-      # reference -- the asset itself stays in the library. Task 8 replaces
-      # this upload field with the picker. A failed upload (a refused type,
-      # no `media.upload`) answers as a failed save, without saving the rest
-      # of the form: the next autosave resends every field anyway.
-      attributes = drop_blank_file_params(attributes, fields: %w[hero_image])
-      upload = attributes.delete("hero_image")
-      removing = upload.nil? && ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
-      hero_image_changing = upload.present? || removing
-
-      if upload
-        uploaded = upload_to_library(upload, record: @page, field: :hero_image)
-        upload_failure = uploaded unless uploaded.ok?
-        attributes["hero_media_asset_id"] = uploaded.record.id if uploaded.ok?
-      elsif removing
-        attributes["hero_media_asset_id"] = nil
-      end
-
-      result = upload_failure || Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
+      result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 
       streams = autosave_stream(
         record: result.record,
@@ -161,32 +132,6 @@ module Admin
         base_updated_at: params[:base_updated_at],
         fields: page_error_fields
       )
-
-      # The hero section (the image preview and the "Remove image"
-      # checkbox, `admin/shared/_hero_image_field`) is the one part of this
-      # form autosave doesn't otherwise touch on success -- every other
-      # field's own value already sits correctly in the input the editor
-      # just typed into, but a removed or replaced image has nothing
-      # equivalent: the checkbox would stay checked (or the file input
-      # would still show the just-picked file) with nothing in the DOM
-      # reflecting what actually got saved. Re-rendered whenever this save
-      # touched the hero and succeeded, showing the saved image.
-      #
-      # And whenever a file was uploaded, *whatever* happened next (Task 4
-      # fix round 1, I1): a refused upload, or an accepted one followed by
-      # a failed save (another field's validation error, a denial). The
-      # section is what holds the file input, so re-rendering it is what
-      # clears the file -- otherwise every later autosave of this form
-      # would resend it, uploading a duplicate asset (and another
-      # `media.uploaded`) each time. On failure it shows the hero as
-      # *stored* (the reference `Pages::Save` never wrote), and goes in
-      # *before* the error slots `autosave_stream` just filled, since the
-      # hero's own error slot lives inside that section.
-      if result.ok? && hero_image_changing
-        streams << hero_image_stream(result.record.hero_media_asset)
-      elsif upload
-        streams.insert(1, hero_image_stream(Media::Asset.find_by(id: @page.attribute_in_database("hero_media_asset_id"))))
-      end
 
       # The tree column lives outside this form entirely (the layout's own
       # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream
@@ -284,29 +229,6 @@ module Admin
         page_type: [ :page_type ],
         hero_image: [ :hero_image ]
       }
-    end
-
-    # The Turbo Stream that brings the hero section's DOM back in sync with
-    # what `update` just saved (fix round 2) -- same partial, same ids
-    # `Admin::PageSettingsFormComponent` renders on a normal GET, built off
-    # `Admin::PageSettingsFormComponent::ID_PREFIX` rather than a second,
-    # hand-kept copy of "page", so the two can never drift apart.
-    #
-    # `asset` is the hero to show (or nil) -- passed in rather than read off
-    # the page, since after a failed save the page still holds the
-    # unsaved reference.
-    def hero_image_stream(asset)
-      prefix = Admin::PageSettingsFormComponent::ID_PREFIX
-
-      turbo_stream.replace("#{prefix}-hero-image-section", partial: "admin/shared/hero_image_field", locals: {
-        section_id: "#{prefix}-hero-image-section",
-        image_id: "#{prefix}-hero_image",
-        image_html_name: "#{prefix}[hero_image]",
-        image_value: asset&.file,
-        checkbox_id: "#{prefix}-remove_hero_image",
-        checkbox_html_name: "#{prefix}[remove_hero_image]",
-        show_checkbox: asset.present?
-      })
     end
 
     # See `update`'s own comment for why every successful settings-form

@@ -225,125 +225,104 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal original, copy2.read_attribute(:body)
   end
 
-  # Fix round 2 (this task's own label bug, spotted alongside round 1's
-  # review): the shared `admin/shared/_hero_image_field` partial used to
-  # hard-code `name: "hero_image"`, so a block's own image column's label
-  # always read "Hero image" -- unrelated to the field it actually is.
-  test "a block's own image column labels itself Image, not Hero image" do
+  # The image column is a library image field (media library Task 8):
+  # labelled "Image" (never the page's "Hero image"), a hidden
+  # `media_asset_id` the card's autosave sends, and the image's own default
+  # alt/caption as the per-use overrides' placeholders.
+  test "an image block's card shows the picker field and the image's defaults as the overrides' placeholders" do
     block = image_block_with_image
-    get "/cs-studio/pages/#{@page.id}"
+    block.media_asset.update!(alt: "A dog", caption: "Our dog")
+    prefix = Admin::BlockCardComponent.error_prefix(block)
 
-    assert_select "label", text: "Image"
-    assert_select "label", text: "Hero image", count: 0
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+
+    assert_select "##{prefix}-image-section[data-controller='admin--media-field']" do
+      assert_select "p", text: "Image"
+      assert_select "input[type=hidden][name='block[media_asset_id]'][value='#{block.media_asset_id}']"
+      assert_select "button", text: "Change image"
+    end
+    assert_select "p", text: "Hero image", count: 0
+    assert_select "input[name='block[alt]'][placeholder='A dog']"
+    assert_select "input[name='block[caption]'][placeholder='Our dog']"
+    assert_equal({ "alt" => "#{prefix}-alt", "caption" => "#{prefix}-caption" },
+      JSON.parse(css_select("##{prefix}-image-section").first["data-admin--media-field-placeholder-ids-value"]))
   end
 
-  # The next four mirror `Admin::PageEditorTest`'s own hero-image cases
-  # (Task 4 fix rounds 1/2) for a block's own `image` column -- same bugs,
-  # same fixes, same shared code path (`Admin::FileParams
-  # #drop_blank_file_params`, the "Remove image" checkbox, the shared
-  # partial), just reached through the block card's own autosave endpoint
-  # instead of the page settings form's.
-  test "autosaving another field doesn't clear an already-attached block image" do
+  # Every autosave resends the hidden input's stored id -- a no-op.
+  test "autosaving another field resends the stored image id and keeps the image" do
     block = image_block_with_image
+    asset = block.media_asset
 
     patch "#{blocks_path}/#{block.id}",
-      params: { block: { caption: "A caption", image: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { block: { caption: "A caption", media_asset_id: asset.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
     block.reload
     assert_equal "A caption", block.caption(locale: :en)
-    assert block.media_asset.present?
+    assert_equal asset, block.media_asset
   end
 
-  test "the explicit remove-image checkbox clears a block's image" do
+  test "choosing a library image sets the block's image" do
+    block = image_block_with_image
+    chosen = create_media_asset(filename: "medium.png")
+
+    assert_no_difference "Media::Asset.count" do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    end
+    assert_response :success
+
+    assert_equal chosen, block.reload.media_asset
+    assert Media::Usage.exists?(media_asset: chosen, owner: block, role: "block_image")
+  end
+
+  test "an empty image id (Remove) clears a block's image" do
     block = image_block_with_image
 
     patch "#{blocks_path}/#{block.id}",
-      params: { block: { remove_image: "1" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+      params: { block: { media_asset_id: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
     assert_nil block.reload.media_asset
   end
 
-  test "uploading a block image creates a library asset and references it" do
+  test "an image id naming no asset is refused into the image column's error slot" do
     block = image_block_with_image
     previous = block.media_asset
 
-    assert_difference "Media::Asset.count", 1 do
+    patch "#{blocks_path}/#{block.id}",
+      params: { block: { media_asset_id: (Media::Asset.maximum(:id) + 1).to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+
+    assert_includes response.body, %(target="#{Admin::BlockCardComponent.error_prefix(block)}-image-errors")
+    assert_includes response.body, "Image doesn&#39;t exist"
+    assert_equal previous, block.reload.media_asset
+  end
+
+  # Only a type that `uses :image` takes an image id at all.
+  test "a media_asset_id sent to a block type without an image is ignored" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    patch "#{blocks_path}/#{block.id}",
+      params: { block: { media_asset_id: create_media_asset.id.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+
+    assert_nil block.reload.media_asset_id
+  end
+
+  # The interim upload field (media library Task 4) is gone.
+  test "an image file param is ignored and uploads nothing" do
+    block = image_block_with_image
+    previous = block.media_asset
+
+    assert_no_difference "Media::Asset.count" do
       patch "#{blocks_path}/#{block.id}",
         params: { block: { image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
         as: :turbo_stream
     end
     assert_response :success
-
-    assert_not_equal previous, block.reload.media_asset
-    assert_equal "medium", block.media_asset.title
-  end
-
-  # Fix round 1 (I1), the block twin of the page editor's test: an accepted
-  # upload whose save then fails still clears the file input.
-  test "an accepted block image upload with a failed save uploads once and clears the file input" do
-    block = image_block_with_image
-    stored = block.media_asset
-    failing_save = ->(record, **) { ApplicationService::Result.failure(record, [ "Nope" ]) }
-
-    with_singleton_override(ContentBlocks::Save, :call, failing_save) do
-      assert_difference "Media::Asset.count", 1 do
-        patch "#{blocks_path}/#{block.id}",
-          params: { block: { image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
-          as: :turbo_stream
-      end
-    end
-    assert_response :unprocessable_entity
-    assert_equal stored, block.reload.media_asset
-
-    assert_includes response.body, "#{Admin::BlockCardComponent.error_prefix(block)}-image-section"
-    assert_not_includes response.body, "medium.png"
-
-    assert_no_difference "Media::Asset.count" do
-      patch "#{blocks_path}/#{block.id}",
-        params: { block: { caption: "Later", image: "" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
-    end
-    assert_response :success
-  end
-
-  test "a refused block image upload fails the save and keeps the current image" do
-    block = image_block_with_image
-    previous = block.media_asset
-
-    assert_no_difference "Media::Asset.count" do
-      patch "#{blocks_path}/#{block.id}",
-        params: { block: { image: fixture_file_upload("fake.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
-        as: :turbo_stream
-    end
-    assert_response :unprocessable_entity
-
-    assert_includes response.body, "Image must be a PNG, JPEG, GIF, or WEBP image"
     assert_equal previous, block.reload.media_asset
-  end
-
-  test "a new upload wins over a stale remove flag in the same save" do
-    block = image_block_with_image
-
-    patch "#{blocks_path}/#{block.id}",
-      params: {
-        block: { image: fixture_file_upload("tiny.png", "image/png"), remove_image: "1" },
-        base_updated_at: block.updated_at.iso8601(6)
-      }, as: :turbo_stream
-    assert_response :success
-
-    assert block.reload.media_asset.present?
-  end
-
-  test "the success stream after an image change re-renders the image section without a checked remove box" do
-    block = image_block_with_image
-
-    patch "#{blocks_path}/#{block.id}",
-      params: { block: { remove_image: "1" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
-    assert_response :success
-
-    assert_includes response.body, "#{Admin::BlockCardComponent.error_prefix(block)}-image-section"
-    assert_not_includes response.body, "block[remove_image]"
   end
 
   private

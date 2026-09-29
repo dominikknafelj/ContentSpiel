@@ -45,25 +45,22 @@
         ) %>
 
     <% if landing? %>
-      <%# `admin/shared/hero_image_field` (Task 4 fix round 2) is the one
-          template for "what does the hero section look like" -- rendered
-          here on a normal GET, and again by
-          `Admin::PagesController#hero_image_stream` after any save that
-          replaces or removes the hero (a library image since media
-          library Task 4), so the checkbox below (and
-          the preview above it) never goes stale the way a plain autosave
-          -- which only ever reflects back whatever an editor already typed
-          into an unrelated input -- would otherwise leave it. %>
-      <%= render partial: "admin/shared/hero_image_field", locals: {
-            section_id: hero_image_section_id,
-            image_id: field_id("hero_image"), image_html_name: field_html_name("hero_image"), image_value: page.hero_media_asset&.file,
-            checkbox_id: field_id("remove_hero_image"), checkbox_html_name: field_html_name("remove_hero_image"),
-            show_checkbox: page.hero_media_asset_id.present?
-          } %>
+      <%# The hero is a library image (media library Task 8): chosen
+          through the picker into a hidden `hero_media_asset_id` that
+          autosaves like any other field, with `hero_alt` as this page's
+          own per-use override -- its placeholder is the image's own
+          default alt in this language, kept current by
+          `admin--media-field` when the image changes. %>
+      <%= render Admin::Columns::MediaColumnComponent.new(
+            name: "hero_image", id: field_id("hero_image"), html_name: field_html_name("hero_media_asset_id"),
+            value: page.hero_media_asset, locale: locale, section_id: hero_image_section_id,
+            placeholder_ids: { alt: field_id("hero_alt") }
+          ) %>
 
       <%= render Admin::Columns::PlainColumnComponent.new(
             name: "hero_alt", id: field_id("hero_alt"), html_name: field_html_name("hero_alt"),
-            value: value(:hero_alt), original: original(:hero_alt), locale: locale
+            value: value(:hero_alt), original: original(:hero_alt), locale: locale,
+            placeholder: hero_alt_placeholder
           ) %>
     <% end %>
 

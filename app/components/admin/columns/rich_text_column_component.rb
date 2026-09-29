@@ -18,9 +18,8 @@ module Admin
     # - the toolbar (`TOOLBAR`, spec §4.1's exact list), as real
     #   server-rendered `<button type="button">`s: accessible names come
     #   from here, not from JS, and a system test can `press` them;
-    # - the editor mount (empty; Tiptap fills it) and a message slot the
-    #   controller fills with an upload's own 422 `errors` (spec §7: shown
-    #   inline, nothing inserted -- never `alert()`);
+    # - the editor mount (empty; Tiptap fills it) and a message slot for
+    #   the editor's own notices (never `alert()`);
     # - in a translation, the primary language's document rendered to HTML,
     #   read-only, beside the editor, plus the `data-translate-slot` every
     #   other column's original carries;
@@ -28,9 +27,9 @@ module Admin
     #   replaces after a save).
     #
     # Everything the editor needs from the server arrives as `data-*`
-    # values rendered here with route helpers -- the upload and link-target
-    # endpoints (never a hardcoded `/cs-studio`: the admin path is
-    # configurable, `ContentSpiel::ADMIN_PATH`), the editing locale the
+    # values rendered here with route helpers -- the link-target endpoint
+    # (never a hardcoded `/cs-studio`: the admin path is configurable,
+    # `ContentSpiel::ADMIN_PATH`), the editing locale the
     # link picker searches in, and two lookups for what the document
     # already references: `Media::Asset` URLs for its `image` nodes (the node
     # itself stores only `asset_id`, schema fidelity, so the editor can't
@@ -43,6 +42,13 @@ module Admin
     # The public interface -- `name:`, `value:`, `original:`, `errors:`,
     # `locale:`, `id:`, `html_name:` -- is exactly `Admin::Columns::Base`'s.
     # `value`/`original` are a `RichText::Document`, a document Hash, or nil.
+    #
+    # Images come from the library (media library Task 8): the Image button
+    # opens `Media::PickerComponent` (rendered once by the admin layout) and
+    # the picked asset is inserted as `image{asset_id}` -- the picker's
+    # `media-picker:picked` event bubbles from the button to this
+    # controller's element. There's no upload of the editor's own any more;
+    # the picker's Upload tab covers it.
     class RichTextColumnComponent < Base
       # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text` method the button runs (`data-action` below) and
@@ -70,19 +76,16 @@ module Admin
         [ "youtube", "YouTube", "YouTube", false ]
       ].freeze
 
-      # The upload's own `accept` -- `Media::Asset`'s content types (spec
-      # §4.2). A hint for the file chooser only; the server decides.
-      ACCEPT = "image/png,image/jpeg,image/gif,image/webp".freeze
-
       # What an internal link to a page or post the actor can't read shows
       # instead of its title (see `#link_titles_json`).
       UNREADABLE_TITLES = { "page" => "A page you can't open", "post" => "A post you can't open" }.freeze
 
       # The toolbar actually rendered: `TOOLBAR` without "Image" for someone
-      # who can't upload (`media.upload`, access-control design spec §5's
-      # "Upload" button) -- the button's only way to add an image is an
-      # upload. An image already in the document stays editable by
-      # selecting it.
+      # without `media.upload` (access-control design spec §5, media library
+      # design spec §5.1: browse, upload and choose) -- the button's only
+      # way to add an image is the picker, which isn't on the page without
+      # it. An image already in the document stays editable by selecting
+      # it.
       def toolbar
         can?("media.upload") ? TOOLBAR : TOOLBAR.reject { |action, *| action == "image" }
       end
@@ -98,8 +101,6 @@ module Admin
       def editor_id = "#{id}-editor"
 
       def label_id = "#{id}-label"
-
-      def upload_url = helpers.admin_media_assets_path
 
       def link_targets_url = helpers.admin_link_targets_path
 
