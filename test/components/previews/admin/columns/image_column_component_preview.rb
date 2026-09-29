@@ -6,10 +6,7 @@ module Admin
       end
 
       def with_current_image
-        page = PreviewFixtures.page(title: "Image column preview")
-        page.hero_image.attach(io: StringIO.new("fake image bytes"), filename: "hero.png", content_type: "image/png")
-
-        render Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: page.hero_image)
+        render Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: PreviewFixtures.media_asset.file)
       end
     end
   end

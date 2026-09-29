@@ -49,15 +49,16 @@
           template for "what does the hero section look like" -- rendered
           here on a normal GET, and again by
           `Admin::PagesController#hero_image_stream` after any save that
-          replaces or removes the attachment, so the checkbox below (and
+          replaces or removes the hero (a library image since media
+          library Task 4), so the checkbox below (and
           the preview above it) never goes stale the way a plain autosave
           -- which only ever reflects back whatever an editor already typed
           into an unrelated input -- would otherwise leave it. %>
       <%= render partial: "admin/shared/hero_image_field", locals: {
             section_id: hero_image_section_id,
-            image_id: field_id("hero_image"), image_html_name: field_html_name("hero_image"), image_value: page.hero_image,
+            image_id: field_id("hero_image"), image_html_name: field_html_name("hero_image"), image_value: page.hero_media_asset&.file,
             checkbox_id: field_id("remove_hero_image"), checkbox_html_name: field_html_name("remove_hero_image"),
-            show_checkbox: page.hero_image.attached?
+            show_checkbox: page.hero_media_asset_id.present?
           } %>
 
       <%= render Admin::Columns::PlainColumnComponent.new(

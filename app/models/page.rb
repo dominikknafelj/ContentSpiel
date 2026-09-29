@@ -74,15 +74,14 @@ class Page < ApplicationRecord
   accepts_nested_attributes_for :content_blocks, allow_destroy: true,
     reject_if: ->(attributes) { attributes["id"].blank? && attributes["block_type"].blank? }
 
-  has_one_attached :hero_image
-
-  # `pages.hero_media_asset_id` (design spec §3.3), added early by Task 3's
-  # own migration so `Media::UsageIndex` has something real to index and
-  # test against now -- Task 4 is what actually migrates existing
-  # `hero_image` attachments onto this column, removes `has_one_attached
-  # :hero_image` above, and starts writing it from CS Studio. Until then
-  # this is reachable but unused by any save path. `optional: true`: a page
-  # need not have a hero at all.
+  # The page's hero image (design spec §3.3): a reference to a library
+  # `Media::Asset`, not an attachment of its own -- Task 4's data migration
+  # (`MoveImagesIntoMediaLibrary`) moved every former `has_one_attached
+  # :hero_image` onto this column, re-using the same blobs. The per-use alt
+  # text stays on the page (`hero_alt`, translated); the asset only supplies
+  # its own default (`Media::Asset#alt_text`). The FK is `on_delete:
+  # :restrict`, so an asset a page still shows can't be deleted out from
+  # under it. `optional: true`: a page need not have a hero at all.
   belongs_to :hero_media_asset, class_name: "Media::Asset", optional: true
 
   enum :page_type, { standard: 0, landing: 1 }

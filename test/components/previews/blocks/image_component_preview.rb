@@ -17,8 +17,8 @@ module Blocks
 
     def component(caption:)
       page = PreviewFixtures.page(title: "Image preview")
-      block = page.content_blocks.create!(block_type: :image, position: 0, caption: caption, alt: "A bright, plant-filled room")
-      block.image.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+      block = page.content_blocks.create!(block_type: :image, position: 0, caption: caption, alt: "A bright, plant-filled room",
+        media_asset: PreviewFixtures.media_asset)
 
       Blocks::ImageComponent.new(block: block, page: page)
     end

@@ -6,8 +6,7 @@ module Admin
   class BlockCardComponentPreview < ViewComponent::Preview
     def image_block
       page = PreviewFixtures.page(title: "Image block preview")
-      block = page.content_blocks.create!(block_type: "image", position: 0)
-      block.image.attach(io: StringIO.new("fake image bytes"), filename: "photo.png", content_type: "image/png")
+      block = page.content_blocks.create!(block_type: "image", position: 0, media_asset: PreviewFixtures.media_asset)
 
       render Admin::BlockCardComponent.new(page: page, block: block, locale: "en")
     end

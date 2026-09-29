@@ -129,12 +129,29 @@ module Admin
       # upload they just made. `attributes.key?("hero_image")` here is
       # exactly "a non-blank file survived the drop above", since a blank
       # one never reaches this hash at all.
+      #
+      # The hero is a library image now (media library Task 4): an upload
+      # goes into the library through `Media::Upload` first
+      # (`FileParams#upload_to_library`) and the page is then saved pointing
+      # at the new asset (`hero_media_asset_id`); removing just clears that
+      # reference -- the asset itself stays in the library. Task 8 replaces
+      # this upload field with the picker. A failed upload (a refused type,
+      # no `media.upload`) answers as a failed save, without saving the rest
+      # of the form: the next autosave resends every field anyway.
       attributes = drop_blank_file_params(attributes, fields: %w[hero_image])
-      hero_image_changing = attributes.key?("hero_image")
-      attributes["hero_image"] = nil if !hero_image_changing && ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
-      hero_image_changing ||= attributes.key?("hero_image")
+      upload = attributes.delete("hero_image")
+      removing = upload.nil? && ActiveModel::Type::Boolean.new.cast(params.dig(:page, :remove_hero_image))
+      hero_image_changing = upload.present? || removing
 
-      result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
+      if upload
+        uploaded = upload_to_library(upload, record: @page, field: :hero_image)
+        upload_failure = uploaded unless uploaded.ok?
+        attributes["hero_media_asset_id"] = uploaded.record.id if uploaded.ok?
+      elsif removing
+        attributes["hero_media_asset_id"] = nil
+      end
+
+      result = upload_failure || Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 
       streams = autosave_stream(
         record: result.record,
@@ -156,6 +173,13 @@ module Admin
       # save actually touched the attachment, and only on success -- a
       # failed save never reaches `Pages::Save`'s attachment writer at all.
       streams << hero_image_stream(result.record) if result.ok? && hero_image_changing
+
+      # A refused upload re-renders the hero section too -- *before* the
+      # error slot `autosave_stream` just filled (which lives inside that
+      # section), so the message survives -- to clear the file input:
+      # otherwise every later autosave of this form would resend the same
+      # refused file and fail again.
+      streams.insert(1, hero_image_stream(@page)) if upload_failure
 
       # The tree column lives outside this form entirely (the layout's own
       # `<aside>`, spec §4.2), so nothing about a normal Turbo Stream
@@ -267,10 +291,10 @@ module Admin
         section_id: "#{prefix}-hero-image-section",
         image_id: "#{prefix}-hero_image",
         image_html_name: "#{prefix}[hero_image]",
-        image_value: record.hero_image,
+        image_value: record.hero_media_asset&.file,
         checkbox_id: "#{prefix}-remove_hero_image",
         checkbox_html_name: "#{prefix}[remove_hero_image]",
-        show_checkbox: record.hero_image.attached?
+        show_checkbox: record.hero_media_asset_id.present?
       })
     end
 

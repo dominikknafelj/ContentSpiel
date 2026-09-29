@@ -15,4 +15,33 @@ namespace :media do
       puts "media:reindex: rebuilt cleanly"
     end
   end
+
+  # Design spec §3.4 step 5: every `ActiveStorage::Blob` no attachment row
+  # points at -- a duplicate file the Task 4 data migration deduped onto
+  # another asset (it deletes attachment rows, never blobs), a leftover
+  # from the ActionText import, a blob whose record was deleted without its
+  # purge job ever running. Cleanup is manual only (global constraints):
+  # without CONFIRM=1 this only lists them; with it, each is purged (its
+  # stored file and its row, plus any variants Active Storage made of it).
+  #
+  # A variant's own blob is attached to its `ActiveStorage::VariantRecord`
+  # (`image`), so it never shows up here while the variant exists.
+  desc "List blobs with no attachments (media library cleanup); CONFIRM=1 purges them"
+  task orphans: :environment do
+    orphans = ActiveStorage::Blob.where.missing(:attachments).order(:id)
+    confirmed = ENV["CONFIRM"] == "1"
+
+    count = 0
+    orphans.find_each do |blob|
+      count += 1
+      puts "  blob ##{blob.id}  #{blob.filename}  #{blob.content_type}  #{blob.byte_size} bytes  created #{blob.created_at.iso8601}"
+      blob.purge if confirmed
+    end
+
+    if confirmed
+      puts "media:orphans: purged #{count} blob(s)"
+    else
+      puts "media:orphans: #{count} blob(s) with no attachments#{" -- run with CONFIRM=1 to purge them" if count.positive?}"
+    end
+  end
 end

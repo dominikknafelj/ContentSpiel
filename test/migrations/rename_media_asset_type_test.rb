@@ -27,8 +27,11 @@ class RenameMediaAssetTypeMigrationTest < ActiveSupport::TestCase
   test "up leaves an attachment for an unrelated record type untouched" do
     page = create_page(title: "Untouched by the media asset rename")
     block = page.content_blocks.create!(block_type: "image", position: 0)
-    block.image.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    attachment = block.image.attachment
+    # A legacy block-image attachment row, as it stood before media library
+    # Task 4 moved block images into the library (the model no longer
+    # declares `has_one_attached :image`).
+    blob = ActiveStorage::Blob.create_and_upload!(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
+    attachment = ActiveStorage::Attachment.create!(record_type: "ContentBlock", record_id: block.id, name: "image", blob: blob)
 
     ActiveRecord::Migration.suppress_messages { RenameMediaAssetType.new.migrate(:up) }
 

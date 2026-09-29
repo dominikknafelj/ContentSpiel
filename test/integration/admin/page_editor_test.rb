@@ -102,7 +102,9 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   # touched -- which Rack parses as a blank string, exactly like the empty
   # `hero_image:` param below simulates. Before `drop_blank_file_params`,
   # that blank rode along into `Pages::Save`'s `attributes:` and
-  # `has_one_attached`'s writer read it as "detach the current file".
+  # `has_one_attached`'s writer read it as "detach the current file" (and
+  # the library upload path since media library Task 4 would read it as a
+  # file to upload).
   test "autosaving another field doesn't clear an already-attached hero image" do
     landing = landing_page_with_hero_image
 
@@ -112,17 +114,57 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
     landing.reload
     assert_equal "Landing v2", landing.title(locale: :en)
-    assert landing.hero_image.attached?
+    assert landing.hero_media_asset.present?
   end
 
-  test "the explicit remove-image checkbox detaches the hero image" do
+  test "the explicit remove-image checkbox clears the hero, leaving the image in the library" do
     landing = landing_page_with_hero_image
+    asset = landing.hero_media_asset
 
     patch "/cs-studio/pages/#{landing.id}",
       params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
-    assert_not landing.reload.hero_image.attached?
+    assert_nil landing.reload.hero_media_asset
+    assert Media::Asset.exists?(asset.id)
+  end
+
+  # Media library Task 4: the interim upload field puts the file into the
+  # library through `Media::Upload` and points the page at the new asset.
+  test "uploading a hero image creates a library asset and references it" do
+    landing = landing_page_with_hero_image
+
+    assert_difference -> { Media::Asset.count } => 1, -> { Audit::Event.where(action: "media.uploaded").count } => 1 do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { hero_image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :success
+
+    asset = landing.reload.hero_media_asset
+    assert_equal "medium", asset.title
+    assert_equal users(:one), asset.created_by
+    assert_includes response.body, "page-hero-image-section"
+  end
+
+  test "a refused hero upload fails the save, shows why and keeps the current hero" do
+    landing = landing_page_with_hero_image
+    asset = landing.hero_media_asset
+
+    assert_no_difference "Media::Asset.count" do
+      patch "/cs-studio/pages/#{landing.id}",
+        params: { page: { title: "Not saved", hero_image: fixture_file_upload("fake.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+
+    assert_includes response.body, "Hero image must be a PNG, JPEG, GIF, or WEBP image"
+    landing.reload
+    assert_equal asset, landing.hero_media_asset
+    assert_equal "Landing", landing.title(locale: :en)
+    # The section is re-rendered before its error slot, so the message
+    # isn't wiped and the refused file isn't resent by the next autosave.
+    assert_operator response.body.index("page-hero-image-section"), :<, response.body.index("Hero image must be")
   end
 
   # Fix round 2: the "Remove image" checkbox stays checked in the DOM after
@@ -149,14 +191,14 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
       params: { page: { remove_hero_image: "1" }, base_updated_at: landing.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
     landing.reload
-    assert_not landing.hero_image.attached?
+    assert_nil landing.hero_media_asset
 
     patch "/cs-studio/pages/#{landing.id}",
       params: { page: { hero_image: fixture_file_upload("tiny.png", "image/png") }, base_updated_at: landing.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
 
-    assert landing.reload.hero_image.attached?
+    assert landing.reload.hero_media_asset.present?
   end
 
   # The scenario the coordinator's review actually named: an editor ticks
@@ -173,16 +215,13 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
       }, as: :turbo_stream
     assert_response :success
 
-    assert landing.reload.hero_image.attached?
+    assert landing.reload.hero_media_asset.present?
   end
 
   private
 
   def landing_page_with_hero_image
-    landing = Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true },
+    Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: create_media_asset.id },
       translations: { Locales.default => { title: "Landing" } }).record
-    landing.hero_image.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    assert landing.hero_image.attached?
-    landing
   end
 end

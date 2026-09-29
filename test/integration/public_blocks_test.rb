@@ -15,8 +15,7 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
   end
 
   test "an image block renders its alt text and caption" do
-    block = @root.content_blocks.create!(block_type: :image, position: 0, caption: "Our studio", alt: "A bright room")
-    block.image.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+    @root.content_blocks.create!(block_type: :image, position: 0, caption: "Our studio", alt: "A bright room", media_asset: create_media_asset)
     get "/"
 
     assert_select "img[alt='A bright room']"

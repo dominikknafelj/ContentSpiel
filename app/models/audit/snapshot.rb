@@ -125,6 +125,11 @@ module Audit
           "related_post_ids" => record.post_relations.pluck(:related_post_id).sort
         )
       when Page
+        # `hero_media_asset_id` (media library design spec §5.1) rides along
+        # in `attributes` -- the hero is a column reference now, not an
+        # attachment, and so is an image block's `media_asset_id` (plain
+        # `record.attributes`, the `else` branch below): the library asset
+        # itself is what a version restore finds again, by id.
         record.attributes.merge("content_block_ids" => record.content_blocks.reorder(:position, :id).ids)
       when User
         { "id" => record.id, "email_address" => record.email_address, "owner" => record.owner, "group_ids" => record.group_ids.sort }
@@ -135,12 +140,6 @@ module Audit
         }
       when ApiToken
         { "id" => record.id, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
-      when ContentBlock
-        # The attachment isn't a column, so it's named here (final fix wave,
-        # Minor 6): which blob the block showed, by id and filename -- what
-        # a version restore would need to find it again.
-        image = record.image.attached? ? { "blob_id" => record.image.blob_id, "filename" => record.image.filename.to_s } : nil
-        record.attributes.merge("image" => image)
       else
         # The site settings, and anything a later task audits before it gets its own
         # serializer here -- still scrubbed by `.for`.

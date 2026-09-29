@@ -168,31 +168,29 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Unavailable type — gone/thing"
   end
 
-  # Fix round 1 (critical): the original `duplicate` re-attached the
-  # source's own blob (`copy.image.attach(source.image.blob)`), so both
-  # blocks pointed at one `ActiveStorage::Blob` row -- destroying *either*
-  # block purges that shared blob (`has_one_attached`'s default `dependent:
-  # :purge_later`) out from under the other one.
-  test "duplicating an image block gives the copy its own independent blob" do
+  # Media library Task 4: an image block's image is a library asset, so a
+  # duplicate points at the same asset -- nothing is copied, and the asset
+  # can't be deleted while either block uses it (the FK restricts), which
+  # is what the old "independent blob" copy (fix round 1) was protecting.
+  test "duplicating an image block shares the library asset" do
     source = image_block_with_image
 
-    post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    assert_no_difference "Media::Asset.count" do
+      post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    end
     assert_response :success
 
     copy = @page.content_blocks.order(:position).last
     assert_not_equal source.id, copy.id
-    assert copy.image.attached?
-    assert_not_equal source.image.blob_id, copy.image.blob_id, "the copy must not share the source's blob"
+    assert_equal source.media_asset, copy.media_asset
 
-    perform_enqueued_jobs { source.destroy! }
-
-    assert copy.reload.image.attached?
-    assert_equal "tiny.png", copy.image.filename.to_s
-    assert copy.image.blob.download.present?, "the copy's own blob must still be downloadable"
+    source.destroy!
+    assert copy.reload.media_asset.file.attached?
   end
 
-  # Final fix wave (Minor 6): the copy's image is attached inside
-  # `ContentBlocks::Save`, so the `block.created` event's snapshot has it.
+  # Final fix wave (Minor 6): the copy's image is set inside
+  # `ContentBlocks::Save`, so the `block.created` event's snapshot has it --
+  # as `media_asset_id` since media library Task 4.
   test "duplicating an image block records block.created with the image in its snapshot" do
     source = image_block_with_image
 
@@ -201,8 +199,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     copy = @page.content_blocks.order(:position).last
     event = Audit::Event.find_by!(action: "block.created", subject: copy)
-    assert_equal "tiny.png", event.snapshot.dig("image", "filename")
-    assert_equal copy.image.blob_id, event.snapshot.dig("image", "blob_id")
+    assert_equal source.media_asset_id, event.snapshot["media_asset_id"]
+    assert_not event.snapshot.key?("image")
   end
 
   # Duplicating copies every locale's JSON body document verbatim (the
@@ -254,17 +252,47 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     block.reload
     assert_equal "A caption", block.caption(locale: :en)
-    assert block.image.attached?
+    assert block.media_asset.present?
   end
 
-  test "the explicit remove-image checkbox detaches a block's image" do
+  test "the explicit remove-image checkbox clears a block's image" do
     block = image_block_with_image
 
     patch "#{blocks_path}/#{block.id}",
       params: { block: { remove_image: "1" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
 
-    assert_not block.reload.image.attached?
+    assert_nil block.reload.media_asset
+  end
+
+  test "uploading a block image creates a library asset and references it" do
+    block = image_block_with_image
+    previous = block.media_asset
+
+    assert_difference "Media::Asset.count", 1 do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { image: fixture_file_upload("medium.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :success
+
+    assert_not_equal previous, block.reload.media_asset
+    assert_equal "medium", block.media_asset.title
+  end
+
+  test "a refused block image upload fails the save and keeps the current image" do
+    block = image_block_with_image
+    previous = block.media_asset
+
+    assert_no_difference "Media::Asset.count" do
+      patch "#{blocks_path}/#{block.id}",
+        params: { block: { image: fixture_file_upload("fake.png", "image/png") }, base_updated_at: block.updated_at.iso8601(6) },
+        as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+
+    assert_includes response.body, "Image must be a PNG, JPEG, GIF, or WEBP image"
+    assert_equal previous, block.reload.media_asset
   end
 
   test "a new upload wins over a stale remove flag in the same save" do
@@ -277,7 +305,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
       }, as: :turbo_stream
     assert_response :success
 
-    assert block.reload.image.attached?
+    assert block.reload.media_asset.present?
   end
 
   test "the success stream after an image change re-renders the image section without a checked remove box" do
@@ -294,9 +322,6 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   private
 
   def image_block_with_image
-    block = @page.content_blocks.create!(block_type: "image", position: 0)
-    block.image.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
-    assert block.image.attached?
-    block
+    @page.content_blocks.create!(block_type: "image", position: 0, media_asset: create_media_asset)
   end
 end

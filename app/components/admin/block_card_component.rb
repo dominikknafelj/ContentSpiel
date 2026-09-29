@@ -126,7 +126,9 @@ module Admin
     # through `body_document` (a `RichText::Document`) rather than the raw
     # Mobility accessor.
     def column_value(name)
-      return block.image if name == "image"
+      # The block's library image's file (media library Task 4) -- what the
+      # upload field previews, until Task 8's picker replaces it.
+      return block.media_asset&.file if name == "image"
       return block.body_document(locale: locale) if name == "body"
 
       block.public_send(name, locale: locale)

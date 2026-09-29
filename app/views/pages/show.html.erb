@@ -15,7 +15,15 @@
       <% if subtitle.present? %>
         <p class="subtitle mt-4 max-w-2xl text-lg text-dim"><%= subtitle %></p>
       <% end %>
-      <%= image_tag @page.hero_image, alt: translated(@page, :hero_alt).to_s, class: "mt-8 w-full rounded-cs" if @page.hero_image.attached? %>
+      <%# The hero is a library image (media library design spec §3.3); the
+          page's own translated `hero_alt` overrides the image's default alt.
+          `url_for(asset.file)` serves the original for now -- Task 5 swaps
+          in `Media::PictureComponent` (srcset, dimensions). A reference to
+          an asset whose file is somehow gone renders nothing (spec §4). %>
+      <% hero = @page.hero_media_asset %>
+      <% if hero&.file&.attached? %>
+        <%= image_tag url_for(hero.file), alt: hero.alt_text(override: translated(@page, :hero_alt)), class: "mt-8 w-full rounded-cs" %>
+      <% end %>
     <% end %>
   </header>
 <% end %>

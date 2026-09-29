@@ -1,13 +1,10 @@
-# One uploaded image (design spec §4.2), backing a rich-text `image` node's
-# `asset_id` (`RichText::BuiltIns`, `RichText::Schema`'s `image` node
-# attribute). Kept while referenced, with no automatic cleanup of orphaned
-# rows yet -- an interim state (global constraints, docs/roadmap.md) closed
-# by the media library sub-project.
-#
-# Deliberately not the same model an `image` *content block*'s own `image`
-# attachment uses (`ContentBlock#image`, an open type) -- design spec §4.2's
-# "Relation to open types": unifying the two storage paths is that same
-# future sub-project's job, not this one's.
+# One library image (media library design spec §3.1): what a page's hero
+# (`Page#hero_media_asset`), an image block (`ContentBlock#media_asset`) and
+# a rich-text `image` node's `asset_id` (`RichText::BuiltIns`) all reference
+# -- since Task 4 there is one storage path for all three. Uploaded through
+# `Media::Upload`; where it's used is indexed in `media_usages`
+# (`Media::UsageIndex`), and the `on_delete: :restrict` FKs keep a used
+# asset from being deleted. Cleanup of unused assets is manual only.
 class Media::Asset < ApplicationRecord
   extend Mobility
 
@@ -177,7 +174,7 @@ class Media::Asset < ApplicationRecord
   #   break the page around it.
   #
   # `width` (this asset's *own* dimensions column, from `file.analyze`) may
-  # itself be nil -- analysis hasn't run, or failed (`MediaAssets::Create
+  # itself be nil -- analysis hasn't run, or failed (`Media::Upload
   # #analyze_dimensions`'s own comment) -- in which case the "never upscale"
   # check is simply skipped for lack of anything to compare against; the
   # processed check below still applies.
@@ -398,7 +395,7 @@ class Media::Asset < ApplicationRecord
 
   # `width`/`height` come from the blob's own `metadata`, written by
   # `file.analyze` (design spec §4.2's "Implement" step) -- but *not* by
-  # this callback: `Admin::MediaAssetsController#analyze_dimensions` calls
+  # this callback: `Media::Upload#analyze_dimensions` calls
   # `analyze` (and writes these two columns) in a second pass, strictly
   # after this record's own save has actually committed and Active
   # Storage's own `after_commit` hook has uploaded the blob's bytes --

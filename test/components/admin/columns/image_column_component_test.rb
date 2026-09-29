@@ -8,10 +8,7 @@ class Admin::Columns::ImageColumnComponentTest < ViewComponent::TestCase
   end
 
   test "renders a preview of the current image when one is attached" do
-    page = root_page
-    page.hero_image.attach(io: StringIO.new("fake"), filename: "hero.png", content_type: "image/png")
-
-    render_inline Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: page.hero_image)
+    render_inline Admin::Columns::ImageColumnComponent.new(name: "hero_image", value: create_media_asset.file)
 
     assert_selector "img"
   end

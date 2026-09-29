@@ -552,16 +552,14 @@ class PagesRoutingTest < ActionDispatch::IntegrationTest
   # back.
   test "a landing page renders its title, subtitle, and hero image" do
     root = Page.create!(page_type: :landing, title: "Welcome", subtitle: "A warm welcome", slug: "",
-      published_at: Time.current)
-    root.hero_image.attach(io: StringIO.new("fake image data"), filename: "hero.jpg", content_type: "image/jpeg")
-    root.save!
+      published_at: Time.current, hero_media_asset: create_media_asset(filename: "tiny.png"))
 
     get "/"
 
     assert_response :success
     assert_includes response.body, ">Welcome</h1>"
     assert_includes response.body, "A warm welcome"
-    assert_match(/<img[^>]*src="[^"]*hero/, response.body)
+    assert_select "header img[src*='tiny.png']"
   end
 
   # `page_type` gates the hero fields defensively rather than trusting that a

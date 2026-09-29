@@ -64,11 +64,25 @@ module Admin
       return render_gone unless block
 
       attributes, translations = split_block_params(block)
+      # An image upload goes into the library first and the block is saved
+      # pointing at the new asset -- the same interim path, and the same
+      # "a refused upload is a failed save" rule, as the page hero
+      # (`Admin::PagesController#update`'s own comment); Task 8's picker
+      # replaces it.
       attributes = drop_blank_file_params(attributes, fields: ATTRIBUTE_COLUMNS)
-      attributes[:image] = nil if !attributes.key?(:image) && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
-      image_changing = attributes.key?(:image)
+      upload = attributes.delete(:image)
+      removing = upload.nil? && ActiveModel::Type::Boolean.new.cast(params.dig(:block, :remove_image))
+      image_changing = upload.present? || removing
 
-      result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
+      if upload
+        uploaded = upload_to_library(upload, record: block, field: :image)
+        upload_failure = uploaded unless uploaded.ok?
+        attributes[:media_asset_id] = uploaded.record.id if uploaded.ok?
+      elsif removing
+        attributes[:media_asset_id] = nil
+      end
+
+      result = upload_failure || ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
       streams = autosave_stream(
         record: result.record,
@@ -80,6 +94,9 @@ module Admin
       )
 
       streams << image_field_stream(result.record) if result.ok? && image_changing
+      # Before the error slot inside that section, to clear the refused
+      # file -- see `Admin::PagesController#update`.
+      streams.insert(1, image_field_stream(block)) if upload_failure
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -130,8 +147,9 @@ module Admin
 
     # Duplicate (spec §5.1): copies the type, its settings (both halves --
     # untranslated and every locale's translations), every locale's
-    # caption/alt/body and the image attachment (as an independent blob,
-    # not a shared one -- see `duplicate_image`'s own comment), then
+    # caption/alt/body and the image reference (the copy shows the same
+    # library asset -- media library Task 4; nothing is copied, and the
+    # asset can't be deleted while either block uses it), then
     # inserts the copy directly after the source the same way `create`'s
     # own `after_id` does -- `after_id: source.id` here is always present,
     # unlike `create`'s (which is only sometimes given), so this never
@@ -144,10 +162,10 @@ module Admin
       copy = @page.content_blocks.new(block_type: source.block_type, settings: source.settings, translated_settings: source.translated_settings)
       copy_translations(source, copy)
 
-      # The image goes in through the service (final fix wave, Minor 6), so
-      # it's saved in the same authorized, audited write -- and the
-      # `block.created` snapshot shows it.
-      attributes = source.image.attached? ? { image: duplicate_image(source) } : {}
+      # The image reference goes in through the service (final fix wave,
+      # Minor 6), so it's saved in the same authorized, audited write -- and
+      # the `block.created` snapshot shows it.
+      attributes = source.media_asset_id ? { media_asset_id: source.media_asset_id } : {}
       result = ContentBlocks::Save.call(copy, attributes: attributes)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
@@ -371,21 +389,6 @@ module Admin
       end
     end
 
-    # `attach(source.image.blob)` would point the copy at the very same
-    # `ActiveStorage::Blob` row the source uses -- fine to read, but
-    # `has_one_attached`'s default `dependent: :purge_later` means
-    # destroying *either* block later purges that shared blob out from
-    # under whichever one is left, silently breaking its image (fix round
-    # 1, flagged in review of the original commit). Re-attaching from the
-    # blob's own bytes (`blob.download`) gives the copy a brand new blob --
-    # its own row, its own file on the storage service -- so the two blocks'
-    # lifecycles are fully independent from the moment they're created.
-    # Returned as an attachable for `ContentBlocks::Save`'s `image:`.
-    def duplicate_image(source)
-      blob = source.image.blob
-      { io: StringIO.new(blob.download), filename: blob.filename.to_s, content_type: blob.content_type }
-    end
-
     # The Turbo Stream `update`/`destroy`/`duplicate` answer with for a
     # block that's already gone (spec §5.1's "Interfaces" list: "A PATCH to
     # a destroyed block answers 410 with the status 'This block was
@@ -404,9 +407,9 @@ module Admin
       turbo_stream.replace("#{prefix}-image-section", partial: "admin/shared/hero_image_field", locals: {
         section_id: "#{prefix}-image-section", name: "image",
         image_id: "#{prefix}-image", image_html_name: "block[image]",
-        image_value: block.image,
+        image_value: block.media_asset&.file,
         checkbox_id: "#{prefix}-remove_image", checkbox_html_name: "block[remove_image]",
-        show_checkbox: block.image.attached?
+        show_checkbox: block.media_asset_id.present?
       })
     end
   end

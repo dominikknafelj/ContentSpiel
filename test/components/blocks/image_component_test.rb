@@ -6,8 +6,7 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
   test "alt and caption fall back along the fallback chain" do
     with_locales(%w[en de], default: "en") do
       page = root_page
-      block = page.content_blocks.create!(block_type: :image, position: 0)
-      block.image.attach(io: File.open(Rails.root.join("public/icon.png")), filename: "icon.png")
+      block = page.content_blocks.create!(block_type: :image, position: 0, media_asset: create_media_asset)
       block.alt = "A bright room"
       block.caption = "Our studio"
       block.save!
@@ -19,5 +18,26 @@ class Blocks::ImageComponentTest < ActiveSupport::TestCase
       assert_selector "img[alt='A bright room']"
       assert_selector "figcaption", text: "Our studio"
     end
+  end
+
+  # The block's own per-use alt/caption win; the library image's defaults
+  # fill in where the block leaves them blank (media library spec §3.3).
+  test "the asset's own alt and caption are the defaults behind the block's overrides" do
+    asset = create_media_asset
+    asset.update!(alt: "Library alt", caption: "Library caption")
+    block = root_page.content_blocks.create!(block_type: :image, position: 0, media_asset: asset, caption: "Block caption")
+
+    render_inline(Blocks::ImageComponent.new(block: block, page: root_page))
+
+    assert_selector "img[alt='Library alt']"
+    assert_selector "figcaption", text: "Block caption"
+  end
+
+  test "renders nothing without an image" do
+    block = root_page.content_blocks.create!(block_type: :image, position: 0, alt: "Unused")
+
+    render_inline(Blocks::ImageComponent.new(block: block, page: root_page))
+
+    assert_no_selector "figure"
   end
 end

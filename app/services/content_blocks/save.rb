@@ -43,7 +43,11 @@ module ContentBlocks
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.
-      @block.assign_attributes(@attributes.slice(:block_type, :image, :position))
+      # `media_asset_id` is an image block's library image (media library
+      # Task 4) -- set by CS Studio's interim upload field after
+      # `Media::Upload`, or copied by Duplicate; Task 6 adds the
+      # `media.upload`/existence checks for choosing one directly.
+      @block.assign_attributes(@attributes.slice(:block_type, :media_asset_id, :position))
 
       @block.assign_settings(@attributes[:settings], locale: Locales.default) if @attributes.key?(:settings)
 
