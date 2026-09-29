@@ -7,6 +7,12 @@ namespace :media do
   # restored backup).
   desc "Rebuild the media usage index (media_usages) from every page, block and post's current state"
   task reindex: :environment do
-    Media::UsageIndex.rebuild_all
+    failures = Media::UsageIndex.rebuild_all
+
+    if failures.positive?
+      puts "media:reindex: #{failures} owner(s) failed to index -- see the Rails log for details"
+    else
+      puts "media:reindex: rebuilt cleanly"
+    end
   end
 end

@@ -82,6 +82,107 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
     assert_equal expected.sort, usage_tuples(Media::Usage.where(owner: post)).sort
   end
 
+  # Fix round 1, C1: `HasRichTextBody#body_errors_for` lets a document keep
+  # a reference to an asset that's since been deleted (only a *new*
+  # reference is checked for existence), so `.refresh` must tolerate one
+  # rather than let the whole owner's refresh blow up on the FK.
+  test "a rich-text image referencing a since-deleted asset is skipped, not a raise" do
+    kept = create_media_asset
+    removed = create_media_asset
+    post = create_post(title: "Dangling reference post")
+    post.assign_body(rich_doc(%(::image{asset="#{kept.id}"}\n\n::image{asset="#{removed.id}"})), locale: "en")
+    post.save!
+
+    # No `media_usages` row references `removed` yet (refresh hasn't run),
+    # and nothing else does either, so the FK allows this -- reproducing
+    # "the reference in the document is already dead" without needing a
+    # second post or a raw SQL delete.
+    removed.delete
+
+    assert_nothing_raised { Media::UsageIndex.refresh(post) }
+
+    assert_equal [ [ kept.id, "Post", post.id, "rich_text", "en" ] ], usage_tuples(Media::Usage.where(owner: post))
+  end
+
+  # Fix round 1, C1: `RichText::Document#references` doesn't type-check its
+  # values, so a stored `asset_id` can be garbage. Written via
+  # `update_column` (bypassing `HasRichTextBody`'s own validation, which
+  # would otherwise refuse this) to simulate a document that predates that
+  # validation, or was hand-edited.
+  test "a non-numeric asset_id is skipped, not a raise" do
+    post = create_post(title: "Garbage reference post")
+    post.update_column(:body, { "en" => { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => "abc" } } ] } })
+
+    assert_nothing_raised { Media::UsageIndex.refresh(post) }
+
+    assert_empty Media::Usage.where(owner: post)
+  end
+
+  # Fix round 1, C1: `rebuild_all` sweeps every owner in turn; one that
+  # raises (simulated here -- the two tests above already cover the actual
+  # cause this was written for, a dead/garbage reference, no longer raising
+  # at all) must not stop the owners queued after it from being indexed.
+  test "rebuild_all continues past an owner that raises, and reports how many failed" do
+    good_page = create_page(title: "Good page")
+    good_asset = create_media_asset
+    good_page.update!(hero_media_asset: good_asset)
+
+    broken_page = create_page(title: "Broken page")
+    broken_page.update!(hero_media_asset: create_media_asset)
+
+    original_refresh = Media::UsageIndex.method(:refresh)
+    raise_for_broken_page = lambda do |owner|
+      raise "boom" if owner == broken_page
+
+      original_refresh.call(owner)
+    end
+
+    Media::Usage.delete_all
+    failures = nil
+    with_singleton_override(Media::UsageIndex, :refresh, raise_for_broken_page) do
+      failures = Media::UsageIndex.rebuild_all
+    end
+
+    assert_equal 1, failures
+    assert_equal [ [ good_asset.id, "Page", good_page.id, "hero", nil ] ], usage_tuples(Media::Usage.where(owner: good_page))
+    assert_empty Media::Usage.where(owner: broken_page)
+  end
+
+  # Fix round 1, I1: two `.refresh` calls for the same owner racing each
+  # other can each fail to see the other's not-yet-committed `delete_all`,
+  # so both try to insert the same row. Reproduced here without real
+  # concurrency by stubbing `delete_all` to a no-op for the duration of one
+  # `.refresh` call, so its own insert collides with a row already sitting
+  # there from an earlier refresh.
+  #
+  # Uses a `rich_text` usage (a real, non-null `locale`), not `hero`/
+  # `block_image`: Postgres never treats two `locale IS NULL` rows as
+  # conflicting on a plain unique index (`NULL <> NULL`, even under
+  # `ON CONFLICT`), so a `hero`/`block_image` duplicate was never able to
+  # raise `RecordNotUnique` in the first place -- it just silently left an
+  # extra row for the next ordinary refresh to clean up. A non-null
+  # `locale` is the case that actually did raise before this fix, and is
+  # what `unique_by:` now genuinely skips.
+  test "refresh doesn't raise when its insert collides with a row a racing refresh already wrote" do
+    post = create_post(title: "Race post")
+    asset = create_media_asset
+    post.assign_body(rich_doc(%(::image{asset="#{asset.id}"})), locale: "en")
+    post.save!
+    Media::UsageIndex.refresh(post)
+    assert_equal 1, Media::Usage.where(owner: post).count
+
+    original_where = Media::Usage.method(:where)
+    where_with_inert_delete = lambda do |*args|
+      original_where.call(*args).tap { |relation| relation.define_singleton_method(:delete_all) { 0 } }
+    end
+
+    assert_nothing_raised do
+      with_singleton_override(Media::Usage, :where, where_with_inert_delete) { Media::UsageIndex.refresh(post) }
+    end
+
+    assert_equal [ [ asset.id, "Post", post.id, "rich_text", "en" ] ], usage_tuples(Media::Usage.where(owner: post))
+  end
+
   test "a rich-text block owned by a page gives a rich_text row owned by the block, not the page" do
     page = create_page(title: "Page with a rich-text block")
     asset = create_media_asset
