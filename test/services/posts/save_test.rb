@@ -172,4 +172,26 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert result.ok?, result.errors.inspect
     assert_equal [ other.id ], result.record.post_relations.pluck(:related_post_id)
   end
+
+  # Media library design spec §5.1: the write path keeps `media_usages` in
+  # step with the body, and a destroyed post leaves no rows behind.
+  test "saving a post indexes its body images and destroying it removes them" do
+    first = create_media_asset
+    second = create_media_asset
+    post = Posts::Save.call(attributes: { content_type: "blog" }, translations: {
+      "en" => { title: "Pictures", body: rich_doc("::image{asset=\"#{first.id}\"}") },
+      "de" => { title: "Bilder", body: rich_doc("::image{asset=\"#{second.id}\"}") }
+    }).record
+
+    usages = -> { Media::Usage.where(owner_type: "Post", owner_id: post.id).order(:locale).pluck(:media_asset_id, :role, :locale) }
+    assert_equal [ [ second.id, "rich_text", "de" ], [ first.id, "rich_text", "en" ] ], usages.call
+
+    # Review Focus 2: removing the image from `de` only drops that row.
+    assert Posts::Save.call(post, translations: { "de" => { body: rich_doc("Keine Bilder") } }).ok?
+    assert_equal [ [ first.id, "rich_text", "en" ] ], usages.call
+    assert second.reload.usages.none?
+
+    assert Posts::Destroy.call(post).ok?
+    assert_empty usages.call
+  end
 end

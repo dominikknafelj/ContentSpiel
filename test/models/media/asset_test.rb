@@ -332,7 +332,7 @@ class Media::AssetTest < ActiveSupport::TestCase
 
   private
 
-  # Mirrors `MediaAssets::Create#analyze_dimensions`: `file.analyze` needs the
+  # Mirrors `Media::Upload#analyze_dimensions`: `file.analyze` needs the
   # blob's real bytes on the storage service, which only exist once this
   # record's save has actually committed.
   def analyze(asset)

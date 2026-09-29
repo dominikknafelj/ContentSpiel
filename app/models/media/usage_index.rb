@@ -7,7 +7,7 @@
 #
 # `.refresh(owner)` is called from a save/destroy service's own transaction
 # (design spec §5.1: `Pages::Save`, `ContentBlocks::Save`, `Posts::Save`
-# and the destroy services -- wired up in a later task, not this one) --
+# and the `Pages`/`Posts`/`ContentBlocks::Destroy` services) --
 # never from a model callback, so a script or a migration can also call it
 # directly without needing to go through a whole record save.
 class Media::UsageIndex

@@ -61,6 +61,18 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     end
   end
 
+  # A library image `user` uploaded (media library design spec §5.1).
+  def upload_by(user)
+    file = Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")
+    Media::Upload.call(file: file, actor: user).record
+  end
+
+  # `editor_branch` may edit pages, but holds no `media.upload`.
+  def draft_page_for_editor_without_media
+    grant("pages.edit")
+    as_owner { create_page(title: "Draft", published: false) }
+  end
+
   def token_for(user, group)
     ApiToken.generate!(user, group: access_control_groups(group)).first
   end
@@ -134,7 +146,42 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
       false, "access.denied" ],
     [ "an Author-group token of an author creates a post", -> { token_for(users(:author), :author) }, :mcp,
       -> { Posts::Save.call(attributes: { content_type: "blog" }, translations: { "en" => { title: "Via token" } }) },
-      true, "post.created" ]
+      true, "post.created" ],
+    # Media library (design spec §5.1): `media.upload` uploads and chooses,
+    # `media.manage` edits and deletes any image, the uploader their own.
+    [ "a read-only user uploads an image", -> { users(:reader) }, :admin,
+      -> { Media::Upload.call(file: Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")) },
+      false, "access.denied" ],
+    [ "an author uploads an image", -> { users(:author) }, :admin,
+      -> { Media::Upload.call(file: Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")) },
+      true, "media.uploaded" ],
+    [ "an author edits their own upload", -> { users(:author) }, :admin,
+      -> { Media::Save.call(upload_by(users(:author)), attributes: { title: "Mine" }) },
+      true, "media.updated" ],
+    [ "an author edits someone else's upload", -> { users(:author) }, :admin,
+      -> { Media::Save.call(upload_by(users(:one)), attributes: { title: "Hijacked" }) },
+      false, "access.denied" ],
+    [ "an author deletes their own upload", -> { users(:author) }, :admin,
+      -> { Media::Destroy.call(upload_by(users(:author))) },
+      true, "media.deleted" ],
+    [ "an author deletes someone else's upload", -> { users(:author) }, :admin,
+      -> { Media::Destroy.call(upload_by(users(:one))) },
+      false, "access.denied" ],
+    [ "an Admin-group member deletes someone else's upload", -> { users(:two) }, :admin,
+      -> { Media::Destroy.call(upload_by(users(:author))) },
+      true, "media.deleted" ],
+    [ "an Admin-group token of an author (the intersection) deletes someone else's upload", -> { token_for(users(:author), :admin) }, :mcp,
+      -> { Media::Destroy.call(upload_by(users(:one))) },
+      false, "access.denied" ],
+    [ "a Read-only token of the uploader edits their own upload", -> { token_for(users(:author), :read_only) }, :mcp,
+      -> { Media::Save.call(upload_by(users(:author)), attributes: { title: "Via token" }) },
+      false, "access.denied" ],
+    [ "a page editor without media.upload chooses a hero", -> { users(:editor_branch) }, :admin,
+      -> { Pages::Save.call(draft_page_for_editor_without_media, attributes: { hero_media_asset_id: upload_by(users(:one)).id }) },
+      false, "access.denied" ],
+    [ "the owner chooses a hero", -> { users(:one) }, :admin,
+      -> { Pages::Save.call(as_owner { create_page(title: "Hero", published: false) }, attributes: { hero_media_asset_id: upload_by(users(:one)).id }) },
+      true, "page.updated" ]
   ].freeze
 
   ROWS.each do |description, actor, channel, call, ok, action|

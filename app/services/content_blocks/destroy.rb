@@ -28,6 +28,10 @@ module ContentBlocks
       destroyed = ContentBlock.transaction do
         record_event("block.deleted", subject: @block)
         @block.destroy || raise(ActiveRecord::Rollback)
+        # Drops the block's `media_usages` rows (media library design spec
+        # §5.1): `refresh` computes none for a destroyed record.
+        Media::UsageIndex.refresh(@block)
+        true
       end
 
       return failure(@block) unless destroyed

@@ -13,4 +13,19 @@ class Pages::DestroyTest < ActiveSupport::TestCase
     assert Pages::Destroy.call(leaf, actor: nil).ok?
     assert_not Page.exists?(leaf.id)
   end
+
+  # Media library design spec §5.1: a destroyed page leaves no usage rows,
+  # neither its own hero's nor its blocks' (destroyed along with it).
+  test "deleting a page removes its own and its blocks' usages" do
+    asset = create_media_asset
+    page = create_page(title: "Leaf")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: asset.id }).record
+    assert_equal 2, asset.usages.count
+
+    assert Pages::Destroy.call(page, actor: nil).ok?
+
+    assert_not ContentBlock.exists?(block.id)
+    assert_equal 0, asset.usages.count
+  end
 end

@@ -61,4 +61,71 @@ class Pages::SaveTest < ActiveSupport::TestCase
     assert result.ok?
     assert_equal section, page.reload.parent
   end
+
+  # --- The hero image (media library design spec §5.1) ---
+
+  # `editor_branch` may edit pages but holds no `media.upload`.
+  def page_editor_without_media
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: {})
+    users(:editor_branch)
+  end
+
+  def hero_usages(page) = Media::Usage.where(owner: page, role: "hero").pluck(:media_asset_id)
+
+  test "a hero_media_asset_id sets the hero and indexes its usage" do
+    asset = create_media_asset
+    page = create_page(title: "Hero")
+
+    result = as_owner { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal asset, page.reload.hero_media_asset
+    assert_equal [ asset.id ], hero_usages(page)
+    assert_equal asset.id, Audit::Event.where(action: "page.updated").last.snapshot["hero_media_asset_id"]
+  end
+
+  # Review Focus 5: a forged id is a validation failure, the page unchanged.
+  test "an unknown hero_media_asset_id fails validation" do
+    asset = create_media_asset
+    page = create_page(title: "Hero")
+    as_owner { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }) }
+
+    [ asset.id + 1000, "abc" ].each do |forged|
+      result = as_owner { Pages::Save.call(Page.find(page.id), attributes: { hero_media_asset_id: forged }, translations: { "en" => { title: "Changed" } }) }
+
+      assert_not result.ok?
+      assert_not result.denied?
+      assert_equal [ "Hero image doesn't exist" ], result.errors
+      assert_equal asset.id, page.reload.hero_media_asset_id
+      assert_equal "Hero", page.title
+    end
+  end
+
+  # Review Focus 5: choosing an image needs `media.upload`.
+  test "an actor without media.upload can't set the hero" do
+    asset = create_media_asset
+    page = create_page(title: "Hero", published: false)
+
+    result = as(page_editor_without_media) { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }) }
+
+    assert result.denied?
+    assert_equal [ "You don't have permission to upload media" ], result.errors
+    assert_nil page.reload.hero_media_asset_id
+    assert_empty hero_usages(page)
+  end
+
+  test "clearing the hero needs only pages.edit and removes the usage" do
+    asset = create_media_asset
+    page = create_page(title: "Hero", published: false)
+    as_owner { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }) }
+
+    editor = page_editor_without_media
+    # Resending the stored id changes nothing, so it needs nothing more either.
+    assert as(editor) { Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id.to_s }) }.ok?
+    result = as(editor) { Pages::Save.call(page, attributes: { hero_media_asset_id: nil }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_nil page.reload.hero_media_asset_id
+    assert_empty hero_usages(page)
+  end
 end

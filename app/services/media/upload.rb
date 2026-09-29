@@ -1,11 +1,13 @@
 module Media
   # Stores one uploaded image as a library `Media::Asset` (media library
   # design spec §5.1) -- every way an image enters the library goes through
-  # here: the Tiptap editor's upload button (`Admin::MediaAssetsController`,
-  # via `MediaAssets::Create`, which now just inherits this), and, until the
-  # picker replaces them (Task 8), a page's hero upload field and an image
-  # block's upload field, which upload through this and then set the
-  # page's/block's reference to the new asset. `file` is an uploaded file
+  # here: the Tiptap editor's upload button (`Admin::MediaAssetsController`)
+  # and, until the picker replaces them (Task 8), a page's hero upload field
+  # and an image block's upload field (`Admin::FileParams
+  # #upload_to_library`), which upload through this and then set the
+  # page's/block's reference to the new asset through `Pages::Save`/
+  # `ContentBlocks::Save`. It replaced the editor's original
+  # `MediaAssets::Create` (media library Task 6). `file` is an uploaded file
   # (`ActionDispatch::Http::UploadedFile`, or anything with `tempfile`,
   # `original_filename` and `content_type`).
   #

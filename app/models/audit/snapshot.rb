@@ -84,6 +84,7 @@ module Audit
       when User then record.email_address
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
+      when Media::Asset then record.title.presence || "Image ##{record.id}"
       when ApiToken then "API token ##{record.id}"
       when SiteSetting then "Site settings"
       else "#{record.model_name.human} ##{record.id}"
@@ -140,6 +141,19 @@ module Audit
         }
       when ApiToken
         { "id" => record.id, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
+      when Media::Asset
+        # Named fields, not `attributes` (media library design spec §5.1):
+        # the title and every locale's alt/caption default (the raw jsonb
+        # hashes), plus the file's metadata -- what `media.deleted` needs
+        # to say which image went. The blob itself (its key, its service
+        # URL) is storage detail, not content, and never logged.
+        {
+          "id" => record.id, "title" => record.title,
+          "alt" => record.read_attribute(:alt), "caption" => record.read_attribute(:caption),
+          "filename" => record.file.attached? ? record.file.filename.to_s : nil,
+          "content_type" => record.content_type, "byte_size" => record.byte_size,
+          "width" => record.width, "height" => record.height, "created_by_id" => record.created_by_id
+        }
       else
         # The site settings, and anything a later task audits before it gets its own
         # serializer here -- still scrubbed by `.for`.

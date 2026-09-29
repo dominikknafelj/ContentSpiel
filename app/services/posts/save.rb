@@ -61,6 +61,10 @@ module Posts
         raise ActiveRecord::Rollback if refused
 
         (@post.save && assign_related_posts) || raise(ActiveRecord::Rollback)
+        # The body's `image` nodes, every locale (media library design spec
+        # §5.1) -- recomputed from the saved post, so an image removed from
+        # one locale's body loses exactly that locale's row.
+        Media::UsageIndex.refresh(@post)
         record_events(related_before)
         true
       end

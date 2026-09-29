@@ -7,8 +7,17 @@ module ContentBlocks
   # owner) -- see `ContentBlocks::OwnerPermissions`. A block's owner never
   # changes through here, so the check runs once, before anything is
   # assigned.
+  #
+  # An image block's library image (media library design spec §5.1):
+  # `media_asset_id` in `attributes` sets, changes or (nil) clears it --
+  # CS Studio's upload field after `Media::Upload`, Duplicate copying the
+  # source's, later the picker. Choosing one also needs `media.upload` and
+  # an existing asset (`Media::Choosing`), so a duplicate of an image block
+  # does too. Every save then refreshes the block's `media_usages` rows
+  # (its image and its rich-text body's images) inside the transaction.
   class Save < ApplicationService
     include OwnerPermissions
+    include Media::Choosing
 
     TRANSLATED = %i[caption alt body].freeze
 
@@ -23,9 +32,13 @@ module ContentBlocks
       refused = owner_refusal(@block.owner) { |key| authorize!(key, @block) }
       return denied(refused, @block) if refused
 
+      image_refusal = media_choice_result(@block, :media_asset_id, :image)
+      return image_refusal if image_refusal
+
       saved = ContentBlock.transaction do
         assign
         @block.save || raise(ActiveRecord::Rollback)
+        Media::UsageIndex.refresh(@block)
 
         created = @block.previously_new_record?
         changes = Audit::Snapshot.field_changes_for(@block)
@@ -43,10 +56,8 @@ module ContentBlocks
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.
-      # `media_asset_id` is an image block's library image (media library
-      # Task 4) -- set by CS Studio's interim upload field after
-      # `Media::Upload`, or copied by Duplicate; Task 6 adds the
-      # `media.upload`/existence checks for choosing one directly.
+      # `media_asset_id` is an image block's library image, already
+      # checked by `#media_choice_result` (see the class comment).
       @block.assign_attributes(@attributes.slice(:block_type, :media_asset_id, :position))
 
       @block.assign_settings(@attributes[:settings], locale: Locales.default) if @attributes.key?(:settings)
