@@ -44,7 +44,13 @@ module Trash
       return failure(@record, [ "The homepage can't be moved to the trash" ]) if page? && @record.root?
       return failure(@record, [ @record.in_use_message(kept_only: true, actor:) ]) if @record.is_a?(Media::Asset) && @record.used_by_kept_owner?
 
-      @record.class.transaction do
+      # A savepoint of its own (`requires_new`), like every other writing
+      # service: inside a caller's joinable transaction, a plain nested
+      # block wouldn't roll back when the root's `update!` raises -- the
+      # rescue below swallows the exception before the outer transaction
+      # sees it -- leaving the descendants' `update_all` in place under a
+      # kept root.
+      @record.class.transaction(requires_new: true) do
         descendant_ids = page? ? trash_descendants : []
         @record.update!(trashed_at: now, trashed_by: actor_user, **(page? ? { trash_root_id: @record.id } : {}))
         record_event("#{event_prefix}.trashed", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})
@@ -52,7 +58,7 @@ module Trash
 
       success(@record)
     rescue ActiveRecord::RecordInvalid
-      # The transaction has rolled back the descendants' `update_all` along
+      # The savepoint has rolled back the descendants' `update_all` along
       # with the event; only the in-memory flag is left to undo, so the
       # record the caller holds still reads as kept.
       @record.restore_attributes(%w[trashed_at trashed_by_id trash_root_id].select { |name| @record.has_attribute?(name) })

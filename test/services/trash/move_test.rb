@@ -137,13 +137,36 @@ class Trash::MoveTest < ActiveSupport::TestCase
     assert_equal [ "It's already in the trash" ], result.errors
   end
 
-  test "a failed save comes back as a failure, not an exception" do
-    post = create_post(title: "Broken")
-    post.define_singleton_method(:update!) { |*| raise ActiveRecord::RecordInvalid, self }
-    result = Trash::Move.call(post)
-    assert_not result.ok?
-    assert_not post.trashed?, "the in-memory record should read as kept again"
-    assert_nil post.trashed_by
-    assert_not post.reload.trashed?
+  test "a root save that fails after the branch was flagged rolls the branch back too" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+    # Raises only on the root, *after* `trash_descendants` has flagged the
+    # child with `update_all`. Called inside an outer, joinable transaction
+    # -- the way a caller such as `Trash::Empty` will -- since the test's
+    # own fixture transaction isn't joinable and would hand the service a
+    # savepoint whether it asked for one or not.
+    parent.define_singleton_method(:update!) { |*| raise ActiveRecord::RecordInvalid, self }
+
+    assert_no_difference -> { Audit::Event.where(action: "page.trashed").count } do
+      result = Page.transaction { Trash::Move.call(parent) }
+      assert_not result.ok?
+    end
+    assert_not parent.trashed?, "the in-memory record should read as kept again"
+    assert_nil parent.trashed_by
+    assert_not parent.reload.trashed?
+    child.reload
+    assert_not child.trashed?
+    assert_nil child.trash_root_id
+    assert PublicPath.where(record: child).exists?
+  end
+
+  test "moving a page leaves its kept siblings' positions alone" do
+    first = create_page(title: "First")
+    middle = create_page(title: "Middle")
+    last = create_page(title: "Last")
+    before = [ first, last ].map { |page| page.reload.position }
+
+    assert Trash::Move.call(middle).ok?
+    assert_equal before, [ first, last ].map { |page| page.reload.position }
   end
 end
