@@ -78,12 +78,34 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     assert_equal "/elsewhere/child", PublicSite::Paths.current_path(child, Locales.default)
   end
 
+  test "a subpage restored under a new parent brings its own subpages along" do
+    root = create_page(title: "Section")
+    middle = create_page(title: "Middle", parent: root)
+    grandchild = create_page(title: "Grandchild", parent: middle)
+    other = create_page(title: "Elsewhere")
+    Trash::Move.call(root)
+
+    assert Trash::Restore.call(middle.reload, parent: other).ok?
+    [ middle, grandchild ].each do |page|
+      page.reload
+      assert_not page.trashed?
+      assert_nil page.trash_root_id
+    end
+    assert_equal middle, grandchild.parent
+    assert_equal "/elsewhere/middle/grandchild", PublicSite::Paths.current_path(grandchild, Locales.default)
+    assert root.reload.trashed?
+    assert_equal root.id, root.trash_root_id
+  end
+
   test "a new parent can't be the page itself, one of its descendants, or a trashed page" do
     parent = create_page(title: "Section")
     child = create_page(title: "Child", parent: parent)
     Trash::Move.call(parent)
-    assert_not Trash::Restore.call(parent.reload, parent: parent.reload).ok?
-    assert_not Trash::Restore.call(parent.reload, parent: child.reload).ok?
+    [ parent, child ].each do |target|
+      refused = Trash::Restore.call(parent.reload, parent: target.reload)
+      assert_not refused.ok?
+      assert_equal [ "A page can't be restored under itself or one of its own subpages" ], refused.errors
+    end
 
     gone = create_page(title: "Gone")
     Trash::Move.call(gone)
@@ -167,6 +189,11 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     assert_equal [ asset ], service.restored_assets
     event = Audit::Event.find_by(action: "page.restored", subject_id: page.id)
     assert_equal [ asset.id ], event.metadata["restored_asset_ids"]
+    asset_event = Audit::Event.find_by(action: "media.restored", subject_id: asset.id)
+    assert asset_event
+    assert_equal "Media::Asset", asset_event.subject_type
+    assert_equal "Page##{page.id}", asset_event.metadata["restored_with"]
+    assert_not Audit::Event.where(action: "media.restored", subject_id: unrelated.id).exists?
   end
 
   test "an image restores on its own" do

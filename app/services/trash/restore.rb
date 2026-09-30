@@ -5,12 +5,17 @@ module Trash
   # callbacks write it (a page resyncs its subtree and the posts its listing
   # blocks give URLs to).
   #
-  # A branch comes back the way `Trash::Move` sent it: the other members
-  # (`trash_root_id` = this page) are unflagged with `update_all` first and
-  # the root saved last, so the root's single `sync_subtree` pass already
-  # sees them kept. A descendant that went to the trash on its own, earlier,
-  # has its own `trash_root_id` and stays where it is -- it wasn't part of
-  # what this restore is undoing.
+  # A branch comes back the way `Trash::Move` sent it: the page's own
+  # descendants that went to the trash in the same move (same
+  # `trash_root_id` as the page) are unflagged with `update_all` first and
+  # the page saved last, so its single `sync_subtree` pass already sees them
+  # kept. That's the same set whether the page is the branch root or a
+  # subpage coming back alone under a new parent -- a subpage takes its own
+  # subpages along, never leaving them trashed under a kept page (which
+  # would also keep handing out listed posts' URLs, see `Trash::Move`). A
+  # descendant that went to the trash on its own, earlier, has its own
+  # `trash_root_id` and stays where it is -- it wasn't part of what this
+  # restore is undoing.
   #
   # Slugs were freed while the record was in the trash, so each locale's slug
   # is checked against kept records first and moved to the first free `-2`,
@@ -62,6 +67,12 @@ module Trash
         @record.save!
         restore_referenced_assets(branch_ids)
         record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata)
+        # Each image that came along gets its own event too, so an image's
+        # history in the audit log shows it leaving the trash, not only its
+        # owner's.
+        @restored_assets.each do |asset|
+          record_event("media.restored", subject: asset.reload, metadata: { restored_with: "#{@record.class.name}##{@record.id}" })
+        end
       end
 
       success(@record)
@@ -85,8 +96,11 @@ module Trash
       if @parent
         return denied("pages.move", @record) unless authorize!("pages.move", @record)
         return denied("pages.create", @record) unless may_create_under_target?
-        return failure(@record, [ "Choose a page that isn't in the trash" ]) if @parent.trashed?
+        # The more specific answer first: a trashed page's subpages are
+        # (usually) trashed with it, so checking the trash first would hide
+        # why picking one of them can never work.
         return failure(@record, [ "A page can't be restored under itself or one of its own subpages" ]) if @parent.self_and_ancestors.include?(@record)
+        return failure(@record, [ "Choose a page that isn't in the trash" ]) if @parent.trashed?
       elsif @record.parent_id.nil? || !Page.exists?(@record.parent_id)
         return failure(@record, [ "Its parent page no longer exists: choose a new parent" ])
       elsif @record.trash_root_id != @record.id
@@ -109,7 +123,7 @@ module Trash
     end
 
     def restore_branch_members
-      ids = Page.where(trash_root_id: @record.id).where.not(id: @record.id).pluck(:id)
+      ids = @record.descendants.where(trash_root_id: @record.trash_root_id).pluck(:id)
       Page.where(id: ids).update_all(trashed_at: nil, trashed_by_id: nil, trash_root_id: nil, updated_at: Time.current)
       ids
     end
