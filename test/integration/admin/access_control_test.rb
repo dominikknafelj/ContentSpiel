@@ -33,9 +33,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # (design spec §6, `Admin::BaseController::MODULES`), which `two`
       # (Admin, every permission) and `author` (`media.upload` is one of
       # its own seeded grants, test/fixtures/access_control/grants.yml)
-      # both hold, and `reader` (Read only) doesn't.
-      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Pages", "Posts", "Media", "AI assistant", "Mind graph" ],
+      # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
+      # opens for any one of the rights that act on a trashed item, so
+      # `author`'s `media.upload` is enough -- its own trashed images.
+      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
+      users(:author) => [ "Pages", "Posts", "Media", "Trash", "AI assistant", "Mind graph" ],
       users(:reader) => [ "Pages", "Posts", "AI assistant", "Mind graph" ]
     }
 

@@ -93,6 +93,15 @@ Rails.application.routes.draw do
     # with an `:as` this app has no other resource needing.
     resources :media, only: %i[index show create update destroy]
 
+    # Trash (trash spec §7). `:type` is page|post|media -- one screen for
+    # three models, so the item is addressed by type and id rather than by a
+    # resource per model. The constraint is what turns any other `:type`
+    # into a routing 404 before `Admin::TrashController` is ever reached.
+    get "trash", to: "trash#index", as: :trash
+    delete "trash", to: "trash#empty", as: :empty_trash
+    post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
+    delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
+
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource
