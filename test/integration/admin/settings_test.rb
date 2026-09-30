@@ -97,6 +97,27 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "en", @site.reload.default_locale
   end
 
+  test "a settings.manage user can set the trash retention period" do
+    get "/cs-studio/settings"
+    assert_response :success
+    assert_select "input[type='number'][name='site_setting[trash_retention_days]'][value=?]", "30"
+
+    patch "/cs-studio/settings", params: { site_setting: { trash_retention_days: 7 },
+      base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal 7, @site.reload.trash_retention_days
+  end
+
+  test "a negative trash retention period shows the validation error" do
+    patch "/cs-studio/settings", params: { site_setting: { trash_retention_days: -1 },
+      base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "settings-trash_retention_days-errors", /must be greater than or equal to 0/
+    assert_equal 30, @site.reload.trash_retention_days
+  end
+
   test "a stale save is reported instead of silently overwriting a newer one" do
     patch "/cs-studio/settings", params: { site_setting: { title: "First" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
