@@ -104,10 +104,11 @@ module AccessControl
       def nothing(base) = base.where(id: [])
     end
 
-    def initialize(actor, key, channel)
+    def initialize(actor, key, channel, trashed: false)
       @actor = actor
       @permission = Permissions.fetch(key)
       @channel = channel
+      @trashed = trashed
     end
 
     # Owners and trusted code paths get `relation` back untouched (bar the
@@ -121,9 +122,16 @@ module AccessControl
     # the caller's own filter. `and` only ever adds predicates. The
     # conditions are built on `relation.unscope(:where)` so they share the
     # caller's order/limit/joins, which `and` requires.
+    #
+    # The trash narrowing (`#by_trash_state`) is added to `relation` first,
+    # so it's one of the caller's own conditions as far as the rest of this
+    # method is concerned: the unrestricted path returns it as is, and
+    # `#narrow`'s `and` keeps it (only the *grant* conditions are rebuilt
+    # from `unscope(:where)`).
     def apply(relation)
       model = relation.model
       check_subject!(model)
+      relation = by_trash_state(relation, model)
       unrestricted = Checker.trusted?(@actor, @channel) || owner?
       return relation.none unless unrestricted || actor_may_hold_grants?
 
@@ -135,6 +143,29 @@ module AccessControl
     end
 
     private
+
+    # Trash (spec §5.1): every scoped read sees kept records only, except the
+    # Trash screen, which asks for `trashed: true`. A block is kept when its
+    # owner is -- blocks have no trash state of their own. Applied before the
+    # owner/trusted shortcut on purpose: "may see everything" never includes
+    # the trash, so an owner's CS Studio 404s a trashed page's id just like
+    # anyone else's ("not found, not forbidden").
+    #
+    # Deliberately not mirrored in `Checker#allowed?`: a permission check
+    # answers "may this actor do X to this record", which the trash
+    # services themselves ask of trashed records (restore, purge). Keeping
+    # trashed records out of sight is a *read* concern, and every read goes
+    # through here.
+    def by_trash_state(relation, model)
+      if model <= ContentBlock
+        raise ArgumentError, "blocks have no trash of their own" if @trashed
+
+        relation.where(owner_type: "Page", owner_id: Page.kept.select(:id))
+          .or(relation.where(owner_type: "Post", owner_id: Post.kept.select(:id)))
+      else
+        @trashed ? relation.trashed : relation.kept
+      end
+    end
 
     def narrow(relation, conditions) = conditions ? relation.and(conditions) : relation.none
 

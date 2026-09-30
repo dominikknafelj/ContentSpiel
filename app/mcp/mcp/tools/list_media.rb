@@ -52,7 +52,7 @@ module Mcp
         invalid_locale = reject_unless_enabled(locale)
         return invalid_locale if invalid_locale
 
-        scope = Media::Asset.with_variants
+        scope = Media::Asset.kept.with_variants
         scope = scope.unused if unused
         scope = Media::Search.call(scope, query) if query.present?
 

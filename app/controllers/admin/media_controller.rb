@@ -133,7 +133,10 @@ module Admin
     # ::DetailComponent`'s own preview/thumbnail read `#srcset` without an
     # extra query either.
     def set_asset
-      @asset = Media::Asset.with_variants.find(params[:id])
+      # `.kept`: a trashed image is 404 here, like a trashed page or post
+      # (trash spec §5.1, "not found, not forbidden") -- it can't be
+      # viewed, edited or deleted from the library, only from the Trash.
+      @asset = Media::Asset.kept.with_variants.find(params[:id])
     end
 
     def offset
@@ -142,7 +145,7 @@ module Admin
     end
 
     def filtered_assets
-      scope = Media::Asset.with_variants
+      scope = Media::Asset.kept.with_variants
       scope = scope.unused if params[:filter] == "unused"
       scope = scope.where(created_by_id: Current.user&.id) if params[:filter] == "mine"
       # Title, alt (any locale) and filename (global constraints: "search

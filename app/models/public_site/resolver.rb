@@ -20,7 +20,13 @@ module PublicSite
     # URL runs through a draft page, reachable in preview only. One closure-table
     # query per record: `self_and_ancestors` is a scope, not a loaded array,
     # so this stays a single indexed lookup rather than N ancestor checks.
+    #
+    # A trashed record is never visible (trash spec §5.2). It has no
+    # `public_paths` row to be found by in the first place -- this is the
+    # belt to that pair of braces, and what the sitemap relies on too.
     def self.visible?(record)
+      return false if record.trashed?
+
       pages = case record
       when Page then record.self_and_ancestors
       when Post then (page = PublicSite::Paths.canonical_page(record)) ? page.self_and_ancestors : nil
@@ -61,7 +67,7 @@ module PublicSite
       page_row = PublicPath.current.find_by(record_type: "Page", locale: locale.to_s, path: parent_path.presence || "/")
       return nil if page_row.nil? || slug.blank?
 
-      post = Post.where("slug ->> ? = ?", locale.to_s, slug).find { |candidate| page_row.record.content_blocks.listing.any? { |b| b.lists?(candidate) } }
+      post = Post.kept.where("slug ->> ? = ?", locale.to_s, slug).find { |candidate| page_row.record.content_blocks.listing.any? { |b| b.lists?(candidate) } }
       return nil if post.nil? || !visible?(post)
 
       target = @urls.path_for(post, locale)

@@ -53,8 +53,14 @@ module AccessControl
     # subject's write grants); an admin-area key, or one for another
     # subject, raises ArgumentError. Costs no queries of its own beyond
     # loading the actor's grants, once per request.
-    def scope(actor, key, relation, channel: Current.channel)
-      Scoping.new(actor, key, channel).apply(relation)
+    #
+    # Trash (trash spec §5.1): only kept pages and posts, and only blocks
+    # whose owner is kept, for everyone -- owners and trusted code paths
+    # included. `trashed: true` flips a page or post relation to the
+    # trashed rows instead, for the Trash screen alone; blocks have no
+    # trash of their own, so asking for trashed blocks raises.
+    def scope(actor, key, relation, channel: Current.channel, trashed: false)
+      Scoping.new(actor, key, channel, trashed: trashed).apply(relation)
     end
 
     # The CS Studio page tree (design spec §3.3): the ids of the pages

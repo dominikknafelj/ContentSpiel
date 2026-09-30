@@ -266,9 +266,11 @@ module RichText
       # (`Media::Choosing`). *Uploading* a new image does need `media.upload`
       # (`Media::Upload`), and so does browsing the library in the picker.
       # MCP clients rely on this: `update_post` can embed an id they were
-      # given.
+      # given. A trashed image reads as missing (trash spec §5.1) -- only
+      # for a *new* reference, like every existence check here, so a body
+      # already holding one still saves.
       RichText::Schema.register_node("image") do |node|
-        node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { Media::Asset.exists?(value) }
+        node.attribute :asset_id, :integer, required: true, reference: true, validate: ->(value) { Media::Asset.kept.exists?(value) }
         node.attribute :alt, :string
         node.attribute :caption, :string
         node.directive "image", asset: { attr: :asset_id, type: :integer }, alt: :string, caption: :string

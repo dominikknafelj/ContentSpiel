@@ -76,9 +76,12 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
   test "an image deleted between the check and the save fails validation" do
     asset = create_media_asset
     block = image_block
-    racing = ->(*) { Media::Asset.where(id: asset.id).delete_all.positive? }
+    # The check is `Media::Asset.kept.exists?` (trashed images read as
+    # missing), so the race is staged on what `.kept` returns.
+    racing = Object.new
+    racing.define_singleton_method(:exists?) { |*| Media::Asset.where(id: asset.id).delete_all.positive? }
 
-    result = with_singleton_override(Media::Asset, :exists?, racing) do
+    result = with_singleton_override(Media::Asset, :kept, ->(*) { racing }) do
       as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }, translations: { "en" => { caption: "Changed" } }) }
     end
 

@@ -55,7 +55,11 @@ module Admin
     def related = readable(post.related_posts).order(:id).to_a
 
     # Forward relations to posts the actor can't read: counted, never shown.
-    def hidden_related_count = post.related_posts.count - related.size
+    # A trashed post isn't one of them (trash spec §5.1): it's hidden from
+    # everyone, not from this actor, and "+1 you can't open" would suggest
+    # otherwise. Its relation row stays (`Posts::Save#unreadable_related_ids`
+    # keeps it on save), so it's back as soon as the post is restored.
+    def hidden_related_count = post.related_posts.kept.count - related.size
 
     def related_from
       readable(Post.where(id: PostRelation.where(related_post_id: post.id).select(:post_id))).order(:id).to_a
