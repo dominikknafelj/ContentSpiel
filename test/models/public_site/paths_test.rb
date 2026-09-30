@@ -308,4 +308,61 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
     assert_equal "/section/archive/hello", current(post)
   end
+
+  # -- trashed records (trash spec §5.2) ---------------------------------------
+
+  test "saving a trashed page removes its paths and redirects, restoring rebuilds them" do
+    about = Page.create!(parent: @root, title: "About", published_at: 1.day.ago)
+    team = Page.create!(parent: about, title: "Team", published_at: 1.day.ago)
+    Mobility.with_locale(:en) { about.update!(slug: "about-us") }
+    assert PublicPath.redirects.exists?(record: about, locale: "en", path: "/about")
+
+    about.update!(trashed_at: Time.current)
+
+    assert_not PublicPath.exists?(record: about), "current rows and redirects alike are gone"
+    assert_nil current(team), "a descendant has no parent path to hang off"
+
+    about.update!(trashed_at: nil)
+
+    assert_equal "/about-us", current(about)
+    assert_equal "/about-us/team", current(team)
+    assert_equal "/about/team", current(team, "de"), "only :en was renamed"
+    assert_not PublicPath.redirects.exists?(record: about), "old redirects aren't resurrected"
+  end
+
+  test "a trashed page's post listing no longer gives posts their URL" do
+    blog = listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post)
+
+    blog.update!(trashed_at: Time.current)
+
+    assert_nil PublicSite::Paths.canonical_page(post.reload)
+    assert_nil current(post)
+  end
+
+  test "a trashed listing page's posts move to the next listing, and back on restore" do
+    blog = listing(@root, "Blog", "blog")
+    listing(@root, "Archive", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    blog.update!(trashed_at: Time.current)
+    assert_equal "/archive/hello", current(post)
+
+    blog.update!(trashed_at: nil)
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "rebuild! never gives a trashed page or post a URL" do
+    listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    page = Page.create!(parent: @root, title: "About", published_at: 1.day.ago)
+    post.update_columns(trashed_at: Time.current)
+    page.update_columns(trashed_at: Time.current)
+
+    PublicSite::Paths.rebuild!
+
+    assert_not PublicPath.exists?(record: post)
+    assert_not PublicPath.exists?(record: page)
+  end
 end

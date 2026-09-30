@@ -138,4 +138,43 @@ class LocalizedSlugTest < ActiveSupport::TestCase
     assert_nil page.slug_de
     assert_includes page.errors[:slug_de], "can't be blank in DE"
   end
+
+  # Trash spec §2 "URLs: freed at once": a page rebuilt in a trashed one's
+  # place must be able to take its slug. Trashed through `update!` rather
+  # than `update_columns`, so its `public_paths` rows go too (see
+  # `PublicSite::Paths.compute_path`) -- otherwise `HasPublicPaths` would
+  # refuse the new page's `/about` as another record's live address, which
+  # is a different check from the one under test here.
+  test "a trashed page doesn't hold its slug" do
+    gone = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    gone.update!(trashed_at: Time.current)
+
+    fresh = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+
+    assert_equal "about", fresh.slug_en
+    assert gone.slug_taken?(:en, "about"), "the kept page now holds it"
+    assert_not fresh.slug_taken?(:en, "about"), "the trashed page no longer counts"
+  end
+
+  test "a trashed post doesn't hold its slug" do
+    gone = Post.create!(content_type: :blog, title_en: "Hello")
+    gone.update!(trashed_at: Time.current)
+
+    fresh = Post.create!(content_type: :blog, title_en: "Hello")
+
+    assert_equal "hello", fresh.slug_en
+    assert_not fresh.slug_taken?(:en, "hello")
+  end
+
+  # A trashed record never needs a unique slug while it's in the trash --
+  # `Trash::Restore` finds it a free one on the way out -- so a save of the
+  # trashed record itself (its own trashing, or anything else) is never
+  # refused over a slug a kept record has since taken.
+  test "a trashed page's own save skips the uniqueness check" do
+    gone = Page.create!(parent: @root, page_type: :standard, title_en: "About")
+    gone.update!(trashed_at: Time.current)
+    Page.create!(parent: @root, page_type: :standard, title_en: "About")
+
+    assert gone.reload.valid?, gone.errors.full_messages.to_sentence
+  end
 end

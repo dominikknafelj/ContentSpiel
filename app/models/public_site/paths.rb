@@ -72,7 +72,20 @@ module PublicSite
     # either. Only `Post` has a type to check here -- a `Page`'s `page_type`
     # is a closed enum (layout, not open content), so it has no equivalent
     # "unregistered" state.
+    #
+    # A trashed page or post has no URL either (trash spec §5.2). Returning
+    # nil here, rather than deleting rows from the trash services, is what
+    # keeps every other writer -- `rebuild!`, `sync_posts`, an ancestor's
+    # `sync_subtree` -- from ever giving it one back; `write(record, locale,
+    # nil)` deletes the record's current row *and* its redirects for that
+    # locale. A trashed page's descendants follow without a check of their
+    # own: `page_path` finds no current path for their parent and returns nil.
+    # Restoring is the same save in reverse: `trashed_at` cleared, the
+    # model's own `after_save` sync writes the rows afresh (old redirects are
+    # not resurrected -- they were deleted, not demoted).
     def compute_path(record, locale)
+      return nil if record.respond_to?(:trashed?) && record.trashed?
+
       case record
       when Page then page_path(record, locale)
       when Post
@@ -138,7 +151,12 @@ module PublicSite
       # `lists_posts` capability -- only a `Page` owner is a candidate at
       # all (open-types spec §4.1 lets other records own blocks too, but
       # none render a listing of their own posts today).
-      blocks = ContentBlock.listing.includes(:owner).select { |block| block.owner.is_a?(Page) && block.lists?(post) }
+      # A block on a trashed page isn't a candidate either (trash spec §5.2):
+      # its posts move to the next-best listing, or lose their URL, and
+      # come back here when the page is restored.
+      blocks = ContentBlock.listing.includes(:owner).select do |block|
+        block.owner.is_a?(Page) && !block.owner.trashed? && block.lists?(post)
+      end
       chains = blocks.map(&:owner).uniq.index_with { |page| page.self_and_ancestors.to_a.reverse }
 
       best = blocks.min_by do |block|

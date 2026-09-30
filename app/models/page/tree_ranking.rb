@@ -61,7 +61,15 @@ module Page::TreeRanking
 
     # `self` rather than the row for this page, so the in-memory record ends up
     # holding the position it was actually given.
-    others = self.class.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
+    #
+    # Kept siblings only (trash spec corrections, "Sibling rank"): the rank an
+    # editor types is a place among the pages the tree shows them, and a
+    # trashed sibling isn't shown. Trashed siblings keep whatever `position`
+    # they had -- so a kept and a trashed sibling may share a number, which
+    # is harmless: every reader that orders siblings for display, or ranks
+    # them (`PublicSite::Paths.canonical_page`), ignores trashed pages, and a
+    # restored page rejoins at the position `Trash::Restore` gives it.
+    others = self.class.kept.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
     ordered = others.insert(requested.clamp(0, others.size), self)
 
     ordered.each_with_index do |page, index|

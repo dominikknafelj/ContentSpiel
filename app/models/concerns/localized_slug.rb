@@ -64,6 +64,26 @@ module LocalizedSlug
     end
   end
 
+  # Whether `value` is some other *kept* record's slug in `locale` within the
+  # same `localized_slug_scope`. Trashed records don't hold their slug (trash
+  # spec §2 "URLs: freed at once") -- a page rebuilt in the trashed one's
+  # place must be able to take its address, and `Trash::Restore` uses this
+  # same question to find a free `-2`, `-3` suffix instead.
+  #
+  # `.i18n` reads the locale off `Mobility.locale` when `where` runs rather
+  # than from an argument, so the query is built inside the locale it asks
+  # about. The `trashed_at` guard is a column check rather than an
+  # `include?(Trashable)` so this concern stays usable by a model that has no
+  # trash at all.
+  def slug_taken?(locale, value)
+    ::Mobility.with_locale(locale) do
+      scope = self.class.i18n.where(slug: value).where(localized_slug_scope => public_send(localized_slug_scope))
+      scope = scope.where(trashed_at: nil) if self.class.column_names.include?("trashed_at")
+      scope = scope.where.not(id: id) if persisted?
+      scope.exists?
+    end
+  end
+
   private
 
   # `String#parameterize` transliterates through ASCII (`I18n.transliterate`)
@@ -138,10 +158,17 @@ module LocalizedSlug
   #
   # Every enabled locale is checked, not just `Mobility.locale`: the admin
   # form writes all of them in a single request that runs under one ambient
-  # locale, so checking only that one lets the rest through to the per-locale
-  # unique indexes, where the collision surfaces as a raw Postgres error
-  # instead of a form error.
+  # locale, so checking only that one would let a collision in any other
+  # locale through unreported.
+  #
+  # A trashed record skips the check entirely: it never needs a unique slug
+  # while it's in the trash (it has no URL at all -- `PublicSite::Paths.
+  # compute_path`), and a kept record may have taken its slug since, which
+  # must not make the trashed one unsaveable. `Trash::Restore` finds it a
+  # free `-2`, `-3` suffix on the way back out instead.
   def slug_is_unused_in_every_locale
+    return if respond_to?(:trashed?) && trashed?
+
     ::Locales.enabled.each do |locale|
       accessor = ::Mobility.normalize_locale_accessor(:slug, locale)
 
@@ -153,14 +180,7 @@ module LocalizedSlug
       value = public_send(accessor)
       next if value.blank?
 
-      # `.i18n` reads the locale off `Mobility.locale` when `where` runs
-      # rather than from an argument, so the query is built inside the locale
-      # it asks about.
-      taken = ::Mobility.with_locale(locale) do
-        scope = self.class.i18n.where(slug: value).where(localized_slug_scope => public_send(localized_slug_scope))
-        scope = scope.where.not(id: id) if persisted?
-        scope.exists?
-      end
+      taken = slug_taken?(locale, value)
 
       # Reported against `slug_de` rather than `slug`, so the admin form marks
       # the offending locale's tab instead of an ambient field nobody edits.

@@ -27,4 +27,22 @@ class Pages::MoveTest < ActiveSupport::TestCase
     assert Pages::Move.call(a, parent: root_page, position: 99, actor: nil).ok?
     assert_equal "B", root_page.children.reload.first.title
   end
+
+  # Trash spec corrections, "Sibling rank": a trashed sibling keeps its
+  # stored `position` but doesn't count, so "rank 1" means second among the
+  # pages the editor can actually see in the tree. Moving D to rank 1 among
+  # [A (trashed), B, C, D]: counting A would land D at [A, D, B, C] --
+  # first of the visible ones, not second.
+  test "rank counts kept siblings only" do
+    parent = create_page(title: "Parent")
+    a = create_page(title: "A", parent: parent)
+    create_page(title: "B", parent: parent)
+    create_page(title: "C", parent: parent)
+    d = create_page(title: "D", parent: parent)
+    a.update_columns(trashed_at: Time.current)
+
+    assert Pages::Move.call(d, parent: parent, position: 1, actor: nil).ok?
+
+    assert_equal %w[B D C], Page.kept.where(parent_id: parent.id).order(:position, :id).map(&:title)
+  end
 end
