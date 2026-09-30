@@ -70,6 +70,26 @@ class Trash::MoveTest < ActiveSupport::TestCase
     assert_equal users(:one), asset.trashed_by
   end
 
+  # The refusal names places for the service's own actor ("not found, not
+  # forbidden"): a kept page the actor can't read isn't named by its title,
+  # and only kept owners count (a trashed one isn't mentioned at all).
+  test "an image refusal names a place the actor can't read neutrally, and skips trashed owners" do
+    asset = create_media_asset
+    secret = create_page(title: "Secret")
+    assert Pages::Save.call(secret, attributes: { hero_media_asset_id: asset.id }).ok?
+    binned = create_page(title: "Binned")
+    assert Pages::Save.call(binned, attributes: { hero_media_asset_id: asset.id }).ok?
+    assert Trash::Move.call(binned).ok?
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "media.manage", scope: {})
+
+    refused = as(users(:editor_branch)) { Trash::Move.call(asset.reload) }
+
+    assert_not refused.ok?
+    assert_not refused.denied?
+    assert_equal [ "This image is used on a page you can't open" ], refused.errors
+    assert_not asset.reload.trashed?
+  end
+
   test "posts a trashed listing page gave a URL lose it" do
     blog = create_page(title: "Blog")
     assert ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "post_list", settings: { "content_type" => "blog" } }).ok?

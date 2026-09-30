@@ -75,6 +75,34 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert_not Audit::Event.exists?(action: "page.purged")
   end
 
+  # Purging a subpage out of a branch still in the trash would leave that
+  # branch's later restore incomplete: it's the branch root that goes.
+  test "a page trashed as part of another page's branch is refused, naming the root" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+    assert Trash::Move.call(parent).ok?
+
+    result = Trash::Purge.call(child.reload)
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ "Delete “Section” permanently to remove this page" ], result.errors
+    assert Page.exists?(child.id)
+    assert_not Audit::Event.exists?(action: "page.purged")
+  end
+
+  # Once the root is gone (or back out of the trash), a leftover member is
+  # no longer part of anyone's pending restore.
+  test "a branch member whose root isn't in the trash any more can go" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+    assert Trash::Move.call(parent).ok?
+    parent.update_columns(trashed_at: nil, trash_root_id: nil)
+
+    assert Trash::Purge.call(child.reload).ok?
+    assert_not Page.exists?(child.id)
+  end
+
   test "a kept record can't be purged" do
     post = create_post(title: "Here")
 
@@ -120,6 +148,46 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert Trash::Purge.call(page.reload).ok?
     assert Trash::Purge.call(asset.reload).ok?
     assert_not Media::Asset.exists?(asset.id)
+  end
+
+  # Carried over from `Media::DestroyTest`: `Media::Asset#in_use_message`
+  # names three places, counts the rest, and names a block's usage by the
+  # page or post it sits on -- here every owner is itself in the trash.
+  test "the refusal lists three usages and counts the rest, blocks named by their page or post" do
+    asset = upload_by(users(:author))
+    owners = %w[One Two Three].map do |title|
+      page = create_page(title: title)
+      assert Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }).ok?
+      page
+    end
+    four = create_page(title: "Four")
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: four), attributes: { block_type: "image", media_asset_id: asset.id }).ok?
+    five = create_post(title: "Five")
+    assert Posts::Save.call(five, translations: { "en" => { body: rich_doc("::image{asset=\"#{asset.id}\"}") } }).ok?
+    [ *owners, four, five ].each { |owner| assert Trash::Move.call(owner).ok? }
+    assert Trash::Move.call(asset.reload).ok?
+
+    result = as(users(:two)) { Trash::Purge.call(asset.reload) }
+
+    assert_not result.ok?
+    assert_equal [ "This image is used on the page “One”, the page “Two”, the page “Three” and 2 more" ], result.errors
+  end
+
+  # "Not found, not forbidden": a place the acting user can't read is named
+  # neutrally, never by its title.
+  test "a place the actor can't read is named neutrally" do
+    asset = upload_by(users(:author))
+    page = create_page(title: "Secret")
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }).ok?
+    assert Trash::Move.call(page).ok?
+    assert Trash::Move.call(asset.reload).ok?
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "media.manage", scope: {})
+
+    result = as(users(:editor_branch)) { Trash::Purge.call(asset.reload) }
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ "This image is used on a page you can't open" ], result.errors
   end
 
   test "an unused image goes, records media.purged and purges the file after commit" do

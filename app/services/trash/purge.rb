@@ -12,7 +12,9 @@ module Trash
   # page's branch, which `Trash::Restore` can't do -- so this is a guard,
   # not a flow. `Page#ensure_no_children` (`before_destroy, prepend: true`)
   # still runs on each destroy and passes because children go first. The
-  # homepage never gets here: it can't be moved to the trash.
+  # homepage never gets here: it can't be moved to the trash. A page that
+  # went to the trash as part of another page's branch can't be purged on
+  # its own while that branch is still there (`#pending_branch_root`).
   #
   # A post has no descendants; its `has_many ... dependent: :destroy`
   # associations (`post_tags`, `post_relations`, `inverse_post_relations`)
@@ -50,6 +52,9 @@ module Trash
       # `trash.empty` is an admin-area key: no subject, so a nil record.
       return denied(refused, @record) if refused && !authorize!("trash.empty", nil)
       return failure(@record, [ "Only items in the trash can be deleted permanently" ]) unless @record.trashed?
+      if (root = pending_branch_root)
+        return failure(@record, [ "Delete “#{root.title}” permanently to remove this page" ])
+      end
 
       # A savepoint of its own (`requires_new`), like every writing service:
       # `Trash::Empty` runs one purge after another, and an item that can't
@@ -75,6 +80,21 @@ module Trash
     end
 
     private
+
+    # A page trashed as part of another page's branch goes only with that
+    # branch: purging it alone would leave the root's later restore
+    # (`Trash::Restore`, which brings back exactly the pages sharing its
+    # `trash_root_id`) quietly incomplete. Only while that root is itself
+    # still in the trash -- once it's been purged (the id no longer
+    # resolves) or restored, a leftover member is nobody's pending restore
+    # and may go on its own. A subpage trashed on its own, earlier, is its
+    # own root (`trash_root_id == id`) and is never refused here.
+    def pending_branch_root
+      return unless @record.is_a?(Page) && @record.trash_root_id && @record.trash_root_id != @record.id
+
+      root = Page.find_by(id: @record.trash_root_id)
+      root if root&.trashed?
+    end
 
     def purge_branch
       pages = branch_deepest_first
