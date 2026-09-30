@@ -264,6 +264,29 @@ class Media::Asset < ApplicationRecord
     usages.exists?
   end
 
+  # Whether any *kept* Page/Post (a block's usage counts through the block's
+  # own owner -- the second hop `Media::Usage.by_kept_owner` already does)
+  # still references this asset (trash spec §4.1/§5.1). Moving an image to
+  # the trash is refused while this is true; purging asks the plain `#used?`
+  # instead, since a purge must also be refused for an asset a *trashed*
+  # owner still points at -- restoring that owner would otherwise resurrect
+  # a dangling reference.
+  def used_by_kept_owner?
+    usages.by_kept_owner.exists?
+  end
+
+  # Which of the three "Used on"/Delete states this asset is in (trash spec
+  # §4.1, media library design spec §6): nothing references it at all, a
+  # kept page or post still does, or every reference left is to something in
+  # the trash. `#used?` stays the coarse any-usage-at-all question purging
+  # (and the database's own FK) actually needs; this is the finer question
+  # CS Studio's detail panel renders around.
+  def usage_state
+    return :unused unless used?
+
+    used_by_kept_owner? ? :in_use : :trash_only
+  end
+
   # One entry per distinct place this asset is used -- grouped by owner,
   # not one entry per `media_usages` row: a post whose `en` and `de` bodies
   # both embed this image is one link in "Used on" (design spec §6), not

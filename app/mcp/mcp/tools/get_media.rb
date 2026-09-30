@@ -91,8 +91,17 @@ module Mcp
       # `place_for` drops a stale index entry (an owner already gone) or an
       # orphaned block with no page/post of its own -- neither is
       # something this can name.
+      #
+      # `by_kept_owner` (trash spec §5.1): a trashed page or post -- or a
+      # block sitting on one -- is dropped here the same way a plain `find`
+      # of one 404s elsewhere ("not found, not forbidden"), never folded
+      # into `hidden_usages` alongside an unreadable-but-kept owner. Both
+      # `usage_count` and `usages` below come from this one already-filtered
+      # list, so neither counts nor names a trashed owner.
       def self.usage_places(asset)
-        asset.usages_summary.filter_map { |entry| place_for(entry[:owner]) }.uniq
+        usages = asset.usages.by_kept_owner.includes(:owner).to_a
+        Media::Asset.preload_usage_places(usages.map(&:owner))
+        usages.filter_map { |usage| place_for(usage.owner) }.uniq
       end
       private_class_method :usage_places
 

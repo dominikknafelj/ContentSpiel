@@ -46,6 +46,8 @@
         <h2 class="mb-2 font-semibold text-ink">Used on</h2>
         <% if unresolved_usage? %>
           <p class="text-sm text-meta">Used somewhere that can’t be shown — the record of where may be out of date.</p>
+        <% elsif usage_state == :trash_only %>
+          <p class="text-sm text-meta">Used only by items in the trash.</p>
         <% elsif usage_entries.empty? %>
           <p class="text-sm text-meta">Not used anywhere yet.</p>
         <% else %>

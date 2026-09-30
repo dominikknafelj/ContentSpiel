@@ -121,6 +121,23 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     assert_equal %(::image{asset="#{asset.id}"}), entry["directive"]
   end
 
+  # Trash spec §5.1 / Task 4 controller ruling: `usage_count` is the "still
+  # used" signal an agent decides against, so a trashed owner's reference
+  # must not count toward it.
+  test "list_media's usage_count excludes a trashed owner" do
+    raw = token_for(users(:one), access_control_groups(:admin))
+    asset = create_media_asset
+    asset.update!(title: "Only a trashed page uses this")
+    page = create_page(title: "Will be trashed")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+    page.update!(trashed_at: Time.current)
+
+    result = call_tool(raw, "list_media_tool", query: "Only a trashed page uses this")
+
+    entry = result["structuredContent"].sole
+    assert_equal 0, entry["usage_count"]
+  end
+
   # --- get_media -------------------------------------------------------------
 
   # Final fix wave (M5): the caption default is part of what an agent needs
@@ -187,6 +204,29 @@ class McpMediaTest < ActionDispatch::IntegrationTest
     data = result["structuredContent"]
     assert_equal [ { "type" => "page", "id" => page.id, "title" => "Has an image block" } ], data["usages"]
     assert_equal 0, data["hidden_usages"]
+  end
+
+  # Trash spec §5.1 / Task 4 controller ruling: a trashed owner is never
+  # named, and doesn't inflate the count either -- distinct from
+  # `hidden_usages`, which is for an owner the token merely can't *read*,
+  # not one that's gone from the site entirely. No trash service exists yet,
+  # so this sets `trashed_at` directly (`test/models/media/usage_test.rb`
+  # does the same).
+  test "get_media doesn't name or count a trashed owner's usage" do
+    asset = create_media_asset
+    page = create_page(title: "Will be trashed")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+    page.update!(trashed_at: Time.current)
+
+    raw = token_for(users(:one), access_control_groups(:admin))
+
+    result = call_tool(raw, "get_media_tool", id: asset.id)
+
+    data = result["structuredContent"]
+    assert_equal [], data["usages"]
+    assert_equal 0, data["hidden_usages"]
+    assert_equal 0, data["usage_count"]
+    assert_not_includes text_of(result), "Will be trashed"
   end
 
   test "get_media reports no usages for an unused image" do

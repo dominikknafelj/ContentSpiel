@@ -97,6 +97,12 @@ module Admin
 
       def used? = defined?(@used) ? @used : (@used = asset.used?)
 
+      # `:unused` / `:in_use` / `:trash_only` (trash spec §4.1/§5.1) --
+      # memoized for the same reason `#usage_entries` is: the template reads
+      # it more than once (the "Used on" empty-state branch, Task 10's
+      # Delete-vs-"Move to trash" gate).
+      def usage_state = defined?(@usage_state) ? @usage_state : (@usage_state = asset.usage_state)
+
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw
       # `media_usages` rows -- a block's own usage is named by the page or
@@ -114,10 +120,20 @@ module Admin
       # Memoized (final fix wave, M7): the template reads it twice (the
       # empty check and the list), and each call ran `#usages_summary`'s
       # queries again.
+      #
+      # Kept places only (trash spec §5.1) -- a trashed page or post (or a
+      # block sitting on one, the same second hop `Media::Usage
+      # .by_kept_owner`/`Media::Asset#used_by_kept_owner?` use) is skipped
+      # here, not merely unlinked: naming it would disclose a record this
+      # screen has no business surfacing outside the Trash. `#usage_state`
+      # is what tells an editor "used only by items in the trash" instead;
+      # `#unresolved_usage?` still covers a *genuinely* stale row (no owner
+      # at all), which `place_for` also reads as `nil` and this list also
+      # drops.
       def usage_entries
-        @usage_entries ||= asset.usages_summary.filter_map do |entry|
+        @usage_entries ||= usage_summary.filter_map do |entry|
           place = place_for(entry[:owner])
-          next if place.nil?
+          next if place.nil? || place.trashed?
 
           role_label = role_label(entry[:roles])
           locale_suffix = entry[:locales].any? ? " (#{entry[:locales].join(", ")})" : ""
@@ -131,15 +147,29 @@ module Admin
         end
       end
 
-      # Used, but by nothing this panel can name (final fix wave, M7): every
-      # usage row's owner is gone, or is a block with no page/post of its
-      # own -- a stale index entry. Delete stays disabled (`#used?`), so
-      # "Used on" must not say "Not used anywhere yet" beside it.
-      def unresolved_usage? = usage_entries.empty? && used?
+      # Used, but by nothing this panel can name (final fix wave, M7): a
+      # `media_usages` row whose owner is gone entirely, or a block with no
+      # page/post of its own -- `place_for` reads `nil` in both cases. Kept
+      # deliberately separate from `#usage_state`'s `:trash_only` (Task 4):
+      # a *trashed* owner still resolves fine (`place_for` returns it,
+      # `#usage_entries` just chooses not to list it), so it takes the more
+      # specific "used only by items in the trash" message instead of this
+      # generic "may be out of date" one -- checked first in the template,
+      # since a single asset could in principle carry both kinds of row.
+      def unresolved_usage? = used? && usage_summary.any? { |entry| place_for(entry[:owner]).nil? }
 
       private
 
       attr_reader :asset, :locale, :url_options
+
+      # The raw, ungrouped-by-visibility `usages_summary` rows, memoized
+      # once: `#usage_entries` and `#unresolved_usage?` both need to walk
+      # them (the former to build the visible list, the latter to check for
+      # a row `place_for` can't resolve at all), and neither should re-run
+      # `usages_summary`'s own queries to do it.
+      def usage_summary
+        @usage_summary ||= asset.usages_summary
+      end
 
       # A block's own usage is named by its page/post; a page's hero and a
       # post's own rich text are already named by themselves. `nil` for a
