@@ -122,7 +122,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     within("#page-hero-image-section") { click_on "Change image" }
     within("dialog[open]") { assert_button doomed.title }
-    assert Media::Destroy.call(doomed).ok?
+    assert delete_for_good(doomed)
     pick_from_library(doomed)
 
     # Waited for outside `within` first (final fix wave): the refusal

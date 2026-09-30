@@ -12,7 +12,7 @@ class AuditEventsTest < ActiveSupport::TestCase
 
   def actions_for(subject) = Audit::Event.for_subject(subject).order(:id).pluck(:action)
 
-  test "posts: created, updated, published, scheduled, unpublished, deleted" do
+  test "posts: created, updated, published, scheduled, unpublished, trashed, purged" do
     post = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "ruby" ] }, translations: { "en" => { title: "Draft" } }).record
     Posts::Save.call(post, translations: { "en" => { title: "Renamed" } })
     Posts::Save.call(post, attributes: { published: true })
@@ -25,9 +25,10 @@ class AuditEventsTest < ActiveSupport::TestCase
     assert_equal [ "Draft", "Renamed" ], Audit::Event.find_by!(action: "post.updated").field_changes["en title"]
     assert_equal [ "published_at" ], Audit::Event.find_by!(action: "post.published").field_changes.keys
 
-    Posts::Destroy.call(post)
-    deleted = Audit::Event.find_by!(action: "post.deleted")
-    assert_equal [ "ruby" ], deleted.snapshot["tag_names"]
+    delete_for_good(post)
+    assert_equal %w[post.trashed post.purged], actions_for(post).last(2)
+    purged = Audit::Event.find_by!(action: "post.purged")
+    assert_equal [ "ruby" ], purged.snapshot["tag_names"]
   end
 
   test "creating a published post records created and published" do
@@ -45,16 +46,16 @@ class AuditEventsTest < ActiveSupport::TestCase
     assert_equal %w[post.created], actions_for(post)
   end
 
-  test "pages: created, updated, published, unpublished, moved, deleted" do
+  test "pages: created, updated, published, unpublished, moved, trashed, purged" do
     parent = create_page(title: "Parent")
     page = Pages::Save.call(attributes: { parent: root_page, published: false }, translations: { "en" => { title: "Page" } }).record
     Pages::Save.call(page, translations: { "en" => { title: "Page 2" } })
     Pages::Save.call(page, attributes: { published: true })
     Pages::Save.call(page, attributes: { published: false })
     Pages::Move.call(page, parent: parent, position: 0)
-    Pages::Destroy.call(page)
+    delete_for_good(page)
 
-    assert_equal %w[page.created page.updated page.published page.unpublished page.moved page.deleted], actions_for(page)
+    assert_equal %w[page.created page.updated page.published page.unpublished page.moved page.trashed page.purged], actions_for(page)
     assert_equal [ "Page", "Page 2" ], Audit::Event.find_by!(action: "page.updated", subject: page).field_changes["en title"]
     assert_equal [ root_page.id, parent.id ], Audit::Event.find_by!(action: "page.moved").field_changes["parent_id"]
   end

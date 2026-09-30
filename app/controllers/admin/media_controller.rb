@@ -2,7 +2,7 @@ module Admin
   # The Media module (media library design spec §6, Task 7): the grid
   # (search, filters, pagination), one image's detail panel, and its own
   # multi-file upload -- every write still goes through `Media::Upload`/
-  # `Save`/`Destroy` (`Admin::BaseController`'s own "every write goes
+  # `Save`/`Trash::Move` (`Admin::BaseController`'s own "every write goes
   # through a service" rule), this controller only ever translates params
   # and renders their `Result`.
   #
@@ -11,7 +11,7 @@ module Admin
   # whole library needs no scoping the way Pages/Posts do (there is no
   # per-asset "read" permission), so `index`/`show`/`create` share one
   # `require_permission`. Editing and deleting are gated per §5.1 instead,
-  # inside `Media::Save`/`Media::Destroy` themselves (`Media::Ownership`:
+  # inside `Media::Save`/`Trash::Move`/`Trash::Purge` themselves (`Media::Ownership`:
   # `media.manage`, or the asset's own uploader) -- a denial from either
   # comes back as an ordinary 403/422, exactly like every other module's
   # write.
@@ -102,16 +102,17 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Permanent, same "no trash yet" interim state every other delete in
-    # CS Studio is (`Admin::TagsController`'s own comment) -- `Media
-    # ::Destroy` itself is what actually refuses this while the image is
-    # still used (design spec §5.1), which `Admin::MediaLibrary::DetailComponent`
+    # Moves the image to the trash (`Trash::Move`, trash spec §4.1); the
+    # permanent delete is `Trash::Purge`, reachable only from the trash.
+    # `Trash::Move` itself is what refuses this while a *kept* page or post
+    # still uses the image, which `Admin::MediaLibrary::DetailComponent`
     # already disables the button for ahead of time; this is only ever hit
     # for real through a forged request, a race, or an actor whose rights
     # just changed, and any of those come back as the ordinary redirect-
     # with-alert every other module's own `destroy` already gives.
+    # Interim: the "Deleted" notice stays until the Trash UI task.
     def destroy
-      result = Media::Destroy.call(@asset)
+      result = Trash::Move.call(@asset)
 
       if result.ok?
         redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Deleted"

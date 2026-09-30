@@ -2,7 +2,8 @@ module Media
   # Who may edit or delete a library image (media library design spec
   # §5.1): anyone holding `media.manage`, or the image's own uploader
   # (`created_by_id`) -- "a user can always edit or delete their own
-  # uploads" -- shared by `Media::Save` and `Media::Destroy`, which each
+  # uploads" -- shared by `Media::Save` and the trash services (`Trash::
+  # ItemPermissions`), which each
   # call `authorize!("media.manage", ...)` themselves and fall back to
   # `#uploader_may_manage?` below.
   #

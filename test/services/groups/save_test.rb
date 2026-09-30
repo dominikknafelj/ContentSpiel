@@ -222,7 +222,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
     grant(group, "posts.edit", "content_types" => %w[blog retired_type])
     grant(group, "pages.edit", "page_ids" => [ page.id, kept.id ])
     grant(group, "pages.read", "page_ids" => [ page.id ])
-    as_owner { Pages::Destroy.call(page) }
+    as_owner { delete_for_good(page) }
 
     live = AccessControl::LiveGrants.new(group.grants.reload.to_a)
     submitted = live.attributes

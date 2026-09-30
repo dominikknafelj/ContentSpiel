@@ -55,9 +55,10 @@ module AccessControl
     # a hero, an image block or a rich-text image -- and `media.manage` --
     # edit any image's title/alt/caption and delete any image. The uploader
     # of an image may edit or delete that one image without `media.manage`
-    # (`Media::Save`/`Media::Destroy`'s own "ownership" rule); the library
+    # (`Media::Save`'s and the trash services' own "ownership" rule,
+    # `Media::Ownership`); the library
     # itself isn't read-scoped, so there's no `own` scope here to express
-    # that with -- ownership is decided in those two services instead.
+    # that with -- ownership is decided in those services instead.
     def self.register_content
       Permissions.register "tags.manage", label: "Manage tags", area: "Content", action: :manage
       Permissions.register "media.upload", label: "Upload media", area: "Content", action: :upload

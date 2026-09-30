@@ -191,7 +191,7 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal [ [ first.id, "rich_text", "en" ] ], usages.call
     assert second.reload.usages.none?
 
-    assert Posts::Destroy.call(post).ok?
+    assert delete_for_good(post)
     assert_empty usages.call
   end
 

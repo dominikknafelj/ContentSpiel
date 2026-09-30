@@ -132,8 +132,10 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
+    # Moves the post to the trash (`Trash::Move`, trash spec §4.1); the
+    # permanent delete is `Trash::Purge`, reachable only from the trash.
     def destroy
-      result = Posts::Destroy.call(@post)
+      result = Trash::Move.call(@post)
 
       if result.ok?
         redirect_to admin_posts_path(**admin_url_options), status: :see_other

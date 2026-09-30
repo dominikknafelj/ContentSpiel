@@ -56,7 +56,7 @@ class Media::Asset < ApplicationRecord
   # `#destroy` with a *different* exception (`DeleteRestrictionError`)
   # before the query ever reaches Postgres, which would both duplicate the
   # database's own guarantee and hide the `ActiveRecord::InvalidForeignKey`
-  # a bypassed or racing delete (`Media::Destroy`'s own service-level check
+  # a bypassed or racing delete (`Trash::Purge`'s own service-level check
   # losing a race, or a raw `delete`) is still expected to surface.
   #
   # `foreign_key:` is explicit for the same reason `self.table_name` is:
@@ -258,7 +258,7 @@ class Media::Asset < ApplicationRecord
 
   # Whether anything currently references this asset -- the same question
   # the database's own FK answers at delete time,
-  # asked ahead of that (design spec §5.1: `Media::Destroy`'s own usage
+  # asked ahead of that (design spec §5.1: `Trash::Purge`'s own usage
   # check, the "Unused" filter's inverse).
   def used?
     usages.exists?
@@ -312,8 +312,8 @@ class Media::Asset < ApplicationRecord
   IN_USE_NAMED_PLACES = 3
 
   # "This image is used on the page “About”, the post “Hello” and 2 more" --
-  # why an image can't go (moved here from `Media::Destroy`, trash spec
-  # §4.1, so `Trash::Move` and later `Trash::Purge` share one wording). A
+  # why an image can't go (moved here from the retired `Media::Destroy`,
+  # trash spec §4.1, so `Trash::Move` and `Trash::Purge` share one wording). A
   # block's usage is named by the page or post it sits on, and a place is
   # named once however many ways it uses the image (a hero and a block on
   # the same page, a body image in two locales). A place `actor` can't read

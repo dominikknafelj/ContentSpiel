@@ -136,7 +136,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     group = AccessControl::Group.create!(name: "Stale")
     AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
     AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ page.id ] })
-    as_owner { Pages::Destroy.call(page) }
+    as_owner { delete_for_good(page) }
     sign_in_as(users(:one))
 
     get "/cs-studio/groups/#{group.id}/edit"

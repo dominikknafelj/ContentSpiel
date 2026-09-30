@@ -160,15 +160,13 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Deleting is permanent (spec §7's own "No trash" interim state) and
-    # refused outright for a branch that still has children
-    # (`Page#ensure_no_children`, run by `Pages::Destroy`) -- the header's
-    # own Delete button is already disabled with that reason before a
-    # request is ever sent, but a direct request (or a stale page whose
-    # children changed in another tab) still has to get the same answer
-    # from the server, not just the client.
+    # Moves the page, with its whole branch, to the trash (`Trash::Move`,
+    # trash spec §4.1) -- nothing is deleted from here any more; the
+    # permanent delete is `Trash::Purge`, reachable only from the trash.
+    # Interim: the redirect and the header's Delete button are still the
+    # pre-trash ones until the Trash UI task replaces them.
     def destroy
-      result = Pages::Destroy.call(@page)
+      result = Trash::Move.call(@page)
 
       if result.ok?
         redirect_to admin_root_path(**admin_url_options), status: :see_other

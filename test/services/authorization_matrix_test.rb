@@ -73,6 +73,12 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     as_owner { create_page(title: "Draft", published: false) }
   end
 
+  # Moved to the trash by the owner, ready for a restore or purge row.
+  def trashed(record)
+    as_owner { assert Trash::Move.call(record).ok? }
+    record.reload
+  end
+
   def token_for(user, group)
     ApiToken.generate!(user, group: access_control_groups(group)).first
   end
@@ -102,8 +108,8 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     [ "an own-only publisher edits their own live post", -> { users(:editor_branch) }, :admin,
       -> { Posts::Save.call(live_post_for_scoped_publisher({ "own" => true }), translations: { "en" => { title: "Still mine" } }) },
       true, "post.updated" ],
-    [ "an author deletes their own draft without posts.delete", -> { users(:author) }, :admin,
-      -> { Posts::Destroy.call(authors_draft) },
+    [ "an author trashes their own draft without posts.delete", -> { users(:author) }, :admin,
+      -> { Trash::Move.call(authors_draft) },
       false, "access.denied" ],
     [ "a branch editor moves a page within their branch", -> { users(:editor_branch) }, :admin,
       -> { Pages::Move.call(branches[:child], parent: branches[:a], position: 0) },
@@ -126,9 +132,27 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     [ "the owner publishes someone else's post", -> { users(:one) }, :admin,
       -> { Posts::Save.call(authors_draft, attributes: { published: true }) },
       true, "post.published" ],
-    [ "the owner deletes a page", -> { users(:one) }, :admin,
-      -> { Pages::Destroy.call(as_owner { create_page(title: "Doomed") }) },
-      true, "page.deleted" ],
+    [ "the owner trashes a page", -> { users(:one) }, :admin,
+      -> { Trash::Move.call(as_owner { create_page(title: "Doomed") }) },
+      true, "page.trashed" ],
+    # Trash (trash spec §6): moving, restoring and purging one item need its
+    # own delete right; `trash.empty` (Admin only) empties everything and
+    # may purge any single trashed item.
+    [ "the owner purges a trashed page", -> { users(:one) }, :admin,
+      -> { Trash::Purge.call(trashed(as_owner { create_page(title: "Doomed") })) },
+      true, "page.purged" ],
+    [ "an author restores their own trashed draft without posts.delete", -> { users(:author) }, :admin,
+      -> { Trash::Restore.call(trashed(authors_draft)) },
+      false, "access.denied" ],
+    [ "an Editor-group token of the owner purges a trashed post", -> { token_for(users(:one), :editor) }, :mcp,
+      -> { Trash::Purge.call(trashed(owners_post)) },
+      true, "post.purged" ],
+    [ "an Editor-group token of the owner (no trash.empty) empties the trash", -> { token_for(users(:one), :editor) }, :mcp,
+      -> { Trash::Empty.call },
+      false, "access.denied" ],
+    [ "an Admin-group member empties the trash", -> { users(:two) }, :admin,
+      -> { Trash::Empty.call },
+      true, "trash.emptied" ],
     [ "the owner changes the languages", -> { users(:one) }, :admin,
       -> { Locales::Disable.call("es") },
       true, "language.disabled" ],
@@ -161,17 +185,20 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
     [ "an author edits someone else's upload", -> { users(:author) }, :admin,
       -> { Media::Save.call(upload_by(users(:one)), attributes: { title: "Hijacked" }) },
       false, "access.denied" ],
-    [ "an author deletes their own upload", -> { users(:author) }, :admin,
-      -> { Media::Destroy.call(upload_by(users(:author))) },
-      true, "media.deleted" ],
-    [ "an author deletes someone else's upload", -> { users(:author) }, :admin,
-      -> { Media::Destroy.call(upload_by(users(:one))) },
+    [ "an author trashes their own upload", -> { users(:author) }, :admin,
+      -> { Trash::Move.call(upload_by(users(:author))) },
+      true, "media.trashed" ],
+    [ "an author purges their own trashed upload", -> { users(:author) }, :admin,
+      -> { Trash::Purge.call(trashed(upload_by(users(:author)))) },
+      true, "media.purged" ],
+    [ "an author trashes someone else's upload", -> { users(:author) }, :admin,
+      -> { Trash::Move.call(upload_by(users(:one))) },
       false, "access.denied" ],
-    [ "an Admin-group member deletes someone else's upload", -> { users(:two) }, :admin,
-      -> { Media::Destroy.call(upload_by(users(:author))) },
-      true, "media.deleted" ],
-    [ "an Admin-group token of an author (the intersection) deletes someone else's upload", -> { token_for(users(:author), :admin) }, :mcp,
-      -> { Media::Destroy.call(upload_by(users(:one))) },
+    [ "an Admin-group member trashes someone else's upload", -> { users(:two) }, :admin,
+      -> { Trash::Move.call(upload_by(users(:author))) },
+      true, "media.trashed" ],
+    [ "an Admin-group token of an author (the intersection) trashes someone else's upload", -> { token_for(users(:author), :admin) }, :mcp,
+      -> { Trash::Move.call(upload_by(users(:one))) },
       false, "access.denied" ],
     [ "a Read-only token of the uploader edits their own upload", -> { token_for(users(:author), :read_only) }, :mcp,
       -> { Media::Save.call(upload_by(users(:author)), attributes: { title: "Via token" }) },

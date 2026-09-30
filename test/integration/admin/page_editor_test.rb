@@ -89,12 +89,23 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "scheduled", draft.reload.status
   end
 
-  test "deleting a page with children is refused with the reason" do
+  # Deleting moves the page to the trash (`Trash::Move`), its subpages
+  # with it -- no longer refused for a page with children. Only the
+  # homepage is still refused, with the reason.
+  test "deleting a page with children moves the whole branch to the trash" do
     parent = create_page(title: "Parent")
-    create_page(title: "Kid", parent: parent)
+    kid = create_page(title: "Kid", parent: parent)
     delete "/cs-studio/pages/#{parent.id}"
+    assert_response :see_other
+    assert parent.reload.trashed?
+    assert kid.reload.trashed?
+  end
+
+  test "deleting the homepage is refused with the reason" do
+    delete "/cs-studio/pages/#{root_page.id}"
     assert_response :unprocessable_entity
-    assert Page.exists?(parent.id)
+    assert_includes response.body, "The homepage can&#39;t be moved to the trash"
+    assert_not root_page.reload.trashed?
   end
 
   # Media library Task 8: the hero is chosen through the picker into a

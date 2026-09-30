@@ -311,14 +311,15 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Can't delete"
   end
 
-  test "delete removes an unused image and redirects to the grid" do
+  test "delete moves an unused image to the trash and redirects to the grid" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "unused.png")
 
-    assert_difference -> { Media::Asset.count }, -1 do
+    assert_no_difference -> { Media::Asset.count } do
       delete "/cs-studio/media/#{asset.id}"
     end
     assert_redirected_to "/cs-studio/media"
+    assert asset.reload.trashed?
   end
 
   test "delete is refused while the image is used, even forged past the disabled button" do
@@ -332,7 +333,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       delete "/cs-studio/media/#{asset.id}"
     end
     assert_response :redirect
-    assert Media::Asset.exists?(asset.id)
+    assert_not asset.reload.trashed?
   end
 
   test "editing title, alt and caption autosaves per locale through Media::Save" do

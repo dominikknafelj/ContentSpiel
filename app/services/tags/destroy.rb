@@ -1,7 +1,7 @@
 module Tags
   # Permanently deletes a tag (spec §5.3's "No trash" interim state, global
-  # constraints), the same shape `Pages::Destroy`/`ContentBlocks::Destroy`
-  # already use. Removing the tag's own `post_tags` (`Tag#has_many
+  # constraints), the same shape `ContentBlocks::Destroy` and
+  # `Trash::Purge` use. Removing the tag's own `post_tags` (`Tag#has_many
   # :post_tags, dependent: :destroy`) already resyncs each of those posts'
   # own canonical page individually, through `PostTag#sync_post_paths`'s
   # `after_commit` -- but a tag-filtered `post_list` block's *other*

@@ -11,7 +11,7 @@ module Admin
   # Cancel button below is a plain, unwired `<button>`. The actual confirm
   # action is a slot (`confirm_action`), not a `url:`/`method:` pair, so the
   # caller can render whatever it already uses to perform the write --
-  # typically a `button_to` against a `Pages::Destroy`/`Tags::Destroy`-backed
+  # typically a `button_to` against a `Trash::Move`/`Tags::Destroy`-backed
   # route -- rather than this component reinventing Rails' own form helpers
   # for one method call.
   class ConfirmDialogComponent < AdminComponent

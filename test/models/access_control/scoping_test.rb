@@ -158,7 +158,7 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     group = access_control_groups(:branch_editors)
     doomed = create_page(title: "Doomed")
     grant!(group, "pages.edit", { "page_ids" => [ doomed.id ] })
-    assert Pages::Destroy.call(doomed).ok?
+    assert delete_for_good(doomed)
     grant!(group, "posts.edit").update_columns(scope: { "content_types" => [ "gone" ] })
     grant!(group, "posts.edit").update_columns(permission: "gone/thing.edit")
     grant!(group, "posts.read", { "content_types" => [] })
