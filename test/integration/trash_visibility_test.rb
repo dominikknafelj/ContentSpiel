@@ -1,4 +1,6 @@
 require "test_helper"
+require "sitemap_generator"
+require "tmpdir"
 
 # Every narrowing point that must hide trashed pages, posts and images
 # (trash spec §5.4). Each test builds one kept and one trashed record and
@@ -83,6 +85,54 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :moved_permanently
     get "/other/gone-post"
     assert_response :not_found
+  end
+
+  # A link to a trashed page or post renders as plain text, like a dead link
+  # (trash spec §5.2) -- both on the public site and in preview, where links
+  # to drafts otherwise do resolve. The block is written with
+  # `update_columns` because a *new* link to a trashed target is refused on
+  # save (it's outside every read scope); this is the link that already
+  # existed when its target was trashed.
+  test "an internal link to a trashed page or post renders as plain text, publicly and in preview" do
+    # Spelled with kept targets and repointed afterwards: the Markdown
+    # importer itself already drops a link to a trashed target.
+    body = rich_doc("See [the kept page](cs:page/#{@kept_page.id}), " \
+      "[the gone page](cs:page/#{@kept_page.id}) and [the gone post](cs:post/#{@kept_post.id}).")
+    targets = { "the gone page" => @gone_page.id, "the gone post" => @gone_post.id }
+    body["content"].sole["content"].each do |node|
+      next unless (id = targets[node["text"]])
+
+      node["marks"].find { |mark| mark["type"] == "internalLink" }["attrs"]["id"] = id
+    end
+    block = @kept_page.content_blocks.create!(block_type: :rich_text, position: 0)
+    block.update_columns(body: { "en" => body })
+
+    get "/kept-page"
+    assert_response :ok
+    assert_select ".content-block--rich-text a[href='/kept-page']", text: "the kept page"
+    assert_select ".content-block--rich-text", text: /the gone page/
+    assert_select ".content-block--rich-text", text: /the gone post/
+    assert_select ".content-block--rich-text a", text: /the gone/, count: 0
+
+    sign_in_as users(:one)
+    get "/preview/kept-page"
+    assert_response :ok
+    assert_select ".content-block--rich-text a[href='/preview/kept-page']", text: "the kept page"
+    assert_select ".content-block--rich-text", text: /the gone page/
+    assert_select ".content-block--rich-text", text: /the gone post/
+    assert_select ".content-block--rich-text a", text: /the gone/, count: 0
+  end
+
+  # Generated the way the deploy runs it (see test/lib/sitemap_test.rb).
+  test "the sitemap lists neither a trashed page nor a trashed post" do
+    paths = Dir.mktmpdir do |dir|
+      SitemapGenerator::Interpreter.run(config_file: Rails.root.join("config/sitemap.rb"), public_path: dir, compress: false, verbose: false)
+      Nokogiri::XML(File.read(File.join(dir, "sitemap.xml"))).tap(&:remove_namespaces!).css("url > loc").map { |loc| URI.parse(loc.text).path }
+    end
+
+    assert_includes paths, "/kept-page"
+    assert_includes paths, "/blog/kept-post"
+    assert_empty paths.grep(/gone/)
   end
 
   test "preview 404s a trashed page and post" do
