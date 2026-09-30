@@ -52,6 +52,33 @@ class Trash::PurgeExpiredJobTest < ActiveJob::TestCase
     assert_not Post.exists?(@old.id)
   end
 
+  test "a page trashed alone, then swept up by its later-trashed ancestor's branch purge, isn't purged a second time" do
+    Current.actor = users(:one)
+    ancestor = create_page(title: "Ancestor")
+    descendant = create_page(title: "Descendant", parent: ancestor)
+    Trash::Move.call(descendant)
+    Trash::Move.call(ancestor)
+    Current.reset
+
+    # Both past the 30-day cutoff, with the ancestor's own trashed_at set
+    # older than the descendant's -- so the ancestor is the one a plain
+    # id-ordered `find_each` (the bug: the ancestor is always created,
+    # hence numbered, before its own descendant) and the properly ordered
+    # `Trash.each_root` (the fix) both visit first, isolating the one
+    # thing that actually differs between them: whether the descendant --
+    # already swept away for good by the ancestor's own branch purge -- is
+    # re-visited afterwards from a stale, pre-destroy copy.
+    ancestor.update_columns(trashed_at: 40.days.ago)
+    descendant.update_columns(trashed_at: 31.days.ago)
+
+    Trash::PurgeExpiredJob.perform_now
+
+    assert_not Page.exists?(ancestor.id)
+    assert_not Page.exists?(descendant.id)
+    assert_equal 1, Audit::Event.where(action: "page.purged", subject_id: ancestor.id).count
+    assert_equal 0, Audit::Event.where(action: "page.purged", subject_id: descendant.id).count
+  end
+
   test "is scheduled daily in every environment" do
     config = YAML.load_file(Rails.root.join("config/recurring.yml"), aliases: true)
     %w[production development test].each do |env|

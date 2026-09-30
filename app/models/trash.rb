@@ -23,10 +23,19 @@ module Trash
   # front but each record only when its turn comes, and skipped if it's gone
   # by then: a subpage trashed on its own is a root of its own, yet an
   # earlier-tried ancestor's branch purge may already have taken it -- a
-  # stale in-memory copy would otherwise be "purged" (and audited) twice.
+  # stale in-memory copy would otherwise be "purged" (and audited) twice
+  # (it still reads `trashed?`, still passes the branch-member guard, and
+  # a vanished closure-table row makes its own "purge" a no-op success).
   # Not `find_each`, which ignores the order this depends on.
-  def each_root
+  #
+  # `trashed_before:` (the retention job, `Trash::PurgeExpiredJob`) filters
+  # each relation *before* plucking ids, so a root younger than the cutoff
+  # is never yielded -- filtering after plucking, or on the re-found
+  # record, would still leave the pluck itself racing an unrelated older
+  # root's branch purge the way `find_each` does above.
+  def each_root(trashed_before: nil)
     roots.each_value do |relation|
+      relation = relation.where(trashed_at: ...trashed_before) if trashed_before
       relation.pluck(:id).each do |id|
         record = relation.find_by(id:)
         yield record if record
