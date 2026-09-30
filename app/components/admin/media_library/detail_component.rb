@@ -100,8 +100,24 @@ module Admin
       # `:unused` / `:in_use` / `:trash_only` (trash spec §4.1/§5.1) --
       # memoized for the same reason `#usage_entries` is: the template reads
       # it more than once (the "Used on" empty-state branch, Task 10's
-      # Delete-vs-"Move to trash" gate).
+      # Move-to-trash gate).
       def usage_state = defined?(@usage_state) ? @usage_state : (@usage_state = asset.usage_state)
+
+      # Move to trash is refused only while a *kept* page or post still uses
+      # the image (`Trash::Move`'s own check, `Media::Asset
+      # #used_by_kept_owner?`) -- not merely `used?`, which also counts a
+      # usage by something already in the trash (`usage_state == :trash_only`)
+      # or one whose owner can't even be resolved any more (a stale index
+      # row). Both of those are cases `Trash::Move` would actually let
+      # through, so disabling the button for them would refuse something the
+      # server wouldn't.
+      def move_to_trash_disabled? = usage_state == :in_use
+
+      # The same wording `Trash::Move`'s own refusal uses
+      # (`Media::Asset#in_use_message(kept_only: true)`), so the disabled
+      # button's reason and the 422 an editor would get from forging past it
+      # never disagree.
+      def in_use_reason = asset.in_use_message(kept_only: true)
 
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw

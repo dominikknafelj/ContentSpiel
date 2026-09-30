@@ -390,7 +390,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_response :success
-    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Delete/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Move to trash/, count: 0
     assert_select "details.admin-record-header__schedule", count: 0
     assert_select "#block-picker-end", count: 0
 
@@ -398,18 +398,18 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_select "button", text: "Unpublish"
-    assert_select "button", text: "Delete"
+    assert_select "button", text: "Move to trash"
     assert_select "#block-picker-end"
   end
 
-  test "an author editing their own draft post gets neither Publish nor Delete" do
+  test "an author editing their own draft post gets neither Publish nor Move to trash" do
     sign_in_as(users(:author))
 
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_response :success
     assert_select "form[data-controller~='admin--autosave']"
-    assert_select "button, input[type=submit]", text: /Publish now|Delete/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish now|Move to trash/, count: 0
   end
 
   test "new posts offer only the content types the author may create" do

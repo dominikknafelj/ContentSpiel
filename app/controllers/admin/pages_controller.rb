@@ -163,13 +163,22 @@ module Admin
     # Moves the page, with its whole branch, to the trash (`Trash::Move`,
     # trash spec §4.1) -- nothing is deleted from here any more; the
     # permanent delete is `Trash::Purge`, reachable only from the trash.
-    # Interim: the redirect and the header's Delete button are still the
-    # pre-trash ones until the Trash UI task replaces them.
+    # `count` is read before the move (`Trash::Move` itself trashes every
+    # kept descendant, so counting after would just see them all already
+    # gone): it's both the notice's own "and N subpages" and, unlike a
+    # kept-vs-trashed check on `@page.children` alone, the exact number a
+    # later Undo (Task 9's `Trash::Restore`) brings back with it. The Undo
+    # link's own URL carries `from: "undo"` (`Admin::TrashController#restore`)
+    # so restoring lands the actor back on this page's editor, not the
+    # Trash screen.
     def destroy
+      count = @page.descendants.kept.count
       result = Trash::Move.call(@page)
 
       if result.ok?
-        redirect_to admin_root_path(**admin_url_options), status: :see_other
+        notice = count.zero? ? "Moved “#{@page.title}” to the trash" : "Moved “#{@page.title}” and #{helpers.pluralize(count, "subpage")} to the trash"
+        flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("page", @page, from: "undo", **admin_url_options) }
+        redirect_to admin_root_path(**admin_url_options), notice:, status: :see_other
       else
         forbidden_or(result) do
           @page = result.record

@@ -108,6 +108,45 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_not root_page.reload.trashed?
   end
 
+  # Task 10: the flash names the branch (singular for a leaf, "and N
+  # subpages" for a branch) and offers an Undo that posts straight back to
+  # `Admin::TrashController#restore` with `from=undo` -- which, unlike an
+  # ordinary Trash-screen restore, lands the actor back on this page's own
+  # editor rather than the Trash list.
+  test "deleting a page with subpages moves the branch to the trash and offers Undo" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+
+    delete "/cs-studio/pages/#{parent.id}"
+    assert_response :see_other
+    assert parent.reload.trashed?
+    assert child.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_match "Moved “Section” and 1 subpage to the trash", response.body
+    undo_url = admin_restore_trash_item_path("page", parent, from: "undo")
+    assert_select "form[action='#{undo_url}'] button", text: "Undo"
+
+    post undo_url
+    assert_response :see_other
+    assert_not parent.reload.trashed?
+    assert_not child.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_select "h1", "Section"
+    assert_match "Restored “Section”", response.body
+  end
+
+  # A leaf page (no kept descendants) gets the plain singular wording, with
+  # no "and N subpages" tail.
+  test "deleting a leaf page moves just that page to the trash" do
+    delete "/cs-studio/pages/#{@page.id}"
+    assert_response :see_other
+    follow_redirect!
+    assert_match "Moved “About” to the trash", response.body
+    assert_no_match(/and \d+ subpage/, response.body)
+  end
+
   # Media library Task 8: the hero is chosen through the picker into a
   # hidden `hero_media_asset_id`, with `hero_alt` as the page's own
   # override -- its placeholder is the image's own default alt.

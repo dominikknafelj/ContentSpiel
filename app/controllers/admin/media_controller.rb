@@ -109,13 +109,16 @@ module Admin
     # already disables the button for ahead of time; this is only ever hit
     # for real through a forged request, a race, or an actor whose rights
     # just changed, and any of those come back as the ordinary redirect-
-    # with-alert every other module's own `destroy` already gives.
-    # Interim: the "Deleted" notice stays until the Trash UI task.
+    # with-alert every other module's own `destroy` already gives. The Undo
+    # link's own URL carries `from: "undo"` (`Admin::TrashController
+    # #restore`) so restoring lands the actor back on this image's detail
+    # panel, not the Trash screen.
     def destroy
       result = Trash::Move.call(@asset)
 
       if result.ok?
-        redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Deleted"
+        flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("media", @asset, from: "undo", **admin_url_options) }
+        redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Moved “#{@asset.title}” to the trash"
       else
         forbidden_or(result) { redirect_to admin_medium_path(@asset, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end

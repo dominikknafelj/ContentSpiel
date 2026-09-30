@@ -268,4 +268,29 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal "posts.edit", denied.first.metadata["permission"]
     assert_not Audit::Event.exists?(action: "post.updated", subject: post_record)
   end
+
+  # Task 10: deleting moves the post to the trash (`Trash::Move`) with a
+  # flash naming it and an Undo that posts straight back to
+  # `Admin::TrashController#restore` with `from=undo` -- landing the actor
+  # back on this post's own editor rather than the Trash list, the same
+  # shape `Admin::PageEditorTest`'s own Undo test gives a page.
+  test "deleting a post moves it to the trash and offers Undo" do
+    post_record = create_post(title: "Gone post")
+
+    delete "/cs-studio/posts/#{post_record.id}"
+    assert_response :see_other
+    assert post_record.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_match "Moved “Gone post” to the trash", response.body
+    undo_url = admin_restore_trash_item_path("post", post_record, from: "undo")
+    assert_select "form[action='#{undo_url}'] button", text: "Undo"
+
+    post undo_url
+    assert_response :see_other
+    assert_not post_record.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_match "Restored “Gone post”", response.body
+  end
 end

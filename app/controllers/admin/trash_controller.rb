@@ -36,12 +36,23 @@ module Admin
       @retention_days = Current.site.trash_retention_days
     end
 
+    # `params[:from] == "undo"` is the flash's own Undo link (Task 10, added
+    # to its URL by each module's `#destroy`): restoring the one item it
+    # named lands the actor back on that item's own CS Studio screen ("as if
+    # the delete never happened") rather than the Trash screen they never
+    # chose to open. Every other restore -- from the Trash list itself, in
+    # place or under a new parent -- still lands back there, with the fuller
+    # `restored_notice` (slug changes, images brought along).
     def restore
       service = Trash::Restore.new(@item, parent: chosen_parent)
       result = service.call
       return forbidden_or(result) { redirect_to admin_trash_path(**admin_url_options), alert: result.errors.to_sentence, status: :see_other } unless result.ok?
 
-      redirect_to admin_trash_path(**admin_url_options), notice: restored_notice(service), status: :see_other
+      if params[:from] == "undo"
+        redirect_to item_screen_path, notice: "Restored “#{title_of(@item)}”", status: :see_other
+      else
+        redirect_to admin_trash_path(**admin_url_options), notice: restored_notice(service), status: :see_other
+      end
     end
 
     def purge
@@ -115,6 +126,18 @@ module Admin
       when "page" then relation.where("pages.trash_root_id = pages.id").includes(:parent)
       when "media" then relation.with_variants
       else relation
+      end
+    end
+
+    # The item's own editor/detail screen (Task 10's Undo): `params[:type]`
+    # is already constrained to `page|post|media` by the route, and `@item`
+    # is that very record -- `set_item` (through `visible`) already loaded
+    # it as this type, so there's no case this falls through to `nil`.
+    def item_screen_path
+      case params[:type]
+      when "page" then admin_page_path(@item, **admin_url_options)
+      when "post" then admin_post_path(@item, **admin_url_options)
+      when "media" then admin_medium_path(@item, **admin_url_options)
       end
     end
 

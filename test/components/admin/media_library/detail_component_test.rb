@@ -44,4 +44,31 @@ class Admin::MediaLibrary::DetailComponentTest < ViewComponent::TestCase
 
     assert_text "Not used anywhere yet."
   end
+
+  # Task 10: Move to trash is disabled only while a *kept* owner uses the
+  # image -- an asset used solely by something already in the trash is the
+  # same "trash_only" state as the first test above, and `Trash::Move`
+  # itself would let this one through, so the button must too.
+  test "Move to trash is enabled for an asset used only by a trashed owner" do
+    asset = create_media_asset
+    page = create_page(title: "Hero page")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+    page.update!(trashed_at: Time.current)
+
+    render_inline Admin::MediaLibrary::DetailComponent.new(asset: asset.reload, locale: "en")
+
+    assert_selector "button", text: "Move to trash"
+    assert_no_selector "button[disabled]", text: "Move to trash"
+  end
+
+  test "Move to trash is disabled, with the in-use reason, while a kept owner uses the image" do
+    asset = create_media_asset
+    page = create_page(title: "Hero page")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+
+    render_inline Admin::MediaLibrary::DetailComponent.new(asset: asset.reload, locale: "en")
+
+    assert_selector "button[disabled]", text: "Move to trash"
+    assert_text asset.reload.in_use_message(kept_only: true)
+  end
 end

@@ -133,12 +133,16 @@ module Admin
     end
 
     # Moves the post to the trash (`Trash::Move`, trash spec §4.1); the
-    # permanent delete is `Trash::Purge`, reachable only from the trash.
+    # permanent delete is `Trash::Purge`, reachable only from the trash. The
+    # Undo link's own URL carries `from: "undo"` (`Admin::TrashController
+    # #restore`) so restoring lands the actor back on this post's editor,
+    # not the Trash screen.
     def destroy
       result = Trash::Move.call(@post)
 
       if result.ok?
-        redirect_to admin_posts_path(**admin_url_options), status: :see_other
+        flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("post", @post, from: "undo", **admin_url_options) }
+        redirect_to admin_posts_path(**admin_url_options), notice: "Moved “#{@post.title}” to the trash", status: :see_other
       else
         forbidden_or(result) { redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
