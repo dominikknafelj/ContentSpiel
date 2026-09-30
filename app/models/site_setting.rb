@@ -8,6 +8,10 @@ class SiteSetting < ApplicationRecord
   validate :social_links_are_safe, if: :will_save_change_to_social_links?
   validate :default_locale_is_enabled
 
+  # 0 means "never" (trash spec §3.1/§7: the sweep job skips a site with this
+  # set to 0) -- so this is a plain non-negative check, not `greater_than: 0`.
+  validates :trash_retention_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+
   after_commit :reset_cached_state
 
   def self.instance

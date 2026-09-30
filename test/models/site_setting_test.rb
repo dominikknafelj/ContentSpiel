@@ -92,4 +92,16 @@ class SiteSettingTest < ActiveSupport::TestCase
     setting.social_link_rows = [ { name: "GitHub", url: "https://github.com/dana" }, { name: "Mail", url: "MAILTO:dana@example.com" } ]
     assert setting.valid?, setting.errors.full_messages.to_sentence
   end
+
+  # Trash spec §3.1: 0 means "never" (the sweep job skips it), so this is a
+  # non-negative check, not `greater_than: 0`.
+  test "trash retention defaults to 30 days and can't be negative" do
+    site = site_settings(:default)
+    assert_equal 30, SiteSetting.new(title: "x").trash_retention_days
+    site.trash_retention_days = -1
+    assert_not site.valid?
+    assert_includes site.errors[:trash_retention_days], "must be greater than or equal to 0"
+    site.trash_retention_days = 0
+    assert site.valid?
+  end
 end

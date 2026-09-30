@@ -20,8 +20,16 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     keys = %w[posts.read posts.create posts.edit posts.publish posts.delete
               pages.read pages.create pages.edit pages.publish pages.move pages.delete
               tags.manage media.upload media.manage settings.manage languages.manage users.manage
-              groups.manage tokens.manage system_status.view audit.view]
+              groups.manage tokens.manage system_status.view audit.view trash.empty]
     assert_equal keys.sort, AccessControl::Permissions.keys.sort
+  end
+
+  # Trash spec §3.1/global constraints: its own area (not folded into
+  # Administration), Admin only.
+  test "trash.empty is registered in its own Trash area" do
+    permission = AccessControl::Permissions.find("trash.empty")
+    assert_equal "Empty trash", permission.label
+    assert_equal "Trash", permission.area
   end
 
   test "plugin permissions must be prefixed and unique" do

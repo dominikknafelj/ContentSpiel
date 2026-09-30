@@ -7,6 +7,7 @@
 # asset from being deleted. Cleanup of unused assets is manual only.
 class Media::Asset < ApplicationRecord
   extend Mobility
+  include Trashable
 
   # Zeitwerk infers a namespaced model's table name by demodulizing it
   # (`Media::Asset` -> `assets`), so this has to be explicit: Task 1 (media

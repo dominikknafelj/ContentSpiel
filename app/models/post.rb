@@ -3,6 +3,7 @@ class Post < ApplicationRecord
   include LocalizedSlug
   include Publishable
   include HasPublicPaths
+  include Trashable
 
   # A post with no slug in some enabled locale would have no URL there at
   # all (see `LocalizedSlug#slug_present_in_every_enabled_locale`, registered

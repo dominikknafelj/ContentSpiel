@@ -18,6 +18,7 @@ module AccessControl
       register_pages
       register_content
       register_administration
+      register_trash
     end
 
     def self.register_posts
@@ -74,6 +75,15 @@ module AccessControl
       # snapshots of every record, whatever the viewer may read elsewhere,
       # and the label says so wherever it's offered or denied.
       Permissions.register "audit.view", label: "View audit log (all content)", area: "Administration", action: :view
+    end
+
+    # Its own area, not folded into Administration (global constraints:
+    # Admin only, and the one permission that both empties the whole trash
+    # and, per `trash.empty` ruling in the plan's spec corrections, purges
+    # any single trashed item too) -- unscoped, like the Administration
+    # permissions above, since holding it is all-or-nothing.
+    def self.register_trash
+      Permissions.register "trash.empty", label: "Empty trash", area: "Trash", action: :empty
     end
   end
 end
