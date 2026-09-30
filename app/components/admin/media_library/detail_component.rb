@@ -22,10 +22,18 @@ module Admin
     class DetailComponent < Admin::AdminComponent
       ROLE_LABELS = { "hero" => "Hero image", "block_image" => "Image block", "rich_text" => "Rich text" }.freeze
 
-      def initialize(asset:, locale:, url_options: {})
+      # `notice:`/`alert:` are the flash a restore-via-Undo redirect
+      # (`Admin::TrashController#restore`, Task 10) or a failed delete's own
+      # `alert:` (`Admin::MediaController#destroy`) leaves for this panel to
+      # show -- the same "the controller's flash, read by the view, handed
+      # to the component" shape `Admin::RecordHeaderComponent`/`Admin::
+      # PostFormComponent` already use for a page/post.
+      def initialize(asset:, locale:, url_options: {}, notice: nil, alert: nil)
         @asset = asset
         @locale = locale.to_s
         @url_options = url_options
+        @notice = notice
+        @alert = alert
       end
 
       def editable?
@@ -116,8 +124,10 @@ module Admin
       # The same wording `Trash::Move`'s own refusal uses
       # (`Media::Asset#in_use_message(kept_only: true)`), so the disabled
       # button's reason and the 422 an editor would get from forging past it
-      # never disagree.
-      def in_use_reason = asset.in_use_message(kept_only: true)
+      # never disagree. Memoized like `#usage_state`/`#usage_entries` above:
+      # the template reads it twice (the disabled button's own `title:` and
+      # the paragraph under it), and `#in_use_message` runs its own queries.
+      def in_use_reason = defined?(@in_use_reason) ? @in_use_reason : (@in_use_reason = asset.in_use_message(kept_only: true))
 
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw
@@ -176,7 +186,7 @@ module Admin
 
       private
 
-      attr_reader :asset, :locale, :url_options
+      attr_reader :asset, :locale, :url_options, :notice, :alert
 
       # The raw, ungrouped-by-visibility `usages_summary` rows, memoized
       # once: `#usage_entries` and `#unresolved_usage?` both need to walk

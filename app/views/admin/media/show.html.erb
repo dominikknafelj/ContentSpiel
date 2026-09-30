@@ -1,8 +1,10 @@
 <%# One image's detail panel (media library design spec §6) -- entirely
     `Admin::MediaLibrary::DetailComponent`'s own; this view only ever hands
-    it the asset and the editing locale, the same "component owns the
+    it the asset, the editing locale and the flash (a restore-via-Undo's
+    "Restored …" notice, a refused delete's alert), the same "component owns the
     screen" shape `Admin::PostsController#show` already gives `Admin::
     PostFormComponent`. %>
 <% content_for :title, @asset.title %>
 
-<%= render Admin::MediaLibrary::DetailComponent.new(asset: @asset, locale: admin_locale, url_options: admin_url_options) %>
+<%= render Admin::MediaLibrary::DetailComponent.new(asset: @asset, locale: admin_locale, url_options: admin_url_options,
+      notice: flash[:notice], alert: flash[:alert]) %>

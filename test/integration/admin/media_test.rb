@@ -336,8 +336,11 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "form[action='#{undo_url}'] button", text: "Undo"
 
     post undo_url
-    assert_response :see_other
+    assert_redirected_to "/cs-studio/media/#{asset.id}"
     assert_not asset.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_select "p[role=status]", text: "Restored “#{asset.title}”"
   end
 
   # The disabled button is only ever a courtesy -- `Trash::Move` itself is
@@ -354,8 +357,11 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { Media::Asset.count } do
       delete "/cs-studio/media/#{asset.id}"
     end
-    assert_response :redirect
+    assert_redirected_to "/cs-studio/media/#{asset.id}"
     assert_not asset.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_select "p[role=alert]", text: asset.in_use_message(kept_only: true)
   end
 
   test "editing title, alt and caption autosaves per locale through Media::Save" do
