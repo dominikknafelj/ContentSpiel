@@ -81,8 +81,8 @@ module Mcp
       # grouping `Media::Asset#usages_summary` already does (one per
       # `(owner_type, owner_id)`, not one per `media_usages` row), resolved
       # from a raw owner (`Page`, `ContentBlock` or `Post`) down to the
-      # page/post it's actually shown on, exactly like `Media::Destroy
-      # #place_of`/`Admin::MediaLibrary::DetailComponent#place_for`: a
+      # page/post it's actually shown on, exactly like `Media::Asset
+      # #usage_place_of`/`Admin::MediaLibrary::DetailComponent#place_for`: a
       # block's own usage is named by whichever page or post it sits on,
       # since that -- not the `ContentBlock` row itself -- is what a
       # `pages.read`/`posts.read` grant actually governs. `.uniq` folds

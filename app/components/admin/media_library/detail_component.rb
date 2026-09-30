@@ -106,15 +106,15 @@ module Admin
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw
       # `media_usages` rows -- a block's own usage is named by the page or
-      # post it sits on (`Media::Destroy#place_of`'s own reasoning: nobody
+      # post it sits on (`Media::Asset#usage_place_of`'s own reasoning: nobody
       # editing this asset cares that a "block_image" row's `owner_type` is
       # technically `ContentBlock`, they care which page shows it). Only
       # an owner the current viewer can actually read
       # (`pages.read`/`posts.read`) becomes a link; unreadable becomes a
       # neutral label (global constraints' own "Used on" ruling) --
       # exactly `Admin::AuditEventsHelper#audit_subject_path`'s rule,
-      # reapplied here since neither that helper nor `Media::Destroy`'s own
-      # (private, text-only) `#in_use_message` is built to hand back a
+      # reapplied here since neither that helper nor `Media::Asset`'s own
+      # (text-only) `#in_use_message` is built to hand back a
       # clickable link.
       #
       # Memoized (final fix wave, M7): the template reads it twice (the

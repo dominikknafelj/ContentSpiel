@@ -307,20 +307,57 @@ class Media::Asset < ApplicationRecord
     end
   end
 
+  # How many places `#in_use_message` names before summing up the rest as
+  # "and N more".
+  IN_USE_NAMED_PLACES = 3
+
+  # "This image is used on the page “About”, the post “Hello” and 2 more" --
+  # why an image can't go (moved here from `Media::Destroy`, trash spec
+  # §4.1, so `Trash::Move` and later `Trash::Purge` share one wording). A
+  # block's usage is named by the page or post it sits on, and a place is
+  # named once however many ways it uses the image (a hero and a block on
+  # the same page, a body image in two locales). A place `actor` can't read
+  # isn't disclosed ("not found, not forbidden"): it's "a page you can't
+  # open" instead of its title.
+  #
+  # `kept_only:` limits it to usages by kept owners (`Media::Usage
+  # .by_kept_owner`) -- what refuses a move to the trash, where a usage by a
+  # page already in the trash doesn't count. `actor:` is whoever the refusal
+  # is for (a service's own `actor`, which may differ from `Current.actor`).
+  def in_use_message(kept_only: false, actor: Current.actor)
+    scope = kept_only ? usages.by_kept_owner : usages
+    loaded = scope.includes(:owner).order(:id).to_a
+    # Fix round 1 (review of `0695e7a`): batches the `ContentBlock#owner`
+    # second hop for every block-owned row in one shot, one query per
+    # owner type (Page, Post) -- see `.preload_usage_places`'s own comment
+    # for why this can't just share `#usages_summary`'s own query (this
+    # needs the strict `.order(:id)` above, which that method doesn't
+    # promise).
+    self.class.preload_usage_places(loaded.map(&:owner))
+    places = loaded.map { |usage| usage_place_of(usage.owner) }.compact.uniq
+    # Only rows whose owner is already gone (a stale index): still refused.
+    return "This image is still in use and can't be deleted" if places.empty?
+
+    named = places.first(IN_USE_NAMED_PLACES).map { |place| describe_usage_place(place, actor) }
+    named << "#{places.size - IN_USE_NAMED_PLACES} more" if places.size > IN_USE_NAMED_PLACES
+
+    "This image is used on #{named.to_sentence(two_words_connector: " and ", last_word_connector: " and ")}"
+  end
+
   # Batches the second hop every caller of a `media_usages` row's owner
   # needs for a `block_image`/`rich_text` usage: which page or post the
   # owning `ContentBlock` actually sits on (`ContentBlock#owner`, itself
   # polymorphic). Fix round 1 (review of `0695e7a`): `#usages_summary`'s
-  # own `owner: group.first.owner` and `Media::Destroy#in_use_message`'s
-  # own `place_of` both used to call that bare `.owner` once per
+  # own `owner: group.first.owner` and `#in_use_message`'s
+  # own `usage_place_of` both used to call that bare `.owner` once per
   # `ContentBlock`-owned usage -- fine for the "and 2 more" case `#in_use_
   # message` truncates to, but a real N+1 once an asset (or a delete
   # attempt's own full count) is used on a page full of image blocks
   # (Admin::MediaLibrary::DetailComponent's own "Used on" list, unlike
   # `#in_use_message`, never truncates at all).
   #
-  # A public class method, not a private instance one: `Media::Destroy
-  # #in_use_message` runs its own separate `@asset.usages.includes(:owner)
+  # A public class method, not a private instance one: `#in_use_message`
+  # runs its own separate `@asset.usages.includes(:owner)
   # .order(:id)` query (it needs a strict id order `#usages_summary`
   # doesn't promise, so the two can't simply share one query) and calls
   # this directly on its own loaded batch, rather than duplicating the
@@ -342,6 +379,15 @@ class Media::Asset < ApplicationRecord
   end
 
   private
+
+  def usage_place_of(owner) = owner.is_a?(ContentBlock) ? owner&.owner : owner
+
+  def describe_usage_place(place, actor)
+    kind = place.is_a?(Post) ? "post" : "page"
+    return "a #{kind} you can't open" unless AccessControl.allowed?(actor, "#{kind}s.read", place)
+
+    "the #{kind} “#{Audit::Snapshot.label_for(place)}”"
+  end
 
   # `#alt_text`/`#caption_text`'s shared walk (see `#alt_text` for the two
   # shapes `override` takes). Each step reads a literal per-locale value,
