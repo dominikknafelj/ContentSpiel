@@ -172,10 +172,16 @@ export default class extends Controller {
     // document) is what a `<turbo-stream>`'s own hidden field actually
     // lives in -- a `<template>`'s content is its own document fragment,
     // invisible to a query against the document around it.
-    const freshBase = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
-      .map((template) => template.content.querySelector('[name="base_updated_at"]'))
-      .find((field) => field)
+    //
+    // Matched by id, not just by name: a block card's response also carries
+    // the page settings form's own base (the block write touched the page --
+    // `Admin::ContentBlocksController#page_base_stream`), and taking the
+    // first `base_updated_at` in the response would hand this card the
+    // page's value instead of its own.
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
+    const freshBase = ownBase && Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
+      .map((template) => template.content.querySelector(`[name="base_updated_at"][id="${ownBase.id}"]`))
+      .find((field) => field)
     if (freshBase && ownBase) ownBase.value = freshBase.value
 
     Turbo.renderStreamMessage(text)

@@ -188,6 +188,25 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     assert_equal @me, mine.last_change(post)[:user]
   end
 
+  # Final fix wave I3: a block event's subject is the block, but editing a
+  # block is editing its page -- so it counts as the page's newest change.
+  test "editing a page's block makes the page mine and bumps it" do
+    page = Current.set(actor: @me) { create_page(title: "Blocks", published: false) }
+    block = Current.set(actor: @me) { ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "rich_text" }).record }
+    travel 1.minute
+    Current.set(actor: @other, channel: :admin) do
+      result = ContentBlocks::Save.call(block, translations: { Locales.default => { body: rich_text_doc("Edited") } })
+      assert result.ok?, result.errors.to_sentence
+    end
+
+    theirs = feed(@other)
+    assert_includes theirs.recently_edited, page
+    assert_includes theirs.drafts, page
+    assert_equal page, theirs.recently_updated.first
+    assert_equal @other, theirs.last_change(page)[:user]
+    assert_not_includes feed.drafts, page
+  end
+
   test "a branch-scoped editor sees only their branch" do
     branch = Current.set(actor: @me) { create_page(title: "Branch", published: false) }
     inside = Current.set(actor: @me) { create_page(title: "Inside", parent: branch, published: false) }

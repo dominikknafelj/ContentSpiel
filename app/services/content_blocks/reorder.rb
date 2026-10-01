@@ -40,6 +40,9 @@ module ContentBlocks
         # post, and its snapshot lists the block ids in their new order. An
         # order resubmitted unchanged isn't an event.
         unless before == @ordered_ids
+          # Same owner bump as `ContentBlocks::Save` (final fix wave, I3);
+          # an unchanged order is no edit, so it's no bump either.
+          @page.touch
           record_event("block.reordered", subject: @page, field_changes: { "content_block_ids" => [ before, @ordered_ids ] })
         end
       end

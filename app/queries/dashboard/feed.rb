@@ -145,21 +145,56 @@ module Dashboard
     end
 
     # Joins each row to its newest audit event (`newest.newest_user_id`,
-    # `newest.newest_at`): one index lookup on `(subject_type, subject_id)`
-    # per row, never more than one event row per record.
+    # `newest.newest_at`): never more than one event row per record, found
+    # through the `(subject_type, subject_id, last_occurred_at)` index.
+    #
+    # For a block owner (a page or post) the newest event is the newer of
+    # two: its own newest, and the newest about any block it currently owns
+    # (final fix wave, I3 -- a block event's subject is the block, but
+    # editing a block is editing its page, so it counts towards "mine" and
+    # "by" exactly like a title edit). Each half is its own `LIMIT 1`, so
+    # both stay index lookups; `#load_last_changes` applies the same rule.
+    # An event about a block deleted since can't be traced back to its owner
+    # any more (the block row is gone) -- its edit still shows through the
+    # owner's `updated_at`, which `ContentBlocks::Destroy` bumps.
     def with_newest_event(relation, join: "JOIN")
+      table = relation.quoted_table_name
+      own = <<~SQL.squish
+        SELECT e.user_id, e.last_occurred_at, e.id
+        FROM audit_events e
+        WHERE e.subject_type IN (:types) AND e.subject_id = #{table}.id AND e.action NOT IN (:ignored)
+        ORDER BY e.last_occurred_at DESC, e.id DESC
+        LIMIT 1
+      SQL
+      candidates = if block_owner?(relation.klass)
+        <<~SQL.squish
+          (#{own})
+          UNION ALL
+          (SELECT e.user_id, e.last_occurred_at, e.id
+           FROM content_blocks b
+           JOIN audit_events e ON e.subject_type IN (:block_types) AND e.subject_id = b.id
+           WHERE b.owner_type = :owner_type AND b.owner_id = #{table}.id AND e.action NOT IN (:ignored)
+           ORDER BY e.last_occurred_at DESC, e.id DESC
+           LIMIT 1)
+        SQL
+      else
+        own
+      end
       sql = <<~SQL.squish
         #{join} LATERAL (
-          SELECT e.user_id AS newest_user_id, e.last_occurred_at AS newest_at
-          FROM audit_events e
-          WHERE e.subject_type IN (?) AND e.subject_id = #{relation.quoted_table_name}.id
-            AND e.action NOT IN (?)
-          ORDER BY e.last_occurred_at DESC, e.id DESC
+          SELECT c.user_id AS newest_user_id, c.last_occurred_at AS newest_at
+          FROM (#{candidates}) c
+          ORDER BY c.last_occurred_at DESC, c.id DESC
           LIMIT 1
         ) newest ON true
       SQL
-      relation.joins(ActiveRecord::Base.sanitize_sql_array([ sql, subject_type_names(relation.klass), NOT_A_CHANGE ]))
+      relation.joins(ActiveRecord::Base.sanitize_sql_array([ sql, {
+        types: subject_type_names(relation.klass), block_types: subject_type_names(ContentBlock),
+        owner_type: relation.klass.base_class.name, ignored: NOT_A_CHANGE
+      } ]))
     end
+
+    def block_owner?(model) = AccessControl::Checker::BLOCK_OWNER_PREFIX.key?(model.base_class.name)
 
     # Every `subject_type` an event about `model` may carry: its current
     # name plus any name it was recorded under before a rename -- the
@@ -176,24 +211,38 @@ module Dashboard
 
     # One DISTINCT ON query over every listed record (spec §4.5), bounded by
     # the lists' own limits, then one actor preload per actor type and one
-    # of their users. A record
-    # with events under both its current and a legacy subject type comes
-    # back twice (DISTINCT ON sees two types); the newer of the two wins.
+    # of their users. Its candidates are each record's own events plus, for
+    # a page or post, its current blocks' events (the same rule as
+    # `#with_newest_event`), every one tagged with the record it counts for
+    # (`dashboard_owner_type`/`_id`) -- the model's current name, so a
+    # legacy subject type ("MediaAsset") lands on the same record too.
     def load_last_changes
       records = [ drafts, scheduled, recently_edited, going_live_next, recently_updated ].flatten.uniq
       return {} if records.empty?
 
-      events = records.group_by { |r| r.class.base_class }
-        .map { |model, rs| Audit::Event.where(subject_type: subject_type_names(model), subject_id: rs.map(&:id)) }
-        .reduce(:or)
-        .where.not(action: NOT_A_CHANGE)
-        .select("DISTINCT ON (subject_type, subject_id) audit_events.*")
-        .order(:subject_type, :subject_id, last_occurred_at: :desc, id: :desc)
+      candidates = records.group_by { |r| r.class.base_class }.flat_map do |model, rs|
+        owner = Audit::Event.connection.quote(model.name)
+        ids = rs.map(&:id)
+        own = Audit::Event.where(subject_type: subject_type_names(model), subject_id: ids)
+          .select("audit_events.*, #{owner} AS dashboard_owner_type, audit_events.subject_id AS dashboard_owner_id")
+        next [ own ] unless block_owner?(model)
+
+        via_blocks = Audit::Event.joins("JOIN content_blocks ON content_blocks.id = audit_events.subject_id")
+          .where(subject_type: subject_type_names(ContentBlock), content_blocks: { owner_type: model.name, owner_id: ids })
+          .select("audit_events.*, #{owner} AS dashboard_owner_type, content_blocks.owner_id AS dashboard_owner_id")
+        [ own, via_blocks ]
+      end
+      union = candidates.map { |relation| "(#{relation.where.not(action: NOT_A_CHANGE).to_sql})" }.join(" UNION ALL ")
+
+      events = Audit::Event.from("(#{union}) audit_events")
+        .select("DISTINCT ON (dashboard_owner_type, dashboard_owner_id) audit_events.*")
+        .order(:dashboard_owner_type, :dashboard_owner_id, last_occurred_at: :desc, id: :desc)
         .to_a
       ActiveRecord::Associations::Preloader.new(records: events, associations: %i[actor user]).call
 
-      events.group_by { |e| [ Audit::Event::LEGACY_POLYMORPHIC_TYPES.fetch(e.subject_type, e.subject_type), e.subject_id ] }
-        .transform_values { |es| es.max_by { |e| [ e.last_occurred_at, e.id ] }.then { |e| { actor: e.actor, user: e.user, at: e.last_occurred_at } } }
+      events.to_h do |e|
+        [ [ e.dashboard_owner_type, e.dashboard_owner_id ], { actor: e.actor, user: e.user, user_id: e.user_id, at: e.last_occurred_at } ]
+      end
     end
   end
 end
