@@ -46,19 +46,29 @@ module Trash
 
       # A savepoint of its own (`requires_new`), like every other writing
       # service: inside a caller's joinable transaction, a plain nested
-      # block wouldn't roll back when the root's `update!` raises -- the
+      # block wouldn't roll back when the root's `save!` raises -- the
       # rescue below swallows the exception before the outer transaction
       # sees it -- leaving the descendants' `update_all` in place under a
       # kept root.
       @record.class.transaction(requires_new: true) do
         descendant_ids = page? ? trash_descendants : []
-        @record.update!(trashed_at: now, trashed_by: actor_user, **(page? ? { trash_root_id: @record.id } : {}))
+        @record.assign_attributes(trashed_at: now, trashed_by: actor_user, **(page? ? { trash_root_id: @record.id } : {}))
+        # Without validations: setting the trash flags can't make a valid
+        # record invalid, and one that has gone invalid since its last save
+        # (a plugin's content type unregistered, a stricter rich-text
+        # schema, a slug reserved by a later ADMIN_PATH change, an image
+        # whose file is gone) must still be clearable -- the permanent
+        # delete this replaced never validated either. Callbacks still run,
+        # so the URL sync above happens as usual. `Trash::Restore` keeps
+        # full validation: what comes back to the live site must be valid.
+        @record.save!(validate: false)
         record_event("#{event_prefix}.trashed", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})
       end
 
       success(@record)
-    rescue ActiveRecord::RecordInvalid
-      # The savepoint has rolled back the descendants' `update_all` along
+    rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotSaved
+      # A callback halting the save (`RecordNotSaved`) or raising on a
+      # record it saves in turn (`RecordInvalid`). The savepoint has rolled back the descendants' `update_all` along
       # with the event; only the in-memory flag is left to undo, so the
       # record the caller holds still reads as kept.
       @record.restore_attributes(%w[trashed_at trashed_by_id trash_root_id].select { |name| @record.has_attribute?(name) })

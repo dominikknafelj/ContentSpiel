@@ -165,7 +165,7 @@ class Trash::MoveTest < ActiveSupport::TestCase
     # -- the way a caller such as `Trash::Empty` will -- since the test's
     # own fixture transaction isn't joinable and would hand the service a
     # savepoint whether it asked for one or not.
-    parent.define_singleton_method(:update!) { |*| raise ActiveRecord::RecordInvalid, self }
+    parent.define_singleton_method(:save!) { |*| raise ActiveRecord::RecordInvalid, self }
 
     assert_no_difference -> { Audit::Event.where(action: "page.trashed").count } do
       result = Page.transaction { Trash::Move.call(parent) }
@@ -178,6 +178,25 @@ class Trash::MoveTest < ActiveSupport::TestCase
     assert_not child.trashed?
     assert_nil child.trash_root_id
     assert PublicPath.where(record: child).exists?
+  end
+
+  # Setting the trash flags can't make a valid record invalid, so moving
+  # one to the trash doesn't re-run its validations: a record that went
+  # invalid under it (a removed plugin content type, a stricter schema, a
+  # reserved slug after an ADMIN_PATH change) can still be cleared away,
+  # the way the old permanent delete could.
+  test "a record that fails today's validations can still be moved to the trash, then purged" do
+    post = create_post(title: "Orphaned type")
+    post.update_columns(content_type: "gone/plugin_type")
+    assert_not post.reload.valid?
+
+    result = Trash::Move.call(post)
+
+    assert result.ok?, result.errors.to_sentence
+    assert post.reload.trashed?
+    assert_not PublicPath.where(record: post).exists?
+    assert Trash::Purge.call(post).ok?
+    assert_not Post.exists?(post.id)
   end
 
   test "moving a page leaves its kept siblings' positions alone" do
