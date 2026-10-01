@@ -238,3 +238,24 @@ MCP has no delete tools, so nothing changes there except visibility (§5.1). Tra
 **Interim states resolved:** "Deletes are permanent" (roadmap, known interim states).
 
 **Interim states introduced:** none. A trashed page's old redirect rows are dropped with its current paths and aren't recreated on restore; this is intended, since the URLs were free in the meantime.
+
+## 11. Amendments
+
+Rulings made while planning and building, binding over the sections above where they differ.
+
+**From planning (the plan's "Spec corrections"):**
+- **URL finder names.** §5.2's `Page.find_by_full_path` and `cached_paths` column are gone. Routing runs through the `public_paths` table (`PublicPath`, `PublicSite::Paths`, `PublicSite::Resolver`, `PublicSite::Urls`).
+- **How URLs are freed and rebuilt.** §4.1/§4.2's "delete / rebuild `public_paths`" happens inside `PublicSite::Paths`: `compute_path` returns nil for a trashed record and `canonical_page` ignores listing blocks on trashed pages, so saving a changed `trashed_at` deletes or rebuilds the rows through the existing model callbacks. Nothing (`rebuild!`, `sync_posts`, a page save elsewhere) can resurrect a trashed record's URL, and a nil path deletes all of a record's rows for that locale, redirects included.
+- **Restoring under a new parent** needs what `Pages::Move` needs: `pages.move` on the page and `pages.create` under the target. It's refused when the target is the page itself or one of its descendants.
+- **Parent picker.** A server-rendered `<select>` of kept pages the actor may create pages under (`AccessControl.scope(actor, "pages.create", ...)`), not the link-target combobox.
+- **Images in the trash.** Restoring a page or post also restores every trashed library image its hero, blocks or bodies still reference, and lists them in the result. Moving an image to the trash is refused while a *kept* owner uses it, so this only concerns images trashed after their owner.
+- **Branch purge.** Purging a page purges it and **all** of its descendants, which must all be trashed (refused if any is kept). Descendants trashed separately earlier go too, since their parent is going.
+- **`trash.empty` includes single purges.** Holding `trash.empty` also permits purging any single trashed item. `Trash::Empty` and the retention job reuse `Trash::Purge` this way; the job runs as the trusted nil actor on the `:system` channel.
+- **Sibling rank** (`Page::TreeRanking`) counts kept siblings only, so "move to rank N" means rank N among the pages the editor can see.
+
+**From implementation:**
+- **Images restored with their owner get their own event.** Each image brought back by a page or post restore records its own `media.restored` (metadata `restored_with: "Page#42"`), not only a mention in the owner's event, so an image's audit history doesn't end at `media.trashed` while it's live again.
+- **A branch member can't be purged on its own.** `Trash::Purge` refuses a page that went to the trash as part of another page's branch (`trash_root_id` present and not its own id) while that root is still in the trash: purging it would leave the root's restore quietly incomplete. Purge the root instead. Once the root is purged or restored, a leftover member may go on its own. The Trash screen lists roots only, so this only concerns API callers.
+- **Trash screen components live under `Admin::TrashScreen::`,** not `Admin::Trash::`: an `Admin::Trash` module would shadow the top-level `Trash` services for every bare `Trash::` reference inside `module Admin`, the same trap as `Admin::Media`. Guarded by `test/lib/admin_trash_namespace_test.rb`.
+- **`Trash::ItemPermissions#item_refusal` takes a block** (`{ |key| authorize!(key, record) }`) written out in each service's own `#call`, so the service contract test still finds `authorize!(` in every service file.
+- **MCP media usages count kept owners only.** `get_media`'s usages and `list_media`'s usage count reflect kept pages and posts only, so an MCP client is never sent to a trashed place (§5.1's trash-only distinction is a CS Studio display concern).

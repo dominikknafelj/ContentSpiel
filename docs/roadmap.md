@@ -45,7 +45,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
 | Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
-| Trash / soft delete + restore | Must | #43 |
+| Trash / soft delete + restore | Must | #43 — done (sub-project 6b, spec `2026-09-29-trash-design.md`): pages (with their branch), posts and library images; Trash screen, Undo, retention job |
 | Media library (`Media::Asset`, alt text, reuse, responsive variants) | Must | #46 — done (sub-project 6a, spec `2026-09-29-media-library-design.md`) |
 | Invites (one-time set-password link without mail) | Should | `Users::Invite` |
 | Admin UI in German (admin i18n) | Should | #49 |
@@ -79,9 +79,12 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Media library: video and document files, not only images | Could | Out of scope for sub-project 6a, spec `2026-09-29-media-library-design.md` §8 |
 | Media library: cropping and a focal point | Could | Same spec §8 |
 | Media library: folders and tags for organizing assets | Could | Same spec §8 |
-| Media library: automatic cleanup of unused assets | Could | Needs Trash first (Phase 2's own "Trash / soft delete + restore" row); today cleanup is manual only, by design — an editor deletes an unused asset by hand, or runs `bin/rails media:orphans` for orphaned blobs (same spec §8) |
+| Media library: automatic cleanup of unused assets | Could | Can now build on the trash (e.g. move long-unused images to the trash and let the retention job purge them); today cleanup is manual only, by design — an editor moves an unused asset to the trash by hand, or runs `bin/rails media:orphans` for orphaned blobs (same spec §8; trash spec §10) |
 | Media library: uploads through MCP | Could | MCP is read-only over the library today (`list_media_tool`/`get_media_tool`); same spec §8 |
 | Move the site logo into the media library | Could | Needs SVG sanitising the library doesn't have (SVG stays refused everywhere else); the logo stays its own separate `SiteSetting` attachment until then (same spec §8) |
+| Trash for single content blocks, tags, groups, users and API tokens (deleting one is still permanent) | Could | Out of scope for the trash, spec `2026-09-29-trash-design.md` §10; `Trashable` + `Trash::` services are the seam |
+| MCP trash tools (list, restore, purge; MCP can't delete anything today) | Could | Same trash spec §10; the services already take a token actor |
+| 410 Gone for trashed (or purged) URLs instead of 404 | Could | Same trash spec §10; a trashed record's `public_paths` rows are deleted, so this needs a tombstone of its own |
 
 ## Known interim states
 
@@ -90,7 +93,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Interim state | Since | Closed by |
 |---|---|---|
 | CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
-| Deletes are permanent | Sub-project 3 | Trash (Phase 2 / sub-project 6) |
+| ~~Deletes are permanent~~ — resolved: pages, posts and library images now go to the trash first (single blocks, tags, groups, users and tokens are still deleted for good, by design) | Sub-project 3 | Trash (sub-project 6b, spec `2026-09-29-trash-design.md`) — done |
 | CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
 | CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
 | Until a variant (`w480`/`w960`/`w1600`/`w2400`) has actually been processed, a page serves the original file at full size instead | Sub-project 6a (media library) | Preprocessing catches up on its own shortly after upload; `bin/rails media:variants` re-enqueues any still missing (design spec §8) |
