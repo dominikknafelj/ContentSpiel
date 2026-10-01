@@ -69,7 +69,7 @@ module Admin
     private
 
     def use_site_time_zone(&block)
-      Time.use_zone(Current.site.time_zone, &block)
+      Time.use_zone(Current.site.effective_time_zone, &block)
     end
 
     # The `MODULES` entries this actor may open: `nil` is open to everyone,

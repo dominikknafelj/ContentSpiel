@@ -57,4 +57,23 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match "Jul 1, 2026 09:30", response.body
   end
+
+  # Fix round 1: a row written around `SiteSetting`'s own validation (raw
+  # SQL, a restored backup) could hold a `time_zone` `ActiveSupport::
+  # TimeZone` doesn't recognise -- `Time.use_zone` raises `ArgumentError`
+  # on exactly that, and since `use_site_time_zone` wraps *every* admin
+  # request, an unguarded read would take all of CS Studio down with no
+  # in-app way back in (the Settings form itself is behind the same
+  # wrapper). `effective_time_zone` falls back to UTC instead.
+  test "an unrecognised stored time zone still renders CS Studio, in UTC" do
+    site_settings(:default).update_column(:time_zone, "Mars/Olympus")
+
+    get admin_posts_path
+    assert_response :success
+
+    @post.update_columns(published_at: Time.utc(2030, 7, 1, 7, 30))
+    get admin_post_path(@post)
+    assert_response :success
+    assert_match "2030-07-01T07:30", response.body # UTC, not the stored garbage value
+  end
 end

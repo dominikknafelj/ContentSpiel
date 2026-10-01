@@ -37,6 +37,21 @@ class SiteSetting < ApplicationRecord
     false
   end
 
+  # The zone `Admin::BaseController`/`McpController`'s own `use_site_time_
+  # zone` actually wraps every request in -- never the bare `time_zone`
+  # attribute, which `#time_zone_is_known` only guards on a save made
+  # *through this model*. A row written around it (a raw-SQL migration,
+  # e.g. `20260926120000`'s own `INSERT`/`UPDATE` pattern, or a restored
+  # backup) could still hold something `ActiveSupport::TimeZone` doesn't
+  # recognise, and `Time.use_zone` raises `ArgumentError` on exactly that --
+  # which, wrapping *every* admin and MCP request, would otherwise take the
+  # whole surface down with no in-app way to fix it (the Settings form
+  # itself is behind the same wrapper). Falling back to UTC instead keeps
+  # both up, readable in the one zone every stored time is actually in.
+  def effective_time_zone
+    ActiveSupport::TimeZone[time_zone.to_s] || ActiveSupport::TimeZone["UTC"]
+  end
+
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }
   end

@@ -63,7 +63,7 @@ class McpController < ActionController::API
   end
 
   def use_site_time_zone(&block)
-    Time.use_zone(Current.site.time_zone, &block)
+    Time.use_zone(Current.site.effective_time_zone, &block)
   end
 
   def authenticate

@@ -119,4 +119,18 @@ class SiteSettingTest < ActiveSupport::TestCase
     site.time_zone = "Europe/Berlin"
     assert site.valid?
   end
+
+  # Fix round 1: `#time_zone_is_known` only guards a save made through this
+  # model -- a row written around it (raw SQL, a restored backup) could
+  # still hold something `ActiveSupport::TimeZone` doesn't recognise.
+  # `effective_time_zone` is what every request-wrapping `around_action`
+  # actually reads, so it has to fall back instead of raising.
+  test "effective_time_zone resolves a known zone and falls back to UTC for an unrecognised stored value" do
+    site = site_settings(:default)
+    site.update_column(:time_zone, "Europe/Berlin")
+    assert_equal "Europe/Berlin", site.reload.effective_time_zone.name
+
+    site.update_column(:time_zone, "Mars/Olympus")
+    assert_equal "UTC", site.reload.effective_time_zone.name
+  end
 end

@@ -156,6 +156,25 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_match(/\A.*\d\d:\d\d\+(01|02):00\z/, data["published_at"])
   end
 
+  # Fix round 1: same fallback as Admin::TimeZoneTest's own "unrecognised
+  # stored time zone" test, for MCP -- `use_site_time_zone` wraps this
+  # controller's one action too, so a bad stored zone must not 500 the
+  # whole endpoint either.
+  test "an unrecognised stored time zone still answers MCP, in UTC" do
+    site_settings(:default).update_column(:time_zone, "Mars/Olympus")
+    post_record = create_post(title: "Still answers")
+    post_record.update_columns(published_at: Time.utc(2030, 7, 1, 7, 30))
+
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "get_post_tool", arguments: { id: post_record.id } })
+
+    assert_response :success
+    result = response.parsed_body["result"]
+    assert_equal false, result["isError"]
+    data = JSON.parse(result["content"].first["text"])
+    assert_equal "2030-07-01T07:30:00Z", data["published_at"]
+  end
+
   test "a valid token records its usage" do
     mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
 
