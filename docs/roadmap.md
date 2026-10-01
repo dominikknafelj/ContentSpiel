@@ -90,6 +90,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Dashboard statistics and counts | Could | Same spec §8 |
 | An audit-event feed on the dashboard (today: "Recently updated" shows the records themselves, newest `updated_at` first, not individual audit events) | Could | Same spec §8 |
 | Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 |
+| Public site dates in the site time zone (today: `ThemeHelper#post_date` on the public site and `/preview` still renders in UTC — only CS Studio and MCP run inside `Time.use_zone`) | Could | Needs the rich-text/page render cache to vary on the zone (a zone change must invalidate cached renders); dashboard spec §5 kept the public site unchanged |
 
 ## Known interim states
 
@@ -111,7 +112,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | The Tags list shows each tag's post count across every kept post, not scoped to what the viewer can read (the module itself is gated by `tags.manage`) | Sub-project 5 | Scope tag counts to `AccessControl.scope` (future work) |
 | Deleting a tag (still permanent) takes it off trashed posts too, so a post restored later comes back without that tag; the Tags list's count and its delete dialog count kept posts only | Sub-project 6b (trash) | Trash for tags (see "Trash for single content blocks, tags, …" above) |
 | A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
-| The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (a `LATERAL` join per candidate row, `Dashboard::Feed#recently_edited`) to find whose newest audit event is theirs — `audit_events` has no index shaped for that probe (`subject_type, subject_id, last_occurred_at`) | Sub-project 6c (dashboard) | Revisit (an index, or a different query shape) if dashboard load time grows with audit log size |
+| The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (a `LATERAL` join per candidate row, `Dashboard::Feed#recently_edited`) to find whose newest audit event is theirs — each probe is an index lookup (`index_audit_events_on_subject_and_newest`, `(subject_type, subject_id, last_occurred_at DESC)`), but the scan still grows with the number of readable records | Sub-project 6c (dashboard) | Revisit (a query driven from the actor's own events) if dashboard load time grows with site size |
 
 ## Out of scope (for now)
 
