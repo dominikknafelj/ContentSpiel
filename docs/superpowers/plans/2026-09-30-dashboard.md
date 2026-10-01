@@ -343,7 +343,7 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
 end
 ```
 
-Clean up the query-count test: drop the stray `DatabaseCleanerish` line, and use the repo's existing query-count helper if there is one (`grep -rn "sql.active_record" test`). Write out the two placeholder bodies with real assertions. Images must appear in `recently_updated`/`recently_edited` for a `media.upload` holder, and not for a viewer without it; add that test.
+In the query-count test, use the repo's existing query-count helper if there is one (`grep -rn "sql.active_record" test`). Write out the two placeholder bodies with real assertions. Images must appear in `recently_updated`/`recently_edited` for a `media.upload` holder, and not for a viewer without it; add that test.
 
 - [ ] **Step 2: Run them and see them fail.** `PARALLEL_WORKERS=1 bin/rails test test/queries/dashboard/feed_test.rb`
 
