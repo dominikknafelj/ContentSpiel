@@ -5,7 +5,8 @@ module Dashboard
   # limited query per model per list (pages, posts and, for a `media.upload`
   # holder, images -- merged and cut to the list's limit in Ruby), then ONE
   # batched "newest audit event per record" query for every row any list
-  # returned (`#last_change`), plus one actor preload per actor type.
+  # returned (`#last_change`), plus one actor preload per actor type and
+  # one preload of those events' users.
   #
   # "Mine" (spec §4.2): a post I authored, or any page/post/image whose
   # *newest* audit event is mine. Pages have no author, so for a page only
@@ -73,9 +74,13 @@ module Dashboard
       end
     end
 
-    # `{ actor:, at: }` from `record`'s newest audit event -- `actor` nil for
-    # a change made by the system (a nil actor on a trusted channel) or by
-    # an actor since deleted -- or nil when `record` has no event at all.
+    # `{ actor:, user:, at: }` from `record`'s newest audit event -- `actor`
+    # nil for a change made by the system (a nil actor on a trusted channel)
+    # or by an actor since deleted; `user` the human behind it (the actor
+    # itself for a user, the token's owner for an API token -- `Audit.record`
+    # fills `user_id` for both), so a change made through MCP can be shown
+    # as its user's without a query per row -- or nil when `record` has no
+    # event at all.
     # The first call loads every listed record's newest event in one query
     # (so it forces every list); a record no list returned answers nil.
     def last_change(record)
@@ -96,10 +101,13 @@ module Dashboard
 
     # Pages, posts and -- only for a `media.upload` holder (spec §4.4: the
     # library isn't read-scoped, so holding the right is the whole check) --
-    # kept images.
+    # kept images, loaded `with_variants` so each row's thumbnail
+    # (`Media::Asset#thumbnail_url`, which reads the attachment, its blob
+    # and the blob's variant records) costs a constant three preload
+    # queries per list instead of three per image.
     def all_relations
       relations = page_and_post_relations(&:itself)
-      relations << Media::Asset.kept if AccessControl.holds?(@actor, "media.upload", channel: @channel)
+      relations << Media::Asset.kept.with_variants if AccessControl.holds?(@actor, "media.upload", channel: @channel)
       relations
     end
 
@@ -157,7 +165,8 @@ module Dashboard
     def soonest_first(records, attribute, limit) = records.min_by(limit) { |r| [ r.public_send(attribute), r.id ] }
 
     # One DISTINCT ON query over every listed record (spec §4.5), bounded by
-    # the lists' own limits, then one actor preload per actor type. A record
+    # the lists' own limits, then one actor preload per actor type and one
+    # of their users. A record
     # with events under both its current and a legacy subject type comes
     # back twice (DISTINCT ON sees two types); the newer of the two wins.
     def load_last_changes
@@ -170,10 +179,10 @@ module Dashboard
         .select("DISTINCT ON (subject_type, subject_id) audit_events.*")
         .order(:subject_type, :subject_id, last_occurred_at: :desc, id: :desc)
         .to_a
-      ActiveRecord::Associations::Preloader.new(records: events, associations: :actor).call
+      ActiveRecord::Associations::Preloader.new(records: events, associations: %i[actor user]).call
 
       events.group_by { |e| [ Audit::Event::LEGACY_POLYMORPHIC_TYPES.fetch(e.subject_type, e.subject_type), e.subject_id ] }
-        .transform_values { |es| es.max_by { |e| [ e.last_occurred_at, e.id ] }.then { |e| { actor: e.actor, at: e.last_occurred_at } } }
+        .transform_values { |es| es.max_by { |e| [ e.last_occurred_at, e.id ] }.then { |e| { actor: e.actor, user: e.user, at: e.last_occurred_at } } }
     end
   end
 end

@@ -1,13 +1,44 @@
-<%# CS Studio's start page (dashboard spec §3-§4, Task 2): a shell today --
-    "Your work" and "On the site" as two columns, quick create above them --
-    with every list's actual content arriving task by task (Task 3 is
-    "Your work", Task 4 adds quick create and "On the site"'s own feeds).
+<%# CS Studio's start page (dashboard spec §4): quick create on top, then
+    "Your work" and "On the site" -- two columns from `lg` up, stacked
+    below it. Every list comes from `@feed` (`Dashboard::Feed`), already
+    read-scoped and loaded in a constant number of queries; the columns
+    only render what it returns. Each section is labelled by its own
+    heading, so a screen reader names both landmarks.
+
     No `content_for :tree` here: the dashboard isn't a Pages screen, so the
     layout's grid collapses to its two-column form, same as every other
     module but Pages. %>
 <h1 class="mb-4 text-h1 text-ink">Dashboard</h1>
 
-<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-  <section aria-label="Your work"></section>
-  <section aria-label="On the site"></section>
+<%= render Admin::DashboardScreen::QuickCreateComponent.new(**(@draft || {})) %>
+
+<%# "Show all" goes to the posts list, filtered by status -- the only
+    filtered list there is (spec §4.2). It shows every readable post in
+    that state, not only mine and not pages; it's the fuller list, not the
+    same list longer. Only for someone who can open the posts list. %>
+<% posts_list = ->(status) { admin_posts_path(status:, **admin_url_options) if can?("posts.read") } %>
+
+<div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+  <section aria-labelledby="your-work" class="flex flex-col gap-6">
+    <h2 id="your-work" class="text-h2 text-ink">Your work</h2>
+    <%= render Admin::DashboardScreen::ColumnComponent.new(title: "Drafts", id: "dashboard-drafts",
+          records: @feed.drafts, feed: @feed, empty: "No drafts — start one above.", show_all_path: posts_list.call("draft")) %>
+    <%= render Admin::DashboardScreen::ColumnComponent.new(title: "Scheduled", id: "dashboard-scheduled",
+          records: @feed.scheduled, feed: @feed, empty: "Nothing scheduled.", show_all_path: posts_list.call("scheduled"),
+          time: :published_at) %>
+    <%= render Admin::DashboardScreen::ColumnComponent.new(title: "Recently edited by you", id: "dashboard-recently-edited",
+          records: @feed.recently_edited, feed: @feed, empty: "Nothing edited yet.", time: :last_change) %>
+  </section>
+
+  <section aria-labelledby="on-the-site" class="flex flex-col gap-6">
+    <h2 id="on-the-site" class="text-h2 text-ink">On the site</h2>
+    <%= render Admin::DashboardScreen::ColumnComponent.new(title: "Going live next", id: "dashboard-going-live-next",
+          records: @feed.going_live_next, feed: @feed, empty: "Nothing scheduled on the site.", show_all_path: posts_list.call("scheduled"),
+          time: :published_at) %>
+    <%= render Admin::DashboardScreen::ColumnComponent.new(title: "Recently updated", id: "dashboard-recently-updated",
+          records: @feed.recently_updated, feed: @feed, empty: "No changes yet.") %>
+    <% if can?("audit.view") %>
+      <%= link_to "Full audit log →", admin_audit_events_path(**admin_url_options), class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
+    <% end %>
+  </section>
 </div>

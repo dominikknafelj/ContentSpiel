@@ -1,0 +1,22 @@
+<li class="flex items-center gap-3 border-b border-line py-2 last:border-b-0">
+  <% if image? %>
+    <span class="block size-10 shrink-0 overflow-hidden rounded-cs bg-sunken">
+      <%= image_tag record.thumbnail_url, alt: "", loading: "lazy", class: "h-full w-full object-cover" if record.file.attached? %>
+    </span>
+  <% end %>
+  <div class="min-w-0 flex-1">
+    <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
+    <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
+      <span><%= type_label %></span>
+      <% if at %>
+        <span><%= time_prefix %> <time datetime="<%= at.iso8601 %>"><%= formatted_at %></time></span>
+      <% end %>
+      <% if (by = changed_by) %>
+        <span><%= by %></span>
+      <% end %>
+    </div>
+  </div>
+  <% unless image? %>
+    <%= render Admin::StatusBadgeComponent.new(status: record.status, at: record.published_at) %>
+  <% end %>
+</li>

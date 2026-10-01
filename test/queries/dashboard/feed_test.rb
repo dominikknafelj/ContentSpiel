@@ -124,6 +124,23 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     assert_equal 15, feed.recently_updated.size
   end
 
+  # A change made through an API token (MCP) is the token's user's change:
+  # the event's actor is the token, its `user_id` the human behind it, and
+  # both come back preloaded, so the dashboard can say "by <user>" without
+  # a query per row (the constant-query tests here and in the dashboard's
+  # integration test pin that part).
+  test "a change made through an API token carries its user" do
+    post = Current.set(actor: @me) { create_post(title: "Via MCP") }
+    token, = ApiToken.generate!(@other, group: access_control_groups(:admin))
+    Current.set(actor: token, channel: :mcp) { Posts::Save.call(post, translations: { Locales.default => { title: "Via MCP!" } }) }
+
+    f = feed
+    f.recently_updated
+    change = f.last_change(post)
+    assert_equal token, change[:actor]
+    assert_equal @other, change[:user]
+  end
+
   test "constant query count however many records" do
     counts = [ 1, 20 ].map do |n|
       n.times do |i|

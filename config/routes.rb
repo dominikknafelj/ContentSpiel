@@ -210,6 +210,10 @@ Rails.application.routes.draw do
     # user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
+    # Quick draft (dashboard spec §4.1): a title and a content type, saved
+    # through `Posts::Save` as an unpublished post, then opened in the
+    # post editor.
+    post "dashboard/draft", to: "dashboard#create_draft", as: :dashboard_draft
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
