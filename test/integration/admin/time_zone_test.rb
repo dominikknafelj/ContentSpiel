@@ -31,7 +31,9 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
   test "a time in the spring-forward gap is saved, not a 500" do
     post schedule_path_for(@post), params: { published_at: "2027-03-28T02:30" }
     assert_response :redirect
-    assert @post.reload.published_at.present?
+    # 02:30 doesn't exist in Berlin that night (clocks jump 02:00 -> 03:00);
+    # ActiveSupport moves it forward an hour, to 03:30 CEST = 01:30 UTC.
+    assert_equal Time.utc(2027, 3, 28, 1, 30), @post.reload.published_at
   end
 
   test "audit log and trash times render in the site zone" do
