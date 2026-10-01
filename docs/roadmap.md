@@ -103,7 +103,8 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Pages have no author, so there is no `own` scope for pages the way posts have one | Sub-project 5 | Page authorship (out of scope for now, spec §9) |
 | The audit log (`audit_events`) has no export or retention setting and grows without limit; the append-only trigger blocks `DELETE`/`UPDATE`/raw SQL but deliberately not `TRUNCATE`, so `db:truncate_all` still works in development | Sub-project 5 | Audit export/retention (not yet scheduled) |
 | The seeded Author group's `posts.read`/`posts.create` are unscoped by spec §5, so an Author reads every post, not only their own (only `posts.edit` is `own`-scoped) | Sub-project 5 | Revisit the seeded Author grants if this proves surprising in practice |
-| The Tags list shows each tag's total post count across every post, not scoped to what the viewer can read (the module itself is gated by `tags.manage`) | Sub-project 5 | Scope tag counts to `AccessControl.scope` (future work) |
+| The Tags list shows each tag's post count across every kept post, not scoped to what the viewer can read (the module itself is gated by `tags.manage`) | Sub-project 5 | Scope tag counts to `AccessControl.scope` (future work) |
+| Deleting a tag (still permanent) takes it off trashed posts too, so a post restored later comes back without that tag; the Tags list's count and its delete dialog count kept posts only | Sub-project 6b (trash) | Trash for tags (see "Trash for single content blocks, tags, …" above) |
 | A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
 
 ## Out of scope (for now)
