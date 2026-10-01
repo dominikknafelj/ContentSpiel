@@ -139,6 +139,23 @@ class McpTest < ActionDispatch::IntegrationTest
     assert_equal true, response.parsed_body["result"]["isError"]
   end
 
+  # Dashboard spec §5: MCP runs under the site's own time zone too (the
+  # same `around_action` `Admin::BaseController` wraps every CS Studio
+  # request with), so a published_at this serialises carries the site's
+  # UTC offset rather than always reading "Z" regardless of what the site
+  # considers "local".
+  test "a post's published_at carries the site's time zone offset, not Z" do
+    site_settings(:default).update!(time_zone: "Europe/Berlin")
+    post_record = create_post(title: "Zoned")
+
+    mcp_post(jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: "get_post_tool", arguments: { id: post_record.id } })
+
+    result = response.parsed_body["result"]
+    data = JSON.parse(result["content"].first["text"])
+    assert_match(/\A.*\d\d:\d\d\+(01|02):00\z/, data["published_at"])
+  end
+
   test "a valid token records its usage" do
     mcp_post(jsonrpc: "2.0", id: 1, method: "tools/list")
 

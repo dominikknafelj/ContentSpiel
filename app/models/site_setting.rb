@@ -8,6 +8,12 @@ class SiteSetting < ApplicationRecord
   validate :social_links_are_safe, if: :will_save_change_to_social_links?
   validate :default_locale_is_enabled
 
+  # The zone every CS Studio and MCP time is shown and parsed in (dashboard
+  # spec §5); storage stays UTC. Accepts a Rails zone name ("Berlin") or an
+  # IANA identifier ("Europe/Berlin") -- `ActiveSupport::TimeZone[]` resolves
+  # both, so an admin pasting either kind of name still validates.
+  validate :time_zone_is_known
+
   # 0 means "never" (trash spec §3.1/§7: the sweep job skips a site with this
   # set to 0) -- so this is a plain non-negative check, not `greater_than: 0`.
   validates :trash_retention_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
@@ -88,6 +94,10 @@ class SiteSetting < ApplicationRecord
   # page unreachable at the site's own root.
   def default_locale_is_enabled
     errors.add(:default_locale, "must be one of the enabled languages") unless locale_codes.include?(default_locale.to_s)
+  end
+
+  def time_zone_is_known
+    errors.add(:time_zone, "isn't a known time zone") unless ActiveSupport::TimeZone[time_zone.to_s]
   end
 
   # Both caches hold a copy of this row's state: Current.site the whole row,

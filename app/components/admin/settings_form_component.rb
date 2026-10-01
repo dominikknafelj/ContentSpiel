@@ -45,6 +45,15 @@ module Admin
       ::Locales.enabled.map { |code| [ "#{::Locales.name(code, native: true)} (#{code.upcase})", code ] }
     end
 
+    # Every zone `ActiveSupport::TimeZone` knows (dashboard spec §5), each
+    # labelled with its current UTC offset the way `ActiveSupport::
+    # TimeZone#to_s` already formats it ("(GMT+01:00) Berlin") -- the same
+    # label the Rails zone-name select helper elsewhere in Rails apps
+    # shows, so there's nothing CS Studio-specific to maintain here.
+    def time_zone_options
+      ::ActiveSupport::TimeZone.all.map { |zone| [ zone.to_s, zone.name ] }
+    end
+
     # The form always renders a few name/URL rows (spec §4.1's own "site.
     # html.erb" convention, carried over verbatim): a row missing either
     # half is silently dropped on save (`SiteSetting#social_link_rows=`),

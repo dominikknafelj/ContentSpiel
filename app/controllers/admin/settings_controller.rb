@@ -32,7 +32,7 @@ module Admin
     def update
       site = Current.site
       permitted = params.fetch(:site_setting, ActionController::Parameters.new)
-        .permit(:title, :tagline, :logo, :default_locale, :trash_retention_days, social_links: [ [ :name, :url ] ])
+        .permit(:title, :tagline, :logo, :default_locale, :trash_retention_days, :time_zone, social_links: [ [ :name, :url ] ])
 
       attributes = permitted.except(:social_links).to_h
 
@@ -57,7 +57,7 @@ module Admin
         error_prefix: ID_PREFIX,
         base_updated_at: params[:base_updated_at],
         fields: { title: [ :title ], tagline: [ :tagline ], logo: [ :logo ], default_locale: [ :default_locale ],
-          trash_retention_days: [ :trash_retention_days ], social_links: [ :social_links ] }
+          trash_retention_days: [ :trash_retention_days ], time_zone: [ :time_zone ], social_links: [ :social_links ] }
       )
 
       streams << logo_field_stream(site) if saved && logo_changing

@@ -53,9 +53,24 @@ module Admin
 
     layout "admin"
     before_action { Current.channel = :admin }
+
+    # Every time CS Studio shows or parses -- schedule inputs, "Saved
+    # HH:MM", the trash and audit screens, the dashboard -- is in the
+    # site's zone (dashboard spec §5). Wrapping the request is what lets
+    # the existing `Time.zone.parse`/`strftime` call sites (schedule
+    # inputs, `record_header_component.rb`/`post_form_component.rb`,
+    # `occurred_at`/`trashed_at` reads) stay exactly as they are --
+    # they've always read/written through `Time.zone`, which was simply
+    # always UTC until now.
+    around_action :use_site_time_zone
+
     helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules
 
     private
+
+    def use_site_time_zone(&block)
+      Time.use_zone(Current.site.time_zone, &block)
+    end
 
     # The `MODULES` entries this actor may open: `nil` is open to everyone,
     # otherwise any one of the entry's keys will do.

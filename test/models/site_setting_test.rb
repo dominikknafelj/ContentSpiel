@@ -104,4 +104,19 @@ class SiteSettingTest < ActiveSupport::TestCase
     site.trash_retention_days = 0
     assert site.valid?
   end
+
+  # Dashboard spec §5: the zone every CS Studio and MCP time is shown and
+  # parsed in. Accepts a Rails zone name ("Berlin") or an IANA identifier
+  # ("Europe/Berlin") -- `ActiveSupport::TimeZone[]` resolves both.
+  test "time zone defaults to UTC and must be a known zone" do
+    assert_equal "UTC", SiteSetting.new(title: "x").time_zone
+    site = site_settings(:default)
+    site.time_zone = "Mars/Olympus"
+    assert_not site.valid?
+    assert_includes site.errors[:time_zone], "isn't a known time zone"
+    site.time_zone = "Berlin"
+    assert site.valid?
+    site.time_zone = "Europe/Berlin"
+    assert site.valid?
+  end
 end

@@ -12,6 +12,12 @@
 class McpController < ActionController::API
   before_action :authenticate
 
+  # Same wrapping as `Admin::BaseController#use_site_time_zone` (dashboard
+  # spec §5): an MCP client reads/writes `published_at` as ISO 8601
+  # (`Mcp::PostSerializer`/`Time.zone.parse`-backed tools), and that offset
+  # should match CS Studio's own rather than always being UTC.
+  around_action :use_site_time_zone
+
   def create
     server = MCP::Server.new(
       name: "contentspiel",
@@ -54,6 +60,10 @@ class McpController < ActionController::API
       "it can only see and change what both that user and that group are allowed to. " \
       "A post outside that scope is reported as not found; a change it isn't allowed to make " \
       "is refused with a \"You don't have permission to …\" error."
+  end
+
+  def use_site_time_zone(&block)
+    Time.use_zone(Current.site.time_zone, &block)
   end
 
   def authenticate
