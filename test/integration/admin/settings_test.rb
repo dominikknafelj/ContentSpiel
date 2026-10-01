@@ -141,6 +141,40 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal "UTC", @site.reload.time_zone
   end
 
+  # Final fix wave I2: autosave resends the whole form, so whatever the
+  # select shows as selected is what a title-only edit writes back. A
+  # stored value no option matched used to fall through to the first
+  # option ("International Date Line West") and get saved as that.
+  test "a stored zone no option names stays selected, and a title-only autosave keeps it" do
+    @site.update_column(:time_zone, "America/Argentina/Cordoba")
+
+    get "/cs-studio/settings"
+    assert_response :success
+    selected = css_select("select[name='site_setting[time_zone]'] option[selected]")
+    assert_equal [ "America/Argentina/Cordoba" ], selected.map { |option| option["value"] }
+
+    patch "/cs-studio/settings", params: { site_setting: { title: "Retitled", time_zone: selected.first["value"] },
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Retitled", @site.reload.title
+    assert_equal "America/Argentina/Cordoba", @site.time_zone
+  end
+
+  test "a stored IANA identifier shows as its Rails zone and saves as it" do
+    @site.update_column(:time_zone, "Europe/Berlin")
+
+    get "/cs-studio/settings"
+    selected = css_select("select[name='site_setting[time_zone]'] option[selected]").map { |option| option["value"] }
+    assert_equal 1, selected.size
+
+    patch "/cs-studio/settings", params: { site_setting: { title: "Retitled", time_zone: selected.first },
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Europe/Berlin", @site.reload.effective_time_zone.tzinfo.name
+  end
+
   test "a stale save is reported instead of silently overwriting a newer one" do
     patch "/cs-studio/settings", params: { site_setting: { title: "First" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success

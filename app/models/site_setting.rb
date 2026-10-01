@@ -9,10 +9,21 @@ class SiteSetting < ApplicationRecord
   validate :default_locale_is_enabled
 
   # The zone every CS Studio and MCP time is shown and parsed in (dashboard
-  # spec §5); storage stays UTC. Accepts a Rails zone name ("Berlin") or an
-  # IANA identifier ("Europe/Berlin") -- `ActiveSupport::TimeZone[]` resolves
-  # both, so an admin pasting either kind of name still validates.
-  validate :time_zone_is_known
+  # spec §5); storage stays UTC. Stored as a Rails zone name ("Berlin"):
+  # an IANA identifier ("Europe/Berlin") is accepted but normalised to its
+  # Rails name first (`#normalize_time_zone`), because the Settings select's
+  # option values are Rails names -- a stored "Europe/Berlin" matched no
+  # option, the browser showed the first one instead, and the next autosave
+  # of *any* field (the form resends everything) silently wrote
+  # "International Date Line West" back (final fix wave, I2).
+  #
+  # Validated only when it changes: a value written around the model that
+  # no Rails name covers (raw SQL, a restored backup) is still shown and
+  # resent unchanged by the form (`Admin::SettingsFormComponent#
+  # time_zone_options`), and mustn't block an unrelated title edit --
+  # `#effective_time_zone` is what keeps an unknown one from 500ing.
+  before_validation :normalize_time_zone
+  validate :time_zone_is_known, if: :will_save_change_to_time_zone?
 
   # 0 means "never" (trash spec §3.1/§7: the sweep job skips a site with this
   # set to 0) -- so this is a plain non-negative check, not `greater_than: 0`.
@@ -111,8 +122,17 @@ class SiteSetting < ApplicationRecord
     errors.add(:default_locale, "must be one of the enabled languages") unless locale_codes.include?(default_locale.to_s)
   end
 
+  # `MAPPING` is Rails name => IANA identifier; `key` finds the first Rails
+  # name for an identifier (several share one -- "Edinburgh" and "London"
+  # are both "Europe/London" -- and any of them is the same zone). A value
+  # that already is a Rails name, or that no Rails name covers, is kept.
+  def normalize_time_zone
+    rails_name = ActiveSupport::TimeZone::MAPPING.key(time_zone.to_s)
+    self.time_zone = rails_name if rails_name
+  end
+
   def time_zone_is_known
-    errors.add(:time_zone, "isn't a known time zone") unless ActiveSupport::TimeZone[time_zone.to_s]
+    errors.add(:time_zone, "isn't a known time zone") unless ActiveSupport::TimeZone.all.any? { |zone| zone.name == time_zone }
   end
 
   # Both caches hold a copy of this row's state: Current.site the whole row,

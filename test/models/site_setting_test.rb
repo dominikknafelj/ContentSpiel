@@ -120,6 +120,18 @@ class SiteSettingTest < ActiveSupport::TestCase
     assert site.valid?
   end
 
+  # Final fix wave I2: the Settings select's option values are Rails zone
+  # names, so an IANA identifier is stored as its Rails name -- otherwise it
+  # matches no option and autosave would write the first option back.
+  test "an IANA identifier is saved as its Rails zone name" do
+    site = site_settings(:default)
+    site.update!(time_zone: "Europe/Berlin")
+    assert_equal "Berlin", site.reload.time_zone
+
+    site.update!(time_zone: "London")
+    assert_equal "London", site.reload.time_zone
+  end
+
   # Fix round 1: `#time_zone_is_known` only guards a save made through this
   # model -- a row written around it (raw SQL, a restored backup) could
   # still hold something `ActiveSupport::TimeZone` doesn't recognise.

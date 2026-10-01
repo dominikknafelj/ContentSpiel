@@ -50,8 +50,24 @@ module Admin
     # TimeZone#to_s` already formats it ("(GMT+01:00) Berlin") -- the same
     # label the Rails zone-name select helper elsewhere in Rails apps
     # shows, so there's nothing CS Studio-specific to maintain here.
+    #
+    # The stored value is always among the options (final fix wave, I2):
+    # autosave resends the whole form, so a stored value no option matched
+    # would make the browser select -- and the next title edit save -- the
+    # first option instead. An IANA identifier selects its Rails name (what
+    # `SiteSetting#normalize_time_zone` would store it as anyway); anything
+    # else written around the model is listed as itself, so it's resent
+    # unchanged.
     def time_zone_options
-      ::ActiveSupport::TimeZone.all.map { |zone| [ zone.to_s, zone.name ] }
+      options = ::ActiveSupport::TimeZone.all.map { |zone| [ zone.to_s, zone.name ] }
+      return options if options.any? { |_, name| name == selected_time_zone }
+
+      [ [ ::ActiveSupport::TimeZone[selected_time_zone.to_s]&.to_s || selected_time_zone.to_s, selected_time_zone ], *options ]
+    end
+
+    def selected_time_zone
+      stored = site_setting.time_zone.to_s
+      ::ActiveSupport::TimeZone::MAPPING.key(stored) || stored
     end
 
     # The form always renders a few name/URL rows (spec §4.1's own "site.
