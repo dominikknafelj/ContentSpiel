@@ -163,4 +163,60 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     end
     assert_equal counts.first, counts.last
   end
+  # Final fix wave I1: `ApplicationService#denied` records `access.denied`
+  # with the refused record as its subject, and those coalesce -- so a
+  # refused attempt must never count as "the newest change".
+  test "a refused attempt doesn't take a page or post over" do
+    page = Current.set(actor: @me) { create_page(title: "Not yours", published: false) }
+    post = Current.set(actor: @me) { create_post(title: "Not yours either", published: false) }
+    author = users(:author)
+    Current.set(actor: author, channel: :admin) do
+      assert Pages::Save.call(page, translations: { Locales.default => { title: "Mine now" } }).denied?
+      assert Posts::Save.call(post, translations: { Locales.default => { title: "Mine now" } }).denied?
+    end
+    assert Audit::Event.exists?(action: "access.denied", subject_type: "Post", subject_id: post.id)
+
+    author_feed = feed(author)
+    assert_not_includes author_feed.drafts, page
+    assert_not_includes author_feed.drafts, post
+    assert_not_includes author_feed.recently_edited, post
+
+    mine = feed
+    assert_includes mine.drafts, page
+    assert_includes mine.recently_edited, post
+    assert_equal @me, mine.last_change(page)[:user]
+    assert_equal @me, mine.last_change(post)[:user]
+  end
+
+  test "a branch-scoped editor sees only their branch" do
+    branch = Current.set(actor: @me) { create_page(title: "Branch", published: false) }
+    inside = Current.set(actor: @me) { create_page(title: "Inside", parent: branch, published: false) }
+    outside = Current.set(actor: @me) { create_page(title: "Outside", published: false) }
+    access_control_groups(:branch_editors).grants.create!(permission: "pages.read", scope: { "page_ids" => [ branch.id ] })
+
+    f = feed(users(:editor_branch))
+    assert_includes f.recently_updated, inside
+    assert_includes f.recently_updated, branch
+    assert_not_includes f.recently_updated, outside
+  end
+
+  test "trashed pages and images are never listed" do
+    page = Current.set(actor: @me) { create_page(title: "Binned", published: false) }
+    file = Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")
+    asset = Current.set(actor: @me, channel: :admin) { Media::Upload.call(file: file).record }
+    Current.set(actor: @me, channel: :admin) do
+      assert Trash::Move.call(page).ok?
+      assert Trash::Move.call(asset).ok?
+    end
+
+    f = feed
+    [ f.drafts, f.recently_edited, f.recently_updated ].each do |list|
+      assert_not_includes list, page
+      assert_not_includes list, asset
+    end
+  end
+
+  private
+
+  def rich_text_doc(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
 end

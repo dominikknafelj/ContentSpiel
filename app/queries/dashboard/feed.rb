@@ -24,6 +24,15 @@ module Dashboard
   class Feed
     LIMITS = { drafts: 10, scheduled: 10, recently_edited: 10, going_live_next: 10, recently_updated: 15 }.freeze
 
+    # Events that never count as "the newest change" (final fix wave, I1):
+    # `ApplicationService#denied` records `access.denied` with the refused
+    # record as its subject -- and it coalesces -- so without this a user
+    # merely *refused* on someone else's page would take it over as "mine"
+    # and become its "by". Both places that decide the newest event (the
+    # LATERAL join and `#load_last_changes`) exclude exactly this list, so
+    # a row's "mine" and its "by" can never disagree.
+    NOT_A_CHANGE = %w[access.denied].freeze
+
     # `channel:` is captured here rather than read from `Current` each time
     # a list is first asked for: the lists are lazy, and a view may well
     # render them outside the block that set the request's channel.
@@ -144,11 +153,12 @@ module Dashboard
           SELECT e.user_id AS newest_user_id, e.last_occurred_at AS newest_at
           FROM audit_events e
           WHERE e.subject_type IN (?) AND e.subject_id = #{relation.quoted_table_name}.id
+            AND e.action NOT IN (?)
           ORDER BY e.last_occurred_at DESC, e.id DESC
           LIMIT 1
         ) newest ON true
       SQL
-      relation.joins(ActiveRecord::Base.sanitize_sql_array([ sql, subject_type_names(relation.klass) ]))
+      relation.joins(ActiveRecord::Base.sanitize_sql_array([ sql, subject_type_names(relation.klass), NOT_A_CHANGE ]))
     end
 
     # Every `subject_type` an event about `model` may carry: its current
@@ -176,6 +186,7 @@ module Dashboard
       events = records.group_by { |r| r.class.base_class }
         .map { |model, rs| Audit::Event.where(subject_type: subject_type_names(model), subject_id: rs.map(&:id)) }
         .reduce(:or)
+        .where.not(action: NOT_A_CHANGE)
         .select("DISTINCT ON (subject_type, subject_id) audit_events.*")
         .order(:subject_type, :subject_id, last_occurred_at: :desc, id: :desc)
         .to_a
