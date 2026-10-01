@@ -83,13 +83,15 @@ module Dashboard
       end
     end
 
-    # `{ actor:, user:, at: }` from `record`'s newest audit event -- `actor`
-    # nil for a change made by the system (a nil actor on a trusted channel)
-    # or by an actor since deleted; `user` the human behind it (the actor
-    # itself for a user, the token's owner for an API token -- `Audit.record`
-    # fills `user_id` for both), so a change made through MCP can be shown
-    # as its user's without a query per row -- or nil when `record` has no
-    # event at all.
+    # `{ actor:, user:, user_id:, at: }` from `record`'s newest audit event
+    # (or nil when `record` has no event at all). `actor` is nil for a
+    # change made by the system (a nil actor on a trusted channel) or by an
+    # actor since deleted; `user` is the human behind it (the actor itself
+    # for a user, the token's owner for an API token -- `Audit.record` fills
+    # `user_id` for both), so a change made through MCP can be shown as its
+    # user's without a query per row. `user_id` outlives the user (no
+    # foreign key), which is what tells "a deleted user" apart from the
+    # system (`Admin::DashboardScreen::RowComponent#changed_by`).
     # The first call loads every listed record's newest event in one query
     # (so it forces every list); a record no list returned answers nil.
     def last_change(record)

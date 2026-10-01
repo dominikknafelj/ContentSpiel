@@ -45,7 +45,7 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
   test "a change with no actor reads as the system; a record with no event names nobody" do
     post = create_post(title: "Tidied")
 
-    render_inline row(post, change: { actor: nil, user: nil, at: Time.current })
+    render_inline row(post, change: { actor: nil, user: nil, user_id: nil, at: Time.current })
     assert_text "by System"
 
     render_inline row(post, change: nil)
@@ -58,6 +58,19 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
 
     render_inline row(post, change: { actor: token, user: users(:two), at: Time.current })
 
+    assert_text "by two@example.com"
+  end
+
+  # Final fix wave M4: `audit_events` keeps `user_id` after the user (or
+  # the token) is gone, so a deleted actor isn't mistaken for the system.
+  test "a deleted user reads as such, and a deleted token still names its user" do
+    post = create_post(title: "Orphaned")
+
+    render_inline row(post, change: { actor: nil, user: nil, user_id: 123_456, at: Time.current })
+    assert_text "by a deleted user"
+    assert_no_text "System"
+
+    render_inline row(post, change: { actor: nil, user: users(:two), user_id: users(:two).id, at: Time.current })
     assert_text "by two@example.com"
   end
 

@@ -56,19 +56,21 @@ module Admin
 
       # Spec §4.3's "Who changed it": the newest event's person -- for a
       # change made through an API token, the token's user, never "API
-      # token #7" (the audit log is where that detail lives) -- "System"
-      # when the event has no actor, and nothing at all when the record
-      # has no event (saved straight through the model, or before the audit
-      # log existed). An event whose actor has since been deleted also has
-      # a nil actor, and reads as "System" too: telling the two apart would
-      # take the actor's type and id off the event, and the audit log --
-      # not the dashboard -- is the place for that distinction.
+      # token #7" (the audit log is where that detail lives) -- and nothing
+      # at all when the record has no event (saved straight through the
+      # model, or before the audit log existed).
+      #
+      # The person is the event's `user_id`, which `Audit.record` fills for
+      # a user and a token alike and which outlives both (`audit_events`
+      # has no foreign key on it -- final fix wave, M4): a deleted token
+      # still names its user, and a deleted user reads "by a deleted user",
+      # not "by System". Only an event with no `user_id` -- a nil actor on
+      # a trusted channel -- is the system's.
       def changed_by
         return if change.nil?
-        return "by System" if change[:actor].nil?
+        return "by System" if change[:user_id].nil? && change[:user].nil?
 
-        name = change[:user]&.email_address || (change[:actor].email_address if change[:actor].is_a?(User))
-        "by #{name}" if name
+        change[:user] ? "by #{change[:user].email_address}" : "by a deleted user"
       end
 
       private

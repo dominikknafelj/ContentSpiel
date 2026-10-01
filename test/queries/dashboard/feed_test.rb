@@ -235,6 +235,30 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     end
   end
 
+  test "the last change keeps the user id of a deleted user and the user of a deleted token" do
+    post = Current.set(actor: @me) { create_post(title: "Gone") }
+    ghost = User.create!(email_address: "ghost@example.com", password: "password123")
+    AccessControl::Membership.create!(user: ghost, group: access_control_groups(:admin))
+    Current.set(actor: ghost, channel: :admin) { assert Posts::Save.call(post, translations: { Locales.default => { title: "Gone!" } }).ok? }
+    ghost.memberships.delete_all
+    ghost_id = ghost.id
+    ghost.sessions.delete_all
+    ghost.delete
+
+    change = feed.tap(&:recently_updated).last_change(post)
+    assert_nil change[:actor]
+    assert_nil change[:user]
+    assert_equal ghost_id, change[:user_id]
+
+    token, = ApiToken.generate!(@other, group: access_control_groups(:admin))
+    Current.set(actor: token, channel: :mcp) { Posts::Save.call(post, translations: { Locales.default => { title: "Back" } }) }
+    token.delete
+
+    change = feed.tap(&:recently_updated).last_change(post)
+    assert_nil change[:actor]
+    assert_equal @other, change[:user]
+  end
+
   private
 
   def rich_text_doc(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
