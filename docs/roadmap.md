@@ -40,7 +40,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 |
+| Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 — done (sub-project 6c, spec `2026-09-30-dashboard-design.md`) |
 | "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
 | Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
@@ -85,6 +85,11 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Trash for single content blocks, tags, groups, users and API tokens (deleting one is still permanent) | Could | Out of scope for the trash, spec `2026-09-29-trash-design.md` §10; `Trashable` + `Trash::` services are the seam |
 | MCP trash tools (list, restore, purge; MCP can't delete anything today) | Could | Same trash spec §10; the services already take a token actor |
 | 410 Gone for trashed (or purged) URLs instead of 404 | Could | Same trash spec §10; a trashed record's `public_paths` rows are deleted, so this needs a tombstone of its own |
+| Per-user time zones (today: one site-wide zone in Settings) | Could | Out of scope for the dashboard, spec `2026-09-30-dashboard-design.md` §8 |
+| Dashboard customisation and widgets (today: the two columns and quick-create bar are fixed) | Could | Same spec §8 |
+| Dashboard statistics and counts | Could | Same spec §8 |
+| An audit-event feed on the dashboard (today: "Recently updated" shows the records themselves, newest `updated_at` first, not individual audit events) | Could | Same spec §8 |
+| Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 |
 
 ## Known interim states
 
@@ -94,7 +99,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 |---|---|---|
 | CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
 | ~~Deletes are permanent~~ — resolved: pages, posts and library images now go to the trash first (single blocks, tags, groups, users and tokens are still deleted for good, by design) | Sub-project 3 | Trash (sub-project 6b, spec `2026-09-29-trash-design.md`) — done |
-| CS Studio times (schedule input, "Saved HH:MM", scheduled hover) are UTC — no site time zone | Sub-project 3 | Site time zone setting (sub-project 6, settings screen) |
+| ~~CS Studio times (schedule input, "Saved HH:MM", scheduled hover) were UTC — no site time zone~~ — resolved: `site_settings.time_zone` (default UTC) wraps every CS Studio and MCP request (`Time.use_zone`); schedule inputs, "Saved HH:MM", the dashboard, the trash and audit screens, and MCP's own ISO-8601 dates all show and parse local time now; storage stays UTC | Sub-project 3 | Site time zone setting (sub-project 6c, spec `2026-09-30-dashboard-design.md`) — done |
 | CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
 | Until a variant (`w480`/`w960`/`w1600`/`w2400`) has actually been processed, a page serves the original file at full size instead | Sub-project 6a (media library) | Preprocessing catches up on its own shortly after upload; `bin/rails media:variants` re-enqueues any still missing (design spec §8) |
 | MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | A lookup prefix on `ApiToken` (future work) |
@@ -106,6 +111,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | The Tags list shows each tag's post count across every kept post, not scoped to what the viewer can read (the module itself is gated by `tags.manage`) | Sub-project 5 | Scope tag counts to `AccessControl.scope` (future work) |
 | Deleting a tag (still permanent) takes it off trashed posts too, so a post restored later comes back without that tag; the Tags list's count and its delete dialog count kept posts only | Sub-project 6b (trash) | Trash for tags (see "Trash for single content blocks, tags, …" above) |
 | A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
+| The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (a `LATERAL` join per candidate row, `Dashboard::Feed#recently_edited`) to find whose newest audit event is theirs — `audit_events` has no index shaped for that probe (`subject_type, subject_id, last_occurred_at`) | Sub-project 6c (dashboard) | Revisit (an index, or a different query shape) if dashboard load time grows with audit log size |
 
 ## Out of scope (for now)
 
