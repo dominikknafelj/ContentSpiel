@@ -1,6 +1,6 @@
 require "test_helper"
 
-# "Create starter pages" on the Pages home (design spec §6.1): reuses
+# "Create starter pages" on the Pages index (design spec §6.1): reuses
 # `StarterContent.create_pages_and_posts!` as-is, offered only while the
 # starter sections don't exist yet, and refreshes the whole shell (the
 # tree lives outside the content frame) with a `_top` redirect.
@@ -11,14 +11,14 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     root_page
   end
 
-  test "the Pages home offers the action while the starter pages are missing" do
-    get "/cs-studio"
+  test "the Pages index offers the action while the starter pages are missing" do
+    get "/cs-studio/pages"
 
     assert_select "form[action='/cs-studio/starter_contents'][data-turbo-frame='_top']", minimum: 1
     assert_select "button", text: "Create starter pages"
   end
 
-  test "creating adds a page per section and redirects to the Pages home" do
+  test "creating adds a page per section and redirects to the Pages index" do
     sections = StarterContent.sections.size
     assert sections.positive?
 
@@ -26,7 +26,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       post "/cs-studio/starter_contents"
     end
 
-    assert_redirected_to "/cs-studio"
+    assert_redirected_to "/cs-studio/pages"
     follow_redirect!
     assert_select "#tree", text: /Blog/
     assert_select "[role=status]", text: "Starter pages created"
@@ -59,13 +59,13 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert_redirected_to "/cs-studio"
+    assert_redirected_to "/cs-studio/pages"
     follow_redirect!
     assert_select "[role=alert]", text: /couldn.t be added/
   end
 
   test "a request from a stale tab re-checks and finds the sections another tab created" do
-    get "/cs-studio"
+    get "/cs-studio/pages"
     assert_select "button", text: "Create starter pages" # this tab still offers it
 
     StarterContent.create_pages_and_posts!(locale: "en") # another tab finished first

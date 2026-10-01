@@ -1,8 +1,9 @@
 module Admin
-  # The Pages module (cs-studio spec §4.1/§5.1) and CS Studio's home:
-  # the tree, creating a page from just a title, and the page editor
-  # itself -- its record header (publish state, delete) and its
-  # autosaving "Page settings" form.
+  # The Pages module (cs-studio spec §4.1/§5.1), at its own `/pages`
+  # (dashboard spec Task 2 -- CS Studio's home is now the dashboard): the
+  # tree, creating a page from just a title, and the page editor itself --
+  # its record header (publish state, delete) and its autosaving "Page
+  # settings" form.
   #
   # `AutosaveResponses` is shared with every later editor this task's brief
   # calls out (a block card, the post form) -- only `update` here uses it;
@@ -34,10 +35,11 @@ module Admin
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule]
 
-    # CS Studio's home. Someone who can't read any page (a group with only
-    # tags or settings, say) is sent on to the first module they *can*
-    # open rather than shown a 403 the moment they sign in -- there's
-    # always one, the AI assistant screen being open to everyone.
+    # The Pages module's own index. Someone who can't read any page (a
+    # group with only tags or settings, say) is sent on to the first
+    # module they *can* open rather than shown a 403 -- in practice always
+    # the dashboard now (`BaseController::MODULES`'s first entry, open to
+    # everyone), same as if they'd signed in fresh.
     def index
       return redirect_to(first_admin_module_path) unless can?("pages.read")
 
@@ -178,7 +180,7 @@ module Admin
       if result.ok?
         notice = count.zero? ? "Moved “#{@page.title}” to the trash" : "Moved “#{@page.title}” and #{helpers.pluralize(count, "subpage")} to the trash"
         flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("page", @page, from: "undo", **admin_url_options) }
-        redirect_to admin_root_path(**admin_url_options), notice:, status: :see_other
+        redirect_to admin_pages_path(**admin_url_options), notice:, status: :see_other
       else
         forbidden_or(result) do
           @page = result.record

@@ -1,16 +1,18 @@
 module Admin
   # "Create starter pages" (design spec §6.1, Task 9), the setup wizard's
-  # optional starter-content step available again from the Pages home --
-  # `StarterContent.create_pages_and_posts!` reused as-is, in the site's
-  # default language, exactly as the wizard's own step runs it.
+  # optional starter-content step available again from the Pages module's
+  # own index (`/pages`, dashboard spec Task 2 -- not CS Studio's home any
+  # more, which is now the dashboard) -- `StarterContent
+  # .create_pages_and_posts!` reused as-is, in the site's default language,
+  # exactly as the wizard's own step runs it.
   #
-  # The Pages home only offers this while the starter sections are missing
+  # The Pages index only offers this while the starter sections are missing
   # (`StarterContent.added?`, the same check the wizard uses), but a stale
   # tab or a second click can still get here after they exist: the call is
   # idempotent anyway (it looks every page and post up first), so this just
   # says nothing needed doing instead of pretending it created something.
   #
-  # Always a redirect to the Pages home, and the form posts with
+  # Always a redirect to the Pages index, and the form posts with
   # `data-turbo-frame="_top"`: the new pages appear in the tree, which
   # lives in the layout's own column outside the `content` frame, so only
   # a full-page visit brings it up to date.
@@ -26,9 +28,9 @@ module Admin
 
       if result.ok?
         notice = result.record ? "Starter pages created" : "Starter pages already exist"
-        redirect_to admin_root_path(**admin_url_options), status: :see_other, notice: notice
+        redirect_to admin_pages_path(**admin_url_options), status: :see_other, notice: notice
       else
-        forbidden_or(result) { redirect_to admin_root_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
+        forbidden_or(result) { redirect_to admin_pages_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
   end

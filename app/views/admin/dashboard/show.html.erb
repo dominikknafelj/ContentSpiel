@@ -1,0 +1,13 @@
+<%# CS Studio's start page (dashboard spec §3-§4, Task 2): a shell today --
+    "Your work" and "On the site" as two columns, quick create above them --
+    with every list's actual content arriving task by task (Task 3 is
+    "Your work", Task 4 adds quick create and "On the site"'s own feeds).
+    No `content_for :tree` here: the dashboard isn't a Pages screen, so the
+    layout's grid collapses to its two-column form, same as every other
+    module but Pages. %>
+<h1 class="mb-4 text-h1 text-ink">Dashboard</h1>
+
+<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+  <section aria-label="Your work"></section>
+  <section aria-label="On the site"></section>
+</div>

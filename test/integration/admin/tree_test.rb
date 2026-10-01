@@ -19,8 +19,8 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "the pages home shows the tree with status and child counts" do
-    get "/cs-studio"
+  test "the pages index shows the tree with status and child counts" do
+    get "/cs-studio/pages"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
       assert_select "[data-status='live']"
       assert_select "[data-child-count]", text: "1"

@@ -106,7 +106,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   test "create starter pages refreshes the tree" do
     create_page(title: "Existing") # a root page, but no starter sections yet
 
-    visit admin_root_path
+    visit admin_pages_path
     await_admin_controllers
     within(".admin-empty-state") { press "Create starter pages" }
 
