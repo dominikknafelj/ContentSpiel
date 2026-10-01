@@ -36,4 +36,16 @@ class Admin::TagInputComponentTest < ViewComponent::TestCase
     # just truncating whatever order `Tag.all` happened to return.
     assert_includes names, "common"
   end
+
+  # A post in the trash doesn't make its tags any likelier to be wanted:
+  # the ranking counts kept posts only.
+  test "trashed posts don't count towards a tag's ranking" do
+    create_post(title: "Kept", tags: [ "alpha" ])
+    2.times { |i| create_post(title: "Gone #{i}", tags: [ "zulu" ]).update_columns(trashed_at: Time.current) }
+
+    render_inline Admin::TagInputComponent.new(value: "")
+
+    names = JSON.parse(page.find("[data-admin--tag-input-names-value]")["data-admin--tag-input-names-value"])
+    assert_equal %w[alpha zulu], names.first(2)
+  end
 end

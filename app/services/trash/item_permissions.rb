@@ -26,5 +26,18 @@ module Trash
       else raise ArgumentError, "#{record.class} can't go to the trash"
       end
     end
+
+    # How a refusal names the root of the branch a page went to the trash
+    # with: by title only when the actor may read it -- the subpage's own
+    # delete right can be scoped to a branch that doesn't reach the root,
+    # and its title isn't theirs to learn ("not found, not forbidden").
+    # Also the answer when the root is gone altogether.
+    def branch_root_name(root)
+      if root && AccessControl.allowed?(actor, "pages.read", root)
+        "“#{root.title}”"
+      else
+        "the page it was moved to the trash with"
+      end
+    end
   end
 end

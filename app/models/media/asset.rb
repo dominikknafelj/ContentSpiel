@@ -336,7 +336,8 @@ class Media::Asset < ApplicationRecord
     self.class.preload_usage_places(loaded.map(&:owner))
     places = loaded.map { |usage| usage_place_of(usage.owner) }.compact.uniq
     # Only rows whose owner is already gone (a stale index): still refused.
-    return "This image is still in use and can't be deleted" if places.empty?
+    # No verb, since both moving to the trash and purging answer with this.
+    return "This image is still in use" if places.empty?
 
     named = places.first(IN_USE_NAMED_PLACES).map { |place| describe_usage_place(place, actor) }
     named << "#{places.size - IN_USE_NAMED_PLACES} more" if places.size > IN_USE_NAMED_PLACES

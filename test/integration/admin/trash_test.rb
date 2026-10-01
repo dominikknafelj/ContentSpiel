@@ -105,6 +105,22 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_match "Deleted “Gone post” permanently", response.body
   end
 
+  # The confirm dialog says what else goes: every page under the root, a
+  # descendant trashed separately earlier included -- the same set
+  # `Trash::Purge` destroys -- while a post's says nothing of subpages.
+  test "a page's delete dialog counts every subpage that goes with it" do
+    Current.set(actor: users(:one)) do
+      Trash::Restore.call(@section.reload)
+      grandchild = create_page(title: "Grandchild", parent: @child)
+      Trash::Move.call(grandchild)
+      Trash::Move.call(@section.reload)
+    end
+    sign_in_as users(:one)
+    get admin_trash_path
+    assert_select "dialog#purge-page-#{@section.id}", text: /2 subpages under it are deleted too/
+    assert_select "dialog#purge-post-#{@post.id}", text: /subpage/, count: 0
+  end
+
   test "an image still used by a trashed item can't be deleted permanently from the list" do
     Current.set(actor: users(:one)) do
       Trash::Restore.call(@asset.reload)

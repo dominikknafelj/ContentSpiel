@@ -255,6 +255,29 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal @kept_asset.id, @kept_page.reload.hero_media_asset_id
   end
 
+  # --- Render cache ------------------------------------------------------------
+
+  # Trash spec §5.3/§9: every move, restore and purge must change
+  # `PublicSite.content_version`, or a cached rich-text render could keep
+  # linking to (or showing) what just left the site, or keep leaving out
+  # what just came back. Called directly, with `Current` reset between
+  # steps, since `current_content_version` is memoised per request.
+  test "moving, restoring and purging each change the content version" do
+    post = create_post(title: "Versioned")
+    versions = [ fresh_content_version ]
+
+    travel(1.second) { as_owner { assert Trash::Move.call(post).ok? } }
+    versions << fresh_content_version
+    travel(2.seconds) { as_owner { assert Trash::Restore.call(post.reload).ok? } }
+    versions << fresh_content_version
+    travel(3.seconds) { as_owner { assert Trash::Move.call(post.reload).ok? } }
+    versions << fresh_content_version
+    travel(4.seconds) { as_owner { assert Trash::Purge.call(post.reload).ok? } }
+    versions << fresh_content_version
+
+    assert_equal versions.size, versions.uniq.size, "each step should change the version: #{versions.inspect}"
+  end
+
   # --- MCP --------------------------------------------------------------------
 
   test "MCP media and post tools don't see trashed records" do
@@ -295,6 +318,11 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
         "Authorization" => "Bearer #{raw_token}" }
     assert_response :success
     response.parsed_body["result"]
+  end
+
+  def fresh_content_version
+    Current.reset
+    PublicSite.content_version
   end
 
   def text_of(result) = result["content"].map { |item| item["text"] }.join("\n")

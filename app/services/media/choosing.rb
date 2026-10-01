@@ -71,7 +71,10 @@ module Media
       raise error unless error.message.include?("media_assets")
 
       id = reference_attribute && record.public_send(reference_attribute)
-      if id && !Media::Asset.kept.exists?(id)
+      # Row existence, not `.kept`: this decides which FK refused the
+      # save, and a trashed image's row is still there for its FK to find
+      # -- a record pointing at one didn't cause this failure.
+      if id && !Media::Asset.exists?(id)
         record.errors.add(error_attribute, "doesn't exist")
       else
         record.errors.add(:body, "has an image that doesn't exist")

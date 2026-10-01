@@ -66,7 +66,7 @@ module Trash
         @record.assign_attributes(trashed_at: nil, trashed_by: nil, **(page? ? { trash_root_id: nil } : {}))
         @record.save!
         restore_referenced_assets(branch_ids)
-        record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata)
+        record_event("#{event_prefix}.restored", subject: @record, metadata: event_metadata(branch_ids))
         # Each image that came along gets its own event too, so an image's
         # history in the audit log shows it leaving the trash, not only its
         # owner's.
@@ -105,7 +105,7 @@ module Trash
         return failure(@record, [ "Its parent page no longer exists: choose a new parent" ])
       elsif @record.trash_root_id != @record.id
         root = Page.find_by(id: @record.trash_root_id)
-        return failure(@record, [ "Restore “#{root&.title}” to bring this page back, or choose a new parent" ])
+        return failure(@record, [ "Restore #{branch_root_name(root)} to bring this page back, or choose a new parent" ])
       elsif @record.parent.trashed?
         return failure(@record, [ "Its parent page is in the trash: restore that first, or choose a new parent" ])
       end
@@ -184,8 +184,12 @@ module Trash
 
     def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)
 
-    def event_metadata
+    # `restored_page_ids` mirrors `page.trashed`'s `descendant_ids`: the
+    # branch members that came back with the page (empty, so dropped, for a
+    # post, an image or a page restored alone).
+    def event_metadata(branch_ids)
       {
+        restored_page_ids: branch_ids,
         slug_changes: @slug_changes.map { |change| change.except(:record).merge(record: "#{change[:record].class.name}##{change[:record].id}") },
         restored_asset_ids: @restored_assets.map(&:id)
       }.compact_blank

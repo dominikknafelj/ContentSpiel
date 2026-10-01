@@ -2,8 +2,9 @@ require "test_helper"
 
 # `Admin::TrashScreen::RowComponent` (trash spec §7): the parts of a row the
 # integration tests don't pin down -- the countdown's edges, a trasher who
-# has since been deleted, the disabled purge for an image still in use, and
-# the parent picker for a page that can't go back where it was.
+# isn't known any more, the purge dialog's subpage count, the disabled
+# purge for an image still in use, and the parent picker for a page that
+# can't go back where it was.
 class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   include ContentHelper
 
@@ -26,7 +27,10 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
     assert_no_text "Deleted permanently today"
   end
 
-  test "names who trashed it, or says they've since left" do
+  # A nil trasher is either a deleted user or nobody at all (the console,
+  # a system job) -- telling the two apart would take the move event, so
+  # the row says neither.
+  test "names who trashed it, or says it's unknown" do
     post = create_post(title: "Gone post")
     Trash::Move.call(post)
 
@@ -35,7 +39,20 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
     post.update_columns(trashed_by_id: nil)
     render_inline row(post.reload)
-    assert_text "Trashed by someone who has since left"
+    assert_text "Trashed by unknown"
+    assert_no_text "since left"
+  end
+
+  test "a page's delete dialog names how many subpages go with it" do
+    section = create_page(title: "Section")
+    Trash::Move.call(section)
+
+    render_inline row(section.reload, purge_subpage_count: 1)
+    assert_selector "dialog#purge-page-#{section.id}", text: "1 subpage under it is deleted too. This can't be undone."
+
+    render_inline row(section.reload, purge_subpage_count: 0)
+    assert_selector "dialog#purge-page-#{section.id}", text: "This can't be undone."
+    assert_no_text "subpage"
   end
 
   test "an image in use can't be deleted permanently; an unused one opens a confirm dialog" do
@@ -74,7 +91,7 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
   private
 
-  def row(item, retention_days: 30, subpages: [], in_use: false, parent_choices: nil)
-    Admin::TrashScreen::RowComponent.new(item:, retention_days:, subpages:, in_use:, parent_choices:)
+  def row(item, retention_days: 30, subpages: [], purge_subpage_count: 0, in_use: false, parent_choices: nil)
+    Admin::TrashScreen::RowComponent.new(item:, retention_days:, subpages:, purge_subpage_count:, in_use:, parent_choices:)
   end
 end

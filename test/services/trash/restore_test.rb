@@ -57,6 +57,24 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     assert child.reload.trashed?
   end
 
+  # Not found, not forbidden: an actor who may restore the subpage but
+  # can't read the branch root isn't told the root's title.
+  test "the refusal doesn't name a branch root the actor can't read" do
+    parent = create_page(title: "Secret section")
+    child = create_page(title: "Child", parent: parent)
+    %w[pages.read pages.delete].each do |key|
+      AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ child.id ] })
+    end
+    assert Trash::Move.call(parent).ok?
+
+    result = Trash::Restore.call(child.reload, actor: users(:editor_branch))
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ "Restore the page it was moved to the trash with to bring this page back, or choose a new parent" ], result.errors
+    assert child.reload.trashed?
+  end
+
   test "a subpage alone is refused while its branch root is trashed, and works with a new parent" do
     parent = create_page(title: "Section")
     child = create_page(title: "Child", parent: parent)
@@ -95,6 +113,24 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     assert_equal "/elsewhere/middle/grandchild", PublicSite::Paths.current_path(grandchild, Locales.default)
     assert root.reload.trashed?
     assert_equal root.id, root.trash_root_id
+  end
+
+  # Mirrors `page.trashed`'s `descendant_ids`: the event lists the branch
+  # members that came back with the page -- not a descendant trashed
+  # separately, which stays in the trash.
+  test "a page's restored event lists the subpages that came back with it" do
+    root = create_page(title: "Section")
+    child = create_page(title: "Child", parent: root)
+    grandchild = create_page(title: "Grandchild", parent: child)
+    loner = create_page(title: "Loner", parent: root)
+    Trash::Move.call(loner)
+    Trash::Move.call(root.reload)
+
+    assert Trash::Restore.call(root.reload).ok?
+
+    event = Audit::Event.find_by!(action: "page.restored", subject_id: root.id)
+    assert_equal [ child.id, grandchild.id ].sort, event.metadata["restored_page_ids"].sort
+    assert loner.reload.trashed?
   end
 
   test "a new parent can't be the page itself, one of its descendants, or a trashed page" do

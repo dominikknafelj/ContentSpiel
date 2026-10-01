@@ -50,7 +50,7 @@
       <% else %>
         <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "button",
               onclick: "document.getElementById('#{purge_dialog_id}').showModal()") %>
-        <%= render Admin::ConfirmDialogComponent.new(id: purge_dialog_id, title: "Delete permanently?", body: "This can't be undone.") do |dialog| %>
+        <%= render Admin::ConfirmDialogComponent.new(id: purge_dialog_id, title: "Delete permanently?", body: purge_dialog_body) do |dialog| %>
           <% dialog.with_confirm_action do %>
             <%= form_with url: purge_path, method: :delete, data: { turbo_frame: "_top" } do %>
               <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "submit") %>

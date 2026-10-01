@@ -56,7 +56,7 @@ module Trash
       return denied(refused, @record) if refused && !authorize!("trash.empty", nil)
       return failure(@record, [ "Only items in the trash can be deleted permanently" ]) unless @record.trashed?
       if (root = pending_branch_root)
-        return failure(@record, [ "Delete “#{root.title}” permanently to remove this page" ])
+        return failure(@record, [ "Delete #{branch_root_name(root)} permanently to remove this page" ])
       end
 
       # A savepoint of its own (`requires_new`), like every writing service:

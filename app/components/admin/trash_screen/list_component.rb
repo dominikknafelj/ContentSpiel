@@ -10,7 +10,8 @@ module Admin
     # first, as `Admin::TrashController#index` loaded them. Everything a row
     # needs beyond its own record is looked up here once for the whole page
     # rather than per row:
-    # - each page root's branch members (`#subpages_for`), one query;
+    # - each page root's branch members (`#subpages_for`), one query, and
+    #   how many pages its purge would take (`#descendant_counts`), one;
     # - which images something still uses (`#in_use?`) -- a trashed owner
     #   included, the same `Media::Asset#used?` `Trash::Purge` refuses on;
     # - the restore form's parent choices (`#parent_choices`), only when a
@@ -29,6 +30,7 @@ module Admin
           item:,
           retention_days:,
           subpages: subpages_for(item),
+          purge_subpage_count: item.is_a?(Page) ? descendant_counts.fetch(item.id, 0) : 0,
           in_use: in_use?(item),
           parent_choices: Admin::TrashScreen::RowComponent.needs_parent?(item) ? parent_choices : nil,
           url_options:
@@ -59,6 +61,13 @@ module Admin
       def subpages_by_root
         @subpages_by_root ||= Page.where(trash_root_id: pages.map(&:id)).where("pages.id <> pages.trash_root_id")
           .order(:id).group_by(&:trash_root_id)
+      end
+
+      # How many pages a purge of each listed page would take with it --
+      # every descendant, branch member or trashed separately, the same set
+      # `Trash::Purge` destroys -- off the closure table in one query.
+      def descendant_counts
+        @descendant_counts ||= Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).where("generations > 0").group(:ancestor_id).count
       end
 
       def in_use?(item)

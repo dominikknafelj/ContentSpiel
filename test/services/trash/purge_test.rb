@@ -114,6 +114,24 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert_not Audit::Event.exists?(action: "page.purged")
   end
 
+  # Not found, not forbidden: an actor who may delete the subpage but
+  # can't read the branch root isn't told the root's title.
+  test "the refusal doesn't name a root the actor can't read" do
+    parent = create_page(title: "Secret section")
+    child = create_page(title: "Child", parent: parent)
+    %w[pages.read pages.delete].each do |key|
+      AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ child.id ] })
+    end
+    assert Trash::Move.call(parent).ok?
+
+    result = Trash::Purge.call(child.reload, actor: users(:editor_branch))
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_equal [ "Delete the page it was moved to the trash with permanently to remove this page" ], result.errors
+    assert Page.exists?(child.id)
+  end
+
   # Once the root is gone (or back out of the trash), a leftover member is
   # no longer part of anyone's pending restore.
   test "a branch member whose root isn't in the trash any more can go" do
@@ -263,7 +281,7 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     result = Trash::Purge.call(asset.reload)
 
     assert_not result.ok?
-    assert_equal [ "This image is still in use and can't be deleted" ], result.errors
+    assert_equal [ "This image is still in use" ], result.errors
     assert Media::Asset.exists?(asset.id)
     assert asset.reload.file.attached?
     assert_not Audit::Event.exists?(action: "media.purged")

@@ -28,10 +28,15 @@ module Admin
         item.trash_root_id != item.id || item.parent.nil? || item.parent.trashed?
       end
 
-      def initialize(item:, retention_days:, subpages: [], in_use: false, parent_choices: nil, url_options: {})
+      # `subpages` are the branch members listed under the title (what a
+      # restore brings back); `purge_subpage_count` is every page under it,
+      # a descendant trashed separately included -- what a purge takes
+      # (`Trash::Purge#branch_deepest_first`), so the two can differ.
+      def initialize(item:, retention_days:, subpages: [], purge_subpage_count: 0, in_use: false, parent_choices: nil, url_options: {})
         @item = item
         @retention_days = retention_days
         @subpages = subpages
+        @purge_subpage_count = purge_subpage_count
         @in_use = in_use
         @parent_choices = parent_choices
         @url_options = url_options
@@ -53,8 +58,18 @@ module Admin
 
       def in_use? = @in_use
 
+      # A nil `trashed_by` is either a user deleted since (the FK nullifies)
+      # or nobody at all (a console or system move); only the `*.trashed`
+      # event's actor could tell them apart, which would be a query per row,
+      # so the label claims neither.
       def trashed_by_label
-        item.trashed_by ? "Trashed by #{item.trashed_by.email_address}" : "Trashed by someone who has since left"
+        item.trashed_by ? "Trashed by #{item.trashed_by.email_address}" : "Trashed by unknown"
+      end
+
+      def purge_dialog_body
+        return "This can't be undone." unless @purge_subpage_count.positive?
+
+        "#{helpers.pluralize(@purge_subpage_count, "subpage")} under it #{@purge_subpage_count == 1 ? "is" : "are"} deleted too. This can't be undone."
       end
 
       # `retention - days since trashed`, never below 0; nil (nothing shown)

@@ -23,9 +23,15 @@ module Admin
     # the `SELECT` list once the `GROUP BY` names the table's primary key
     # (the "functional dependency" rule), so this needs no `MAX()`/`array_
     # agg()` wrapper around the rest of the row.
+    #
+    # Kept posts only (`FILTER`): a post in the trash isn't one of the
+    # tag's posts as far as this list or the delete dialog's "Removes the
+    # tag from N posts" is concerned -- even though deleting the tag does
+    # take it off trashed posts too (a known interim state, docs/
+    # roadmap.md).
     def index
-      @tags = Tag.left_joins(:post_tags)
-        .select("tags.*, COUNT(post_tags.id) AS posts_count")
+      @tags = Tag.left_joins(:posts)
+        .select("tags.*, COUNT(posts.id) FILTER (WHERE posts.trashed_at IS NULL) AS posts_count")
         .group(:id)
         .order(Arel.sql("LOWER(tags.name)"))
     end
