@@ -222,21 +222,23 @@ module Dashboard
       records = [ drafts, scheduled, recently_edited, going_live_next, recently_updated ].flatten.uniq
       return {} if records.empty?
 
+      events_table = Audit::Event.arel_table
       candidates = records.group_by { |r| r.class.base_class }.flat_map do |model, rs|
-        owner = Audit::Event.connection.quote(model.name)
+        owner_type = Arel::Nodes.build_quoted(model.name).as("dashboard_owner_type")
         ids = rs.map(&:id)
         own = Audit::Event.where(subject_type: subject_type_names(model), subject_id: ids)
-          .select("audit_events.*, #{owner} AS dashboard_owner_type, audit_events.subject_id AS dashboard_owner_id")
+          .select(events_table[Arel.star], owner_type, events_table[:subject_id].as("dashboard_owner_id"))
         next [ own ] unless block_owner?(model)
 
         via_blocks = Audit::Event.joins("JOIN content_blocks ON content_blocks.id = audit_events.subject_id")
           .where(subject_type: subject_type_names(ContentBlock), content_blocks: { owner_type: model.name, owner_id: ids })
-          .select("audit_events.*, #{owner} AS dashboard_owner_type, content_blocks.owner_id AS dashboard_owner_id")
+          .select(events_table[Arel.star], owner_type, ContentBlock.arel_table[:owner_id].as("dashboard_owner_id"))
         [ own, via_blocks ]
       end
-      union = candidates.map { |relation| "(#{relation.where.not(action: NOT_A_CHANGE).to_sql})" }.join(" UNION ALL ")
+      union = candidates.map { |relation| relation.where.not(action: NOT_A_CHANGE).arel.ast }
+        .reduce { |left, right| Arel::Nodes::UnionAll.new(left, right) }
 
-      events = Audit::Event.from("(#{union}) audit_events")
+      events = Audit::Event.from(Arel::Nodes::TableAlias.new(Arel::Nodes::Grouping.new(union), "audit_events"))
         .select("DISTINCT ON (dashboard_owner_type, dashboard_owner_id) audit_events.*")
         .order(:dashboard_owner_type, :dashboard_owner_id, last_occurred_at: :desc, id: :desc)
         .to_a
