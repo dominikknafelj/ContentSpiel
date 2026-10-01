@@ -39,7 +39,10 @@ module Trash
   # `<kind>.purged` is recorded *before* the destroy, in its transaction:
   # its snapshot is the record's last state (a post's tags and relations
   # included, which are gone once the destroy has run), and a refused
-  # destroy rolls the event back with it.
+  # destroy rolls the event back with it. A branch purge records one
+  # `page.purged` per page it destroys: the root's lists the rest in
+  # `metadata["descendant_ids"]` (mirroring `page.trashed`), and each
+  # descendant's names the root in `metadata["purged_with"]`.
   class Purge < ApplicationService
     include ItemPermissions
 
@@ -61,9 +64,11 @@ module Trash
       # go (the FK case below, rescued outside the block) must roll back
       # alone without poisoning the rest of the run.
       purged = @record.class.transaction(requires_new: true) do
-        record_event("#{event_prefix}.purged", subject: @record)
+        branch = branch_deepest_first if @record.is_a?(Page)
+        descendant_ids = branch.to_a.map(&:id) - [ @record.id ]
+        record_event("#{event_prefix}.purged", subject: @record, metadata: descendant_ids.any? ? { descendant_ids: } : {})
         case @record
-        when Page then purge_branch
+        when Page then purge_branch(branch)
         when Post then purge_post
         when Media::Asset then purge_asset
         end
@@ -96,8 +101,7 @@ module Trash
       root if root&.trashed?
     end
 
-    def purge_branch
-      pages = branch_deepest_first
+    def purge_branch(pages)
       if pages.any? { |page| !page.trashed? }
         @record.errors.add(:base, "A page under it isn't in the trash")
         raise ActiveRecord::Rollback
@@ -110,6 +114,14 @@ module Trash
         # what makes `Media::UsageIndex.refresh` drop its rows rather than
         # recompute them from stale attributes.
         blocks = page.content_blocks.to_a
+        # Every page this destroys gets its own `page.purged` -- a branch
+        # member or a descendant trashed separately, earlier, would
+        # otherwise vanish from the log without a trace of its own -- with
+        # `purged_with` naming the page the editor actually purged. Before
+        # the destroy, in the same transaction, like the root's: the
+        # snapshot is the page's last state, and a refusal further down
+        # rolls these back too.
+        record_event("page.purged", subject: page, metadata: { purged_with: "Page##{@record.id}" }) unless page.equal?(@record)
         unless page.destroy
           @record.errors.merge!(page.errors) unless page.equal?(@record)
           raise ActiveRecord::Rollback
@@ -125,10 +137,14 @@ module Trash
     # The page and every descendant, deepest first, read off the closure
     # table's `generations` in one query. The root itself is `@record`, the
     # object the caller holds, so its `destroyed?` reads true afterwards.
+    # An id whose page is gone between the two queries (a concurrent purge
+    # of a separately trashed descendant) is simply skipped -- it's already
+    # what this purge wanted -- rather than raising `KeyError` out of the
+    # whole branch.
     def branch_deepest_first
       ids = Page.hierarchy_class.where(ancestor_id: @record.id).order(generations: :desc, descendant_id: :asc).pluck(:descendant_id)
-      loaded = Page.where(id: ids - [ @record.id ]).index_by(&:id)
-      ids.map { |id| id == @record.id ? @record : loaded.fetch(id) }
+      loaded = Page.where(id: ids - [ @record.id ]).index_by(&:id).merge(@record.id => @record)
+      ids.filter_map { |id| loaded[id] }
     end
 
     def purge_post

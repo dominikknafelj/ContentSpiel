@@ -52,6 +52,23 @@ class Trash::PurgeExpiredJobTest < ActiveJob::TestCase
     assert_not Post.exists?(@old.id)
   end
 
+  # Trash spec §4.4: an exception out of one purge is logged, never the
+  # end of the sweep.
+  test "an item whose purge raises doesn't stop the run" do
+    @old.update_columns(trashed_at: 31.days.ago)
+    older = create_post(title: "Older")
+    older.update_columns(trashed_at: 40.days.ago) # tried first: `Trash.roots` orders by trashed_at
+    original = Trash::Purge.method(:call)
+
+    with_singleton_override(Trash::Purge, :call, ->(record, **options) {
+      raise ArgumentError, "boom" if record.id == older.id
+      original.call(record, **options)
+    }) { Trash::PurgeExpiredJob.perform_now }
+
+    assert Post.exists?(older.id)
+    assert_not Post.exists?(@old.id)
+  end
+
   test "a page trashed alone, then swept up by its later-trashed ancestor's branch purge, isn't purged a second time" do
     Current.actor = users(:one)
     ancestor = create_page(title: "Ancestor")
@@ -75,8 +92,12 @@ class Trash::PurgeExpiredJobTest < ActiveJob::TestCase
 
     assert_not Page.exists?(ancestor.id)
     assert_not Page.exists?(descendant.id)
+    # Exactly one event per page: the descendant's own, recorded by the
+    # ancestor's branch purge (`purged_with`) -- never a second, bogus one
+    # from a stale re-visit.
     assert_equal 1, Audit::Event.where(action: "page.purged", subject_id: ancestor.id).count
-    assert_equal 0, Audit::Event.where(action: "page.purged", subject_id: descendant.id).count
+    assert_equal 1, Audit::Event.where(action: "page.purged", subject_id: descendant.id).count
+    assert_equal "Page##{ancestor.id}", Audit::Event.find_by!(action: "page.purged", subject_id: descendant.id).metadata["purged_with"]
   end
 
   test "is scheduled daily in every environment" do

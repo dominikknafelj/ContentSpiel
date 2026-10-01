@@ -31,6 +31,16 @@ module Trash
         else
           @skipped << { record:, errors: result.errors }
         end
+      rescue StandardError => e
+        # Trash spec §4.4, "a failing item doesn't stop the run": anything
+        # `Purge` didn't turn into a failure itself (a callback raising,
+        # storage unreachable) rolled back its own savepoint and is
+        # reported as a skip like any other, so the rest still go and the
+        # run still ends in its `trash.emptied` summary. The class name
+        # only -- an exception message can carry SQL or a path, and this
+        # one is shown to the editor; the log gets the full message.
+        Rails.logger.error("[trash] couldn't purge #{record.class.name}##{record.id}: #{e.class}: #{e.message}")
+        @skipped << { record:, errors: [ "Couldn't be deleted: #{e.class.name}" ] }
       end
       record_event("trash.emptied", metadata: { purged: @purged_count, skipped: @skipped.size })
 

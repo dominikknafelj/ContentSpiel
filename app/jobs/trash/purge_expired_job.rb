@@ -7,9 +7,9 @@ module Trash
   # Runs as the trusted nil actor on the `:system` channel, so its
   # `*.purged` events read "System" in the audit log and `Trash::Purge`'s
   # authorization passes the way it does for any trusted code path. Each item
-  # purges in its own savepoint (`Trash::Purge`); one that can't go is logged
-  # and skipped, so a single stuck item (still in use, a mid-restore race)
-  # never stops the rest of the sweep.
+  # purges in its own savepoint (`Trash::Purge`); one that can't go -- or
+  # whose purge raises -- is logged and skipped, so a single stuck item
+  # (still in use, a mid-restore race) never stops the rest of the sweep.
   #
   # Goes through `Trash.each_root(trashed_before:)`, not a plain
   # `relation.where(...).find_each` of its own: a page trashed on its own
@@ -30,6 +30,11 @@ module Trash
         Trash.each_root(trashed_before: days.days.ago) do |record|
           result = Purge.call(record, actor: nil)
           Rails.logger.info("[trash] kept #{record.class.name}##{record.id}: #{result.errors.to_sentence}") unless result.ok?
+        rescue StandardError => e
+          # An exception `Purge` didn't turn into a failure itself has
+          # rolled back that item's own savepoint; log it and carry on with
+          # the next one (trash spec §4.4).
+          Rails.logger.error("[trash] couldn't purge #{record.class.name}##{record.id}: #{e.class}: #{e.message}")
         end
       end
     end

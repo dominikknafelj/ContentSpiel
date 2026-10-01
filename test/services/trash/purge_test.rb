@@ -50,6 +50,29 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert_equal 0, asset.usages.count
   end
 
+  # Every page a branch purge destroys leaves its own trace in the audit
+  # log -- members and separately trashed descendants alike -- pointing
+  # back at the page the editor actually purged; the root's event lists
+  # them all.
+  test "a branch purge records one page.purged per page" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+    grandchild = create_page(title: "Grandchild", parent: child)
+    loner = create_page(title: "Loner", parent: parent)
+    assert Trash::Move.call(loner).ok?
+    assert Trash::Move.call(parent.reload).ok?
+
+    assert Trash::Purge.call(parent.reload).ok?
+
+    root_event = Audit::Event.find_by!(action: "page.purged", subject_id: parent.id)
+    assert_equal [ child.id, grandchild.id, loner.id ].sort, root_event.metadata["descendant_ids"].sort
+    [ child, grandchild, loner ].each do |page|
+      events = Audit::Event.where(action: "page.purged", subject_type: "Page", subject_id: page.id)
+      assert_equal 1, events.count, page.title
+      assert_equal "Page##{parent.id}", events.first.metadata["purged_with"]
+    end
+  end
+
   test "a separately trashed descendant goes with the branch" do
     parent = create_page(title: "Section")
     child = create_page(title: "Child", parent: parent)

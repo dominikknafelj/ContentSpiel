@@ -43,7 +43,35 @@ class Trash::EmptyTest < ActiveSupport::TestCase
     assert_equal 1, service.purged_count
     assert_empty service.skipped
     assert_not Page.exists?(child.id)
-    assert_equal 1, Audit::Event.where(action: "page.purged").count
+    # One event per page, the child's recorded by its parent's branch
+    # purge -- not a second one from trying the child again.
+    assert_equal [ child.id, parent.id ].sort, Audit::Event.where(action: "page.purged").pluck(:subject_id).sort
+  end
+
+  # Trash spec §4.4, "a failing item doesn't stop the run": an exception
+  # out of one purge (a callback raising, a lost connection to storage)
+  # is reported as a skip, the rest still go, and the run is still
+  # summarised.
+  test "an item whose purge raises is skipped, and the rest still go" do
+    broken = create_post(title: "Broken")
+    fine = create_post(title: "Fine")
+    [ broken, fine ].each { |record| assert Trash::Move.call(record).ok? }
+    original = Trash::Purge.method(:call)
+
+    service = Trash::Empty.new
+    result = with_singleton_override(Trash::Purge, :call, ->(record, **options) {
+      raise ArgumentError, "boom" if record.id == broken.id
+      original.call(record, **options)
+    }) { service.call }
+
+    assert result.ok?
+    assert_equal 1, service.purged_count
+    assert_equal [ broken ], service.skipped.map { |skip| skip[:record] }
+    assert_equal [ "Couldn't be deleted: ArgumentError" ], service.skipped.first[:errors]
+    assert Post.exists?(broken.id)
+    assert_not Post.exists?(fine.id)
+    event = Audit::Event.find_by!(action: "trash.emptied")
+    assert_equal({ "purged" => 1, "skipped" => 1 }, event.metadata)
   end
 
   test "needs trash.empty" do
