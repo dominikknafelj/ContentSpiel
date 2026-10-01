@@ -58,6 +58,24 @@ class StarterContentTest < ActiveSupport::TestCase
     assert_not StarterContent.added?(locale: "en")
   end
 
+  # Starter sections and sample posts in the trash don't count as "already
+  # there": the offer comes back, and adding again creates fresh ones next
+  # to the trashed (whose slugs the trash freed).
+  test "trashing the starter sections brings the offer back" do
+    StarterContent.create_pages_and_posts!(locale: "en")
+    home = Page.find_by(parent_id: nil)
+    Current.set(actor: users(:one)) do
+      home.children.each { |page| assert Trash::Move.call(page).ok? }
+      Post.find_each { |post| assert Trash::Move.call(post).ok? }
+    end
+
+    assert_not StarterContent.added?(locale: "en")
+    assert_difference -> { Page.kept.count } => 3, -> { Post.kept.count } => 3 do
+      assert StarterContent.add_once!(locale: "en")
+    end
+    assert StarterContent.added?(locale: "en")
+  end
+
   test "running it again in another locale creates nothing new" do
     StarterContent.create_pages_and_posts!(locale: "de")
 

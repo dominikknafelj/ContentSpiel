@@ -44,8 +44,9 @@ module Mcp
         # `find_readable_post`): the media library has none (`Admin::Media
         # Controller`'s own comment) -- `media.upload`, already checked
         # above, is the whole gate. So a plain `find_by` id lookup is
-        # enough; an unknown id is the only "not found" this ever needs.
-        asset = Media::Asset.with_variants.find_by(id: id)
+        # enough; an unknown id is the only "not found" this ever needs --
+        # and a trashed image reads as unknown (trash spec §5.1).
+        asset = Media::Asset.kept.with_variants.find_by(id: id)
         return image_not_found unless asset
 
         locale ||= Locales.default
@@ -80,8 +81,8 @@ module Mcp
       # grouping `Media::Asset#usages_summary` already does (one per
       # `(owner_type, owner_id)`, not one per `media_usages` row), resolved
       # from a raw owner (`Page`, `ContentBlock` or `Post`) down to the
-      # page/post it's actually shown on, exactly like `Media::Destroy
-      # #place_of`/`Admin::MediaLibrary::DetailComponent#place_for`: a
+      # page/post it's actually shown on, exactly like `Media::Asset
+      # #usage_place_of`/`Admin::MediaLibrary::DetailComponent#place_for`: a
       # block's own usage is named by whichever page or post it sits on,
       # since that -- not the `ContentBlock` row itself -- is what a
       # `pages.read`/`posts.read` grant actually governs. `.uniq` folds
@@ -90,8 +91,17 @@ module Mcp
       # `place_for` drops a stale index entry (an owner already gone) or an
       # orphaned block with no page/post of its own -- neither is
       # something this can name.
+      #
+      # `by_kept_owner` (trash spec §5.1): a trashed page or post -- or a
+      # block sitting on one -- is dropped here the same way a plain `find`
+      # of one 404s elsewhere ("not found, not forbidden"), never folded
+      # into `hidden_usages` alongside an unreadable-but-kept owner. Both
+      # `usage_count` and `usages` below come from this one already-filtered
+      # list, so neither counts nor names a trashed owner.
       def self.usage_places(asset)
-        asset.usages_summary.filter_map { |entry| place_for(entry[:owner]) }.uniq
+        usages = asset.usages.by_kept_owner.includes(:owner).to_a
+        Media::Asset.preload_usage_places(usages.map(&:owner))
+        usages.filter_map { |usage| place_for(usage.owner) }.uniq
       end
       private_class_method :usage_places
 

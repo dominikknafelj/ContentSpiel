@@ -86,21 +86,22 @@
       </details>
     <% end %>
 
-    <%# No Delete at all without `pages.delete`; with it, disabled (with the
-        reason) for the homepage or a page that still has subpages. %>
+    <%# No Move to trash at all without `pages.delete`; with it, disabled
+        (with the reason) only for the homepage -- a page with subpages
+        moves its whole branch along (trash spec §4.1). %>
     <% if may_delete? && can_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
             onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
 
-      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this page?", body: "This can't be undone.") do |dialog| %>
+      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this page to the trash?", body: delete_dialog_body) do |dialog| %>
         <% dialog.with_confirm_action do %>
           <%= form_with url: helpers.admin_page_path(page, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
-            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
           <% end %>
         <% end %>
       <% end %>
     <% elsif may_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button", disabled: true, title: delete_disabled_reason) %>
+      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button", disabled: true, title: delete_disabled_reason) %>
     <% end %>
   </div>
 </header>

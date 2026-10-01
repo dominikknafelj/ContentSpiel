@@ -60,13 +60,31 @@ module Admin
 
     def can_unpublish? = page.status != "draft" && may_publish?
 
-    def can_delete? = !page.root? && page.children.empty?
+    # Trash spec §4.1: moving a page to the trash takes its whole branch
+    # with it (`Trash::Move`), so a page with subpages is no longer refused
+    # the way permanent deletion was -- only the homepage still is
+    # (`Page#only_one_root_page`, and `Trash::Move`'s own "The homepage
+    # can't be moved to the trash" refusal).
+    def can_delete? = !page.root?
 
     def delete_disabled_reason
-      return "The homepage can't be deleted" if page.root?
-      return "Delete its subpages first" unless page.children.empty?
+      "The homepage can't be deleted" if page.root?
+    end
 
-      nil
+    # How many kept descendants would come along (Task 10): read once,
+    # since both `#delete_dialog_body` and its own template read it, and
+    # each read is a `closure_tree` query.
+    def kept_descendant_count = defined?(@kept_descendant_count) ? @kept_descendant_count : (@kept_descendant_count = page.descendants.kept.count)
+
+    # "You can restore it from the trash." -- the dialog's own reassurance
+    # that this isn't `Trash::Purge` -- plus, only when subpages are coming
+    # along too, a second sentence naming how many (trash spec Review Focus
+    # 1's "a branch moves together" made visible here, not just enforced by
+    # the service).
+    def delete_dialog_body
+      body = "You can restore it from the trash."
+      body += " This also moves #{helpers.pluralize(kept_descendant_count, "subpage")} to the trash." if kept_descendant_count.positive?
+      body
     end
 
     def delete_dialog_id = "delete-page-#{page.id}"

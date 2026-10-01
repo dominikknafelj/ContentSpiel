@@ -1,0 +1,37 @@
+<%# The Trash screen (trash spec §7): what the viewer could restore or
+    delete permanently, newest first, filterable by type, 50 per page
+    (`Admin::TrashController`). The list itself, its Empty trash button
+    and every row's actions are `Admin::TrashScreen::ListComponent`'s. %>
+<h1 class="mb-2 text-h1 text-ink">Trash</h1>
+<p class="mb-4 text-meta">
+  <% if @retention_days.zero? %>
+    Items stay in the trash until someone deletes them permanently.
+  <% else %>
+    Items are deleted permanently <%= pluralize(@retention_days, "day") %> after they're moved to the trash.
+  <% end %>
+</p>
+
+<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert]) %>
+
+<nav aria-label="Filter by type" class="mb-4 flex flex-wrap gap-2">
+  <% [ [ "All", nil ], [ "Pages", "page" ], [ "Posts", "post" ], [ "Images", "media" ] ].each do |label, type| %>
+    <%= link_to label, admin_trash_path(type:, **admin_url_options),
+          class: "rounded-cs px-3 py-1 #{@type == type ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
+          aria: { current: (@type == type ? "page" : nil) } %>
+  <% end %>
+</nav>
+
+<%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, url_options: admin_url_options) %>
+
+<% if @has_next || @offset.positive? %>
+  <div class="mt-4 flex items-center gap-3">
+    <% if @offset.positive? %>
+      <%= link_to "Previous", admin_trash_path(request.query_parameters.merge("offset" => [ @offset - Admin::TrashController::PER_PAGE, 0 ].max)),
+            class: setup_secondary_link_class %>
+    <% end %>
+    <% if @has_next %>
+      <%= link_to "Next", admin_trash_path(request.query_parameters.merge("offset" => @offset + Admin::TrashController::PER_PAGE)),
+            class: setup_secondary_link_class %>
+    <% end %>
+  </div>
+<% end %>

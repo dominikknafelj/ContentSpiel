@@ -126,13 +126,17 @@ module StarterContent
     end
   end
 
+  # Kept records only: a starter section or sample post in the trash is
+  # on its way out, so it doesn't count as "already added" -- trashing
+  # them brings the offer back, and adding again creates fresh ones beside
+  # them (the trash freed their slugs, so nothing clashes).
   def find_section_page(home, section)
-    find_in_any_locale { Page.i18n.where(slug: section[:section][:slug]).where(parent_id: home.id).first }
+    find_in_any_locale { Page.kept.i18n.where(slug: section[:section][:slug]).where(parent_id: home.id).first }
   end
 
   def find_sample_post(section)
     title = section[:sample][:title]
-    find_in_any_locale { Post.i18n.where(title: title).where(content_type: section[:content_type]).first }
+    find_in_any_locale { Post.kept.i18n.where(title: title).where(content_type: section[:content_type]).first }
   end
 
   # Runs `block` once per enabled locale, inside that locale, and returns

@@ -158,7 +158,7 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     group = access_control_groups(:branch_editors)
     doomed = create_page(title: "Doomed")
     grant!(group, "pages.edit", { "page_ids" => [ doomed.id ] })
-    assert Pages::Destroy.call(doomed).ok?
+    assert delete_for_good(doomed)
     grant!(group, "posts.edit").update_columns(scope: { "content_types" => [ "gone" ] })
     grant!(group, "posts.edit").update_columns(permission: "gone/thing.edit")
     grant!(group, "posts.read", { "content_types" => [] })
@@ -217,6 +217,41 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { scoped(@reader, "users.manage", Post.all) }
     assert_raises(ArgumentError) { scoped(@reader, "users.manage", ContentBlock.all) }
     assert_raises(AccessControl::UnknownPermission) { scoped(@reader, "posts.frobnicate", Post.all) }
+  end
+
+  # --- The trash (trash spec §5.1) ---------------------------------------------
+
+  test "trashed pages, posts and their blocks are outside every scope, an owner's and trusted code's included" do
+    @b1.update!(trashed_at: Time.current)
+    @posts.first.update!(trashed_at: Time.current)
+    trashed_blocks = ContentBlock.where(owner: [ @posts.first ]).pluck(:id)
+    assert_equal 1, trashed_blocks.size
+
+    [ [ @owner, :admin ], [ nil, :console ], [ @reader, :admin ] ].each do |actor, channel|
+      assert_not_includes scoped(actor, "pages.read", Page.all, channel: channel).pluck(:id), @b1.id
+      assert_not_includes scoped(actor, "posts.read", Post.all, channel: channel).pluck(:id), @posts.first.id
+      assert_empty scoped(actor, "posts.read", ContentBlock.all, channel: channel).where(id: trashed_blocks)
+      assert_equal ContentBlock.count - 1, scoped(actor, "pages.read", ContentBlock.all, channel: channel).count
+    end
+  end
+
+  test "trashed: true returns the trashed rows alone, still narrowed by the actor's grants" do
+    @a1a.update!(trashed_at: Time.current)
+    @b1.update!(trashed_at: Time.current)
+    @posts.first.update!(trashed_at: Time.current)
+    grant!(access_control_groups(:branch_editors), "pages.read", { "page_ids" => [ @a.id ] })
+
+    assert_equal [ @a1a.id, @b1.id ].sort, AccessControl.scope(@owner, "pages.read", Page.all, channel: :admin, trashed: true).pluck(:id).sort
+    assert_equal [ @posts.first.id ], AccessControl.scope(@owner, "posts.read", Post.all, channel: :admin, trashed: true).pluck(:id)
+    assert_equal [ @a1a.id ], AccessControl.scope(@brancher, "pages.read", Page.all, channel: :admin, trashed: true).pluck(:id)
+    assert_equal [ @a.id, @a1.id ].sort, scoped(@brancher, "pages.read", Page.all).pluck(:id).sort
+    assert_raises(ArgumentError) { AccessControl.scope(@owner, "pages.read", ContentBlock.all, channel: :admin, trashed: true) }
+  end
+
+  test "the trash narrowing keeps the caller's own conditions" do
+    @posts.first.update!(trashed_at: Time.current)
+    blogs = scoped(@reader, "posts.read", Post.where(content_type: "blog").order(id: :desc))
+    assert_equal Post.kept.where(content_type: "blog").order(id: :desc).pluck(:id), blogs.pluck(:id)
   end
 
   # --- The tree ------------------------------------------------------------

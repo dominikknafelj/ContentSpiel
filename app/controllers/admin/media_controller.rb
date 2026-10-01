@@ -2,7 +2,7 @@ module Admin
   # The Media module (media library design spec §6, Task 7): the grid
   # (search, filters, pagination), one image's detail panel, and its own
   # multi-file upload -- every write still goes through `Media::Upload`/
-  # `Save`/`Destroy` (`Admin::BaseController`'s own "every write goes
+  # `Save`/`Trash::Move` (`Admin::BaseController`'s own "every write goes
   # through a service" rule), this controller only ever translates params
   # and renders their `Result`.
   #
@@ -11,7 +11,7 @@ module Admin
   # whole library needs no scoping the way Pages/Posts do (there is no
   # per-asset "read" permission), so `index`/`show`/`create` share one
   # `require_permission`. Editing and deleting are gated per §5.1 instead,
-  # inside `Media::Save`/`Media::Destroy` themselves (`Media::Ownership`:
+  # inside `Media::Save`/`Trash::Move`/`Trash::Purge` themselves (`Media::Ownership`:
   # `media.manage`, or the asset's own uploader) -- a denial from either
   # comes back as an ordinary 403/422, exactly like every other module's
   # write.
@@ -102,19 +102,23 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Permanent, same "no trash yet" interim state every other delete in
-    # CS Studio is (`Admin::TagsController`'s own comment) -- `Media
-    # ::Destroy` itself is what actually refuses this while the image is
-    # still used (design spec §5.1), which `Admin::MediaLibrary::DetailComponent`
+    # Moves the image to the trash (`Trash::Move`, trash spec §4.1); the
+    # permanent delete is `Trash::Purge`, reachable only from the trash.
+    # `Trash::Move` itself is what refuses this while a *kept* page or post
+    # still uses the image, which `Admin::MediaLibrary::DetailComponent`
     # already disables the button for ahead of time; this is only ever hit
     # for real through a forged request, a race, or an actor whose rights
     # just changed, and any of those come back as the ordinary redirect-
-    # with-alert every other module's own `destroy` already gives.
+    # with-alert every other module's own `destroy` already gives. The Undo
+    # link's own URL carries `from: "undo"` (`Admin::TrashController
+    # #restore`) so restoring lands the actor back on this image's detail
+    # panel, not the Trash screen.
     def destroy
-      result = Media::Destroy.call(@asset)
+      result = Trash::Move.call(@asset)
 
       if result.ok?
-        redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Deleted"
+        flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("media", @asset, from: "undo", **admin_url_options) }
+        redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Moved “#{@asset.title}” to the trash"
       else
         forbidden_or(result) { redirect_to admin_medium_path(@asset, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
@@ -133,7 +137,10 @@ module Admin
     # ::DetailComponent`'s own preview/thumbnail read `#srcset` without an
     # extra query either.
     def set_asset
-      @asset = Media::Asset.with_variants.find(params[:id])
+      # `.kept`: a trashed image is 404 here, like a trashed page or post
+      # (trash spec §5.1, "not found, not forbidden") -- it can't be
+      # viewed, edited or deleted from the library, only from the Trash.
+      @asset = Media::Asset.kept.with_variants.find(params[:id])
     end
 
     def offset
@@ -142,7 +149,7 @@ module Admin
     end
 
     def filtered_assets
-      scope = Media::Asset.with_variants
+      scope = Media::Asset.kept.with_variants
       scope = scope.unused if params[:filter] == "unused"
       scope = scope.where(created_by_id: Current.user&.id) if params[:filter] == "mine"
       # Title, alt (any locale) and filename (global constraints: "search

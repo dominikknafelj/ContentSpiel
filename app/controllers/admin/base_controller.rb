@@ -26,11 +26,20 @@ module Admin
     # One list for the sidebar (`admin_modules`) and for where the Pages
     # home sends someone who can't read pages (`first_admin_module_path`),
     # so the two can never disagree about what a user can open.
+    #
+    # A `permission` Array means *any* of them (trash spec §6): the Trash
+    # screen lists whatever the viewer could restore or purge, so it opens
+    # for anyone holding one of the rights that act on a trashed item --
+    # `Admin::TrashController#require_trash_access` gates on the very same
+    # list (`TRASH_PERMISSIONS`).
+    TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload trash.empty].freeze
+
     MODULES = [
       { label: "Pages", icon: :pages, path: :admin_root_path, permission: "pages.read" },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
       { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload" },
+      { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS },
       { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
       { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage" },
@@ -48,10 +57,13 @@ module Admin
 
     private
 
-    # The `MODULES` entries this actor may open.
+    # The `MODULES` entries this actor may open: `nil` is open to everyone,
+    # otherwise any one of the entry's keys will do.
     def admin_modules
-      @admin_modules ||= MODULES.select { |entry| entry[:permission].nil? || can?(entry[:permission]) }
+      @admin_modules ||= MODULES.select { |entry| entry[:permission].nil? || holds_any?(entry[:permission]) }
     end
+
+    def holds_any?(keys) = Array(keys).any? { |key| can?(key) }
 
     def first_admin_module_path
       entry = admin_modules.first

@@ -38,11 +38,12 @@ module Admin
     # tags, including every tag with zero posts at all) fall back to
     # alphabetical, so the cap's own cutoff is deterministic rather than
     # depending on whatever order Postgres happens to return equal counts
-    # in.
+    # in. Kept posts only, the same count `Admin::TagsController#index`
+    # shows: a trashed post doesn't make its tags likelier to be wanted.
     def tag_names
       Tag.left_joins(:posts)
         .group(:id)
-        .order(Arel.sql("COUNT(posts.id) DESC"), Arel.sql("LOWER(tags.name) ASC"))
+        .order(Arel.sql("COUNT(posts.id) FILTER (WHERE posts.trashed_at IS NULL) DESC"), Arel.sql("LOWER(tags.name) ASC"))
         .limit(MAX_SUGGESTED_TAGS)
         .pluck(:name)
     end

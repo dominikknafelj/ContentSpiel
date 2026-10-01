@@ -468,7 +468,7 @@ class PostTest < ActiveSupport::TestCase
     post.assign_body(body.call(linked.call("go", target.id)), locale: :en)
     assert post.save, post.errors.full_messages.to_sentence
 
-    Pages::Destroy.call(target)
+    delete_for_good(target)
     asset.destroy!
 
     post.reload.assign_body(body.call({ "type" => "text", "text" => "Edited " }, linked.call("go", target.id)), locale: :en)

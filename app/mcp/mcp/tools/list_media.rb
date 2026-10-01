@@ -52,7 +52,7 @@ module Mcp
         invalid_locale = reject_unless_enabled(locale)
         return invalid_locale if invalid_locale
 
-        scope = Media::Asset.with_variants
+        scope = Media::Asset.kept.with_variants
         scope = scope.unused if unused
         scope = Media::Search.call(scope, query) if query.present?
 
@@ -72,8 +72,13 @@ module Mcp
       # `GROUP BY` a listing needs instead, computed once for the whole
       # page and handed to `entry_for` per asset rather than queried again
       # per asset.
+      #
+      # `by_kept_owner` (trash spec §5.1): a usage whose owner is trashed
+      # (or is a block sitting on one) doesn't count -- an agent deciding
+      # whether an image is "still used" shouldn't be told yes because of a
+      # reference that's itself in the trash.
       def self.usage_counts(assets)
-        Media::Usage.where(media_asset_id: assets.map(&:id)).group(:media_asset_id).count
+        Media::Usage.where(media_asset_id: assets.map(&:id)).by_kept_owner.group(:media_asset_id).count
       end
       private_class_method :usage_counts
 

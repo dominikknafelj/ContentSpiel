@@ -152,8 +152,8 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     page = as(users(:one)) { create_page(title: "Temporary page") }
     label = page.title
-    as(users(:one)) { Pages::Destroy.call(page) }
-    event = Audit::Event.find_by!(action: "page.deleted", subject_type: "Page", subject_id: page.id)
+    as(users(:one)) { Trash::Move.call(page) && Trash::Purge.call(page.reload) }
+    event = Audit::Event.find_by!(action: "page.purged", subject_type: "Page", subject_id: page.id)
 
     get "/cs-studio/audit_events"
 

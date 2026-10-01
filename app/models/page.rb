@@ -2,6 +2,7 @@ class Page < ApplicationRecord
   extend Mobility
   include LocalizedSlug
   include Publishable
+  include Trashable
 
   localized_slug scope: :parent_id
 
@@ -83,6 +84,15 @@ class Page < ApplicationRecord
   # :restrict`, so an asset a page still shows can't be deleted out from
   # under it. `optional: true`: a page need not have a hero at all.
   belongs_to :hero_media_asset, class_name: "Media::Asset", optional: true
+
+  # Which page an editor actually trashed (trash spec §3.1): set on this page
+  # and every descendant that goes with it, so `Trash::Restore` can bring the
+  # whole branch back together even though each row's own `trashed_at` is
+  # identical and gives no ordering to restore by. `optional: true` -- a kept
+  # page has no trash root at all, and the FK nullifies rather than restricts
+  # so purging the root itself doesn't get blocked by its own descendants'
+  # bookkeeping column.
+  belongs_to :trash_root, class_name: "Page", optional: true
 
   enum :page_type, { standard: 0, landing: 1 }
 

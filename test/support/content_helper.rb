@@ -7,6 +7,17 @@ module ContentHelper
       Pages::Save.call(attributes: { published: true }, translations: { Locales.default => { title: "Home", slug: "" } }).record
   end
 
+  # Deletes a page (with its branch), post or library image for good -- the
+  # only way there is since the trash: moved there, then purged from it.
+  # Returns true, so `assert delete_for_good(record)` reads naturally.
+  def delete_for_good(record)
+    moved = Trash::Move.call(record)
+    assert moved.ok?, moved.errors.to_sentence
+    purged = Trash::Purge.call(record.reload)
+    assert purged.ok?, purged.errors.to_sentence
+    true
+  end
+
   def create_page(title:, parent: root_page, published: true, translations: {})
     result = Pages::Save.call(attributes: { parent: parent, published: published },
       translations: { Locales.default => { title: title } }.merge(translations))

@@ -213,9 +213,13 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   end
 
   # Final fix wave (M7): a usage row whose owner is gone (a stale index)
-  # still keeps Delete disabled, so "Used on" must not claim the image is
-  # "Not used anywhere yet" -- it says the use can't be shown instead.
-  test "a usage that resolves to no page or post says so rather than 'not used'" do
+  # still keeps "Used on" from claiming the image is "Not used anywhere
+  # yet" -- it says the use can't be shown instead. Task 10: Move to trash
+  # itself is no longer disabled for this case -- `Trash::Move` only
+  # refuses a *kept* owner, and a stale row (like a trash-only one) isn't
+  # one, so disabling the button here would refuse something the server
+  # wouldn't.
+  test "a usage that resolves to no page or post says so rather than 'not used', but doesn't disable Move to trash" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "stale.png")
     Media::Usage.insert_all([ { media_asset_id: asset.id, owner_type: "Page", owner_id: 0, role: "hero", locale: nil } ])
@@ -225,7 +229,8 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not_includes response.body, "Not used anywhere yet."
     assert_includes response.body, "Used somewhere that can’t be shown"
-    assert_select "button[disabled]", text: "Delete"
+    assert_select "button[disabled]", text: "Move to trash", count: 0
+    assert_select "button", text: "Move to trash"
   end
 
   # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
@@ -297,7 +302,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "span", text: /a page you can't open/
   end
 
-  test "delete is disabled with a reason while the image is used" do
+  test "Move to trash is disabled with the in-use reason while a kept page uses the image" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")
     page = create_page(title: "About")
@@ -307,20 +312,41 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media/#{asset.id}"
 
     assert_response :success
-    assert_select "button[disabled]", text: "Delete"
-    assert_includes response.body, "Can't delete"
+    assert_select "button[disabled]", text: "Move to trash"
+    assert_includes response.body, asset.reload.in_use_message(kept_only: true)
   end
 
-  test "delete removes an unused image and redirects to the grid" do
+  # Task 10: the redirect carries a flash naming the image and an Undo that
+  # posts straight back to `Admin::TrashController#restore` with
+  # `from=undo` -- landing the actor back on this image's own detail panel
+  # rather than the Trash list.
+  test "delete moves an unused image to the trash and offers Undo" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "unused.png")
 
-    assert_difference -> { Media::Asset.count }, -1 do
+    assert_no_difference -> { Media::Asset.count } do
       delete "/cs-studio/media/#{asset.id}"
     end
     assert_redirected_to "/cs-studio/media"
+    assert asset.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_match "Moved “#{asset.title}” to the trash", response.body
+    undo_url = admin_restore_trash_item_path("media", asset, from: "undo")
+    assert_select "form[action='#{undo_url}'] button", text: "Undo"
+
+    post undo_url
+    assert_redirected_to "/cs-studio/media/#{asset.id}"
+    assert_not asset.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_select "p[role=status]", text: "Restored “#{asset.title}”"
   end
 
+  # The disabled button is only ever a courtesy -- `Trash::Move` itself is
+  # what actually refuses this, with the same "used on" wording, whether
+  # the request came from the disabled-button's own dialog (impossible
+  # through the UI) or a forged DELETE.
   test "delete is refused while the image is used, even forged past the disabled button" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")
@@ -331,8 +357,11 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { Media::Asset.count } do
       delete "/cs-studio/media/#{asset.id}"
     end
-    assert_response :redirect
-    assert Media::Asset.exists?(asset.id)
+    assert_redirected_to "/cs-studio/media/#{asset.id}"
+    assert_not asset.reload.trashed?
+    follow_redirect!
+    assert_response :success
+    assert_select "p[role=alert]", text: asset.in_use_message(kept_only: true)
   end
 
   test "editing title, alt and caption autosaves per locale through Media::Save" do

@@ -16,12 +16,13 @@
 <% offer_starter_pages = !StarterContent.added?(locale: Locales.default) && StarterContents::Add.new.permitted? %>
 <% offer_new_page = can?("pages.create", Page.new(parent: root_page)) %>
 
-<% if flash[:notice].present? %>
-  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-<% end %>
-<% if flash[:alert].present? %>
-  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-<% end %>
+<%# `flash[:undo]` (Task 10's "Moved “About” to the trash", Undo) round-trips
+    through the session between the `destroy` redirect and this render, so
+    it comes back with String keys (`config.load_defaults`'s own `:json`
+    cookie serializer) even though the controller set it that way on
+    purpose -- `symbolize_keys` is what lets `Admin::FlashComponent` read
+    `action[:label]`/`action[:url]` either way. %>
+<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert], action: flash[:undo]&.symbolize_keys) %>
 
 <% if offer_starter_pages %>
   <div class="mb-4 flex justify-end">

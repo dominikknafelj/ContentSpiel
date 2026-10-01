@@ -39,7 +39,9 @@ module BlockTypes
     # filter naming a real type can never accidentally let a stale-typed post
     # through some other path.
     def self.listed_posts(settings, include_unpublished: false)
-      scope = include_unpublished ? Post.all : Post.published
+      # Never a trashed post (trash spec §5.2), in preview or not: it has
+      # no URL to link to, and a listing is exactly where it would leak.
+      scope = include_unpublished ? Post.kept : Post.published.kept
       scope = scope.where(content_type: ContentTypes.names)
       content_type = settings.content_type
       scope = scope.where(content_type: content_type) if content_type.present?

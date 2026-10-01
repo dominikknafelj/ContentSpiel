@@ -20,6 +20,21 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A trashed post isn't one of the tag's posts as far as the list (and the
+  # delete dialog's count) is concerned.
+  test "the post count leaves out trashed posts" do
+    create_post(title: "One", tags: [ "rails" ])
+    create_post(title: "Two", tags: [ "rails" ]).update_columns(trashed_at: Time.current)
+    tag = Tag.find_by!(name: "rails")
+
+    get "/cs-studio/tags"
+    assert_response :success
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
+      assert_select "td", text: "1"
+      assert_select "td", text: "2", count: 0
+    end
+  end
+
   test "an empty tag list shows the empty state" do
     get "/cs-studio/tags"
     assert_response :success

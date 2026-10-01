@@ -18,6 +18,7 @@ module AccessControl
       register_pages
       register_content
       register_administration
+      register_trash
     end
 
     def self.register_posts
@@ -54,9 +55,10 @@ module AccessControl
     # a hero, an image block or a rich-text image -- and `media.manage` --
     # edit any image's title/alt/caption and delete any image. The uploader
     # of an image may edit or delete that one image without `media.manage`
-    # (`Media::Save`/`Media::Destroy`'s own "ownership" rule); the library
+    # (`Media::Save`'s and the trash services' own "ownership" rule,
+    # `Media::Ownership`); the library
     # itself isn't read-scoped, so there's no `own` scope here to express
-    # that with -- ownership is decided in those two services instead.
+    # that with -- ownership is decided in those services instead.
     def self.register_content
       Permissions.register "tags.manage", label: "Manage tags", area: "Content", action: :manage
       Permissions.register "media.upload", label: "Upload media", area: "Content", action: :upload
@@ -74,6 +76,15 @@ module AccessControl
       # snapshots of every record, whatever the viewer may read elsewhere,
       # and the label says so wherever it's offered or denied.
       Permissions.register "audit.view", label: "View audit log (all content)", area: "Administration", action: :view
+    end
+
+    # Its own area, not folded into Administration (global constraints:
+    # Admin only, and the one permission that both empties the whole trash
+    # and, per `trash.empty` ruling in the plan's spec corrections, purges
+    # any single trashed item too) -- unscoped, like the Administration
+    # permissions above, since holding it is all-or-nothing.
+    def self.register_trash
+      Permissions.register "trash.empty", label: "Empty trash", area: "Trash", action: :empty
     end
   end
 end

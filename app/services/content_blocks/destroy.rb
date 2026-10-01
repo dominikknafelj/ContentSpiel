@@ -1,6 +1,6 @@
 module ContentBlocks
   # Permanently removes one block (spec §7's "No trash" interim state,
-  # global constraints) -- unlike `Pages::Destroy`, there is no "refuse if
+  # global constraints) -- unlike a page's purge (`Trash::Purge`), there is no "refuse if
   # it has children" rule to enforce first: a block has no descendants of
   # its own, so this is a plain `destroy` wrapped in the same
   # `ApplicationService::Result` shape every other write goes through

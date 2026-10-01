@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_090100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -133,7 +133,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
     t.string "title", default: "", null: false
     t.jsonb "alt", default: {}, null: false
     t.jsonb "caption", default: {}, null: false
+    t.datetime "trashed_at"
+    t.bigint "trashed_by_id"
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
+    t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
+    t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
   end
 
   create_table "media_library_migrated_assets", id: false, force: :cascade do |t|
@@ -176,8 +180,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
     t.jsonb "title", default: {}, null: false
     t.datetime "updated_at", null: false
     t.bigint "hero_media_asset_id"
+    t.datetime "trashed_at"
+    t.bigint "trashed_by_id"
+    t.bigint "trash_root_id"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
+    t.index ["trash_root_id"], name: "index_pages_on_trash_root_id"
+    t.index ["trashed_at"], name: "index_pages_on_trashed_at"
+    t.index ["trashed_by_id"], name: "index_pages_on_trashed_by_id"
   end
 
   create_table "post_relations", force: :cascade do |t|
@@ -212,8 +222,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
     t.datetime "updated_at", null: false
     t.jsonb "body", default: {}, null: false
     t.bigint "author_id"
+    t.datetime "trashed_at"
+    t.bigint "trashed_by_id"
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
+    t.index ["trashed_at"], name: "index_posts_on_trashed_at"
+    t.index ["trashed_by_id"], name: "index_posts_on_trashed_by_id"
   end
 
   create_table "public_paths", force: :cascade do |t|
@@ -247,6 +261,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
     t.string "tagline"
     t.string "title", null: false
     t.datetime "updated_at", null: false
+    t.integer "trash_retention_days", default: 30, null: false
   end
 
   create_table "tags", force: :cascade do |t|
@@ -273,13 +288,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_080000) do
   add_foreign_key "api_tokens", "access_control_groups", column: "group_id"
   add_foreign_key "api_tokens", "users"
   add_foreign_key "content_blocks", "media_assets"
+  add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"
   add_foreign_key "pages", "media_assets", column: "hero_media_asset_id"
   add_foreign_key "pages", "pages", column: "parent_id"
+  add_foreign_key "pages", "pages", column: "trash_root_id", on_delete: :nullify
+  add_foreign_key "pages", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "post_relations", "posts"
   add_foreign_key "post_relations", "posts", column: "related_post_id"
   add_foreign_key "post_tags", "posts"
   add_foreign_key "post_tags", "tags"
   add_foreign_key "posts", "users", column: "author_id", on_delete: :nullify
+  add_foreign_key "posts", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "sessions", "users"
 end

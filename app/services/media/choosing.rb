@@ -48,7 +48,10 @@ module Media
       # comparing with it would skip the permission check below.
       return if id && id == record.attribute_in_database(attribute)
       return denied("media.upload", record) unless authorize!("media.upload", record)
-      return if id && Media::Asset.exists?(id)
+      # A trashed image reads as missing (trash spec §5.1): a kept page
+      # must never start pointing at something in the trash, which is also
+      # what lets moving an image to the trash refuse only kept usages.
+      return if id && Media::Asset.kept.exists?(id)
 
       record.errors.add(error_attribute, "doesn't exist")
       failure(record)
@@ -68,6 +71,9 @@ module Media
       raise error unless error.message.include?("media_assets")
 
       id = reference_attribute && record.public_send(reference_attribute)
+      # Row existence, not `.kept`: this decides which FK refused the
+      # save, and a trashed image's row is still there for its FK to find
+      # -- a record pointing at one didn't cause this failure.
       if id && !Media::Asset.exists?(id)
         record.errors.add(error_attribute, "doesn't exist")
       else

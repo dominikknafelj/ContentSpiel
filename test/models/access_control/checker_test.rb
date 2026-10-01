@@ -301,7 +301,7 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     doomed = create_page(title: "Doomed")
     grant!("pages.edit", { "page_ids" => [ doomed.id ] })
     doomed_id = doomed.id
-    assert Pages::Destroy.call(doomed).ok?
+    assert delete_for_good(doomed)
     assert_nil Page.find_by(id: doomed_id)
 
     assert_not allowed?(@brancher, "pages.edit", create_page(title: "Other"))
@@ -378,7 +378,7 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
     assert_not AccessControl.can_assign_group?(@reader, group)
 
-    as_owner { Pages::Destroy.call(page) }
+    as_owner { delete_for_good(page) }
 
     assert AccessControl.can_assign_group?(@reader, group.reload)
   end

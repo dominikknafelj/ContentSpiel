@@ -76,9 +76,12 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
   test "an image deleted between the check and the save fails validation" do
     asset = create_media_asset
     block = image_block
-    racing = ->(*) { Media::Asset.where(id: asset.id).delete_all.positive? }
+    # The check is `Media::Asset.kept.exists?` (trashed images read as
+    # missing), so the race is staged on what `.kept` returns.
+    racing = Object.new
+    racing.define_singleton_method(:exists?) { |*| Media::Asset.where(id: asset.id).delete_all.positive? }
 
-    result = with_singleton_override(Media::Asset, :exists?, racing) do
+    result = with_singleton_override(Media::Asset, :kept, ->(*) { racing }) do
       as_owner { ContentBlocks::Save.call(block, attributes: { media_asset_id: asset.id }, translations: { "en" => { caption: "Changed" } }) }
     end
 
@@ -104,6 +107,27 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_not result.ok?
     assert_equal [ "Body has an image that doesn't exist" ], result.errors
     assert block.reload.body_document(locale: "en").blank?
+  end
+
+  # Telling which FK refused the save is about row existence, not trash
+  # state: a block still pointing at a *trashed* image (its row is there,
+  # so its FK can't be what failed) must not be blamed for a body image
+  # that vanished.
+  test "a vanished body image isn't blamed on the block's own trashed image" do
+    trashed = create_media_asset
+    asset = create_media_asset
+    block = as_owner { ContentBlocks::Save.call(ContentBlock.new(owner: create_page(title: "Page", published: false)), attributes: { block_type: "rich_text" }).record }
+    block.update_columns(media_asset_id: trashed.id)
+    trashed.update_columns(trashed_at: Time.current)
+    insert_all = Media::Usage.method(:insert_all)
+    racing = ->(rows, **options) { Media::Asset.where(id: asset.id).delete_all && insert_all.call(rows, **options) }
+
+    result = with_singleton_override(Media::Usage, :insert_all, racing) do
+      as_owner { ContentBlocks::Save.call(block.reload, translations: { "en" => { body: rich_doc("::image{asset=\"#{asset.id}\"}") } }) }
+    end
+
+    assert_not result.ok?
+    assert_equal [ "Body has an image that doesn't exist" ], result.errors
   end
 
   test "an actor without media.upload can't set the image, but can clear it" do

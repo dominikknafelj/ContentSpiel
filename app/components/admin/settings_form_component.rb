@@ -1,12 +1,15 @@
 module Admin
   # The Settings module's own form (cs-studio spec §6.1, Task 8): title,
-  # tagline, logo (the explicit-remove pattern), social link rows and the
-  # default language -- one autosaving `<form>`, same shape as
-  # `Admin::PageSettingsFormComponent`. Unlike a page/post, none of
-  # `SiteSetting`'s own columns are translated (Mobility), so this renders
-  # through `Admin::Columns::PlainColumnComponent`/`ImageColumnComponent`
-  # with no `locale`/`original` at all -- those components already treat
-  # both as optional for exactly this case.
+  # tagline, logo (the explicit-remove pattern), social link rows, the
+  # default language and the trash retention period (trash spec §4.4,
+  # plain `<input type="number">`, `0` meaning never -- `SiteSetting#
+  # trash_retention_days`'s own numericality validation is what a negative
+  # value comes back as a per-field error from) -- one autosaving `<form>`,
+  # same shape as `Admin::PageSettingsFormComponent`. Unlike a page/post,
+  # none of `SiteSetting`'s own columns are translated (Mobility), so this
+  # renders through `Admin::Columns::PlainColumnComponent`/
+  # `ImageColumnComponent` with no `locale`/`original` at all -- those
+  # components already treat both as optional for exactly this case.
   class SettingsFormComponent < AdminComponent
     ID_PREFIX = "settings"
 

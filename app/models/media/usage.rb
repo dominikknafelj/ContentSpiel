@@ -22,4 +22,16 @@ class Media::Usage < ApplicationRecord
   belongs_to :owner, polymorphic: true
 
   validates :role, inclusion: { in: ROLES }
+
+  # Usages whose owner is still live (trash spec §4.1/§5.1). A block has no
+  # trash state of its own, so a block-owned usage counts as kept when the
+  # block's page or post is -- the second hop. Moving an image to the trash
+  # asks this; purging one asks the plain `exists?` (any usage at all).
+  scope :by_kept_owner, -> {
+    kept_blocks = ContentBlock.where(owner_type: "Page", owner_id: Page.kept.select(:id))
+      .or(ContentBlock.where(owner_type: "Post", owner_id: Post.kept.select(:id)))
+    where(owner_type: "Page", owner_id: Page.kept.select(:id))
+      .or(where(owner_type: "Post", owner_id: Post.kept.select(:id)))
+      .or(where(owner_type: "ContentBlock", owner_id: kept_blocks.select(:id)))
+  }
 end

@@ -26,7 +26,7 @@ module ThemeHelper
   end
 
   def navigation_pages
-    theme_root_page ? theme_root_page.children.published.to_a : []
+    theme_root_page ? theme_root_page.children.kept.published.to_a : []
   end
 
   def home_url_path

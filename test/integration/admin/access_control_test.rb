@@ -33,9 +33,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # (design spec §6, `Admin::BaseController::MODULES`), which `two`
       # (Admin, every permission) and `author` (`media.upload` is one of
       # its own seeded grants, test/fixtures/access_control/grants.yml)
-      # both hold, and `reader` (Read only) doesn't.
-      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Pages", "Posts", "Media", "AI assistant", "Mind graph" ],
+      # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
+      # opens for any one of the rights that act on a trashed item, so
+      # `author`'s `media.upload` is enough -- its own trashed images.
+      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
+      users(:author) => [ "Pages", "Posts", "Media", "Trash", "AI assistant", "Mind graph" ],
       users(:reader) => [ "Pages", "Posts", "AI assistant", "Mind graph" ]
     }
 
@@ -388,7 +390,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_response :success
-    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Delete/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Move to trash/, count: 0
     assert_select "details.admin-record-header__schedule", count: 0
     assert_select "#block-picker-end", count: 0
 
@@ -396,18 +398,18 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_select "button", text: "Unpublish"
-    assert_select "button", text: "Delete"
+    assert_select "button", text: "Move to trash"
     assert_select "#block-picker-end"
   end
 
-  test "an author editing their own draft post gets neither Publish nor Delete" do
+  test "an author editing their own draft post gets neither Publish nor Move to trash" do
     sign_in_as(users(:author))
 
     get "/cs-studio/posts/#{@own_post.id}"
 
     assert_response :success
     assert_select "form[data-controller~='admin--autosave']"
-    assert_select "button, input[type=submit]", text: /Publish now|Delete/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish now|Move to trash/, count: 0
   end
 
   test "new posts offer only the content types the author may create" do

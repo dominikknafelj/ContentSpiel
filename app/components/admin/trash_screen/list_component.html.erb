@@ -1,0 +1,34 @@
+<% if may_empty? && total_count.positive? %>
+  <div class="mb-4 flex justify-end">
+    <%= render Admin::ButtonComponent.new(label: "Empty trash", variant: :danger, type: "button",
+          onclick: "document.getElementById('#{EMPTY_DIALOG_ID}').showModal()") %>
+  </div>
+  <%= render Admin::ConfirmDialogComponent.new(id: EMPTY_DIALOG_ID, title: "Empty the trash?",
+        body: "#{helpers.pluralize(total_count, "item")} will be deleted permanently. This can't be undone.") do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: helpers.admin_empty_trash_path(**url_options), method: :delete, data: { turbo_frame: "_top" } do %>
+        <%= render Admin::ButtonComponent.new(label: "Empty trash", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if items.empty? %>
+  <%= render Admin::EmptyStateComponent.new(title: "The trash is empty", description: "Deleted pages, posts and images show up here until they're deleted permanently.") %>
+<% else %>
+  <table class="admin-trash-table w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+        <th class="py-2 pr-4">Item</th>
+        <th class="py-2 pr-4">Type</th>
+        <th class="py-2 pr-4">Trashed</th>
+        <th class="py-2"><span class="sr-only">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% items.each do |item| %>
+        <%= render row_for(item) %>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

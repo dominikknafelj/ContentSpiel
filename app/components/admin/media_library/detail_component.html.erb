@@ -1,5 +1,6 @@
 <div class="admin-media-detail flex flex-col gap-6">
   <%= link_to "← Back to media", index_path, class: "text-sm text-meta hover:text-ink" %>
+  <%= render Admin::FlashComponent.new(notice: notice, alert: alert) %>
 
   <div class="grid gap-6 md:grid-cols-[16rem_1fr]">
     <div class="flex flex-col gap-2">
@@ -46,6 +47,8 @@
         <h2 class="mb-2 font-semibold text-ink">Used on</h2>
         <% if unresolved_usage? %>
           <p class="text-sm text-meta">Used somewhere that can’t be shown — the record of where may be out of date.</p>
+        <% elsif usage_state == :trash_only %>
+          <p class="text-sm text-meta">Used only by items in the trash.</p>
         <% elsif usage_entries.empty? %>
           <p class="text-sm text-meta">Not used anywhere yet.</p>
         <% else %>
@@ -65,16 +68,16 @@
 
       <% if can_delete? %>
         <div>
-          <% if used? %>
-            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button", disabled: true) %>
-            <p class="mt-1 text-sm text-meta">Can't delete — this image is used. See “Used on” above.</p>
+          <% if move_to_trash_disabled? %>
+            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button", disabled: true, title: in_use_reason) %>
+            <p class="mt-1 text-sm text-meta"><%= in_use_reason %></p>
           <% else %>
-            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
                   onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
-            <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this image?", body: "This can't be undone.") do |dialog| %>
+            <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
               <% dialog.with_confirm_action do %>
                 <%= form_with url: destroy_path, method: :delete do %>
-                  <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
+                  <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
                 <% end %>
               <% end %>
             <% end %>
