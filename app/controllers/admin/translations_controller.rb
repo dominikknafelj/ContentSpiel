@@ -80,9 +80,17 @@ module Admin
     # inline error. The status says how it went (403 for a refusal, 422 for
     # any other failure) but the streams are sent either way, so
     # `admin--translate` always has something to show under the field.
+    #
+    # A request in which no field names a valid input id has nowhere to show
+    # anything, so it's a bare 422 before `AI::Translate` runs: no provider
+    # call (nothing paid for that nobody could see), no `ai.translated`
+    # event. The editor never sends one; `admin--translate` shows its own
+    # generic error for a non-stream answer.
     def suggest
       record = load_translatable_record
       fields = requested_fields
+      return head(:unprocessable_entity) if requested_inputs(fields).empty?
+
       translation = AI::Translate.new(record, fields: fields, to: params[:locale].to_s)
       result = translation.call
 

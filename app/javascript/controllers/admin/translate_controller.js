@@ -250,8 +250,12 @@ function setBusy(button, busy) {
   if (spinner) spinner.hidden = !busy
 }
 
-// The same shape as `SuggestionComponent`'s error variant, built from text
-// nodes only.
+// The same shape as `SuggestionComponent`'s error variant -- including its
+// Dismiss, so a client-side error can be cleared like a server-sent one --
+// built from text nodes only. The button is `type="button"`: the box sits
+// inside an autosave form, and a default (submit) button would post it.
+// Its classes mirror `SuggestionComponent::BUTTON_CLASS` (Tailwind only
+// sees class names spelled out in full, here as there).
 function showError(box, message) {
   if (!box) return
   const wrapper = document.createElement("div")
@@ -261,7 +265,15 @@ function showError(box, message) {
   text.setAttribute("role", "alert")
   text.className = "text-danger-ink"
   text.textContent = message
-  wrapper.append(text)
+  const actions = document.createElement("div")
+  actions.className = "mt-2"
+  const dismiss = document.createElement("button")
+  dismiss.type = "button"
+  dismiss.className = "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken"
+  dismiss.dataset.action = "admin--translate#discard"
+  dismiss.textContent = "Dismiss"
+  actions.append(dismiss)
+  wrapper.append(text, actions)
   box.replaceChildren(wrapper)
 }
 

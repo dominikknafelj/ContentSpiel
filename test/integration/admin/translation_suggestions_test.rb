@@ -144,11 +144,25 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
 
   test "an input id that isn't a plain DOM id gets no stream" do
     record = create_post(title: "Hello")
+    assert Posts::Save.call(record, translations: { "en" => { excerpt: "A summary" } }).ok?
 
-    suggest(record, %w[title], inputs: { title: %(x"><script>) })
+    suggest(record, %w[title excerpt], inputs: { title: %(x"><script>), excerpt: "post-excerpt" })
 
     assert_response :success
+    assert_equal 1, css_select("turbo-stream").size
+    assert_includes stream_fragment("translation-suggestion-post-excerpt").text, "[de] A summary"
+  end
+
+  test "422 before any provider call when no requested field names a valid input id" do
+    record = create_post(title: "Hello")
+
+    assert_no_difference -> { Audit::Event.where(action: "ai.translated").count } do
+      suggest(record, %w[title], inputs: { title: %(x"><script>) })
+    end
+
+    assert_response :unprocessable_entity
     assert_empty css_select("turbo-stream")
+    assert_empty StubProvider.calls, "nowhere to show a suggestion, so nothing is sent to the provider"
   end
 
   test "403 without ai.translate, with the refusal inline" do
