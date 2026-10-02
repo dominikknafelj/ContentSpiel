@@ -11,19 +11,25 @@ module Translations
   # that predate this feature have no digest and read `:unknown`, never
   # `:outdated` (Review Focus 1), so deploying this flags nothing.
   #
-  # A model declares its fields with `tracks_translations`:
+  # A model opts in with `tracks_translations`:
   #
-  #   tracks_translations :title, :excerpt, :body, schema: :fields
+  #   tracks_translations schema: :fields
   #
-  # Plain names are Mobility jsonb columns (`{ locale => value }`), `body`
-  # included (`HasRichTextBody` stores one document per locale the same
-  # way). `schema:` names the reader (`Post#fields`/`ContentBlock
-  # #settings_object`) whose type definition's `translated: true` fields
-  # are tracked too -- those live in one shared jsonb column,
-  # `{ locale => { field => value } }` (`ContentModel::FieldSet`), named by
-  # `SCHEMA_COLUMNS`. Every read here is literal per locale, never through
-  # a fallback: a German value that only *looks* present because English
-  # shows through is missing, not current.
+  # The tracked columns are the model's own Mobility `translates` names
+  # (`mobility_attributes`, the same list `Audit::Snapshot` splits per
+  # locale) minus `except:` (default `slug`, which is generated per
+  # language, not translated from the original) -- derived,
+  # never listed a second time (spec §3.1), so a newly translated column is
+  # tracked without anyone remembering to add it here. `body` is one of
+  # them (`HasRichTextBody` calls `translates :body`) and reads as a
+  # `RichText::Document`. `schema:` names the reader (`Post#fields`/
+  # `ContentBlock#settings_object`) whose type definition's
+  # `translated: true` fields are tracked too -- those live in one shared
+  # jsonb column, `{ locale => { field => value } }`
+  # (`ContentModel::FieldSet`), named by `SCHEMA_COLUMNS`. Every read here
+  # is literal per locale, never through a fallback: a German value that
+  # only *looks* present because English shows through is missing, not
+  # current.
   module Tracker
     extend ActiveSupport::Concern
 
@@ -31,17 +37,22 @@ module Translations
     SCHEMA_COLUMNS = { fields: "translated_metadata", settings_object: "translated_settings" }.freeze
 
     included do
-      class_attribute :translation_columns, instance_writer: false, default: []
+      class_attribute :untracked_translations, instance_writer: false, default: %w[slug]
       class_attribute :translation_schema_reader, instance_writer: false, default: nil
 
       before_save :record_translation_sources
     end
 
     class_methods do
-      def tracks_translations(*columns, schema: nil)
-        self.translation_columns = columns.map(&:to_s).freeze
+      def tracks_translations(schema: nil, except: %w[slug])
+        self.untracked_translations = Array(except).map(&:to_s).freeze
         self.translation_schema_reader = schema
       end
+
+      # Read when asked, not captured at `tracks_translations` time, so the
+      # call's position relative to `translates`/`include HasRichTextBody`
+      # doesn't matter.
+      def translation_columns = mobility_attributes.map(&:to_s) - untracked_translations
 
       # Instance-aware: a post's or block's schema fields depend on its own
       # content/block type. A schema field sharing a column's name is
@@ -95,7 +106,7 @@ module Translations
     end
 
     def translation_schema_field(field)
-      return if translation_columns.include?(field)
+      return if self.class.translation_columns.include?(field)
 
       translation_schema_fields.find { |candidate| candidate.name == field }
     end
@@ -106,6 +117,12 @@ module Translations
       return [ field, [] ] unless translation_schema_field(field)
 
       [ SCHEMA_COLUMNS.fetch(translation_schema_reader), [ field ] ]
+    end
+
+    def translation_locales(field)
+      column, = translation_location(field)
+      stored = read_attribute(column).to_h.keys + (new_record? ? [] : attribute_in_database(column).to_h.keys)
+      (Translations.target_locales + stored.map(&:to_s)).uniq - [ Translations.primary_locale ]
     end
 
     def raw_translation_value(field, locale, in_database: false)
@@ -127,9 +144,14 @@ module Translations
       RichText::Document.new(before).normalized.to_h != RichText::Document.new(after).normalized.to_h
     end
 
+    # Every non-primary locale the value exists in -- before or after this
+    # save -- not only the currently enabled ones: a German value edited
+    # through MCP or the console while German is switched off must still get
+    # a fresh digest, or it would wrongly read `:current` against a stale one
+    # once German is enabled again (review fix round 1, ruling 4).
     def record_translation_sources
       self.class.translation_tracked_fields(self).each do |field|
-        Translations.target_locales.each do |locale|
+        translation_locales(field).each do |locale|
           next unless translation_value_changed?(field, locale)
 
           if blank_translation?(translation_value(field, locale))

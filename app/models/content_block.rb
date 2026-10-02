@@ -28,7 +28,7 @@ class ContentBlock < ApplicationRecord
   # (translation helpers spec §3.2), plus the block type's own
   # `translated: true` settings. Rolls up into the owner's state.
   include Translations::Tracker
-  tracks_translations :caption, :alt, :body, schema: :settings_object
+  tracks_translations schema: :settings_object
 
   belongs_to :owner, polymorphic: true
 

@@ -126,6 +126,54 @@ class Translations::TrackerTest < ActiveSupport::TestCase
     end
   end
 
+  test "each model's tracked columns are its translated attributes minus the slug" do
+    [ Page, Post, ContentBlock, Media::Asset ].each do |model|
+      assert_equal model.mobility_attributes.map(&:to_s) - %w[slug], model.translation_columns, model.name
+    end
+    assert_equal %w[title excerpt body], Post.translation_columns
+  end
+
+  # Postgres jsonb reorders keys on storage (shorter keys first), so a
+  # translated group value saved as `{ "label", "url" }` reloads as
+  # `{ "url", "label" }` -- the digest taken in memory at save time and the
+  # one `translation_state` takes after reload must still agree.
+  test "a translated group field reads current after its own save, despite jsonb key reordering" do
+    FieldGroups.register("test/link") { |c| c.field :label, :string; c.field :url, :string }
+    BlockTypes.register("test/cta") do |t|
+      t.label "Call to action"
+      t.field :link, :group, of: "test/link", translated: true
+      t.component TestQuoteComponent
+    end
+
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "Links")
+      block = save_block(ContentBlock.new(owner: page), attributes: { block_type: "test/cta" },
+        translations: { "en" => { settings: { "link" => { "label" => "Read more", "url" => "/en" } } },
+                        "de" => { settings: { "link" => { "label" => "Mehr lesen", "url" => "/de" } } } })
+
+      stored = block.reload.translated_settings.dig("en", "link")
+      assert_equal %w[url label], stored.keys, "jsonb didn't reorder the keys -- this test would pass vacuously"
+      assert_equal :current, block.translation_state("link", "de")
+    end
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "a value edited while its locale is disabled is still tracked" do
+    post = nil
+    with_locales(%w[en], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "de", { title: "Hallo" })
+      assert post.reload.translation_sources.dig("title", "de").present?
+    end
+
+    with_locales(%w[en de], default: "en") do
+      assert_equal :current, post.reload.translation_state("title", "de")
+      save_post(post, "en", { title: "Hello there" })
+      assert_equal :outdated, post.reload.translation_state("title", "de")
+    end
+  end
+
   test "confirm_translation marks an outdated field current without changing the value" do
     with_locales(%w[en de], default: "en") do
       post = create_post(title: "Hello")

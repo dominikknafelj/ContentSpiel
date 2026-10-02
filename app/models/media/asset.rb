@@ -47,7 +47,7 @@ class Media::Asset < ApplicationRecord
   # Which version of the original alt/caption each translation was saved
   # against (translation helpers spec §3.2).
   include Translations::Tracker
-  tracks_translations :alt, :caption
+  tracks_translations
 
   belongs_to :created_by, class_name: "User", optional: true
 

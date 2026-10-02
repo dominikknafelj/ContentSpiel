@@ -28,7 +28,11 @@ module Audit
     EXEMPT_FROM_FILTER = %w[email_address].freeze
 
     # Timestamps churn on every save and say nothing `occurred_at` doesn't.
-    IGNORED_CHANGES = %w[created_at updated_at].freeze
+    # `translation_sources` (`Translations::Tracker`) is bookkeeping derived
+    # from the translated values whose own changes are already listed --
+    # digests nobody reads in a changes row. It stays in the full snapshot,
+    # which is the version basis, not a diff.
+    IGNORED_CHANGES = %w[created_at updated_at translation_sources].freeze
 
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK

@@ -60,7 +60,7 @@ class Page < ApplicationRecord
   # (translation helpers spec §3.2). Never `slug`: it's generated per
   # language, not translated from the original's.
   include Translations::Tracker
-  tracks_translations :title, :subtitle, :meta_title, :meta_description, :hero_alt
+  tracks_translations
 
   # A page's body is an ordered list of blocks; the renderer walks them in
   # `position` order and dispatches on each one's `block_type`. `as: :owner`

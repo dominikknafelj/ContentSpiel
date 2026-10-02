@@ -15,12 +15,26 @@ module Translations
   # whitespace, merged text nodes) isn't a change. A translated schema
   # *group* field's value is a raw jsonb Hash/Array (see
   # `Tracker#translation_value`), digested as JSON rather than through
-  # `to_s`, whose `inspect` form isn't something to pin a format on.
+  # `to_s`, whose `inspect` form isn't something to pin a format on --
+  # and as *canonical* JSON, keys sorted at every level: Postgres jsonb
+  # reorders keys on storage, so the in-memory value a save digests and the
+  # reloaded one `translation_state` digests can differ in key order alone,
+  # which must not read as an edit (review fix round 1, I1).
   def digest(value)
     case value
     when RichText::Document then value.blank? ? nil : value.normalized.digest
-    when Hash, Array then value.blank? ? nil : Digest::SHA256.hexdigest(value.to_json)
+    when Hash, Array then value.blank? ? nil : Digest::SHA256.hexdigest(canonical(value).to_json)
     else value.to_s.strip.presence && Digest::SHA256.hexdigest(value.to_s.strip)
+    end
+  end
+
+  # `value` with every Hash's keys sorted (as Strings, so a Symbol-keyed
+  # in-memory Hash and its String-keyed reload agree), recursively.
+  def canonical(value)
+    case value
+    when Hash then value.to_h { |key, item| [ key.to_s, canonical(item) ] }.sort.to_h
+    when Array then value.map { |item| canonical(item) }
+    else value
     end
   end
 end
