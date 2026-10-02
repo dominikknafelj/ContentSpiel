@@ -37,7 +37,12 @@ module Admin
     def index
       @content_types = ContentTypes.all
       @tags = Tag.order(:name)
-      @posts = filtered_posts.includes(:tags).order(updated_at: :desc)
+      @posts = filtered_posts.includes(:tags).order(updated_at: :desc).to_a
+      # The "Languages" column (translation helpers spec §4): every listed
+      # post's state per target language, worked out once for the whole
+      # list -- `Translations::Status.for` loads every post's blocks in one
+      # query, so the column costs the same however many rows it shows.
+      @translation_states = Translations::Status.for(@posts)
     end
 
     # "New post" (spec §5.2): asks for the content type up front, in the

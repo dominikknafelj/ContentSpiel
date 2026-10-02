@@ -63,4 +63,54 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "no longer exists"
     assert_equal @a, @child.reload.parent
   end
+
+  # Translation helpers spec §4 (Task 4): one marker on a page that isn't
+  # complete in some target language, its tooltip naming them.
+  test "the tree marks a page incomplete in some language, naming the languages" do
+    with_locales(%w[en de es], default: "en")
+    assert Pages::Save.call(@a, translations: { "es" => { title: "Alfa" } }).ok?
+    assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" }, "es" => { title: "Beta" } }).ok?
+
+    get "/cs-studio/pages"
+
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]" do |markers|
+      assert_equal 1, markers.size
+      assert_equal "Incomplete in Deutsch (missing)", markers.first["title"]
+      assert_equal "Incomplete in Deutsch (missing)", markers.first["aria-label"]
+    end
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker]", count: 0
+  end
+
+  test "the tree marker lists outdated languages too" do
+    with_locales(%w[en de es], default: "en")
+    assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" } }).ok?
+    assert Pages::Save.call(@b, translations: { "en" => { title: "Beta!" } }).ok?
+
+    get "/cs-studio/pages"
+
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker][title='Incomplete in Deutsch (outdated), Español (missing)']"
+  end
+
+  test "the tree shows no marker with one language enabled" do
+    with_locales(%w[en], default: "en")
+
+    get "/cs-studio/pages"
+
+    assert_select "turbo-frame#tree [data-translation-marker]", count: 0
+  end
+
+  test "a context-only row never shows the marker" do
+    with_locales(%w[en de es], default: "en")
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.edit", scope: { "page_ids" => [ @a.id ] })
+    sign_out
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/pages/#{@child.id}"
+
+    assert_response :success
+    assert_select "turbo-frame#tree li[data-page-id='#{root_page.id}'][data-context-only] > div" do |rows|
+      assert_nil rows.first.at_css("[data-translation-marker]")
+    end
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]"
+  end
 end

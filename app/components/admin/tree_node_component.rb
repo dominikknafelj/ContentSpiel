@@ -30,11 +30,17 @@ module Admin
   # page and the drag handle `pages.move` on it (the drop target's own
   # `pages.create` is `Pages::Move`'s to check, answered in the tree's
   # status line).
+  #
+  # `translation_states` is `{ page_id => { locale => state } }` for the
+  # readable rows (`Translations::Status.for`, computed once by
+  # `Admin::TreeComponent`, same reasoning as `children_by_parent`); a row
+  # not complete in some target language gets one marker naming them.
   class TreeNodeComponent < AdminComponent
-    def initialize(page:, children_by_parent:, context_only_ids: Set.new, selected: nil, locale:, url_options: {}, root: false)
+    def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_states: {}, selected: nil, locale:, url_options: {}, root: false)
       @page = page
       @children_by_parent = children_by_parent
       @context_only_ids = context_only_ids
+      @translation_states = translation_states
       @selected = selected
       @locale = locale
       @url_options = url_options
@@ -73,8 +79,21 @@ module Admin
 
     def status = page.status
 
+    # `{ locale => :missing | :outdated }`, target languages in order; never
+    # anything for a context-only row (no status shows there at all).
+    def incomplete_locales
+      return {} if context_only?
+
+      translation_states.fetch(page.id, {}).reject { |_code, state| state == :complete }
+    end
+
+    # "Incomplete in Deutsch (missing), Español (outdated)"
+    def translation_marker_label
+      "Incomplete in " + incomplete_locales.map { |code, state| "#{::Locales.name(code, native: true)} (#{state})" }.join(", ")
+    end
+
     private
 
-    attr_reader :page, :children_by_parent, :context_only_ids, :selected, :locale, :url_options
+    attr_reader :page, :children_by_parent, :context_only_ids, :translation_states, :selected, :locale, :url_options
   end
 end

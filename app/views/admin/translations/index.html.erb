@@ -1,0 +1,39 @@
+<%# The Translations overview (translation helpers spec §4): a tab per
+    target language, a type filter, then what's missing or outdated there
+    (`Admin::TranslationScreen::ListComponent`), 50 per page
+    (`Admin::TranslationsController`). %>
+<h1 class="mb-2 text-h1 text-ink">Translations</h1>
+<p class="mb-4 text-meta">What's missing or out of date in each language. Open an item to translate it.</p>
+
+<nav aria-label="Target languages" class="mb-3 flex flex-wrap gap-2">
+  <% @target_locales.each do |code| %>
+    <%= link_to Locales.name(code, native: true), admin_translations_path(locale: code, type: @type),
+          class: "rounded-cs px-3 py-1 #{@locale == code ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
+          aria: { current: (@locale == code ? "page" : nil) } %>
+  <% end %>
+</nav>
+
+<% if @types.size > 1 %>
+  <nav aria-label="Filter by type" class="mb-4 flex flex-wrap gap-2">
+    <% [ [ "All", nil ] ].concat(@types.map { |type| [ Admin::TranslationsController::TYPES.dig(type, :label), type ] }).each do |label, type| %>
+      <%= link_to label, admin_translations_path(locale: @locale, type:),
+            class: "rounded-cs px-3 py-1 #{@type == type ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
+            aria: { current: (@type == type ? "page" : nil) } %>
+    <% end %>
+  </nav>
+<% end %>
+
+<%= render Admin::TranslationScreen::ListComponent.new(items: @items, locale: @locale) %>
+
+<% if @has_next || @offset.positive? %>
+  <div class="mt-4 flex items-center gap-3">
+    <% if @offset.positive? %>
+      <%= link_to "Previous", admin_translations_path(request.query_parameters.merge("offset" => [ @offset - Admin::TranslationsController::PER_PAGE, 0 ].max)),
+            class: setup_secondary_link_class %>
+    <% end %>
+    <% if @has_next %>
+      <%= link_to "Next", admin_translations_path(request.query_parameters.merge("offset" => @offset + Admin::TranslationsController::PER_PAGE)),
+            class: setup_secondary_link_class %>
+    <% end %>
+  </div>
+<% end %>

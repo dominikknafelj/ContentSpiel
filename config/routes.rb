@@ -109,6 +109,14 @@ Rails.application.routes.draw do
     # type rather than one nested route per model.
     post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
 
+    # The Translations overview (translation helpers spec §4): what's
+    # missing or outdated in `?locale=` (a target language), optionally
+    # narrowed by `?type=page|post|media`, paged by `?offset=`. A plain
+    # `get` rather than `resources :translations, only: :index`, so the
+    # AI suggestion action (Task 8) can join the same controller on a
+    # route of its own without a resource's implied member routes.
+    get "translations", to: "translations#index", as: :translations
+
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource
