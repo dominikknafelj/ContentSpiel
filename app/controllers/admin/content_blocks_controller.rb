@@ -49,7 +49,7 @@ module Admin
 
       if result.ok?
         reposition_after(result.record, params[:after_id])
-        render turbo_stream: [ *insertion_stream(result.record, params[:after_id], previous_last_id: previous_last_id), page_base_stream ], status: :created
+        render turbo_stream: [ *insertion_stream(result.record, params[:after_id], previous_last_id: previous_last_id), *page_base_streams ], status: :created
       else
         render turbo_stream: picker_error_stream(result.errors), status: failure_status(result)
       end
@@ -86,7 +86,7 @@ module Admin
         Admin::BlockCardComponent.image_field(block: block, asset: stored, locale: admin_locale, errors: errors)
       end
       streams << refused if refused
-      streams << page_base_stream if result.ok?
+      streams.concat(page_base_streams) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
     end
@@ -106,7 +106,7 @@ module Admin
       result = ContentBlocks::Destroy.call(block)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), page_base_stream ]
+      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), *page_base_streams ]
     end
 
     # Drag reorder or Move up/down (spec §6.1): the client already knows
@@ -131,7 +131,7 @@ module Admin
       end
 
       streams = [ turbo_stream.replace(status_id, state) ]
-      streams << (result.ok? ? page_base_stream : picker_error_stream(result.errors))
+      result.ok? ? streams.concat(page_base_streams) : streams << picker_error_stream(result.errors)
       render turbo_stream: streams, status: (result.ok? ? :ok : failure_status(result))
     end
 
@@ -160,7 +160,7 @@ module Admin
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
       reposition_after(copy, source.id)
-      render turbo_stream: [ *insertion_stream(copy.reload, source.id, previous_last_id: previous_last_id), page_base_stream ], status: :created
+      render turbo_stream: [ *insertion_stream(copy.reload, source.id, previous_last_id: previous_last_id), *page_base_streams ], status: :created
     end
 
     private
@@ -172,21 +172,41 @@ module Admin
     # on a published page), answered 403 below.
     def set_page
       @page = admin_scope(Page.all).find(params[:page_id])
+      # Before any write this request makes touches it -- see
+      # `#page_base_streams`.
+      @page_updated_at_before_write = @page.updated_at
     end
 
     # Every successful block write touches the page (`ContentBlocks::Save`,
     # final fix wave I3), which moves the `updated_at` the page settings
-    # form on this same screen holds as its autosave base -- so its next
-    # save would report "Changed elsewhere" against nothing but this same
-    # editor's block edit. Each block response hands that form the page's
-    # fresh value too (read from the row: `@page` itself may not be the
-    # object the service touched). A page saved in another tab in the
-    # meantime is still caught: this only ever moves the base forward to
-    # what the row holds now, after *this* write.
-    def page_base_stream
+    # form on this same screen holds as its autosave base -- so, left
+    # alone, that form's next save would report "Changed elsewhere" against
+    # nothing but this same editor's block edit.
+    #
+    # So a block response may move that form's base forward to the page's
+    # new `updated_at` -- but only when the base the form holds (sent by
+    # `admin--autosave`/`admin--blocks` as `X-Page-Base-Updated-At`) was
+    # still current *before* this write (fix round 2). If the page was saved
+    # elsewhere since the form loaded it (another tab, another user), the
+    # sent base is older than `@page_updated_at_before_write`, and moving it
+    # forward would silently absorb that save: the form's next autosave
+    # would pass the staleness check and overwrite the other editor's
+    # fields without a word. Then the base is left alone, so that autosave
+    # still reports "Changed elsewhere". No base sent (an older client), or
+    # an unparseable one, means nothing to vouch for -- left alone too.
+    def page_base_streams
+      return [] unless page_base_was_current?
+
       id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
-      turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
-        locals: { id: id, value: Page.where(id: @page.id).pick(:updated_at).iso8601(6) })
+      [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
+        locals: { id: id, value: Page.where(id: @page.id).pick(:updated_at).iso8601(6) }) ]
+    end
+
+    def page_base_was_current?
+      sent = request.headers["X-Page-Base-Updated-At"]
+      sent.present? && Time.iso8601(sent) >= @page_updated_at_before_write
+    rescue ArgumentError
+      false
     end
 
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity

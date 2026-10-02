@@ -27,7 +27,21 @@ export default class extends Controller {
   static targets = ["card"]
   static values = { reorderUrl: String }
 
+  // Every block request also carries the page settings form's current base
+  // (`X-Page-Base-Updated-At`): a block write touches the page, and the
+  // server only moves that form's base forward when the one it holds was
+  // still current (`Admin::ContentBlocksController#page_base_streams`).
+  // Turbo's own submissions inside this section (add, duplicate, delete)
+  // get it here; `reorder` below adds it itself; a card's autosave through
+  // `admin--autosave`'s `pageBaseId` value.
+  static pageBaseId = "page-base-updated-at"
+
   connect() {
+    this.addPageBase = (event) => {
+      const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
+      if (pageBase) event.detail.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+    }
+    this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
     this.sortable = Sortable.create(this.element, {
       handle: ".admin-block-card__handle",
       animation: 150,
@@ -36,6 +50,7 @@ export default class extends Controller {
   }
 
   disconnect() {
+    this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
     this.sortable?.destroy()
   }
 
@@ -76,7 +91,8 @@ export default class extends Controller {
       headers: {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken
+        "X-CSRF-Token": csrfToken,
+        "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
       },
       body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) })
     })

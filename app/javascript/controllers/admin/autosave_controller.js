@@ -36,7 +36,13 @@ import { Turbo } from "@hotwired/turbo-rails"
 export default class extends Controller {
   static values = {
     statusId: String,
-    debounce: { type: Number, default: 1000 }
+    debounce: { type: Number, default: 1000 },
+    // A block card's form names the page settings form's base field here
+    // (`Admin::BlockCardComponent#form_data`): its current value rides
+    // along as `X-Page-Base-Updated-At`, so the server only moves that
+    // form's base forward when it was still current (`Admin::
+    // ContentBlocksController#page_base_streams`).
+    pageBaseId: String
   }
 
   // Client-only states `Admin::SaveStatusComponent` never has occasion to
@@ -99,10 +105,7 @@ export default class extends Controller {
       response = await fetch(this.element.action, {
         method: "PATCH",
         body: new FormData(this.element),
-        headers: {
-          Accept: "text/vnd.turbo-stream.html",
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
-        }
+        headers: this.requestHeaders()
       })
     } catch (error) {
       this.scheduleRetry()
@@ -189,6 +192,16 @@ export default class extends Controller {
     this.busy = false
 
     if (this.pending) this.trigger()
+  }
+
+  requestHeaders() {
+    const headers = {
+      Accept: "text/vnd.turbo-stream.html",
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
+    }
+    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)?.value
+    if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
+    return headers
   }
 
   scheduleRetry() {

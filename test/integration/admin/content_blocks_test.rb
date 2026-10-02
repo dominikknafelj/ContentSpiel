@@ -374,19 +374,20 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
   def image_block_with_image
     @page.content_blocks.create!(block_type: "image", position: 0, media_asset: create_media_asset)
   end
-  # Final fix wave I3: a block write touches its page, so every block
-  # response also hands the page settings form on the same screen the
-  # page's fresh `updated_at` -- otherwise that form's next autosave would
-  # report "Changed elsewhere" against nothing but this same editor.
+  # Final fix wave I3: a block write touches its page, so a block response
+  # also hands the page settings form on the same screen the page's fresh
+  # `updated_at` -- but only when the base that form holds (sent along as
+  # `X-Page-Base-Updated-At`) was still current before this write;
+  # otherwise its next autosave would report "Changed elsewhere" against
+  # nothing but this same editor.
   test "block writes refresh the page form's base so its next save isn't stale" do
     block = @page.content_blocks.create!(block_type: :rich_text, position: 0)
     travel 1.minute
 
     patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("Edited").to_json }, base_updated_at: block.updated_at.iso8601(6) },
-      as: :turbo_stream
+      headers: page_base_header(@page.reload.updated_at), as: :turbo_stream
     assert_response :success
     fresh = @page.reload.updated_at.iso8601(6)
-    assert_select_in_stream "page-base-updated-at", //
     assert_equal fresh, streamed_page_base
 
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: fresh }, as: :turbo_stream
@@ -394,12 +395,48 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_no_match(/Changed elsewhere/, response.body)
 
     travel 1.minute
-    patch "#{blocks_path}/reorder", params: { ids: [ block.id ] }, as: :turbo_stream
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ] }, headers: page_base_header(@page.reload.updated_at), as: :turbo_stream
     assert_response :success
-    delete "#{blocks_path}/#{block.id}", as: :turbo_stream
+    delete "#{blocks_path}/#{block.id}", headers: page_base_header(@page.reload.updated_at), as: :turbo_stream
     assert_response :success
     assert_equal @page.reload.updated_at.iso8601(6), streamed_page_base
   end
+
+  # Fix round 2: the refresh above must never paper over a real conflict.
+  # A loaded the editor, B then saved the page's settings, then A edited a
+  # block: A's page form still holds the pre-B base, so the block response
+  # must leave it alone -- A's next page autosave is then reported as
+  # "Changed elsewhere", as it would have been without the block edit.
+  test "a block edit doesn't hide a page save made elsewhere in the meantime" do
+    block = @page.content_blocks.create!(block_type: :rich_text, position: 0)
+    a_base = @page.reload.updated_at
+    travel 1.minute
+    assert Current.set(actor: users(:two), channel: :admin) { Pages::Save.call(@page.reload, translations: { Locales.default => { title: "B's title" } }) }.ok?
+    travel 1.minute
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("A's edit").to_json }, base_updated_at: block.reload.updated_at.iso8601(6) },
+      headers: page_base_header(a_base), as: :turbo_stream
+    assert_response :success
+    assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
+
+    patch "/cs-studio/pages/#{@page.id}", params: { page: { subtitle: "A's subtitle" }, base_updated_at: a_base.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_match(/Changed elsewhere/, response.body)
+    assert_equal "B's title", @page.reload.title
+  end
+
+  # No page base sent (a client that doesn't send one): nothing to vouch
+  # for, so the page form's base is never moved.
+  test "a block write without the page form's base doesn't stream one" do
+    block = @page.content_blocks.create!(block_type: :rich_text, position: 0)
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { body: rich_doc("Edited").to_json }, base_updated_at: block.updated_at.iso8601(6) },
+      as: :turbo_stream
+    assert_response :success
+    assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
+  end
+
+  def page_base_header(time) = { "X-Page-Base-Updated-At" => time.iso8601(6) }
 
   def streamed_page_base
     stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")

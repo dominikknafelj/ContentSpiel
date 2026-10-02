@@ -72,4 +72,26 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{second.id}']"
     assert_equal [ second, first ], @page.content_blocks.reload.order(:position).to_a
   end
+  # Final fix wave I3 / fix round 2: every block write touches the page, so
+  # each block request sends the page form's base along and gets it moved
+  # forward when it was current -- through Turbo's own submissions (the
+  # picker) and a card's autosave alike. Without that, the page form's next
+  # save here would read "Changed elsewhere" with nobody else involved.
+  test "editing blocks doesn't make the page settings form report a false conflict" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    press "Post list"
+    assert_selector ".admin-block-card", text: "Post list"
+    block = @page.content_blocks.sole
+
+    within("##{ActionView::RecordIdentifier.dom_id(block)}") { find("input[name='block[settings][limit]']").fill_in(with: "4") }
+    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_equal 4, block.reload.settings["limit"].to_i
+
+    fill_in "Title", with: "About the Studio"
+    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_no_text "Changed elsewhere"
+    assert_equal "About the Studio", @page.reload.title(locale: :en)
+  end
 end
