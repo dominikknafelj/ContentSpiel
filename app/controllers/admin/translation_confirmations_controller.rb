@@ -16,7 +16,10 @@ module Admin
   #   `Admin::ContentBlocksController#set_page`;
   # - an image: `Media::Asset.kept`, like `Admin::MediaController` (a
   #   library image has no per-record read right).
-  # Any other `record_type` is a 404 too. Site settings join in Task 5.
+  # - the site settings: `Current.site`, the one row there is -- any other
+  #   id is a 404. Nothing about it is secret, so there's no read scope;
+  #   `Translations::Confirm` asks for `settings.manage` (a 403 without).
+  # Any other `record_type` is a 404 too.
   #
   # Answers a Turbo request with streams removing the note and, once that
   # language has nothing else outdated, the switcher's marker; anything
@@ -49,6 +52,7 @@ module Admin
       when "Post" then admin_scope(Post.all).find(id)
       when "ContentBlock" then admin_scope(ContentBlock.all, "pages.read").find(id)
       when "Media::Asset" then Media::Asset.kept.find(id)
+      when "SiteSetting" then Current.site.id.to_s == id.to_s ? Current.site : raise(ActiveRecord::RecordNotFound)
       else raise ActiveRecord::RecordNotFound
       end
     end

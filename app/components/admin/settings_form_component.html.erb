@@ -1,3 +1,8 @@
+<div class="mb-2 flex items-center justify-between gap-3">
+  <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+  <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+</div>
+
 <div class="admin-settings-form rounded-cs border border-line bg-surface p-4">
   <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
         data: {
@@ -8,13 +13,18 @@
 
     <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
+    <%# Translated: this language's value, the original beside it. %>
     <%= render Admin::Columns::PlainColumnComponent.new(
-          name: "title", id: field_id("title"), html_name: field_html_name("title"), value: site_setting.title
+          name: "title", id: field_id("title"), html_name: field_html_name("title"), value: value(:title),
+          original: original(:title), locale: locale, **translation(:title)
         ) %>
 
     <%= render Admin::Columns::PlainColumnComponent.new(
-          name: "tagline", id: field_id("tagline"), html_name: field_html_name("tagline"), value: site_setting.tagline
+          name: "tagline", id: field_id("tagline"), html_name: field_html_name("tagline"), value: value(:tagline),
+          original: original(:tagline), locale: locale, **translation(:tagline)
         ) %>
+
+    <%# Everything below is one value for the whole site, in every language. %>
 
     <%= render partial: "admin/shared/image_upload_field", locals: {
           section_id: logo_section_id, name: "logo",

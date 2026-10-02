@@ -253,4 +253,28 @@ class Translations::StatusTest < ActiveSupport::TestCase
       assert_empty Translations::Status.missing_locales(post)
     end
   end
+
+  # -- the site settings (Task 5): the title is the required field --
+
+  test "the site settings are missing where the title is blank, and the tagline is optional" do
+    with_locales(%w[en de es], default: "en") do
+      site = Current.site
+      Mobility.with_locale(:en) { site.update!(tagline: "Things I learned") }
+      Mobility.with_locale(:de) { site.update!(title: "Danas Notizen") }
+
+      assert_equal({ "de" => :complete, "es" => :missing }, Translations::Status.for([ site ])[site])
+      assert_equal %w[es], Translations::Status.missing_locales(site)
+    end
+  end
+
+  test "the site settings read outdated when the original title changed" do
+    with_locales(%w[en de], default: "en") do
+      site = Current.site
+      Mobility.with_locale(:de) { site.update!(title: "Danas Notizen") }
+      Mobility.with_locale(:en) { site.update!(title: "Dana's Notes") }
+
+      assert_equal({ "de" => :outdated }, Translations::Status.for([ site ])[site])
+      assert_equal({ missing: [], outdated: %w[de] }, Translations::Status.switcher_locales(site))
+    end
+  end
 end

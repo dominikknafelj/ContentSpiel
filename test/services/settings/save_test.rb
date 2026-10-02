@@ -8,7 +8,8 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert_equal "New title", Current.site.reload.title
     event = Audit::Event.find_by!(action: "settings.updated")
     assert_equal Current.site, event.subject
-    assert_equal "New title", event.field_changes["title"].last
+    # Translated (translation helpers spec §5), so listed per language.
+    assert_equal "New title", event.field_changes["en title"].last
   end
 
   test "a save that changes nothing records nothing" do
@@ -39,5 +40,28 @@ class Settings::SaveTest < ActiveSupport::TestCase
 
     result = as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { tagline: "Fine" }) }
     assert result.ok?, result.errors.inspect
+  end
+
+  test "the title and tagline are saved per language through translations" do
+    with_locales(%w[en de], default: "en")
+
+    result = as_owner do
+      Settings::Save.call(Current.site, translations: { "de" => { title: "Danas Notizen", tagline: "Was ich gelernt habe", logo: nil } })
+    end
+
+    assert result.ok?, result.errors.inspect
+    site = Current.site.reload
+    assert_equal "Test Site", site.title(locale: "en")
+    assert_equal "Danas Notizen", site.title(locale: "de")
+    assert_equal "Was ich gelernt habe", site.tagline(locale: "de")
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_equal [ nil, "Danas Notizen" ], event.field_changes["de title"]
+  end
+
+  test "a blank title in the default language is refused" do
+    result = as_owner { Settings::Save.call(Current.site, translations: { "en" => { title: " " } }) }
+
+    assert_not result.ok?
+    assert_equal "Test Site", Current.site.reload.title(locale: "en")
   end
 end

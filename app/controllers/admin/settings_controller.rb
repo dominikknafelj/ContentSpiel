@@ -29,12 +29,19 @@ module Admin
     # `Admin::PagesController#update`: every field in `params[:site_setting]`
     # PATCHes here together, answered with the shared Turbo Stream response
     # regardless of success.
+    #
+    # The title and tagline (`Settings::Save::TRANSLATED`) are saved in the
+    # language being edited (`admin_locale`, the `?locale=` the form posts
+    # to), the same way `Admin::PagesController#update` saves a page title;
+    # every other field is one value for the whole site, resent and saved
+    # the same whichever language the form is showing.
     def update
       site = Current.site
       permitted = params.fetch(:site_setting, ActionController::Parameters.new)
-        .permit(:title, :tagline, :logo, :default_locale, :trash_retention_days, :time_zone, social_links: [ [ :name, :url ] ])
+        .permit(*Settings::Save::TRANSLATED, :logo, :default_locale, :trash_retention_days, :time_zone, social_links: [ [ :name, :url ] ])
 
-      attributes = permitted.except(:social_links).to_h
+      translated = permitted.slice(*Settings::Save::TRANSLATED).to_h
+      attributes = permitted.except(:social_links, *Settings::Save::TRANSLATED).to_h
 
       # `drop_blank_file_params` (see its own doc comment, carried over from
       # `Admin::PagesController#update`) keeps this same PATCH -- resent in
@@ -47,7 +54,7 @@ module Admin
       logo_changing = attributes.key?("logo")
       attributes["social_link_rows"] = permitted[:social_links] if permitted.key?(:social_links)
 
-      result = Settings::Save.call(site, attributes: attributes)
+      result = Settings::Save.call(site, attributes: attributes, translations: { admin_locale => translated })
       saved = result.ok?
 
       streams = autosave_stream(

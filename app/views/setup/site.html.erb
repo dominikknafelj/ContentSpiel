@@ -6,11 +6,11 @@
   <%= render "setup/errors", record: @site_setting %>
   <div>
     <%= form.label :title, "Site title", class: setup_label_class %>
-    <%= form.text_field :title, required: true, class: setup_input_class %>
+    <%= form.text_field :title, value: @site_setting.title(locale: @site_setting.default_locale), required: true, class: setup_input_class %>
   </div>
   <div>
     <%= form.label :tagline, class: setup_label_class %>
-    <%= form.text_field :tagline, class: setup_input_class %>
+    <%= form.text_field :tagline, value: @site_setting.tagline(locale: @site_setting.default_locale), class: setup_input_class %>
   </div>
   <div>
     <%= form.label :logo, class: setup_label_class %>

@@ -10,15 +10,25 @@ module Settings
   # own setters apply: `social_link_rows` normalises the name/URL rows, and
   # `logo` attaches (or, as nil, removes) the file on save.
   #
+  # `translations` carries the translated title and tagline (translation
+  # helpers spec §5), `{ locale => { title:, tagline: } }` -- the same shape
+  # as `Pages::Save`/`Media::Save`'s, each locale assigned inside its own
+  # `Mobility.with_locale`, and anything but `TRANSLATED` ignored. The
+  # default language's title is required (`SiteSetting#title_present_in_
+  # default_locale`); another language's may be left blank.
+  #
   # Needs `settings.manage`; one that changes the enabled `locales` too
   # needs `languages.manage`, the right that owns them everywhere else
   # (`Locales::Enable`/`Disable`/`Configure`). The default language stays a
   # settings field, as on the Settings screen. Recorded as
   # `settings.updated`, and only when something actually changed.
   class Save < ApplicationService
-    def initialize(site = Current.site, attributes:, actor: Current.actor)
+    TRANSLATED = %i[title tagline].freeze
+
+    def initialize(site = Current.site, attributes: {}, translations: {}, actor: Current.actor)
       @site = site
       @attributes = attributes.to_h.symbolize_keys
+      @translations = translations.to_h
       @actor = actor
     end
 
@@ -28,7 +38,7 @@ module Settings
         return denied("languages.manage", @site)
       end
 
-      @site.assign_attributes(@attributes)
+      assign
       logo_changing = @site.attachment_changes.key?("logo")
 
       saved = SiteSetting.transaction do
@@ -42,6 +52,16 @@ module Settings
       return failure(@site) unless saved
 
       success(@site)
+    end
+
+    private
+
+    def assign
+      @site.assign_attributes(@attributes)
+
+      @translations.each do |locale, values|
+        Mobility.with_locale(locale) { @site.assign_attributes(values.to_h.symbolize_keys.slice(*TRANSLATED)) }
+      end
     end
   end
 end

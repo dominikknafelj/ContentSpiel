@@ -18,6 +18,9 @@ module Translations
   #   (nothing about it is required), and untranslated images would never
   #   surface anywhere. An image without an original alt has nothing to
   #   translate, so it isn't missing anywhere.
+  #   The site settings (Task 5) are missing where the site title is blank:
+  #   it's their one required translated field (`SiteSetting#title_present_
+  #   in_default_locale`); the tagline is optional.
   # * `:outdated` is any tracked field of the record, or of its blocks,
   #   reading `:outdated` (`Translations::Tracker#translation_state`).
   #
@@ -97,6 +100,7 @@ module Translations
       when Page then page_missing?(record, blocks, code)
       when Post then post_missing?(record, blocks, code)
       when Media::Asset then image_missing?(record, code)
+      when SiteSetting then title_blank?(record, code)
       else false
       end
     end

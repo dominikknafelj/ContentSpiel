@@ -160,7 +160,14 @@ class SetupController < ApplicationController
     def update_site
       @site_setting = Current.site
 
-      if Settings::Save.call(@site_setting, attributes: site_params.to_h).ok?
+      site = site_params.to_h
+      translated = site.extract!(*Settings::Save::TRANSLATED.map(&:to_s))
+
+      # The title and tagline are translated (translation helpers spec §5)
+      # and typed here in the site's default language -- which the next
+      # step may still change, taking them along (`SiteSetting#carry_
+      # translations_into_new_default_locale`).
+      if Settings::Save.call(@site_setting, attributes: site, translations: { @site_setting.default_locale => translated }).ok?
         redirect_to setup_step_path("languages")
       else
         render :site, status: :unprocessable_entity

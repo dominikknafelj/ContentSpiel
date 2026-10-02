@@ -4,8 +4,8 @@
 
 <dl class="mt-6 divide-y divide-line border-y border-line">
   <% rows = [
-       [ "Site title", @site_setting.title, "site" ],
-       [ "Tagline", @site_setting.tagline.presence || "—", "site" ],
+       [ "Site title", @site_setting.title(locale: @site_setting.default_locale), "site" ],
+       [ "Tagline", @site_setting.tagline(locale: @site_setting.default_locale).presence || "—", "site" ],
        [ "Social links", @site_setting.social_links.keys.to_sentence.presence || "None", "site" ],
        [ "Default language", language_name(@site_setting.default_locale), "languages" ],
        [ "Home page", "Always created", nil ],

@@ -7,5 +7,13 @@ module Admin
     def default
       render Admin::SettingsFormComponent.new(site_setting: SiteSetting.instance)
     end
+
+    # The first language after the default (translation helpers spec §5):
+    # the title and tagline in that language, the original beside each.
+    def in_another_language
+      site = SiteSetting.instance
+      locale = (site.locale_codes - [ site.default_locale ]).first || site.default_locale
+      render Admin::SettingsFormComponent.new(site_setting: site, locale: locale)
+    end
   end
 end

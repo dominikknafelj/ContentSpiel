@@ -183,4 +183,134 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/Changed elsewhere/, response.body)
   end
+
+  # -- translated title and tagline (translation helpers spec §5) --
+
+  def translate_site(title:, tagline: nil, locale: "de")
+    Mobility.with_locale(locale) { @site.update!(title: title, tagline: tagline) }
+  end
+
+  test "in another language the title and tagline show that language's value beside the English original" do
+    with_locales(%w[en de es], default: "en")
+    @site.reload.update!(title: "Dana's Notes", tagline: "Things I learned")
+    translate_site(title: "Danas Notizen")
+
+    get "/cs-studio/settings", params: { locale: "de" }
+
+    assert_response :success
+    assert_select "input[name='site_setting[title]'][value=?]", "Danas Notizen"
+    assert_select "input[name='site_setting[tagline]']" do |inputs|
+      assert_nil inputs.first["value"].presence
+    end
+    assert_select "[data-original-for='title']", text: "Dana's Notes"
+    assert_select "[data-original-for='tagline']", text: "Things I learned"
+    assert_select "[data-translate-slot='title']"
+    # The language switcher, keeping the editing language in the form's URL.
+    assert_select "nav.admin-language-switcher a[href='/cs-studio/settings']", text: "English"
+    assert_select "nav.admin-language-switcher a[href='/cs-studio/settings?locale=es']", text: "Español"
+    assert_select "nav.admin-language-switcher [aria-current]", text: "Deutsch"
+    assert_select "form[action='/cs-studio/settings?locale=de']"
+    # Untranslated settings render once, the same in every language.
+    assert_select "select[name='site_setting[default_locale]']", 1
+    assert_select "select[name='site_setting[time_zone]']", 1
+    assert_select "input[name='site_setting[trash_retention_days]']", 1
+  end
+
+  test "the default language shows no original" do
+    with_locales(%w[en de], default: "en")
+
+    get "/cs-studio/settings"
+
+    assert_response :success
+    assert_select "[data-original-for='title']", count: 0
+    assert_select "[data-original-for='tagline']", count: 0
+  end
+
+  test "saving in German writes only the German title and tagline" do
+    with_locales(%w[en de], default: "en")
+    @site.reload.update!(title: "Dana's Notes", tagline: "Things I learned")
+
+    patch "/cs-studio/settings", params: { locale: "de", site_setting: { title: "Danas Notizen", tagline: "Was ich gelernt habe" },
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    @site.reload
+    assert_equal({ "en" => "Dana's Notes", "de" => "Danas Notizen" }, @site.read_attribute(:title))
+    assert_equal({ "en" => "Things I learned", "de" => "Was ich gelernt habe" }, @site.read_attribute(:tagline))
+    event = Audit::Event.where(action: "settings.updated").order(:id).last
+    assert_equal [ nil, "Danas Notizen" ], event.field_changes["de title"]
+  end
+
+  test "a blank German title is fine: only the default language's title is required" do
+    with_locales(%w[en de], default: "en")
+    translate_site(title: "Danas Notizen")
+
+    patch "/cs-studio/settings", params: { locale: "de", site_setting: { title: "" },
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal({ "en" => "Test Site" }, @site.reload.read_attribute(:title).compact_blank)
+  end
+
+  test "a blank title in the default language is refused, even with a German one" do
+    with_locales(%w[en de], default: "en")
+    translate_site(title: "Danas Notizen")
+
+    patch "/cs-studio/settings", params: { site_setting: { title: "" },
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "settings-title-errors", /can't be blank/
+    assert_equal "Test Site", @site.reload.title(locale: "en")
+  end
+
+  test "an outdated German title shows the note, the confirm button and the switcher marker" do
+    with_locales(%w[en de es], default: "en")
+    translate_site(title: "Danas Notizen")
+    Mobility.with_locale(:en) { @site.reload.update!(title: "Dana's Notes") }
+    assert_equal :outdated, @site.reload.translation_state("title", "de")
+
+    get "/cs-studio/settings", params: { locale: "de" }
+
+    assert_response :success
+    assert_select "#translation-note-site-setting-#{@site.id}-title", text: /Original changed since this was translated/
+    assert_select "#translation-note-site-setting-#{@site.id}-title button[form='translation-confirm-form']", text: "Mark as up to date"
+    assert_select "#language-switcher-outdated-de"
+    assert_select "#language-switcher-outdated-es", count: 0
+  end
+
+  test "marking the German title up to date clears the note" do
+    with_locales(%w[en de], default: "en")
+    translate_site(title: "Danas Notizen")
+    Mobility.with_locale(:en) { @site.reload.update!(title: "Dana's Notes") }
+
+    post "/cs-studio/translations/confirm",
+      params: { record_type: "SiteSetting", record_id: @site.id, field: "title", locale: "de" }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal :current, @site.reload.translation_state("title", "de")
+    assert Audit::Event.exists?(action: "settings.translation_confirmed")
+  end
+
+  test "marking a site field up to date needs settings.manage" do
+    with_locales(%w[en de], default: "en")
+    translate_site(title: "Danas Notizen")
+    Mobility.with_locale(:en) { @site.reload.update!(title: "Dana's Notes") }
+    sign_in_as(users(:author))
+
+    post "/cs-studio/translations/confirm",
+      params: { record_type: "SiteSetting", record_id: @site.id, field: "title", locale: "de" }, as: :turbo_stream
+
+    assert_response :forbidden
+    assert_equal :outdated, @site.reload.translation_state("title", "de")
+  end
+
+  test "confirming names the one settings row; any other id is not found" do
+    with_locales(%w[en de], default: "en")
+
+    post "/cs-studio/translations/confirm",
+      params: { record_type: "SiteSetting", record_id: @site.id + 1, field: "title", locale: "de" }, as: :turbo_stream
+
+    assert_response :not_found
+  end
 end

@@ -83,7 +83,7 @@ module Translations
     def translation_state(field, locale)
       locale = locale.to_s
       return :missing if blank_translation?(translation_value(field, locale))
-      return :current if locale == Translations.primary_locale
+      return :current if locale == translation_primary_locale
 
       recorded = translation_sources.dig(field.to_s, locale)
       return :unknown if recorded.nil?
@@ -92,7 +92,7 @@ module Translations
       # rule `store_translation_source` follows when it drops the digest of a
       # blank one. Reading `:outdated` here would flag a field whose editor
       # shows no original box at all, so no note and no way to confirm it.
-      original = Translations.digest(translation_value(field, Translations.primary_locale))
+      original = Translations.digest(translation_value(field, translation_primary_locale))
       return :unknown if original.nil?
 
       recorded == original ? :current : :outdated
@@ -105,6 +105,16 @@ module Translations
     end
 
     private
+
+    # The original's language and its translations' -- the site's
+    # (`Translations.primary_locale`/`.target_locales`), read at the time of
+    # use. A hook rather than a direct call only for `SiteSetting`, the row
+    # those are read *from*: it answers from its own columns, since asking
+    # `Current.site` while that very row is first being created would
+    # create it again, forever.
+    def translation_primary_locale = Translations.primary_locale
+
+    def translation_target_locales = Translations.target_locales
 
     def translation_schema_fields
       return [] unless translation_schema_reader && respond_to?(:definition)
@@ -129,7 +139,7 @@ module Translations
     def translation_locales(field)
       column, = translation_location(field)
       stored = read_attribute(column).to_h.keys + (new_record? ? [] : attribute_in_database(column).to_h.keys)
-      (Translations.target_locales + stored.map(&:to_s)).uniq - [ Translations.primary_locale ]
+      (translation_target_locales + stored.map(&:to_s)).uniq - [ translation_primary_locale ]
     end
 
     def raw_translation_value(field, locale, in_database: false)
@@ -174,7 +184,7 @@ module Translations
     # recorded (and a stale one is dropped), so the value reads `:unknown`
     # until it's saved against a real original.
     def store_translation_source(field, locale)
-      digest = Translations.digest(translation_value(field, Translations.primary_locale))
+      digest = Translations.digest(translation_value(field, translation_primary_locale))
       return remove_translation_source(field, locale) unless digest
 
       sources = translation_sources.deep_dup

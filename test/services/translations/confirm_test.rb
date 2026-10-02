@@ -176,4 +176,36 @@ class Translations::ConfirmTest < ActiveSupport::TestCase
     assert confirm(own, "alt", actor: users(:author)).ok?
     assert_equal :current, own.reload.translation_state("alt", "de")
   end
+
+  # -- the site settings (Task 5) --
+
+  def outdated_site
+    site = Current.site
+    assert as_owner { Settings::Save.call(site, translations: { "de" => { title: "Danas Notizen" } }) }.ok?
+    assert as_owner { Settings::Save.call(site, translations: { "en" => { title: "Dana's Notes" } }) }.ok?
+    assert_equal :outdated, site.reload.translation_state("title", "de")
+    site
+  end
+
+  test "confirms a site title and records settings.translation_confirmed" do
+    site = outdated_site
+
+    assert confirm(site, "title").ok?
+
+    assert_equal :current, site.reload.translation_state("title", "de")
+    assert_equal "Danas Notizen", site.title(locale: "de")
+    event = Audit::Event.find_by!(action: "settings.translation_confirmed")
+    assert_equal site, event.subject
+    assert_equal({ "field" => "title", "locale" => "de" }, event.metadata.slice("field", "locale"))
+  end
+
+  test "confirming a site field needs settings.manage" do
+    site = outdated_site
+
+    result = confirm(site, "title", actor: users(:author))
+
+    assert result.denied?
+    assert_equal "settings.manage", denied_permission
+    assert_equal :outdated, site.reload.translation_state("title", "de")
+  end
 end

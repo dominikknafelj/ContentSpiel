@@ -145,4 +145,73 @@ class SiteSettingTest < ActiveSupport::TestCase
     site.update_column(:time_zone, "Mars/Olympus")
     assert_equal "UTC", site.reload.effective_time_zone.name
   end
+
+  # -- translated title and tagline (translation helpers spec §5) --
+
+  test "the title must be present in the default language, not merely in some language" do
+    setting = SiteSetting.instance
+    setting.update!(locales: [ { "code" => "en" }, { "code" => "de" } ], default_locale: "en")
+    setting.title = nil
+    Mobility.with_locale(:de) { setting.title = "Danas Notizen" }
+
+    assert_not setting.valid?
+    assert_includes setting.errors[:title], "can't be blank"
+  end
+
+  test "title and tagline are stored per language" do
+    setting = SiteSetting.instance
+    Mobility.with_locale(:de) { setting.update!(title: "Danas Notizen", tagline: "Was ich gelernt habe") }
+
+    setting.reload
+    assert_equal "Test Site", setting.title(locale: "en")
+    assert_equal "Danas Notizen", setting.title(locale: "de")
+    assert_equal "Was ich gelernt habe", setting.tagline(locale: "de")
+    assert_nil setting.tagline(locale: "en")
+  end
+
+  test "instance creates the record titled in its default language, whatever language is ambient" do
+    SiteSetting.delete_all
+
+    setting = Mobility.with_locale(:de) { SiteSetting.instance }
+
+    assert_equal({ "en" => "My Site" }, setting.read_attribute(:title))
+  end
+
+  test "the title and tagline are tracked translations" do
+    setting = SiteSetting.instance
+    setting.update!(locales: [ { "code" => "en" }, { "code" => "de" } ], default_locale: "en")
+    Mobility.with_locale(:de) { setting.update!(title: "Danas Notizen") }
+    assert_equal :current, setting.translation_state("title", "de")
+
+    Mobility.with_locale(:en) { setting.update!(title: "Dana's Notes") }
+
+    assert_equal :outdated, setting.reload.translation_state("title", "de")
+    assert_equal %w[title tagline], SiteSetting.translation_tracked_fields(setting)
+  end
+
+  # The setup wizard asks for the title before the default language, and
+  # an autosaving Settings select would otherwise be stuck resending a
+  # refused default: a new default with no title of its own takes the old
+  # default's.
+  test "switching the default language carries a title and tagline it lacks over from the old default" do
+    setting = SiteSetting.instance
+    setting.update!(tagline: "Things I learned")
+
+    setting.update!(default_locale: "de")
+
+    setting.reload
+    assert_equal "Test Site", setting.title(locale: "de")
+    assert_equal "Things I learned", setting.tagline(locale: "de")
+    assert_equal "Test Site", setting.title(locale: "en")
+  end
+
+  test "switching the default language keeps a title the new default already has" do
+    setting = SiteSetting.instance
+    Mobility.with_locale(:de) { setting.update!(title: "Danas Notizen") }
+
+    setting.update!(default_locale: "de")
+
+    assert_equal "Danas Notizen", setting.reload.title(locale: "de")
+    assert_nil setting.tagline(locale: "de")
+  end
 end

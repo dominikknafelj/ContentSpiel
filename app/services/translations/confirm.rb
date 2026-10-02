@@ -7,12 +7,13 @@ module Translations
   # that record would (`Translations::EditRight`), and is recorded as
   # `<subject>.translation_confirmed` with the field and language.
   #
-  # The record is a Page, Post, ContentBlock or Media::Asset; the site
-  # settings (Task 5) join with one `EVENT` entry and one `EditRight` case.
+  # The record is a Page, Post, ContentBlock, Media::Asset or the
+  # SiteSetting row (its title and tagline).
   class Confirm < ApplicationService
     include EditRight
 
-    EVENT = { "Page" => "page", "Post" => "post", "ContentBlock" => "block", "Media::Asset" => "media" }.freeze
+    EVENT = { "Page" => "page", "Post" => "post", "ContentBlock" => "block", "Media::Asset" => "media",
+      "SiteSetting" => "settings" }.freeze
 
     def initialize(record, field:, locale:, actor: Current.actor)
       @record = record

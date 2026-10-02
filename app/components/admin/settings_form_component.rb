@@ -5,17 +5,55 @@ module Admin
   # plain `<input type="number">`, `0` meaning never -- `SiteSetting#
   # trash_retention_days`'s own numericality validation is what a negative
   # value comes back as a per-field error from) -- one autosaving `<form>`,
-  # same shape as `Admin::PageSettingsFormComponent`. Unlike a page/post,
-  # none of `SiteSetting`'s own columns are translated (Mobility), so this
-  # renders through `Admin::Columns::PlainColumnComponent`/
-  # `ImageColumnComponent` with no `locale`/`original` at all -- those
-  # components already treat both as optional for exactly this case.
+  # same shape as `Admin::PageSettingsFormComponent`.
+  #
+  # The title and tagline are translated (translation helpers spec §5), so
+  # like a page's settings form this shows the language switcher (with its
+  # missing/outdated markers, `Translations::Status.switcher_locales`), the
+  # editing language's own value in each input and the default
+  # language's original beside it, with the "Original changed" note where
+  # it applies. Everything else on the form is one value for the whole
+  # site: it renders once, the same in every language, and is resent with
+  # every autosave whichever language is showing.
   class SettingsFormComponent < AdminComponent
     ID_PREFIX = "settings"
 
-    def initialize(site_setting:, url_options: {})
+    def initialize(site_setting:, locale: ::Locales.default, url_options: {})
       @site_setting = site_setting
+      @locale = locale.to_s
       @url_options = url_options
+    end
+
+    # The title/tagline in the language being edited -- the per-locale
+    # Mobility reader, never a fallback: a blank German tagline has to show
+    # as blank here, not as the English one (`Admin::PageSettingsForm
+    # Component#value`'s comment).
+    def value(field) = site_setting.public_send(field, locale: locale)
+
+    # The default-language value shown beside a translated field in any
+    # other language; nil in the default language itself, which is what
+    # tells `Admin::Columns::Base#show_original?` there's nothing to show.
+    def original(field)
+      return nil if locale == ::Locales.default
+
+      site_setting.public_send(field, locale: ::Locales.default)
+    end
+
+    # See `Admin::PageSettingsFormComponent#translation`. The Settings
+    # module as a whole needs `settings.manage` -- the same right
+    # `Translations::Confirm` asks for a site field -- so anyone seeing this
+    # form may confirm.
+    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(site_setting, field, locale: locale, confirmable: true)
+
+    def missing_locales = switcher_locales[:missing]
+
+    def outdated_locales = switcher_locales[:outdated]
+
+    # See `Admin::RecordHeaderComponent#switcher_locales`.
+    def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(site_setting)
+
+    def language_url
+      ->(code) { helpers.admin_settings_path(**(code.to_s == ::Locales.default ? {} : { locale: code })) }
     end
 
     def form_url = helpers.admin_settings_path(**url_options)
@@ -81,6 +119,6 @@ module Admin
 
     private
 
-    attr_reader :site_setting, :url_options
+    attr_reader :site_setting, :locale, :url_options
   end
 end

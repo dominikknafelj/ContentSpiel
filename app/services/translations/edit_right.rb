@@ -12,7 +12,7 @@ module Translations
   # * a block: its owner's, the same rule (`ContentBlocks::OwnerPermissions`);
   # * an image: `media.manage`, or being its uploader with `media.upload`
   #   (`Media::Ownership`, what `Media::Save` asks);
-  # * the site settings (Task 5): `settings.manage`, one more `when` here.
+  # * the site settings: `settings.manage`, what `Settings::Save` asks.
   #
   # Like `OwnerPermissions`, it yields each key to the including service,
   # which answers with its own `authorize!(key, record)` -- so `authorize!(`
@@ -34,6 +34,7 @@ module Translations
         keys.find { |key| !allowed.call(key) }
       when ContentBlock then owner_refusal(record.owner, &allowed)
       when Media::Asset then "media.manage" unless allowed.call("media.manage") || uploader_may_manage?(record)
+      when SiteSetting then "settings.manage" unless allowed.call("settings.manage")
       else raise ArgumentError, "no edit right defined for #{record.class.name}"
       end
     end
