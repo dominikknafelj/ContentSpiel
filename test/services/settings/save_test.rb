@@ -2,7 +2,7 @@ require "test_helper"
 
 class Settings::SaveTest < ActiveSupport::TestCase
   test "saves the settings and records settings.updated with what changed" do
-    result = as_owner { Settings::Save.call(Current.site, attributes: { title: "New title", social_link_rows: [ { name: "Mastodon", url: "https://example.social/@me" } ] }) }
+    result = as_owner { Settings::Save.call(Current.site, attributes: { social_link_rows: [ { name: "Mastodon", url: "https://example.social/@me" } ] }, translations: { "en" => { title: "New title" } }) }
 
     assert result.ok?, result.errors.inspect
     assert_equal "New title", Current.site.reload.title
@@ -13,7 +13,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
   end
 
   test "a save that changes nothing records nothing" do
-    as_owner { Settings::Save.call(Current.site, attributes: { title: Current.site.title }) }
+    as_owner { Settings::Save.call(Current.site, translations: { "en" => { title: Current.site.title(locale: "en") } }) }
 
     assert_not Audit::Event.exists?(action: "settings.updated")
   end
@@ -26,7 +26,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
   end
 
   test "needs settings.manage" do
-    result = as(users(:author)) { Settings::Save.call(Current.site, attributes: { title: "Nope" }) }
+    result = as(users(:author)) { Settings::Save.call(Current.site, translations: { "en" => { title: "Nope" } }) }
 
     assert_equal [ "You don't have permission to manage settings" ], result.errors
     assert_not_equal "Nope", Current.site.reload.title
@@ -38,7 +38,7 @@ class Settings::SaveTest < ActiveSupport::TestCase
     result = as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { locales: [ { "code" => "en" } ] }) }
     assert_equal [ "You don't have permission to manage languages" ], result.errors
 
-    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { tagline: "Fine" }) }
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, translations: { "en" => { tagline: "Fine" } }) }
     assert result.ok?, result.errors.inspect
   end
 
@@ -62,6 +62,15 @@ class Settings::SaveTest < ActiveSupport::TestCase
     result = as_owner { Settings::Save.call(Current.site, translations: { "en" => { title: " " } }) }
 
     assert_not result.ok?
+    assert_equal "Test Site", Current.site.reload.title(locale: "en")
+  end
+
+  # The title and tagline are per language: through `attributes:` they'd be
+  # written in whatever `Mobility.locale` is ambient, so they're refused
+  # there outright rather than silently landing in the wrong language.
+  test "the title or tagline passed as plain attributes is refused" do
+    assert_raises(ArgumentError) { Settings::Save.new(Current.site, attributes: { title: "Ambient" }) }
+    assert_raises(ArgumentError) { Settings::Save.new(Current.site, attributes: { "tagline" => "Ambient" }) }
     assert_equal "Test Site", Current.site.reload.title(locale: "en")
   end
 end

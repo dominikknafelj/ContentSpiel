@@ -15,7 +15,10 @@ module Settings
   # as `Pages::Save`/`Media::Save`'s, each locale assigned inside its own
   # `Mobility.with_locale`, and anything but `TRANSLATED` ignored. The
   # default language's title is required (`SiteSetting#title_present_in_
-  # default_locale`); another language's may be left blank.
+  # default_locale`); another language's may be left blank. A `TRANSLATED`
+  # key in `attributes` is an `ArgumentError`: assigned there it would land
+  # in whatever `Mobility.locale` happens to be ambient -- a wrong-language
+  # write nobody asked for, so it's refused rather than ignored.
   #
   # Needs `settings.manage`; one that changes the enabled `locales` too
   # needs `languages.manage`, the right that owns them everywhere else
@@ -28,6 +31,9 @@ module Settings
     def initialize(site = Current.site, attributes: {}, translations: {}, actor: Current.actor)
       @site = site
       @attributes = attributes.to_h.symbolize_keys
+      misplaced = @attributes.keys & TRANSLATED
+      raise ArgumentError, "#{misplaced.join(", ")} must be passed per language in translations:" if misplaced.any?
+
       @translations = translations.to_h
       @actor = actor
     end

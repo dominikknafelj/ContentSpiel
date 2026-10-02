@@ -68,11 +68,23 @@ module Admin
       )
 
       streams << logo_field_stream(site) if saved && logo_changing
+      # First, so the status and error streams after it land in the new form.
+      streams.unshift(form_stream(site)) if saved && site.saved_change_to_default_locale?
 
       render turbo_stream: streams, status: autosave_status(result)
     end
 
     private
+
+    # A new default language changes what every translated field shows:
+    # which language is the original, the originals beside the inputs, the
+    # switcher's links and markers. The whole form is re-rendered, still in
+    # the language it was being edited in (`admin_locale`, which the form
+    # always posts).
+    def form_stream(site)
+      turbo_stream.replace(Admin::SettingsFormComponent::DOM_ID,
+        Admin::SettingsFormComponent.new(site_setting: site, locale: admin_locale))
+    end
 
     def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
 

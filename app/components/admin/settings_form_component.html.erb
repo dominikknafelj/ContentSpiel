@@ -1,3 +1,4 @@
+<div id="<%= DOM_ID %>">
 <div class="mb-2 flex items-center justify-between gap-3">
   <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
   <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
@@ -72,4 +73,5 @@
       <div id="<%= errors_id("social_links") %>" class="mt-1 text-sm text-danger-ink"></div>
     </fieldset>
   <% end %>
+</div>
 </div>

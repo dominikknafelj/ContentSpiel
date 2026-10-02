@@ -18,10 +18,13 @@ module Admin
   class SettingsFormComponent < AdminComponent
     ID_PREFIX = "settings"
 
-    def initialize(site_setting:, locale: ::Locales.default, url_options: {})
+    # The one element a `default_locale` change replaces wholesale
+    # (`Admin::SettingsController#update`).
+    DOM_ID = "settings-form".freeze
+
+    def initialize(site_setting:, locale: ::Locales.default)
       @site_setting = site_setting
       @locale = locale.to_s
-      @url_options = url_options
     end
 
     # The title/tagline in the language being edited -- the per-locale
@@ -56,7 +59,13 @@ module Admin
       ->(code) { helpers.admin_settings_path(**(code.to_s == ::Locales.default ? {} : { locale: code })) }
     end
 
-    def form_url = helpers.admin_settings_path(**url_options)
+    # Always names the language it was rendered in -- even the default
+    # one. The default language is itself a field on this form: without
+    # the explicit `locale`, the autosave right after an editor switched
+    # the default to German would resolve `admin_locale` to German and
+    # write the English title still showing in the input over the German
+    # one (review fix round 1).
+    def form_url = helpers.admin_settings_path(locale: locale)
 
     def status_id = "#{ID_PREFIX}-save-status"
 
@@ -119,6 +128,6 @@ module Admin
 
     private
 
-    attr_reader :site_setting, :locale, :url_options
+    attr_reader :site_setting, :locale
   end
 end

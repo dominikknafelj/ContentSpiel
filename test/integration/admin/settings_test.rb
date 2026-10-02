@@ -210,6 +210,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "nav.admin-language-switcher a[href='/cs-studio/settings?locale=es']", text: "Español"
     assert_select "nav.admin-language-switcher [aria-current]", text: "Deutsch"
     assert_select "form[action='/cs-studio/settings?locale=de']"
+    assert_select "##{Admin::SettingsFormComponent::DOM_ID} form"
     # Untranslated settings render once, the same in every language.
     assert_select "select[name='site_setting[default_locale]']", 1
     assert_select "select[name='site_setting[time_zone]']", 1
@@ -312,5 +313,39 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
       params: { record_type: "SiteSetting", record_id: @site.id + 1, field: "title", locale: "de" }, as: :turbo_stream
 
     assert_response :not_found
+  end
+
+  # Review fix round 1: the form names the language it was rendered in,
+  # even the default one -- otherwise the autosave right after switching the
+  # default to German wrote the English title, still in the input, over the
+  # German one.
+  test "the default-language form always posts its own language" do
+    get "/cs-studio/settings"
+
+    assert_select "form[action='/cs-studio/settings?locale=en']"
+  end
+
+  test "changing the default language and then autosaving another field leaves the German title alone" do
+    with_locales(%w[en de], default: "en")
+    translate_site(title: "Danas Notizen")
+    form_params = { title: "Test Site", tagline: "", time_zone: "UTC", trash_retention_days: 30 }
+    get "/cs-studio/settings"
+    form_url = css_select("##{Admin::SettingsFormComponent::DOM_ID} form").first["action"]
+
+    patch form_url, params: { site_setting: form_params.merge(default_locale: "de"),
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal "de", @site.reload.default_locale
+    # The whole form comes back for the new default, still in English, now
+    # with the German original beside it.
+    assert_select_in_stream Admin::SettingsFormComponent::DOM_ID, /Danas Notizen/
+
+    patch form_url, params: { site_setting: form_params.merge(default_locale: "de", trash_retention_days: 7),
+      base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    @site.reload
+    assert_equal 7, @site.trash_retention_days
+    assert_equal({ "en" => "Test Site", "de" => "Danas Notizen" }, @site.read_attribute(:title))
   end
 end
