@@ -26,12 +26,18 @@ module Admin
   #
   # Each readable row's translation state per target language (translation
   # helpers spec §4: "a single marker on a page that isn't complete in some
-  # language") is worked out here too, once for the whole tree --
-  # `Translations::Status.for` loads every listed page's blocks in one
-  # query -- and handed down like `children_by_parent`. Context-only rows
-  # get none: they show no status at all, and the actor can't open them.
-  # With no target language (one enabled) there's nothing to mark, so not
-  # even that one query runs.
+  # language") is worked out here too, once for the whole tree, and handed
+  # down like `children_by_parent`. It goes through
+  # `Translations::CachedStatus`, not `Translations::Status.for` directly:
+  # this tree is re-rendered after every page-settings autosave, and
+  # recomputing every page's markers each time made a keystroke pause cost
+  # work proportional to the whole site (final fix wave, I1). Cached, it's
+  # one light query for the blocks' fingerprints plus one cache read, and
+  # only the pages whose content, blocks or confirmations changed since
+  # (normally just the one being edited) are worked out again -- with
+  # their blocks in one query. Context-only rows get none: they show no
+  # status at all, and the actor can't open them. With no target language
+  # (one enabled) there's nothing to mark, so none of that runs.
   #
   # `root` is swapped for its copy in the loaded list, so the checks on the
   # homepage's own row use the preload too. With no visible root (no pages,
@@ -66,7 +72,7 @@ module Admin
     def translation_states_for(pages)
       return {} if Translations.target_locales.empty?
 
-      Translations::Status.for(pages).transform_keys(&:id)
+      Translations::CachedStatus.for(pages).transform_keys(&:id)
     end
   end
 end
