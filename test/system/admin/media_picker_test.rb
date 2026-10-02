@@ -128,7 +128,10 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     # Waited for outside `within` first (final fix wave): the refusal
     # replaces the whole section, and a `within` scope found before that
     # stream lands goes stale (Cuprite's ObsoleteNode) instead of retrying.
-    assert_selector "#page-hero-image-section", text: "Hero image doesn't exist"
+    # A longer wait than Capybara's 2s default: picking runs an autosave
+    # PATCH whose refusal comes back as a stream replacing the section,
+    # which can take longer than 2s on a slow CI runner.
+    assert_selector "#page-hero-image-section", text: "Hero image doesn't exist", wait: 10
     within("#page-hero-image-section") do
       assert_text "Hero image doesn't exist"
       assert_text stored.title

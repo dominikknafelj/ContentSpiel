@@ -37,10 +37,15 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
       controller.onDrop({ item: item, to: targetList, newIndex: targetList.children.length - 1 })
     JS
 
-    # The tree's own re-render lands async (the `fetch` above), so this is
-    # what actually waits for it -- Capybara polls until Alpha's `<li>`
-    # shows up nested under Beta's, or times out.
+    # The script above already moved Alpha's `<li>` under Beta's by hand
+    # (that's what a drop does before `onDrop` runs), so the selector below
+    # is satisfied at once and can't be what waits for the PATCH. Waiting
+    # on the database is: polling until the move has persisted, or the
+    # deadline passes. Asserting straight after the selector raced the
+    # PATCH and failed intermittently on slower CI runners.
     assert_selector "ul[data-parent-id='#{@beta.id}'] li[data-page-id='#{@alpha.id}']"
+    deadline = Capybara.default_max_wait_time.seconds.from_now + 8.seconds
+    sleep 0.05 until @alpha.reload.parent == @beta || Time.current > deadline
     assert_equal @beta, @alpha.reload.parent
   end
 end
