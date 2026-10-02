@@ -69,6 +69,21 @@ class AI::Providers::AnthropicTest < ActiveSupport::TestCase
       provider.translate(texts: %w[Hello Two World], from: "en", to: "de", format: :plain)
   end
 
+  test "only surrounding newlines are trimmed, so indentation survives" do
+    answer = "<<<1>>>\n    code()\n  - nested\n\n<<<2>>>\nWelt\n"
+    provider = provider_with(reply(answer))
+
+    assert_equal [ "    code()\n  - nested", "Welt" ],
+      provider.translate(texts: [ "    code()\n  - nested", "World" ], from: "en", to: "de", format: :markdown)
+  end
+
+  test "an empty translation of a non-empty text raises AI::Error" do
+    provider = provider_with(reply("<<<1>>>\n\n<<<2>>>\nWelt"))
+
+    error = assert_raises(AI::Error) { provider.translate(texts: %w[Hello World], from: "en", to: "de", format: :plain) }
+    assert_match(/empty translation/, error.message)
+  end
+
   test "text split across several content blocks is read as one answer" do
     answer = Reply.new(content: [ TextBlock.new(type: :text, text: "<<<1>>>\nHal"), TextBlock.new(type: :text, text: "lo") ], stop_reason: :end_turn)
 

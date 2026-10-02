@@ -112,6 +112,16 @@ class SiteSetting < ApplicationRecord
     ActiveSupport::TimeZone[time_zone.to_s] || ActiveSupport::TimeZone["UTC"]
   end
 
+  # Whether a key is stored, read off the raw column -- never decrypting
+  # it. Everything that only needs to know *that* there's a key (the
+  # Settings form's "API key: set", `AI.configured?`) asks this, so a key
+  # the current encryption keys can't read (keys lost, rotated, or a
+  # production boot without them) still shows as set and can still be
+  # removed or replaced, instead of 500ing the Settings screen that's the
+  # only way to fix it. Only `AI.provider`, which actually needs the
+  # plaintext, decrypts.
+  def ai_api_key_set? = ai_api_key_before_type_cast.present?
+
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }
   end

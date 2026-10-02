@@ -40,6 +40,10 @@ module Settings
       misplaced = @attributes.keys & TRANSLATED
       raise ArgumentError, "#{misplaced.join(", ")} must be passed per language in translations:" if misplaced.any?
 
+      # Kept out of `assign_attributes` -- see `#write_ai_key`.
+      @ai_key_given = @attributes.key?(:ai_api_key)
+      @new_ai_key = @attributes.delete(:ai_api_key).to_s.strip.presence
+
       @translations = translations.to_h
       @actor = actor
     end
@@ -55,10 +59,11 @@ module Settings
 
       saved = SiteSetting.transaction do
         @site.save || raise(ActiveRecord::Rollback)
+        ai_key_change = write_ai_key if @ai_key_given
 
         changes = Audit::Snapshot.field_changes_for(@site)
         changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
-        changes["AI key"] = ai_key_change if @site.saved_change_to_ai_api_key?
+        changes["AI key"] = ai_key_change if ai_key_change
         record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
         true
       end
@@ -69,14 +74,26 @@ module Settings
 
     private
 
-    # The AI API key (translation helpers spec §6.2) is scrubbed from the
-    # snapshot and the changes row (`Audit::Snapshot::NEVER_STORED`), so
-    # the event says only that it changed -- set, replaced or removed --
-    # never what it is. The label is deliberately not `ai_api_key` (or
-    # anything else matching a `filter_parameters` entry such as `_key`),
-    # which the scrub would drop again.
-    def ai_key_change
-      @site.saved_change_to_ai_api_key.map { |key| key.present? ? "set" : "not set" }
+    # The AI API key (translation helpers spec §6.2), written straight to
+    # its column after the main save (inside the same transaction, so a
+    # refused save writes no key either) rather than through
+    # `assign_attributes`: assigning an encrypted attribute makes dirty
+    # tracking decrypt the *old* value to compare, and a stored key the
+    # current encryption keys can't read (lost, rotated) would then make it
+    # impossible to remove or replace -- the very fix for it.
+    #
+    # Returns the audit row's `"AI key"` change, `[before, after]` as
+    # "set"/"not set" (never the key; `Audit::Snapshot::NEVER_STORED`
+    # scrubs the column itself, and the label deliberately doesn't match
+    # the `_key` filter, which would drop it again), or nil when nothing
+    # changed (removing a key that isn't there). A new key always counts as
+    # a change: telling it apart from the stored one would mean decrypting.
+    def write_ai_key
+      before = @site.ai_api_key_set?
+      return nil if !before && @new_ai_key.nil?
+
+      @site.update_columns(ai_api_key: @new_ai_key, updated_at: Time.current)
+      [ before, @new_ai_key.present? ].map { |set| set ? "set" : "not set" }
     end
 
     def assign

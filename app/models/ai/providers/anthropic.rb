@@ -86,7 +86,7 @@ module AI
         end
         check_complete!(response)
 
-        parse(response_text(response), count: texts.size)
+        parse(response_text(response), texts: texts)
       end
 
       # The smallest real request there is: proves the key, the model name
@@ -128,8 +128,15 @@ module AI
 
       # Everything before the first marker is ignored (a model that says
       # "Here you go:" anyway); each marker must be the next number in
-      # sequence, and there must be exactly `count` of them.
-      def parse(text, count:)
+      # sequence, and there must be exactly one per text.
+      #
+      # Only the newlines around each translation are trimmed, never spaces:
+      # a Markdown body may start with an indented code block or end inside
+      # a nested list item, and stripping that indentation changes what it
+      # parses as. An empty translation of a non-empty text is a failed
+      # answer, not a suggestion to blank the field.
+      def parse(text, texts:)
+        count = texts.size
         parts = text.split(MARKER)
         parts.shift # whatever came before the first marker
         pairs = parts.each_slice(2).to_a
@@ -139,7 +146,12 @@ module AI
           raise AI::Error, "The AI provider's answer didn't match the request (expected #{count} #{"translation".pluralize(count)}, got #{numbers.size}). Try again."
         end
 
-        pairs.map { |_, translation| translation.to_s.strip }
+        translations = pairs.map { |_, translation| translation.to_s.gsub(/\A(?:\r?\n)+|(?:\r?\n)+\z/, "") }
+        if translations.zip(texts).any? { |translation, source| translation.blank? && source.present? }
+          raise AI::Error, "The provider returned an empty translation. Try again."
+        end
+
+        translations
       end
 
       # Maps the SDK's errors (anthropic gem, `Anthropic::Errors`) to the

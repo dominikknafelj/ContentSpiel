@@ -37,6 +37,15 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/settings", params: { site_setting: params, base_updated_at: @site.reload.updated_at.iso8601(6) }, as: :turbo_stream
   end
 
+  # A stored key the current encryption keys can't decrypt -- keys lost or
+  # rotated, or production booted without them. Raw SQL: anything through
+  # the model would encrypt this string properly.
+  def corrupt_stored_key!
+    SiteSetting.connection.execute(%q(update site_settings set ai_api_key = '{"p":"garbage","h":{"iv":"x","at":"y"}}'))
+    Current.site = nil
+    @site = SiteSetting.find(@site.id)
+  end
+
   def stored_ciphertext = SiteSetting.connection.select_value("select ai_api_key from site_settings where id = #{@site.id}")
 
   test "the section shows the provider choices, the model with its default as placeholder, and an empty key field" do
@@ -114,6 +123,57 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_nil @site.reload.ai_api_key
     assert_select_in_stream "settings-ai-key-section", /No API key/
+  end
+
+  test "Remove key asks first, in the confirm dialog" do
+    @site.update!(ai_api_key: KEY)
+
+    get "/cs-studio/settings"
+
+    assert_select "#settings-ai-key-section button[type=button]", text: "Remove key"
+    assert_select "#settings-ai-key-section dialog#settings-ai-remove-key-dialog" do
+      assert_select "form input[type=hidden][name='site_setting[remove_ai_key]'][value='1']"
+      assert_select "button[type=submit]", text: "Remove key"
+    end
+  end
+
+  test "a stored key that can't be decrypted still shows as set, and can be removed" do
+    @site.update!(ai_api_key: KEY)
+    corrupt_stored_key!
+
+    get "/cs-studio/settings"
+    assert_response :success
+    assert_select "#settings-ai-key-section", /API key: set/
+
+    save(title: "Still editable")
+    assert_response :success
+
+    save(remove_ai_key: "1")
+    assert_response :success
+    assert_nil stored_ciphertext
+    assert_select_in_stream "settings-ai-key-section", /No API key/
+    event = Audit::Event.where(action: "settings.updated").order(:id).last
+    assert_equal [ "set", "not set" ], event.field_changes["AI key"]
+  end
+
+  test "a stored key that can't be decrypted can be replaced" do
+    @site.update!(ai_api_key: KEY)
+    corrupt_stored_key!
+
+    save(ai_api_key: "sk-ant-replacement")
+
+    assert_response :success
+    assert_equal "sk-ant-replacement", SiteSetting.find(@site.id).ai_api_key
+  end
+
+  test "Test connection with an unreadable stored key says to enter it again" do
+    @site.update!(ai_provider: "test/stub", ai_api_key: KEY)
+    corrupt_stored_key!
+
+    post "/cs-studio/settings/test_ai_connection", as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "settings-ai-test-result", /can't be read/
   end
 
   test "a newly typed key wins over Remove key in the same save" do

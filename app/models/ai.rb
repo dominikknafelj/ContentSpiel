@@ -32,7 +32,7 @@ module AI
   # §6.2). Callers that offer AI (the Translate buttons) check this; it
   # never builds a client or touches the network.
   def self.configured?(site = Current.site)
-    site.ai_provider.present? && Providers.find(site.ai_provider).present? && site.ai_api_key.present?
+    site.ai_provider.present? && Providers.find(site.ai_provider).present? && site.ai_api_key_set?
   end
 
   # A provider instance built from the settings, the model defaulting to
@@ -41,6 +41,17 @@ module AI
   def self.provider(site = Current.site)
     raise Error, NOT_CONFIGURED unless configured?(site)
 
-    Providers.find(site.ai_provider).new(api_key: site.ai_api_key, model: site.ai_model.presence || DEFAULT_MODEL)
+    Providers.find(site.ai_provider).new(api_key: readable_api_key(site), model: site.ai_model.presence || DEFAULT_MODEL)
   end
+
+  # The one place the key is decrypted. A key stored under encryption keys
+  # this server no longer has (or never had) can't be read; the fix is
+  # entering it again, which the Settings screen still allows
+  # (`SiteSetting#ai_api_key_set?`).
+  def self.readable_api_key(site)
+    site.ai_api_key
+  rescue ActiveRecord::Encryption::Errors::Base
+    raise Error, "The stored API key can't be read — enter it again in Settings."
+  end
+  private_class_method :readable_api_key
 end

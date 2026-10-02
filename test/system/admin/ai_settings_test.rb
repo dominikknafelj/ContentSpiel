@@ -46,6 +46,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-ai-test-result", text: "Connection OK."
 
     click_on "Remove key"
+    within("#settings-ai-remove-key-dialog") { click_on "Remove key" }
     assert_selector "#settings-ai-key-section", text: "No API key"
     assert_nil site_settings(:default).reload.ai_api_key
   end

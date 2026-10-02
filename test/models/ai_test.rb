@@ -52,6 +52,16 @@ class AITest < ActiveSupport::TestCase
     assert_equal "claude-opus-5", AI.provider.model
   end
 
+  test "an unreadable stored key is configured, but provider raises AI::Error saying to enter it again" do
+    @site.update!(ai_provider: "test/recording", ai_api_key: "sk-test")
+    SiteSetting.connection.execute(%q(update site_settings set ai_api_key = '{"p":"garbage","h":{"iv":"x","at":"y"}}'))
+    Current.site = nil
+
+    assert AI.configured?, "deciding needs no decryption"
+    error = assert_raises(AI::Error) { AI.provider }
+    assert_match(/can't be read/, error.message)
+  end
+
   test "provider raises AI::Error when AI isn't configured" do
     error = assert_raises(AI::Error) { AI.provider }
     assert_match(/Settings/, error.message)

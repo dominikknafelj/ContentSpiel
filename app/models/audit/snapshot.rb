@@ -163,8 +163,11 @@ module Audit
         }
       else
         # The site settings, and anything a later task audits before it gets its own
-        # serializer here -- still scrubbed by `.for`.
-        record.attributes
+        # serializer here -- still scrubbed by `.for`. Columns `.scrub` would
+        # drop anyway are never even read: reading an encrypted one
+        # (`SiteSetting#ai_api_key`) decrypts it, and a key that can't be
+        # decrypted any more would otherwise fail every settings save.
+        record.attribute_names.select { |name| keep?(name) }.index_with { |name| record.read_attribute(name) }
       end
     end
 
