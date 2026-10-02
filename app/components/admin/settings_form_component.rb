@@ -117,6 +117,17 @@ module Admin
       ::ActiveSupport::TimeZone::MAPPING.key(stored) || stored
     end
 
+    # Every registered provider by name (`AI::Providers`, translation
+    # helpers spec §6.2), plus whatever is stored even if it's no longer
+    # registered (a removed plugin's) -- like `time_zone_options`, so an
+    # autosave resends the stored value instead of the browser silently
+    # switching to the first option.
+    def ai_provider_options
+      names = ::AI::Providers.names
+      stored = site_setting.ai_provider
+      stored.present? && !names.include?(stored) ? [ stored, *names ] : names
+    end
+
     # The form always renders a few name/URL rows (spec §4.1's own "site.
     # html.erb" convention, carried over verbatim): a row missing either
     # half is silently dropped on save (`SiteSetting#social_link_rows=`),

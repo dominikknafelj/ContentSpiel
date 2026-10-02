@@ -50,4 +50,11 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Fixed Active Record encryption keys for the test suite (and CI), so
+  # `SiteSetting#ai_api_key` encrypts without credentials or ENV -- see
+  # config/application.rb. Test-only values, protecting nothing.
+  config.active_record.encryption.primary_key = "bucjIMC1e75jAXYLfrKbf3aIriMMYu2k"
+  config.active_record.encryption.deterministic_key = "jlibvbSMI4KFeyeILzWPfJAWGFpJkVgZ"
+  config.active_record.encryption.key_derivation_salt = "L0wR0q5UUCl1myUS0fbgkCkLKbvzcLaI"
 end

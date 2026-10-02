@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_02_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_02_120100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -269,6 +269,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_110000) do
     t.integer "trash_retention_days", default: 30, null: false
     t.string "time_zone", default: "UTC", null: false
     t.jsonb "translation_sources", default: {}, null: false
+    t.string "ai_provider"
+    t.string "ai_model"
+    t.text "ai_api_key"
   end
 
   create_table "tags", force: :cascade do |t|

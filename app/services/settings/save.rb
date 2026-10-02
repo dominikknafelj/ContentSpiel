@@ -20,6 +20,12 @@ module Settings
   # in whatever `Mobility.locale` happens to be ambient -- a wrong-language
   # write nobody asked for, so it's refused rather than ignored.
   #
+  # The AI settings (`ai_provider`, `ai_model`, `ai_api_key`, translation
+  # helpers spec §6.2) are plain `attributes` too, one value for the whole
+  # site; what a blank key or "Remove key" means is the Settings screen's
+  # to decide (`Admin::SettingsController#assign_ai_key`) -- here, nil
+  # clears the key like any other attribute.
+  #
   # Needs `settings.manage`; one that changes the enabled `locales` too
   # needs `languages.manage`, the right that owns them everywhere else
   # (`Locales::Enable`/`Disable`/`Configure`). The default language stays a
@@ -52,6 +58,7 @@ module Settings
 
         changes = Audit::Snapshot.field_changes_for(@site)
         changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
+        changes["AI key"] = ai_key_change if @site.saved_change_to_ai_api_key?
         record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
         true
       end
@@ -61,6 +68,16 @@ module Settings
     end
 
     private
+
+    # The AI API key (translation helpers spec §6.2) is scrubbed from the
+    # snapshot and the changes row (`Audit::Snapshot::NEVER_STORED`), so
+    # the event says only that it changed -- set, replaced or removed --
+    # never what it is. The label is deliberately not `ai_api_key` (or
+    # anything else matching a `filter_parameters` entry such as `_key`),
+    # which the scrub would drop again.
+    def ai_key_change
+      @site.saved_change_to_ai_api_key.map { |key| key.present? ? "set" : "not set" }
+    end
 
     def assign
       @site.assign_attributes(@attributes)

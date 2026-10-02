@@ -18,7 +18,10 @@ module Audit
   # hash must round-trip exactly to be a usable version, and a Tiptap node
   # attribute that happens to be called "token" is content, not a secret.
   module Snapshot
-    NEVER_STORED = %w[password password_confirmation password_digest token token_digest].freeze
+    # `ai_api_key` (translation helpers spec §6.2) already matches the
+    # `_key` filter; it's listed here too so it stays out even if that
+    # filter entry is ever narrowed.
+    NEVER_STORED = %w[password password_confirmation password_digest token token_digest ai_api_key].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
     # addresses out of *request logs*. The audit log is different: the spec

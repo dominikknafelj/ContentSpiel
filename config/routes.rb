@@ -150,7 +150,11 @@ Rails.application.routes.draw do
     # default language) -- `resource` (singular), like the page tree's own
     # `resource :tree`, since there's exactly one settings row to show or
     # update, never a collection or an `:id` to route on.
-    resource :settings, only: %i[show update]
+    resource :settings, only: %i[show update] do
+      # Translation helpers spec §6.2: checks the saved AI provider, model
+      # and key with one tiny request, answered inline as a Turbo Stream.
+      post :test_ai_connection
+    end
 
     # The Languages module (cs-studio spec §6.1, Task 8), nested under
     # "settings" by *path* only (`scope`, not `namespace` -- the brief calls

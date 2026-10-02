@@ -48,6 +48,34 @@ module ContentSpiel
     config.i18n.available_locales = SUPPORTED_LOCALES.keys.map(&:to_sym)
     config.i18n.default_locale = :en
 
+    # Active Record encryption -- today only for the AI API key
+    # (`SiteSetting` `encrypts :ai_api_key`, translation helpers spec §6.2).
+    # Keys come from, in order of precedence:
+    # - `ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"]`, `..._DETERMINISTIC_KEY`
+    #   and `..._KEY_DERIVATION_SALT`, set below only when present -- a nil
+    #   here would override the credentials, since Rails merges this config
+    #   over them;
+    # - otherwise `active_record_encryption.primary_key`/`deterministic_key`/
+    #   `key_derivation_salt` in the app's credentials, which Rails reads by
+    #   itself (`bin/rails db:encryption:init` prints a fresh set).
+    # Test and development set fixed values of their own
+    # (config/environments/test.rb, development.rb), so CI needs nothing.
+    #
+    # Production must provide one or the other. Nothing is checked at boot:
+    # with no keys, the app runs normally until something actually encrypts
+    # or decrypts -- saving an AI key in Settings raises
+    # `ActiveRecord::Encryption::Errors::Configuration` right there, and a
+    # site that never saves one never needs keys. Keep them once set:
+    # losing them makes a stored key unreadable (remove and re-enter it).
+    %w[primary_key deterministic_key key_derivation_salt].each do |name|
+      value = ENV["ACTIVE_RECORD_ENCRYPTION_#{name.upcase}"]
+      config.active_record.encryption[name.to_sym] = value if value.present?
+    end
+    # Rails' own default, spelled out: a value that isn't an encryption
+    # payload (written around the model) is an error, never read as
+    # plaintext.
+    config.active_record.encryption.support_unencrypted_data = false
+
     # Configuration for the application, engines, and railties goes here.
     #
     # These settings can be overridden in specific environments using the files

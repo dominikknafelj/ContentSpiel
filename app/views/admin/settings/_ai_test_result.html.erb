@@ -1,0 +1,7 @@
+<%# locals: message, ok -- where Test connection (`Admin::Settings
+    Controller#test_ai_connection`) reports back, inline (translation
+    helpers spec §6.2): empty on the GET, replaced by that action's Turbo
+    Stream with "Connection OK." or the provider's `AI::Error` message. %>
+<div id="settings-ai-test-result" class="mt-2 text-sm <%= ok ? "text-ok-ink" : "text-danger-ink" %>" role="status">
+  <%= message %>
+</div>

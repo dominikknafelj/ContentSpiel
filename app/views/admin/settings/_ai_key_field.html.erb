@@ -1,0 +1,35 @@
+<%# locals: site_setting -- the AI API key's section of the Settings
+    module (translation helpers spec §6.2), wrapped in one element whose id
+    a Turbo Stream `replace` targets after any save that touched the key
+    (`Admin::SettingsController#ai_key_field_stream`), so it's rendered from
+    this one partial on the GET and in that stream alike.
+
+    The key itself is never rendered (global constraints): only whether one
+    is stored, read from the database value -- not the in-memory attribute,
+    which after a refused save may hold a key that was typed but never
+    stored. The password field is always empty; typing into it and saving
+    replaces the key, saving it blank keeps the stored one, and Remove key
+    clears it.
+
+    Its own form, not part of the autosaving settings form (see
+    `Admin::SettingsFormComponent`'s template), PATCHing the same endpoint. %>
+<% key_set = site_setting.ai_api_key_in_database.present? %>
+<div id="settings-ai-key-section" class="mb-4">
+  <%= form_with url: admin_settings_path, method: :patch, class: "admin-column" do %>
+    <%= label_tag "settings-ai_api_key", key_set ? "Replace API key" : "API key", class: setup_label_class %>
+    <p class="mt-1 text-sm text-ink" data-ai-key-state="<%= key_set ? "set" : "unset" %>">
+      <%= key_set ? "API key: set" : "No API key" %>
+    </p>
+    <div class="flex flex-wrap items-center gap-2">
+      <%= password_field_tag "site_setting[ai_api_key]", nil, id: "settings-ai_api_key",
+            autocomplete: "off", spellcheck: false, placeholder: key_set ? "Paste a new key to replace it" : "Paste the provider's API key",
+            class: "#{setup_input_class} max-w-md" %>
+      <%= button_tag "Save key", type: "submit", class: "#{setup_primary_button_class} mt-1" %>
+      <% if key_set %>
+        <%= button_tag "Remove key", type: "submit", name: "site_setting[remove_ai_key]", value: "1",
+              class: "#{setup_secondary_link_class} mt-1" %>
+      <% end %>
+    </div>
+    <div id="<%= Admin::FieldComponent.error_id("settings", "ai_api_key") %>" class="mt-1 text-sm text-danger-ink"></div>
+  <% end %>
+</div>

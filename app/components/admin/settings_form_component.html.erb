@@ -72,6 +72,41 @@
       </div>
       <div id="<%= errors_id("social_links") %>" class="mt-1 text-sm text-danger-ink"></div>
     </fieldset>
+
+    <%# AI translation (translation helpers spec §6.2): provider and model
+        autosave with everything else, one value for the whole site. The
+        key is deliberately *not* in this form -- see below. %>
+    <section class="border-t border-line pt-4" aria-labelledby="<%= field_id("ai-heading") %>">
+      <h2 id="<%= field_id("ai-heading") %>" class="mb-1 text-h2 text-ink">AI translation</h2>
+      <p class="mb-4 text-sm text-meta">Lets editors ask for a suggested translation of a field. Nothing is saved until they use it.</p>
+
+      <div class="admin-column mb-4" data-field-name="ai_provider">
+        <%= label_tag field_id("ai_provider"), "Provider", class: setup_label_class %>
+        <%= select_tag field_html_name("ai_provider"), options_for_select(ai_provider_options, site_setting.ai_provider),
+              include_blank: "None (AI translation off)", id: field_id("ai_provider"), class: setup_input_class %>
+        <div id="<%= errors_id("ai_provider") %>" class="mt-1 text-sm text-danger-ink"></div>
+      </div>
+
+      <div class="admin-column mb-4" data-field-name="ai_model">
+        <%= label_tag field_id("ai_model"), "Model", class: setup_label_class %>
+        <%= text_field_tag field_html_name("ai_model"), site_setting.ai_model, placeholder: ::AI::DEFAULT_MODEL,
+              id: field_id("ai_model"), autocomplete: "off", spellcheck: false, class: setup_input_class %>
+        <div id="<%= errors_id("ai_model") %>" class="mt-1 text-sm text-danger-ink"></div>
+      </div>
+    </section>
   <% end %>
+
+  <%# The key's own small form, outside the autosaving one above: an
+      autosave on every pause in typing would store half a key, and
+      replacing the section (to say "API key: set") would wipe the field
+      mid-typing. Saved by its own button instead -- same endpoint. %>
+  <%= render partial: "admin/settings/ai_key_field", locals: { site_setting: site_setting } %>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <%= button_to "Test connection", helpers.test_ai_connection_admin_settings_path, method: :post,
+          form: { class: "inline" }, class: setup_secondary_link_class %>
+    <span class="text-sm text-meta">Uses the saved provider, model and key.</span>
+  </div>
+  <%= render partial: "admin/settings/ai_test_result", locals: { message: nil, ok: nil } %>
 </div>
 </div>

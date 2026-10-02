@@ -17,6 +17,23 @@ class SiteSetting < ApplicationRecord
   include Translations::Tracker
   tracks_translations
 
+  # The AI translation key (translation helpers spec §6.2): encrypted at
+  # rest with Active Record encryption (keys: config/application.rb), and
+  # never rendered (the Settings form only ever says whether one is set),
+  # logged (the `_key` entry in `filter_parameters`) or audited
+  # (`Audit::Snapshot::NEVER_STORED`).
+  encrypts :ai_api_key
+
+  # A select's "None" posts "", a pasted key often carries a trailing
+  # newline: stored as nil / stripped instead.
+  normalizes :ai_provider, :ai_model, :ai_api_key, with: ->(value) { value.to_s.strip.presence }
+
+  # Only a provider somebody registered (`AI::Providers`); blank means AI
+  # is off. Checked only when it changes, like `time_zone` below: a plugin
+  # provider whose plugin was later removed mustn't block an unrelated
+  # title edit -- `AI.configured?` already treats it as not set up.
+  validate :ai_provider_is_registered, if: :will_save_change_to_ai_provider?
+
   validate :only_one_record_exists, on: :create
 
   # The title is the site's one required translated field, and only in the
@@ -118,6 +135,12 @@ class SiteSetting < ApplicationRecord
   end
 
   private
+
+  def ai_provider_is_registered
+    return if ai_provider.blank? || AI::Providers.find(ai_provider)
+
+    errors.add(:ai_provider, "isn't an available provider")
+  end
 
   def only_one_record_exists
     errors.add(:base, "only one SiteSetting may exist") if SiteSetting.exists?

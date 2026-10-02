@@ -19,7 +19,7 @@ admin_<%= key.tr(".", "_") %>:
 
 <% %w[posts.read posts.create posts.edit posts.publish posts.delete
       pages.read pages.create pages.edit pages.publish pages.move pages.delete
-      tags.manage media.upload media.manage].each do |key| %>
+      tags.manage media.upload media.manage ai.translate].each do |key| %>
 editor_<%= key.tr(".", "_") %>:
   group: editor
   permission: <%= key %>
