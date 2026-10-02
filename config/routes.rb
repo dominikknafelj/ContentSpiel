@@ -205,9 +205,15 @@ Rails.application.routes.draw do
     # one POST, `StarterContent.create_pages_and_posts!`, idempotent.
     resources :starter_contents, only: :create
 
-    # The Pages module is CS Studio's home (cs-studio spec §4.1) -- replaces
-    # the placeholder `home#show` this task's brief removes.
-    root to: "pages#index"
+    # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
+    # "Your work", "On the site" and quick create, open to every signed-in
+    # user. The Pages module -- the tree and its own editor -- lives at
+    # its own `/pages` (`resources :pages` above), no longer at the root.
+    root to: "dashboard#show"
+    # Quick draft (dashboard spec §4.1): a title and a content type, saved
+    # through `Posts::Save` as an unpublished post, then opened in the
+    # post editor.
+    post "dashboard/draft", to: "dashboard#create_draft", as: :dashboard_draft
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

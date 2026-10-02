@@ -1,0 +1,15 @@
+<section aria-labelledby="<%= id %>" class="flex flex-col gap-2">
+  <h3 id="<%= id %>" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= title %></h3>
+  <% if records.empty? %>
+    <p class="text-meta"><%= empty %></p>
+  <% else %>
+    <ul class="rounded-cs border border-line bg-surface px-3">
+      <% records.each do |record| %>
+        <%= render Admin::DashboardScreen::RowComponent.new(record:, change: feed.last_change(record), time:) %>
+      <% end %>
+    </ul>
+  <% end %>
+  <% if show_all_path %>
+    <%= link_to "Show all →", show_all_path, class: "self-end text-sm text-ink hover:underline", data: { turbo_frame: "_top" } %>
+  <% end %>
+</section>

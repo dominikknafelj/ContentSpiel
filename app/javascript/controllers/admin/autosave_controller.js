@@ -36,7 +36,13 @@ import { Turbo } from "@hotwired/turbo-rails"
 export default class extends Controller {
   static values = {
     statusId: String,
-    debounce: { type: Number, default: 1000 }
+    debounce: { type: Number, default: 1000 },
+    // A block card's form names the page settings form's base field here
+    // (`Admin::BlockCardComponent#form_data`): its current value rides
+    // along as `X-Page-Base-Updated-At`, so the server only moves that
+    // form's base forward when it was still current (`Admin::
+    // ContentBlocksController#page_base_streams`).
+    pageBaseId: String
   }
 
   // Client-only states `Admin::SaveStatusComponent` never has occasion to
@@ -99,10 +105,7 @@ export default class extends Controller {
       response = await fetch(this.element.action, {
         method: "PATCH",
         body: new FormData(this.element),
-        headers: {
-          Accept: "text/vnd.turbo-stream.html",
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
-        }
+        headers: this.requestHeaders()
       })
     } catch (error) {
       this.scheduleRetry()
@@ -172,17 +175,47 @@ export default class extends Controller {
     // document) is what a `<turbo-stream>`'s own hidden field actually
     // lives in -- a `<template>`'s content is its own document fragment,
     // invisible to a query against the document around it.
-    const freshBase = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
-      .map((template) => template.content.querySelector('[name="base_updated_at"]'))
-      .find((field) => field)
+    //
+    // Matched by id, not just by name: a block card's response may also
+    // carry the page settings form's own base (the block write touched the
+    // page -- `Admin::ContentBlocksController#page_base_streams`), and
+    // taking the first `base_updated_at` in the response would hand this
+    // card the page's value instead of its own.
+    //
+    // That page base is applied synchronously too, for the same reason
+    // (fix round 3): a queued retrigger sends it as `X-Page-Base-Updated-At`
+    // (`#requestHeaders`), and read before Turbo's deferred replace it would
+    // be the *old* value -- the server then (rightly) won't move it, this
+    // write touches the page again, and the page form's next save reads
+    // "Changed elsewhere" with nobody else involved.
+    const templates = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
+    const freshValue = (id) => templates
+      .map((template) => template.content.querySelector(`[name="base_updated_at"][id="${id}"]`))
+      .find((field) => field)?.value
+
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
-    if (freshBase && ownBase) ownBase.value = freshBase.value
+    const ownFresh = ownBase && freshValue(ownBase.id)
+    if (ownFresh) ownBase.value = ownFresh
+
+    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)
+    const pageFresh = pageBase && freshValue(this.pageBaseIdValue)
+    if (pageFresh) pageBase.value = pageFresh
 
     Turbo.renderStreamMessage(text)
     this.retryCount = 0
     this.busy = false
 
     if (this.pending) this.trigger()
+  }
+
+  requestHeaders() {
+    const headers = {
+      Accept: "text/vnd.turbo-stream.html",
+      "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
+    }
+    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)?.value
+    if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
+    return headers
   }
 
   scheduleRetry() {

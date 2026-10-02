@@ -28,6 +28,8 @@ module ContentBlocks
       destroyed = ContentBlock.transaction do
         record_event("block.deleted", subject: @block)
         @block.destroy || raise(ActiveRecord::Rollback)
+        # Same owner bump as `ContentBlocks::Save` (final fix wave, I3).
+        @block.owner.touch
         # Drops the block's `media_usages` rows (media library design spec
         # §5.1): `refresh` computes none for a destroyed record.
         Media::UsageIndex.refresh(@block)

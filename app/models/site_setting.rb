@@ -8,6 +8,23 @@ class SiteSetting < ApplicationRecord
   validate :social_links_are_safe, if: :will_save_change_to_social_links?
   validate :default_locale_is_enabled
 
+  # The zone every CS Studio and MCP time is shown and parsed in (dashboard
+  # spec §5); storage stays UTC. Stored as a Rails zone name ("Berlin"):
+  # an IANA identifier ("Europe/Berlin") is accepted but normalised to its
+  # Rails name first (`#normalize_time_zone`), because the Settings select's
+  # option values are Rails names -- a stored "Europe/Berlin" matched no
+  # option, the browser showed the first one instead, and the next autosave
+  # of *any* field (the form resends everything) silently wrote
+  # "International Date Line West" back (final fix wave, I2).
+  #
+  # Validated only when it changes: a value written around the model that
+  # no Rails name covers (raw SQL, a restored backup) is still shown and
+  # resent unchanged by the form (`Admin::SettingsFormComponent#
+  # time_zone_options`), and mustn't block an unrelated title edit --
+  # `#effective_time_zone` is what keeps an unknown one from 500ing.
+  before_validation :normalize_time_zone
+  validate :time_zone_is_known, if: :will_save_change_to_time_zone?
+
   # 0 means "never" (trash spec §3.1/§7: the sweep job skips a site with this
   # set to 0) -- so this is a plain non-negative check, not `greater_than: 0`.
   validates :trash_retention_days, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
@@ -29,6 +46,21 @@ class SiteSetting < ApplicationRecord
     scheme.present? && SOCIAL_LINK_SCHEMES.include?(scheme.downcase)
   rescue URI::InvalidURIError
     false
+  end
+
+  # The zone `Admin::BaseController`/`McpController`'s own `use_site_time_
+  # zone` actually wraps every request in -- never the bare `time_zone`
+  # attribute, which `#time_zone_is_known` only guards on a save made
+  # *through this model*. A row written around it (a raw-SQL migration,
+  # e.g. `20260926120000`'s own `INSERT`/`UPDATE` pattern, or a restored
+  # backup) could still hold something `ActiveSupport::TimeZone` doesn't
+  # recognise, and `Time.use_zone` raises `ArgumentError` on exactly that --
+  # which, wrapping *every* admin and MCP request, would otherwise take the
+  # whole surface down with no in-app way to fix it (the Settings form
+  # itself is behind the same wrapper). Falling back to UTC instead keeps
+  # both up, readable in the one zone every stored time is actually in.
+  def effective_time_zone
+    ActiveSupport::TimeZone[time_zone.to_s] || ActiveSupport::TimeZone["UTC"]
   end
 
   def locale_codes
@@ -88,6 +120,19 @@ class SiteSetting < ApplicationRecord
   # page unreachable at the site's own root.
   def default_locale_is_enabled
     errors.add(:default_locale, "must be one of the enabled languages") unless locale_codes.include?(default_locale.to_s)
+  end
+
+  # `MAPPING` is Rails name => IANA identifier; `key` finds the first Rails
+  # name for an identifier (several share one -- "Edinburgh" and "London"
+  # are both "Europe/London" -- and any of them is the same zone). A value
+  # that already is a Rails name, or that no Rails name covers, is kept.
+  def normalize_time_zone
+    rails_name = ActiveSupport::TimeZone::MAPPING.key(time_zone.to_s)
+    self.time_zone = rails_name if rails_name
+  end
+
+  def time_zone_is_known
+    errors.add(:time_zone, "isn't a known time zone") unless ActiveSupport::TimeZone.all.any? { |zone| zone.name == time_zone }
   end
 
   # Both caches hold a copy of this row's state: Current.site the whole row,

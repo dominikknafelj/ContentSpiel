@@ -175,7 +175,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 
-    get "/cs-studio"
+    get "/cs-studio/pages"
     assert_select "turbo-frame#tree li[data-page-id='#{@kept_page.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@gone_page.id}']", count: 0
 

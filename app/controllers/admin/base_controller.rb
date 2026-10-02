@@ -21,11 +21,14 @@ module Admin
 
     # The modules column (cs-studio spec §4.2), in order: each entry is
     # shown only when the actor holds its `permission` anywhere (`can?`
-    # without a record); `nil` is open to every signed-in user (the AI
-    # assistant screen lists and manages the user's own tokens, spec §5).
-    # One list for the sidebar (`admin_modules`) and for where the Pages
-    # home sends someone who can't read pages (`first_admin_module_path`),
-    # so the two can never disagree about what a user can open.
+    # without a record); `nil` is open to every signed-in user (the
+    # dashboard, CS Studio's home, dashboard spec §3-§4 -- and the AI
+    # assistant screen, which lists and manages the user's own tokens,
+    # spec §5). One list for the sidebar (`admin_modules`) and for where
+    # the Pages index sends someone who can't read pages
+    # (`first_admin_module_path`), so the two can never disagree about
+    # what a user can open -- with Dashboard listed first and always open,
+    # that fallback now always lands on the dashboard.
     #
     # A `permission` Array means *any* of them (trash spec §6): the Trash
     # screen lists whatever the viewer could restore or purge, so it opens
@@ -35,7 +38,8 @@ module Admin
     TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload trash.empty].freeze
 
     MODULES = [
-      { label: "Pages", icon: :pages, path: :admin_root_path, permission: "pages.read" },
+      { label: "Dashboard", icon: :dashboard, path: :admin_root_path, permission: nil },
+      { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read" },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
       { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload" },
@@ -53,9 +57,24 @@ module Admin
 
     layout "admin"
     before_action { Current.channel = :admin }
+
+    # Every time CS Studio shows or parses -- schedule inputs, "Saved
+    # HH:MM", the trash and audit screens, the dashboard -- is in the
+    # site's zone (dashboard spec §5). Wrapping the request is what lets
+    # the existing `Time.zone.parse`/`strftime` call sites (schedule
+    # inputs, `record_header_component.rb`/`post_form_component.rb`,
+    # `occurred_at`/`trashed_at` reads) stay exactly as they are --
+    # they've always read/written through `Time.zone`, which was simply
+    # always UTC until now.
+    around_action :use_site_time_zone
+
     helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules
 
     private
+
+    def use_site_time_zone(&block)
+      Time.use_zone(Current.site.effective_time_zone, &block)
+    end
 
     # The `MODULES` entries this actor may open: `nil` is open to everyone,
     # otherwise any one of the entry's keys will do.

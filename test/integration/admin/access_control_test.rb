@@ -36,9 +36,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
       # opens for any one of the rights that act on a trashed item, so
       # `author`'s `media.upload` is enough -- its own trashed images.
-      users(:two) => [ "Pages", "Posts", "Tags", "Media", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Pages", "Posts", "Media", "Trash", "AI assistant", "Mind graph" ],
-      users(:reader) => [ "Pages", "Posts", "AI assistant", "Mind graph" ]
+      users(:two) => [ "Dashboard", "Pages", "Posts", "Tags", "Media", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
+      users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Trash", "AI assistant", "Mind graph" ],
+      users(:reader) => [ "Dashboard", "Pages", "Posts", "AI assistant", "Mind graph" ]
     }
 
     expectations.each do |user, labels|
@@ -56,7 +56,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/api_tokens"
 
-    assert_equal [ "Pages", "AI assistant" ], sidebar_labels
+    assert_equal [ "Dashboard", "Pages", "AI assistant" ], sidebar_labels
   end
 
   # --- Area access -------------------------------------------------------------
@@ -93,13 +93,17 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "the pages home sends a user without pages.read to a module they can open" do
+  # Dashboard spec Task 2: `BaseController::MODULES` now lists Dashboard
+  # first with `permission: nil`, so `first_admin_module_path` -- the Pages
+  # index's own fallback for someone without `pages.read` -- always resolves
+  # to it, whatever else the actor can or can't open.
+  test "the pages index sends a user without pages.read to the dashboard" do
     access_control_grants(:read_only_pages_read).destroy!
     sign_in_as(users(:reader))
 
-    get "/cs-studio"
+    get "/cs-studio/pages"
 
-    assert_redirected_to "/cs-studio/posts"
+    assert_redirected_to "/cs-studio"
   end
 
   # --- Out-of-scope records: 404, not 403 (Review Focus 2) -------------------
@@ -183,12 +187,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     3.times { |index| create_page(title: "Small #{index}", parent: @inside) }
 
-    get "/cs-studio" # warm up whatever a first request loads once
-    small = count_queries { get "/cs-studio" }
+    get "/cs-studio/pages" # warm up whatever a first request loads once
+    small = count_queries { get "/cs-studio/pages" }
     assert_response :success
 
     12.times { |index| create_page(title: "Large #{index}", parent: @inside) }
-    large = count_queries { get "/cs-studio" }
+    large = count_queries { get "/cs-studio/pages" }
 
     assert_select "turbo-frame#tree li.admin-tree-node", count: 18
     assert_equal small, large, "the tree ran a query per page"

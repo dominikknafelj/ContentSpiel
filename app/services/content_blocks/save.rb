@@ -42,6 +42,13 @@ module ContentBlocks
         assign
         @block.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@block)
+        # Editing a block is editing its owner (final fix wave, I3): bump
+        # the owner's `updated_at` so the dashboard's "Recently updated"
+        # (ordered by it) sees the edit. `touch` runs no validations and no
+        # save callbacks -- so not `Page#sync_public_paths` or closure_tree's
+        # hierarchy rebuild, which a block edit can't affect -- only
+        # `after_touch`/commit callbacks, of which `Page`/`Post` have none.
+        @block.owner.touch
 
         created = @block.previously_new_record?
         changes = Audit::Snapshot.field_changes_for(@block)

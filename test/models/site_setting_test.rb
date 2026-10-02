@@ -104,4 +104,45 @@ class SiteSettingTest < ActiveSupport::TestCase
     site.trash_retention_days = 0
     assert site.valid?
   end
+
+  # Dashboard spec §5: the zone every CS Studio and MCP time is shown and
+  # parsed in. Accepts a Rails zone name ("Berlin") or an IANA identifier
+  # ("Europe/Berlin") -- `ActiveSupport::TimeZone[]` resolves both.
+  test "time zone defaults to UTC and must be a known zone" do
+    assert_equal "UTC", SiteSetting.new(title: "x").time_zone
+    site = site_settings(:default)
+    site.time_zone = "Mars/Olympus"
+    assert_not site.valid?
+    assert_includes site.errors[:time_zone], "isn't a known time zone"
+    site.time_zone = "Berlin"
+    assert site.valid?
+    site.time_zone = "Europe/Berlin"
+    assert site.valid?
+  end
+
+  # Final fix wave I2: the Settings select's option values are Rails zone
+  # names, so an IANA identifier is stored as its Rails name -- otherwise it
+  # matches no option and autosave would write the first option back.
+  test "an IANA identifier is saved as its Rails zone name" do
+    site = site_settings(:default)
+    site.update!(time_zone: "Europe/Berlin")
+    assert_equal "Berlin", site.reload.time_zone
+
+    site.update!(time_zone: "London")
+    assert_equal "London", site.reload.time_zone
+  end
+
+  # Fix round 1: `#time_zone_is_known` only guards a save made through this
+  # model -- a row written around it (raw SQL, a restored backup) could
+  # still hold something `ActiveSupport::TimeZone` doesn't recognise.
+  # `effective_time_zone` is what every request-wrapping `around_action`
+  # actually reads, so it has to fall back instead of raising.
+  test "effective_time_zone resolves a known zone and falls back to UTC for an unrecognised stored value" do
+    site = site_settings(:default)
+    site.update_column(:time_zone, "Europe/Berlin")
+    assert_equal "Europe/Berlin", site.reload.effective_time_zone.name
+
+    site.update_column(:time_zone, "Mars/Olympus")
+    assert_equal "UTC", site.reload.effective_time_zone.name
+  end
 end
