@@ -40,6 +40,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-ai-key-section", text: "API key: set"
     assert_equal "", find_field("Replace API key").value
     assert_no_text KEY
+    assert_not_includes page.html, KEY, "never rendered, not even in a hidden input or attribute"
     assert_equal KEY, site_settings(:default).reload.ai_api_key
 
     click_on "Test connection"
