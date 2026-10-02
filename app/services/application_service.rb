@@ -101,9 +101,13 @@ class ApplicationService
   # e.g. `"post.updated"`; `field_changes` is usually
   # `Audit::Snapshot.field_changes_for(record)`. Call it inside the
   # service's transaction, so a rolled-back write leaves no event.
-  def record_event(action, subject: nil, field_changes: {}, metadata: {})
+  #
+  # `snapshot: nil` leaves the snapshot out: for an event about a record
+  # that didn't change (`ai.translated`, which must carry no text at all),
+  # a full copy of the subject would only put its content in the log.
+  def record_event(action, subject: nil, field_changes: {}, metadata: {}, snapshot: Audit::Snapshot.for(subject))
     as_actor do
-      Audit.record(action, subject:, field_changes:, snapshot: Audit::Snapshot.for(subject), metadata:)
+      Audit.record(action, subject:, field_changes:, snapshot:, metadata:)
     end
   end
 

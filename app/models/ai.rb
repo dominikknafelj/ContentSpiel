@@ -41,8 +41,13 @@ module AI
   def self.provider(site = Current.site)
     raise Error, NOT_CONFIGURED unless configured?(site)
 
-    Providers.find(site.ai_provider).new(api_key: readable_api_key(site), model: site.ai_model.presence || DEFAULT_MODEL)
+    Providers.find(site.ai_provider).new(api_key: readable_api_key(site), model: model(site))
   end
+
+  # The model a provider is built with -- what `AI::Translate` records in
+  # its `ai.translated` event, read from the same place so the log names
+  # the model actually asked.
+  def self.model(site = Current.site) = site.ai_model.presence || DEFAULT_MODEL
 
   # The one place the key is decrypted. A key stored under encryption keys
   # this server no longer has (or never had) can't be read; the fix is
