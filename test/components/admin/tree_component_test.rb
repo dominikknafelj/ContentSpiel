@@ -71,6 +71,8 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
         render_tree
         large = count_queries { render_tree }
         assert_equal small, large, "the tree ran a query per page"
+
+        assert_equal Page.count, cache_hits { render_tree }.size, "an unchanged tree recomputes nothing"
       end
     end
   end
