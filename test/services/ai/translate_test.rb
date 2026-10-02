@@ -140,6 +140,28 @@ class AI::TranslateTest < ActiveSupport::TestCase
     assert_equal({ "alt" => "[de] Sand dunes" }, service.suggestions)
   end
 
+  # Final fix wave, M5: the site settings row is a record like any other
+  # here -- its title and tagline are suggested from the primary language,
+  # nothing is saved, and the edit right is `settings.manage`.
+  test "the site title and tagline can be translated, needing settings.manage, saving nothing" do
+    site = Current.site
+    assert as_owner { Settings::Save.call(site, translations: { "en" => { title: "My site", tagline: "Notes and photos" } }) }.ok?
+    site.reload
+    before = site.attributes
+
+    service, result = translate(site, %w[title tagline])
+    assert result.ok?, result.errors.to_sentence
+    assert_equal({ "title" => "[de] My site", "tagline" => "[de] Notes and photos" }, service.suggestions)
+    assert_equal [ "My site", "Notes and photos" ], StubProvider.calls.last[:texts]
+    assert_equal before, site.reload.attributes, "nothing about the settings row changed"
+    assert_equal site, Audit::Event.where(action: "ai.translated").order(:id).last.subject
+
+    grant_ai_translate(users(:author))
+    _, result = translate(site, %w[title], actor: users(:author))
+    assert result.denied?
+    assert_equal "settings.manage", denied_permission
+  end
+
   # -- the audit event --
 
   test "records ai.translated with the metadata, and never any text" do
