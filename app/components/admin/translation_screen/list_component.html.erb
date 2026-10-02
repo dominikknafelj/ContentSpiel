@@ -1,0 +1,19 @@
+<% if items.empty? %>
+  <p class="rounded-cs border border-dashed border-line-strong px-6 py-10 text-center text-ink">Everything is translated into <%= language_name %>.</p>
+<% else %>
+  <div class="flex flex-col gap-6">
+    <% groups.each do |type, label, group_items| %>
+      <section id="<%= section_id(type) %>" aria-labelledby="<%= section_id(type) %>-heading">
+        <h2 id="<%= section_id(type) %>-heading" class="mb-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></h2>
+        <ul class="flex flex-col divide-y divide-line border-y border-line">
+          <% group_items.each do |item| %>
+            <li id="<%= row_id(item) %>" class="flex items-center gap-3 py-2">
+              <%= link_to title(item), editor_path(item), class: "flex-1 truncate font-semibold text-ink hover:underline" %>
+              <%= render Admin::TranslationScreen::StateBadgeComponent.new(state: item.state, locale: locale) %>
+            </li>
+          <% end %>
+        </ul>
+      </section>
+    <% end %>
+  </div>
+<% end %>

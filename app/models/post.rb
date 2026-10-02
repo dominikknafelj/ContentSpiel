@@ -21,6 +21,12 @@ class Post < ApplicationRecord
   # `translates` itself.
   include HasRichTextBody
 
+  # Which version of the original each translation was saved against
+  # (translation helpers spec §3.2), plus the content type's own
+  # `translated: true` fields. Never `slug`: it's generated per language.
+  include Translations::Tracker
+  tracks_translations schema: :fields
+
   has_many :post_tags, dependent: :destroy
   has_many :tags, through: :post_tags
 

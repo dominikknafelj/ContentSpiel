@@ -46,7 +46,7 @@
           <%= render Admin::FieldComponent.new(
                 field: field, form_name: "block[settings]",
                 value: value_for(field), original: original_for(field), locale: locale,
-                errors: field_errors(field), id_prefix: error_prefix
+                errors: field_errors(field), id_prefix: error_prefix, **translation(field.name)
               ) %>
         <% end %>
 
@@ -55,19 +55,20 @@
              when "body" %>
             <%= render Admin::Columns::RichTextColumnComponent.new(
                   name: "body", id: field_id("body"), html_name: field_html_name("body"),
-                  value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale
+                  value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
+                  **translation("body")
                 ) %>
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "caption", id: field_id("caption"), html_name: field_html_name("caption"),
                   value: column_value("caption"), original: column_original("caption"), errors: column_errors("caption"), locale: locale,
-                  placeholder: column_placeholder("caption")
+                  placeholder: column_placeholder("caption"), **translation("caption")
                 ) %>
           <% when "alt" %>
             <%= render Admin::Columns::PlainColumnComponent.new(
                   name: "alt", id: field_id("alt"), html_name: field_html_name("alt"),
                   value: column_value("alt"), original: column_original("alt"), errors: column_errors("alt"), locale: locale,
-                  placeholder: column_placeholder("alt")
+                  placeholder: column_placeholder("alt"), **translation("alt")
                 ) %>
           <% when "image" %>
             <%# A library image, chosen through the picker (media library

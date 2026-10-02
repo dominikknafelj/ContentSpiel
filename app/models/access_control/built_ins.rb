@@ -63,6 +63,12 @@ module AccessControl
       Permissions.register "tags.manage", label: "Manage tags", area: "Content", action: :manage
       Permissions.register "media.upload", label: "Upload media", area: "Content", action: :upload
       Permissions.register "media.manage", label: "Manage media", area: "Content", action: :manage
+      # Translation helpers spec §7: request an AI translation suggestion.
+      # Never enough on its own -- `AI::Translate` also asks the record's
+      # own edit right (`Translations::EditRight`), so this only ever adds
+      # a way of filling in a field the actor could already type into.
+      # Configuring AI is `settings.manage`, not this.
+      Permissions.register "ai.translate", label: "Use AI translation", area: "Content", action: :translate
     end
 
     def self.register_administration

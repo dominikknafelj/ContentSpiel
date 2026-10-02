@@ -1,0 +1,10 @@
+<%= tag.div class: "mt-2", data: wrapper_data do %>
+  <%# The spinner and label are toggled by `admin--translate` while the
+      request runs (`aria-busy`, disabled). %>
+  <%= tag.button type: "button", class: self.class::BUTTON_CLASS,
+        data: { action: "admin--translate#translate", "admin--translate-target": "button" } do %>
+    <span hidden data-translate-spinner class="<%= self.class::SPINNER_CLASS %>" aria-hidden="true"></span>
+    <span data-translate-label><%= self.class::LABEL %></span>
+  <% end %>
+  <%= tag.div id: box_id, "aria-live": "polite", data: { translation_box: true } %>
+<% end %>

@@ -37,7 +37,16 @@ module Admin
     def index
       @content_types = ContentTypes.all
       @tags = Tag.order(:name)
-      @posts = filtered_posts.includes(:tags).order(updated_at: :desc)
+      @posts = filtered_posts.includes(:tags).order(updated_at: :desc).to_a
+      # The "Languages" column (translation helpers spec §4): every listed
+      # post's state per target language, worked out once for the whole
+      # list, so the column costs the same queries however many rows it
+      # shows. Cached per post (`Translations::CachedStatus`, final fix
+      # wave I1): this list isn't paginated, so recomputing every post's
+      # every tracked field per language on each visit would grow with the
+      # whole site; only posts changed since the last visit are worked out
+      # again.
+      @translation_states = Translations::CachedStatus.for(@posts)
     end
 
     # "New post" (spec §5.2): asks for the content type up front, in the

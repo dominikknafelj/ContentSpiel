@@ -36,9 +36,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
       # opens for any one of the rights that act on a trashed item, so
       # `author`'s `media.upload` is enough -- its own trashed images.
-      users(:two) => [ "Dashboard", "Pages", "Posts", "Tags", "Media", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Trash", "AI assistant", "Mind graph" ],
-      users(:reader) => [ "Dashboard", "Pages", "Posts", "AI assistant", "Mind graph" ]
+      users(:two) => [ "Dashboard", "Pages", "Posts", "Tags", "Media", "Translations", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
+      users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Trash", "AI assistant", "Mind graph" ],
+      users(:reader) => [ "Dashboard", "Pages", "Posts", "Translations", "AI assistant", "Mind graph" ]
     }
 
     expectations.each do |user, labels|
@@ -56,7 +56,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/api_tokens"
 
-    assert_equal [ "Dashboard", "Pages", "AI assistant" ], sidebar_labels
+    assert_equal [ "Dashboard", "Pages", "Translations", "AI assistant" ], sidebar_labels
   end
 
   # --- Area access -------------------------------------------------------------

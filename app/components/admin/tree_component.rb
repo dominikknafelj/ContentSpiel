@@ -24,6 +24,21 @@ module Admin
   # the readable ids and their ancestors, one branch preload) however many
   # pages it shows.
   #
+  # Each readable row's translation state per target language (translation
+  # helpers spec §4: "a single marker on a page that isn't complete in some
+  # language") is worked out here too, once for the whole tree, and handed
+  # down like `children_by_parent`. It goes through
+  # `Translations::CachedStatus`, not `Translations::Status.for` directly:
+  # this tree is re-rendered after every page-settings autosave, and
+  # recomputing every page's markers each time made a keystroke pause cost
+  # work proportional to the whole site (final fix wave, I1). Cached, it's
+  # one light query for the blocks' fingerprints plus one cache read, and
+  # only the pages whose content, blocks or confirmations changed since
+  # (normally just the one being edited) are worked out again -- with
+  # their blocks in one query. Context-only rows get none: they show no
+  # status at all, and the actor can't open them. With no target language
+  # (one enabled) there's nothing to mark, so none of that runs.
+  #
   # `root` is swapped for its copy in the loaded list, so the checks on the
   # homepage's own row use the preload too. With no visible root (no pages,
   # or none the actor may see) there's nothing to hang the tree on, and
@@ -35,12 +50,13 @@ module Admin
       @url_options = url_options
       @children_by_parent = {}
       @context_only_ids = Set.new
+      @translation_states = {}
       @root = root && load_visible(root)
     end
 
     private
 
-    attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids
+    attr_reader :root, :selected, :locale, :url_options, :children_by_parent, :context_only_ids, :translation_states
 
     def load_visible(root)
       visibility = AccessControl.tree_visibility(Current.actor)
@@ -49,7 +65,14 @@ module Admin
 
       @context_only_ids = visibility[:context_only]
       @children_by_parent = pages.group_by(&:parent_id)
+      @translation_states = translation_states_for(pages.reject { |page| @context_only_ids.include?(page.id) })
       pages.find { |page| page.id == root.id }
+    end
+
+    def translation_states_for(pages)
+      return {} if Translations.target_locales.empty?
+
+      Translations::CachedStatus.for(pages).transform_keys(&:id)
     end
   end
 end

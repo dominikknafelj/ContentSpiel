@@ -20,8 +20,16 @@ class AccessControl::PermissionsTest < ActiveSupport::TestCase
     keys = %w[posts.read posts.create posts.edit posts.publish posts.delete
               pages.read pages.create pages.edit pages.publish pages.move pages.delete
               tags.manage media.upload media.manage settings.manage languages.manage users.manage
-              groups.manage tokens.manage system_status.view audit.view trash.empty]
+              groups.manage tokens.manage system_status.view audit.view trash.empty ai.translate]
     assert_equal keys.sort, AccessControl::Permissions.keys.sort
+  end
+
+  # Translation helpers spec §7: unscoped, no subject -- requesting a
+  # suggestion also needs the record's own edit right, checked separately.
+  test "ai.translate is a Content permission with no subject" do
+    permission = AccessControl::Permissions.fetch("ai.translate")
+    assert_equal [ "Use AI translation", "Content", nil, :translate, [] ],
+      [ permission.label, permission.area, permission.subject, permission.action, permission.scopes ]
   end
 
   # Trash spec §3.1/global constraints: its own area (not folded into

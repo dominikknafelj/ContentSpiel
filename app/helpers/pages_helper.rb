@@ -37,9 +37,11 @@ module PagesHelper
   end
 
   # "<page or post> – <site>" in the browser tab; the homepage is the site
-  # name alone, and an explicit meta title is taken as written.
+  # name alone, and an explicit meta title is taken as written. The site
+  # title is translated (translation helpers spec §5) and read in the
+  # request's language with the usual fallback, like the page's own.
   def document_title(page, post: nil)
-    site_title = Current.site.title
+    site_title = Locales.read(Current.site, :title)
     meta_title = translated(page, :meta_title)
     return meta_title if post.nil? && meta_title.present?
     return site_title if post.nil? && page.root?

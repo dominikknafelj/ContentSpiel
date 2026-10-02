@@ -117,3 +117,9 @@ gem "rack-attack", "~> 6.8"
 gem "view_component", "~> 4.15"
 
 gem "lookbook", "~> 2.3", groups: [ :development, :test ]
+
+# The official Anthropic SDK -- the built-in AI translation provider
+# (`AI::Providers::Anthropic`, translation helpers spec §6). Only ever
+# constructed when a site has an AI key configured; tests inject a fake
+# client and never reach the network.
+gem "anthropic"

@@ -124,7 +124,7 @@ class AuthorizationMatrixTest < ActiveSupport::TestCase
       -> { Tags::Rename.call(Tag.create!(name: "old"), name: "new") },
       false, "access.denied" ],
     [ "an Admin-group member edits the site settings", -> { users(:two) }, :admin,
-      -> { Settings::Save.call(Current.site, attributes: { title: "Renamed" }) },
+      -> { Settings::Save.call(Current.site, translations: { "en" => { title: "Renamed" } }) },
       true, "settings.updated" ],
     [ "an Admin-group member resets the owner's password", -> { users(:two) }, :admin,
       -> { Users::UpdatePassword.call(users(:one), password: "new-password-1", password_confirmation: "new-password-1") },

@@ -90,4 +90,40 @@ class SetupSiteStepsTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
   end
+
+  # Translation helpers spec §5: the title and tagline are translated, and
+  # setup writes them in the site's default language.
+  test "the site step writes the title and tagline in the default language" do
+    SiteSetting.instance.update!(locales: [ { "code" => "de" }, { "code" => "en" } ], default_locale: "de")
+
+    patch setup_step_path("site"), params: { site_setting: { title: "Danas Notizen", tagline: "Was ich gelernt habe" } }
+
+    assert_redirected_to setup_step_path("languages")
+    setting = SiteSetting.instance
+    assert_equal "Danas Notizen", setting.title(locale: "de")
+    assert_equal "Was ich gelernt habe", setting.tagline(locale: "de")
+    assert_nil setting.read_attribute(:tagline)["en"]
+
+    get setup_step_path("site")
+    assert_select "input[name='site_setting[title]'][value=?]", "Danas Notizen"
+    get setup_step_path("review")
+    assert_includes response.body, "Danas Notizen"
+  end
+
+  # The site step comes before the languages step, so the title is typed in
+  # whatever the default was then; choosing a different default afterwards
+  # takes it along rather than leaving the new default without a title
+  # (which would refuse the languages step outright).
+  test "choosing a different default language afterwards carries the title and tagline into it" do
+    patch setup_step_path("site"), params: { site_setting: { title: "Dana's Notes", tagline: "Things I learned" } }
+    assert_equal "en", SiteSetting.instance.default_locale
+
+    patch setup_step_path("languages"), params: { site_setting: { default_locale: "de", extra_locales: [ "en" ] } }
+
+    assert_redirected_to setup_step_path("mcp_token")
+    setting = SiteSetting.instance
+    assert_equal "Dana's Notes", setting.title(locale: "de")
+    assert_equal "Things I learned", setting.tagline(locale: "de")
+    assert_equal "Dana's Notes", setting.title(locale: "en")
+  end
 end

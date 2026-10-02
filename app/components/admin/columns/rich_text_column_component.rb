@@ -166,6 +166,12 @@ module Admin
       # here rather than degrading to text the way the public render would.
       def original_html = original_document.to_html(locale: ::Locales.default, urls: PublicSite::Urls.new(preview: true))
 
+      # Use loads the suggestion into this editor through its hidden JSON
+      # input (`translate:use`, dispatched there, bubbles to
+      # `admin--rich-text#applySuggestion`), and the original counts as the
+      # Markdown `AI::Translate` actually sends.
+      def translate_target = { input_id: "#{id}-json", kind: :rich, characters: original_document.to_markdown.length }
+
       def self.to_document(value)
         case value
         when RichText::Document then value

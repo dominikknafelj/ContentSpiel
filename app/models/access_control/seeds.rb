@@ -54,7 +54,10 @@ module AccessControl
           # Added with the media library (design spec §5.1); an install
           # seeded before that gets it from a data migration instead
           # (`GrantMediaManageToBuiltInGroups`).
-          { permission: "media.manage", scope: {} }
+          { permission: "media.manage", scope: {} },
+          # Translation helpers spec §7; an install seeded before that gets
+          # it from `GrantAiTranslateToBuiltInGroups`.
+          { permission: "ai.translate", scope: {} }
         ]
       },
       AUTHOR_NAME => {

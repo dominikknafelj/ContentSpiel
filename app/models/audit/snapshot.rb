@@ -18,7 +18,10 @@ module Audit
   # hash must round-trip exactly to be a usable version, and a Tiptap node
   # attribute that happens to be called "token" is content, not a secret.
   module Snapshot
-    NEVER_STORED = %w[password password_confirmation password_digest token token_digest].freeze
+    # `ai_api_key` (translation helpers spec §6.2) already matches the
+    # `_key` filter; it's listed here too so it stays out even if that
+    # filter entry is ever narrowed.
+    NEVER_STORED = %w[password password_confirmation password_digest token token_digest ai_api_key].freeze
 
     # `filter_parameters` includes `:email`, which is there to keep
     # addresses out of *request logs*. The audit log is different: the spec
@@ -28,7 +31,11 @@ module Audit
     EXEMPT_FROM_FILTER = %w[email_address].freeze
 
     # Timestamps churn on every save and say nothing `occurred_at` doesn't.
-    IGNORED_CHANGES = %w[created_at updated_at].freeze
+    # `translation_sources` (`Translations::Tracker`) is bookkeeping derived
+    # from the translated values whose own changes are already listed --
+    # digests nobody reads in a changes row. It stays in the full snapshot,
+    # which is the version basis, not a diff.
+    IGNORED_CHANGES = %w[created_at updated_at translation_sources].freeze
 
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK
@@ -156,8 +163,11 @@ module Audit
         }
       else
         # The site settings, and anything a later task audits before it gets its own
-        # serializer here -- still scrubbed by `.for`.
-        record.attributes
+        # serializer here -- still scrubbed by `.for`. Columns `.scrub` would
+        # drop anyway are never even read: reading an encrypted one
+        # (`SiteSetting#ai_api_key`) decrypts it, and a key that can't be
+        # decrypted any more would otherwise fail every settings save.
+        record.attribute_names.select { |name| keep?(name) }.index_with { |name| record.read_attribute(name) }
       end
     end
 

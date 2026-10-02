@@ -34,4 +34,10 @@ Rails.application.config.to_prepare do
   # in the registry from before the reload.
   AccessControl::Permissions.reset!
   AccessControl::BuiltIns.register
+
+  # The AI provider registry (translation helpers spec §6.1) -- reset then
+  # register, for the same reason as every registry above
+  # (`AI::DuplicateProvider` otherwise, after a development reload).
+  AI::Providers.reset!
+  AI::Providers.register("anthropic", AI::Providers::Anthropic)
 end

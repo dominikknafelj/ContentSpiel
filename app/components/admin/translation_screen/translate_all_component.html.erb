@@ -1,0 +1,10 @@
+<%= tag.div class: "flex flex-wrap items-center gap-2", data: wrapper_data do %>
+  <%= tag.button type: "button", class: Admin::TranslationScreen::TranslateButtonComponent::BUTTON_CLASS,
+        data: { action: "admin--translate#translateEmpty", "admin--translate-target": "button" } do %>
+    <span hidden data-translate-spinner class="<%= Admin::TranslationScreen::TranslateButtonComponent::SPINNER_CLASS %>" aria-hidden="true"></span>
+    <span data-translate-label>Translate empty fields</span>
+  <% end %>
+  <%= tag.button "Use all", type: "button", hidden: true, class: Admin::TranslationScreen::TranslateButtonComponent::BUTTON_CLASS,
+        data: { action: "admin--translate#useAll", "admin--translate-target": "useAll" } %>
+  <p role="status" class="text-sm text-meta" data-admin--translate-target="status"></p>
+<% end %>

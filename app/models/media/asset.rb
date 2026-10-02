@@ -44,6 +44,11 @@ class Media::Asset < ApplicationRecord
   # fallback.
   translates :alt, :caption
 
+  # Which version of the original alt/caption each translation was saved
+  # against (translation helpers spec §3.2).
+  include Translations::Tracker
+  tracks_translations
+
   belongs_to :created_by, class_name: "User", optional: true
 
   # Where this asset is actually used (design spec §3.2) -- entirely

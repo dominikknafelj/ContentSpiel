@@ -29,3 +29,12 @@
 
 en:
   hello: "Hello world"
+
+  # How these columns are named in validation messages ("AI provider isn't
+  # an available provider", not Rails' default "Ai provider ...").
+  activerecord:
+    attributes:
+      site_setting:
+        ai_provider: "AI provider"
+        ai_model: "AI model"
+        ai_api_key: "AI API key"

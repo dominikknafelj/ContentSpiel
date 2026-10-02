@@ -1,8 +1,54 @@
 class SiteSetting < ApplicationRecord
+  extend Mobility
+
   has_one_attached :logo
 
+  # The site's name and tagline, per language (translation helpers spec
+  # §5): Mobility jsonb columns like every other translated one, read on
+  # the public site through `Locales.read` (`ThemeHelper#translated`), so a
+  # language without its own falls back like a page title does. Every
+  # other column here is a single value for the whole site, the same in
+  # every language.
+  translates :title, :tagline
+
+  # Which version of the default-language title/tagline each translation
+  # was saved against (translation helpers spec §3.2) -- the tracked
+  # fields are exactly the two `translates` names above.
+  include Translations::Tracker
+  tracks_translations
+
+  # The AI translation key (translation helpers spec §6.2): encrypted at
+  # rest with Active Record encryption (keys: config/application.rb), and
+  # never rendered (the Settings form only ever says whether one is set),
+  # logged (the `_key` entry in `filter_parameters`) or audited
+  # (`Audit::Snapshot::NEVER_STORED`).
+  encrypts :ai_api_key
+
+  # A select's "None" posts "", a pasted key often carries a trailing
+  # newline: stored as nil / stripped instead.
+  normalizes :ai_provider, :ai_model, :ai_api_key, with: ->(value) { value.to_s.strip.presence }
+
+  # Only a provider somebody registered (`AI::Providers`); blank means AI
+  # is off. Checked only when it changes, like `time_zone` below: a plugin
+  # provider whose plugin was later removed mustn't block an unrelated
+  # title edit -- `AI.configured?` already treats it as not set up.
+  validate :ai_provider_is_registered, if: :will_save_change_to_ai_provider?
+
   validate :only_one_record_exists, on: :create
-  validates :title, presence: true
+
+  # The title is the site's one required translated field, and only in the
+  # default language: that's the one every other language falls back to
+  # (`Locales.fallback_chain`), so a site with a title there always has a
+  # name to show. Read from the raw jsonb, never through the plain Mobility
+  # reader, which reads the *ambient* locale (`Page#title_present_in_any_
+  # locale`'s comment has the incident) -- a German-only save mustn't be
+  # judged on the German title. A blank title in another language is a
+  # missing translation (`Translations::Status`), not an error.
+  validate :title_present_in_default_locale
+
+  # Runs before the title check above, so a new default inherits a name
+  # instead of being refused for not having one -- see the method.
+  before_validation :carry_translations_into_new_default_locale, if: :will_save_change_to_default_locale?
 
   validate :locales_are_well_formed
   validate :social_links_are_safe, if: :will_save_change_to_social_links?
@@ -31,8 +77,11 @@ class SiteSetting < ApplicationRecord
 
   after_commit :reset_cached_state
 
+  # Titled in the new row's own default language, not the ambient
+  # `Mobility.locale` -- which, the first time this runs on a public
+  # request, is whatever language that request happened to be in.
   def self.instance
-    first || create!(title: "My Site")
+    first || create! { |site| Mobility.with_locale(site.default_locale) { site.title = "My Site" } }
   end
 
   # The one rule for a social link's URL: an absolute http/https/mailto
@@ -63,6 +112,16 @@ class SiteSetting < ApplicationRecord
     ActiveSupport::TimeZone[time_zone.to_s] || ActiveSupport::TimeZone["UTC"]
   end
 
+  # Whether a key is stored, read off the raw column -- never decrypting
+  # it. Everything that only needs to know *that* there's a key (the
+  # Settings form's "API key: set", `AI.configured?`) asks this, so a key
+  # the current encryption keys can't read (keys lost, rotated, or a
+  # production boot without them) still shows as set and can still be
+  # removed or replaced, instead of 500ing the Settings screen that's the
+  # only way to fix it. Only `AI.provider`, which actually needs the
+  # plaintext, decrypts.
+  def ai_api_key_set? = ai_api_key_before_type_cast.present?
+
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }
   end
@@ -87,8 +146,56 @@ class SiteSetting < ApplicationRecord
 
   private
 
+  def ai_provider_is_registered
+    return if ai_provider.blank? || AI::Providers.find(ai_provider)
+
+    errors.add(:ai_provider, "isn't an available provider")
+  end
+
   def only_one_record_exists
     errors.add(:base, "only one SiteSetting may exist") if SiteSetting.exists?
+  end
+
+  # `Translations::Tracker`'s hooks: this row *is* where the site's
+  # languages live, so it reads them off itself rather than through
+  # `Current.site` -- which, while `.instance` is still creating this row,
+  # would try to create it again.
+  def translation_primary_locale = default_locale.to_s
+
+  def translation_target_locales = locale_codes - [ translation_primary_locale ]
+
+  def title_present_in_default_locale
+    errors.add(:title, :blank) if read_attribute(:title).to_h[default_locale.to_s].blank?
+  end
+
+  # A new default language with no title (or tagline) of its own takes the
+  # previous default's, so the site keeps the name it had. Two places would
+  # otherwise get stuck:
+  # - the setup wizard asks for the title (site step) *before* the default
+  #   language (languages step), so the title was typed in the old default,
+  #   and `#title_present_in_default_locale` would refuse the languages step
+  #   outright;
+  # - CS Studio's Settings autosaves the whole form on every change, so a
+  #   refused default language would be resent, and refused again, with
+  #   every later edit until someone put the select back.
+  # Public output doesn't change: the old default's value was already what
+  # the new default fell back to. A value the new default already has is
+  # kept as it is.
+  def carry_translations_into_new_default_locale
+    previous = default_locale_in_database.to_s
+    current = default_locale.to_s
+    # An unknown or not-enabled language is `#default_locale_is_enabled`'s
+    # (or `#locales_are_well_formed`'s) to refuse -- and Mobility raises on
+    # writing one outside `I18n.available_locales`.
+    return if previous.blank? || previous == current
+    return unless locale_codes.include?(current) && I18n.available_locales.map(&:to_s).include?(current)
+
+    self.class.translation_columns.each do |field|
+      values = read_attribute(field).to_h
+      next if values[current].present? || values[previous].blank?
+
+      Mobility.with_locale(current) { public_send("#{field}=", values[previous]) }
+    end
   end
 
   # Final fix wave (E): a link the footer can't render -- `github.com/dana`

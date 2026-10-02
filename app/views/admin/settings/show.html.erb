@@ -1,11 +1,11 @@
 <%# The Settings module (cs-studio spec §6.1, Task 8): title, tagline,
     logo, social links and the default language, all through one
-    autosaving form (`Admin::SettingsFormComponent`). %>
+    autosaving form (`Admin::SettingsFormComponent`) -- the title and
+    tagline in whichever language is being edited (`admin_locale`,
+    translation helpers spec §5). %>
 <% content_for :title, "Settings" %>
 <h1 class="mb-4 text-h1 text-ink">Settings</h1>
 
-<%= render Admin::SaveStatusComponent.new(id: "settings-save-status", state: :idle) %>
-
 <div class="mt-2">
-  <%= render Admin::SettingsFormComponent.new(site_setting: @site_setting, url_options: admin_url_options) %>
+  <%= render Admin::SettingsFormComponent.new(site_setting: @site_setting, locale: admin_locale) %>
 </div>

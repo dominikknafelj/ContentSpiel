@@ -24,6 +24,15 @@
         <%= render Admin::StatusBadgeComponent.new(status: status, at: page.published_at) %>
       </span>
 
+      <% if incomplete_locales.any? %>
+        <%# One marker for every language at once (translation helpers spec
+            §4), its tooltip naming them; `role="img"` + `aria-label` so a
+            screen reader hears the same list the tooltip shows. %>
+        <%= tag.span "!", data: { translation_marker: true }, role: "img", title: translation_marker_label,
+              aria: { label: translation_marker_label },
+              class: "shrink-0 rounded-cs border border-warn bg-warn-tint px-1 font-cs-mono text-label text-warn-ink" %>
+      <% end %>
+
       <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
 
       <% if can_add_child? %>
@@ -40,7 +49,7 @@
       a context-only page (see the component's comment). %>
   <ul <%= tag.attributes("data-admin--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
     <% children.each do |child| %>
-      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, selected: selected, locale: locale, url_options: url_options) %>
+      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_states: translation_states, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>
   </ul>
 </li>

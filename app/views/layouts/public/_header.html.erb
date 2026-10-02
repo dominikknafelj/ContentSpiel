@@ -3,7 +3,7 @@
     <% if theme_site.logo.attached? %>
       <%= image_tag theme_site.logo, alt: "", class: "h-8 w-auto" %>
     <% end %>
-    <span><%= theme_site.title %></span>
+    <span><%= translated(theme_site, :title) %></span>
   <% end %>
 
   <nav aria-label="Main" class="flex flex-wrap items-center gap-5 text-sm">

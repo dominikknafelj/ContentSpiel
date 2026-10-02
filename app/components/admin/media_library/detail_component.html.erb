@@ -18,7 +18,7 @@
 
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-3">
-        <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, url: language_url) %>
+        <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
         <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
       </div>
 
@@ -33,12 +33,13 @@
 
           <%= render Admin::Columns::PlainColumnComponent.new(
                 name: "alt", id: "media-alt", html_name: "media_asset[alt]",
-                value: alt_value, errors: alt_errors, locale: locale
+                value: alt_value, original: original(:alt), errors: alt_errors, locale: locale, **translation(:alt)
               ) %>
 
           <%= render Admin::Columns::PlainColumnComponent.new(
                 name: "caption", id: "media-caption", html_name: "media_asset[caption]",
-                value: caption_value, errors: caption_errors, locale: locale, multiline: true
+                value: caption_value, original: original(:caption), errors: caption_errors, locale: locale, multiline: true,
+                **translation(:caption)
               ) %>
         <% end %>
       <% end %>

@@ -102,6 +102,29 @@ Rails.application.routes.draw do
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
 
+    # "Mark as up to date" for an outdated translation (translation helpers
+    # spec §3.4/§4): one endpoint for every translatable record kind, named
+    # by `record_type`/`record_id` in the params (the editor's button posts
+    # them in its `formaction`), the way the trash addresses its items by
+    # type rather than one nested route per model.
+    post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
+
+    # The Translations overview (translation helpers spec §4): what's
+    # missing or outdated in `?locale=` (a target language), optionally
+    # narrowed by `?type=page|post|media`, paged by `?offset=`. A plain
+    # `get` rather than `resources :translations, only: :index`, so the
+    # AI suggestion action (Task 8) can join the same controller on a
+    # route of its own without a resource's implied member routes.
+    get "translations", to: "translations#index", as: :translations
+
+    # AI translation suggestions (translation helpers spec §6.4): the
+    # editor's Translate buttons post the record (`record_type`/
+    # `record_id`, like the confirm endpoint above), `fields[]`, the target
+    # `locale` and `inputs[field]` (the input each suggestion is for), and
+    # get Turbo Streams back. A POST although nothing is saved: it spends
+    # the provider's quota and records an `ai.translated` event.
+    post "translations/suggest", to: "translations#suggest", as: :translation_suggestions
+
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource
@@ -135,7 +158,11 @@ Rails.application.routes.draw do
     # default language) -- `resource` (singular), like the page tree's own
     # `resource :tree`, since there's exactly one settings row to show or
     # update, never a collection or an `:id` to route on.
-    resource :settings, only: %i[show update]
+    resource :settings, only: %i[show update] do
+      # Translation helpers spec §6.2: checks the saved AI provider, model
+      # and key with one tiny request, answered inline as a Turbo Stream.
+      post :test_ai_connection
+    end
 
     # The Languages module (cs-studio spec §6.1, Task 8), nested under
     # "settings" by *path* only (`scope`, not `namespace` -- the brief calls

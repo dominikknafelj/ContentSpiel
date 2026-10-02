@@ -56,6 +56,12 @@ class Page < ApplicationRecord
   # reason every other piece of editor-facing copy here is.
   translates :title, :slug, :subtitle, :meta_title, :meta_description, :hero_alt
 
+  # Which version of the original each translation was saved against
+  # (translation helpers spec §3.2). Never `slug`: it's generated per
+  # language, not translated from the original's.
+  include Translations::Tracker
+  tracks_translations
+
   # A page's body is an ordered list of blocks; the renderer walks them in
   # `position` order and dispatches on each one's `block_type`. `as: :owner`
   # because `ContentBlock#owner` is polymorphic (open-types spec §4.1) --

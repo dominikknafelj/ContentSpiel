@@ -85,7 +85,11 @@ puts "  admin@example.com / password123 (owner)"
 puts "  author@example.com / password123 (Author group)"
 
 SiteSetting.instance.tap do |settings|
-  settings.update!(title: "ContentSpiel", tagline: "Notes from building a personal CMS") if settings.title.blank?
+  # Translated columns (translation helpers spec §5): written in the site's
+  # default language, not whatever `Mobility.locale` happens to be.
+  Mobility.with_locale(settings.default_locale) do
+    settings.update!(title: "ContentSpiel", tagline: "Notes from building a personal CMS") if settings.title.blank?
+  end
   # A seeded dev database is fully set up; never send it into /setup.
   settings.update!(setup_completed_at: Time.current) if settings.setup_completed_at.nil?
 end

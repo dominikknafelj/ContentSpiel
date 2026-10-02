@@ -125,6 +125,21 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
     assert_not changes.key?("updated_at")
   end
 
+  # `translation_sources` (`Translations::Tracker`) changes on every
+  # translation save, but it's derived bookkeeping: the translated value's
+  # own change is what a changes row shows. The full snapshot keeps it.
+  test "translation_sources is left out of field changes but kept in the snapshot" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Hello")
+      Posts::Save.call(post, translations: { "de" => { title: "Hallo" } })
+
+      changes = Audit::Snapshot.field_changes_for(post)
+      assert_equal [ nil, "Hallo" ], changes["de title"]
+      assert_not changes.key?("translation_sources")
+      assert Audit::Snapshot.for(post.reload)["translation_sources"].dig("title", "de").present?
+    end
+  end
+
   test "a body added in a new locale has a nil digest_before" do
     post = create_post(title: "Adding German")
     body = rich_doc("Hallo")

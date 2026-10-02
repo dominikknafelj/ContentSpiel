@@ -2,6 +2,7 @@
 # (Setup::RedirectConstraint). Tests that need a fresh install clear
 # setup_completed_at themselves (see test/test_helpers/setup_test_helper.rb).
 default:
-  title: Test Site
+  # Translated (Mobility jsonb, translation helpers spec §5).
+  title: { en: Test Site }
   default_locale: en
   setup_completed_at: <%= Time.current.to_fs(:db) %>

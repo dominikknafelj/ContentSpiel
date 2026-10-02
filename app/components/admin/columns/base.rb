@@ -28,12 +28,19 @@ module Admin
       # caller (a bare column name, no brackets in sight) is unaffected --
       # `id`/`html_name` default to it.
       #
+      # `translation_state:` is this field's `Translations::Tracker
+      # #translation_state` in the locale being edited, and
+      # `translation_confirm:` what its "Mark as up to date" button posts
+      # (nil for a viewer who can't) -- see `#outdated_note`. Both are the
+      # caller's to work out: only it knows the record behind the value.
+      #
       # `**html` is the same "anything else passes through" escape hatch
       # `Admin::ButtonComponent` already uses, needed here so a caller can
       # wire a Stimulus target/action onto the actual `<input>` (the live
       # slug-preview controller, Task 4) without this component knowing
       # anything about that controller.
-      def initialize(name:, value:, original: nil, errors: [], locale: nil, id: nil, html_name: nil, **html)
+      def initialize(name:, value:, original: nil, errors: [], locale: nil, id: nil, html_name: nil,
+        translation_state: nil, translation_confirm: nil, **html)
         @name = name
         @value = value
         @original = original
@@ -42,6 +49,8 @@ module Admin
         @id = id || name
         @html_name = html_name || name
         @html = html
+        @translation_state = translation_state
+        @translation_confirm = translation_confirm
       end
 
       def show_original? = original.present?
@@ -50,9 +59,34 @@ module Admin
 
       def errors_id = "#{id}-errors"
 
+      # The "Original changed" note (translation helpers spec §4), shown in
+      # the original's box only for an `:outdated` field -- `:unknown` (a
+      # translation older than tracking) and `:current` show nothing.
+      def outdated_note
+        return unless translation_state == :outdated
+
+        Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+      end
+
+      # The AI **Translate** button in the original's box (translation
+      # helpers spec §6.4) -- it renders only for a viewer who may edit the
+      # record (`translation_confirm` is handed over only then), with AI
+      # set up and `ai.translate`; see `Admin::TranslationScreen
+      # ::TranslateButtonComponent`. Nil when there's no confirm at all (the
+      # primary language, an untracked column, a view-only viewer).
+      def translate_button
+        return unless translation_confirm
+
+        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
+      end
+
       private
 
-      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html
+      # What Use fills and how (`TranslateButtonComponent`): a plain column
+      # its own input, measured as the text it is.
+      def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }
+
+      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm
     end
   end
 end

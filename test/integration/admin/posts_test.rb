@@ -269,6 +269,45 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_not Audit::Event.exists?(action: "post.updated", subject: post_record)
   end
 
+  # Translation helpers spec §4 (Task 4): the "Languages" column shows one
+  # badge per *target* language -- ✓ complete, ! missing, ↻ outdated --
+  # each with a title and an accessible label, and none for the original.
+  test "the list shows a translation badge per target language" do
+    with_locales(%w[en de es], default: "en")
+    post_record = create_post(title: "Hello")
+    assert Posts::Save.call(post_record, translations: { "de" => { title: "Hallo" } }).ok?
+    stale = create_post(title: "Stale")
+    assert Posts::Save.call(stale, translations: { "de" => { title: "Alt" }, "es" => { title: "Viejo" } }).ok?
+    assert Posts::Save.call(stale, translations: { "en" => { title: "Stale!" } }).ok?
+
+    get "/cs-studio/posts"
+
+    assert_response :success
+    assert_select "tr#post_#{post_record.id}" do
+      assert_select "[data-translation-state][data-locale='en']", count: 0
+      assert_select "[data-locale='de'][data-translation-state='complete'][title='Deutsch: complete'][aria-label='Deutsch: complete']", text: /✓/
+      assert_select "[data-locale='es'][data-translation-state='missing'][title='Español: missing'][aria-label='Español: missing']", text: /!/
+    end
+    assert_select "tr#post_#{stale.id}" do
+      assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated']", text: /↻/
+      assert_select "[data-locale='es'][data-translation-state='outdated']"
+    end
+  end
+
+  test "the list costs the same queries for 1 post as for 20" do
+    with_locales(%w[en de es], default: "en")
+    create_post(title: "First", tags: [ "first" ])
+    get "/cs-studio/posts"
+    one = count_queries { get "/cs-studio/posts" }
+
+    19.times { |index| create_post(title: "Post #{index}", tags: [ "tag#{index}" ]) }
+    twenty = count_queries { get "/cs-studio/posts" }
+
+    assert_response :success
+    assert_select "tbody tr", 20
+    assert_equal one, twenty
+  end
+
   # Task 10: deleting moves the post to the trash (`Trash::Move`) with a
   # flash naming it and an Undo that posts straight back to
   # `Admin::TrashController#restore` with `from=undo` -- landing the actor
@@ -292,5 +331,16 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     assert_match "Restored “Gone post”", response.body
+  end
+
+  private
+
+  # Every SQL statement the block issues, cached or not (see
+  # `Admin::AccessControlTest#count_queries`).
+  def count_queries(&block)
+    count = 0
+    counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+    count
   end
 end

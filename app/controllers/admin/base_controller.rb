@@ -37,12 +37,19 @@ module Admin
     # list (`TRASH_PERMISSIONS`).
     TRASH_PERMISSIONS = %w[pages.delete posts.delete media.manage media.upload trash.empty].freeze
 
+    # An entry's optional `if:` is a further condition, a lambda evaluated
+    # per request (`admin_modules`) for what a static `permission` can't
+    # say -- the Translations overview (translation helpers spec §4) only
+    # makes sense with more than one language enabled, which is a runtime
+    # site setting, not a right.
     MODULES = [
       { label: "Dashboard", icon: :dashboard, path: :admin_root_path, permission: nil },
       { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read" },
       { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
       { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
       { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload" },
+      { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],
+        if: -> { Locales.enabled.size > 1 } },
       { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS },
       { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
@@ -77,9 +84,12 @@ module Admin
     end
 
     # The `MODULES` entries this actor may open: `nil` is open to everyone,
-    # otherwise any one of the entry's keys will do.
+    # otherwise any one of the entry's keys will do -- and an entry with an
+    # `if:` lambda only while it's true.
     def admin_modules
-      @admin_modules ||= MODULES.select { |entry| entry[:permission].nil? || holds_any?(entry[:permission]) }
+      @admin_modules ||= MODULES.select do |entry|
+        (entry[:permission].nil? || holds_any?(entry[:permission])) && (entry[:if].nil? || entry[:if].call)
+      end
     end
 
     def holds_any?(keys) = Array(keys).any? { |key| can?(key) }

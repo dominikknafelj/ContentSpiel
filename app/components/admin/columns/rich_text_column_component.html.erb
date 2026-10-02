@@ -8,7 +8,7 @@
     <%= tag.div class: "admin-rich-text relative min-w-0",
           data: {
             controller: "admin--rich-text",
-            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked",
+            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked translate:use->admin--rich-text#applySuggestion",
             "admin--rich-text-link-targets-url-value": link_targets_url,
             "admin--rich-text-locale-value": editor_locale,
             "admin--rich-text-assets-value": assets_json,
@@ -46,7 +46,8 @@
       <div class="rounded-cs border border-line bg-sunken px-3 py-2">
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <div data-original-for="<%= name %>" class="admin-rich-text-content text-ink"><%= original_html %></div>
-        <span data-translate-slot="<%= name %>"></span>
+        <div data-translate-slot="<%= name %>"><% if (button = translate_button) %><%= render button %><% end %></div>
+        <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>
   </div>

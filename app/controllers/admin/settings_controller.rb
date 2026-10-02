@@ -29,12 +29,20 @@ module Admin
     # `Admin::PagesController#update`: every field in `params[:site_setting]`
     # PATCHes here together, answered with the shared Turbo Stream response
     # regardless of success.
+    #
+    # The title and tagline (`Settings::Save::TRANSLATED`) are saved in the
+    # language being edited (`admin_locale`, the `?locale=` the form posts
+    # to), the same way `Admin::PagesController#update` saves a page title;
+    # every other field is one value for the whole site, resent and saved
+    # the same whichever language the form is showing.
     def update
       site = Current.site
       permitted = params.fetch(:site_setting, ActionController::Parameters.new)
-        .permit(:title, :tagline, :logo, :default_locale, :trash_retention_days, :time_zone, social_links: [ [ :name, :url ] ])
+        .permit(*Settings::Save::TRANSLATED, :logo, :default_locale, :trash_retention_days, :time_zone,
+          :ai_provider, :ai_model, :ai_api_key, social_links: [ [ :name, :url ] ])
 
-      attributes = permitted.except(:social_links).to_h
+      translated = permitted.slice(*Settings::Save::TRANSLATED).to_h
+      attributes = permitted.except(:social_links, *Settings::Save::TRANSLATED).to_h
 
       # `drop_blank_file_params` (see its own doc comment, carried over from
       # `Admin::PagesController#update`) keeps this same PATCH -- resent in
@@ -46,8 +54,9 @@ module Admin
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_logo))
       logo_changing = attributes.key?("logo")
       attributes["social_link_rows"] = permitted[:social_links] if permitted.key?(:social_links)
+      ai_key_touched = assign_ai_key(attributes)
 
-      result = Settings::Save.call(site, attributes: attributes)
+      result = Settings::Save.call(site, attributes: attributes, translations: { admin_locale => translated })
       saved = result.ok?
 
       streams = autosave_stream(
@@ -57,15 +66,66 @@ module Admin
         error_prefix: ID_PREFIX,
         base_updated_at: params[:base_updated_at],
         fields: { title: [ :title ], tagline: [ :tagline ], logo: [ :logo ], default_locale: [ :default_locale ],
-          trash_retention_days: [ :trash_retention_days ], time_zone: [ :time_zone ], social_links: [ :social_links ] }
+          trash_retention_days: [ :trash_retention_days ], time_zone: [ :time_zone ], social_links: [ :social_links ],
+          ai_provider: [ :ai_provider ], ai_model: [ :ai_model ], ai_api_key: [ :ai_api_key ] }
       )
 
       streams << logo_field_stream(site) if saved && logo_changing
+      # Saved or not: either way the field must come back empty (a refused
+      # save mustn't leave a typed key sitting in the page), and the
+      # section says what's stored now.
+      streams << ai_key_field_stream(site) if ai_key_touched
+      # First, so the status and error streams after it land in the new form.
+      streams.unshift(form_stream(site)) if saved && site.saved_change_to_default_locale?
 
       render turbo_stream: streams, status: autosave_status(result)
     end
 
+    # Test connection (translation helpers spec §6.2): one tiny request
+    # with the *saved* provider, model and key (`AI.provider`, then the
+    # provider's own `#test_connection`), reported inline under the button.
+    # Writes nothing, so it's not a service; `settings.manage` is the
+    # controller-wide `before_action` above.
+    def test_ai_connection
+      AI.provider.test_connection
+      render turbo_stream: ai_test_result_stream(message: "Connection OK.", ok: true)
+    rescue AI::Error => error
+      render turbo_stream: ai_test_result_stream(message: error.message, ok: false), status: :unprocessable_entity
+    end
+
     private
+
+    # The API key's two rules (spec §6.2), applied to the attributes about
+    # to go to `Settings::Save`: a blank `ai_api_key` keeps the stored key
+    # (the field is always rendered empty, so blank means "not changing
+    # it"), and `remove_ai_key` clears it -- unless a new key was typed in
+    # the same submit, which wins, like a new logo over `remove_logo`.
+    # Returns whether this request touched the key at all.
+    def assign_ai_key(attributes)
+      attributes.delete("ai_api_key") if attributes["ai_api_key"].blank?
+      removing = ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_ai_key))
+      attributes["ai_api_key"] = nil if removing && !attributes.key?("ai_api_key")
+
+      attributes.key?("ai_api_key")
+    end
+
+    def ai_key_field_stream(site)
+      turbo_stream.replace("#{ID_PREFIX}-ai-key-section", partial: "admin/settings/ai_key_field", locals: { site_setting: site })
+    end
+
+    def ai_test_result_stream(message:, ok:)
+      turbo_stream.replace("#{ID_PREFIX}-ai-test-result", partial: "admin/settings/ai_test_result", locals: { message: message, ok: ok })
+    end
+
+    # A new default language changes what every translated field shows:
+    # which language is the original, the originals beside the inputs, the
+    # switcher's links and markers. The whole form is re-rendered, still in
+    # the language it was being edited in (`admin_locale`, which the form
+    # always posts).
+    def form_stream(site)
+      turbo_stream.replace(Admin::SettingsFormComponent::DOM_ID,
+        Admin::SettingsFormComponent.new(site_setting: site, locale: admin_locale))
+    end
 
     def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
 
