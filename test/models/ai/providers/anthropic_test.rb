@@ -168,13 +168,27 @@ class AI::Providers::AnthropicTest < ActiveSupport::TestCase
     assert_match(/API key/, error.message)
   end
 
-  test "without an injected client it builds the SDK client with the key and a 60 second timeout" do
+  test "without an injected client it builds the SDK client with the key and a 25 second timeout" do
     provider = AI::Providers::Anthropic.new(api_key: "sk-test", model: "claude-sonnet-5")
     client = provider.instance_variable_get(:@client)
 
     assert_instance_of Anthropic::Client, client
     assert_equal "sk-test", client.api_key
-    assert_equal 60, client.timeout
+    assert_equal 25, client.timeout
+  end
+
+  # Final fix wave, I2: a suggestion request runs inside an editor's web
+  # request, behind kamal-proxy (default response timeout 30 s). One
+  # `AI::Translate` call makes at most two provider calls (plain fields,
+  # then rich text), each bounded by `TIMEOUT`, so the proxy's timeout in
+  # config/deploy.yml must outlast both -- or the proxy cuts the request
+  # off while Puma is still waiting on the provider.
+  test "the production proxy waits longer than one suggestion request can take" do
+    deploy = YAML.load_file(Rails.root.join("config/deploy.yml"))
+    response_timeout = deploy.dig("proxy", "response_timeout")
+
+    assert_kind_of Integer, response_timeout, "config/deploy.yml sets no proxy response_timeout (kamal-proxy's default is 30 s)"
+    assert_operator response_timeout, :>, 2 * AI::Providers::Anthropic::TIMEOUT
   end
 
   test "a blank key is refused rather than falling back to the server's environment" do

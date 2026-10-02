@@ -24,15 +24,17 @@ module AI
   class Translate < ApplicationService
     include Translations::EditRight
 
-    # The per-request cap (controller ruling, narrower than the spec's
+    # The per-request cap (spec §10, narrower than the spec's original
     # 30,000 characters): one request must finish inside the provider's
-    # 60 s timeout with no retry (`AI::Providers::Anthropic::TIMEOUT`), and
-    # 12,000 characters is what reliably does. Counted over what's actually
-    # sent -- blank originals skipped, rich text as its Markdown. Public:
-    # the bulk "Translate empty fields" (Task 8) splits its request by
-    # these, so a split never trips them.
+    # 25 s timeout with no retry (`AI::Providers::Anthropic::TIMEOUT`,
+    # itself bounded by the production proxy's response timeout and Puma's
+    # thread count -- see its comment), and 6,000 characters is what
+    # reliably does. Counted over what's actually sent -- blank originals
+    # skipped, rich text as its Markdown. Public: the bulk "Translate empty
+    # fields" (Task 8) splits its request by these, so a split never trips
+    # them.
     MAX_FIELDS = 20
-    MAX_CHARACTERS = 12_000
+    MAX_CHARACTERS = 6_000
 
     TOO_MUCH = "Too much at once — translate in parts".freeze
 

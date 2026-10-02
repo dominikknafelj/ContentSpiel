@@ -239,6 +239,13 @@ class AI::TranslateTest < ActiveSupport::TestCase
     saved&.each { |definition| ContentTypes.registry_put(definition) }
   end
 
+  # Final fix wave, I2: small enough that one request reliably finishes
+  # inside the provider's 25 s timeout.
+  test "the caps are 20 fields and 6,000 characters" do
+    assert_equal 20, AI::Translate::MAX_FIELDS
+    assert_equal 6_000, AI::Translate::MAX_CHARACTERS
+  end
+
   test "refused over the character cap" do
     post = post_with(excerpt: "x" * (AI::Translate::MAX_CHARACTERS - "Original sentence".length + 1))
 

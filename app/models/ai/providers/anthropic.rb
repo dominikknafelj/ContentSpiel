@@ -44,17 +44,27 @@ module AI
 
       FORMATS = %i[plain markdown].freeze
 
-      # Translation helpers global constraints: 60 s. Retries are off: this
-      # runs inside an editor's web request, and the SDK's default retries
+      # 25 s (final fix wave, I2; spec §10 -- the original 60 s didn't fit
+      # production). This runs inside an editor's web request, which in
+      # production goes through kamal-proxy: its default response timeout
+      # is 30 s, raised to 75 s in config/deploy.yml, and one `AI::Translate`
+      # call makes at most two provider calls (plain fields, then rich
+      # text), so 2 x 25 s stays well inside it. Every second spent here
+      # also holds one of Puma's few threads (`RAILS_MAX_THREADS`, 3 by
+      # default) -- a short timeout bounds how long concurrent bulk
+      # translations can starve the site of them. `AI::Translate::
+      # MAX_CHARACTERS` is sized so one request finishes well inside it.
+      # Retries are off for the same reason: the SDK's default retries
       # would let one click hang for several timeouts in a row -- a clear
       # "try again" message straight away is the better answer.
-      TIMEOUT = 60
+      TIMEOUT = 25
       MAX_RETRIES = 0
 
-      # Enough for the largest request `AI::Translate` sends (30,000
-      # characters, spec §6.3) in a language that runs longer than the
-      # original. An answer that still hits it is reported as such
-      # (`#check_complete!`) rather than as a count mismatch.
+      # A ceiling, not a target: generous headroom over the largest request
+      # `AI::Translate` sends (`MAX_CHARACTERS`, 6,000 characters -- roughly
+      # 1,500-3,000 tokens of output even in a language that runs longer
+      # than the original). An answer that still hits it is reported as
+      # such (`#check_complete!`) rather than as a count mismatch.
       MAX_TOKENS = 16_000
 
       # The SDK otherwise reads `ANTHROPIC_BASE_URL` from the server's

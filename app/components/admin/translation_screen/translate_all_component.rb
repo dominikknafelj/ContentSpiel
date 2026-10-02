@@ -12,7 +12,7 @@ module Admin
     # the page loaded no longer counts). The requests are split per record
     # and by `AI::Translate::MAX_FIELDS`/`MAX_CHARACTERS`, and sent one
     # after another rather than as one long server request: each must fit
-    # the provider's 60 s timeout on its own, and a sequence of short
+    # the provider's 25 s timeout on its own, and a sequence of short
     # requests also shows progress and keeps what earlier parts returned if
     # a later one fails.
     #
