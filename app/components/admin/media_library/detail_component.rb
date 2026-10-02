@@ -100,9 +100,12 @@ module Admin
       # the original has alt text and this language doesn't (the image
       # rule in `Translations::Status`), outdated where alt or caption was
       # translated from an older original.
-      def missing_locales = Translations::Status.missing_locales(asset)
+      def missing_locales = switcher_locales[:missing]
 
-      def outdated_locales = Translations::Status.outdated_locales(asset)
+      def outdated_locales = switcher_locales[:outdated]
+
+      # See `Admin::RecordHeaderComponent#switcher_locales`.
+      def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(asset)
 
       # See `Admin::PageSettingsFormComponent#translation`.
       def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(asset, field, locale: locale, confirmable: editable?)

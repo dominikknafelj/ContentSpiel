@@ -88,7 +88,14 @@ module Translations
       recorded = translation_sources.dig(field.to_s, locale)
       return :unknown if recorded.nil?
 
-      recorded == Translations.digest(translation_value(field, Translations.primary_locale)) ? :current : :outdated
+      # A cleared original has nothing to be outdated *against* -- the same
+      # rule `store_translation_source` follows when it drops the digest of a
+      # blank one. Reading `:outdated` here would flag a field whose editor
+      # shows no original box at all, so no note and no way to confirm it.
+      original = Translations.digest(translation_value(field, Translations.primary_locale))
+      return :unknown if original.nil?
+
+      recorded == original ? :current : :outdated
     end
 
     # Marks `field` in `locale` as translated from the original as it

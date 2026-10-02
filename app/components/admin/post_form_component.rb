@@ -97,10 +97,13 @@ module Admin
     # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
     # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
     # gives for its own page.
-    def missing_locales = Translations::Status.missing_locales(post)
+    def missing_locales = switcher_locales[:missing]
 
     # The switcher's "original changed" codes (translation helpers spec §4).
-    def outdated_locales = Translations::Status.outdated_locales(post)
+    def outdated_locales = switcher_locales[:outdated]
+
+    # See `Admin::RecordHeaderComponent#switcher_locales`.
+    def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(post)
 
     # See `Admin::PageSettingsFormComponent#translation`.
     def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(post, field, locale: locale, confirmable: editable?)

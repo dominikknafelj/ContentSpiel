@@ -97,11 +97,15 @@ module Admin
     # §6.2) -- computed here, not handed in, since every caller of this
     # component already has the one `page` it's for and nothing else this
     # check would need.
-    def missing_locales = Translations::Status.missing_locales(page)
+    def missing_locales = switcher_locales[:missing]
 
     # The switcher's "original changed" codes (translation helpers spec §4)
     # -- the page's own fields and its blocks', which roll up into it.
-    def outdated_locales = Translations::Status.outdated_locales(page)
+    def outdated_locales = switcher_locales[:outdated]
+
+    # Both marker sets from one `Translations::Status` pass (one blocks
+    # query), read once per render.
+    def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(page)
 
     # Per-code URL for the switcher: this same page's editor, with `locale:`
     # omitted for the site's default language -- the same "the default

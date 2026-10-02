@@ -48,19 +48,33 @@ module Translations
       end
     end
 
-    # The codes `Admin::LanguageSwitcherComponent` marks with a dot. Every
-    # enabled locale, the primary one included: a page whose own title is
-    # blank in the default language is just as much a gap.
-    def missing_locales(record) = locales_in(record, :missing, ::Locales.enabled)
+    # What `Admin::LanguageSwitcherComponent` marks, for one record (and,
+    # for a page or post, its blocks), with one blocks query:
+    # `{ missing: [codes], outdated: [codes] }`. Unlike the single record
+    # state `.for` gives the lists, the two are worked out *independently*
+    # (spec §4: the switcher shows both states per language) -- a German
+    # page with a blank required block field *and* an outdated title gets
+    # both markers, not just the missing dot (review fix round 1).
+    #
+    # `missing` covers every enabled locale, the primary one included: a
+    # page whose own title is blank in the default language is just as much
+    # a gap. `outdated` covers target locales only: the original is never
+    # outdated against itself.
+    def switcher_locales(record)
+      blocks = blocks_by_owner([ record ]).fetch([ record.class.polymorphic_name, record.id ], [])
+      items = [ record ] + blocks
 
-    # The primary locale is the original, never outdated against itself.
-    def outdated_locales(record) = locales_in(record, :outdated, Translations.target_locales)
+      {
+        missing: ::Locales.enabled.map(&:to_s).select { |code| missing?(record, blocks, code) },
+        outdated: Translations.target_locales.select { |code| items.any? { |item| outdated?(item, code) } }
+      }
+    end
+
+    def missing_locales(record) = switcher_locales(record)[:missing]
+
+    def outdated_locales(record) = switcher_locales(record)[:outdated]
 
     def field_state(record, field, locale) = record.translation_state(field, locale)
-
-    def locales_in(record, state, locales)
-      self.for([ record ], locales: locales).fetch(record).select { |_code, value| value == state }.keys
-    end
 
     def record_state(record, blocks, code)
       return :missing if missing?(record, blocks, code)
@@ -121,7 +135,7 @@ module Translations
       definition.fields.any? { |field| field.required? && field.translated? && object.public_send(field.name).blank? }
     end
 
-    private_class_method :locales_in, :record_state, :blocks_by_owner, :missing?, :outdated?,
+    private_class_method :record_state, :blocks_by_owner, :missing?, :outdated?,
       :page_missing?, :post_missing?, :image_missing?, :title_blank?, :required_fields_blank?
   end
 end

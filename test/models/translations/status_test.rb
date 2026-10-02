@@ -125,6 +125,26 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
+  # Review fix round 1: the switcher shows both states per language, so a
+  # language that is missing *and* outdated gets both markers -- only the
+  # single record state the lists use lets missing win.
+  test "the switcher sees a language that is both missing and outdated as both" do
+    with_test_types do
+      with_locales(%w[en de], default: "en") do
+        page = create_page(title: "About", translations: { "de" => { title: "Über" } })
+        assert Pages::Save.call(page, translations: { "en" => { title: "About us" } }).ok?
+        save_block(ContentBlock.new(owner: page), attributes: { block_type: "test/quote" },
+          translations: { "en" => { settings: { "text" => "To be" } } })
+        page.reload
+
+        assert_equal :missing, Translations::Status.for([ page ])[page]["de"]
+        assert_equal({ missing: %w[de], outdated: %w[de] }, Translations::Status.switcher_locales(page))
+        assert_equal %w[de], Translations::Status.outdated_locales(page)
+        assert_operator count_queries { Translations::Status.switcher_locales(page) }, :<=, 1
+      end
+    end
+  end
+
   test "field_state delegates to the record's translation_state" do
     with_locales(%w[en de], default: "en") do
       post = create_post(title: "Hello")

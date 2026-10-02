@@ -123,6 +123,21 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Languages'] [title='Missing required fields']", count: 1
   end
 
+  test "a language both missing and outdated shows both markers" do
+    with_test_types do
+      page = create_page(title: "About", translations: { "de" => { title: "Über" } })
+      assert Pages::Save.call(page, translations: { "en" => { title: "About us" } }).ok?
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test/quote" },
+        translations: { "en" => { settings: { "text" => "To be" } } }).ok?
+
+      get "/cs-studio/pages/#{page.id}", params: { locale: "de" }
+
+      assert_response :success
+      assert_select "#language-switcher-outdated-de"
+      assert_select "nav[aria-label='Languages'] [title='Missing required fields']", minimum: 1
+    end
+  end
+
   test "a view-only reader sees the note but no button" do
     record = outdated_post
     sign_in_as(users(:reader))

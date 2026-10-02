@@ -69,6 +69,24 @@ class Translations::TrackerTest < ActiveSupport::TestCase
     end
   end
 
+  # Review fix round 1: a cleared original has nothing to be outdated
+  # against -- and the editor shows no original box for it, so an
+  # `:outdated` here could never be noted or confirmed.
+  test "a translation whose original was cleared reads unknown, not outdated" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "en", excerpt: "Short")
+      save_post(post, "de", excerpt: "Kurz")
+      assert_equal :current, post.reload.translation_state("excerpt", "de")
+
+      save_post(post, "en", excerpt: "")
+      assert_equal :unknown, post.reload.translation_state("excerpt", "de")
+
+      save_post(post, "en", excerpt: "Shorter")
+      assert_equal :outdated, post.reload.translation_state("excerpt", "de")
+    end
+  end
+
   test "clearing a translation removes its entry; missing reads :missing" do
     with_locales(%w[en de], default: "en") do
       post = create_post(title: "Hello")
