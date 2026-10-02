@@ -97,7 +97,7 @@ module Admin
     # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
     # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
     # gives for its own page.
-    def missing_locales = Admin::TranslationStatus.missing_locales(post)
+    def missing_locales = Translations::Status.missing_locales(post)
 
     # Per-code URL for the switcher: same "omit `locale:` for the site's
     # default language" rule `Admin::RecordHeaderComponent#language_url`

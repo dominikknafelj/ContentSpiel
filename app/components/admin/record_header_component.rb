@@ -97,7 +97,7 @@ module Admin
     # §6.2) -- computed here, not handed in, since every caller of this
     # component already has the one `page` it's for and nothing else this
     # check would need.
-    def missing_locales = Admin::TranslationStatus.missing_locales(page)
+    def missing_locales = Translations::Status.missing_locales(page)
 
     # Per-code URL for the switcher: this same page's editor, with `locale:`
     # omitted for the site's default language -- the same "the default
