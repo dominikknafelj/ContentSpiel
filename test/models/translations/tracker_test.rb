@@ -15,6 +15,19 @@ class Translations::TrackerTest < ActiveSupport::TestCase
 
   def paragraph(*texts) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => texts.map { |text| { "type" => "text", "text" => text } } } ] }
 
+  # How many times `Translations.digest` runs inside the block -- the
+  # expensive part of every status read (a rich-text original is
+  # normalised and hashed whole each time).
+  def count_digests
+    count = 0
+    original = Translations.method(:digest)
+    Translations.define_singleton_method(:digest) { |value| count += 1; original.call(value) }
+    yield
+    count
+  ensure
+    Translations.define_singleton_method(:digest, original)
+  end
+
   test "saving a translation records the original's digest; changing the original makes it outdated" do
     with_locales(%w[en de], default: "en") do
       post = create_post(title: "Hello")
@@ -201,6 +214,133 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       post.save!
       assert_equal :current, post.reload.translation_state("title", "de")
       assert_equal "Hallo", post.translation_value("title", "de")
+    end
+  end
+
+  # Final fix wave, I1(a): a status read walks every target locale of every
+  # field, and each of them compared against the same original -- which
+  # used to be re-normalised and re-hashed per locale.
+  test "the original's digest is worked out once per field, however many languages are read" do
+    with_locales(%w[en de es], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "en", { body: paragraph("Hello world") })
+      save_post(post, "de", { title: "Hallo", body: paragraph("Hallo Welt") })
+      save_post(post, "es", { title: "Hola", body: paragraph("Hola mundo") })
+      post.reload
+
+      calls = count_digests do
+        2.times { %w[de es].each { |code| %w[title body].each { |field| assert_equal :current, post.translation_state(field, code) } } }
+      end
+      assert_equal 2, calls, "one digest per field (title, body), not per locale or per read"
+    end
+  end
+
+  test "an unsaved change to the original is still seen after a memoised read" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "de", { title: "Hallo" })
+      post.reload
+      assert_equal :current, post.translation_state("title", "de")
+
+      Mobility.with_locale(:en) { post.title = "Hello there" }
+      assert_equal :outdated, post.translation_state("title", "de")
+
+      post.reload
+      assert_equal :current, post.translation_state("title", "de")
+    end
+  end
+
+  # Spec §8: "changing the default locale in Settings is handled". Pinned
+  # here as accepted, documented behaviour (spec §10 "Known limitation",
+  # roadmap "Known interim states"): `translation_sources` records the
+  # original's digest, not which language that original was in, so after
+  # the default moves every field is judged against the *new* primary --
+  # a translation saved against the old one reads outdated, the old
+  # primary (which never had a digest of its own) reads unknown, and the
+  # new primary is the original, so it's current.
+  test "changing the default locale judges every field against the new primary" do
+    post = nil
+    with_locales(%w[en de es], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "de", { title: "Hallo" })
+      save_post(post, "es", { title: "Hola" })
+      assert_equal :current, post.reload.translation_state("title", "es")
+    end
+
+    with_locales(%w[en de es], default: "de") do
+      post.reload
+      assert_equal :current, post.translation_state("title", "de")
+      assert_equal :outdated, post.translation_state("title", "es"), "es was saved against the English original"
+      assert_equal :unknown, post.translation_state("title", "en"), "the old original never had a digest of its own"
+
+      save_post(post, "es", { title: "Hola!" })
+      assert_equal :current, post.reload.translation_state("title", "es"), "re-saving against the new primary records its digest"
+      save_post(post, "de", { title: "Hallo!" })
+      assert_equal :outdated, post.reload.translation_state("title", "es")
+    end
+  end
+
+  # Spec §8 / I3: a post's content type's `translated: true` schema fields
+  # are tracked through the `translated_metadata` path
+  # (`tracks_translations schema: :fields`), just like a block's settings.
+  test "a post tracks its content type's translated schema fields" do
+    saved = ContentTypes.all.dup
+    ContentTypes.register("test/interview") do |t|
+      t.label "Interview"
+      t.field :quote, :string, translated: true
+      t.field :source, :string
+    end
+
+    with_locales(%w[en de], default: "en") do
+      post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "To be", source: "Hamlet" } },
+        translations: { "en" => { title: "Quote" } }).record
+      assert post.persisted?
+
+      assert_includes Post.translation_tracked_fields(post), "quote"
+      assert_not_includes Post.translation_tracked_fields(post), "source"
+      assert_equal :missing, post.translation_state("quote", "de")
+
+      save_post(post, "de", { title: "Zitat", fields: { quote: "Sein" } })
+      post.reload
+      assert_equal "Sein", post.translation_value("quote", "de")
+      assert_equal "Sein", post.translated_metadata.dig("de", "quote")
+      assert post.translation_sources.dig("quote", "de").present?
+      assert_equal :current, post.translation_state("quote", "de")
+
+      save_post(post, "en", { fields: { quote: "Or not to be" } })
+      assert_equal :outdated, post.reload.translation_state("quote", "de")
+      assert_equal "outdated", Translations::Status.for([ post ])[post]["de"].to_s
+    end
+  ensure
+    ContentTypes.reset!
+    saved.each { |definition| ContentTypes.registry_put(definition) }
+  end
+
+  # M1: a browser submits a textarea's line breaks as CRLF, while the same
+  # value saved through MCP or the console has bare LF. Neither spelling
+  # is an edit.
+  test "re-submitting an original with CRLF line breaks doesn't flag its translation" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "en", { excerpt: "Line one\nLine two" })
+      save_post(post, "de", { excerpt: "Zeile eins\nZeile zwei" })
+      assert_equal :current, post.reload.translation_state("excerpt", "de")
+
+      save_post(post, "en", { excerpt: "Line one\r\nLine two" })
+      assert_equal :current, post.reload.translation_state("excerpt", "de")
+    end
+  end
+
+  test "re-submitting an outdated translation with CRLF line breaks doesn't mark it current" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Hello")
+      save_post(post, "en", { excerpt: "Line one\nLine two" })
+      save_post(post, "de", { excerpt: "Zeile eins\nZeile zwei" })
+      save_post(post, "en", { excerpt: "Line one\nLine two, revised" })
+      assert_equal :outdated, post.reload.translation_state("excerpt", "de")
+
+      save_post(post, "de", { excerpt: "Zeile eins\r\nZeile zwei" })
+      assert_equal :outdated, post.reload.translation_state("excerpt", "de")
     end
   end
 end

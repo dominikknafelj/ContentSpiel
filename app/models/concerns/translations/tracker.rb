@@ -77,7 +77,7 @@ module Translations
       return raw_translation_value(field, locale) unless schema_field
       return raw_translation_value(field, locale) if schema_field.group?
 
-      public_send(translation_schema_reader, locale: locale).public_send(field)
+      translation_field_set(locale).public_send(field)
     end
 
     def translation_state(field, locale)
@@ -92,7 +92,7 @@ module Translations
       # rule `store_translation_source` follows when it drops the digest of a
       # blank one. Reading `:outdated` here would flag a field whose editor
       # shows no original box at all, so no note and no way to confirm it.
-      original = Translations.digest(translation_value(field, translation_primary_locale))
+      original = translation_original_digest(field)
       return :unknown if original.nil?
 
       recorded == original ? :current : :outdated
@@ -101,10 +101,62 @@ module Translations
     # Marks `field` in `locale` as translated from the original as it
     # stands now, without touching the value. The caller saves.
     def confirm_translation(field, locale)
+      forget_translation_memos
       store_translation_source(field.to_s, locale.to_s)
     end
 
+    def reload(...)
+      forget_translation_memos
+      super
+    end
+
     private
+
+    # The original's digest for `field`, worked out once per record and
+    # field rather than once per target locale per read (final fix wave,
+    # I1): a status read compares every target language against the same
+    # original, and a whole page tree or posts list reads every tracked
+    # field of every record and block -- re-normalising and re-hashing a
+    # rich-text original once per language made that scale with site size
+    # times languages.
+    #
+    # The memo is checked against the raw stored original it was taken from
+    # (its `#hash`, an Integer, so an in-place mutation of the stored value
+    # can't make a stale entry compare equal to itself), and against the
+    # primary language, so an unsaved assignment to the original -- a form
+    # re-rendered after a failed validation -- or a default-language change
+    # is seen straight away. It's also dropped outright on save, reload and
+    # confirm, where the stored value is about to change underneath it.
+    def translation_original_digest(field)
+      field = field.to_s
+      primary = translation_primary_locale
+      basis = [ primary, raw_translation_value(field, primary) ].hash
+      memo = (@translation_original_digests ||= {})[field]
+      return memo.last if memo&.first == basis
+
+      digest = Translations.digest(translation_value(field, primary))
+      @translation_original_digests[field] = [ basis, digest ]
+      digest
+    end
+
+    # The schema reader's per-locale `ContentModel::FieldSet`, built once
+    # per locale (and the stored translated column it was built from)
+    # rather than once per schema field read -- same reasoning, and the
+    # same staleness guard, as `#translation_original_digest`.
+    def translation_field_set(locale)
+      basis = read_attribute(SCHEMA_COLUMNS.fetch(translation_schema_reader)).hash
+      memo = (@translation_field_sets ||= {})[locale]
+      return memo.last if memo&.first == basis
+
+      field_set = public_send(translation_schema_reader, locale: locale)
+      @translation_field_sets[locale] = [ basis, field_set ]
+      field_set
+    end
+
+    def forget_translation_memos
+      @translation_original_digests = nil
+      @translation_field_sets = nil
+    end
 
     # The original's language and its translations' -- the site's
     # (`Translations.primary_locale`/`.target_locales`), read at the time of
@@ -152,10 +204,18 @@ module Translations
     # body differing only by normalisation (one stored before a
     # normalisation rule existed, resent normalised by the editor) is not a
     # change -- the same rule `HasRichTextBody#body_documents_valid` applies.
+    #
+    # Strings are compared with line endings normalised
+    # (`Translations.normalize_newlines`, the same rule `Translations.digest`
+    # applies): a browser submits a textarea's line breaks as CRLF, so an
+    # editor re-submitting an unchanged multi-line translation that MCP or
+    # the console stored with bare LF isn't an edit -- and mustn't record a
+    # fresh digest that would mark an outdated translation current.
     def translation_value_changed?(field, locale)
       before = new_record? ? nil : raw_translation_value(field, locale, in_database: true)
       after = raw_translation_value(field, locale)
       return false if before == after
+      return Translations.normalize_newlines(before) != Translations.normalize_newlines(after) if before.is_a?(String) && after.is_a?(String)
       return true unless field == "body" && before.is_a?(Hash) && after.is_a?(Hash)
 
       RichText::Document.new(before).normalized.to_h != RichText::Document.new(after).normalized.to_h
@@ -167,6 +227,7 @@ module Translations
     # a fresh digest, or it would wrongly read `:current` against a stale one
     # once German is enabled again (review fix round 1, ruling 4).
     def record_translation_sources
+      forget_translation_memos
       self.class.translation_tracked_fields(self).each do |field|
         translation_locales(field).each do |locale|
           next unless translation_value_changed?(field, locale)
@@ -184,7 +245,7 @@ module Translations
     # recorded (and a stale one is dropped), so the value reads `:unknown`
     # until it's saved against a real original.
     def store_translation_source(field, locale)
-      digest = Translations.digest(translation_value(field, translation_primary_locale))
+      digest = translation_original_digest(field)
       return remove_translation_source(field, locale) unless digest
 
       sources = translation_sources.deep_dup

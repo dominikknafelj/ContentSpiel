@@ -19,14 +19,24 @@ module Translations
   # and as *canonical* JSON, keys sorted at every level: Postgres jsonb
   # reorders keys on storage, so the in-memory value a save digests and the
   # reloaded one `translation_state` digests can differ in key order alone,
-  # which must not read as an edit (review fix round 1, I1).
+  # which must not read as an edit (review fix round 1, I1). A plain value
+  # is digested with its line endings normalised to LF
+  # (`normalize_newlines`): a browser re-submitting an unchanged
+  # multi-line original sends CRLF where MCP or the console stored LF, and
+  # that alone mustn't flag every translation of it as outdated.
   def digest(value)
     case value
     when RichText::Document then value.blank? ? nil : value.normalized.digest
     when Hash, Array then value.blank? ? nil : Digest::SHA256.hexdigest(canonical(value).to_json)
-    else value.to_s.strip.presence && Digest::SHA256.hexdigest(value.to_s.strip)
+    else
+      text = normalize_newlines(value.to_s).strip
+      text.presence && Digest::SHA256.hexdigest(text)
     end
   end
+
+  # CRLF (and a lone CR) as LF -- the one spelling of a line break both
+  # `digest` and `Tracker#translation_value_changed?` compare by.
+  def normalize_newlines(text) = text.gsub(/\r\n?/, "\n")
 
   # `value` with every Hash's keys sorted (as Strings, so a Symbol-keyed
   # in-memory Hash and its String-keyed reload agree), recursively.

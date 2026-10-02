@@ -64,18 +64,15 @@ module Translations
     # a gap. `outdated` covers target locales only: the original is never
     # outdated against itself.
     def switcher_locales(record)
-      blocks = blocks_by_owner([ record ]).fetch([ record.class.polymorphic_name, record.id ], [])
-      items = [ record ] + blocks
-
-      {
-        missing: ::Locales.enabled.map(&:to_s).select { |code| missing?(record, blocks, code) },
-        outdated: Translations.target_locales.select { |code| items.any? { |item| outdated?(item, code) } }
-      }
+      blocks = owned_blocks(record)
+      { missing: missing_codes(record, blocks), outdated: outdated_codes(record, blocks) }
     end
 
-    def missing_locales(record) = switcher_locales(record)[:missing]
+    # Each half on its own, so asking for one never pays for the other (the
+    # outdated half digests every tracked original).
+    def missing_locales(record) = missing_codes(record, owned_blocks(record))
 
-    def outdated_locales(record) = switcher_locales(record)[:outdated]
+    def outdated_locales(record) = outdated_codes(record, owned_blocks(record))
 
     def field_state(record, field, locale) = record.translation_state(field, locale)
 
@@ -93,6 +90,15 @@ module Translations
       return {} if owners.empty?
 
       ContentBlock.where(owner: owners).order(:position).group_by { |block| [ block.owner_type, block.owner_id ] }
+    end
+
+    def owned_blocks(record) = blocks_by_owner([ record ]).fetch([ record.class.polymorphic_name, record.id ], [])
+
+    def missing_codes(record, blocks) = ::Locales.enabled.map(&:to_s).select { |code| missing?(record, blocks, code) }
+
+    def outdated_codes(record, blocks)
+      items = [ record ] + blocks
+      Translations.target_locales.select { |code| items.any? { |item| outdated?(item, code) } }
     end
 
     def missing?(record, blocks, code)
@@ -139,7 +145,7 @@ module Translations
       definition.fields.any? { |field| field.required? && field.translated? && object.public_send(field.name).blank? }
     end
 
-    private_class_method :record_state, :blocks_by_owner, :missing?, :outdated?,
+    private_class_method :record_state, :blocks_by_owner, :owned_blocks, :missing_codes, :outdated_codes, :missing?, :outdated?,
       :page_missing?, :post_missing?, :image_missing?, :title_blank?, :required_fields_blank?
   end
 end

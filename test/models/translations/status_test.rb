@@ -145,6 +145,26 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
+  # Final fix wave (T2 minor): `missing_locales` is a required-field check
+  # only; it used to run the whole outdated scan too and throw it away.
+  test "missing_locales doesn't run the outdated scan" do
+    with_locales(%w[en de es], default: "en") do
+      post = create_post(title: "Hello")
+      assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
+      post.reload
+
+      calls = 0
+      original = Translations.method(:digest)
+      Translations.define_singleton_method(:digest) { |value| calls += 1; original.call(value) }
+      begin
+        assert_equal %w[es], Translations::Status.missing_locales(post)
+      ensure
+        Translations.define_singleton_method(:digest, original)
+      end
+      assert_equal 0, calls
+    end
+  end
+
   test "field_state delegates to the record's translation_state" do
     with_locales(%w[en de], default: "en") do
       post = create_post(title: "Hello")
