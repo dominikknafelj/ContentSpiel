@@ -1,7 +1,7 @@
 <%# locals: section_id, name, image_id, image_html_name, image_value,
     checkbox_id, checkbox_html_name, show_checkbox -- an attachment's
     preview, its file input and a "Remove image" checkbox (cs-studio spec
-    §5.1), wrapped in one `id="<%= section_id %>"` element so a single Turbo
+    §5.1), wrapped in one element whose id is `section_id` so a single Turbo
     Stream `replace` can bring all three back in sync with the record after
     a save that touched the attachment (`Admin::SettingsController
     #logo_field_stream`) -- rendered from this one partial on the initial

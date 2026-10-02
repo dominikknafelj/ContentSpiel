@@ -42,7 +42,7 @@
   <details class="mt-6">
     <summary class="cursor-pointer font-cs-mono text-label uppercase tracking-mono text-meta">Snapshot</summary>
     <%# `JSON.pretty_generate` returns a plain (not `html_safe`) String --
-        ERB's own `<%= %>` escaping is what keeps a stored value that
+        ERB's own output-tag escaping is what keeps a stored value that
         looks like markup (a title of literal `<script>`) rendering as
         text here, the same rule `Admin::AuditChangesComponent` follows
         for the changes table above (Task 9 controller ruling). %>
