@@ -14,7 +14,7 @@
       <div class="rounded-cs border border-line bg-sunken px-3 py-2">
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <p data-original-for="<%= name %>" class="text-ink"><%= original %></p>
-        <span data-translate-slot="<%= name %>"></span>
+        <div data-translate-slot="<%= name %>"><% if (button = translate_button) %><%= render button %><% end %></div>
         <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>

@@ -68,7 +68,23 @@ module Admin
         Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
       end
 
+      # The AI **Translate** button in the original's box (translation
+      # helpers spec §6.4) -- it renders only for a viewer who may edit the
+      # record (`translation_confirm` is handed over only then), with AI
+      # set up and `ai.translate`; see `Admin::TranslationScreen
+      # ::TranslateButtonComponent`. Nil when there's no confirm at all (the
+      # primary language, an untracked column, a view-only viewer).
+      def translate_button
+        return unless translation_confirm
+
+        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
+      end
+
       private
+
+      # What Use fills and how (`TranslateButtonComponent`): a plain column
+      # its own input, measured as the text it is.
+      def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }
 
       attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm
     end

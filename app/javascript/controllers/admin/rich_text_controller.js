@@ -280,6 +280,38 @@ export default class extends Controller {
     if (position !== null) this.openImagePopover(position)
   }
 
+  // --- AI translation (translation helpers spec §6.4) -----------------------
+  //
+  // `translate:use` from `admin--translate#use`, dispatched on this editor's
+  // hidden input: replaces the document with the suggested one and writes
+  // it back exactly like an edit (`writeDocument`, whose `input` event the
+  // form's autosave saves). `assets`/`linkTitles` are what the suggestion's
+  // images and internal links need to show here -- this language's
+  // document may not have referenced them yet. Sets `detail.applied` so
+  // the caller knows whether it took: a read-only editor (view only, or
+  // stored content it can't show) refuses, and so does a document this
+  // schema rejects -- leaving the current one untouched.
+  applySuggestion(event) {
+    const detail = event.detail || {}
+    const suggested = detail.document
+    if (!this.editable() || !suggested || typeof suggested !== "object") return
+
+    Object.assign(this.assets, detail.assets || {})
+    Object.assign(this.linkTitles, detail.linkTitles || {})
+    this.closePopover({ refocus: false })
+    this.showMessage("")
+    // `errorOnInvalidContent` makes an invalid document throw here instead
+    // of loading as an empty one.
+    try {
+      if (!this.editor.commands.setContent(suggested, { emitUpdate: false, errorOnInvalidContent: true })) return
+    } catch {
+      return
+    }
+    this.edited = true
+    this.writeDocument()
+    detail.applied = true
+  }
+
   // The image just inserted -- not simply the first `image` node for this
   // asset in the document, since the same library image may already
   // appear earlier in it. `insertContent` leaves the selection either *on*

@@ -48,6 +48,9 @@
 
   <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle) %>
 
+  <%# Translate empty fields / Use all -- see `Admin::RecordHeaderComponent`. %>
+  <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: editable?) %>
+
   <div class="flex flex-wrap items-center gap-2">
     <%# Unlike a page (always somewhere in the tree, so it always has a
         would-be path even as a draft), a post with no canonical listing

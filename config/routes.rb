@@ -117,6 +117,14 @@ Rails.application.routes.draw do
     # route of its own without a resource's implied member routes.
     get "translations", to: "translations#index", as: :translations
 
+    # AI translation suggestions (translation helpers spec §6.4): the
+    # editor's Translate buttons post the record (`record_type`/
+    # `record_id`, like the confirm endpoint above), `fields[]`, the target
+    # `locale` and `inputs[field]` (the input each suggestion is for), and
+    # get Turbo Streams back. A POST although nothing is saved: it spends
+    # the provider's quota and records an `ai.translated` event.
+    post "translations/suggest", to: "translations#suggest", as: :translation_suggestions
+
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource

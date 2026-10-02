@@ -39,6 +39,12 @@
 
   <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle) %>
 
+  <%# Translate empty fields / Use all (translation helpers spec §6.4):
+      only in a non-default language, for a viewer who may edit the page,
+      with AI set up and `ai.translate`. It asks for the page's own fields
+      and its blocks' alike -- whatever has a Translate button below. %>
+  <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: editable?) %>
+
   <div class="flex flex-wrap items-center gap-2">
     <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
 

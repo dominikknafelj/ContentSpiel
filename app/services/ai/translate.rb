@@ -56,7 +56,8 @@ module AI
       return failure(@record, [ "Choose a language to translate into" ]) unless Translations.target_locales.include?(@to)
 
       untranslatable = @fields - @record.class.translation_tracked_fields(@record)
-      return failure(@record, [ "#{untranslatable.to_sentence} can't be translated" ]) if untranslatable.any?
+      # Named by label, the way the editor shows the field, never by attribute.
+      return failure(@record, [ "#{untranslatable.map(&:humanize).to_sentence} can't be translated" ]) if untranslatable.any?
 
       originals = read_originals
       return failure(@record, [ TOO_MUCH ]) if originals.size > MAX_FIELDS || characters(originals) > MAX_CHARACTERS

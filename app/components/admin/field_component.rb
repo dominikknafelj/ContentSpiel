@@ -103,6 +103,18 @@ module Admin
       Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
     end
 
+    # Text types only get the AI **Translate** button (translation helpers
+    # spec §6.4): a group's original is a nested value no provider is
+    # handed (`AI::Translate` skips it), and no other scalar type is
+    # translated prose. See `Admin::Columns::Base#translate_button`.
+    TRANSLATABLE_TYPES = %i[string text].freeze
+
+    def translate_button
+      return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+
+      Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
+    end
+
     private
 
     attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm
