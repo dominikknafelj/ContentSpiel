@@ -94,4 +94,71 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_text "Changed elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
+  # Fix round 3: a card's queued follow-up save (`admin--autosave`'s
+  # `pending` retrigger) runs before Turbo applies the previous response's
+  # streams (next animation frame), so it used to send the page form's
+  # *old* base -- the server then rightly refused to move it, the write
+  # touched the page again, and the page form's next save read "Changed
+  # elsewhere" with nobody else involved. The first PATCH is held (same
+  # JS-side stub as `autosave_test.rb`'s in-flight test) so the follow-up
+  # is certain to be queued behind it.
+  test "a queued block save doesn't make the page settings form report a false conflict" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    press "Post list"
+    assert_selector ".admin-block-card", text: "Post list"
+    block = @page.content_blocks.sole
+
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patchesStarted = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() !== "PATCH") return originalFetch(url, options)
+
+        window.__patchesStarted += 1
+        if (window.__patchesStarted > 1) return originalFetch(url, options)
+        return new Promise((resolve) => { window.__releaseFirstPatch = () => resolve(originalFetch(url, options)) })
+      }
+    JS
+
+    limit = find("##{ActionView::RecordIdentifier.dom_id(block)} input[name='block[settings][limit]']")
+    limit.set("4")
+    limit.send_keys(:tab)
+    await_js "typeof window.__releaseFirstPatch === 'function'"
+    limit = find("##{ActionView::RecordIdentifier.dom_id(block)} input[name='block[settings][limit]']")
+    limit.set("5")
+    limit.send_keys(:tab)
+    assert_equal 1, page.evaluate_script("window.__patchesStarted")
+
+    page.execute_script("window.__releaseFirstPatch()")
+    await_js "window.__patchesStarted === 2"
+    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_eventually { block.reload.settings["limit"].to_i == 5 }
+
+    fill_in "Title", with: "About the Studio"
+    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_no_text "Changed elsewhere"
+  end
+
+  private
+
+  def await_js(condition, timeout: 5)
+    met = page.evaluate_async_script(<<~JS, condition, timeout * 1000)
+      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
+      const deadline = Date.now() + timeout
+      const poll = () => {
+        if (Function(`return (${condition})`)()) return done(true)
+        if (Date.now() > deadline) return done(false)
+        setTimeout(poll, 50)
+      }
+      poll()
+    JS
+    assert met, "timed out waiting for: #{condition}"
+  end
+
+  def assert_eventually(timeout: 5)
+    deadline = Time.current + timeout
+    sleep 0.05 until yield || Time.current > deadline
+    assert yield, "condition never became true"
+  end
 end

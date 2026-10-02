@@ -176,16 +176,30 @@ export default class extends Controller {
     // lives in -- a `<template>`'s content is its own document fragment,
     // invisible to a query against the document around it.
     //
-    // Matched by id, not just by name: a block card's response also carries
-    // the page settings form's own base (the block write touched the page --
-    // `Admin::ContentBlocksController#page_base_stream`), and taking the
-    // first `base_updated_at` in the response would hand this card the
-    // page's value instead of its own.
+    // Matched by id, not just by name: a block card's response may also
+    // carry the page settings form's own base (the block write touched the
+    // page -- `Admin::ContentBlocksController#page_base_streams`), and
+    // taking the first `base_updated_at` in the response would hand this
+    // card the page's value instead of its own.
+    //
+    // That page base is applied synchronously too, for the same reason
+    // (fix round 3): a queued retrigger sends it as `X-Page-Base-Updated-At`
+    // (`#requestHeaders`), and read before Turbo's deferred replace it would
+    // be the *old* value -- the server then (rightly) won't move it, this
+    // write touches the page again, and the page form's next save reads
+    // "Changed elsewhere" with nobody else involved.
+    const templates = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
+    const freshValue = (id) => templates
+      .map((template) => template.content.querySelector(`[name="base_updated_at"][id="${id}"]`))
+      .find((field) => field)?.value
+
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
-    const freshBase = ownBase && Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
-      .map((template) => template.content.querySelector(`[name="base_updated_at"][id="${ownBase.id}"]`))
-      .find((field) => field)
-    if (freshBase && ownBase) ownBase.value = freshBase.value
+    const ownFresh = ownBase && freshValue(ownBase.id)
+    if (ownFresh) ownBase.value = ownFresh
+
+    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)
+    const pageFresh = pageBase && freshValue(this.pageBaseIdValue)
+    if (pageFresh) pageBase.value = pageFresh
 
     Turbo.renderStreamMessage(text)
     this.retryCount = 0
