@@ -42,7 +42,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
 | Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 — done (sub-project 6c, spec `2026-09-30-dashboard-design.md`) |
 | "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Translation helpers (source hint, status per locale) | Should | Dropped Task 16 |
+| Translation helpers (source hint, status per locale) | Should | Dropped Task 16 — done (spec `2026-10-02-translation-helpers-design.md`): outdated tracking with "Mark as up to date", status in lists and the page tree, a Translations overview, translatable site title and tagline, AI translation suggestions |
 | Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
 | Trash / soft delete + restore | Must | #43 — done (sub-project 6b, spec `2026-09-29-trash-design.md`): pages (with their branch), posts and library images; Trash screen, Undo, retention job |
@@ -74,7 +74,14 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Import / export / backups | Could | Revision snapshot = export format |
 | Content quality checks (broken links, required alt) | Could | Event subscribers / job |
 | Runtime-configurable languages (define N in setup, add later) | Should | Locale decision in Phase 1 |
-| In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Provider/API key + opt-in; audit AI edits |
+| In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Partially done: translate only (translation helpers spec `2026-10-02-translation-helpers-design.md` §6 — provider registry, encrypted key in Settings, `ai.translate`, suggestions the editor applies with Use, `ai.translated` audit events). Excerpts, alt text and summaries are still open (row below) |
+| AI for excerpts, alt text and summaries | Could | Out of scope for translation helpers, spec `2026-10-02-translation-helpers-design.md` §9; `AI::Providers` and the suggestion box (`Admin::TranslationScreen::SuggestionComponent`) are the seams |
+| A monthly AI budget (spend cap per site) | Could | Same spec §9; `ai.translated` events already record `characters` per request |
+| More built-in AI providers (an OpenAI-compatible one) | Could | Same spec §9; `AI::Providers.register` takes plugin providers today |
+| Background whole-site translation (translate everything missing in a language as a job) | Could | Same spec §9; today "Translate empty fields" works per editor screen, and nothing is saved without Use |
+| Translation memory and glossary | Could | Same spec §9 |
+| A side-by-side translate mode (original and translation in two full columns) | Could | Same spec §9; today the original shows beside each field |
+| AI tools over MCP | Could | Same spec §9; deliberately not planned — MCP clients are already AIs and can translate through `update_post` themselves |
 | Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
 | Media library: video and document files, not only images | Could | Out of scope for sub-project 6a, spec `2026-09-29-media-library-design.md` §8 |
 | Media library: cropping and a focal point | Could | Same spec §8 |
@@ -113,6 +120,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | Deleting a tag (still permanent) takes it off trashed posts too, so a post restored later comes back without that tag; the Tags list's count and its delete dialog count kept posts only | Sub-project 6b (trash) | Trash for tags (see "Trash for single content blocks, tags, …" above) |
 | A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
 | The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (a `LATERAL` join per candidate row, `Dashboard::Feed#recently_edited`) to find whose newest audit event is theirs — each probe is an index lookup (`index_audit_events_on_subject_and_newest`, `(subject_type, subject_id, last_occurred_at DESC)`), but the scan still grows with the number of readable records | Sub-project 6c (dashboard) | Revisit (a query driven from the actor's own events) if dashboard load time grows with site size |
+| Changing the default language to a third one flags every translation as outdated: `translation_sources` stores the original's digest but not which language the original was in, so after en → de every Spanish translation (made from English) is compared against the German original and differs. "Mark as up to date" clears them one field at a time | Translation helpers (Task 1) | Record the primary language next to each digest (or re-baseline digests in the default-language change), if default-language changes happen on real sites |
 | The Translations overview filters in Ruby: `Translations::Status` is computed per record (field digests, block roll-ups), so `Admin::TranslationsController` walks every readable page, post and image in batches of 200 until a page of 50 incomplete items is filled — cheap for early pages, a full scan for a late page or a language with few gaps | Translation helpers (Task 4) | A stored per-locale translation state kept current by the save services, if overview load time grows with site size |
 
 ## Out of scope (for now)

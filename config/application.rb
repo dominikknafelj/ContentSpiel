@@ -58,6 +58,9 @@ module ContentSpiel
     # - otherwise `active_record_encryption.primary_key`/`deterministic_key`/
     #   `key_derivation_salt` in the app's credentials, which Rails reads by
     #   itself (`bin/rails db:encryption:init` prints a fresh set).
+    # The precedence is per key, not per set: with only some of the three
+    # env vars present, the rest still come from the credentials, and the
+    # app runs on a mix of two sets. Keep all three in the same place.
     # Test and development set fixed values of their own
     # (config/environments/test.rb, development.rb), so CI needs nothing.
     #

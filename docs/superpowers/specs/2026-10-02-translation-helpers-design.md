@@ -267,3 +267,37 @@ Recorded in `docs/roadmap.md`:
 - translation memory and glossary;
 - a side-by-side translate mode;
 - AI tools over MCP (MCP clients are already AIs).
+
+## 10. Amendments
+
+Behaviour-changing rulings made during implementation (plan `docs/superpowers/plans/2026-10-02-translation-helpers.md`, ledger `.superpowers/sdd/2026-10-02-translation-helpers/progress.md`). Where one contradicts the text above, the amendment wins.
+
+**Tracking (§3)**
+- **Tracked columns are derived, not listed.** `Translations::Tracker` tracks the model's own Mobility `translates` names (`mobility_attributes`) minus `except:` (default `slug`), plus the `translated: true` fields of the schema reader named by `tracks_translations schema:`. §3.1's per-model lists describe the result, not a second source. The method is `confirm_translation` (no bang, the caller saves), not `confirm_translation!`.
+- **Every stored non-primary locale is tracked**, not only the enabled ones, so a language disabled and re-enabled later keeps its digests.
+- **Group fields are digested as canonical JSON.** A translated schema group field's value (a Hash/Array) is digested with its keys sorted at every level. Postgres jsonb reorders keys, and a key-order difference alone must not read as an edit.
+- **`translation_sources` is kept out of audit `field_changes`** (`IGNORED_CHANGES`) but stays in the snapshot. It's bookkeeping, not an edit anyone made.
+- **A cleared original reads `:unknown`, not `:outdated`.** When the primary value is blank there's nothing to compare against, and an outdated note would offer "Mark as up to date" for an original that doesn't exist.
+
+**Status (§3.3, §4)**
+- **Images can be `:missing`.** An image is missing in a language when its original has alt text and that language's alt is blank. Alt plays the title's part, and the caption stays optional. Without this an untranslated image could never be missing (nothing about it is required), so it would never show up in the overview. An image without an original alt has nothing to translate and is complete everywhere.
+- **The site settings are missing where the site title is blank.** The tagline stays optional.
+- **The switcher shows missing and outdated independently.** A language can show both markers at once. §3.3's precedence (missing beats outdated) only applies to the single record state used by lists, the tree and the overview.
+- **Mark as up to date writes with `update_columns`.** Only `translation_sources` changes: no callbacks run and `updated_at` doesn't move, so the editor's next autosave isn't reported as "Changed elsewhere". The button sits inside the autosave form, but it posts the layout's separate confirm form through the `form=` attribute, because forms can't nest.
+
+**Site title and tagline (§5)**
+- **Changing the default language copies the title and tagline from the old default when the new one has none.** Otherwise the title-in-default-locale validation would refuse the change in both the setup wizard and Settings. Cost: the new default shows the old language's title until someone edits it. `SiteSetting` answers the tracker's primary/target locale hooks from its own columns to avoid recursion through `Locales`.
+- **The Settings form posts its own editing language** (`?locale=`) and re-renders when the default language changes. Before this, later autosaves after a default-language change wrote the stale title into the new default. `Settings::Save` ignores `title`/`tagline` given through `attributes:`; they arrive per locale through `translations:` only.
+
+**AI (§6)**
+- **The API key has its own small form** with Save key and Remove key. It isn't part of the settings autosave, so a half-typed key is never saved. Remove key asks through the existing confirm dialog component (`Admin::ConfirmDialogComponent`).
+- **Whether a key is set is known without decrypting it** (`SiteSetting#ai_api_key_set?` reads the stored ciphertext). Lost or rotated encryption keys therefore never break the Settings screen. Remove and replace still work, and a provider call with an unreadable key fails with "The stored API key can't be read — enter it again in Settings." There's no boot-time check for missing encryption keys: a production server without them fails when someone saves a key, and not before.
+- **The Anthropic client uses `max_retries: 0` and a pinned `base_url`.** One click can't block for 3 × 60 s, and the environment can't redirect the key to another host. Cost: a transient provider error isn't retried; the user presses Translate again.
+- **Responses are trimmed of leading and trailing newlines only, never indentation.** An empty translation of a non-blank original raises `AI::Error`.
+- **The per-request cap is 20 fields and 12,000 characters** (not 30,000), so one request reliably finishes inside the 60 s timeout. "Translate empty fields" splits on the client into requests of one record each, within the caps, sent one after another; a failed part doesn't discard the others. A single field larger than the cap is sent alone and gets "Too much at once — translate in parts" under it.
+- **"Empty" means empty in the editor now**, not `:missing` at page load. Fields typed into or filled by Use since the page loaded are skipped, and only fields with a Translate button (ones this viewer may edit and translate) are considered.
+- **`ai.translated` has no snapshot** (`record_event(..., snapshot: nil)`), so no original text reaches the audit log. Its `subject_label` is the record's title, as on every event for that record: that's the record's name, not the text that was sent. An original that isn't text is skipped like a blank one. If every requested original is blank, the call succeeds with no provider call and no event.
+- **The suggest endpoint names inputs and refuses a request with nowhere to answer.** Besides `fields[]` it takes `inputs[field]`, the DOM id of the input each suggestion is for (matched against `/\A[A-Za-z][\w-]*\z/`, echoed back as the stream target). A field without a valid id gets no stream. If no requested field has one, the answer is a bare 422 before `AI::Translate` runs: no provider call and no `ai.translated` event. A client-side error box (an answer that isn't a stream, or a network failure) has the same `type="button"` Dismiss as the server-rendered one.
+
+**Known limitation**
+- **Changing the default language to a third language flags every translation as outdated.** `translation_sources` records the digest of the original but not which language that original was in. When the default moves (en → de, with es translated from en), every es digest is compared against the new German original and differs. This is tracked in `docs/roadmap.md`.
