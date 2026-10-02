@@ -14,10 +14,22 @@ module Admin
   # (computed by the caller, likely from each field's `FieldSet#valid?`) --
   # marked with a dot so an editor can tell, without opening every language,
   # which ones still need attention before publishing.
+  #
+  # `outdated:` is the set of codes whose translation was made against an
+  # older version of the original (`Translations::Status.outdated_locales`,
+  # translation helpers spec §4) -- a second, differently shaped marker
+  # with its own title and screen-reader text, since "something changed
+  # since" asks for a different job than "something is still empty". Each
+  # one carries a stable id (`.outdated_marker_id`) so "Mark as up to date"
+  # can stream it away once the last outdated field in that language is
+  # confirmed (`Admin::TranslationConfirmationsController`).
   class LanguageSwitcherComponent < AdminComponent
-    def initialize(current:, missing: [], url: ->(code) { "#" })
+    def self.outdated_marker_id(code) = "language-switcher-outdated-#{code}"
+
+    def initialize(current:, missing: [], outdated: [], url: ->(code) { "#" })
       @current = current.to_s
       @missing = Array(missing).map(&:to_s)
+      @outdated = Array(outdated).map(&:to_s)
       @url = url
     end
 
@@ -29,10 +41,14 @@ module Admin
 
     def missing?(code) = missing.include?(code.to_s)
 
+    def outdated?(code) = outdated.include?(code.to_s)
+
+    def outdated_marker_id(code) = self.class.outdated_marker_id(code)
+
     def href(code) = url.call(code)
 
     private
 
-    attr_reader :current, :missing, :url
+    attr_reader :current, :missing, :outdated, :url
   end
 end

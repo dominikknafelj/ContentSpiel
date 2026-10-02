@@ -99,6 +99,10 @@ module Admin
     # check would need.
     def missing_locales = Translations::Status.missing_locales(page)
 
+    # The switcher's "original changed" codes (translation helpers spec §4)
+    # -- the page's own fields and its blocks', which roll up into it.
+    def outdated_locales = Translations::Status.outdated_locales(page)
+
     # Per-code URL for the switcher: this same page's editor, with `locale:`
     # omitted for the site's default language -- the same "the default
     # language's own URL never carries a `?locale=`" rule `Admin::

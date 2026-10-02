@@ -9,6 +9,7 @@
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <p data-original-for="<%= field.name %>" class="text-ink"><%= original %></p>
         <span data-translate-slot="<%= field.name %>"></span>
+        <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>
   </div>

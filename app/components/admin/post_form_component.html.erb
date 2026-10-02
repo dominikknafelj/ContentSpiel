@@ -35,7 +35,7 @@
       <% unless editable? %>
         <%= render "admin/shared/view_only_badge" %>
       <% end %>
-      <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, url: language_url) %>
+      <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
       <span data-status="<%= status %>">
         <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
       </span>
@@ -115,7 +115,7 @@
   <div data-controller="admin--slug-preview" data-action="input->admin--slug-preview#update">
     <%= render Admin::Columns::PlainColumnComponent.new(
           name: "title", id: field_id("title"), html_name: field_html_name("title"),
-          value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"),
+          value: value(:title), original: original(:title), locale: locale, errors: field_errors("title"), **translation(:title),
           data: { "admin--slug-preview-target": "title" }
         ) %>
 
@@ -128,7 +128,8 @@
 
   <%= render Admin::Columns::PlainColumnComponent.new(
         name: "excerpt", id: field_id("excerpt"), html_name: field_html_name("excerpt"),
-        value: value(:excerpt), original: original(:excerpt), locale: locale, multiline: true, errors: field_errors("excerpt")
+        value: value(:excerpt), original: original(:excerpt), locale: locale, multiline: true, errors: field_errors("excerpt"),
+        **translation(:excerpt)
       ) %>
 
   <%# The content type's own typed fields (spec §5.2): a `group` field
@@ -144,13 +145,14 @@
     <%= render Admin::FieldComponent.new(
           field: field, form_name: "post[fields]",
           value: field_value(field), original: field_original(field), locale: locale,
-          errors: field_errors_for(field), id_prefix: ID_PREFIX
+          errors: field_errors_for(field), id_prefix: ID_PREFIX, **translation(field.name)
         ) %>
   <% end %>
 
   <%= render Admin::Columns::RichTextColumnComponent.new(
         name: "body", id: field_id("body"), html_name: field_html_name("body"),
-        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body")
+        value: value(:body), original: original(:body), locale: locale, errors: field_errors("body"),
+        **translation(:body)
       ) %>
 
   <%= render Admin::TagInputComponent.new(

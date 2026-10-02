@@ -12,6 +12,12 @@ module Translations
   #   any of its content blocks is. Those are exactly the tracked fields a
   #   record can't do without; an optional field left blank (a subtitle, an
   #   image's caption) is a choice, not a gap, and never reads missing.
+  #   An image's `alt` plays the title's part (Task 3 ruling): an image is
+  #   missing in a language when its original has alt text and that
+  #   language has none -- without this, an image could never read missing
+  #   (nothing about it is required), and untranslated images would never
+  #   surface anywhere. An image without an original alt has nothing to
+  #   translate, so it isn't missing anywhere.
   # * `:outdated` is any tracked field of the record, or of its blocks,
   #   reading `:outdated` (`Translations::Tracker#translation_state`).
   #
@@ -76,6 +82,7 @@ module Translations
       case record
       when Page then page_missing?(record, blocks, code)
       when Post then post_missing?(record, blocks, code)
+      when Media::Asset then image_missing?(record, code)
       else false
       end
     end
@@ -94,6 +101,11 @@ module Translations
         blocks.any? { |block| required_fields_blank?(block.definition, block.settings_object(locale: code)) }
     end
 
+    def image_missing?(asset, code)
+      alt = asset.read_attribute(:alt).to_h
+      alt[Translations.primary_locale].present? && alt[code.to_s].blank?
+    end
+
     def title_blank?(record, code) = record.read_attribute(:title).to_h[code.to_s].blank?
 
     # `definition`/`object` are handed in already resolved (a block's own
@@ -110,6 +122,6 @@ module Translations
     end
 
     private_class_method :locales_in, :record_state, :blocks_by_owner, :missing?, :outdated?,
-      :page_missing?, :post_missing?, :title_blank?, :required_fields_blank?
+      :page_missing?, :post_missing?, :image_missing?, :title_blank?, :required_fields_blank?
   end
 end

@@ -102,6 +102,13 @@ Rails.application.routes.draw do
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
 
+    # "Mark as up to date" for an outdated translation (translation helpers
+    # spec §3.4/§4): one endpoint for every translatable record kind, named
+    # by `record_type`/`record_id` in the params (the editor's button posts
+    # them in its `formaction`), the way the trash addresses its items by
+    # type rather than one nested route per model.
+    post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
+
     # The internal-link picker's own search (design spec §4.1/§4.2): a
     # `GET`, not nested under `pages`/`posts` -- it searches across both at
     # once (`?type=` narrows to one), so there is no single owning resource

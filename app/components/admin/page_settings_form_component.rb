@@ -77,6 +77,11 @@ module Admin
       page.public_send(field, locale: ::Locales.default)
     end
 
+    # The "Original changed" note's options for a translated field
+    # (translation helpers spec §4) -- see `Admin::TranslationScreen
+    # ::OutdatedNoteComponent.options_for`.
+    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(page, field, locale: locale, confirmable: editable?)
+
     # The homepage has no slug of its own (`Page#generates_slugs?`) -- its
     # path is "/" by design, so there's nothing here for an editor to type.
     def show_slug? = page.parent_id.present?

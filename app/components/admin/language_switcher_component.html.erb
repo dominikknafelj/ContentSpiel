@@ -19,6 +19,14 @@
       <% if missing?(code) %>
         <%= tag.span "", class: "h-1.5 w-1.5 rounded-full bg-danger", title: "Missing required fields", aria: { hidden: true } %>
       <% end %>
+      <% if outdated?(code) %>
+        <%# A ring, not a second dot, so the two read apart at a glance; the
+            `sr-only` text is what a screen reader announces (a `title`
+            alone isn't reliably read out). %>
+        <%= tag.span id: outdated_marker_id(code), class: "h-1.5 w-1.5 rounded-full border border-warn", title: "Original changed" do %>
+          <span class="sr-only"><%= native_name(code) %>: original changed</span>
+        <% end %>
+      <% end %>
     </span>
   <% end %>
 </nav>

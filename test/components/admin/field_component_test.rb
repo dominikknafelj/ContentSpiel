@@ -76,3 +76,24 @@ class Admin::FieldComponentTest < ViewComponent::TestCase
     end
   end
 end
+
+class Admin::FieldComponentTranslationTest < ViewComponent::TestCase
+  Field = ContentModel::Definition::Field
+
+  test "an outdated translated field shows the note beside its original" do
+    field = Field.new(name: "headline", type: :string, options: { translated: true })
+    render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de",
+      translation_state: :outdated, translation_confirm: { record_type: "Post", record_id: 4, field: "headline", locale: "de" })
+
+    assert_selector "[data-original-for='headline'] ~ #translation-note-post-4-headline button", text: "Mark as up to date"
+  end
+
+  test "a view-only outdated field shows the note without a button" do
+    field = Field.new(name: "headline", type: :string, options: { translated: true })
+    render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de",
+      translation_state: :outdated)
+
+    assert_text "Original changed since this was translated"
+    refute_selector "button", text: "Mark as up to date"
+  end
+end

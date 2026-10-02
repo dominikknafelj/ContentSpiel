@@ -10,5 +10,9 @@ module Admin
     def with_missing_translations
       render Admin::LanguageSwitcherComponent.new(current: "en", missing: [ "de" ], url: ->(code) { "?locale=#{code}" })
     end
+
+    def with_outdated_translations
+      render Admin::LanguageSwitcherComponent.new(current: "en", missing: [ "es" ], outdated: [ "de" ], url: ->(code) { "?locale=#{code}" })
+    end
   end
 end

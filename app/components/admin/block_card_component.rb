@@ -142,6 +142,11 @@ module Admin
 
     def column_errors(name) = block.errors.full_messages_for(name)
 
+    # See `Admin::PageSettingsFormComponent#translation` -- a block's own
+    # fields, confirmed on the block (`block.translation_confirmed`), with
+    # the page's edit right (`editable?`, blocks follow their page).
+    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(block, field, locale: locale, confirmable: editable?)
+
     # The caption/alt fields are this block's per-use overrides of its
     # image's own defaults (media library design spec §6): blank, the
     # public page falls back to the image's default in this language, which

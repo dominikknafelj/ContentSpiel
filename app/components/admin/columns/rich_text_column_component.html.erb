@@ -47,6 +47,7 @@
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <div data-original-for="<%= name %>" class="admin-rich-text-content text-ink"><%= original_html %></div>
         <span data-translate-slot="<%= name %>"></span>
+        <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>
   </div>

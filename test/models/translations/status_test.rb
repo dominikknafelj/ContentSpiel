@@ -80,6 +80,21 @@ class Translations::StatusTest < ActiveSupport::TestCase
     end
   end
 
+  # Controller ruling (Task 3): an image's alt is its "title" -- without
+  # one in a language the image is missing there, so untranslated images
+  # show up at all. Only once the original has an alt: nothing to translate
+  # otherwise. A blank caption is a choice, never missing.
+  test "an image is missing where its original has alt text and the translation doesn't" do
+    with_locales(%w[en de es], default: "en") do
+      asset = create_media_asset
+      assert_equal({ "de" => :complete, "es" => :complete }, Translations::Status.for([ asset ])[asset])
+
+      assert Media::Save.call(asset, translations: { "en" => { alt: "Sand", caption: "Dunes" }, "de" => { alt: "Sand (de)" } }).ok?
+      assert_equal({ "de" => :complete, "es" => :missing }, Translations::Status.for([ asset.reload ])[asset])
+      assert_equal %w[es], Translations::Status.missing_locales(asset)
+    end
+  end
+
   test "batched: constant queries for 1 vs 20 pages with blocks" do
     with_locales(%w[en de], default: "en") do
       pages = Array.new(20) do |index|

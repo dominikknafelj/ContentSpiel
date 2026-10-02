@@ -49,7 +49,12 @@ module Admin
     # (falling back to the old `dom_id_prefix(form_name)` behaviour) keeps
     # every existing single-instance-per-page caller (the post/group fields
     # this component already serves) unchanged.
-    def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil)
+    #
+    # `translation_state:`/`translation_confirm:` drive the "Original
+    # changed" note beside the original -- the same contract
+    # `Admin::Columns::Base` gives every column field.
+    def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
+      translation_state: nil, translation_confirm: nil)
       @field = field
       @form_name = form_name
       @value = value
@@ -57,6 +62,8 @@ module Admin
       @locale = locale
       @errors = errors
       @id_prefix = id_prefix || self.class.dom_id_prefix(form_name)
+      @translation_state = translation_state
+      @translation_confirm = translation_confirm
     end
 
     def label_text = field.name.humanize
@@ -89,8 +96,15 @@ module Admin
 
     def default_locale_name = Locales.name(Locales.default, native: true)
 
+    # See `Admin::Columns::Base#outdated_note`.
+    def outdated_note
+      return unless translation_state == :outdated
+
+      Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+    end
+
     private
 
-    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix
+    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm
   end
 end

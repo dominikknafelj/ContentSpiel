@@ -99,6 +99,12 @@ module Admin
     # gives for its own page.
     def missing_locales = Translations::Status.missing_locales(post)
 
+    # The switcher's "original changed" codes (translation helpers spec §4).
+    def outdated_locales = Translations::Status.outdated_locales(post)
+
+    # See `Admin::PageSettingsFormComponent#translation`.
+    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(post, field, locale: locale, confirmable: editable?)
+
     # Per-code URL for the switcher: same "omit `locale:` for the site's
     # default language" rule `Admin::RecordHeaderComponent#language_url`
     # applies to a page, rebuilt here against this post's own editor path.

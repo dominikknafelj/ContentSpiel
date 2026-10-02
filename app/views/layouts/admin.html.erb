@@ -84,5 +84,15 @@
         never feed an autosave. Renders nothing without `media.upload`
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
+
+    <%# The one form every "Mark as up to date" button submits
+        (`Admin::TranslationScreen::OutdatedNoteComponent`): empty, here
+        outside `#content` and every autosave form for the same reason as
+        the picker -- forms can't nest, so each button names this one as
+        its owner (`form=`) and its own record in `formaction`. It carries
+        only the CSRF token. %>
+    <%= form_with url: admin_translation_confirmation_path, method: :post,
+          id: Admin::TranslationScreen::OutdatedNoteComponent::FORM_ID, class: "hidden" do %>
+    <% end %>
   </body>
 </html>
