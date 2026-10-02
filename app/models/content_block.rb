@@ -24,6 +24,12 @@ class ContentBlock < ApplicationRecord
   # write one, but like `caption`/`alt` it's declared unconditionally.
   include HasRichTextBody
 
+  # Which version of the original each translation was saved against
+  # (translation helpers spec §3.2), plus the block type's own
+  # `translated: true` settings. Rolls up into the owner's state.
+  include Translations::Tracker
+  tracks_translations :caption, :alt, :body, schema: :settings_object
+
   belongs_to :owner, polymorphic: true
 
   # An `image` block's image (design spec §3.3): a reference to a library
