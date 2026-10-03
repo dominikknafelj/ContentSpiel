@@ -14,7 +14,7 @@
       no public header/footer. color-scheme stays scoped to this body. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <div class="mx-auto flex max-w-xl flex-col gap-6 px-4 py-16">
-      <div class="flex justify-end"><%= render "shared/theme_toggle" %></div>
+      <div class="flex justify-end"><%= render Admin::ThemeSwitchComponent.new %></div>
       <main><%= yield %></main>
     </div>
   </body>

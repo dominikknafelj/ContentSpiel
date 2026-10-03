@@ -27,6 +27,13 @@
   --color-danger: var(--cs-danger);
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
+  --color-chrome: var(--cs-chrome);
+  --color-cat-1: var(--cs-cat-1);
+  --color-cat-2: var(--cs-cat-2);
+  --color-cat-3: var(--cs-cat-3);
+  --color-cat-4: var(--cs-cat-4);
+  --color-cat-5: var(--cs-cat-5);
+  --color-cat-6: var(--cs-cat-6);
   /* font-cs / font-cs-mono, not --font-sans / --font-mono: Tailwind preflight
      wires --font-sans into --default-font-family on <html>, so mapping the
      token fonts there would restyle every existing page (public site, auth
@@ -42,4 +49,14 @@
   --radius-cs: var(--cs-radius);
   --shadow-menu: var(--cs-shadow-menu);
   --ease-cs: var(--cs-ease);
+}
+
+/* The active theme choice needs no JS: shared/_theme_head sets
+   <html data-theme-choice> before first paint, and Admin::ThemeSwitchComponent's
+   buttons carry their own choice as data-theme-choice-param. */
+[data-theme-choice="light"] .admin-theme-switch__choice[data-theme-choice-param="light"],
+[data-theme-choice="dark"] .admin-theme-switch__choice[data-theme-choice-param="dark"],
+[data-theme-choice="auto"] .admin-theme-switch__choice[data-theme-choice-param="auto"] {
+  background: var(--cs-sunken);
+  color: var(--cs-ink);
 }

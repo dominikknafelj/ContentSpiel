@@ -53,7 +53,7 @@
         </ul>
 
         <div class="mt-auto flex flex-col gap-2">
-          <%= render "shared/theme_toggle" %>
+          <%= render Admin::ThemeSwitchComponent.new %>
           <%# The account menu: your own password (open to every user,
               access-control design spec §5), then sign out. %>
           <%= link_to admin_account_password_path(**admin_url_options), class: nav_link_classes do %>

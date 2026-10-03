@@ -47,6 +47,19 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'localStorage.getItem("cs-theme")'
   end
 
+  test "the chrome and content-type tokens exist in both themes and map to utilities" do
+    css = Rails.root.join("app/assets/tailwind/content-spiel.css").read
+    light, dark = css.split('[data-theme="dark"] {', 2)
+    %w[--cs-chrome --cs-cat-1 --cs-cat-2 --cs-cat-3 --cs-cat-4 --cs-cat-5 --cs-cat-6].each do |token|
+      assert_includes light, "#{token}:", "#{token} missing from the light theme"
+      assert_includes dark, "#{token}:", "#{token} missing from the dark theme"
+    end
+    map = Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read
+    assert_includes map, "--color-chrome: var(--cs-chrome);"
+    (1..6).each { |n| assert_includes map, "--color-cat-#{n}: var(--cs-cat-#{n});" }
+    refute_match(/color-scheme\s*:/, css.gsub(%r{/\*.*?\*/}m, ""), "color-scheme stays per layout, never global")
+  end
+
   private
     def helpers = ActionController::Base.helpers
 
