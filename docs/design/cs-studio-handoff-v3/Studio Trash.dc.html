@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="trash" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;max-width:1100px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:6px"><h1 style="margin:0;font-size:26px;font-weight:600">Trash</h1><p style="margin:0;font-size:14px;color:var(--cs-dim)">Items are deleted permanently 30 days after they’re trashed. <a href="Studio%20Settings.dc.html#publishing">Change</a></p></div>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-danger);border:1px solid var(--cs-line-strong);border-radius:2px;padding:8px 14px">Empty trash…</button>
+  </div>
+  <div style="display:inline-flex;align-self:flex-start;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden;background:var(--cs-surface)">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <button onClick="{{ t.go }}" style="display:flex;gap:6px;align-items:center;font-size:13px;padding:6px 11px;border:0;border-right:1px solid var(--cs-line);cursor:pointer;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}<span style="font-family:var(--cs-mono);font-size:10px;opacity:0.7">{{ t.n }}</span></button>
+    </sc-for>
+  </div>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="display:grid;grid-template-columns:minmax(220px,1fr) 80px 180px 130px 200px;gap:12px;min-width:820px;padding:9px 16px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)"><span>ITEM</span><span>TYPE</span><span>TRASHED</span><span>DELETES</span><span></span></div>
+    <sc-for list="{{ rows }}" as="r" hint-placeholder-count="3">
+      <div style="display:grid;grid-template-columns:minmax(220px,1fr) 80px 180px 130px 200px;gap:12px;min-width:820px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--cs-line)">
+        <span style="display:flex;gap:10px;align-items:center;min-width:0">
+          <sc-if value="{{ r.isImg }}" hint-placeholder-val="{{ false }}"><span style="width:32px;height:24px;background:#000;border:1px solid var(--cs-line);flex-shrink:0"></span></sc-if>
+          <span style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:14px;font-weight:500">{{ r.title }}</span><span style="font-size:12px;color:var(--cs-meta)">{{ r.sub }}</span></span>
+        </span>
+        <span style="font-size:13px;color:var(--cs-dim)">{{ r.type }}</span>
+        <span style="font-size:13px;color:var(--cs-dim)">{{ r.by }} · {{ r.when }}</span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ r.deletes }}</span>
+        <span style="display:flex;gap:8px;justify-content:flex-end">
+          <button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:5px 11px">Restore</button>
+          <button style="font-weight:500;font-size:12px;background:transparent;color:var(--cs-danger);border:1px solid transparent;border-radius:2px;padding:5px 8px">Delete now…</button>
+        </span>
+      </div>
+    </sc-for>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { tab: 'All' };
+  renderVals() {
+    const all = [
+      { title: 'tiny', sub: 'tiny.png · 1×1', type: 'Image', isImg: true, by: 'You', when: '3h ago', deletes: 'IN 30 DAYS' },
+      { title: 'Retired announcement', sub: '/blog/retired-announcement', type: 'Post', isImg: false, by: 'You', when: '3h ago', deletes: 'IN 30 DAYS' },
+      { title: 'Old campaign', sub: 'Includes 1 subpage: Landing 2025', type: 'Page', isImg: false, by: 'You', when: '3h ago', deletes: 'IN 30 DAYS' }
+    ];
+    const m = { Pages: 'Page', Posts: 'Post', Images: 'Image' };
+    const t = this.state.tab;
+    return {
+      tabs: ['All', 'Pages', 'Posts', 'Images'].map(label => ({ label, n: label === 'All' ? all.length : all.filter(r => r.type === m[label]).length,
+        go: () => this.setState({ tab: label }), bg: t === label ? 'var(--cs-ink)' : 'transparent', fg: t === label ? 'var(--cs-paper)' : 'var(--cs-ink)' })),
+      rows: all.filter(r => t === 'All' || r.type === m[t])
+    };
+  }
+}
+</script>
+</body>
+</html>

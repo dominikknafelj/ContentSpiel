@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,button{font-family:inherit}</style>
+</helmet>
+<div data-theme="{{ theme }}" style="background:var(--cs-paper);color:var(--cs-ink);min-height:100vh">
+<div style="max-width:1180px;margin:0 auto;padding:54px 34px 80px;display:flex;flex-direction:column;gap:54px">
+
+<header style="display:flex;justify-content:space-between;align-items:flex-end;gap:22px;flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid var(--cs-line-strong)">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <span style="font-weight:700;font-size:15px;letter-spacing:0.18em">CONTENT·SPIEL</span>
+      <span style="width:1px;height:16px;background:var(--cs-line-strong)"></span>
+      <span style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">Design system · v0.2</span>
+    </div>
+    <h1 style="margin:0;font-size:clamp(34px,5vw,60px);line-height:1.02;font-weight:700;letter-spacing:-0.01em;max-width:760px;text-wrap:balance">A quiet workspace for pages, posts and the people who write them.</h1>
+  </div>
+  <div style="display:flex;gap:22px;font-size:14px;align-items:center;flex-wrap:wrap">
+    <a href="Demo Site.dc.html">Demo site</a><a href="Setup Wizard.dc.html">Setup</a><a href="Studio%20Dashboard.dc.html">Studio (backend)</a><a href="Studio%20Sign%20In.dc.html">Sign in</a>
+    <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden">
+      <button onClick="{{ setLight }}" style="font-size:12px;padding:6px 11px;border:0;cursor:pointer;background:{{ lightBg }};color:{{ lightFg }}">Light</button>
+      <button onClick="{{ setDark }}" style="font-size:12px;padding:6px 11px;border:0;border-left:1px solid var(--cs-line);cursor:pointer;background:{{ darkBg }};color:{{ darkFg }}">Dark</button>
+    </div>
+  </div>
+</header>
+
+<p style="margin:-22px 0 0;max-width:680px;font-size:16px;line-height:1.6;color:var(--cs-dim);text-wrap:pretty">The light, neutral sibling of Photo·spiel, with a dark twin. Same type pairing and hairline structure; one ink-blue accent; a mono layer for everything machine-like: dates, slugs, locales, status, MCP. Every colour is a token with a light and a dark value, switched by <span style="font-family:var(--cs-mono);font-size:13px">data-theme</span> on the root.</p>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">01 · Colour · light / dark</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));border-top:1px solid var(--cs-line);border-left:1px solid var(--cs-line)">
+    <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="21">
+      <div style="border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);background:var(--cs-surface);display:flex;flex-direction:column">
+        <div style="display:grid;grid-template-columns:1fr 1fr;height:56px;border-bottom:1px solid var(--cs-line)">
+          <div data-theme="light" style="background:var({{ s.var }})"></div>
+          <div data-theme="dark" style="background:var({{ s.var }})"></div>
+        </div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:3px">
+          <span style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:13px;font-weight:600">{{ s.n }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ s.var }}</span></span>
+          <span style="font-size:12px;color:var(--cs-dim)">{{ s.t }}</span>
+          <span style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"><span>{{ s.l }}</span><span>{{ s.d }}</span></span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">02 · Type</div>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);display:flex;flex-direction:column">
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:22px;padding:22px;border-bottom:1px solid var(--cs-line);align-items:baseline"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">DISPLAY · 700 · 34–60</span><span style="font-size:48px;font-weight:700;line-height:1.02;letter-spacing:-0.01em">Writing, mostly.</span></div>
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:22px;padding:22px;border-bottom:1px solid var(--cs-line);align-items:baseline"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">H1 · 600 · 28</span><span style="font-size:28px;font-weight:600">Posts</span></div>
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:22px;padding:22px;border-bottom:1px solid var(--cs-line);align-items:baseline"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">H2 · 600 · 20</span><span style="font-size:20px;font-weight:600">Missing translations</span></div>
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:22px;padding:22px;border-bottom:1px solid var(--cs-line);align-items:baseline"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">BODY · 400 · 15/1.6</span><span style="font-size:15px;line-height:1.6;max-width:560px">Pages are trees of blocks. Each block is rich text, an image or a list of posts, and each can be translated into every language the site has.</span></div>
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:22px;padding:22px;align-items:baseline"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">MONO · 400/500 · 11–13</span><span style="font-family:var(--cs-mono);font-size:12px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-dim)">/writing/notes-on-hotwire · EN DE SL · 12 SEP 2026</span></div>
+  </div>
+</section>
+
+<section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:22px">
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">03 · Spacing</div>
+    <div style="background:var(--cs-surface);border:1px solid var(--cs-line);padding:22px;display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap">
+      <sc-for list="{{ spaces }}" as="sp" hint-placeholder-count="7">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:{{ sp.px }};height:{{ sp.px }};background:var(--cs-accent-tint);border:1px solid var(--cs-accent)"></div><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ sp.px }}</span></div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">04 · Structure</div>
+    <div style="background:var(--cs-surface);border:1px solid var(--cs-line);padding:22px;display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="width:64px;height:44px;border:1px solid var(--cs-line-strong);border-radius:2px"></div><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">2px controls</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="width:64px;height:24px;border:1px solid var(--cs-line-strong);border-radius:999px"></div><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">pill · status</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="width:64px;height:44px;border-top:1px solid var(--cs-line-strong);border-bottom:1px solid var(--cs-line)"></div><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">hairlines</span></div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:center"><div style="width:64px;height:44px;background:var(--cs-surface);box-shadow:var(--cs-shadow-menu);border:1px solid var(--cs-line)"></div><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">menus only</span></div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">05 · Components</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));border-top:1px solid var(--cs-line);border-left:1px solid var(--cs-line)">
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:18px">
+      <span style="font-size:13px;font-weight:600">Button</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:9px 16px;cursor:pointer" style-hover="background:var(--cs-accent-hover)">Publish</button>
+        <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 16px;cursor:pointer" style-hover="background:var(--cs-sunken)">Save draft</button>
+        <button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:9px 12px;cursor:pointer" style-hover="color:var(--cs-ink);background:var(--cs-sunken)">Cancel</button>
+        <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-danger);border:1px solid var(--cs-danger);border-radius:2px;padding:9px 16px;cursor:pointer">Delete</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button style="font-weight:500;font-size:12px;background:var(--cs-accent);color:var(--cs-on-accent);border:0;border-radius:2px;padding:6px 11px">Small</button>
+        <button style="font-weight:500;font-size:13px;background:var(--cs-sunken);color:var(--cs-meta);border:1px solid var(--cs-line);border-radius:2px;padding:9px 16px">Disabled</button>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-dim);border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 7px">⌘K</span>
+      </div>
+    </div>
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Field · Input · Select</span>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:500">Title</span>
+        <input value="Notes on Hotwire" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:500">Slug</span>
+        <div style="display:flex;border:1px solid var(--cs-line-strong);border-radius:2px;overflow:hidden"><span style="font-family:var(--cs-mono);font-size:12px;color:var(--cs-meta);background:var(--cs-sunken);padding:10px;border-right:1px solid var(--cs-line)">/writing/</span><span style="font-family:var(--cs-mono);font-size:12px;padding:10px">notes-on-hotwire</span></div>
+        <span style="font-size:12px;color:var(--cs-meta)">Generated from the title. Edit to override.</span></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:500">Parent page</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;font-size:14px">Writing<span style="color:var(--cs-meta);font-size:11px">▾</span></div></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:500;color:var(--cs-danger)">Email</span>
+        <div style="border:1px solid var(--cs-danger);border-radius:2px;padding:9px 11px;font-size:14px">mara@</div>
+        <span style="font-size:12px;color:var(--cs-danger)">Enter a full email address.</span></label>
+    </div>
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:18px">
+      <span style="font-size:13px;font-weight:600">Status · Locale · Author</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Live</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-meta)"></span>Draft</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-warn)"></span>Scheduled</span>
+        <span style="display:inline-flex;align-items:center;font-size:12px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:2px 7px">Unpublished changes</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-family:var(--cs-mono);font-size:11px;font-weight:500;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 6px">EN</span>
+        <span style="font-family:var(--cs-mono);font-size:11px;font-weight:500;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 6px">DE</span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);border:1px dashed var(--cs-line-strong);border-radius:2px;padding:2px 6px">SL</span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:2px 6px">FR ↻</span><span style="font-size:12px;color:var(--cs-meta);margin-left:6px">Solid = done · dashed = missing · amber ↻ = outdated. Never red.</span>
+      </div>
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:8px;font-size:13px"><span style="width:22px;height:22px;border-radius:999px;background:var(--cs-ink);color:var(--cs-paper);font-size:10px;font-weight:600;display:grid;place-items:center">ML</span>Mara</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;font-size:13px"><span style="width:22px;height:22px;border-radius:2px;border:1px solid var(--cs-accent);color:var(--cs-accent);font-family:var(--cs-mono);font-size:10px;display:grid;place-items:center">AI</span>Agent<span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.1em;color:var(--cs-accent);background:var(--cs-accent-tint);padding:2px 5px;border-radius:2px">MCP</span></span>
+      </div>
+    </div>
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:18px">
+      <span style="font-size:13px;font-weight:600">Language switcher</span>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">1–3 LANGUAGES · INLINE</span>
+        <span style="display:flex;gap:4px;font-family:var(--cs-mono);font-size:11px">
+          <span style="padding:3px 6px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px">EN</span>
+          <span style="padding:3px 6px;border:1px solid var(--cs-line-strong);border-radius:2px">DE</span>
+          <span style="padding:3px 6px;border:1px solid var(--cs-line-strong);border-radius:2px">SL</span>
+        </span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">4+ LANGUAGES · DROPDOWN</span>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+          <span style="display:inline-flex;gap:8px;align-items:center;font-family:var(--cs-mono);font-size:11px;padding:4px 8px;border:1px solid var(--cs-line-strong);border-radius:2px">EN <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+          <div style="width:190px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column">
+            <span style="display:flex;justify-content:space-between;font-size:13px;padding:6px 8px;background:var(--cs-sunken);border-radius:2px">English<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">EN ✓</span></span>
+            <span style="display:flex;justify-content:space-between;font-size:13px;padding:6px 8px">Deutsch<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">DE</span></span>
+            <span style="display:flex;justify-content:space-between;font-size:13px;padding:6px 8px">Slovenščina<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">SL</span></span>
+            <span style="display:flex;justify-content:space-between;font-size:13px;padding:6px 8px">Français<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">FR</span></span>
+          </div>
+        </div>
+      </div>
+      <span style="font-size:12px;line-height:1.5;color:var(--cs-meta)">Labels use each language's own name. The same rule applies to locale pickers in the backend.</span>
+    </div>
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:18px">
+      <span style="font-size:13px;font-weight:600">Toggle · Checkbox · Scopes</span>
+      <div style="display:inline-flex;border:1px solid var(--cs-line-strong);border-radius:2px;align-self:flex-start;overflow:hidden">
+        <span style="font-size:13px;padding:7px 12px;background:var(--cs-ink);color:var(--cs-paper)">All</span>
+        <span style="font-size:13px;padding:7px 12px;border-left:1px solid var(--cs-line)">Published</span>
+        <span style="font-size:13px;padding:7px 12px;border-left:1px solid var(--cs-line)">Drafts</span>
+      </div>
+      <div style="display:flex;gap:22px;align-items:center">
+        <span style="display:inline-flex;align-items:center;gap:10px;font-size:14px"><span style="width:34px;height:20px;border-radius:999px;background:var(--cs-accent);position:relative"><span style="position:absolute;top:2px;left:16px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>MCP server</span>
+        <span style="display:inline-flex;align-items:center;gap:10px;font-size:14px;color:var(--cs-dim)"><span style="width:34px;height:20px;border-radius:999px;background:var(--cs-line-strong);position:relative"><span style="position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:999px;background:#fff"></span></span>Comments</span>
+      </div>
+      <div style="display:flex;gap:22px">
+        <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px"><span style="width:16px;height:16px;border-radius:2px;background:var(--cs-accent);color:var(--cs-on-accent);font-size:11px;display:grid;place-items:center">✓</span>English</span>
+        <span style="display:inline-flex;align-items:center;gap:8px;font-size:14px"><span style="width:16px;height:16px;border-radius:2px;border:1px solid var(--cs-line-strong);box-sizing:border-box"></span>Français</span>
+      </div>
+    </div>
+
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Sidebar item · Index row · Alert</span>
+      <div style="display:flex;flex-direction:column;gap:2px;width:200px">
+        <span style="font-size:14px;padding:7px 10px;border-radius:2px;background:var(--cs-sunken);font-weight:500">Posts</span>
+        <span style="font-size:14px;padding:7px 10px;color:var(--cs-dim)">Pages</span>
+      </div>
+      <div style="display:grid;grid-template-columns:18px 34px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--cs-line-strong);border-bottom:1px solid var(--cs-line);font-size:13px">
+        <span style="width:14px;height:14px;border:1px solid var(--cs-line-strong);border-radius:2px;box-sizing:border-box"></span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">42</span>
+        <span style="font-weight:500">Notes on Hotwire</span>
+        <span style="display:flex;gap:10px;font-size:12px"><a href="#">View</a><a href="#">Edit</a></span>
+      </div>
+      <div style="display:flex;gap:10px;padding:10px 12px;background:var(--cs-accent-tint);border-radius:2px;font-size:13px;line-height:1.5"><span style="color:var(--cs-accent);font-weight:600">i</span><span>An agent drafted this post via MCP. Review before publishing.</span></div>
+      <div style="display:flex;gap:10px;padding:10px 12px;background:var(--cs-warn-tint);border-radius:2px;font-size:13px;line-height:1.5;color:var(--cs-warn-ink)"><span style="font-weight:600">!</span><span>This token is shown once. Copy it now.</span></div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">06 · Tailwind mapping</div>
+  <p style="margin:0;max-width:720px;font-size:14px;line-height:1.6;color:var(--cs-dim)">Tokens live in <span style="font-family:var(--cs-mono);font-size:12px">content-spiel.css</span> as runtime variables; <span style="font-family:var(--cs-mono);font-size:12px">content-spiel.tailwind.css</span> exposes them to Tailwind v4 through <span style="font-family:var(--cs-mono);font-size:12px">@theme inline</span>, so ERB views use utilities and dark mode needs no <span style="font-family:var(--cs-mono);font-size:12px">dark:</span> duplicates.</p>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);overflow-x:auto">
+    <div style="display:grid;grid-template-columns:200px minmax(220px,1fr);gap:14px;min-width:440px;padding:10px 18px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)"><span>TOKEN</span><span>TAILWIND</span></div>
+    <sc-for list="{{ mapping }}" as="m" hint-placeholder-count="8">
+      <div style="display:grid;grid-template-columns:200px minmax(220px,1fr);gap:14px;min-width:440px;padding:10px 18px;border-bottom:1px solid var(--cs-line);font-size:13px;align-items:baseline">
+        <span style="font-family:var(--cs-mono);font-size:12px">{{ m.t }}</span>
+        <span style="font-family:var(--cs-mono);font-size:12px;color:var(--cs-dim)">{{ m.tw }}</span>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">07 · Studio patterns</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));border-top:1px solid var(--cs-line);border-left:1px solid var(--cs-line)">
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Language tabs (editors)</span>
+      <div style="display:flex;gap:2px;border-bottom:1px solid var(--cs-line)">
+        <span style="font-size:13px;padding:8px 12px;border-bottom:2px solid var(--cs-ink);font-weight:600;margin-bottom:-1px">English</span>
+        <span style="display:flex;gap:7px;align-items:center;font-size:13px;padding:8px 12px;color:var(--cs-dim)">Deutsch<span style="width:7px;height:7px;border-radius:999px;background:var(--cs-warn)"></span></span>
+        <span style="display:flex;gap:7px;align-items:center;font-size:13px;padding:8px 12px;color:var(--cs-dim)">Español<span style="width:7px;height:7px;border-radius:999px;border:1px solid var(--cs-meta);box-sizing:border-box"></span></span>
+        <span style="font-size:13px;padding:8px 12px;color:var(--cs-dim)">+2 ▾</span>
+      </div>
+      <span style="font-size:12px;line-height:1.5;color:var(--cs-meta)">No dot = complete, hollow = missing, amber = outdated. Show up to 4 tabs; the rest collapse into “+N ▾”.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Translation reference + suggestion</span>
+      <div style="background:var(--cs-paper);border:1px solid var(--cs-warn);border-radius:2px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+        <span style="display:flex;justify-content:space-between"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">ENGLISH</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink)">↻ CHANGED</span></span>
+        <span style="font-size:14px">Welcome to <span style="text-decoration:line-through;color:var(--cs-danger-ink);background:var(--cs-danger-tint)">the</span> <span style="color:var(--cs-ok-ink);background:var(--cs-ok-tint)">our</span> new site</span>
+      </div>
+      <div style="background:var(--cs-accent-tint);border:1px solid var(--cs-accent);border-radius:2px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-accent)">SUGGESTED TRANSLATION</span>
+        <span style="font-size:14px">Wir haben alles neu gebaut.</span>
+      </div>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Editor actions</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">SAVED 10:42</span>
+        <span style="font-weight:500;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Preview</span>
+        <span style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border-radius:2px;padding:8px 13px">Publish changes</span>
+        <span style="font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">⋯</span>
+      </div>
+      <span style="font-size:12px;line-height:1.5;color:var(--cs-meta)">One primary action. Activity, Schedule, Unpublish and Move to trash live in the ⋯ menu; trash is last and red. This is the header with draft revisions; build the variant below first.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Translation chips · accessible</span>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--cs-dim)">
+        <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE</span>Translated</span>
+        <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px dashed var(--cs-line-strong);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE ○</span>Missing</span>
+        <span style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:1px 5px;white-space:nowrap;flex-shrink:0">DE ↻</span>Outdated</span>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Each state has a shape cue that survives greyscale: done = solid border, no glyph (no check mark, keeps tables calm); missing = dashed border + ○ (matches the hollow dot on tabs); outdated = ↻. Colour is the third cue, never the only one. aria-label: “German: translated / not translated / outdated”.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Content types · open registry</span>
+      <div style="display:grid;grid-template-columns:repeat(3,auto);gap:8px 18px;justify-content:start;font-size:13px;color:var(--cs-dim)">
+        <span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-1)"></span>Blog post</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-2)"></span>Now update</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-3)"></span>Resume entry</span>
+        <span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-4)"></span>Talk</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-5)"></span>Project</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-6)"></span>Recipe</span>
+        <span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;border:1.5px solid var(--cs-cat-1)"></span>Link</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;border:1.5px solid var(--cs-cat-2)"></span>Quote</span><span style="display:flex;gap:7px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;border:1.5px solid var(--cs-cat-3)"></span>Event</span>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Six hues (--cs-cat-1…6), kept away from the status hues. Each type stores a colour_index assigned in creation order: types 1–6 get a filled dot, 7–12 reuse the hues as a ring, 13+ cycle again. The type name always sits next to the dot, so a repeat never makes a type ambiguous. Also used for Mind graph nodes.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px;grid-column:1 / -1">
+      <span style="font-size:13px;font-weight:600">Editor header · without draft revisions (build this first)</span>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="border:1px solid var(--cs-line);background:var(--cs-paper);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:600">About</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-ok)"></span>Live</span></span><span style="display:flex;gap:8px;align-items:center"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-ok-ink)">● SAVED TO SITE 10:42</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Preview</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">⋯</span></span></div>
+        <div style="border:1px solid var(--cs-line);background:var(--cs-paper);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:600">About</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-meta)"></span>Draft</span></span><span style="display:flex;gap:8px;align-items:center"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">SAVED 10:42</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Preview</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Publish</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">⋯</span></span></div>
+        <div style="border:1px solid var(--cs-line);background:var(--cs-paper);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:600">About</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-warn)"></span>Scheduled · Thu 8 Oct 17:30</span></span><span style="display:flex;gap:8px;align-items:center"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">SAVED 10:42</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Edit schedule</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Publish now</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">⋯</span></span></div>
+        <div style="border:1px solid var(--cs-line);background:var(--cs-paper);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="display:flex;gap:10px;align-items:center"><span style="font-size:17px;font-weight:600">About</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-ok)"></span>Live</span></span><span style="display:flex;gap:8px;align-items:center"><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-danger-ink)">● NOT SAVED</span><span style="font-size:12px;font-weight:500;color:var(--cs-accent)">Retry</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Preview</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">⋯</span></span></div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Live: no primary button and no “Unpublished changes” chip. Autosave writes straight to the site, so the indicator reads SAVED TO SITE with an ok dot. On the first edit of a live item, a one-time hint under the header: “This page is live. Changes appear on the site as soon as they’re saved.” Draft: primary Publish. Scheduled: primary Publish now, secondary Edit schedule. ⋯ menu: Activity, Schedule… / Unpublish, divider, Move to trash. When draft revisions ship, switch to the Editor actions card above.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px;grid-column:1 / -1">
+      <span style="font-size:13px;font-weight:600">Narrow screens</span>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+        <div style="width:220px;border:1px solid var(--cs-line-strong);background:var(--cs-paper);display:flex;flex-direction:column;font-size:11px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--cs-chrome);border-bottom:1px solid var(--cs-line)"><span style="font-size:14px">☰</span><span style="font-weight:700;letter-spacing:0.18em;font-size:9px">CONTENT·SPIEL</span><span style="font-family:var(--cs-mono);font-size:9px;color:var(--cs-meta)">⌘K</span></div>
+          <div style="padding:8px 10px;display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;font-size:10px;color:var(--cs-dim)"><span>Pages ▾ / About</span><span>⋯</span></span><span style="font-size:14px;font-weight:600">Über uns</span>
+            <span style="border:1px solid var(--cs-line);background:var(--cs-surface);padding:6px;display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--cs-mono);font-size:8px;color:var(--cs-meta)">ENGLISH ▾</span><span>About</span></span>
+            <span style="border:1px solid var(--cs-line-strong);background:var(--cs-surface);padding:6px">Über uns</span>
+            <span style="border:1px solid var(--cs-line);background:var(--cs-surface);padding:6px;display:flex;flex-direction:column;gap:3px"><span style="font-family:var(--cs-mono);font-size:8px;color:var(--cs-meta)">ENGLISH ▾</span><span>Who we are</span></span>
+            <span style="border:1px solid var(--cs-line-strong);background:var(--cs-surface);padding:6px;color:var(--cs-meta)">Not translated yet</span></div>
+        </div>
+        <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:6px;font-size:13px;line-height:1.5;color:var(--cs-dim)">
+          <span><b style="color:var(--cs-ink);font-weight:500">≥ 1280px</b> · full layout as drawn.</span>
+          <span><b style="color:var(--cs-ink);font-weight:500">1024–1279</b> · the sidebar becomes a drawer behind a 48px top bar (☰, wordmark, ⌘K). The page tree stays a column. The Media detail panel overlays the grid.</span>
+          <span><b style="color:var(--cs-ink);font-weight:500">768–1023</b> · the page tree becomes a “Pages ▾” drawer opened from the breadcrumb. Side-by-side translation stacks: the English reference sits above its field and can be collapsed. Tables scroll sideways with a sticky title column.</span>
+          <span><b style="color:var(--cs-ink);font-weight:500">&lt; 768</b> · not a design target. It stays usable (single column, drawers) but gets no extra design work.</span>
+        </div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Translation stacking follows the main column width (container query, under 880px), not the viewport.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px;grid-column:1 / -1">
+      <span style="font-size:13px;font-weight:600">Save behaviour</span>
+      <div style="display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 16px;font-size:13px;line-height:1.5;color:var(--cs-dim)">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-ink)">AUTOSAVE</span><span>Content: page and post editors, blocks, media title/alt/caption, tag rename, tree and block order. Saves 800ms after typing stops and on blur; indicator SAVING… → SAVED 10:42. On failure: NOT SAVED · Retry plus an error toast. Nothing to confirm on leave.</span>
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-ink)">EXPLICIT SAVE</span><span>Configuration: Settings (all sections, including Languages), Groups, Users, AI tokens, Change password. One sticky save bar per screen appears on the first change: “2 unsaved changes · Cancel · Save”. Leaving with changes opens the Leave dialog. Settings stops autosaving.</span>
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-ink)">INSTANT</span><span>Single actions with their own button (publish, trash, restore, revoke, turn a language off) run at once, after a confirm dialog where listed, and report with a toast.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:22px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">08 · Overlays, feedback &amp; states</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));border-top:1px solid var(--cs-line);border-left:1px solid var(--cs-line)">
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Dialog · confirm (destructive)</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:420px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">Delete “Retired announcement”?</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.55;color:var(--cs-dim)"><span>It will be removed permanently, with all its translations. This can’t be undone.</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 13px;">Cancel</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-danger);color:#fff;border:1px solid var(--cs-danger);border-radius:2px;padding:7px 13px;">Delete permanently</span></div>
+      </div></div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Overlay: ink 38% over the page (no blur). Widths: 420 confirm · 560 form · 880 picker; max-height 85vh, body scrolls. Footer right-aligned: Cancel (ghost) left, the action right. Destructive action = solid danger, label repeats the verb. Esc and × cancel; focus starts on Cancel for destructive dialogs, on the first field for forms. A Turbo confirm dialog replaces the browser one.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Dialog · form</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:560px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">New blog post</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.55;color:var(--cs-dim)"><label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE</span><span style="display:flex;align-items:center;font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;color:var(--cs-ink);border-color:var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint)">Notes on editing in the dark</span></label><label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TYPE</span><span style="display:flex;align-items:center;font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;color:var(--cs-ink);"><span style="flex:1;display:flex;gap:8px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-1)"></span>Blog post</span><span style="font-size:10px;color:var(--cs-meta)">▾</span></span></label><span style="font-size:12px;color:var(--cs-meta)">Created as a draft in English. You can change everything in the editor.</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 13px;">Cancel</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Create draft</span></div>
+      </div></div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Enter submits. Errors show inline under the field and the dialog stays open (see Validation).</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Unsaved changes on leave</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:420px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">Leave without saving?</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.55;color:var(--cs-dim)"><span>You have 2 unsaved changes on this page.</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 13px;color:var(--cs-danger)">Discard changes</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Keep editing</span></div>
+      </div></div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Only on explicit-save screens (see Save behaviour). Triggered by turbo:before-visit and beforeunload. Primary is the safe choice.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Change default language</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:420px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--cs-line)"><span style="font-size:16px;font-weight:600">Make Deutsch the default?</span><span style="font-size:16px;color:var(--cs-meta)">×</span></div>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.55;color:var(--cs-dim)"><span>Deutsch moves to <span style="font-family:var(--cs-mono);font-size:12px">/</span> and English to <span style="font-family:var(--cs-mono);font-size:12px">/en</span>. Old English URLs redirect.</span><span style="padding:10px 12px;background:var(--cs-warn-tint);color:var(--cs-warn-ink);border-radius:2px;font-size:13px">Deutsch becomes the source language, so every translation into English and Español is marked outdated (14 items).</span></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--cs-line)"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 13px;">Cancel</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Change default language</span></div>
+      </div></div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Opened by the Default radio in Settings › Languages. The radio does not change until confirmed.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Command palette · ⌘K</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:560px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--cs-line)"><span style="flex:1;font-size:15px;color:var(--cs-ink)">ab<span style="display:inline-block;width:1px;height:16px;background:var(--cs-accent);vertical-align:-3px;margin-left:1px"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">ESC</span></div>
+        <div style="display:flex;flex-direction:column;padding:4px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">PAGES</span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;background:var(--cs-sunken);"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="font-size:14px;color:var(--cs-ink)">About</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/about</span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">↵</span></span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="font-size:14px;color:var(--cs-ink)">About › Team</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/about/team</span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">POSTS</span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-1)"></span><span style="font-size:14px;color:var(--cs-ink)">Notes about cameras</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/blog/notes-about-cameras</span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">DRAFT</span></span><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">SETTINGS</span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="font-size:14px;color:var(--cs-ink)">Settings › Languages</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">ACTIONS</span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="font-size:14px;color:var(--cs-ink)">New blog post “ab”</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span></div>
+        <div style="display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--cs-line);font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"><span>↑↓ MOVE</span><span>↵ OPEN</span><span>⌘↵ NEW TAB</span></div>
+      </div></div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Opens 12vh from the top over the dialog overlay. Groups in fixed order: Pages, Posts, Media, Settings, Actions; max 5 rows per group. The first row is selected on open; ↑↓ moves, ↵ opens. Matches title, slug and setting names. Only non-Live statuses show on the right.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Command palette · no results</span>
+      <div style="background:color-mix(in srgb, var(--cs-ink) 38%, var(--cs-paper));padding:28px 18px;display:flex;justify-content:center;align-items:flex-start"><div style="width:100%;max-width:560px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--cs-line)"><span style="flex:1;font-size:15px;color:var(--cs-ink)">wotan<span style="display:inline-block;width:1px;height:16px;background:var(--cs-accent);vertical-align:-3px;margin-left:1px"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 5px">ESC</span></div>
+        <div style="display:flex;flex-direction:column;padding:4px"><div style="padding:18px 12px;display:flex;flex-direction:column;gap:4px"><span style="font-size:14px;color:var(--cs-ink)">Nothing matches “wotan”.</span><span style="font-size:13px;color:var(--cs-dim)">Search covers page and post titles, slugs and settings.</span></div><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:10px 12px 4px">ACTIONS</span><span style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 12px;border-radius:2px;background:var(--cs-sunken);"><span style="display:flex;gap:8px;align-items:center;min-width:0"><span style="font-size:14px;color:var(--cs-ink)">New blog post “wotan”</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">↵</span></span></div>
+        <div style="display:flex;gap:14px;padding:8px 14px;border-top:1px solid var(--cs-line);font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"><span>↑↓ MOVE</span><span>↵ OPEN</span><span>⌘↵ NEW TAB</span></div>
+      </div></div>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Toasts</span>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+        <div style="display:flex;align-items:center;gap:12px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px;padding:10px 12px 10px 14px;box-shadow:var(--cs-shadow-menu);font-size:13px;max-width:420px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-ok)"></span><span style="flex:1">Settings saved</span></div>
+        <div style="display:flex;align-items:center;gap:12px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px;padding:10px 12px 10px 14px;box-shadow:var(--cs-shadow-menu);font-size:13px;max-width:420px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-ok)"></span><span style="flex:1">“Retired announcement” moved to trash</span><span style="font-weight:600;text-decoration:underline;text-underline-offset:3px">Undo</span></div>
+        <div style="display:flex;align-items:center;gap:12px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px;padding:10px 12px 10px 14px;box-shadow:var(--cs-shadow-menu);font-size:13px;max-width:420px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-warn)"></span><span style="flex:1">Saved. Outgoing mail isn’t configured, so password reset emails won’t arrive.</span><span style="opacity:0.7">×</span></div>
+        <div style="display:flex;align-items:center;gap:12px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px;padding:10px 12px 10px 14px;box-shadow:var(--cs-shadow-menu);font-size:13px;max-width:420px"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-danger)"></span><span style="flex:1">Couldn’t save. Check your connection.</span><span style="font-weight:600;text-decoration:underline;text-underline-offset:3px">Retry</span><span style="opacity:0.7">×</span></div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Inverted (ink ground, paper text) so they read on any screen. Bottom-centre of the content column, 24px from the bottom; newest at the bottom, max 3. Success hides after 4s, Undo after 8s; warnings and errors stay until dismissed. Rails flash: notice → success, alert → error. Form errors are never toasts.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Validation · form summary + fields</span>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="padding:12px 14px;background:var(--cs-danger-tint);border-radius:2px;display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600;color:var(--cs-danger-ink)">4 fields need attention</span><span style="display:flex;flex-direction:column;gap:2px;font-size:13px"><a href="#">Slug is already used</a><a href="#">Choose a type</a><a href="#">Members: unknown user</a><a href="#">Body can’t be empty</a></span></div>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">SLUG</span><span style="display:flex;border:1px solid var(--cs-danger);border-radius:2px;overflow:hidden"><span style="font-family:var(--cs-mono);font-size:12px;color:var(--cs-meta);background:var(--cs-sunken);padding:10px;border-right:1px solid var(--cs-line)">/blog/</span><span style="font-family:var(--cs-mono);font-size:13px;padding:9px 11px;background:var(--cs-surface);flex:1">welcome</span></span><span style="display:flex;gap:6px;font-size:12px;color:var(--cs-danger-ink)"><b style="font-weight:600">!</b>Already used by “Welcome” (post). Try welcome-2.</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TYPE</span><span style="display:flex;align-items:center;font-size:14px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;color:var(--cs-meta);border-color:var(--cs-danger)"><span style="flex:1">Choose a type</span><span style="font-size:10px">▾</span></span><span style="display:flex;gap:6px;font-size:12px;color:var(--cs-danger-ink)"><b style="font-weight:600">!</b>Choose a type.</span></label>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MEMBERS</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-danger);border-radius:2px;padding:6px 8px;background:var(--cs-surface)"><span style="font-size:12px;background:var(--cs-danger-tint);color:var(--cs-danger-ink);border-radius:999px;padding:3px 10px">nobody@example ×</span></span><span style="display:flex;gap:6px;font-size:12px;color:var(--cs-danger-ink)"><b style="font-weight:600">!</b>“nobody@example” isn’t a user.</span></label>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">BODY</span><div style="border:1px solid var(--cs-danger);border-radius:2px"><div style="padding:5px 8px;border-bottom:1px solid var(--cs-line);background:var(--cs-paper);font-family:var(--cs-mono);font-size:12px;color:var(--cs-dim)">B I H2 H3 • 1. Link</div><div style="padding:12px;min-height:40px;background:var(--cs-surface)"></div></div><span style="display:flex;gap:6px;font-size:12px;color:var(--cs-danger-ink)"><b style="font-weight:600">!</b>Body can’t be empty.</span></div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Rendered by the server after a failed submit (422). Summary at the top of the form; links focus each field. Fields: 1px danger border, label stays meta, message in danger-ink below with “!”, linked via aria-describedby. A slug’s prefix cell keeps its sunken ground. An invalid chip turns danger-tint. Errors clear on the field’s next change.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Busy &amp; pending</span>
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;cursor:progress"><span style="width:11px;height:11px;border-radius:999px;border:1.5px solid var(--cs-ink);border-top-color:transparent;box-sizing:border-box;display:inline-block"></span>Testing…</span><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;cursor:progress"><span style="width:11px;height:11px;border-radius:999px;border:1.5px solid var(--cs-on-accent);border-top-color:transparent;box-sizing:border-box;display:inline-block"></span>Saving…</span><span style="display:inline-flex;align-items:center;gap:6px;font-family:var(--cs-mono);font-size:11px;color:var(--cs-danger-ink)"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-danger)"></span>FAILED · 401 INVALID KEY</span></div>
+        <div style="border:1px solid var(--cs-accent);border-radius:2px;background:var(--cs-accent-tint);padding:10px 12px;display:flex;flex-direction:column;gap:8px">
+          <span style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;gap:8px;align-items:center;font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-accent)"><span style="width:11px;height:11px;border-radius:999px;border:1.5px solid var(--cs-accent);border-top-color:transparent;box-sizing:border-box;display:inline-block"></span>SUGGESTING TRANSLATION · 8 S</span><span style="font-size:12px;font-weight:500;color:var(--cs-dim)">Cancel</span></span>
+          <span style="height:9px;width:90%;background:var(--cs-surface);border-radius:2px"></span><span style="height:9px;width:70%;background:var(--cs-surface);border-radius:2px"></span>
+        </div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--cs-paper)"><span style="font-size:13px;color:var(--cs-danger-ink)">No suggestion after 25 seconds.</span><span style="font-size:12px;font-weight:500;color:var(--cs-accent)">Try again</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--cs-line);padding-bottom:8px"><span style="font-size:13px;padding:6px 10px;border-bottom:2px solid var(--cs-ink);font-weight:600">Deutsch</span><span style="display:flex;gap:10px;align-items:center;font-size:12px;color:var(--cs-dim)"><span style="width:11px;height:11px;border-radius:999px;border:1.5px solid var(--cs-dim);border-top-color:transparent;box-sizing:border-box;display:inline-block"></span>Suggesting 2 of 5 fields<span style="width:80px;height:3px;background:var(--cs-sunken);border-radius:999px;overflow:hidden"><span style="display:block;width:40%;height:3px;background:var(--cs-accent)"></span></span><span style="font-weight:500;color:var(--cs-ink)">Cancel</span></span></div>
+        <div style="display:grid;grid-template-columns:repeat(2,140px);gap:10px">
+          <div style="border:1px solid var(--cs-line);border-radius:2px;overflow:hidden;background:var(--cs-surface)"><div style="aspect-ratio:4/3;background:var(--cs-sunken);position:relative"><span style="position:absolute;left:0;bottom:0;height:3px;width:62%;background:var(--cs-accent)"></span></div><div style="padding:7px 9px;display:flex;justify-content:space-between;font-size:12px"><span>hangar.jpg</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">62%</span></div></div>
+          <div style="border:1px solid var(--cs-danger);border-radius:2px;overflow:hidden;background:var(--cs-surface)"><div style="aspect-ratio:4/3;background:var(--cs-danger-tint);display:grid;place-items:center;font-family:var(--cs-mono);font-size:10px;color:var(--cs-danger-ink)">TOO LARGE · 14 MB</div><div style="padding:7px 9px;display:flex;justify-content:space-between;font-size:12px"><span>scan.tif</span><span style="color:var(--cs-accent)">Remove</span></div></div>
+        </div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Busy buttons keep their width, show an 11px spinner (rotates 0.8s linear; static with reduced motion) and an “-ing…” label, and are disabled while busy. A suggestion shows elapsed seconds and Cancel; at 25s it fails with Try again. The bulk action swaps its button for progress + Cancel, and each pending field shows the pending box. Uploads show a 3px accent bar on the tile; failed tiles stay until removed.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Pagination</span>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border:1px solid var(--cs-line);padding:10px 14px;background:var(--cs-surface)">
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">51–100 OF 312</span>
+        <span style="display:flex;gap:2px;align-items:center;font-size:13px"><span style="padding:5px 9px;color:var(--cs-dim)">‹ Previous</span><span style="padding:5px 9px">1</span><span style="padding:5px 9px;background:var(--cs-ink);color:var(--cs-paper);border-radius:2px">2</span><span style="padding:5px 9px">3</span><span style="padding:5px 6px;color:var(--cs-meta)">…</span><span style="padding:5px 9px">7</span><span style="padding:5px 9px">Next ›</span></span>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Footer row of the table card (Posts, Translations, Trash; Media under the grid). 50 rows per page, 48 tiles for Media. The page is a URL param so filters and back/forward keep it. Hidden when everything fits. Audit log keeps “Load older” (cursor-based).</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px;grid-column:1 / -1">
+      <span style="font-size:13px;font-weight:600">Open menus</span>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NEW POST ▾</span><div style="width:190px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column"><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-1)"></span>Blog post</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">DEFAULT</span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;background:var(--cs-sunken);color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-2)"></span>Now update</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center"><span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-cat-3)"></span>Resume entry</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="height:1px;background:var(--cs-line);margin:4px 0"></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Page</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">+2 ▾ LANGUAGES</span><div style="width:190px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column"><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Français<span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;border:1.5px solid var(--cs-meta)"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Italiano<span style="width:7px;height:7px;flex-shrink:0;border-radius:999px;box-sizing:border-box;background:var(--cs-warn)"></span></span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="height:1px;background:var(--cs-line);margin:4px 0"></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-accent)"><span style="display:flex;gap:8px;align-items:center">Manage languages…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TAG ROW ⋯</span><div style="width:170px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column"><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Rename</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Merge into…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">Show posts</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">4</span></span><span style="height:1px;background:var(--cs-line);margin:4px 0"></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-danger)"><span style="display:flex;gap:8px;align-items:center">Delete…</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:240px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TAGS · AUTOCOMPLETE</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:6px 8px;background:var(--cs-surface)"><span style="font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:3px 10px">news ×</span><span style="font-size:13px">stu</span></span><div style="width:240px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column"><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;background:var(--cs-sunken);color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">studio</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">3 POSTS</span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center">studio-visit</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">1 POST</span></span><span style="height:1px;background:var(--cs-line);margin:4px 0"></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-accent)"><span style="display:flex;gap:8px;align-items:center">Create tag “stu”</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;width:260px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MEMBERS · MULTI-SELECT</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-accent);box-shadow:0 0 0 3px var(--cs-accent-tint);border-radius:2px;padding:6px 8px;background:var(--cs-surface)"><span style="font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:3px 10px">two@example.com ×</span><span style="font-size:13px;color:var(--cs-meta)">Search users</span></span><div style="width:260px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px;padding:4px;display:flex;flex-direction:column"><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center"><span style="width:13px;height:13px;border-radius:2px;background:var(--cs-accent);color:var(--cs-on-accent);font-size:10px;display:grid;place-items:center">✓</span>two@example.com</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;background:var(--cs-sunken);color:var(--cs-ink)"><span style="display:flex;gap:8px;align-items:center"><span style="width:13px;height:13px;border-radius:2px;border:1px solid var(--cs-line-strong);box-sizing:border-box"></span>author@example.com</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)"></span></span><span style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 9px;border-radius:2px;color:var(--cs-meta)"><span style="display:flex;gap:8px;align-items:center"><span style="width:13px;height:13px;border-radius:2px;border:1px solid var(--cs-line);box-sizing:border-box"></span>Mara König</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">OWNER</span></span></div></div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">One panel for all menus: surface, 1px line, menu shadow, 2px radius, 4px padding, 13px rows. Hover and keyboard focus use sunken; checked items show ✓ or a filled box. Destructive items go last after a divider. Menus open below the trigger, flip up near the viewport edge, and close on Esc, outside click or selection (multi-select stays open). Owners are listed but disabled, with the reason on the right.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Drag &amp; drop</span>
+      <div style="display:flex;flex-direction:column;gap:2px;max-width:300px;background:var(--cs-chrome);border:1px solid var(--cs-line);padding:8px">
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 8px;font-size:14px"><span style="color:var(--cs-meta);letter-spacing:-2px;font-size:11px">⋮⋮</span>Home</span>
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 8px 6px 26px;font-size:14px;background:var(--cs-sunken);border-radius:2px"><span style="color:var(--cs-ink);letter-spacing:-2px;font-size:11px">⋮⋮</span>About<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);margin-left:auto">HANDLE HOVER</span></span>
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 8px 6px 26px;font-size:14px;border:1px dashed var(--cs-line-strong);border-radius:2px;color:var(--cs-meta)">Services · original slot</span>
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 8px 6px 26px;font-size:14px;background:var(--cs-accent-tint);outline:1px solid var(--cs-accent);border-radius:2px">Blog<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-accent);margin-left:auto">NEST INSIDE</span></span>
+        <span style="display:flex;align-items:center;margin:2px 0 2px 44px"><span style="width:6px;height:6px;border-radius:999px;border:2px solid var(--cs-accent)"></span><span style="flex:1;height:2px;background:var(--cs-accent)"></span></span>
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 8px 6px 44px;font-size:14px">Photography</span>
+        <span style="display:flex;gap:8px;align-items:center;padding:6px 10px;font-size:14px;background:var(--cs-surface);box-shadow:var(--cs-shadow-menu);border:1px solid var(--cs-line);border-radius:2px;margin:4px 0 0 30px;width:200px"><span style="letter-spacing:-2px;font-size:11px">⋮⋮</span>Services<span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta);margin-left:auto">DRAGGING</span></span>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Same states for tree rows, blocks and language rows. Handle hover: handle turns ink, row sunken, cursor grab. Dragging: a lifted copy (surface + menu shadow) follows the pointer; the original slot becomes a dashed outline. Between rows: 2px accent line with a ring at its start, indented to the target depth. Onto a row (tree only): accent tint + outline means nest inside. Keyboard: focus the handle, Space picks up, ↑↓ moves, ←→ changes depth, Space drops, Esc cancels. Autosaves on drop with an Undo toast.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:13px;font-weight:600">Password field</span>
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:340px">
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NEW PASSWORD</span><span style="display:flex;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;background:var(--cs-surface)"><span style="flex:1;font-size:14px;padding:9px 11px;letter-spacing:0.2em">••••••••••</span><span style="font-size:12px;font-weight:500;color:var(--cs-accent);padding:0 11px">Show</span></span>
+          <span style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px"><span style="height:3px;background:var(--cs-warn)"></span><span style="height:3px;background:var(--cs-warn)"></span><span style="height:3px;background:var(--cs-line)"></span><span style="height:3px;background:var(--cs-line)"></span></span>
+          <span style="font-size:12px;color:var(--cs-dim)">Fair. Use 12 or more characters; a few unrelated words work well.</span></label>
+        <div style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--cs-dim)">
+          <span style="display:flex;gap:8px;align-items:center"><span style="width:32px;height:3px;background:var(--cs-danger)"></span>Too short: under 12 characters, can’t submit</span>
+          <span style="display:flex;gap:8px;align-items:center"><span style="width:32px;height:3px;background:var(--cs-warn)"></span>Fair (2 bars)</span>
+          <span style="display:flex;gap:8px;align-items:center"><span style="width:32px;height:3px;background:var(--cs-ok)"></span>Good (3 bars) · Strong (4 bars)</span>
+        </div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Show/Hide toggles type="password" and flips its label. The meter updates on input (score 0–4 from a strength library, or length + variety). Used in the setup wizard, Change password, the reset form and User new.</span>
+    </div>
+    <div style="background:var(--cs-surface);border-right:1px solid var(--cs-line);border-bottom:1px solid var(--cs-line);padding:22px;display:flex;flex-direction:column;gap:14px;grid-column:1 / -1">
+      <span style="font-size:13px;font-weight:600">Empty states</span>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">No posts yet</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">Posts are blog entries, now updates and resume items.</span><span style="margin-top:6px"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">New blog post</span></span></div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">No posts match these filters</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">Drafts · Tag: workshops · Español missing</span><span style="margin-top:6px"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Clear filters</span></span></div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">No images yet</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">Drop images anywhere on this page, or upload them.</span><span style="margin-top:6px"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 13px;">Upload images</span></span></div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">Trash is empty</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">Items you trash stay here for 30 days.</span></div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">Everything is translated</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">All 14 items are up to date in Deutsch and Español.</span></div>
+        <div style="border:1px solid var(--cs-line);border-radius:2px;padding:22px 18px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="font-size:15px;font-weight:600;color:var(--cs-ink)">No events in this range</span><span style="font-size:13px;line-height:1.5;color:var(--cs-dim)">Nothing happened between 1 and 3 October.</span><span style="margin-top:6px"><span style="display:inline-flex;align-items:center;gap:8px;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px;">Last 30 days</span></span></div>
+      </div>
+      <span style="font-size:12px;line-height:1.55;color:var(--cs-meta)">Shown inside the card where the rows would be. The title states the fact, one line of help, at most one action. “No results” always names the active filters and offers Clear. No illustrations.</span>
+    </div>
+  </div>
+</section>
+
+<section style="display:flex;flex-direction:column;gap:14px">
+  <div style="font-family:var(--cs-mono);font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--cs-meta)">09 · Rules</div>
+  <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px;line-height:1.55;color:var(--cs-dim);max-width:720px">
+    <li>Accent is for the one action per view and for focus. Everything else is ink on paper.</li>
+    <li>Anything a machine produced or reads (slugs, dates, locales, tokens, counts) is set in mono.</li>
+    <li>Divide with 1px rules. Shadows only on floating menus.</li>
+    <li>Never hard-code a colour. Use a token so dark mode works everywhere.</li>
+    <li>Never assume a fixed number of languages. Lists wrap. The public switcher becomes a dropdown above three languages; Studio language tabs show four, then “+N ▾”.</li>
+    <li>A change made through an AI token is the token user’s change: “Mara König via claude-desktop” with an MCP chip. A token is never the actor.</li>
+    <li>Red is only for destructive actions and failures. Missing translations and warnings use amber or neutral.</li>
+    <li>Hide what’s normal: no badge for Live, no count when it’s zero.</li>
+    <li>Content autosaves; configuration has one sticky save bar per screen (see Save behaviour).</li>
+    <li>Never render any part of a secret (API key, token) after creation. Show “Key saved · added 2 Oct”.</li>
+    <li>AI text is never saved until an editor presses Use.</li>
+    <li>Copy describes what the app does today. If behaviour changes, change the copy with it.</li>
+  </ol>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { theme: null };
+  componentDidUpdate(p) { if (p.theme !== this.props.theme) this.setState({ theme: null }); }
+  renderVals() {
+    const theme = this.state.theme ?? this.props.theme ?? 'light';
+    const on = t => theme === t;
+    const sw = [
+      ['Paper', '--cs-paper', 'page ground', '#f5f4f0', '#0f1012'],
+      ['Surface', '--cs-surface', 'panels, inputs, cards', '#ffffff', '#17181b'],
+      ['Sunken', '--cs-sunken', 'hover, selected, prefixes', '#ecebe6', '#212226'],
+      ['Ink', '--cs-ink', 'primary text', '#141417', '#ededee'],
+      ['Dim', '--cs-dim', 'secondary text', '#55565b', '#a9aaaf'],
+      ['Meta', '--cs-meta', 'mono labels, captions', '#6c6d72', '#8e8f95'],
+      ['Line', '--cs-line', 'soft hairlines', 'ink / 10%', 'ink / 9%'],
+      ['Line strong', '--cs-line-strong', 'control borders, headers', 'ink / 20%', 'ink / 18%'],
+      ['Accent', '--cs-accent', 'primary, focus, links', 'L.50 C.12 H250', 'L.74 C.10 H250'],
+      ['Accent hover', '--cs-accent-hover', 'pressed primary', 'L.45 C.12 H250', 'L.80 C.09 H250'],
+      ['Accent tint', '--cs-accent-tint', 'focus ring, info', 'L.95 C.025 H250', 'L.28 C.05 H250'],
+      ['On accent', '--cs-on-accent', 'text on accent', '#ffffff', '#0f1012'],
+      ['OK', '--cs-ok', 'published dot', 'L.52 C.12 H150', 'L.70 C.13 H150'],
+      ['OK ink', '--cs-ok-ink', 'published text', 'L.42 C.11 H150', 'L.80 C.12 H150'],
+      ['OK tint', '--cs-ok-tint', 'published pill', 'L.95 C.04 H150', 'L.28 C.05 H150'],
+      ['Warn', '--cs-warn', 'scheduled dot', 'L.55 C.12 H70', 'L.76 C.13 H70'],
+      ['Warn ink', '--cs-warn-ink', 'scheduled, once-only', 'L.45 C.11 H70', 'L.84 C.11 H75'],
+      ['Warn tint', '--cs-warn-tint', 'warning ground', 'L.95 C.05 H80', 'L.30 C.05 H70'],
+      ['Danger', '--cs-danger', 'destructive', 'L.53 C.19 H25', 'L.68 C.17 H25'],
+      ['Danger ink', '--cs-danger-ink', 'error text on tint', 'L.42 C.15 H25', 'L.80 C.12 H25'],
+      ['Danger tint', '--cs-danger-tint', 'error ground', 'L.96 C.03 H25', 'L.29 C.06 H25']
+    ];
+    return {
+      theme,
+      setLight: () => this.setState({ theme: 'light' }), setDark: () => this.setState({ theme: 'dark' }),
+      lightBg: on('light') ? 'var(--cs-ink)' : 'transparent', lightFg: on('light') ? 'var(--cs-paper)' : 'var(--cs-ink)',
+      darkBg: on('dark') ? 'var(--cs-ink)' : 'transparent', darkFg: on('dark') ? 'var(--cs-paper)' : 'var(--cs-ink)',
+      swatches: sw.map(([n, v, t, l, d]) => ({ n, var: v, t, l: '☀ ' + l, d: '☾ ' + d })),
+      spaces: [4, 8, 14, 22, 34, 54, 80].map(p => ({ px: p + 'px' })),
+      mapping: [
+        { t: '--cs-paper / surface', tw: 'bg-paper · bg-surface', avo: 'Branding background; panels via custom CSS' },
+        { t: '--cs-accent', tw: 'bg-accent · text-accent', avo: 'Branding primary 500 (buttons, links, active nav)' },
+        { t: '--cs-accent-hover', tw: 'hover:bg-accent-hover', avo: 'Branding primary 600' },
+        { t: '--cs-accent-tint', tw: 'bg-accent-tint', avo: 'Branding primary 100 (selected rows, focus)' },
+        { t: '--cs-ink / dim / meta', tw: 'text-ink · text-dim · text-meta', avo: 'Custom CSS on body, labels, table headers' },
+        { t: '--cs-line(-strong)', tw: 'border-line · border-line-strong', avo: 'Custom CSS on panels, table rows, inputs' },
+        { t: '--cs-font / mono', tw: 'font-sans · font-mono', avo: 'Custom CSS + font files; mono for id, dates, slugs' },
+        { t: '--cs-radius', tw: 'rounded-cs', avo: 'Custom CSS overriding the default rounding' },
+        { t: '[data-theme=dark]', tw: 'dark: variant (rarely needed)', avo: 'Toggle writes data-theme on <html>; tokens flip' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

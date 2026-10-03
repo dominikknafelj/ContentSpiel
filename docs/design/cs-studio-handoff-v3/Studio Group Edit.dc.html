@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="groups" hint-size="232px,100vh"></dc-import>
+<main style="display:flex;flex-direction:column;min-width:0">
+  <div style="padding:28px 32px 96px;display:flex;flex-direction:column;gap:18px;max-width:1000px;width:100%;box-sizing:border-box">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:12px;color:var(--cs-meta)"><a href="#" style="color:var(--cs-meta)">Groups</a> /</span>
+      <span style="display:flex;gap:10px;align-items:center"><h1 style="margin:0;font-size:26px;font-weight:600">Editor</h1><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:1px 6px">BUILT-IN</span></span>
+      <span style="font-size:13px;color:var(--cs-dim)">Built-in groups can be changed but not deleted.</span>
+    </div>
+
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:18px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px">
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NAME</span><input value="Editor" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">DESCRIPTION</span><input value="Full, unscoped access to posts and pages, plus tags and media." style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MEMBERS</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 8px">
+          <span style="display:inline-flex;gap:6px;align-items:center;font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:3px 6px 3px 10px">two@example.com <span style="color:var(--cs-meta)">×</span></span>
+          <span style="font-size:13px;color:var(--cs-meta);padding:2px 4px">Add a user…</span>
+        </div>
+        <span style="font-size:12px;color:var(--cs-meta)">Owners have every permission whatever their groups, so they aren’t listed.</span></div>
+    </section>
+
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">Content permissions</span><span style="font-size:13px;color:var(--cs-dim)">Each permission has its own scope. No scope means everything.</span></div>
+      <sc-for list="{{ permGroups }}" as="pg" hint-placeholder-count="2">
+        <div style="padding:8px 18px;background:var(--cs-paper);border-bottom:1px solid var(--cs-line);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">{{ pg.label }}</div>
+        <sc-for list="{{ pg.rows }}" as="p" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:20px minmax(140px,200px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--cs-line)">
+            <button onClick="{{ p.toggle }}" title="{{ p.lockNote }}" style="width:16px;height:16px;padding:0;border-radius:2px;box-sizing:border-box;cursor:{{ p.cursor }};border:1px solid {{ p.cbBorder }};background:{{ p.cbBg }};color:var(--cs-on-accent);font-size:11px;line-height:14px">{{ p.mark }}</button>
+            <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:14px">{{ p.label }}</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ p.key }}</span></span>
+            <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+              <sc-for list="{{ p.chips }}" as="c" hint-placeholder-count="1"><span style="font-size:12px;color:{{ c.fg }};background:{{ c.bg }};border:1px solid {{ c.border }};border-radius:2px;padding:2px 8px;white-space:nowrap">{{ c.t }}</span></sc-for>
+              <span style="font-size:12px;color:var(--cs-meta)">{{ p.lockNote }}</span>
+            </span>
+            <button onClick="{{ p.toggleScope }}" style="visibility:{{ p.scopeVis }};font-size:12px;font-weight:500;background:transparent;color:var(--cs-accent);border:0;padding:4px 2px;cursor:pointer">{{ p.scopeBtn }}</button>
+          </div>
+          <sc-if value="{{ p.open }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:14px 18px 16px 50px;background:var(--cs-paper);border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:12px">
+              <sc-if value="{{ p.isPosts }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">CONTENT TYPES · NONE TICKED = ALL</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <sc-for list="{{ p.types }}" as="t" hint-placeholder-count="3"><span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid {{ t.border }};border-radius:2px;padding:6px 10px"><span style="width:14px;height:14px;border-radius:2px;box-sizing:border-box;border:1px solid {{ t.cb }};background:{{ t.cbBg }};color:var(--cs-on-accent);font-size:10px;line-height:12px;text-align:center">{{ t.mark }}</span><span style="width:7px;height:7px;border-radius:999px;background:{{ t.dot }}"></span>{{ t.name }}</span></sc-for>
+                  <span style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--cs-warn-ink);background:var(--cs-warn-tint);border:1px solid var(--cs-warn);border-radius:2px;padding:6px 10px">! Recipe · this type no longer exists <a href="#" style="font-weight:500">Remove</a></span>
+                </div>
+                <span style="display:flex;gap:10px;align-items:center;font-size:13px"><span style="width:30px;height:18px;border-radius:999px;background:var(--cs-accent);position:relative"><span style="position:absolute;top:2px;left:14px;width:14px;height:14px;border-radius:999px;background:#fff"></span></span>Own only <span style="color:var(--cs-meta)">· posts they authored or last changed</span></span>
+              </sc-if>
+              <sc-if value="{{ p.isPages }}" hint-placeholder-val="{{ false }}">
+                <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PAGE BRANCHES · TICKING A PAGE INCLUDES EVERYTHING UNDER IT · NONE = ALL</span>
+                <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:6px;max-width:520px;display:flex;flex-direction:column">
+                  <sc-for list="{{ p.tree }}" as="b" hint-placeholder-count="7">
+                    <span style="display:flex;gap:9px;align-items:center;padding:5px 8px 5px {{ b.indent }};font-size:13px;color:{{ b.fg }}"><span style="width:14px;height:14px;flex-shrink:0;border-radius:2px;box-sizing:border-box;border:1px solid {{ b.cb }};background:{{ b.cbBg }};color:{{ b.markFg }};font-size:10px;line-height:12px;text-align:center">{{ b.mark }}</span>{{ b.title }}<span style="margin-left:auto;font-size:11px;color:var(--cs-meta)">{{ b.note }}</span></span>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-if>
+        </sc-for>
+      </sc-for>
+      <p style="margin:0;padding:10px 18px;font-size:12px;color:var(--cs-meta)">A greyed tick is a permission you hold through this group but can’t hand out yourself; ask an owner to change it.</p>
+    </section>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
+      <sc-for list="{{ groupsOf }}" as="g" hint-placeholder-count="3">
+        <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+          <div style="padding:12px 16px;border-bottom:1px solid var(--cs-line);font-size:15px;font-weight:600">{{ g.title }}</div>
+          <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="4">
+            <button onClick="{{ p.toggle }}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:9px 16px;border:0;border-bottom:1px solid var(--cs-line);background:transparent;color:var(--cs-ink);cursor:pointer;text-align:left">
+              <span style="display:flex;flex-direction:column;gap:1px"><span style="font-size:13px">{{ p.label }}</span><span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-meta)">{{ p.key }}</span></span>
+              <span style="width:30px;height:18px;border-radius:999px;background:{{ p.track }};position:relative;flex-shrink:0"><span style="position:absolute;top:2px;left:{{ p.knob }};width:14px;height:14px;border-radius:999px;background:#fff;transition:left 0.2s cubic-bezier(0.22,1,0.36,1)"></span></span>
+            </button>
+          </sc-for>
+        </section>
+      </sc-for>
+    </div>
+  </div>
+  <div style="position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;padding:12px 32px;background:var(--cs-surface);border-top:1px solid var(--cs-line)">
+    <span style="font-size:13px;color:var(--cs-dim)">{{ dirtyText }}</span>
+    <span style="display:flex;gap:8px"><button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 12px">Cancel</button><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">Save group</button></span>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { open: 'posts.edit', on: {
+    'posts.read': 1, 'posts.create': 1, 'posts.edit': 1, 'posts.publish': 1, 'posts.delete': 1,
+    'pages.read': 1, 'pages.create': 1, 'pages.edit': 1, 'pages.publish': 1, 'pages.move': 1, 'pages.delete': 1,
+    'tags.manage': 1, 'media.upload': 1, 'media.manage': 1, 'ai.translate': 1 }, changes: 0 };
+  perms() {
+    const c = t => ({ t, fg: 'var(--cs-ink)', bg: 'var(--cs-sunken)', border: 'transparent' });
+    const all = t => ({ t, fg: 'var(--cs-dim)', bg: 'transparent', border: 'transparent' });
+    const w = t => ({ t, fg: 'var(--cs-warn-ink)', bg: 'transparent', border: 'var(--cs-warn)' });
+    const D = {
+      POSTS: [['posts.read', 'Read', [all('All content types')]], ['posts.create', 'Create', [c('Blog post'), c('Now update')]], ['posts.edit', 'Edit', [c('Blog post'), c('Own only'), w('! Recipe · type removed')]], ['posts.publish', 'Publish', [c('Blog post')]], ['posts.delete', 'Move to trash', [c('Own only')]]],
+      PAGES: [['pages.read', 'Read', [all('All pages')]], ['pages.create', 'Create', [c('Under Services')]], ['pages.edit', 'Edit', [c('Under Services'), c('Under About')]], ['pages.publish', 'Publish', [c('Under Services')]], ['pages.move', 'Move', []], ['pages.delete', 'Move to trash', [all('All pages')], true]]
+    };
+    const C = { 'Blog post': 'var(--cs-cat-1)', 'Now update': 'var(--cs-cat-2)', 'Resume entry': 'var(--cs-cat-3)' };
+    return Object.entries(D).map(([label, rows]) => ({ label, rows: rows.map(([key, l, chips, locked]) => {
+      const on = !!this.state.on[key] || locked, open = this.state.open === key && on;
+      const box = (v, part) => ({ mark: v ? (part ? '–' : '✓') : '', cb: v ? 'var(--cs-accent)' : 'var(--cs-line-strong)', cbBg: v && !part ? 'var(--cs-accent)' : 'transparent', markFg: part ? 'var(--cs-accent)' : 'var(--cs-on-accent)' });
+      const aboutOn = key === 'pages.edit';
+      return { key, label: l, chips: on ? chips : [], mark: on ? '✓' : '',
+        cbBorder: locked ? 'var(--cs-line-strong)' : on ? 'var(--cs-accent)' : 'var(--cs-line-strong)', cbBg: locked ? 'var(--cs-line-strong)' : on ? 'var(--cs-accent)' : 'transparent', cursor: locked ? 'not-allowed' : 'pointer',
+        lockNote: locked ? 'You can’t grant this' : '', toggle: locked ? () => {} : () => this.toggle(key),
+        scopeVis: on && !locked ? 'visible' : 'hidden', scopeBtn: open ? 'Done' : 'Edit scope',
+        toggleScope: () => this.setState(s => ({ open: s.open === key ? null : key })), open,
+        isPosts: label === 'POSTS', isPages: label === 'PAGES',
+        types: ['Blog post', 'Now update', 'Resume entry'].map(n => { const v = n === 'Blog post'; return { name: n, dot: C[n], border: v ? 'var(--cs-accent)' : 'var(--cs-line-strong)', ...box(v) }; }),
+        tree: [['Home', 0, aboutOn ? 'p' : 'p', ''], ['About', 1, aboutOn, aboutOn ? 'includes 1 subpage' : ''], ['Team', 2, aboutOn ? 'i' : false, aboutOn ? 'included' : ''], ['Services', 1, true, 'includes 3 subpages'], ['Photography', 2, 'i', 'included'], ['Copywriting', 2, 'i', 'included'], ['Client archive', 2, 'i', 'a page you can’t open (kept)'], ['Contact', 1, false, '']]
+          .map(([title, d, v, note]) => ({ title, note, indent: (8 + d * 20) + 'px', fg: title === 'Client archive' ? 'var(--cs-meta)' : v === 'i' ? 'var(--cs-dim)' : 'var(--cs-ink)', ...box(!!v, v === 'p') })) };
+    }) }));
+  }
+  toggle(k) { this.setState(s => ({ on: { ...s.on, [k]: s.on[k] ? 0 : 1 }, changes: s.changes + 1 })); }
+  renderVals() {
+    const acts = ['read', 'create', 'edit', 'publish', 'move', 'delete'];
+    const row = (name, res, scope, hasOwn, noMove) => ({ name, scope, hasOwn, cells: acts.map(a => {
+      const key = res + '.' + a, on = !!this.state.on[key], hidden = noMove && a === 'move';
+      return { key, mark: on ? '✓' : '', vis: hidden ? 'hidden' : 'visible', toggle: () => this.toggle(key),
+        border: on ? 'var(--cs-accent)' : 'var(--cs-line-strong)', bg: on ? 'var(--cs-accent)' : 'transparent' };
+    }) });
+    const tg = (label, key) => { const on = !!this.state.on[key]; return { label, key, toggle: () => this.toggle(key),
+      track: on ? 'var(--cs-accent)' : 'var(--cs-line-strong)', knob: on ? '14px' : '2px' }; };
+    return {
+      permGroups: this.perms(),
+      groupsOf: [
+        { title: 'Content', items: [tg('Manage tags', 'tags.manage'), tg('Upload media', 'media.upload'), tg('Manage media', 'media.manage'), tg('Use AI translation', 'ai.translate')] },
+        { title: 'Administration', items: [tg('Manage settings', 'settings.manage'), tg('Manage languages', 'languages.manage'), tg('Manage users', 'users.manage'), tg('Manage groups', 'groups.manage'), tg('Manage tokens', 'tokens.manage')] },
+        { title: 'Oversight', items: [tg('View system status', 'system_status.view'), tg('View audit log (all content)', 'audit.view'), tg('Empty trash', 'trash.empty')] }
+      ],
+      dirtyText: this.state.changes ? this.state.changes + ' unsaved change' + (this.state.changes > 1 ? 's' : '') : 'No changes'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="users" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;max-width:1100px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+    <h1 style="margin:0;font-size:26px;font-weight:600">Users</h1>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:8px 14px">New user</button>
+  </div>
+  <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="display:grid;grid-template-columns:minmax(240px,1fr) minmax(180px,1fr) 130px 60px;gap:12px;min-width:700px;padding:9px 16px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)"><span>USER</span><span>GROUPS</span><span>LAST SIGN-IN</span><span></span></div>
+    <sc-for list="{{ users }}" as="u" hint-placeholder-count="5">
+      <a href="#" style="display:grid;grid-template-columns:minmax(240px,1fr) minmax(180px,1fr) 130px 60px;gap:12px;min-width:700px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+        <span style="display:flex;gap:10px;align-items:center;min-width:0">
+          <span style="width:26px;height:26px;flex-shrink:0;border-radius:999px;background:var(--cs-sunken);color:var(--cs-dim);font-size:10px;font-weight:600;display:grid;place-items:center">{{ u.ini }}</span>
+          <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="display:flex;gap:8px;align-items:center;font-size:14px;font-weight:500">{{ u.name }}<sc-if value="{{ u.owner }}" hint-placeholder-val="{{ false }}"><span style="font-family:var(--cs-mono);font-size:9px;letter-spacing:0.12em;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:0 5px">OWNER</span></sc-if></span><span style="font-size:12px;color:var(--cs-meta)">{{ u.email }}</span></span>
+        </span>
+        <span style="display:flex;gap:4px;flex-wrap:wrap"><sc-for list="{{ u.groups }}" as="g" hint-placeholder-count="1"><span style="font-size:12px;background:var(--cs-sunken);border-radius:999px;padding:2px 9px">{{ g }}</span></sc-for></span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ u.last }}</span>
+        <span style="text-align:right;font-size:13px;color:var(--cs-accent)">Edit</span>
+      </a>
+    </sc-for>
+  </div>
+  <p style="margin:0;font-size:12px;color:var(--cs-meta)">Delete a user from their edit page. Their pages, posts and media stay; their posts are left without an author.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { users: [
+      { ini: 'MK', name: 'Mara König (you)', email: 'one@example.com', owner: true, groups: ['Owner'], last: 'NOW' },
+      { ini: 'TW', name: 'two@example.com', email: 'No name set', owner: false, groups: ['Admin'], last: '2 DAYS AGO' },
+      { ini: 'AU', name: 'author@example.com', email: 'No name set', owner: false, groups: ['Author'], last: 'NEVER' },
+      { ini: 'EB', name: 'editor_branch@example.com', email: 'No name set', owner: false, groups: ['Branch editors'], last: 'NEVER' },
+      { ini: 'RE', name: 'reader@example.com', email: 'No name set', owner: false, groups: ['Read only'], last: 'NEVER' }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

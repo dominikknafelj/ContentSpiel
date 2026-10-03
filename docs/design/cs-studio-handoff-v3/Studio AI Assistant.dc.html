@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="ai" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:18px;max-width:1000px;width:100%;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <h1 style="margin:0;font-size:26px;font-weight:600">AI assistant</h1>
+    <p style="margin:0;font-size:14px;line-height:1.55;color:var(--cs-dim);max-width:680px">Connect an assistant such as Claude over MCP. Changes made through a token are recorded as yours (“Mara König via claude-desktop”), limited to the token’s group.</p>
+  </div>
+
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);font-size:16px;font-weight:600">1 · Create a token</div>
+    <div style="padding:18px;display:grid;grid-template-columns:minmax(0,1fr) 220px auto;gap:10px;align-items:end">
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">NAME · REQUIRED</span><input value="claude-desktop" style="font-family:var(--cs-mono);font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+      <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">GROUP</span><span style="display:flex;justify-content:space-between;font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">Author<span style="font-size:10px;color:var(--cs-meta)">▾</span></span></label>
+      <button onClick="{{ create }}" style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:9px 16px;cursor:pointer">Create token</button>
+      <span style="grid-column:1 / -1;font-size:12px;color:var(--cs-meta)"><b style="font-weight:500;color:var(--cs-dim)">Author:</b> can write and edit its own posts, and read pages. It can’t publish unless the group allows it.</span>
+    </div>
+    <sc-if value="{{ fresh }}" hint-placeholder-val="{{ false }}">
+      <div style="margin:0 18px 18px;padding:12px 14px;border:1px solid var(--cs-warn);background:var(--cs-warn-tint);border-radius:2px;display:flex;flex-direction:column;gap:8px">
+        <span style="font-size:13px;color:var(--cs-warn-ink);font-weight:500">Copy this token now. It won’t be shown again.</span>
+        <div style="display:flex;gap:8px;align-items:center;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 7px 7px 11px">
+          <span style="flex:1;font-family:var(--cs-mono);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">cs_mcp_4b1e9c07d2f8a63e5f10c9ab77d2e4c1</span>
+          <button style="font-weight:500;font-size:12px;background:var(--cs-accent);color:var(--cs-on-accent);border:0;border-radius:2px;padding:5px 11px">Copy</button>
+        </div>
+        <span style="font-size:12px;color:var(--cs-warn-ink)">It has also been filled into the configuration below.</span>
+      </div>
+    </sc-if>
+  </section>
+
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">2 · Add it to your assistant</span><span style="font-size:13px;color:var(--cs-dim)">Paste this into your MCP client configuration, e.g. Claude Desktop → Settings → Developer.</span></div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MCP URL</span>
+        <div style="display:flex;gap:8px;align-items:center;background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 7px 7px 11px"><span style="flex:1;font-family:var(--cs-mono);font-size:13px">https://www.example.com/mcp</span><button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 10px">Copy</button></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">CLIENT CONFIGURATION</span><button style="font-size:12px;font-weight:500;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 10px">Copy</button></span>
+        <pre style="margin:0;background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:12px 14px;font-family:var(--cs-mono);font-size:12px;line-height:1.6;color:var(--cs-ink);overflow-x:auto">{{ config }}</pre></div>
+    </div>
+  </section>
+
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;overflow-x:auto">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">Tokens</span><span style="font-size:13px;color:var(--cs-dim)">Revoked tokens stay listed so the audit log can name them. The token value is never shown again.</span></div>
+    <div style="display:grid;grid-template-columns:minmax(130px,1fr) minmax(120px,1fr) 100px 90px 130px 80px 64px;gap:12px;min-width:860px;padding:9px 18px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)"><span>NAME</span><span>ACTS AS</span><span>GROUP</span><span>CREATED</span><span>LAST USED</span><span>STATUS</span><span></span></div>
+    <sc-if value="{{ fresh }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:minmax(130px,1fr) minmax(120px,1fr) 100px 90px 130px 80px 64px;gap:12px;min-width:860px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--cs-line);font-size:13px;color:var(--cs-ink)"><span style="font-family:var(--cs-mono)">claude-desktop</span><span>Mara König</span><span>Author</span><span style="font-family:var(--cs-mono);font-size:11px">3 OCT</span><span style="display:flex;flex-direction:column;gap:1px;font-family:var(--cs-mono);font-size:11px"><span>NEVER</span><span style="color:var(--cs-meta)"></span></span><span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Active</span></span><span style="text-align:right;color:var(--cs-danger)">Revoke…</span></div></sc-if>
+    <div style="display:grid;grid-template-columns:minmax(130px,1fr) minmax(120px,1fr) 100px 90px 130px 80px 64px;gap:12px;min-width:860px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--cs-line);font-size:13px;color:var(--cs-ink)"><span style="font-family:var(--cs-mono)">cursor-laptop</span><span>Mara König</span><span>Editor</span><span style="font-family:var(--cs-mono);font-size:11px">12 SEP</span><span style="display:flex;flex-direction:column;gap:1px;font-family:var(--cs-mono);font-size:11px"><span>2H AGO</span><span style="color:var(--cs-meta)">203.0.113.4</span></span><span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Active</span></span><span style="text-align:right;color:var(--cs-danger)">Revoke…</span></div>
+    <div style="display:grid;grid-template-columns:minmax(130px,1fr) minmax(120px,1fr) 100px 90px 130px 80px 64px;gap:12px;min-width:860px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--cs-line);font-size:13px;color:var(--cs-meta)"><span style="font-family:var(--cs-mono)">old-script</span><span>two@example.com</span><span>Read only</span><span style="font-family:var(--cs-mono);font-size:11px">2 AUG</span><span style="display:flex;flex-direction:column;gap:1px;font-family:var(--cs-mono);font-size:11px"><span>20 AUG</span><span style="color:var(--cs-meta)">198.51.100.7</span></span><span><span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-meta)"></span>Revoked</span></span><span style="text-align:right;color:var(--cs-danger)"></span></div>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;created&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = { fresh: null };
+  renderVals() {
+    const fresh = this.state.fresh ?? !!this.props.created;
+    const tok = fresh ? 'cs_mcp_4b1e9c07d2f8a63e5f10c9ab77d2e4c1' : 'YOUR_TOKEN';
+    return {
+      fresh, empty: !fresh, create: () => this.setState({ fresh: true }),
+      config: '{\n  "mcpServers": {\n    "contentspiel": {\n      "type": "http",\n      "url": "https://www.example.com/mcp",\n      "headers": { "Authorization": "Bearer ' + tok + '" }\n    }\n  }\n}'
+    };
+  }
+}
+</script>
+</body>
+</html>
