@@ -26,7 +26,7 @@ From the earlier session (see `docs/product/2026-10-03-cs-studio-design-pass-han
 
 | Topic | Decision |
 |---|---|
-| Rounds | **Three rounds, one PR each** (§9). |
+| Rounds | **Three rounds, one PR each** (§6–§8). |
 | Live content | **Edits to a Live item still go live at once.** The editor header is the "no drafts" variant (handoff §9 B15), with room left for "Publish changes" later. |
 | User name | **Add an optional `users.name`**, shown wherever a user is named, falling back to the email. |
 | Media detail | **A side panel on the Media grid** (`?selected=ID`), not its own page. |

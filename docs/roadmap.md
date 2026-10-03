@@ -47,7 +47,8 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
 | Trash / soft delete + restore | Must | #43 — done (sub-project 6b, spec `2026-09-29-trash-design.md`): pages (with their branch), posts and library images; Trash screen, Undo, retention job |
 | Media library (`Media::Asset`, alt text, reuse, responsive variants) | Must | #46 — done (sub-project 6a, spec `2026-09-29-media-library-design.md`) |
-| Invites (one-time set-password link without mail) | Should | `Users::Invite` |
+| CS Studio design pass (admin polish): new shell, shared components, every screen rebuilt to the v3 design handoff, in three rounds | Must | In progress — spec `2026-10-03-cs-studio-design-pass-design.md`; handoff in `docs/design/cs-studio-handoff-v3/`. Round 1 foundations and bugs, round 2 editors/dashboard/posts/translations, round 3 settings/media/people/system |
+| Invites (one-time set-password link without mail) | Should | `Users::Invite`; after the design pass, which only renames the button to "New user" |
 | Admin UI in German (admin i18n) | Should | #49 |
 | Port Avo-only invariants, then remove Avo | Must | #40 — done (sub-project 4) |
 
@@ -66,7 +67,7 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Security basics: 2FA, password policy, session list/revoke, login history | Should | Login history = audit events |
 | Legal / GDPR: imprint & privacy pages, consent hook, user export/delete | Should | Cookie-less public site first (Phase 1) |
 | RSS / Atom feeds | Should | Cheap once URLs are canonical |
-| Site search + admin global search (Postgres FTS) | Should | Fed by service events |
+| Site search + admin global search (Postgres FTS) | Should | Fed by service events; the design pass adds a ⌘K "Jump to…" palette that matches titles only, not this |
 | Reusable content: global snippets, page templates, block presets | Could | Needs block owner (#47) |
 | Forms with submissions and spam protection | Could | Routes hook before catch-alls |
 | Headless read API + webhooks on publish | Could | Generalised serializers + events |
@@ -80,7 +81,10 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | More built-in AI providers (an OpenAI-compatible one) | Could | Same spec §9; `AI::Providers.register` takes plugin providers today |
 | Background whole-site translation (translate everything missing in a language as a job) | Could | Same spec §9; today "Translate empty fields" works per editor screen, and nothing is saved without Use |
 | Translation memory and glossary | Could | Same spec §9 |
-| A side-by-side translate mode (original and translation in two full columns) | Could | Same spec §9; today the original shows beside each field |
+| A side-by-side translate mode (original and translation in two full columns) | Could | Same spec §9; today the original shows beside each field — absorbed by the CS Studio design pass (round 2, same spec §7) |
+| A language dropdown on the public site | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
+| Share images (Open Graph image per page and post) | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
+| A "sample" marker on starter content | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
 | AI tools over MCP | Could | Same spec §9; deliberately not planned — MCP clients are already AIs and can translate through `update_post` themselves |
 | Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
 | Media library: video and document files, not only images | Could | Out of scope for sub-project 6a, spec `2026-09-29-media-library-design.md` §8 |
@@ -95,8 +99,8 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Per-user time zones (today: one site-wide zone in Settings) | Could | Out of scope for the dashboard, spec `2026-09-30-dashboard-design.md` §8 |
 | Dashboard customisation and widgets (today: the two columns and quick-create bar are fixed) | Could | Same spec §8 |
 | Dashboard statistics and counts | Could | Same spec §8 |
-| An audit-event feed on the dashboard (today: "Recently updated" shows the records themselves, newest `updated_at` first, not individual audit events) | Could | Same spec §8 |
-| Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 |
+| An audit-event feed on the dashboard (today: "Recently updated" shows the records themselves, newest `updated_at` first, not individual audit events) | Could | Same spec §8 — absorbed by the CS Studio design pass (round 2, spec `2026-10-03-cs-studio-design-pass-design.md` §5.6), as a content-only activity feed |
+| Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 — absorbed by the CS Studio design pass (round 2, same spec §7): "Page" in quick create opens the New page dialog |
 | Public site dates in the site time zone (today: `ThemeHelper#post_date` on the public site and `/preview` still renders in UTC — only CS Studio and MCP run inside `Time.use_zone`) | Could | Needs the rich-text/page render cache to vary on the zone (a zone change must invalidate cached renders); dashboard spec §5 kept the public site unchanged |
 
 ## Known interim states
@@ -108,10 +112,10 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
 | ~~Deletes are permanent~~ — resolved: pages, posts and library images now go to the trash first (single blocks, tags, groups, users and tokens are still deleted for good, by design) | Sub-project 3 | Trash (sub-project 6b, spec `2026-09-29-trash-design.md`) — done |
 | ~~CS Studio times (schedule input, "Saved HH:MM", scheduled hover) were UTC — no site time zone~~ — resolved: `site_settings.time_zone` (default UTC) wraps every CS Studio and MCP request (`Time.use_zone`); schedule inputs, "Saved HH:MM", the dashboard, the trash and audit screens, and MCP's own ISO-8601 dates all show and parse local time now; storage stays UTC | Sub-project 3 | Site time zone setting (sub-project 6c, spec `2026-09-30-dashboard-design.md`) — done |
-| CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | Sub-project 6 (admin polish) |
+| CS Studio tree column isn't resizable/collapsible and isn't a drawer on narrow screens; the posts list isn't paginated | Sub-project 3 | CS Studio design pass (spec `2026-10-03-cs-studio-design-pass-design.md`): the narrow-screen drawers in round 1, posts list pagination in round 2 |
 | Until a variant (`w480`/`w960`/`w1600`/`w2400`) has actually been processed, a page serves the original file at full size instead | Sub-project 6a (media library) | Preprocessing catches up on its own shortly after upload; `bin/rails media:variants` re-enqueues any still missing (design spec §8) |
 | MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | A lookup prefix on `ApiToken` (future work) |
-| No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select | Sub-project 4 | Admin polish (sub-project 6), same as the page tree's own typed-position pattern |
+| No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select | Sub-project 4 | CS Studio design pass, round 3 (same spec §5.6) |
 | Editing an already-published page/post/block requires `publish`, not just `edit`, because autosave writes straight to the live record | Sub-project 5 (access control) | Versioning with pending revisions (Phase 3) |
 | Pages have no author, so there is no `own` scope for pages the way posts have one | Sub-project 5 | Page authorship (out of scope for now, spec §9) |
 | The audit log (`audit_events`) has no export or retention setting and grows without limit; the append-only trigger blocks `DELETE`/`UPDATE`/raw SQL but deliberately not `TRUNCATE`, so `db:truncate_all` still works in development | Sub-project 5 | Audit export/retention (not yet scheduled) |
@@ -122,7 +126,8 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (a `LATERAL` join per candidate row, `Dashboard::Feed#recently_edited`) to find whose newest audit event is theirs — each probe is an index lookup (`index_audit_events_on_subject_and_newest`, `(subject_type, subject_id, last_occurred_at DESC)`), but the scan still grows with the number of readable records | Sub-project 6c (dashboard) | Revisit (a query driven from the actor's own events) if dashboard load time grows with site size |
 | Changing the default language to a third one flags every translation as outdated: `translation_sources` stores the original's digest but not which language the original was in, so after en → de every Spanish translation (made from English) is compared against the German original and differs. "Mark as up to date" clears them one field at a time | Translation helpers (Task 1) | Record the primary language next to each digest (or re-baseline digests in the default-language change), if default-language changes happen on real sites |
 | AI translation suggestions run inside the web request: each holds a Puma thread (3 by default) for up to two 25 s provider calls, so concurrent bulk "Translate empty fields" runs can starve the site of threads, and the request depends on the proxy's `response_timeout` (75 s in `config/deploy.yml`). The cap is 6,000 characters per request to keep each one short | Translation helpers (final fix wave) | Run suggestions as a background job (Solid Queue) that streams the suggestion boxes back over Turbo Streams; the per-request cap and timeout can then grow |
-| The Translations overview filters in Ruby: `Translations::Status` is computed per record (field digests, block roll-ups), so `Admin::TranslationsController` walks every readable page, post and image in batches of 200 until a page of 50 incomplete items is filled — cheap for early pages, a full scan for a late page or a language with few gaps | Translation helpers (Task 4) | A stored per-locale translation state kept current by the save services, if overview load time grows with site size |
+| The Translations overview filters in Ruby: `Translations::Status` is computed per record (field digests, block roll-ups), so `Admin::TranslationsController` walks every readable page, post and image in batches of 200 until a page of 50 incomplete items is filled — cheap for early pages, a full scan for a late page or a language with few gaps | Translation helpers (Task 4) | CS Studio design pass, round 2: the stored `translation_states` table (same spec §5.3), which also replaces `Translations::CachedStatus` |
+| The mind graph fills the whole content column and some nodes animate outside its box | Found 2026-10-02 | CS Studio design pass, round 1 (layout fix); colours, legend and edges in round 3 |
 
 ## Out of scope (for now)
 
