@@ -202,6 +202,7 @@ Rails.application.routes.draw do
     # which needs `users.manage`. Singular: it's always *your* account.
     get "account/password", to: "accounts#edit", as: :account_password
     patch "account/password", to: "accounts#update"
+    patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

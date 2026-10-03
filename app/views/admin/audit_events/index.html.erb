@@ -13,7 +13,7 @@
 
   <div>
     <%= label_tag :user_id, "User", class: setup_label_class %>
-    <%= select_tag :user_id, options_for_select(@users.map { |user| [ user.email_address, user.id ] }, params[:user_id]),
+    <%= select_tag :user_id, options_for_select(@users.map { |user| [ user.display_name, user.id ] }, params[:user_id]),
           include_blank: "All users", class: setup_input_class %>
   </div>
 

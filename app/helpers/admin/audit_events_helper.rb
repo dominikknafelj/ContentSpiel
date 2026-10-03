@@ -46,10 +46,16 @@ module Admin
     # with no user at all (setup/console/system, `Audit.default_channel`)
     # is labelled by its channel instead.
     def audit_actor_label(event)
-      return "#{event.user&.email_address || "a deleted user"} via API token ##{event.actor_id}" if event.actor_type == "ApiToken"
-      return event.user&.email_address || "a deleted user" if event.user_id
+      return "#{audit_user_label(event)} via API token ##{event.actor_id}" if event.actor_type == "ApiToken"
+      return audit_user_label(event) if event.user_id
 
       audit_channel_label(event.channel)
+    end
+
+    # A token event whose user is gone still has no `user_id` to name; the
+    # token's own id stands in so it reads "a deleted user", never "System".
+    def audit_user_label(event)
+      Admin::UserNameComponent.new(user: event.user, user_id: event.user_id || event.actor_id).label
     end
 
     # The Channel column (fix round 1: rendered raw before this), and

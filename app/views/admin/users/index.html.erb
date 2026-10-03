@@ -19,7 +19,7 @@
 <table class="admin-users-table w-full border-collapse text-sm">
   <thead>
     <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
-      <th class="py-2 pr-4">Email</th>
+      <th class="py-2 pr-4">User</th>
       <th class="py-2 pr-4">Groups</th>
       <th class="py-2"><span class="sr-only">Actions</span></th>
     </tr>
@@ -29,7 +29,8 @@
       <% dialog_id = "delete-user-#{user.id}" %>
       <tr id="<%= dom_id(user) %>" class="border-b border-line align-top">
         <td class="py-2 pr-4 text-ink">
-          <%= user.email_address %>
+          <%= render Admin::UserNameComponent.new(user: user) %>
+          <% if user.name.present? %><span class="block text-sm text-meta"><%= user.email_address %></span><% end %>
           <% if user == Current.user %><span class="text-meta">(you)</span><% end %>
           <% if user.owner? %><span class="ml-1 rounded-cs border border-line px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Owner</span><% end %>
         </td>

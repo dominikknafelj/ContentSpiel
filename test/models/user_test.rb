@@ -83,4 +83,23 @@ class UserTest < ActiveSupport::TestCase
   test "the last-owner check counts owners under a row lock" do
     assert_queries_match(/FOR UPDATE/) { users(:one).destroy }
   end
+
+  test "display_name is the name, or the email when there is none" do
+    user = users(:one)
+    user.name = nil
+    assert_equal user.email_address, user.display_name
+    user.name = "   "
+    assert_equal user.email_address, user.display_name
+    user.name = " Ada Lovelace "
+    assert_equal "Ada Lovelace", user.display_name
+  end
+
+  test "name is optional and capped at 120 characters" do
+    user = users(:one)
+    user.name = "a" * 121
+    assert_not user.valid?
+    user.name = ""
+    assert user.valid?
+    assert_nil user.name, "a blank name is stored as nil"
+  end
 end

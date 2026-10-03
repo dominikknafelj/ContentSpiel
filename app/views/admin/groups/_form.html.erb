@@ -24,7 +24,10 @@
       <% all_users.each do |user| %>
         <label class="flex items-center gap-2 text-ink">
           <%= check_box_tag "group[member_ids][]", user.id, selected_member_ids.include?(user.id), id: "group_member_#{user.id}" %>
-          <%= user.email_address %>
+          <span>
+            <%= render Admin::UserNameComponent.new(user: user) %>
+            <% if user.name.present? %><span class="block text-sm text-meta"><%= user.email_address %></span><% end %>
+          </span>
           <% if user.owner? %><span class="text-sm text-meta">(owner: has every permission anyway)</span><% end %>
         </label>
       <% end %>

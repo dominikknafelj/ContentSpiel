@@ -90,7 +90,7 @@ module Admin
     # who may change them (a non-owner's form has no owner field at all,
     # and a forged one is refused there).
     def user_params
-      params.fetch(:user, ActionController::Parameters.new).permit(:email_address, :password, :password_confirmation, :owner, group_ids: [])
+      params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, :owner, group_ids: [])
     end
 
     # For the forms: every group, and whether the owner toggle is locked

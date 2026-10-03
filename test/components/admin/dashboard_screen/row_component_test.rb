@@ -74,6 +74,16 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
     assert_text "by two@example.com"
   end
 
+  test "a named user reads by name, not email" do
+    post = create_post(title: "Named change")
+    users(:two).update!(name: "Ada Lovelace")
+
+    render_inline row(post, change: { actor: users(:two), user: users(:two), user_id: users(:two).id, at: Time.current })
+
+    assert_text "by Ada Lovelace"
+    assert_no_text "two@example.com"
+  end
+
   private
 
   def row(record, change: nil, time: :updated_at)

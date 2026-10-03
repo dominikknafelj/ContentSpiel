@@ -68,9 +68,8 @@ module Admin
       # a trusted channel -- is the system's.
       def changed_by
         return if change.nil?
-        return "by System" if change[:user_id].nil? && change[:user].nil?
 
-        change[:user] ? "by #{change[:user].email_address}" : "by a deleted user"
+        "by #{Admin::UserNameComponent.new(user: change[:user], user_id: change[:user_id]).label}"
       end
 
       private

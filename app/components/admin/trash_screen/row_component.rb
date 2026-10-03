@@ -63,7 +63,7 @@ module Admin
       # event's actor could tell them apart, which would be a query per row,
       # so the label claims neither.
       def trashed_by_label
-        item.trashed_by ? "Trashed by #{item.trashed_by.email_address}" : "Trashed by unknown"
+        item.trashed_by ? "Trashed by #{item.trashed_by.display_name}" : "Trashed by unknown"
       end
 
       def purge_dialog_body

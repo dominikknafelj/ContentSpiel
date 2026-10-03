@@ -61,4 +61,19 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes event.attributes.to_json, "new-password-1"
     assert_not_includes event.attributes.to_json, user.password_digest
   end
+
+  test "a user saves their own name" do
+    user = users(:reader)
+    sign_in_as(user)
+
+    patch "/cs-studio/account/profile", params: { name: "Ada" }
+
+    assert_redirected_to "/cs-studio/account/password"
+    assert_equal "Ada", user.reload.name
+  end
+
+  test "signed out, saving a name redirects to sign-in" do
+    patch "/cs-studio/account/profile", params: { name: "Ada" }
+    assert_redirected_to "/cs-studio/sign-in"
+  end
 end

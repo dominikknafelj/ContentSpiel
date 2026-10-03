@@ -4,7 +4,7 @@
 <% content_for :title, "Change password" %>
 <div class="mx-auto max-w-md">
   <h1 class="mb-1 text-h1 text-ink">Change password</h1>
-  <p class="mb-4 text-meta">Signed in as <%= Current.user.email_address %>. Changing your password signs you out everywhere else.</p>
+  <p class="mb-4 text-meta">Signed in as <%= Current.user.display_name %>. Changing your password signs you out everywhere else.</p>
 
   <% if flash[:notice].present? %>
     <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
@@ -14,6 +14,19 @@
   <% end %>
   <% if @errors.present? %>
     <p role="alert" class="mb-4 text-danger-ink"><%= @errors.to_sentence %></p>
+  <% end %>
+
+  <% if @profile_errors.present? %>
+    <p role="alert" class="mb-4 text-danger-ink"><%= @profile_errors.to_sentence %></p>
+  <% end %>
+
+  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, class: "mb-8" do %>
+    <div class="mb-4">
+      <%= label_tag "name", "Your name", class: setup_label_class %>
+      <%= text_field_tag "name", Current.user.name, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
+    </div>
+
+    <%= render Admin::ButtonComponent.new(label: "Save name", variant: :primary, type: "submit") %>
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch do %>

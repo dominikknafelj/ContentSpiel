@@ -43,6 +43,17 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
     assert_no_text "since left"
   end
 
+  test "a named trasher reads by name, not email" do
+    post = create_post(title: "Named trash")
+    Trash::Move.call(post)
+    users(:one).update!(name: "Ada Lovelace")
+
+    render_inline row(post.reload)
+
+    assert_text "Trashed by Ada Lovelace"
+    assert_no_text "one@example.com"
+  end
+
   test "a page's delete dialog names how many subpages go with it" do
     section = create_page(title: "Section")
     Trash::Move.call(section)

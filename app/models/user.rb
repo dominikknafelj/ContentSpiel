@@ -7,6 +7,13 @@ class User < ApplicationRecord
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
+  # Optional (design pass spec §5.1): shown wherever a user is named, with
+  # the email as the fallback -- `display_name` is the one reader, so no
+  # screen decides the fallback for itself. A blank name is stored as nil,
+  # so "no name" has one representation.
+  normalizes :name, with: ->(name) { name.to_s.strip.presence }
+  validates :name, length: { maximum: 120 }
+
   # Presence here so the setup wizard shows a form error; uniqueness backs up
   # the unique index with a readable message instead of an exception.
   # `normalizes` above already downcases every stored value, which is what
@@ -31,6 +38,8 @@ class User < ApplicationRecord
   # who's making the change); this validation only guards the invariant
   # itself, regardless of who's doing the demoting.
   validate :at_least_one_owner, if: :demoting_from_owner?
+
+  def display_name = name.presence || email_address
 
   private
 
