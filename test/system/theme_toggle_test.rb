@@ -25,4 +25,22 @@ class ThemeToggleTest < ApplicationSystemTestCase
     assert_selector "html[data-theme-choice='auto']"
     assert_selector "button[role=radio][aria-checked='true']", text: /auto/i
   end
+
+  test "the public site's toggle flips the theme and survives a reload" do
+    # Must not be sent through Setup::RedirectConstraint's /setup redirect.
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
+    visit "/"
+    initial = current_theme
+    other = initial == "dark" ? "light" : "dark"
+
+    within("footer") { click_on(initial == "dark" ? "Light mode" : "Dark mode") }
+    assert_equal other, current_theme
+
+    visit "/"
+    assert_equal other, current_theme
+  end
+
+  private
+    def current_theme = page.evaluate_script("document.documentElement.dataset.theme")
 end

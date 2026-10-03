@@ -26,6 +26,15 @@ export default class extends Controller {
     this.apply(choice)
   }
 
+  // Serves the public footer's two-state toggle (layouts/public/_theme_toggle),
+  // which has no Auto: flip the currently *resolved* theme and store that as
+  // an explicit choice. Goes through apply() so data-theme-choice stays in step.
+  toggle() {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark"
+    try { localStorage.setItem("cs-theme", next) } catch (e) {}
+    this.apply(next)
+  }
+
   apply(choice) {
     const root = document.documentElement
     root.dataset.themeChoice = choice
