@@ -9,6 +9,18 @@ module ContentModel
     dsl_attribute :list_component
     dsl_attribute :detail_component
 
+    # The 1-based slot in CS Studio's six-hue content-type palette
+    # (`Admin::ContentTypeDotComponent`; 7-12 are the same hues as rings, 13+
+    # cycle). A plain accessor, not a `dsl_attribute`: it is assigned
+    # (`type.colour_index = 4`), and `Registry#register` fills in a default
+    # when a type states none.
+    attr_accessor :colour_index
+
+    def finalize!
+      return if colour_index.nil?
+      raise ArgumentError, "colour_index must be a positive integer" unless colour_index.is_a?(Integer) && colour_index >= 1
+    end
+
     # `section:` names the page/section this type's sample post seeds into;
     # `sample:` is the attributes (including typed `fields:`) `db/seeds.rb`
     # passes to `Posts::Save`; its `body:` is Markdown (tiptap spec §3.4),

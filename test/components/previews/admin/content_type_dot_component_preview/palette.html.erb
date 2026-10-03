@@ -1,0 +1,9 @@
+<% component = Admin::ContentTypeDotComponent.new(content_type: "blog") %>
+<ul class="flex flex-col gap-2 p-4">
+  <% (1..8).each do |index| %>
+    <li class="inline-flex items-center gap-1.5 text-sm text-dim">
+      <span aria-hidden="true" class="h-[7px] w-[7px] shrink-0 rounded-full <%= component.mark_class(index) %>"></span>
+      Colour index <%= index %>
+    </li>
+  <% end %>
+</ul>

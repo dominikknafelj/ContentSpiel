@@ -7,7 +7,11 @@
   <div class="min-w-0 flex-1">
     <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
     <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
-      <span><%= type_label %></span>
+      <% if record.is_a?(Post) %>
+        <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
+      <% else %>
+        <span><%= type_label %></span>
+      <% end %>
       <% if at %>
         <span><%= time_prefix %> <time datetime="<%= at.iso8601 %>"><%= formatted_at %></time></span>
       <% end %>
