@@ -80,4 +80,10 @@ class Admin::ChipInputComponentTest < ViewComponent::TestCase
 
     assert_selector "[data-admin--chip-input-single-value='false']"
   end
+
+  test "exclude, lowercase and max_length reach the controller as values" do
+    render_chips(exclude: [ 12 ], lowercase: true, max_length: 50)
+
+    assert_selector "[data-admin--chip-input-exclude-value='[\"12\"]'][data-admin--chip-input-lowercase-value='true'][data-admin--chip-input-max-length-value='50']"
+  end
 end

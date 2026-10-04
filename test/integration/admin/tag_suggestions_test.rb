@@ -76,7 +76,34 @@ class Admin::TagSuggestionsTest < ActionDispatch::IntegrationTest
     assert_response :redirect
   end
 
-  test "a user without posts.read is refused" do
+  test "tag names are open to posts.read, pages.edit or tags.manage, and counts only to a post reader" do
+    create_post(title: "A", tags: [ "alpha" ])
+    grant = lambda do |user, key|
+      group = AccessControl::Group.create!(name: "Tag #{key} #{SecureRandom.hex(3)}")
+      group.grants.create!(permission: key, scope: {})
+      AccessControl::Membership.create!(user: user, group: group)
+    end
+
+    [ [ :reader, nil, "1 post" ] ].each do |fixture, _, hint|
+      sign_in_as(users(fixture))
+      get "/cs-studio/tags/suggest", params: { q: "alp" }
+      assert_response :success
+      assert_equal hint, response.parsed_body.first["hint"]
+    end
+
+    %w[pages.edit tags.manage].each do |key|
+      user = users(:editor_branch)
+      grant.call(user, key)
+      sign_in_as(user)
+      get "/cs-studio/tags/suggest", params: { q: "alp" }
+      assert_response :success, key
+      assert_equal [ "alpha" ], response.parsed_body.map { |row| row["value"] }, key
+      assert_not response.parsed_body.first.key?("hint"), "#{key}: a count would mislead someone who can't read posts"
+      user.memberships.destroy_all
+    end
+  end
+
+  test "a user holding none of those rights is refused" do
     sign_in_as(users(:editor_branch))
 
     get "/cs-studio/tags/suggest", params: { q: "a" }

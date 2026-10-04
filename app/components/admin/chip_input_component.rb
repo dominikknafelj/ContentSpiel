@@ -35,10 +35,18 @@ module Admin
   # none. Choosing a suggestion replaces the chip it finds (`admin--chip-input`'s
   # `single` value) instead of adding a second.
   #
+  # `exclude:` lists values never offered as suggestions (a post's own id in
+  # the related-posts field: `Posts::Save` would silently drop it). With
+  # `lowercase: true` a chip made from typed text is lower-cased, because
+  # the server stores the names that way (tags) and the chip should read as it
+  # will after a reload. `max_length:` marks a chip longer than that as invalid
+  # at once (danger tint, `aria-invalid`), where the server would refuse the
+  # whole save (`Tag`'s length limit) and name it in the error slot.
+  #
   # In a view-only editor the surrounding `<fieldset disabled>` disables the
   # input and every remove button, so the whole component is inert.
   class ChipInputComponent < AdminComponent
-    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false)
+    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil)
       @name = name
       @id = id
       @label = label
@@ -51,6 +59,9 @@ module Admin
       @hidden_note = hidden_note
       @help = help
       @single = single
+      @exclude = Array(exclude).map(&:to_s)
+      @lowercase = lowercase
+      @max_length = max_length
     end
 
     def listbox_id = "#{id}-listbox"
@@ -75,6 +86,6 @@ module Admin
 
     private
 
-    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help, :single
+    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help, :single, :exclude, :lowercase, :max_length
   end
 end

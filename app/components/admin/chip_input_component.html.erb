@@ -5,6 +5,9 @@
      data-admin--chip-input-create-value="<%= create %>"
      data-admin--chip-input-noun-value="<%= noun %>"
      data-admin--chip-input-single-value="<%= single %>"
+     data-admin--chip-input-lowercase-value="<%= lowercase %>"
+     data-admin--chip-input-exclude-value="<%= exclude.to_json %>"
+     <% if max_length %>data-admin--chip-input-max-length-value="<%= max_length %>"<% end %>
      data-action="input->admin--chip-input#swallow change->admin--chip-input#swallow">
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= label %></label>
 
@@ -32,7 +35,7 @@
     <%= tag.input type: "text", id: id, placeholder: placeholder, autocomplete: "off", autocapitalize: "off", spellcheck: "false",
           class: "min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-meta",
           role: "combobox", aria: { expanded: "false", controls: listbox_id, autocomplete: "list", describedby: described_by, invalid: (true if errors.any?) },
-          data: { "admin--chip-input-target": "input", action: "keydown->admin--chip-input#keydown input->admin--chip-input#search blur->admin--chip-input#close" } %>
+          data: { "admin--chip-input-target": "input", action: "keydown->admin--chip-input#keydown input->admin--chip-input#search blur->admin--chip-input#leave" } %>
 
     <ul id="<%= listbox_id %>" role="listbox" aria-label="<%= label %> suggestions" hidden
         class="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-cs border border-line-strong bg-surface py-1 shadow-menu"

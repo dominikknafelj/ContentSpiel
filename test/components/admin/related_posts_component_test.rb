@@ -40,4 +40,12 @@ class Admin::RelatedPostsComponentTest < ViewComponent::TestCase
 
     assert_selector "[data-admin--chip-input-search-url-value*='type=post'][data-admin--chip-input-search-url-value*='locale=de']"
   end
+
+  test "the post itself is never offered as a related post" do
+    post = create_post(title: "Hub")
+
+    render_inline Admin::RelatedPostsComponent.new(post: post, locale: "en")
+
+    assert_selector "[data-admin--chip-input-exclude-value='[\"#{post.id}\"]']"
+  end
 end

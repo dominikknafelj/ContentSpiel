@@ -38,12 +38,13 @@ const MAX_OPTIONS = 8
 
 export default class extends Controller {
   static targets = ["input", "list", "listbox", "status", "sentinel", "chipTemplate", "optionTemplate"]
-  static values = { searchUrl: String, name: String, create: Boolean, noun: String, single: Boolean }
+  static values = { searchUrl: String, name: String, create: Boolean, noun: String, single: Boolean, lowercase: Boolean, exclude: Array, maxLength: Number }
 
   connect() {
     this.items = []
     this.active = -1
     this.sequence = 0
+    this.chips.forEach((chip) => this.markInvalidLength(chip))
   }
 
   disconnect() {
@@ -67,8 +68,21 @@ export default class extends Controller {
 
   search() {
     clearTimeout(this.timer)
+    if (this.createValue && this.inputTarget.value.includes(",")) return this.commitCommaSeparated()
     if (this.query === "") return this.close()
     this.timer = setTimeout(() => this.fetchSuggestions(this.query), DEBOUNCE_MS)
+  }
+
+  // A comma typed on a keyboard that doesn't report it as a key (Android),
+  // or one inside pasted text ("ruby, rails"): every complete part before the
+  // last comma becomes a chip, and what follows it stays in the field.
+  commitCommaSeparated() {
+    const parts = this.inputTarget.value.split(",")
+    const rest = parts.pop()
+    this.inputTarget.value = ""
+    parts.map((part) => part.trim()).filter(Boolean).forEach((part) => this.pick({ value: this.fold(part), label: this.fold(part) }))
+    this.inputTarget.value = rest.trimStart()
+    this.search()
   }
 
   get query() {
@@ -79,6 +93,7 @@ export default class extends Controller {
     this.aborter?.abort()
     this.aborter = new AbortController()
     const sequence = ++this.sequence
+    this.inFlight = true
 
     const url = new URL(this.searchUrlValue, window.location.origin)
     url.searchParams.set("q", query)
@@ -90,10 +105,16 @@ export default class extends Controller {
       rows = await response.json()
     } catch (error) {
       if (error.name === "AbortError") return
-      // An older request failing must not replace what a newer one shows.
-      if (sequence === this.sequence) this.showMessage("Search failed — try again.")
+      if (sequence === this.sequence) this.inFlight = false
+      // An older request failing must not replace what a newer one shows. A
+      // field that takes free text (`create`) just offers no suggestions --
+      // what was typed still commits -- and one that doesn't says so, in
+      // words, once.
+      if (sequence === this.sequence) this.searchFailed()
       return
     }
+
+    if (sequence === this.sequence) this.inFlight = false
 
     // An answer for text that is no longer in the field (or superseded by a
     // newer request) is dropped, never rendered under the wrong query.
@@ -116,7 +137,7 @@ export default class extends Controller {
   }
 
   showSuggestions(query, rows) {
-    const items = rows.filter((item) => !this.hasChip(item.value)).slice(0, MAX_OPTIONS)
+    const items = rows.filter((item) => !this.hasChip(item.value) && !this.excludeValue.includes(item.value)).slice(0, MAX_OPTIONS)
 
     // "Create tag “x”" only when nothing already matches the text exactly,
     // in the results or among the chips (names compare case-insensitively).
@@ -124,8 +145,14 @@ export default class extends Controller {
       items.push({ value: this.fold(query), label: this.fold(query), create: true })
     }
 
-    if (items.length === 0) return this.showMessage(`No matching ${this.nounValue}s.`)
+    // A result count or "No matching tags." goes to the live region (the list
+    // holds only options, so nothing there can be a disabled "option").
+    if (items.length === 0) {
+      this.close()
+      return this.announce(`No matching ${this.nounValue}s.`)
+    }
 
+    this.announce(`${items.length} ${items.length === 1 ? "suggestion" : "suggestions"}.`)
     this.items = items
     this.listboxTarget.replaceChildren(...items.map((item, index) => this.optionFor(item, index)))
     this.active = -1
@@ -148,15 +175,9 @@ export default class extends Controller {
     return option
   }
 
-  showMessage(message) {
-    const option = this.optionTemplateTarget.content.firstElementChild.cloneNode(true)
-    option.setAttribute("aria-disabled", "true")
-    option.classList.remove("cursor-pointer")
-    option.querySelector("[data-option-label]").textContent = message
-    this.items = []
-    this.active = -1
-    this.listboxTarget.replaceChildren(option)
-    this.open()
+  searchFailed() {
+    this.close()
+    if (!this.createValue) this.announce("Search failed — try again.")
   }
 
   open() {
@@ -166,10 +187,22 @@ export default class extends Controller {
 
   close() {
     clearTimeout(this.timer)
+    // A request still in flight must not reopen the list once it answers.
+    this.aborter?.abort()
+    this.sequence++
+    this.inFlight = false
     this.listboxTarget.hidden = true
     this.inputTarget.setAttribute("aria-expanded", "false")
     this.inputTarget.removeAttribute("aria-activedescendant")
     this.active = -1
+  }
+
+  // Leaving the field with text still in it (a create field): the editor
+  // believes it was added, so it is -- a chip, announced like any addition.
+  leave() {
+    if (this.inputTarget.disabled) return
+    if (this.createValue && this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query) })
+    else this.close()
   }
 
   // A press on a suggestion must not blur the field (that would close the
@@ -226,7 +259,9 @@ export default class extends Controller {
         if (this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query) })
         break
       case "Escape":
-        if (this.listboxTarget.hidden) return
+        // Also while a search is still on its way: it is cancelled, and
+        // won't reopen the list when it answers.
+        if (this.listboxTarget.hidden && !this.inFlight) return
         event.preventDefault()
         event.stopPropagation()
         this.close()
@@ -286,10 +321,21 @@ export default class extends Controller {
     return String(a).toLowerCase() === String(b).toLowerCase()
   }
 
-  // Tags are stored lower-case (`Posts::Save#assign_tags`), so a name the
-  // editor creates here reads the way it will after the next page load.
+  // `lowercase` is set where the server stores names lower-case (tags,
+  // `Posts::Save#assign_tags`): a name created here then reads the way it
+  // will after the next page load. Inner runs of whitespace collapse too, as
+  // the server does.
   fold(text) {
-    return this.createValue ? text.toLowerCase() : text
+    const collapsed = text.replace(/\s+/g, " ")
+    return this.lowercaseValue ? collapsed.toLowerCase() : collapsed
+  }
+
+  // `maxLength`: a chip the server would refuse is tinted at once.
+  markInvalidLength(chip) {
+    if (!this.hasMaxLengthValue || chip.dataset.chipValue.length <= this.maxLengthValue) return
+    chip.dataset.invalid = "true"
+    chip.classList.remove("bg-sunken", "text-ink")
+    chip.classList.add("bg-danger-tint", "text-danger-ink")
   }
 
   pick(item) {
@@ -309,6 +355,7 @@ export default class extends Controller {
     chip.querySelector("input").value = item.value
     this.removeButton(chip).setAttribute("aria-label", `Remove ${item.label}`)
     this.listTarget.append(chip)
+    this.markInvalidLength(chip)
 
     this.announce(`Added ${item.label}.`)
     this.changed()

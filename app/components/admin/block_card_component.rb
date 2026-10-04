@@ -124,8 +124,9 @@ module Admin
     def other_schema_fields = settings_row? ? schema_fields - settings_row_fields : schema_fields
 
     # Where the row's Tag chip input asks for suggestions: the same
-    # endpoint the post editor's tags use (it needs `posts.read`, which is
-    # what choosing a post-list filter is about anyway).
+    # endpoint the post editor's tags use, open to `pages.edit` as well as
+    # `posts.read`/`tags.manage` (`Admin::TagSuggestionsController`), so an
+    # editor of this page's blocks can always list the tags.
     def tag_search_url = helpers.admin_tag_suggestions_path(**url_options)
 
     def tag_chips(field)

@@ -60,6 +60,18 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal 1, Tag.where(name: "rails").count
   end
 
+  test "a tag name over the limit fails the save and creates nothing; inner whitespace collapses" do
+    result = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "fine", "x" * (Tag::MAX_NAME_LENGTH + 1) ] },
+      translations: { "en" => { title: "Tagged" } })
+
+    assert_not result.ok?
+    assert result.errors.any? { |message| message.include?("longer than #{Tag::MAX_NAME_LENGTH} characters") }
+    assert_not Tag.exists?(name: "fine")
+
+    ok = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "Two   words" ] }, translations: { "en" => { title: "Spaced" } })
+    assert_equal [ "two words" ], ok.record.tags.map(&:name)
+  end
+
   test "invalid input comes back as a failed result, nothing saved" do
     result = Posts::Save.call(attributes: { content_type: "nope" }, translations: { "en" => { title: "X" } })
     assert_not result.ok?

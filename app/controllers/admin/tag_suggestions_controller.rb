@@ -5,8 +5,12 @@ module Admin
   # merely contain it, each with how many posts use it.
   #
   # Its own controller rather than a `TagsController` action: that one is the
-  # Tags module and needs `tags.manage`, while whoever can edit a post's tags
-  # needs only to *read* posts (`posts.read`) to be offered the names.
+  # Tags module and needs `tags.manage`. Tag names are not secret inside CS
+  # Studio, so this is open to whoever has a field that takes one: a user who
+  # holds `posts.read` (the post editor's tags), `pages.edit` (a post-list
+  # block's tag filter) or `tags.manage` anywhere (`AccessControl.holds?`);
+  # anyone else gets the 403. The post counts are only shown to someone who
+  # may read posts -- for anyone else a count would be a misleading "0".
   #
   # The counts are over kept posts the viewer may read
   # (`AccessControl.scope` hides trashed ones and ones out of scope, "not
@@ -20,7 +24,7 @@ module Admin
     # becoming a huge ILIKE pattern.
     MAX_QUERY_LENGTH = 100
 
-    before_action -> { require_permission("posts.read") }
+    before_action -> { forbidden! unless holds_any?(%w[posts.read pages.edit tags.manage]) }
 
     def index
       render json: rows
@@ -33,6 +37,10 @@ module Admin
     # `sanitize_sql_like` keeps a typed `%`/`_` literal. The count is a
     # correlated subquery over the readable posts, so the tag list itself
     # stays one query (no per-tag count).
+    def counts? = can?("posts.read")
+
+    def count_hint(count) = "#{count} #{'post'.pluralize(count)}"
+
     def rows
       counts = admin_scope(Post.all).joins(:post_tags).where("post_tags.tag_id = tags.id").select("COUNT(*)")
       pattern = Tag.sanitize_sql_like(query.downcase)
@@ -41,7 +49,7 @@ module Admin
         .select("tags.name", Arel.sql("(#{counts.to_sql}) AS posts_count"))
         .order(Arel.sql(ActiveRecord::Base.sanitize_sql_array([ "(LOWER(tags.name) LIKE ?) DESC", "#{pattern}%" ])), Arel.sql("posts_count DESC"), Arel.sql("LOWER(tags.name) ASC"))
         .limit(LIMIT)
-        .map { |tag| { value: tag.name, label: tag.name, hint: "#{tag.posts_count} #{'post'.pluralize(tag.posts_count)}" } }
+        .map { |tag| { value: tag.name, label: tag.name, hint: (count_hint(tag.posts_count) if counts?) }.compact }
     end
   end
 end

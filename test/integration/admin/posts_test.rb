@@ -189,12 +189,51 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal [ "rails" ], post_record.reload.tags.map(&:name)
   end
 
-  test "an array element containing a comma is kept whole; only the legacy string splits on commas" do
+  # Defence in depth: the chip input splits pasted text before it makes a
+  # chip, but a client that sends "ruby, rails" as one element means two tags.
+  test "an array element containing a comma is split like the legacy string" do
     post_record = create_post(title: "Chips")
     patch "/cs-studio/posts/#{post_record.id}",
       params: { post: { tag_names: [ "rails, ruby", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
 
-    assert_equal [ "rails, ruby" ], post_record.reload.tags.map(&:name)
+    assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
+  end
+
+  test "a tag_names value that is neither a string nor an array of strings leaves the tags alone" do
+    post_record = create_post(title: "Chips", tags: [ "keep" ])
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: { "0" => "evil" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "non-string elements of the array are ignored" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "ok", { "a" => "b" } ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "ok" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "a tag name over 50 characters is refused in the tags' error slot and nothing is saved" do
+    post_record = create_post(title: "Chips", tags: [ "keep" ])
+    long = "x" * 51
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "fine", long ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "post-tag_names-errors"
+    assert_includes response.body, "longer than 50 characters"
+    assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
+    assert_not Tag.exists?(name: "fine")
+  end
+
+  test "inner whitespace in a tag name collapses" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "Two   words", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "two words" ], post_record.reload.tags.map(&:name)
   end
 
   test "an array holding only the sentinel clears the tags" do

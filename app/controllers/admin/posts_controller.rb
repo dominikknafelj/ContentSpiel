@@ -117,7 +117,8 @@ module Admin
         translated[:fields] = translated_fields
       end
 
-      attributes[:tag_names] = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
+      tag_names = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
+      attributes[:tag_names] = tag_names if tag_names
 
       # The related-posts picker's own contract (`Admin::RelatedPostsComponent`
       # / `Posts::Save#assign_related_posts`): passed on only when the key
@@ -246,12 +247,21 @@ module Admin
     #
     # The chip input (`Admin::ChipInputComponent`) submits `post[tag_names][]`
     # instead -- one element per tag, plus an empty sentinel so an emptied list
-    # still arrives. An Array is already split: an element is one whole name,
-    # comma and all (the comma is only the *legacy string's* separator), so
-    # it is stripped and blank-dropped but never split again.
+    # still arrives.
+    #
+    # An element is split on commas too (defence in depth): the chip input
+    # already splits pasted text before it makes a chip, and a client that
+    # sent "ruby, rails" as one element means two tags, same as the string.
+    # Anything that is neither a String nor an Array of Strings (a hash, nested
+    # arrays) answers nil -- "no usable tag list", so `update` leaves the tags
+    # alone rather than clearing them; non-String elements of an Array are ignored.
     def split_tag_names(raw)
-      names = raw.is_a?(Array) ? raw : raw.to_s.split(",")
-      names.map { |name| name.to_s.strip }.reject(&:blank?)
+      parts = case raw
+      when String then [ raw ]
+      when Array then raw.grep(String)
+      end
+      return nil unless parts
+      parts.flat_map { |part| part.split(",") }.map(&:strip).reject(&:blank?)
     end
 
     # A `groups` field's raw params need straightening into an ordered Array

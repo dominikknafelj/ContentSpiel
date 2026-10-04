@@ -111,13 +111,107 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
   test "searching alone does not save" do
     Tag.create!(name: "rails")
     open_editor
-    before = @post.reload.updated_at
+    page.execute_script(<<~JS)
+      window.__patches = 0
+      const original = window.fetch
+      window.fetch = (input, init) => { if ((init?.method || "GET").toUpperCase() === "PATCH") window.__patches++; return original(input, init) }
+    JS
 
     tag_field.send_keys("ra")
     assert_selector "#post-tag_names-listbox [role=option]"
-    sleep 1.6
-    assert_no_selector "#post-save-status", text: /SAVED|SAVING/i
-    assert_equal before, @post.reload.updated_at
+    # A `focusout` flushes any queued save, so provoke one and count the PATCH
+    # requests the page sent (none), rather than waiting on a clock.
+    page.execute_script("document.querySelector('#post-tag_names').dispatchEvent(new FocusEvent('focusout', { bubbles: true }))")
+    assert_equal 0, page.evaluate_script("window.__patches")
+  end
+
+  test "pasted comma-separated text becomes one chip per part, the remainder stays in the field" do
+    open_editor
+
+    page.execute_script(<<~JS)
+      const input = document.querySelector("#post-tag_names")
+      input.focus()
+      input.value = "Ruby, rails, par"
+      input.dispatchEvent(new Event("input", { bubbles: true }))
+    JS
+
+    assert_selector "li[data-chip-value='ruby']"
+    assert_selector "li[data-chip-value='rails']"
+    assert_no_selector "li[data-chip-value='ruby, rails']"
+    assert_equal "par", tag_field.value
+    assert saved?
+    assert_equal %w[rails ruby], @post.tags.reload.map(&:name).sort
+  end
+
+  test "leaving the field with half-typed text commits it as a chip" do
+    open_editor
+
+    tag_field.send_keys("halfway")
+    find("h1, [data-field-name='title'] input", match: :first).click
+
+    assert_selector "li[data-chip-value='halfway']"
+    assert_selector "[role=status]", text: "Added halfway.", visible: :all
+    assert saved?
+    assert_equal [ "halfway" ], @post.tags.reload.map(&:name)
+  end
+
+  test "a tag longer than the limit is tinted at once and the save names it in the error slot" do
+    open_editor
+
+    tag_field.send_keys("x" * 51, :enter)
+
+    assert_selector "li.bg-danger-tint[data-invalid]"
+    assert_selector "#post-tag_names-errors", text: "longer than 50 characters", wait: 6
+    assert_empty @post.tags.reload
+  end
+
+  test "an older answer never overwrites a newer one" do
+    open_editor
+    page.execute_script(<<~JS)
+      window.__pending = {}
+      window.fetch = (input) => {
+        const q = new URL(input, location.origin).searchParams.get("q")
+        return new Promise((resolve) => {
+          window.__pending[q] = () => resolve(new Response(JSON.stringify([{ value: "answer-" + q, label: "answer-" + q, hint: "1 post" }]), { status: 200 }))
+        })
+      }
+    JS
+
+    tag_field.send_keys("a")
+    assert_eventually { page.evaluate_script("Object.keys(window.__pending).includes('a')") }
+    tag_field.send_keys("b")
+    assert_eventually { page.evaluate_script("Object.keys(window.__pending).includes('ab')") }
+    page.execute_script("window.__pending['ab']()")
+    assert_selector "#post-tag_names-listbox [role=option]", text: "answer-ab"
+    page.execute_script("window.__pending['a']()")
+    sleep 0.2 # the late answer has been delivered; it must have changed nothing
+    assert_selector "#post-tag_names-listbox [role=option]", text: "answer-ab"
+    texts = all("#post-tag_names-listbox [role=option]").map { |option| option.text.sub(/\s*1 post\z/, "") }
+    assert_equal [ "answer-ab", "Create tag “ab”" ], texts
+  end
+
+  test "Escape then a late answer does not reopen the list" do
+    open_editor
+    page.execute_script(<<~JS)
+      window.__release = null
+      window.fetch = () => new Promise((resolve) => { window.__release = () => resolve(new Response(JSON.stringify([{ value: "late", label: "late" }]), { status: 200 })) })
+    JS
+    tag_field.send_keys("l")
+    assert_eventually { page.evaluate_script("window.__release !== null") }
+    tag_field.send_keys(:escape)
+    page.execute_script("window.__release()")
+    sleep 0.2
+    assert_selector "#post-tag_names[aria-expanded='false']"
+  end
+
+  test "the post itself is not offered as a related post" do
+    create_post(title: "Chips sibling")
+    open_editor
+
+    find("#post-related_post_ids").send_keys("Chips")
+    assert_selector "#post-related_post_ids-listbox [role=option]", text: "Chips sibling"
+    assert_no_selector "#post-related_post_ids-listbox [role=option]", text: /\AChips\s*\z/
+    assert_equal 1, all("#post-related_post_ids-listbox [role=option]").size
   end
 
   test "a related post chip shows its type dot and Draft" do
