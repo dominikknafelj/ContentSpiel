@@ -4,7 +4,7 @@ Scope: all of `app/`, `config/`, `db/`, `lib/`, `test/` (structurally) and the d
 
 Not reviewed: the uncommitted round-3 work in the tree at the time (`save_bar_controller.js`, `save_bar_component.*`, `pending_lock_controller.js`, the admin layout edits).
 
-Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation), `L<n>` (before a first deploy), `D<n>` (database structure and Postgres features, §8) and `C<n>` (public-site caching, §9). Each carries a status:
+Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation), `L<n>` (before a first deploy), `D<n>` (database structure and Postgres features, §8) `C<n>` (public-site caching, §9) and `O<n>` (observability, §10). Each carries a status:
 
 - **checked**: the lines named were read a second time by the reviewer who collated this document, and say what the finding says.
 - **reported**: found and traced by one reviewer, not read a second time. Treat as a strong lead, confirm before fixing.
@@ -327,7 +327,47 @@ What exists: one application cache (the rich-text body render, `app/models/rich_
 
 Order: S7's version row and S8, then C1 with C6, then C7's lifetime setting with C8, C2, C3, and C4 as C7's CDN provider.
 
-## 10. Checked and found sound
+## 10. Observability
+
+Added after the first hand-off. Verdict: the plumbing exists, but the app cannot yet be debugged with it. Every query count in this review had to be read from the code because nothing running could answer the question. Status "checked" means the grep or file named was read.
+
+What exists: OpenTelemetry with automatic instrumentation for Rack, Rails, Active Record, Active Job and outgoing HTTP, switched to OTLP by `OTEL_EXPORTER_OTLP_ENDPOINT` (`config/initializers/opentelemetry.rb`, tested in `test/integration/opentelemetry_test.rb`); request ids as log tags and a silenced `/up` (`config/environments/production.rb:37-44`); the audit log (actor, channel, request id per write); the System status screen (`Admin::SystemStatusController`, `Setup::SystemCheck` on demand); two notification hooks, `audit.content_spiel` (`app/models/audit.rb:66`) and `public_paths.changed` (`app/models/public_site/paths.rb:302`).
+
+### O1. No domain context in traces — checked
+- A grep of `app/` and `lib/` for `in_span`, `OpenTelemetry.`, `set_attribute`, `add_event` and `record_exception` finds nothing. A trace shows a request and its SQL, not which service ran, as which actor, on which channel, for which record, or whether a cache was hit.
+- Direction: one `in_span` in `ApplicationService` (every write already funnels through it) with the service name, actor type, channel and outcome (ok / denied / failed), plus the audit event id so the audit log and the trace link both ways. On the public request: resolver status, language, cache hit or miss, the content version. On MCP: the tool name. No titles, bodies or email addresses as attributes.
+
+### O2. No error reporting — checked
+- Nothing subscribes to or calls `Rails.error`, and the Gemfile has no error tracker. The rescue blocks that keep going after a failure log one string and drop the exception: `posts/bulk.rb:123`, `posts/bulk_restore.rb:59`, `trash/empty.rb:42`, `jobs/trash/purge_expired_job.rb:37`, `media/upload.rb:80`, `media/asset.rb:226`, `media/usage_index.rb:75`, `starter_contents/add.rb:46`, `rich_text/markdown.rb:487,498`.
+- Direction: `Rails.error.report(e, handled: true, context: …)` in those blocks, and one subscriber that records the exception on the current span (and forwards to an error tracker once one is chosen). See also L3.
+
+### O3. No metrics — checked (absence)
+- No request rate, latency, queue depth or cache hit rate is recorded anywhere. Span-derived metrics in the tracing backend cover most of this once O1 exists; the cache hit rate is the one the caching work (C1, C7, C8) cannot be tuned without.
+
+### O4. Logs are plain text and not tied to traces — checked
+- `config.log_tags = [ :request_id ]` only; 16 logger calls in `app/`, each a free-form string with an ad-hoc prefix (`[trash]`, `[media]`, `[public_paths]`).
+- Direction: structured (JSON) logs carrying trace id, span id and the actor's id and type; one prefix convention.
+
+### O5. No view into Postgres — checked (absence)
+- No slow-query logging, no `pg_stat_statements` reader, no N+1 detection in development or test (no `bullet` or `prosopite`). Several findings in this review (S6, S14, S15) are the kind such a tool reports as the code is written.
+- Direction: `prosopite` raising in test; a query-count assertion on a public page render and on a page save, as the regression guard for S6 and S7; `pg_stat_statements` in production.
+
+### O6. No view into background jobs — checked (absence)
+- Solid Queue runs variant processing and `Trash::PurgeExpiredJob` with no dashboard and nothing that notices a failed job. `bin/rails media:variants` exists precisely because lost variant jobs go unseen.
+- Direction: `mission_control-jobs` behind `system_status.view`, and failed-job counts on the System status screen.
+
+### O7. The frontend reports nothing — checked
+- One `console.error` in `app/javascript` (the controller loader). Block reorder and tree move end in `.catch(() => {})` (S3). A broken Stimulus controller in an editor's browser is invisible.
+- Direction: a small `window.onerror` / `unhandledrejection` reporter posting to an endpoint that calls `Rails.error.report`; the shared `fetchStream` helper (M6) reports non-stream answers.
+
+### O8. Smaller
+- Until an OTLP endpoint is set, production prints every span to stdout synchronously on the request thread (L2). Use no exporter instead.
+- `/up` is `rails/health#show`: it proves the app booted, not that the database answers.
+- `OpenTelemetry::Instrumentation::PG` is disabled (it crashed forked test workers); Active Record instrumentation covers every query the app makes, so this is fine.
+
+Order: O1 (the `ApplicationService` span and the public-request attributes), O2, then O5's test-side guards alongside the S6/S7 fixes so they can be verified against numbers; O4, O6, O7 and O3 after.
+
+## 11. Checked and found sound
 
 - Read scoping through `AccessControl.scope` on pages, posts, blocks, the tree, bulk actions, MCP get/update and preview (S24 is the one exception found).
 - Denials are recorded outside the service transaction; savepoints are used where a rescue would otherwise swallow a failure; no external call inside a transaction.

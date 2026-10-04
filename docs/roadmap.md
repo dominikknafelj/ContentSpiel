@@ -140,6 +140,9 @@ From `docs/architecture/2026-10-04-staff-review.md` (findings referenced as `S<n
 | Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
 | One plugin registration facade over the four registries | Could | M4 (with Plugin API v1) |
 | Remove leftovers: the ActionText import path, unused Action Mailbox / Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
+| Observability, first step: one span in `ApplicationService` (service, actor type, channel, outcome, audit event id) so every write is traced; attributes on the public request (resolver result, language, cache hit or miss); rescued exceptions reported through `Rails.error` instead of logged as a string | Must | O1, O2 |
+| Guards against the performance problems returning: N+1 detection raising in tests, and query-count assertions on a public page render and a page save | Should | O5 |
+| Structured logs tied to traces (trace id, actor); a jobs dashboard and failed-job counts on System status; browser errors reported to the server; a cache hit rate; `/up` that checks the database | Should | O3, O4, O6, O7, O8 |
 | Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | Must (before a first deploy) | L1–L4 |
 | Smaller defects: unbounded titles in single-record flashes, forged param shapes that 500, a held Turbo submission cancelled by the next, translate timeout that doesn't abort, inconsistent result handling, two ways to enable a language, Duplicate across two transactions | Could | S26–S32 |
 
