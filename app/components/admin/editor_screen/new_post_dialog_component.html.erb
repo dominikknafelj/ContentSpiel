@@ -1,0 +1,9 @@
+<%= render Admin::DialogComponent.new(id: ID, title: "New post", width: :form) do |dialog| %>
+  <%= render form %>
+  <% dialog.with_footer do %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+    <% end %>
+    <%= render Admin::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit", form: form.form_id) %>
+  <% end %>
+<% end %>

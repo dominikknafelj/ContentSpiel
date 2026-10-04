@@ -43,6 +43,10 @@ export default class extends Controller {
     const dialog = document.getElementById(event.params.id)
     if (!dialog || dialog.open) return
     event.preventDefault()
+    // Tells a form dialog who opened it, so it can preset itself from the
+    // trigger's own `data-*` (`admin--new-record`: Inside and Title).
+    // Dispatched on <body>, bubbling to `document`, before the dialog shows.
+    this.dispatch("opening", { detail: { dialog, trigger: event.currentTarget } })
     dialog.showModal()
     this.focusFirstField(dialog)
   }

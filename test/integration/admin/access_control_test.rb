@@ -443,8 +443,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/new"
 
     assert_response :success
-    assert_select "select[name='post[content_type]'] option:not([value=''])", count: 1
-    assert_select "select[name='post[content_type]'] option[value='blog']"
+    assert_select "input[type=radio][name='post[content_type]']", count: 1
+    assert_select "input[type=radio][name='post[content_type]'][value='blog']"
   end
 
   # --- View only ---------------------------------------------------------------

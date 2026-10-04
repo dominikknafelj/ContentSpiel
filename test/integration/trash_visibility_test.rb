@@ -273,6 +273,18 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_empty @kept_post.reload.related_posts
   end
 
+  test "the New page dialog's Inside picker never offers a trashed page, and a forged trashed parent is a 404" do
+    sign_in_as(users(:one))
+    get "/cs-studio/pages/#{@kept_page.id}"
+
+    assert_select "#new-page-inside option[value='#{@kept_page.id}']"
+    assert_select "#new-page-inside option[value='#{@gone_page.id}']", count: 0
+    assert_no_difference "Page.count" do
+      post "/cs-studio/pages", params: { page: { title: "Under the trash", parent_id: @gone_page.id } }
+    end
+    assert_response :not_found
+  end
+
   test "the media library, picker and search hide trashed images" do
     sign_in_as users(:one)
     get "/cs-studio/media"

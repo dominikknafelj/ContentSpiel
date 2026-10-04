@@ -47,18 +47,22 @@ module Admin
       @translation_states = Translations::StateIndex.states_for(@posts)
     end
 
-    # "New post" (spec §5.2): asks for the content type up front, in the
-    # same form as the title -- unlike a page's own title-only "Add a page",
-    # a post has no tree position to default; its content type is fixed for
-    # good the moment `create` below saves it (`Post#definition` never
-    # changes after that), so there is no second chance to pick one later
-    # the way a page's type-ish choices (page_type) stay editable in its own
-    # settings form.
+    # The no-JS fallback of the New post dialog (design pass round 2, Task 15):
+    # the same form (`Admin::EditorScreen::NewPostFormComponent`) as a page of
+    # its own; with JavaScript every "New post" trigger opens the dialog in
+    # the layout instead. The content type is chosen here and nowhere else: it
+    # is fixed for good the moment `create` below saves it (`Post#definition`
+    # never changes after that), unlike a page's type, which stays editable.
     def new
-      @post = Post.new
-      @content_types = creatable_content_types
+      @post = Post.new(content_type: params[:type])
     end
 
+    # From the dialog (type, title) or the standalone form: a draft of the
+    # chosen type. A type the viewer may not create is a `denied` from
+    # `Posts::Save` (one `access.denied` event, the 403 page) however the
+    # request was forged; a blank title is a 422 that, for a Turbo submission,
+    # replaces just the dialog's form (typed values kept, error summary on top)
+    # and, without JS, re-renders the standalone page.
     def create
       result = Posts::Save.call(Post.new, attributes: { content_type: params.dig(:post, :content_type), published: false },
         translations: { admin_locale => { title: params.dig(:post, :title) } })
@@ -68,8 +72,8 @@ module Admin
       else
         forbidden_or(result) do
           @post = result.record
-          @content_types = creatable_content_types
-          render :new, status: :unprocessable_entity
+          @post.errors.add(:base, result.errors.to_sentence) if @post.errors.empty?
+          render_new_post_failure
         end
       end
     end
@@ -192,11 +196,16 @@ module Admin
       @post = admin_scope(Post.all).find(params[:id])
     end
 
-    # The content types "New post" offers: the registered ones the actor may
-    # create a post of (`posts.create` scoped by `content_types`, design
-    # spec §3.3 "Create post"), checked against an unsaved post of each.
-    def creatable_content_types
-      ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
+    def render_new_post_failure
+      form = Admin::EditorScreen::NewPostFormComponent.new(
+        url_options: admin_url_options, locale: admin_locale, content_type: params.dig(:post, :content_type),
+        title: params.dig(:post, :title), errors: @post.errors
+      )
+
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: turbo_stream.replace(form.form_id, form), status: :unprocessable_entity }
+        format.html { render :new, status: :unprocessable_entity }
+      end
     end
 
     def filtered_posts

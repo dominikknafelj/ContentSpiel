@@ -102,6 +102,18 @@
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
 
+    <%# The New page and New post dialogs (design pass round 2, Task 15): once
+        each, here, outside `#content` and every form. Every "+ New page" /
+        "New post" trigger (tree header and rows, ⌘K, the pages empty state,
+        the dashboard, the posts list) opens one of these. Each renders only
+        for a viewer who may create something. The no-JS `new` pages render
+        the same form on their own and skip the dialogs (`:standalone_new_record`),
+        so no id appears twice. %>
+    <% unless content_for?(:standalone_new_record) %>
+      <%= render Admin::EditorScreen::NewPageDialogComponent.new(url_options: admin_url_options, locale: admin_locale) %>
+      <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options, locale: admin_locale) %>
+    <% end %>
+
     <%# The rich-text editor's image, YouTube and Page link dialogs (design pass
         round 2, Task 13): one of each, here for the same reason as the picker
         -- outside `#content` and every autosave form. The editor that opens

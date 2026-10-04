@@ -10,7 +10,7 @@
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
   <h1 class="text-h1 text-ink">Posts</h1>
   <% if may_create %>
-    <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+    <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: dialog_trigger("new-post-dialog").merge(turbo_frame: "content"), class: setup_primary_button_class %>
   <% end %>
 </div>
 
@@ -58,7 +58,7 @@
       <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: (may_create ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
         <% if may_create %>
           <% empty_state.with_action do %>
-            <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+            <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: dialog_trigger("new-post-dialog").merge(turbo_frame: "content"), class: setup_primary_button_class %>
           <% end %>
         <% end %>
       <% end %>

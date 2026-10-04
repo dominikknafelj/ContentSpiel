@@ -17,9 +17,13 @@ module Jump
     LIMIT = 5
     MAX_QUERY = 100
 
+    # An action with a `dialog:` opens that dialog (the New page / New post
+    # dialogs) instead of navigating: its row is still a link, to `path`, which
+    # is what a viewer without JavaScript (or a dialog that isn't on the page)
+    # gets. See `admin/jump/show`.
     ACTIONS = [
-      { title: "New page", path: :new_admin_page_path, permission: "pages.create" },
-      { title: "New post", path: :new_admin_post_path, permission: "posts.create" },
+      { title: "New page", path: :new_admin_page_path, permission: "pages.create", dialog: "new-page-dialog" },
+      { title: "New post", path: :new_admin_post_path, permission: "posts.create", dialog: "new-post-dialog" },
       { title: "Upload image", path: :admin_media_path, permission: "media.upload" },
       { title: "Change password", path: :admin_account_password_path, permission: nil }
     ].freeze
@@ -111,7 +115,7 @@ module Jump
     def action_rows
       ACTIONS.select { |action| action[:permission].nil? || AccessControl.holds?(actor, action[:permission], channel: :admin) }
         .select { |action| blank? || matches?(action[:title]) }
-        .map { |action| { title: action[:title], url: routes.public_send(action[:path], **url_options) } }
+        .map { |action| { title: action[:title], url: routes.public_send(action[:path], **url_options), dialog: action[:dialog] }.compact }
     end
 
     def display_title(record) = Locales.read(record, :title, locale: Locales.default).presence || "(untitled)"

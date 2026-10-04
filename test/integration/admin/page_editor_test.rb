@@ -485,11 +485,12 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
   test "the page type is a select on the default tab and a read-only shared line on a translation tab" do
     get "/cs-studio/pages/#{@page.id}"
-    assert_select "form select[name='page[page_type]']"
+    # `main`: the layout's New page dialog has a select of the same name.
+    assert_select "main form select[name='page[page_type]']"
 
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
     assert_select "form.admin-translation-form"
-    assert_select "form select[name='page[page_type]']", count: 0
+    assert_select "main form select[name='page[page_type]']", count: 0
     assert_select "[data-field-name='page_type']", text: /Page type:\s*Standard\s*— Shared by all languages\./
   end
 

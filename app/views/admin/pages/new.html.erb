@@ -1,41 +1,23 @@
+<%# The no-JS fallback of the New page dialog (design pass round 2, Task 15):
+    the dialog's own form, as a page. `:standalone_new_record` keeps the layout
+    from rendering the dialog as well (the same form ids twice). A refused
+    create answers with this page again (422), errors in the form's summary
+    and the typed values kept. `data-turbo-frame="_top"` on the form makes the
+    redirect to the new page's editor a full visit, so the tree shows it. %>
+<% content_for :standalone_new_record, "page" %>
 <% content_for :tree do %>
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
+<% form = Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+      parent_id: @page.parent_id, title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors) %>
 <div class="mx-auto max-w-md">
-  <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New page</h1>
+  <h1 class="mb-4 text-base font-semibold">New page</h1>
 
-  <%# `Pages::Save`'s own failure leaves its errors on the record it handed
-      back (`@page` here, from Admin::PagesController#create) -- read
-      straight off it rather than a flash, the same as any other admin form
-      in this app re-rendering after a failed save. %>
-  <% if @page.errors.any? %>
-    <p class="mb-4 text-danger-ink" role="alert"><%= @page.errors.full_messages.to_sentence %></p>
-  <% end %>
+  <%= render form %>
 
-  <%# `data-turbo-frame="_top"` (final-fixes round, finding 1): a 422
-      re-render still lands right back in this same frame either way (a
-      `_top`-targeted form submission that gets an ordinary HTML response
-      back is just a normal Turbo Drive visit, no different from a form
-      with no frame scoping at all), but the *success* path here redirects
-      to the new page's own editor -- left at this form's own default frame
-      target (`content`, its enclosing turbo-frame), that redirect would
-      only ever refresh this one frame, leaving the tree column outside it
-      still missing the page a "+"/"Add a page" click was just used to
-      create. `_top` makes that redirect an ordinary full-page visit
-      instead, which re-renders the tree (`content_for :tree`) along with
-      everything else. %>
-  <%= form_with url: admin_pages_path(**admin_url_options), method: :post, data: { turbo_frame: "_top" } do %>
-    <div class="mb-4">
-      <%= label_tag "page_title", "Title", class: setup_label_class %>
-      <%= text_field_tag "page[title]", @page.title, id: "page_title", autofocus: true, class: setup_input_class %>
-    </div>
-
-    <%= hidden_field_tag "page[parent_id]", @page.parent_id %>
-
-    <div class="flex gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit") %>
-      <%= link_to "Cancel", admin_pages_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-    </div>
-  <% end %>
+  <div class="mt-4 flex gap-2">
+    <%= render Admin::ButtonComponent.new(label: "Create page", variant: :primary, type: "submit", form: form.form_id) %>
+    <%= link_to "Cancel", admin_pages_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+  </div>
 </div>

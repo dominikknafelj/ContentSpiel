@@ -8,7 +8,7 @@ module Admin
     # The type select offers exactly the registered content types the actor
     # may create a post of, judged per type against an unsaved post of it
     # (`posts.create` can be scoped by `content_types`) -- the same check
-    # `Admin::PostsController#creatable_content_types` makes for "New
+    # `Admin::EditorScreen::NewPostFormComponent#choices` makes for "New
     # post". It only narrows what's offered: `Posts::Save` repeats the
     # check on whatever type actually arrives, so a forged one is refused
     # there (403), not merely hidden here.

@@ -20,7 +20,7 @@
     <% if new_page? || upload_image? %>
       <div class="flex flex-wrap items-center gap-3">
         <% if new_page? %>
-          <%= link_to "New page", helpers.new_admin_page_path(**url_options), class: setup_secondary_link_class, data: { turbo_frame: "_top" } %>
+          <%= link_to "New page", helpers.new_admin_page_path(**url_options), class: setup_secondary_link_class, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "_top") %>
         <% end %>
         <% if upload_image? %>
           <%= link_to "Upload image", helpers.admin_media_path(**url_options), class: setup_secondary_link_class, data: { turbo_frame: "_top" } %>

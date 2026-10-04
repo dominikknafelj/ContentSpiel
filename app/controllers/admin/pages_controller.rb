@@ -63,13 +63,11 @@ module Admin
       @page = nil
     end
 
-    # "+" in the tree, or the module's own "Add a page" (spec §5.1) -- both
-    # land here with an optional `parent_id`, asking for nothing but a
-    # title. A page with no parent given yet (no page selected in the tree)
-    # falls back to the homepage in `create` below, not here: leaving
-    # `@page.parent_id` nil is what tells the hidden field (and, if the
-    # title turns out blank, the re-rendered form) to show no parent chosen
-    # rather than silently pre-filling the homepage's id.
+    # The no-JS fallback of the New page dialog (design pass round 2, Task
+    # 15): the same form (`Admin::EditorScreen::NewPageFormComponent`) as a
+    # page of its own. With JavaScript every "+ New page" trigger opens the
+    # dialog in the layout instead and never gets here. `parent_id` presets
+    # Inside; none means Home (the form's own default).
     #
     # The parent is looked up through the read scope (a parent id outside
     # it is a 404, like any other out-of-scope record), and the form is
@@ -83,13 +81,33 @@ module Admin
       forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
     end
 
-    # Every field but the title goes through the same defaults regardless of
-    # who's asking (spec §5.1): a draft, under whichever parent the tree (or
-    # the empty state's own link) named, or the homepage if none did. The
-    # slug fills itself from the title (`LocalizedSlug#fill_blank_slugs`,
-    # run inside `Pages::Save` -> `Page#save`).
+    # From the New page dialog (title, Inside, Page type) or the standalone
+    # form: a draft under the chosen parent -- the homepage if none was named
+    # -- with the chosen type. The slug fills itself from the title
+    # (`LocalizedSlug#fill_blank_slugs`, run inside `Pages::Save` ->
+    # `Page#save`).
+    #
+    # A refusal that is the editor's to fix (a blank title, a taken or
+    # reserved slug, an unknown page type) answers 422: a Turbo Stream that
+    # replaces just the dialog's form with the typed values and an error
+    # summary, so the dialog stays open and the editor behind it is untouched;
+    # a plain request (no JS) gets the standalone page again. A permission
+    # refusal is the 403 page, and a parent outside the read scope is a 404
+    # (`requested_parent`), as for any forged id.
     def create
-      result = Pages::Save.call(Page.new, attributes: { parent: requested_parent, published: false },
+      page_type = params.dig(:page, :page_type).presence
+      parent = requested_parent
+
+      # `Page.new(page_type: "bogus")` raises ArgumentError (a Rails enum),
+      # which would be a 500 for a forged value: refuse it as a validation
+      # failure of the field instead, before it reaches the model.
+      if page_type && !Page.page_types.key?(page_type)
+        @page = Page.new(parent: parent)
+        @page.errors.add(:page_type, "isn't a page type")
+        return render_new_page_failure
+      end
+
+      result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, page_type: page_type }.compact,
         translations: { admin_locale => { title: params.dig(:page, :title) } })
 
       if result.ok?
@@ -97,7 +115,8 @@ module Admin
       else
         forbidden_or(result) do
           @page = result.record
-          render :new, status: :unprocessable_entity
+          @page.errors.add(:base, result.errors.to_sentence) if @page.errors.empty?
+          render_new_page_failure
         end
       end
     end
@@ -306,6 +325,18 @@ module Admin
     # silent fallback to the homepage that would put the page somewhere
     # the editor didn't choose. `Pages::Save` then decides `pages.create`
     # against the parent's branch.
+    def render_new_page_failure
+      form = Admin::EditorScreen::NewPageFormComponent.new(
+        url_options: admin_url_options, locale: admin_locale, parent_id: @page.parent_id || params.dig(:page, :parent_id),
+        title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors
+      )
+
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: turbo_stream.replace(form.form_id, form), status: :unprocessable_entity }
+        format.html { render :new, status: :unprocessable_entity }
+      end
+    end
+
     def requested_parent
       parent_id = params.dig(:page, :parent_id)
       parent_id.present? ? admin_scope(Page.all).find(parent_id) : root_page

@@ -28,6 +28,17 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", new_admin_post_path, text: "New post"
   end
 
+  test "the New page and New post actions are links that close the palette and open their dialogs" do
+    sign_in_as users(:one)
+    get admin_jump_path(q: "new p")
+
+    %w[page post].each do |kind|
+      assert_select "a[href=?][data-action='admin--command-palette#close admin--dialog#open'][data-admin--dialog-id-param=?]",
+        public_send("new_admin_#{kind}_path"), "new-#{kind}-dialog", text: /New #{kind}/
+    end
+    assert_select "a[data-admin--dialog-id-param]", count: 2
+  end
+
   test "the fragment echoes the trimmed, capped query it answered" do
     sign_in_as users(:one)
     get admin_jump_path(q: "  jumpmatch  ")

@@ -7,12 +7,14 @@
       Admin::TreeController#update -- kept empty (not `sr-only`'d away
       entirely) on an ordinary page load, since there is nothing to report
       yet. %>
-  <%# Handoff §10 C34. The "+ New page" link keeps the page-form route until the
-      New page dialog (`new-page-dialog`) takes it over. %>
+  <%# Handoff §10 C34. "+ New page" opens the New page dialog (Inside = Home, the
+      default); the `href` is the no-JS page, and the trigger is a data attribute
+      on the link so it keeps working after this frame is replaced by a Turbo
+      Stream. %>
   <div class="mb-2 flex items-center gap-2 px-1">
     <h2 class="flex-1 text-sm font-semibold text-ink">Pages</h2>
     <% if can_add_page? %>
-      <%= link_to "+ New page", new_page_path, data: { turbo_frame: "content" }, class: "rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken" %>
+      <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: "rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken" %>
     <% end %>
     <% if offer_starter_pages? %>
       <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>

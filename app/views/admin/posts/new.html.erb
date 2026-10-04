@@ -1,32 +1,17 @@
-<%# "New post" (cs-studio spec §5.2): asks for the content type first, in
-    the same form as the title -- the content type is fixed for good the
-    moment `Admin::PostsController#create` saves it, so this is the only
-    screen that ever gets to choose it. Mirrors `admin/pages/new.html.erb`'s
-    own shape (a title-only form submitted into the enclosing `<turbo-frame
-    id="content">`, no `data-turbo-frame` needed) plus the one extra field. %>
+<%# The no-JS fallback of the New post dialog (design pass round 2, Task 15):
+    the dialog's own form, as a page; see `admin/pages/new`. The form's
+    `_top` target makes the redirect to the new post's editor a full visit. %>
+<% content_for :standalone_new_record, "post" %>
+
+<% form = Admin::EditorScreen::NewPostFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+      content_type: @post.content_type.presence || params.dig(:post, :content_type), title: params.dig(:post, :title), errors: @post.errors) %>
 <div class="mx-auto max-w-md">
-  <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New post</h1>
+  <h1 class="mb-4 text-base font-semibold">New post</h1>
 
-  <% if @post.errors.any? %>
-    <p class="mb-4 text-danger-ink" role="alert"><%= @post.errors.full_messages.to_sentence %></p>
-  <% end %>
+  <%= render form %>
 
-  <%= form_with url: admin_posts_path(**admin_url_options), method: :post do %>
-    <div class="mb-4">
-      <%= label_tag "post_content_type", "Content type", class: setup_label_class %>
-      <%= select_tag "post[content_type]",
-            options_for_select(@content_types.map { |type| [ type.label, type.name ] }, @post.content_type),
-            id: "post_content_type", include_blank: "Choose a type…", required: true, class: setup_select_class %>
-    </div>
-
-    <div class="mb-4">
-      <%= label_tag "post_title", "Title", class: setup_label_class %>
-      <%= text_field_tag "post[title]", @post.title, id: "post_title", autofocus: true, class: setup_input_class %>
-    </div>
-
-    <div class="flex gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Create post", variant: :primary, type: "submit") %>
-      <%= link_to "Cancel", admin_posts_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-    </div>
-  <% end %>
+  <div class="mt-4 flex gap-2">
+    <%= render Admin::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit", form: form.form_id) %>
+    <%= link_to "Cancel", admin_posts_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+  </div>
 </div>

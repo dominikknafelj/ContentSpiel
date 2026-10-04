@@ -1,0 +1,30 @@
+<%= form_with url: url, method: :post, id: form_id,
+      data: { turbo_frame: "_top", controller: "admin--new-record", admin__new_record_kind_value: "page",
+              action: "admin--dialog:opening@document->admin--new-record#opened input->admin--new-record#update change->admin--new-record#update turbo:submit-start->admin--new-record#submitting turbo:submit-end->admin--new-record#submitted" } do %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
+
+  <div class="mb-4">
+    <label for="<%= TITLE_ID %>" class="<%= setup_label_class %>">Title</label>
+    <%= text_field_tag "page[title]", title_value, id: TITLE_ID, autofocus: true, autocomplete: "off", class: setup_input_class,
+          data: { admin__new_record_target: "title" }, aria: { invalid: (title_invalid? ? "true" : nil) } %>
+  </div>
+
+  <div class="mb-4 grid grid-cols-2 gap-3">
+    <div class="min-w-0">
+      <label for="<%= INSIDE_ID %>" class="<%= setup_label_class %>">Inside</label>
+      <select name="page[parent_id]" id="<%= INSIDE_ID %>" class="mt-1 <%= setup_select_class %>" data-admin--new-record-target="inside">
+        <% choices.each do |choice| %>
+          <%= tag.option choice.label, value: choice.id, selected: (choice.id == selected_choice.id), data: { path: choice.path, title: choice.title } %>
+        <% end %>
+      </select>
+    </div>
+    <div class="min-w-0">
+      <label for="<%= TYPE_ID %>" class="<%= setup_label_class %>">Page type</label>
+      <%= select_tag "page[page_type]", options_for_select(page_type_options, page_type), id: TYPE_ID, class: "mt-1 #{setup_select_class}",
+            data: { admin__new_record_target: "pageType" } %>
+    </div>
+  </div>
+
+  <p data-admin--new-record-target="url" class="font-cs-mono text-[13px] text-dim"><%= initial_url %></p>
+  <p data-admin--new-record-target="note" class="mt-1 text-[13px] text-meta"><%= initial_note %></p>
+<% end %>

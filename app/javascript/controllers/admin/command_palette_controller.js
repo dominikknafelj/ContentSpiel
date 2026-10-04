@@ -55,6 +55,12 @@ export default class extends Controller {
     this.input.focus()
   }
 
+  // Closes the palette without following anything: a row that opens another
+  // dialog (New page, New post) calls this first, then `admin--dialog#open`.
+  close() {
+    this.dialog?.close()
+  }
+
   search() {
     clearTimeout(this.timer)
     this.pendingEnter = false
