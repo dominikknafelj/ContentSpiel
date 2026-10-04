@@ -88,6 +88,17 @@
         fixed target. Empty on a frame request -- see the relay above. %>
     <%= render Admin::ToastRegionComponent.new(flash: turbo_frame_request? ? {} : flash) %>
 
+    <%# The one Leave dialog (design pass spec §4): `admin--save-bar` opens it
+        when a Turbo visit would drop unsaved changes, and wires its Leave
+        button (`data-leave-confirm`) per open, as a listener rather than an
+        inline handler. Here, outside `#content` and every form, like every
+        dialog. Stay is the Cancel button. %>
+    <%= render Admin::ConfirmDialogComponent.new(id: "leave-dialog", title: "Leave without saving?", body: "Your changes on this screen will be lost.", cancel_label: "Stay") do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= render Admin::ButtonComponent.new(label: "Leave", variant: :primary, type: "button", data: { leave_confirm: true }) %>
+      <% end %>
+    <% end %>
+
     <%# The one media picker (media library Task 8) -- here, outside the
         `#content` frame and every form, so there's exactly one per page
         however many image fields and editors open it, and its own inputs

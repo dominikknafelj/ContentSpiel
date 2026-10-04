@@ -1,0 +1,7 @@
+<%# `hidden` is the initial state; `admin--save-bar#refresh` toggles it. The
+    count is a polite live region so a screen reader hears the number change. %>
+<div hidden data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 -mx-6 mt-6 flex items-center justify-end gap-3 border-t border-line bg-surface px-6 py-3">
+  <span data-admin--save-bar-target="count" aria-live="polite" class="mr-auto font-cs-mono text-label uppercase tracking-mono text-meta"></span>
+  <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+  <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data) %>
+</div>
