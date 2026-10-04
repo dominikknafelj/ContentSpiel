@@ -1,154 +1,92 @@
 module Admin
-  # The audit log (access-control design spec §5 "Audit log module",
-  # Task 9): a paginated list of every `Audit::Event`, filterable by
-  # user/action/subject/date range, plus each event's own page.
+  # The audit log (access-control design spec §5 "Audit log module"; design pass
+  # round 3, Task 15): every `Audit::Event` under day headers, each told as a
+  # sentence (`Audit::Sentence`), filterable by user, action, type, channel and
+  # a date preset (`Audit::Filter`), plus each event's own page with its field
+  # changes as word diffs and Older/Newer through the same filtered list.
   #
-  # Unlike every other admin module, this one is never read-scoped by
-  # content (Task 9 controller ruling): `audit.view` is an
-  # administration-area permission (design spec §3.1) that the seeded set
-  # gives only to Admin, so whoever can open this screen at all sees every
-  # event -- there is no "my own events only" reading of it, and `index`/
-  # `show` load straight from `Audit::Event`, not through `admin_scope`.
-  # What *is* still scoped is where a row's subject link goes:
-  # `Admin::AuditEventsHelper#audit_subject_path` only links to a post or
-  # page the current viewer can still read (Review Focus 2 -- a record's
-  # existence is never disclosed through a wider door than its own editor
-  # already opens), falling back to the plain `subject_label` otherwise.
+  # Unlike every other admin module, this one is never read-scoped by content
+  # (Task 9 controller ruling): `audit.view` is an administration-area
+  # permission (design spec §3.1) that the seeded set gives only to Admin, so
+  # whoever can open this screen at all sees every event -- there is no "my own
+  # events only" reading of it, and `index`/`show` load straight from
+  # `Audit::Event`, not through `admin_scope`. The DISCLOSURE is unchanged from
+  # before the redesign: an event's stored label (a title) shows for every
+  # event, a record the viewer can't read included. What is still scoped is
+  # where a subject LINKS: `Audit::Sentence::Targets` links a post or page only
+  # when the viewer can read it (decided for the whole page of events at once,
+  # not per row), a user, group or the settings only to the right to manage
+  # them, and everything else (a deleted record, a block, a tag) is plain text.
+  #
+  # Filters as query params: `user_id` is a `User` id, `event_action` the bare
+  # catalogue string -- named `event_action`, not the more obvious `action`,
+  # because `params[:action]` is Rails' own routing parameter (the controller
+  # action, "index"/"show") and would silently shadow it -- `subject_type` +
+  # `subject_id` narrow to one record (exactly what the Activity link on a
+  # post/page/user editor sends), `channel`, and `range` (+ `from`/`to` for a
+  # custom one). Each is validated by `Audit::Filter`; an invalid value is
+  # dropped, never a 500.
+  #
+  # Pagination is `limit`/`offset` (round 3 decision D23): fetching one extra row
+  # (`PER_PAGE + 1`) is how `@has_next` is known without a count, and Newer /
+  # Load older rather than page numbers, since an offset alone can't give a
+  # reliable page count against a log that keeps growing underneath a
+  # paged-back visitor. The order is `last_occurred_at DESC, id DESC`
+  # (`index_audit_events_on_recent`), which is also where a coalesced span sits.
   class AuditEventsController < BaseController
     PER_PAGE = 50
-
-    # The subject types any cataloged event (design spec §4.3) can carry,
-    # keyed by the polymorphic `subject_type` string actually stored on
-    # the row -- `AccessControl::Group`'s own table-name comment explains
-    # why its own type is the full namespaced name, not "Group". This is
-    # the filter's whitelist (Task 9 brief: "subject_type among known
-    # types ... invalid -> ignored, no 500") and the index view's own
-    # <select>, so the two can't silently drift apart about what "known"
-    # means; `AuditEventsHelper#audit_subject_path` matches the same
-    # literals for the same reason.
-    SUBJECT_TYPES = {
-      "Post" => "Post",
-      "Page" => "Page",
-      "ContentBlock" => "Block",
-      "AccessControl::Group" => "Group",
-      "Tag" => "Tag",
-      "User" => "User",
-      "SiteSetting" => "Settings",
-      "ApiToken" => "API token",
-      # Media library Task 1 renamed the model from the bare `MediaAsset` to
-      # `Media::Asset`; the key here is today's name, since new events only
-      # ever store that. A pre-rename row's `subject_type` still reads
-      # `"MediaAsset"` (append-only, never rewritten -- `Audit::Event`'s own
-      # comment); filtering by "Media asset" matches those rows too
-      # (`#stored_subject_types`, final fix wave M3), and the row lists and
-      # shows fine (its
-      # `subject_label` was captured at write time, not derived from the
-      # constant, and `Audit::Event.polymorphic_class_for` maps the legacy
-      # string so `event.subject` itself doesn't raise `NameError` loading a
-      # class that no longer exists under that name).
-      "Media::Asset" => "Media asset"
-    }.freeze
+    # The User drop-down's cap (the chosen user is always included).
+    MAX_USERS = 200
+    # Actions the log holds that no sentence knows (a plugin's), for the Action
+    # drop-down's "Other" group.
+    MAX_OTHER_ACTIONS = 100
 
     before_action -> { require_permission("audit.view") }
+    before_action :load_filter
 
-    # Filters as query params (mirrors `Admin::PostsController#index`'s own
-    # comment about its own filters): `user_id` is a `User` id,
-    # `event_action` the bare catalogue string (design spec §4.3) -- named
-    # `event_action`, not the more obvious `action`, because `params
-    # [:action]` is Rails' own routing parameter (the controller action,
-    # "index"/"show") and would silently shadow it, matching nothing ever
-    # again -- `subject_type`/`subject_id` narrow to one record (exactly
-    # what the Activity link on a post/page/user editor sends), and
-    # `from`/`to` an inclusive date range in plain `YYYY-MM-DD`. Every one
-    # of them is validated here rather than trusted straight into a
-    # `where`: an invalid or unknown value is silently dropped from the
-    # scope, never a 500 (Task 9 brief).
-    #
-    # Pagination is plain `limit`/`offset` (Task 9 brief: "use the
-    # existing pattern if there is one, else simple limit/offset [50]") --
-    # no other CS Studio list paginates at all (every other one renders in
-    # full), so there's no existing pattern to follow. Fetching one extra
-    # row (`PER_PAGE + 1`) is how `@has_next` is known without a second
-    # `count` query; Next/Previous rather than page numbers, since an
-    # offset alone can't render a reliable page count against a log that
-    # keeps growing underneath a paged-back visitor.
     def index
-      @events = filtered_events.recent.includes(:subject, :user).limit(PER_PAGE + 1).offset(offset).to_a
-      @has_next = @events.size > PER_PAGE
-      @events = @events.first(PER_PAGE)
-      preload_page_branches(@events)
+      events = Audit::Filter.ordered(@filter.scope).includes(:user).limit(PER_PAGE + 1).offset(offset).to_a
+      @has_next = events.size > PER_PAGE
+      events = events.first(PER_PAGE)
       @offset = offset
-      @users = User.order(:email_address)
-      @actions = Audit::Event.distinct.order(:action).pluck(:action)
-      @subject_types = SUBJECT_TYPES
+      @entries = events.zip(Audit::Sentence.for_events(events, viewer: Current.actor, channel: Current.channel))
+      @users = users_for_filter
+      @other_actions = Audit::Event.where.not(action: Audit::Sentence::ACTIONS).distinct.limit(MAX_OTHER_ACTIONS).pluck(:action)
     end
 
+    # An event outside the current filters is not found (the list the visitor
+    # came from wouldn't show it), exactly as a missing id is.
     def show
-      @event = Audit::Event.includes(:subject, :user).find(params[:id])
-      preload_page_branches([ @event ])
+      @event = @filter.scope.includes(:user).find(params[:id])
+      @sentence = Audit::Sentence.for(@event, viewer: Current.actor, channel: Current.channel)
+      @older_id = neighbour(@event, :older)
+      @newer_id = neighbour(@event, :newer)
     end
 
     private
 
-    # Fix round 1 review: `AuditEventsHelper#audit_subject_path` checks
-    # `pages.read` per row for every Page subject the current viewer might
-    # see. For a viewer whose `pages.read` grant is scoped by branch
-    # (`page_ids`), each of those checks would otherwise cost its own
-    # closure-table query (`Checker#branch_ids` -> `Checker.
-    # page_branch_ids`) -- up to `PER_PAGE` per index page. One batched
-    # `AccessControl.preload_branches` call up front (design spec §3.3
-    # "Performance", the same call a page tree or list of pages already
-    # makes elsewhere in CS Studio) leaves every page's branch on the
-    # object itself, so `Checker.page_branch_ids` answers from the preload
-    # instead of querying. Post-subject reads never walk the closure
-    # table at all (a post has no branch), so only `Page` subjects need
-    # this; `filter_map` both selects them and drops the nil `subject`s a
-    # deleted record's event already has.
-    def preload_page_branches(events)
-      AccessControl.preload_branches(events.filter_map { |event| event.subject if event.subject.is_a?(Page) })
-    end
+    def load_filter = @filter = Audit::Filter.new(params)
 
     def offset
       raw = params[:offset].to_i
       raw.positive? ? raw : 0
     end
 
-    def filtered_events
-      scope = Audit::Event.all
-      scope = scope.where(user_id: params[:user_id]) if params[:user_id].present?
-      scope = scope.where(action: params[:event_action]) if params[:event_action].present?
-      scope = scope.where(subject_type: stored_subject_types(params[:subject_type])) if SUBJECT_TYPES.key?(params[:subject_type])
-      # `subject_id` alone, without a valid `subject_type`, is ambiguous
-      # (a `Post` and a `Page` can share the same id) -- ignored rather
-      # than matched against every type at once.
-      scope = scope.where(subject_id: params[:subject_id]) if params[:subject_id].present? && SUBJECT_TYPES.key?(params[:subject_type])
-      scope = scope.where(occurred_at: from_date..) if from_date
-      scope = scope.where(occurred_at: ..to_date) if to_date
-      scope
+    # The adjacent event in the list's own order (`last_occurred_at, id`,
+    # newest first) within the current filters, one indexed query: a row
+    # comparison on the very pair `index_audit_events_on_recent` is ordered by.
+    def neighbour(event, direction)
+      older = direction == :older
+      scope = @filter.scope.where("(audit_events.last_occurred_at, audit_events.id) #{older ? "<" : ">"} (?, ?)", event.last_occurred_at, event.id)
+      scope = older ? Audit::Filter.ordered(scope) : scope.order(last_occurred_at: :asc, id: :asc)
+      scope.pick(:id)
     end
 
-    # A known type plus every legacy name stored for it before a rename
-    # (`Audit::Event::LEGACY_POLYMORPHIC_TYPES`, final fix wave M3) -- the
-    # "Media asset" filter also finds the rows written as `"MediaAsset"`,
-    # so one image's history doesn't split at the rename.
-    def stored_subject_types(type)
-      [ type, *Audit::Event::LEGACY_POLYMORPHIC_TYPES.filter_map { |legacy, current| legacy if current == type } ]
-    end
-
-    def from_date = @from_date ||= parsed_date(params[:from])&.beginning_of_day
-
-    def to_date = @to_date ||= parsed_date(params[:to])&.end_of_day
-
-    # `Date.iso8601` raises on anything that isn't a real `YYYY-MM-DD`
-    # date (a typo, a stray query param, a probing request) -- caught
-    # here so a malformed filter never reaches the visitor as a 500
-    # (Task 9 brief).
-    def parsed_date(value)
-      return nil if value.blank?
-
-      Date.iso8601(value.to_s)
-    rescue ArgumentError, TypeError
-      nil
+    def users_for_filter
+      users = User.order(:email_address).limit(MAX_USERS).to_a
+      chosen = @filter.user_id
+      users << User.find_by(id: chosen) if chosen && users.none? { |user| user.id == chosen }
+      users.compact
     end
   end
 end

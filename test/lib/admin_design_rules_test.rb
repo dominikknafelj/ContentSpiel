@@ -94,7 +94,8 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     %w[
       status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb
       record_header_component.rb tag_input_component.rb translation_screen/list_component.rb
-      translation_screen/outdated_note_component.rb dashboard_screen/column_component.rb
+      translation_screen/outdated_note_component.rb dashboard_screen/column_component.rb audit_changes_component.rb
+      audit_changes_component.html.erb
     ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end

@@ -215,8 +215,8 @@ module Admin
       # an owner the current viewer can actually read
       # (`pages.read`/`posts.read`) becomes a link; unreadable becomes a
       # neutral label (global constraints' own "Used on" ruling) --
-      # exactly `Admin::AuditEventsHelper#audit_subject_path`'s rule,
-      # reapplied here since neither that helper nor `Media::Asset`'s own
+      # exactly the audit log's rule (`Audit::Sentence::Targets`),
+      # reapplied here since neither that nor `Media::Asset`'s own
       # (text-only) `#in_use_message` is built to hand back a
       # clickable link.
       #

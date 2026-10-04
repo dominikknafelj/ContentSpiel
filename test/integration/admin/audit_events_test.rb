@@ -111,13 +111,13 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events", params: { event_action: "test.paginate" }
     assert_response :success
-    assert_select "tbody tr", 50
+    assert_select "li[id^=audit_event_]", 50
     assert_select "a", { text: "Load older" }
     assert_select "a", { text: "Newer", count: 0 }
 
     get "/cs-studio/audit_events", params: { event_action: "test.paginate", offset: 50 }
     assert_response :success
-    assert_select "tbody tr", 1
+    assert_select "li[id^=audit_event_]", 1
     assert_select "a", { text: "Load older", count: 0 }
     assert_select "a", { text: "Newer" }
   end
@@ -184,10 +184,9 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events"
 
     assert_response :success
+    # Linked now (the viewer holds `media.upload` and the image exists), as the
+    # dashboard's feed does; the stored label is what reads either way.
     assert_select "##{dom_id(event)}", text: /Media asset ##{asset.id}/
-    assert_select "##{dom_id(event)}" do
-      assert_select "a", text: /Media asset/, count: 0
-    end
 
     get "/cs-studio/audit_events/#{event.id}"
 
@@ -233,8 +232,8 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events/#{event.id}"
 
     assert_response :success
-    assert_select "dd a", text: post_record.title, count: 0
-    assert_select "dd", text: /#{Regexp.escape(post_record.title)}/
+    assert_select "h1 a", text: post_record.title, count: 0
+    assert_select "h1", text: /#{Regexp.escape(post_record.title)}/
   end
 
   test "the post editor's Activity link opens the log filtered to that post, and the page editor's own" do
@@ -305,7 +304,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
       assert_response :success
     end
 
-    assert_select "tbody tr", 30 # sanity: the last (30-row) request really rendered every row
+    assert_select "li[id^=audit_event_]", 30 # sanity: the last (30-row) request really rendered every row
     assert_equal few_count, many_count,
       "expected a constant number of queries regardless of Page-subject row count (3 rows: #{few_count}, 30 rows: #{many_count})"
   end
@@ -348,8 +347,8 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events"
 
     assert_response :success
-    assert_select "td", text: "#{users(:two).display_name} via <b>Claude</b>"
-    assert_select "td b", count: 0
+    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via <b>Claude<\/b>/
+    assert_select "li p b", count: 0
   end
 
   test "a token event whose user is gone reads a deleted user via the name" do
@@ -359,7 +358,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events"
 
-    assert_select "td", text: "a deleted user via Claude desktop"
+    assert_select "li p", text: /a deleted user via Claude desktop/
   end
 
   test "an old token event with no label reads via an API token" do
@@ -369,6 +368,6 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events"
 
-    assert_select "td", text: "#{users(:two).display_name} via an API token"
+    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via an API token/
   end
 end

@@ -1,0 +1,33 @@
+<section class="rounded-cs border border-line bg-surface">
+  <h2 class="border-b border-line px-4 py-3 text-h2 text-ink">Changes</h2>
+  <% if empty? %>
+    <p class="px-4 py-3 text-sm text-meta">No field changes recorded.</p>
+  <% end %>
+  <% groups.each do |group| %>
+    <div class="overflow-x-auto border-b border-line last:border-b-0" data-changes-group="<%= group.code || "fields" %>">
+      <p class="px-4 pt-3 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group.heading %></p>
+      <table class="w-full min-w-[640px] border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+            <th class="w-40 px-4 py-2 font-normal">Field</th>
+            <th class="py-2 pr-4 font-normal">Before</th>
+            <th class="py-2 pr-4 font-normal">After</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% group.rows.each do |row| %>
+            <tr class="border-b border-line align-top last:border-b-0">
+              <td class="px-4 py-2 font-cs-mono text-xs text-dim"><%= row.field %></td>
+              <% if row.kind == :changed %>
+                <td class="py-2 pr-4 text-meta" colspan="2">Changed</td>
+              <% else %>
+                <td class="py-2 pr-4 whitespace-pre-line break-words text-ink"><%= before_html(row) %></td>
+                <td class="py-2 pr-4 whitespace-pre-line break-words text-ink"><%= after_html(row) %></td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</section>
