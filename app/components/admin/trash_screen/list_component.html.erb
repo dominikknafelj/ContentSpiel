@@ -1,9 +1,9 @@
 <% if may_empty? && total_count.positive? %>
   <div class="mb-4 flex justify-end">
     <%= render Admin::ButtonComponent.new(label: "Empty trash", variant: :danger, type: "button",
-          onclick: "document.getElementById('#{EMPTY_DIALOG_ID}').showModal()") %>
+          data: dialog_trigger(EMPTY_DIALOG_ID)) %>
   </div>
-  <%= render Admin::ConfirmDialogComponent.new(id: EMPTY_DIALOG_ID, title: "Empty the trash?",
+  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: EMPTY_DIALOG_ID, title: "Empty the trash?",
         body: "#{helpers.pluralize(total_count, "item")} will be deleted permanently. This can't be undone.") do |dialog| %>
     <% dialog.with_confirm_action do %>
       <%= form_with url: helpers.admin_empty_trash_path(**url_options), method: :delete, data: { turbo_frame: "_top" } do %>

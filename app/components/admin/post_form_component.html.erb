@@ -88,9 +88,9 @@
 
     <% if can_delete? %>
       <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
-            onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+            data: dialog_trigger(delete_dialog_id)) %>
 
-      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
+      <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
         <% dialog.with_confirm_action do %>
           <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
             <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>

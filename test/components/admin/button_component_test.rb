@@ -26,4 +26,10 @@ class Admin::ButtonComponentTest < ViewComponent::TestCase
   test "rejects an unknown variant" do
     assert_raises(ArgumentError) { Admin::ButtonComponent.new(label: "Save", variant: :nope) }
   end
+
+  test "the ghost variant is accepted" do
+    render_inline Admin::ButtonComponent.new(label: "Cancel", variant: :ghost)
+
+    assert_selector "button.text-dim", text: "Cancel"
+  end
 end

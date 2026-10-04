@@ -97,9 +97,9 @@
         moves its whole branch along (trash spec §4.1). %>
     <% if may_delete? && can_delete? %>
       <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
-            onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+            data: dialog_trigger(delete_dialog_id)) %>
 
-      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this page to the trash?", body: delete_dialog_body) do |dialog| %>
+      <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this page to the trash?", body: delete_dialog_body) do |dialog| %>
         <% dialog.with_confirm_action do %>
           <%= form_with url: helpers.admin_page_path(page, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
             <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>

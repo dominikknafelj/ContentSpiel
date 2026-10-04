@@ -60,3 +60,13 @@
   background: var(--cs-sunken);
   color: var(--cs-ink);
 }
+
+/* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
+   and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
+.admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
+.admin-dialog[open] { display: flex; flex-direction: column; }
+.admin-dialog::backdrop { background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
+.admin-dialog[data-dialog-width="confirm"] { max-width: 420px; }
+.admin-dialog[data-dialog-width="form_narrow"] { max-width: 460px; }
+.admin-dialog[data-dialog-width="form"] { max-width: 560px; }
+.admin-dialog[data-dialog-width="picker"] { max-width: 880px; }

@@ -15,5 +15,7 @@ module Admin
   class AdminComponent < ViewComponent::Base
     include SetupHelper
     include AccessControlHelper
+    # `dialog_trigger(id)`: the `data:` that opens a dialog (no inline JS).
+    include Admin::DialogHelper
   end
 end

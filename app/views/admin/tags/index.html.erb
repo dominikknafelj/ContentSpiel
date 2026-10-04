@@ -49,7 +49,7 @@
 
           <td class="py-2 text-right">
             <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
-                  onclick: "document.getElementById('#{dialog_id}').showModal()") %>
+                  data: dialog_trigger(dialog_id)) %>
 
             <%# "Removes the tag from N posts" (spec §5.3) -- shown for every
                 tag, unused ones included (`pluralize` reads "0 posts" then),
@@ -57,7 +57,7 @@
                 still benefits from the same one confirmation step as any
                 other permanent delete (spec §7's "No trash" interim
                 state). %>
-            <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: "Delete this tag?",
+            <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete this tag?",
                   body: "Removes the tag from #{pluralize(tag.posts_count, 'post')}. This can't be undone.") do |dialog| %>
               <% dialog.with_confirm_action do %>
                 <%= form_with url: admin_tag_path(tag), method: :delete do %>

@@ -1,7 +1,8 @@
 <%= tag.dialog id: DIALOG_ID,
-      class: "admin-media-picker w-[min(56rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] rounded-cs border border-line-strong bg-surface p-6 text-ink shadow-menu backdrop:bg-black/40",
+      class: "admin-media-picker admin-dialog rounded-cs border border-line-strong bg-surface p-6 text-ink shadow-menu",
       "aria-labelledby": part_id("title"),
       data: {
+        dialog_width: "picker",
         controller: "admin--media-picker",
         action: "media-picker:open@window->admin--media-picker#open close->admin--media-picker#closed",
         "admin--media-picker-library-url-value": library_url,

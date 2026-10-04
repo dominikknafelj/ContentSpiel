@@ -67,9 +67,9 @@
           <td class="py-2 text-right">
             <% unless api_token.revoked_at %>
               <%= render Admin::ButtonComponent.new(label: "Revoke", variant: :danger, type: "button",
-                    onclick: "document.getElementById('#{dialog_id}').showModal()") %>
+                    data: dialog_trigger(dialog_id)) %>
 
-              <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: "Revoke this token?",
+              <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Revoke this token?",
                     body: "Any assistant using it stops working immediately. This can't be undone.") do |dialog| %>
                 <% dialog.with_confirm_action do %>
                   <%= form_with url: admin_api_token_path(api_token, **admin_url_options), method: :delete do %>

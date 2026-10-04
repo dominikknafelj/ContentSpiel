@@ -28,7 +28,7 @@
           <button type="button" data-action="click->admin--blocks#moveDown" class="w-full rounded-cs px-2 py-1 text-left text-sm text-ink hover:bg-sunken">Move down</button>
         <% end %>
         <button type="button" class="w-full rounded-cs px-2 py-1 text-left text-sm text-danger-ink hover:bg-danger-tint"
-                onclick="document.getElementById('<%= delete_dialog_id %>').showModal()">Delete</button>
+                data-action="admin--dialog#open" data-admin--dialog-id-param="<%= delete_dialog_id %>">Delete</button>
       </div>
     </details>
     <% end %>
@@ -86,7 +86,7 @@
   <% end %>
 
   <% if editable? %>
-    <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Delete this block?", body: "This can't be undone.") do |dialog| %>
+    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Delete this block?", body: "This can't be undone.") do |dialog| %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: destroy_path, method: :delete do %>
           <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
