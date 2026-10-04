@@ -38,7 +38,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # DOM subtree) rather than the whole page, since the exact wording
     # (global constraints) is this element's *entire* text content, not
     # just some text on the page.
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
 
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
@@ -92,7 +92,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # Still exactly one request: the second edit is queued behind the held
     # first one, not sent alongside it.
     assert_equal 1, page.evaluate_script("window.__patchesStarted")
-    assert_selector "#page-save-status", text: "Saving…"
+    assert_selector "#page-save-status", text: /SAVING/
 
     # Releasing the first request lets `admin--autosave` notice `pending`
     # and send the second attempt with whatever the form holds *now*.
@@ -164,7 +164,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     title_field.set("This will never actually save")
     title_field.send_keys(:tab)
 
-    assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 20
+    assert_selector "#page-save-status", text: "NOT SAVED · Retry", wait: 20
   end
 
   private

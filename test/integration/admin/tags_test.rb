@@ -51,7 +51,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: tag.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_match(/Saved \d\d:\d\d/, response.body)
+    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
     assert_equal "ruby", tag.reload.name
     assert_nil post.reload.full_path("en")
   end

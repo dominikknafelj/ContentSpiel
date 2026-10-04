@@ -53,7 +53,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     # the line).
     within("#post-related_post_ids-results") { find(:button, "Satellite").click }
     assert_selector "[data-controller~='admin--related-posts'] li", text: "Satellite"
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal [ other.id ], post_record.post_relations.reload.pluck(:related_post_id)
 
     within("[data-controller~='admin--related-posts'] li", text: "Satellite") { press "Remove" }

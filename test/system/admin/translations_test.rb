@@ -68,7 +68,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-title", "Use"
 
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "[de] Hello", find_field(id: "post-title").value
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
     post.reload
@@ -94,13 +94,13 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     # Past the autosave debounce (1 s): had the textarea's input or focusout
     # reached the form, a save would have run by now.
     sleep 1.5
-    assert_no_selector "#post-save-status", text: /Saved|Saving/, wait: 0
+    assert_no_selector "#post-save-status", text: /SAVED|SAVING/, wait: 0
     assert_nil post.reload.title(locale: "de", fallback: false), "editing a suggestion is not editing the field"
     assert_equal "", find_field(id: "post-title").value
 
     press_within "#translation-suggestion-post-title", "Use"
 
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "Edited by hand", find_field(id: "post-title").value
     assert_equal "Edited by hand", post.reload.title(locale: "de", fallback: false)
 
@@ -120,7 +120,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     press_within "#translation-suggestion-post-body-json", "Use"
 
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     post.reload
     assert_equal paragraph("[de] Body text"), post.body(locale: "de").to_h
     assert_equal :current, post.translation_state("body", "de")
@@ -144,8 +144,8 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
       press "Use all"
 
-      assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
-      assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
       page_record.reload
       assert_equal "[de] About", page_record.title(locale: "de", fallback: false)
       assert_equal "[de] Who we are", page_record.subtitle(locale: "de", fallback: false)
@@ -173,7 +173,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_no_selector "#translation-suggestion-page-title [role='alert']"
 
       press "Use all"
-      assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+      assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
       assert_equal "[de] To be", block.reload.translated_settings.dig("de", "text")
       assert_nil page_record.reload.title(locale: "de", fallback: false)
     end
@@ -204,7 +204,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}"
     await_admin_controllers
     fill_in "Title", with: "Hello there"
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal :outdated, post.reload.translation_state("title", "de")
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
@@ -239,7 +239,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-original-for='tagline']", text: "Things I learned"
 
     fill_in "settings-tagline", with: "Was ich gelernt habe"
-    assert_selector "#settings-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#settings-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal "Things I learned", site_settings(:default).reload.tagline(locale: "en")
 
     # The homepage eyebrow is uppercased by CSS, hence case-insensitive.

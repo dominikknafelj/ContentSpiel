@@ -29,6 +29,14 @@ export default class extends Controller {
     if (refocus) this.buttonTarget.focus()
   }
 
+  // A pick inside the panel (`close_on_select: true` wires this): the item has
+  // done its job (opened a dialog, revealed a panel, followed a link), so the
+  // panel goes. No refocus -- a dialog takes focus itself.
+  select(event) {
+    const item = event.target.closest("a, button")
+    if (item && this.panelTarget.contains(item) && !item.disabled) this.close()
+  }
+
   closeOutside(event) {
     if (this.open && !this.element.contains(event.target)) this.close()
   }

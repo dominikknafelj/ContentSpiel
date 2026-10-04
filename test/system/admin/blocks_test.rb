@@ -68,7 +68,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     # -- see `test/system/admin/autosave_test.rb`'s own comment for why the
     # two-step form can raise `ElementNotFound` before its own explicit
     # wait gets any say.
-    assert_selector "#content-blocks-status", text: "Saved"
+    assert_selector "#content-blocks-status", text: "SAVED"
     assert_selector "#content-blocks-list .admin-block-card:first-child[data-block-id='#{second.id}']"
     assert_equal [ second, first ], @page.content_blocks.reload.order(:position).to_a
   end
@@ -86,11 +86,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     block = @page.content_blocks.sole
 
     within("##{ActionView::RecordIdentifier.dom_id(block)}") { find("input[name='block[settings][limit]']").fill_in(with: "4") }
-    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal 4, block.reload.settings["limit"].to_i
 
     fill_in "Title", with: "About the Studio"
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_no_text "Changed elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
@@ -132,11 +132,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     page.execute_script("window.__releaseFirstPatch()")
     await_js "window.__patchesStarted === 2"
-    assert_selector "#block-#{block.id}-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_eventually { block.reload.settings["limit"].to_i == 5 }
 
     fill_in "Title", with: "About the Studio"
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_no_text "Changed elsewhere"
   end
 

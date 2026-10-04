@@ -52,10 +52,16 @@ export default class extends Controller {
   // state (`signedOut`/`:signed_out` included, even though that one's never
   // actually rendered by a server response either -- see that component's
   // own comment for why it's still a named state there).
+  //
+  // `savingLive` is the same line for a live record, whose edits go
+  // straight to the site: the status element says so with `data-live`
+  // (`Admin::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
+  // button (`setStatus` builds it), which is why its text stops at "· ".
   static texts = {
-    saving: "Saving…",
-    retrying: "Not saved — retrying",
-    offline: "Not saved — check your connection",
+    saving: "SAVING…",
+    savingLive: "SAVING TO SITE…",
+    retrying: "NOT SAVED · RETRYING…",
+    offline: "NOT SAVED · ",
     signedOut: "Signed out — sign in again to keep saving"
   }
 
@@ -98,7 +104,8 @@ export default class extends Controller {
   }
 
   async attempt() {
-    this.setStatus(this.constructor.texts.saving)
+    const status = document.getElementById(this.statusIdValue)
+    this.setStatus(status && status.hasAttribute("data-live") ? this.constructor.texts.savingLive : this.constructor.texts.saving)
 
     let response
     try {
@@ -222,7 +229,7 @@ export default class extends Controller {
     const delays = this.constructor.retryDelays
 
     if (this.retryCount >= delays.length) {
-      this.setStatus(this.constructor.texts.offline)
+      this.setStatus(this.constructor.texts.offline, { retry: true })
       this.retryCount = 0
       this.busy = false
       return
@@ -253,8 +260,22 @@ export default class extends Controller {
     return answeredStatus && contentType.includes("text/vnd.turbo-stream.html")
   }
 
-  setStatus(text) {
+  // `retry: true` appends the Retry button of `Admin::SaveStatusComponent`'s
+  // offline state. The status line sits in the record header, outside this
+  // controller's form, so a `data-action` on the button would never reach
+  // it: the listener is bound here instead.
+  setStatus(text, { retry = false } = {}) {
     const status = document.getElementById(this.statusIdValue)
-    if (status) status.textContent = text
+    if (!status) return
+
+    status.textContent = text
+    if (!retry) return
+
+    const button = document.createElement("button")
+    button.type = "button"
+    button.className = "cursor-pointer underline hover:text-ink"
+    button.textContent = "Retry"
+    button.addEventListener("click", () => this.saveNow())
+    status.append(button)
   }
 }

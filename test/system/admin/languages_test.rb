@@ -32,7 +32,7 @@ class Admin::LanguagesSystemTest < ApplicationSystemTestCase
     # -- see `test/system/admin/autosave_test.rb`'s own comment for why the
     # two-step form can raise `ElementNotFound` before its own explicit
     # wait gets any say.
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
 
     @page.reload
     assert_equal "Über uns", @page.title(locale: :de)

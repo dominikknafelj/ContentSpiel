@@ -90,13 +90,18 @@ module Admin
 
     private
 
+    # `live:` (a page or post that is live -- its edits go straight to the
+    # site) rides on every state, not just "saved": the status line is
+    # replaced wholesale, and `autosave_controller.js` reads `data-live`
+    # off whatever element is there when it writes its own "saving" line.
     def save_status_component(record:, result:, status_id:, base_updated_at:)
-      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden) if result.denied?
-      return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size) unless result.ok?
+      live = record.respond_to?(:live?) && record.live?
+      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden, live: live) if result.denied?
+      return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size, live: live) unless result.ok?
 
-      return Admin::SaveStatusComponent.new(id: status_id, state: :stale) if stale_base?(record, base_updated_at)
+      return Admin::SaveStatusComponent.new(id: status_id, state: :stale, live: live) if stale_base?(record, base_updated_at)
 
-      Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at)
+      Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at, live: live)
     end
 
     # "Previous" (spec §6.1: "each form carries the record's updated_at as

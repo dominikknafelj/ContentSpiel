@@ -22,7 +22,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
       base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success
-    assert_match(/Saved \d\d:\d\d/, response.body)
+    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
     assert_equal "New Title", @site.reload.title
     assert_equal "New Tagline", @site.tagline
   end

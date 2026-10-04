@@ -385,7 +385,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       params: { media_asset: { title: "New title", alt: "English alt", caption: "English caption" }, base_updated_at: asset.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
-    assert_match(/Saved \d\d:\d\d/, response.body)
+    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
     asset.reload
     assert_equal "New title", asset.title
     assert_equal "English alt", asset.alt(locale: :en)
