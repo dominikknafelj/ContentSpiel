@@ -4,7 +4,7 @@ Scope: all of `app/`, `config/`, `db/`, `lib/`, `test/` (structurally) and the d
 
 Not reviewed: the uncommitted round-3 work in the tree at the time (`save_bar_controller.js`, `save_bar_component.*`, `pending_lock_controller.js`, the admin layout edits).
 
-Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation) and `L<n>` (before a first deploy). Each carries a status:
+Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation), `L<n>` (before a first deploy) and `D<n>` (database structure and Postgres features, §8). Each carries a status:
 
 - **checked**: the lines named were read a second time by the reviewer who collated this document, and say what the finding says.
 - **reported**: found and traced by one reviewer, not read a second time. Treat as a strong lead, confirm before fixing.
@@ -220,7 +220,58 @@ The folder layout is good: clear domain namespaces (`AccessControl`, `Media`, `R
 - MCP list tools paginate "about 50 per call" (S12; only media does).
 - `content_version` "bumps whenever anything publishing/renaming/deleting a link or asset target could invalidate a cached render" (S7; it moves on any write).
 
-## 8. Checked and found sound
+## 8. Database structure and Postgres features
+
+Added after the first hand-off, from a full read of `db/schema.rb` against the queries the code issues. Still nothing measured. Status "checked" here means the schema and the named query were both read.
+
+### D1. No index on any `updated_at` or `published_at` — checked
+- The posts list sorts `updated_at DESC, id DESC` with an offset (`app/controllers/admin/posts_controller.rb:317`); `Publishable`'s `published` scope is `where(published_at: ..Time.current)` (`app/models/concerns/publishable.rb:11`) and sits on every public listing; the dashboard sorts on both (`app/queries/dashboard/feed.rb:45`, `:56`, `:85`); S7's five `maximum(:updated_at)` run per public request.
+- Add: `posts(updated_at)`, `posts(published_at)`, `pages(published_at)`. These treat the symptom; S7 removes most of the need on the public side.
+
+### D2. Slugs and titles are queried inside jsonb with no index — checked
+- Slug uniqueness runs on every save, once per locale: `self.class.i18n.where(slug: value)` (`app/models/concerns/localized_slug.rb:80`). The public 404 fallback is the same shape (S11).
+- Direction: one GIN index with `jsonb_path_ops` on `slug`, queried by containment (`slug @> '{"de": "ueber-uns"}'`). It serves every language from one index, so it survives runtime-configurable languages, which per-locale expression indexes on `(slug ->> 'xx')` do not. **Not checked:** what SQL Mobility's `.i18n` scope generates; if it is `slug ->> ?`, the lookups need writing as containment for the index to be used.
+- Title search (`jump/search.rb:75-78`, `posts_controller.rb:363`) unnests the jsonb and does `ILIKE '%q%'`. `pg_trgm` over a generated "all titles" column, when it starts to matter.
+
+### D3. `content_blocks.block_type` has no index — checked
+- `scope :listing` (`app/models/content_block.rb:97`) filters on it, and S6's `canonical_page` calls that scope once per post per locale.
+- Add a partial index restricted to the listing block types, or a plain one on `block_type`.
+
+### D4. Wide content rows — checked (schema), reported (callers)
+- `posts` and `content_blocks` carry `body` for every locale plus `translation_sources`, which stores a copy of the original text per translated field per language. Whole-row loads pay for all of it: `Page.all` in the tree (S10), the mind graph (S18), `sync_posts` (S6).
+- Direction: `select` only the columns a list needs; consider moving source text out of the hot row.
+
+### D5. `audit_events` — checked
+- Unbounded (already a "Known interim states" row), a full `snapshot` per row, five indexes maintained on every write. Two are near-duplicates: `(subject_type, subject_id, occurred_at)` and `(subject_type, subject_id, last_occurred_at)`. Check which readers still use the `occurred_at` one before dropping it.
+- When retention is built: partition by month and expire by dropping a partition. The table blocks `DELETE` by trigger, so this is the clean way. `db/schema.rb` cannot express partitions; it would need the reapply-after-schema-load hook `config/initializers/db_triggers.rb` already provides for the trigger.
+
+### D6. Sibling positions (extends S16) — checked (schema)
+- `pages.position` is nullable with no uniqueness per parent.
+- Direction: `pg_advisory_xact_lock` on the parent in `Pages::Move` and page create; renumber with `row_number() OVER (PARTITION BY parent_id ORDER BY position, id)` in one `UPDATE … FROM`; a **deferrable** unique constraint on `(parent_id, position)` so duplicates are impossible, not just unlikely. Trashed siblings need thought first: `Page::TreeRanking` counts kept siblings only.
+
+### D7. Set-based path sync (extends S6)
+- Compute a subtree's paths in one statement (a recursive CTE, or a join on `page_hierarchies`) and write them with `INSERT … ON CONFLICT`, instead of recursing per page with per-locale lookups.
+
+### D8. Atomic stale-autosave check
+- `CLAUDE.md` documents that "the check and the save are not atomic". A conditional update closes it: `UPDATE … WHERE id = ? AND updated_at = ?`, then read the affected row count (or Rails' `lock_version`).
+
+### D9. Smaller
+- Redundant single-column indexes, each a leading prefix of a composite: `access_control_grants(group_id)`, `access_control_memberships(user_id)`, `post_tags(post_id)`, `post_relations(post_id)`, `media_usages(media_asset_id)`.
+- `media_assets.created_by_id` has no foreign key (also S18).
+- `api_tokens.token_digest` is a salted bcrypt hash and cannot be indexed: S9's SHA-256 column with a unique index is the fix.
+- `media_library_migrated_assets` is a leftover ledger table (M9).
+
+### Postgres features to use later, and ones to leave alone
+- **Later:** `tsvector` full-text search with per-language configurations for the roadmap's site search (German and Spanish dictionaries ship with Postgres); `pgvector` only if translation memory or semantic search is built.
+- **Not recommended:** row-level security (it would duplicate `AccessControl`'s grant and token-intersection rules in a second language); materialized views (the derived tables are already updated inside the writing transaction, which a refreshed view cannot match); more triggers (writes go through services, where they are authorised and audited; the one existing trigger is a backstop, which is the right use); `LISTEN`/`NOTIFY` (nothing needs push between processes yet).
+
+### Sound in the schema
+- `page_hierarchies` has both indexes closure_tree needs.
+- `public_paths`: unique `(locale, path)` and a partial unique index for the current row, so the public lookup is one index hit.
+- `translation_states` and `media_usages` have unique keys matching how they are read and upserted.
+- The single-root rule is backed by a partial unique index.
+
+## 9. Checked and found sound
 
 - Read scoping through `AccessControl.scope` on pages, posts, blocks, the tree, bulk actions, MCP get/update and preview (S24 is the one exception found).
 - Denials are recorded outside the service transaction; savepoints are used where a rescue would otherwise swallow a failure; no external call inside a transaction.

@@ -126,7 +126,10 @@ From `docs/architecture/2026-10-04-staff-review.md` (findings referenced as `S<n
 | Write down a dependency direction between the domains and fix the four inversions (a model calling `ApplicationController.render`, a model calling services, a query building a component, models using route helpers) | Should | M1 |
 | Public-site strings in German and Spanish (about 15), then a key scheme for the admin UI before more strings land | Should | M8 |
 | Script CSP with nonces; correct the four `CLAUDE.md` claims the code doesn't match | Should | S20, review §7 |
-| Sibling position lock; dashboard drafts without the per-row audit join; missing indexes and FK | Could | S16, S17, S18 |
+| Indexes the queries need: `updated_at`/`published_at` on posts and pages, one GIN index on the slug jsonb queried by containment, `content_blocks.block_type` | Should | D1–D3 |
+| Sibling positions that can't collide (advisory lock, one set-based renumber, a deferrable unique constraint); an atomic stale-autosave check (conditional `UPDATE`) | Should | S16, D6, D8 |
+| Dashboard drafts without the per-row audit join; drop redundant indexes; the missing `created_by_id` FK; narrower row loads | Could | S17, S18, D4, D9 |
+| Partition `audit_events` by month when retention is built; `pg_trgm` for title search; `tsvector` for site search | Could | D5, D2 (with audit retention and site search) |
 | Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
 | One plugin registration facade over the four registries | Could | M4 (with Plugin API v1) |
 | Remove leftovers: the ActionText import path, unused Action Mailbox / Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
