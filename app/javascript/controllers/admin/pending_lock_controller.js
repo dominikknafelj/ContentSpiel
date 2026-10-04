@@ -37,6 +37,18 @@ import { Controller } from "@hotwired/stimulus"
 // named `type="button"`, which looks like an action but is in the form's
 // `elements` like a field: it is skipped too, with a warning in the console
 // naming it.
+//
+// ONE EXEMPTION (final wave B round 2, N3). Something typed BESIDE the form
+// that the form's Save would drop holds that Save back (`admin--save-bar`,
+// `data-save-bar-holds` -- Settings' API key entry). Locking the entry too,
+// because the form has changes, left the two locking each other: the footer
+// said "Save or cancel the API key first." and the key's own Save said "Save
+// or cancel your changes first.". So a control inside an element that carries
+// `data-save-bar-holds` is never locked -- that is the way out the footer's
+// sentence names -- and a hint beside it is not shown. Safe only because that
+// action's answer keeps the form's fields (the key write answers with streams
+// and follows the carried-base rule). The holder announces every change of
+// its state with `admin--save-bar:query`, which brings a fresh `state` here.
 const HINT = "Save or cancel your changes first."
 const MARK = "data-pending-locked"
 const warned = new WeakSet()
@@ -67,7 +79,7 @@ export default class extends Controller {
 
   // A control streamed in while locked is locked too.
   controlTargetConnected(control) {
-    if (this.locked) this.lock(control)
+    if (this.locked && !this.exempt(control)) this.lock(control)
   }
 
   // So is a hint: the key component a write's answer replaces carries its own
@@ -76,15 +88,20 @@ export default class extends Controller {
   hintTargetConnected(hint) {
     if (this.locked === undefined) return
     if (!hint.textContent.trim()) hint.textContent = HINT
-    hint.hidden = !this.locked
+    hint.hidden = !this.locked || this.besideHolder(hint)
   }
+
+  // See "ONE EXEMPTION".
+  exempt(control) { return control.closest("[data-save-bar-holds]") !== null }
+
+  besideHolder(hint) { return hint.parentElement?.querySelector("[data-save-bar-holds]") != null }
 
   apply(locked) {
     this.locked = locked
-    this.controlTargets.forEach((control) => (locked ? this.lock(control) : this.unlock(control)))
+    this.controlTargets.forEach((control) => (locked && !this.exempt(control) ? this.lock(control) : this.unlock(control)))
     this.hintTargets.forEach((hint) => {
       if (!hint.textContent.trim()) hint.textContent = HINT
-      hint.hidden = !locked
+      hint.hidden = !locked || this.besideHolder(hint)
     })
   }
 

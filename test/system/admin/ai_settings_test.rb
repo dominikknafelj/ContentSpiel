@@ -137,6 +137,40 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_eventually { page.evaluate_script("document.activeElement.textContent.trim()") == "Replace" }
   end
 
+  # Round 2, N3: a typed key locked the footer's Save ("Save or cancel the API
+  # key first.") while the changed form locked the key's input and Save key
+  # ("Save or cancel your changes first."): neither could be saved.
+  test "a typed key and a changed form don't lock each other: Save key stays pressable, and then the main Save is" do
+    site_settings(:default).update!(ai_api_key: "sk-old-key-0000")
+    visit "/cs-studio/settings"
+    await_admin_controllers
+
+    within("#settings-ai-key") { click_on "Replace" }
+    fill_in "API key", with: KEY
+    fill_in "settings-ai_model", with: "another-model"
+
+    assert_selector "#{footer} button[type=submit][disabled]", text: "Save"
+    assert_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
+    assert_selector "#settings-ai_api_key:not([disabled])"
+    assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
+    assert_no_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    # Test connection has nothing to do with the entry: still locked.
+    assert_selector "button[disabled]", text: "Test connection"
+
+    click_on "Save key"
+    assert_selector "#toasts .admin-toast", text: "API key saved"
+    assert_equal KEY, site_settings(:default).reload.ai_api_key
+    # The typed Model is still there, still unsaved -- and can be saved now.
+    assert_equal "another-model", find_field("settings-ai_model").value
+    assert_selector "#{footer} button[type=submit]:not([disabled])", text: "Save"
+    # The key's own actions are instant ones again: locked while the form is unsaved.
+    assert_selector "#settings-ai-key button[disabled]", text: "Replace"
+    assert_selector "#settings-ai-key button[disabled]", text: "Remove…"
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    assert_equal "another-model", site_settings(:default).reload.ai_model
+  end
+
   # Task 7 minor 11: a key write that lands while a Test is in flight replaces
   # the test's form; its end never reached the controller and the button
   # stayed disabled, with its spinner, until a reload.

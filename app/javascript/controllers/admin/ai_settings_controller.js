@@ -26,7 +26,10 @@ import { Controller } from "@hotwired/stimulus"
 //    shows, and the footer's Save is disabled (`admin--save-bar`, "ONE FORM
 //    AFTER ANOTHER"). Chosen over counting it in the leave guard: the key is
 //    not a change of the Settings form, and its own Save or Cancel are right
-//    there.
+//    there. And they stay usable: while the entry holds text its input,
+//    Save key and Cancel are exempt from the pending lock
+//    (`admin--pending-lock`, "ONE EXEMPTION"), or a changed form and a typed
+//    key would lock each other. Remove and Test connection stay locked.
 //
 // 4. Focus. Cancel closes the entry under the focus, and a key write's answer
 //    replaces the whole key component: both would leave focus on <body>. It
