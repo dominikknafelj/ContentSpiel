@@ -36,7 +36,7 @@ module Admin
     # (spec §6.4 makes the same call for the preview banner's "View live").
     def public_path = urls.path_for(page, locale)
 
-    def public_url = urls.url_for(page, locale)
+    def public_url = absolute_urls.url_for(page, locale)
 
     def preview_path = preview_urls.path_for(page, locale)
 
@@ -117,6 +117,14 @@ module Admin
     attr_reader :page, :locale, :url_options
 
     def urls = PublicSite::Urls.new
+
+    # Absolute addresses (the "Copy" button) use the configured public
+    # origin, or -- with none configured, as on a local checkout -- the
+    # origin this very request came in on, which is where the site is
+    # actually being served. Its own instance, separate from `urls`:
+    # reading the request needs the view context, which the path readers
+    # above (also called outside a render, e.g. `slug_base_url`) must not.
+    def absolute_urls = PublicSite::Urls.new(host: PublicSite::Urls.configured_host || helpers.request.base_url)
 
     def preview_urls = PublicSite::Urls.new(preview: true)
   end

@@ -136,8 +136,8 @@ export default class extends Controller {
   tick() {
     // Keep every node inside the box (design pass round 1): forceCenter
     // only centres the *mean* position, so a strongly repelled or dragged
-    // node could drift, or be flung, past the edge -- and the box used to
-    // fill the whole content column, so "past the edge" was off-screen.
+    // node could drift, or be flung, past the edge of the box and out of
+    // sight (the box fills the view and hides what overflows it).
     this.clampNodes()
 
     this.edges.forEach((edge, index) => {
