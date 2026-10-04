@@ -1,5 +1,5 @@
 <%= tag.dialog id: DIALOG_ID,
-      class: "admin-media-picker admin-dialog rounded-cs border border-line-strong bg-surface p-6 text-ink shadow-menu",
+      class: "admin-media-picker admin-dialog rounded-cs border border-line-strong bg-surface p-0 text-ink shadow-menu",
       "aria-labelledby": part_id("title"),
       data: {
         dialog_width: "picker",
@@ -8,6 +8,10 @@
         "admin--media-picker-library-url-value": library_url,
         "admin--media-picker-upload-url-value": upload_url
       } do %>
+  <%# Padding lives on this wrapper, not the <dialog>: a click on the
+      dialog's own padding is a click on the <dialog> element, which the
+      body-level `admin--dialog#backdrop` reads as a backdrop click. %>
+  <div class="overflow-y-auto p-6">
   <div class="mb-4 flex items-center justify-between gap-4">
     <h2 id="<%= part_id("title") %>" class="text-h2 text-ink">Choose an image</h2>
     <%= tag.form method: "dialog" do %>
@@ -44,5 +48,6 @@
     <p class="mt-1 text-sm text-meta">PNG, JPEG, GIF or WEBP, up to 10 MB. It's added to the library and chosen straight away.</p>
     <p class="mt-2 text-sm text-meta" aria-live="polite" data-admin--media-picker-target="status"></p>
     <p class="mt-2 text-sm text-danger-ink" role="alert" data-admin--media-picker-target="error"></p>
+  </div>
   </div>
 <% end %>

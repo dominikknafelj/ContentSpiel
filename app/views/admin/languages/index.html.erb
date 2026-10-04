@@ -55,7 +55,7 @@
     <li class="flex items-center justify-between rounded-cs border border-line bg-surface px-3 py-2">
       <span class="text-ink"><%= Locales.name(code, native: true) %> (<%= code %>)</span>
       <% if code == @site_setting.default_locale %>
-        <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger, type: "button", disabled: true,
+        <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger_outline, type: "button", disabled: true,
               title: "The default language can't be disabled") %>
       <% else %>
         <%= form_with url: admin_settings_language_path(code, **admin_url_options), method: :delete do %>

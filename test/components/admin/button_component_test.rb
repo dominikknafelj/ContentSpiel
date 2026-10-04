@@ -32,4 +32,12 @@ class Admin::ButtonComponentTest < ViewComponent::TestCase
 
     assert_selector "button.text-dim", text: "Cancel"
   end
+
+  test "danger_outline (opens a destructive confirm) differs from solid danger" do
+    render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger_outline)
+    assert_selector "button.bg-danger-tint", text: "Delete"
+
+    render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger)
+    assert_no_selector "button.bg-danger-tint"
+  end
 end

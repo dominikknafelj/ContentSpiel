@@ -32,7 +32,7 @@
         <td class="py-2 text-right">
           <%= link_to "Edit", edit_admin_user_path(user, **admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
 
-          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger_outline, type: "button",
                 data: dialog_trigger(dialog_id)) %>
 
           <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete this user?",

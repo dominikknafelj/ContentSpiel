@@ -48,7 +48,7 @@
           <td class="py-2 pr-4"><%= render Admin::SaveStatusComponent.new(id: "tag-#{tag.id}-save-status", state: :idle) %></td>
 
           <td class="py-2 text-right">
-            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger_outline, type: "button",
                   data: dialog_trigger(dialog_id)) %>
 
             <%# "Removes the tag from N posts" (spec §5.3) -- shown for every

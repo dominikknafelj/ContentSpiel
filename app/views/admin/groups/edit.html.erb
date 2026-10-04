@@ -8,7 +8,7 @@
   <% unless @group.built_in? %>
     <% dialog_id = "delete-group-#{@group.id}" %>
     <% tokens = @group.api_tokens.active.includes(:user).order(:id).to_a %>
-    <%= render Admin::ButtonComponent.new(label: "Delete group", variant: :danger, type: "button",
+    <%= render Admin::ButtonComponent.new(label: "Delete group", variant: :danger_outline, type: "button",
           data: dialog_trigger(dialog_id)) %>
     <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete the group “#{@group.name_was}”?",
           body: tokens.empty? ? "Its members lose its permissions. This can't be undone." : "Its members lose its permissions, and deleting it revokes #{pluralize(tokens.size, "token")}. Any assistant using one stops working immediately. This can't be undone.") do |dialog| %>

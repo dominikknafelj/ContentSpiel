@@ -13,6 +13,14 @@ module Admin
       render Admin::ButtonComponent.new(label: "Delete page", variant: :danger)
     end
 
+    def danger_outline
+      render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline)
+    end
+
+    def ghost
+      render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost)
+    end
+
     def disabled
       render Admin::ButtonComponent.new(label: "Saving…", disabled: true)
     end
