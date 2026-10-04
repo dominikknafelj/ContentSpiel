@@ -114,6 +114,18 @@
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
 /* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
 .admin-palette { margin-top: 10vh; }
+/* The media picker (Media::PickerComponent) hangs from a fixed top edge
+   instead of being centred, because its height changes while it is open: the
+   Library frame is empty until its request answers, and the two tabs' panels
+   differ. Centred (`margin: auto`), every such change moved the heading and
+   the tab row -- 112px up when the library arrived -- so a click aimed at
+   "Upload" a moment after opening landed on the library that had just slid
+   under the pointer, and the tab never switched (the one-run-in-ten CI
+   failure of the rich-text upload test; an editor on a slow connection meets
+   the same jump). 7.5vh is where the top of a full-height (85vh) picker sits
+   when centred, so a full one looks as before and a shorter one only grows
+   downwards. `test/system/admin/media_picker_test.rb` pins it. */
+.admin-media-picker { margin-top: 7.5vh; }
 
 /* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }
