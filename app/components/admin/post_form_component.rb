@@ -153,7 +153,9 @@ module Admin
     # front of it.
     def slug_base_url
       page = PublicSite::Paths.canonical_page(post)
-      page ? (urls.path_for(page, locale) || "") : ""
+      # No trailing slash: the listing page at "/" (or "/de/") would otherwise
+      # put "//slug" on screen (design pass bug 1); the slug field appends its own "/".
+      page ? (urls.path_for(page, locale) || "").sub(%r{/+\z}, "") : ""
     end
 
     def schema_fields = definition&.fields || []

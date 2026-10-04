@@ -20,7 +20,16 @@ module Admin
         @base_url = base_url
       end
 
-      def preview_url = "#{base_url.to_s.chomp('/')}/#{value}"
+      # The part of the public URL in front of the slug, shown in the prefix
+      # cell: host and parent path, ending in exactly one slash. Callers pass
+      # bases with and without a trailing slash (the root page's children,
+      # a non-default language's prefix), which is how "//about" and
+      # "/de//about" got on screen (design pass bug 1). The callers now strip
+      # theirs at the source; this stays defensive for any other caller.
+      def prefix
+        base = base_url.to_s.sub(%r{\Ahttps?://}, "").gsub(%r{/+\z}, "")
+        "#{base}/"
+      end
 
       private
 
