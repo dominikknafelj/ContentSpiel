@@ -189,6 +189,14 @@ One PR.
 - **Posts list:** split button, toolbar, columns, pagination, selection and the bulk bar (§5.6).
 - **Translations:** the matrix, summary cards, sort order and row links (handoff §4.4, §10 B18), including a Site settings row.
 - **Data:** §5.2 and §5.3.
+- **Carried over from round 1** (Claude Design's review of the built round 1, 2026-10-04; it checked six screens — sign-in, password reset, dashboard, page tree, page editor in German, posts list — and not yet ⌘K, dialogs, toasts, the save bar, drawers or the light theme):
+  - **Wordmark:** uppercase "CONTENT·SPIEL" (12px, 700, 0.18em tracking) with the site name beneath in dim 13px.
+  - **Account block:** when the name falls back to the email, show the email once; the role sits inline as "Owner" (or up to two group names), not on its own mono line (handoff §10 B15).
+  - **Sidebar height:** the sidebar background is full height and sticky on long pages (it stops at the viewport height today).
+  - **Language tab dots:** 7px and vertically centred on the label.
+  - **Rich-text toolbar:** one row in the side-by-side view too. Round 1 made it wrap inside a narrow column instead of spilling; the stacked translation layout in this round is what gives it the width.
+  - **Sign-in and reset:** the form sits directly on the page, 360px wide, with no card; the site name above the heading; heading 28px/600; the reset heading reads "Reset password"; "Show"/"Hide" in 12px/500 sans in the accent colour (as on setup and change password); "Forgot your password?" right-aligned on the Password label row, 12px; links not underlined.
+  - The page tree's boxed "!" markers were already this round's work (↻N and ○N, no box, hidden at zero).
 
 ## 8. Round 3: settings, media, people, system
 
