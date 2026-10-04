@@ -85,6 +85,43 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ first.id, copy.id, second.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
   end
 
+  # Ledger b6 (final fix wave 1): a reorder queued behind an Add (or Duplicate
+  # or Delete) still in flight reads the card list when it is SENT. The queue
+  # used to let it go as soon as the Add was answered -- but Turbo applies that
+  # answer's stream a frame later, so the reorder listed the cards WITHOUT the
+  # new one, the server refused it (422, "must list exactly this page's
+  # blocks"), and the order on screen was one that had not been saved.
+  test "a Move queued behind an Add block still in flight is sent with the new card in the list" do
+    first = @page.content_blocks.create!(block_type: "image", position: 0)
+    second = @page.content_blocks.create!(block_type: "image", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__statuses = []
+      window.fetch = async (url, options = {}) => {
+        const write = (options.method || "GET").toUpperCase() !== "GET"
+        if (write) await new Promise((resolve) => setTimeout(resolve, 600))
+        const response = await originalFetch(url, options)
+        if (write) window.__statuses.push(response.status)
+        return response
+      }
+    JS
+
+    # One tick: the Add goes out (and is slow), then Move down on the first card.
+    page.execute_script(<<~JS)
+      Array.from(document.querySelectorAll("#block-picker-end button")).find((b) => b.textContent.trim() === "Rich text").click()
+      document.querySelector('[data-block-id="#{first.id}"] [data-move="down"]').click()
+    JS
+
+    assert_selector "#content-blocks-list > .admin-block-card", count: 3, wait: 10
+    assert_eventually(timeout: 10) { page.evaluate_script("window.__statuses.length") == 2 }
+    added = @page.content_blocks.where.not(id: [ first.id, second.id ]).sole
+    assert_equal [ 201, 200 ], page.evaluate_script("window.__statuses"), "the reorder was refused"
+    assert_equal [ second.id, first.id, added.id ], @page.content_blocks.reload.order(:position).ids
+    assert_equal [ second.id, first.id, added.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
+  end
+
   test "the type name collapses and expands the body, and says which" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
     visit "/cs-studio/pages/#{@page.id}"

@@ -24,9 +24,12 @@
 // queue time. The server's base mechanism is unchanged.
 //
 // Everything that sends `X-Page-Base-Updated-At` goes through here: every
-// `admin--autosave` form (`enqueue`), block reorder (`enqueue`), and Turbo's
-// own block form submissions -- add, duplicate, delete, the Undo toast
-// (`holdTurboRequest`).
+// `admin--autosave` form (`enqueue`), block reorder (`enqueue`), Turbo's own
+// block form submissions -- add, duplicate, delete, the Undo toast
+// (`holdTurboRequest`) -- and, from outside the editor's forms, the page
+// tree's move (`enqueue`) and its Undo toast (`holdTurboRequest`): moving the
+// page that is open moves its `updated_at` like any other write to it
+// (`admin--tree`).
 //
 // THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR
 // starts until the queue is empty. Three kinds of thing replace an editor:
@@ -108,6 +111,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 
 const HOLD_LIMIT_MS = 30000
 const DRAIN_LIMIT_MS = 10000
+const STREAM_RENDER_LIMIT_MS = 1000
 
 let tail = Promise.resolve()
 // See "WHAT A GENERATION IS".
@@ -210,15 +214,55 @@ export function syncBases(streamText, ids) {
   }
 }
 
+// Lets a caller wait until Turbo has APPLIED a Turbo Stream answer it is
+// about to render itself (see `holdTurboRequest`). Turbo appends the answer's
+// `<turbo-stream>` elements to the document; each dispatches
+// `turbo:before-stream-render` as it connects -- all of them in that one
+// append -- and performs its action after the next repaint (`StreamElement
+// #render`, turbo-rails 2.0.23; a timer instead when the tab is hidden).
+// `applied(text)` resolves once as many of those events as the answer has
+// stream elements were seen since this was created, plus that repaint and
+// the task after it. Never longer than `STREAM_RENDER_LIMIT_MS` for the
+// events: an answer Turbo does not render after all (the form's page is
+// gone) must not hold the queue.
+function streamRenders() {
+  let seen = 0
+  let check = () => {}
+  const count = () => { seen += 1; check() }
+  document.addEventListener("turbo:before-stream-render", count)
+
+  return {
+    stop: () => document.removeEventListener("turbo:before-stream-render", count),
+    async applied(streamText) {
+      const expected = new DOMParser().parseFromString(streamText, "text/html").querySelectorAll("turbo-stream").length
+      if (expected === 0) return
+
+      await within(new Promise((resolve) => {
+        check = () => { if (seen >= expected) resolve() }
+        check()
+      }), STREAM_RENDER_LIMIT_MS)
+      await new Promise((resolve) => (document.visibilityState === "hidden" ? setTimeout(resolve, 0) : requestAnimationFrame(resolve)))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+  }
+}
+
 // For a Turbo-driven block request (add, duplicate, delete, the Undo toast;
-// `turbo:before-fetch-request`): holds it until the queue is free, lets
-// `before` set its headers at send time, then keeps the queue's slot until the
-// answer's bases are applied (`baseIds`).
+// `turbo:before-fetch-request`) and the tree move's Undo: holds it until the
+// queue is free, lets `before` set its headers at send time, then keeps the
+// queue's slot until the answer's bases (`baseIds`) and its streams are
+// applied.
 //
 // When the slot is released -- checked against Turbo's own source (turbo-rails
 // 2.0.23), not assumed:
-// - the answer arrives (`turbo:before-fetch-response`), or the request errors
-//   (`turbo:fetch-request-error`);
+// - the answer arrives (`turbo:before-fetch-response`) AND, when it is a
+//   Turbo Stream, Turbo has applied it (`streamRenders`; ledger b6). The bases
+//   are in the hidden fields at once, but the stream itself -- the card an
+//   Add or Duplicate inserts, the one a Delete removes, the list an Undo
+//   re-renders -- is applied a frame later, and the next task may read the
+//   DOM: a reorder lists the cards as it is SENT, and sent in that gap it
+//   listed them without the new card (422, the unsaved order left on screen);
+// - or the request errors (`turbo:fetch-request-error`);
 // - the request is ABORTED. Turbo cancels the previous form submission when a
 //   new one starts (`Navigator#submitForm`), and `FetchRequest#perform`
 //   swallows the `AbortError` without dispatching any event, so the request's
@@ -272,9 +316,16 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
     }
     const onResponse = async (responseEvent) => {
       if (!isMyResponse(responseEvent)) return
+      // From now, before anything is awaited: Turbo reads the same body and
+      // renders it on its own schedule.
+      const renders = streamRenders()
       try {
-        if (isCurrentGeneration(queuedUnder)) syncBases(await responseEvent.detail.fetchResponse.response.clone().text(), baseIds)
+        const response = responseEvent.detail.fetchResponse.response
+        const text = await response.clone().text()
+        if (isCurrentGeneration(queuedUnder)) syncBases(text, baseIds)
+        if ((response.headers.get("Content-Type") || "").includes("text/vnd.turbo-stream.html")) await renders.applied(text)
       } finally {
+        renders.stop()
         finish()
       }
     }
