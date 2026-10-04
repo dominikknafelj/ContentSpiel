@@ -2,17 +2,27 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "autosave/queue"
 
-// What the server holds of each autosave form, by form ELEMENT: the signature
-// (`#signature`) the form was first rendered with, then whatever its last
-// successful save sent. Kept here rather than only on the controller because
-// a form's element is disconnected and connected again whenever its card is
-// moved in the DOM (a block drag, Move up/down), and `connect` must not take
-// what the form holds at THAT moment for saved: an edit still inside its
-// debounce -- whose timer `disconnect` has just cleared -- would then compare
-// "unchanged" for good and never be sent (final fix wave 1, ledger m2). A
-// form rendered anew (a stream replacing the card, a page render) is a new
-// element and starts from what it was rendered with, as before.
-const savedSignatures = new WeakMap()
+// Each autosave form's SAVE STATE, by form ELEMENT:
+// - `saved`: what the server holds of it -- the signature (`#signature`) the
+//   form was first rendered with, then whatever its last successful save sent;
+// - `sent`: the signature of the last request that got an answer;
+// - `paused`: a 409 ended this form's saves until Reload (see `attempt`);
+// - `failed`: the last answer was not a success.
+// Kept here rather than on the controller because a form's element is
+// disconnected and connected again whenever its card is moved in the DOM (a
+// block drag, Move up/down), and `connect` must not start over:
+// - taking what the form holds at THAT moment for saved would make an edit
+//   still inside its debounce -- whose timer `disconnect` has just cleared --
+//   compare "unchanged" for good, never to be sent (final fix wave 1, ledger
+//   m2);
+// - forgetting `paused` would let a card that was refused as "Changed
+//   elsewhere" save again after a drag -- its next save refused again, or,
+//   were its base ever fresh, an overwrite of the other editor's work -- and
+//   forgetting `failed` would hide an unsaved card from a header action's
+//   "your last change wasn't saved" (follow-up N4).
+// A form rendered anew (a stream replacing the card, a page render) is a new
+// element and starts clean, from what it was rendered with, as before.
+const saveStates = new WeakMap()
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -71,8 +81,8 @@ const savedSignatures = new WeakMap()
 //   before a header action, that teardown `focusout`: none of them is an
 //   edit, and after Publish the last would be a save on the base Publish
 //   just moved -- a 409 about nothing. What the server holds is remembered
-//   per form element (`savedSignatures` above), so it survives the form
-//   being moved in the DOM.
+//   per form element (`saveStates` above), so it survives the form being
+//   moved in the DOM.
 export default class extends Controller {
   static values = {
     statusId: String,
@@ -114,26 +124,38 @@ export default class extends Controller {
     this.busy = false
     this.pending = false
     this.retryCount = 0
-    // Set by a 409 ("changed elsewhere"): this form's saves are over until
-    // the page is reloaded (see `attempt`).
-    this.paused = false
-    // The last answer was not a success (refused, invalid, offline, signed
-    // out): `clean()` reports it to `drained()` (see `autosave/queue.js`).
-    this.failed = false
-    // The page this form belongs to, and what the server holds of it: what
-    // the form was rendered with, then whatever a successful save last sent.
+    // The page this form belongs to.
     this.generation = currentGeneration()
-    const reconnected = savedSignatures.has(this.element)
-    if (!reconnected) savedSignatures.set(this.element, this.signature(new FormData(this.element)))
+    // `saved`, `sent`, `paused` (set by a 409: this form's saves are over
+    // until the page is reloaded) and `failed` (the last answer was not a
+    // success -- refused, invalid, offline, signed out: `clean()` reports it
+    // to `drained()`, see `autosave/queue.js`) live with the element, see
+    // `saveStates`.
+    const reconnected = saveStates.has(this.element)
+    if (!reconnected) saveStates.set(this.element, { saved: this.signature(new FormData(this.element)), sent: null, paused: false, failed: false })
     registerForm(this)
-    // Moved in the DOM while it held an unsent edit (see `savedSignatures`):
-    // the debounce that `disconnect` cleared starts over.
-    if (reconnected && !this.unchanged()) this.queue()
+    // Moved in the DOM while it held an UNSENT edit: the debounce that
+    // `disconnect` cleared starts over. Not for a paused form (`queue`
+    // refuses it), and not for one whose last answer was a failure about
+    // exactly what it holds now -- an invalid field, a refusal: sending the
+    // same thing again because the card was dragged would only repeat the
+    // error. (That form still sends on its next edit, as always.)
+    if (reconnected && !this.unchanged() && !this.refusedAsIs()) this.queue()
   }
 
-  // What the server holds of this form (see `savedSignatures`).
-  get saved() { return savedSignatures.get(this.element) }
-  set saved(signature) { savedSignatures.set(this.element, signature) }
+  get state() { return saveStates.get(this.element) }
+  get saved() { return this.state.saved }
+  set saved(signature) { this.state.saved = signature }
+  get paused() { return this.state.paused }
+  set paused(value) { this.state.paused = value }
+  get failed() { return this.state.failed }
+  set failed(value) { this.state.failed = value }
+
+  // The form holds exactly what its last answered request sent, and that
+  // answer was a failure.
+  refusedAsIs() {
+    return this.failed && this.signature(new FormData(this.element)) === this.state.sent
+  }
 
   disconnect() {
     unregisterForm(this)
@@ -356,6 +378,7 @@ export default class extends Controller {
     if (!isCurrent()) return "stale"
 
     this.lastAnswerOk = response.ok
+    this.state.sent = sent
     if (response.ok) this.saved = sent
 
     if (response.status === 409) {

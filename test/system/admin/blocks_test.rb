@@ -183,6 +183,59 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_no_text "CHANGED ELSEWHERE"
   end
 
+  # Follow-up N4: what survives a card being moved is the form's whole save
+  # state, not only its signature. A card paused by a 409 ("Changed
+  # elsewhere" -- its saves are over until Reload) used to come back from the
+  # move un-paused, and the restart of the debounce sent its text again.
+  test "a card paused by Changed elsewhere stays paused when it is moved" do
+    first = @page.content_blocks.create!(block_type: "image", position: 0)
+    second = @page.content_blocks.create!(block_type: "image", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__blockPatches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH" && String(url.url || url).includes("/content_blocks/#{second.id}")) window.__blockPatches += 1
+        return originalFetch(url, options)
+      }
+    JS
+    travel 1.minute do
+      as(users(:two), channel: :admin) { ContentBlocks::Save.call(second, translations: { "en" => { caption: "The other editor's caption" } }) }
+    end
+
+    fill_in id: "block-#{second.id}-caption", with: "My caption"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#block-#{second.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
+    assert_equal 1, page.evaluate_script("window.__blockPatches")
+
+    page.execute_script(%(document.querySelector('[data-block-id="#{second.id}"] [data-move="up"]').click()))
+    assert_eventually { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
+    sleep 1.5 # past the debounce a restarted save would wait out
+    fill_in id: "block-#{second.id}-caption", with: "My caption, edited again"
+    page.execute_script("document.activeElement.blur()")
+    sleep 0.5
+
+    assert_equal 1, page.evaluate_script("window.__blockPatches"), "a paused card sent again after it was moved"
+    assert_equal "The other editor's caption", second.reload.caption
+  end
+
+  # Deferred b3: Duplicate is picked from the card's menu, which closes -- and
+  # focus fell to <body>. It goes to the copy's handle, where Space and the
+  # arrows move it on.
+  test "after Duplicate focus is on the copy's handle" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    find("#{card_for(first)} button[aria-label='Block actions']").click
+    within(card_for(first)) { press "Duplicate" }
+
+    assert_selector "#content-blocks-list > .admin-block-card", count: 2
+    copy = @page.content_blocks.where.not(id: first.id).sole
+    assert_selector "#{card_for(copy)} .admin-block-card__handle:focus"
+  end
+
   test "the type name collapses and expands the body, and says which" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
     visit "/cs-studio/pages/#{@page.id}"

@@ -79,7 +79,26 @@ export default class extends Controller {
       if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
-    this.moveStateObserver = new MutationObserver(() => this.refreshMoveState())
+    // Duplicate is picked from a card's "⋯" menu, which closes on the pick:
+    // the item that had focus is hidden, and focus fell to <body> -- a
+    // keyboard user was back at the top of the page with the copy somewhere
+    // below. So a Duplicate that succeeded is remembered (`turbo:submit-end`
+    // bubbles up from its form), and the card its answer's stream then adds
+    // to the list gets focus on its handle (`focusCopy`, from the list's
+    // observer): the copy, where Space and the arrows move it on. The note is
+    // dropped after a moment in case no card follows.
+    this.duplicated = (event) => {
+      const action = event.detail.formSubmission?.formElement?.getAttribute("action") || ""
+      if (!event.detail.success || !new URL(action, window.location.origin).pathname.endsWith("/duplicate")) return
+      this.awaitingCopy = true
+      clearTimeout(this.copyTimer)
+      this.copyTimer = setTimeout(() => { this.awaitingCopy = false }, 2000)
+    }
+    this.element.addEventListener("turbo:submit-end", this.duplicated)
+    this.moveStateObserver = new MutationObserver((mutations) => {
+      this.refreshMoveState()
+      this.focusCopy(mutations)
+    })
     this.moveStateObserver.observe(this.listTarget, { childList: true })
     this.refreshMoveState()
     this.sortable = Sortable.create(this.listTarget, {
@@ -128,8 +147,22 @@ export default class extends Controller {
   disconnect() {
     this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
     document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.element.removeEventListener("turbo:submit-end", this.duplicated)
+    clearTimeout(this.copyTimer)
     this.moveStateObserver?.disconnect()
     this.sortable?.destroy()
+  }
+
+  // See `duplicated` in `connect`: the first card added to the list after a
+  // Duplicate is the copy.
+  focusCopy(mutations) {
+    if (!this.awaitingCopy) return
+    const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
+      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--blocks-target="card"]'))
+    if (!copy) return
+
+    this.awaitingCopy = false
+    this.focusHandle(copy)
   }
 
   // Move up is disabled on the first card, Move down on the last. Only the
