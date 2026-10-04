@@ -183,8 +183,9 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     # The Settings form is not one of the three record editors that refuse a
     # stale save (`AutosaveResponses#refuse_stale_autosave`): it still saves
-    # and warns, now in the new wording.
-    assert_match(/CHANGED ELSEWHERE/, response.body)
+    # and says so in its own wording (`:saved_over`), never the refusal's.
+    assert_match(/SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST/, response.body)
+    assert_no_match(/● CHANGED ELSEWHERE/, response.body)
   end
 
   # -- translated title and tagline (translation helpers spec §5) --

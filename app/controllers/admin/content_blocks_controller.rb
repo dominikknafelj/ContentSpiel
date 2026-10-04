@@ -72,6 +72,7 @@ module Admin
       # (`page_base_streams` is only reached on success) -- see
       # `AutosaveResponses#refuse_stale_autosave`.
       return if refuse_stale_autosave(block, status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
+        error_prefix: Admin::BlockCardComponent.error_prefix(block),
         reload_url: admin_page_path(@page, **admin_url_options))
 
       attributes, translations = split_block_params(block)

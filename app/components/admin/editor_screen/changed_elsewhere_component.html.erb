@@ -3,8 +3,13 @@
     typed. %>
 <div id="changed-elsewhere" role="alert" class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink">
   <p class="min-w-0 flex-1">
-    <% if change %>
-      Changed by <%= render Admin::UserNameComponent.new(user: change.user, user_id: change.user_id) %> <%= render Admin::TimeAgoComponent.new(time: change.last_occurred_at) %>.
+    <% if (found = change) %>
+      <% event = found[:event] %>
+      <% if found[:own] %>
+        Changed in another tab or window <%= render Admin::TimeAgoComponent.new(time: event.last_occurred_at) %>.
+      <% else %>
+        Changed by <%= render Admin::UserNameComponent.new(user: event.user, user_id: event.user_id) %> <%= render Admin::TimeAgoComponent.new(time: event.last_occurred_at) %>.
+      <% end %>
     <% else %>
       Changed elsewhere.
     <% end %>

@@ -377,6 +377,20 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#toasts .admin-toast[role=alert]", text: asset.in_use_message(kept_only: true)
   end
 
+  test "an edit on a stale base still saves, and says so without the refusal's wording" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "hero.png")
+    stale = asset.updated_at.iso8601(6)
+    travel 1.minute
+    asset.update!(title: "Changed elsewhere")
+
+    patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Mine", alt: "", caption: "" }, base_updated_at: stale }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Mine", asset.reload.title
+    assert_match(/SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST/, response.body)
+    assert_no_match(/● CHANGED ELSEWHERE/, response.body)
+  end
+
   test "editing title, alt and caption autosaves per locale through Media::Save" do
     sign_in_as(users(:one))
     asset = upload_asset(filename: "hero.png")

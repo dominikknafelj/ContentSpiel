@@ -70,6 +70,7 @@ module Posts
         raise ActiveRecord::Rollback if refused
 
         (@post.save && assign_related_posts) || raise(ActiveRecord::Rollback)
+        touch_for_join_rows(related_before)
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
         # one locale's body loses exactly that locale's row.
@@ -92,6 +93,22 @@ module Posts
     end
 
     private
+
+    # Tags and related posts are join rows: changing only those saves no
+    # column of the post, so its `updated_at` would not move -- and
+    # `updated_at` is the base every editor's autosave form carries (a stale
+    # base is refused, `Admin::AutosaveResponses#refuse_stale_autosave`).
+    # Left alone, another editor's tag-only change would not make a stale
+    # form's next save a 409: it would silently revert the tags. Touched here,
+    # inside the same transaction, only when a join set really changed (a
+    # no-op resend of the same tags moves nothing) and only if the save did
+    # not already move it.
+    def touch_for_join_rows(related_before)
+      return if @post.saved_change_to_updated_at?
+      return if related_state == related_before
+
+      @post.touch
+    end
 
     # Publishing, unpublishing and scheduling need `posts.publish` (design
     # spec §3.3), not `posts.edit` as well (final fix wave, Important 1):

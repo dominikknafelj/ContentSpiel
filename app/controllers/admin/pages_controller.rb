@@ -124,7 +124,7 @@ module Admin
     def update
       # Before anything is read off the form or any service is called -- see
       # `AutosaveResponses#refuse_stale_autosave`.
-      return if refuse_stale_autosave(@page, status_id: "page-save-status", reload_url: admin_page_path(@page, **admin_url_options))
+      return if refuse_stale_autosave(@page, status_id: "page-save-status", error_prefix: "page", reload_url: admin_page_path(@page, **admin_url_options))
 
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h

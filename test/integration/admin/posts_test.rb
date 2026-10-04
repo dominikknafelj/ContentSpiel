@@ -74,6 +74,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   test "a save made on a stale base is refused, names who changed it, and keeps the newer text" do
     post_record = create_post(title: "Engineer")
     stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
     as(users(:two), channel: :admin) { Posts::Save.call(post_record, translations: { "en" => { excerpt: "Changed by someone else" } }) }
 
     patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { excerpt: "My stale edit" } }, as: :turbo_stream
@@ -82,6 +83,25 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select_in_stream "post-save-status", /CHANGED ELSEWHERE/
     assert_select_in_stream "editor-notice", /Changed by .+Reload/m
     assert_no_match(/post-base-updated-at/, response.body)
+  end
+
+  test "another editor's tag-only change makes a stale form's save a 409, and the tags stay theirs" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { Posts::Save.call(post_record, attributes: { tag_names: [ "ruby", "rails" ] }) }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { tag_names: "ruby" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
+  end
+
+  test "a view-only post editor says so" do
+    post_record = create_post(title: "Engineer", published: false)
+    sign_in_as(users(:reader))
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_select "[data-view-only-hint]", "You can view this post but not change it."
+    assert_select ".admin-view-only"
   end
 
   test "a post save on a current base still saves" do

@@ -75,6 +75,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   test "a save made on a stale base is refused, names who changed it, and keeps the newer text" do
     page = create_page(title: "About 2")
     stale = page.updated_at.iso8601(6)
+    travel 2.seconds
     as(users(:two), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "Changed by someone else" } }) }
 
     patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "My stale edit" } }, as: :turbo_stream
@@ -105,6 +106,34 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   test "the editor has an empty notice slot a stream can target" do
     get admin_page_path(@page)
     assert_select "#editor-notice:empty"
+  end
+
+  test "the refusal also clears a lingering failed-save toast for the form" do
+    page = create_page(title: "About 4")
+    stale = page.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "Theirs" } }) }
+
+    patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "Mine" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_select_in_stream "toast-page", /\A\s*\z/
+    assert_equal "remove", Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='toast-page']")["action"]
+  end
+
+  test "a view-only editor on a live page without the right to publish is told why" do
+    editor = User.create!(email_address: "edit-only@example.com", password: "password12345")
+    group = AccessControl::Group.create!(name: "Edit, no publish")
+    %w[pages.read pages.edit].each { |key| group.grants.create!(permission: key, scope: {}) }
+    group.memberships.create!(user: editor)
+
+    sign_in_as(editor)
+    get admin_page_path(@page)
+    assert_select "[data-view-only-hint]", "You can view this page but not change it. It is live, and changing a live page needs the right to publish."
+
+    scheduled = create_page(title: "Later", published: false)
+    as(users(:one), channel: :admin) { Pages::Save.call(scheduled, attributes: { published_at: 1.day.from_now }) }
+    get admin_page_path(scheduled)
+    assert_select "[data-view-only-hint]", /It is scheduled, and changing a scheduled page needs the right to publish\./
   end
 
   test "a view-only editor says so, and why" do

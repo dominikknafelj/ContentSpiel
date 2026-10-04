@@ -29,9 +29,15 @@ module Admin
     # PATCH resends the whole form and this always reflects the record's
     # complete, current validity rather than only what changed.
     #
-    # `base_updated_at:` is only for a caller that has not adopted the
-    # refusal below (`#refuse_stale_autosave`): it still gets the old
-    # after-the-fact "changed elsewhere" warning, the save having happened.
+    # Which forms refuse a stale save and which do not. The page settings
+    # form, a block card and the post form refuse (`#refuse_stale_autosave`):
+    # they have the `#editor-notice` area for the explanation bar and a
+    # Reload. Settings, the media detail panel and the tag rows still save on
+    # a stale base and pass `base_updated_at:` here for the after-the-fact
+    # warning; those screens have no notice area, and Settings moves to an
+    # explicit save bar in a later round. That warning is its own state
+    # (`:saved_over`, "SAVED · ALSO CHANGED ELSEWHERE -- RELOAD ..."), so the
+    # refusal's "● CHANGED ELSEWHERE" always, everywhere, means "not saved".
     def autosave_stream(record:, result:, status_id:, error_prefix:, base_updated_at: nil, fields: {})
       streams = [ turbo_stream.replace(status_id, save_status_component(record: record, result: result, status_id: status_id, base_updated_at: base_updated_at)) ]
 
@@ -106,21 +112,34 @@ module Admin
     # base is not stale: non-JS and scripted clients (and MCP, which does not
     # use this endpoint at all) never send one, and keep saving as before.
     #
+    # Accepted race: the check and the save are not atomic (the record is
+    # loaded, compared, then written some milliseconds later, with no lock or
+    # `WHERE updated_at = base`). Two saves on the same base arriving within
+    # the same few milliseconds can both pass and the later one wins. The
+    # window is the length of one request, against the human-scale one this
+    # guards (another editor's save minutes ago); closing it would need
+    # row locking in every service for no case a person can produce.
+    #
+    # The refusal also removes a lingering failed-save error toast for the
+    # form (`toast-<error_prefix>`), as a successful save does: the failure
+    # it reports has been superseded by this answer.
+    #
     # Returns true after rendering the refusal, so a caller is
     # `return if refuse_stale_autosave(...)` before it calls its service.
     # `record` must be the record as loaded for this request, before any write.
-    def refuse_stale_autosave(record, status_id:, reload_url:)
+    def refuse_stale_autosave(record, status_id:, error_prefix:, reload_url:)
       return false unless stale_base?(record, params[:base_updated_at])
 
-      render turbo_stream: stale_streams(record, status_id: status_id, reload_url: reload_url), status: :conflict
+      render turbo_stream: stale_streams(record, status_id: status_id, error_prefix: error_prefix, reload_url: reload_url, since: Time.iso8601(params[:base_updated_at])), status: :conflict
       true
     end
 
-    def stale_streams(record, status_id:, reload_url:)
+    def stale_streams(record, status_id:, error_prefix:, reload_url:, since:)
       live = live_record?(record)
       [
         turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :stale, live: live)),
-        turbo_stream.update("editor-notice", Admin::EditorScreen::ChangedElsewhereComponent.new(record: record, reload_url: reload_url))
+        turbo_stream.update("editor-notice", Admin::EditorScreen::ChangedElsewhereComponent.new(record: record, reload_url: reload_url, since: since)),
+        turbo_stream.remove("toast-#{error_prefix}")
       ]
     end
 
@@ -156,7 +175,7 @@ module Admin
       return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden, live: live) if result.denied?
       return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size, live: live) unless result.ok?
 
-      return Admin::SaveStatusComponent.new(id: status_id, state: :stale, live: live) if legacy_stale_after_save?(record, base_updated_at)
+      return Admin::SaveStatusComponent.new(id: status_id, state: :saved_over, live: live) if legacy_stale_after_save?(record, base_updated_at)
 
       Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at, live: live)
     end

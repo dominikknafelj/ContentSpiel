@@ -33,6 +33,11 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
     assert_text "● CHANGED ELSEWHERE"
     assert_selector "p.text-warn-ink"
 
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved_over)
+    assert_text "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
+    assert_no_text "● CHANGED ELSEWHERE"
+    assert_selector "p.text-warn-ink"
+
     # Fix (final-fixes round, finding 4): never rendered by a server
     # response (see this state's own class comment), but its exact text
     # still has to be governed by this one component, the same as every

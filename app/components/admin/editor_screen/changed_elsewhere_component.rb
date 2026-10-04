@@ -9,32 +9,56 @@ module Admin
     # (`data-turbo-frame="_top"`), which is what discards the typed text and
     # loads the newer version.
     #
-    # Who and when is the record's newest audit event -- for a page or post
-    # also any event about a block it owns, since editing a block is editing
-    # its owner -- ignoring `access.denied`, exactly the rule the dashboard
-    # uses for "by" (`Dashboard::Feed::NOT_A_CHANGE`, `#last_change`), so the
-    # two can never name different people. This is one record, so two small
-    # queries rather than the dashboard's batched LATERAL join. A change with
-    # no event at all (saved straight through the model) reads "Changed
-    # elsewhere." without a name; an event with no user is "System".
+    # Who and when come from the audit log, bounded by the base the refused
+    # save carried (`since:`, the `base_updated_at` the form sent): only
+    # events AFTER that base can be what made it stale. Without the bound the
+    # newest event by someone else could be a change the form had already
+    # loaded ("Changed by B 6 minutes ago" when the real change was this same
+    # user's save in a second tab). Events are the record's own plus, for a
+    # page or post, those of blocks it owns (editing a block is editing its
+    # owner), ignoring `access.denied` -- the dashboard's "by" rule
+    # (`Dashboard::Feed::NOT_A_CHANGE`).
+    #
+    # Among those, a change by someone else is preferred, and the newest one
+    # is named ("Changed by <name> <time ago>."): a block this editor just
+    # saved touches the page too, and "Changed by <you>" would explain
+    # nothing. When the only later change is the viewer's own (a second tab or
+    # window) it says so, "Changed in another tab or window <time ago>."; with
+    # no event after the base at all (a change saved straight through the
+    # model), "Changed elsewhere." without a name.
+    #
+    # `SLACK`: an event is recorded a few milliseconds AFTER the save whose
+    # `updated_at` became the base, so the change the form already loaded has
+    # an event just past the base. Events within `SLACK` of the base are that
+    # one, not a later change.
+    #
     class ChangedElsewhereComponent < Admin::AdminComponent
-      def initialize(record:, reload_url:)
+      SLACK = 1.second
+
+      def initialize(record:, reload_url:, since: nil)
         @record = record
         @reload_url = reload_url
+        @since = since
       end
 
+      # `{ event:, own: }` for the change to name, or nil.
       def change
         return @change if defined?(@change)
 
-        @change = newest_event
+        events = events_after_base
+        other = events.where.not(user_id: Current.user&.id).or(events.where(user_id: nil)).first if Current.user
+        @change = if other then { event: other, own: false }
+        elsif (newest = events.first) then { event: newest, own: Current.user.present? && newest.user_id == Current.user.id }
+        end
       end
 
       private
 
-      attr_reader :record, :reload_url
+      attr_reader :record, :reload_url, :since
 
-      def newest_event
+      def events_after_base
         events = Audit::Event.where.not(action: Dashboard::Feed::NOT_A_CHANGE)
+        events = events.where("audit_events.last_occurred_at > ?", since + SLACK) if since
         own = events.where(subject_type: record.class.base_class.name, subject_id: record.id)
         scope = if record.is_a?(::Page) || record.is_a?(::Post)
           via_blocks = events.where(subject_type: ContentBlock.base_class.name,
@@ -44,14 +68,7 @@ module Admin
           own
         end
 
-        newest = scope.includes(:user).order(last_occurred_at: :desc, id: :desc)
-        # The change that made THIS editor's base stale is someone else's: a
-        # block this editor has just saved touches the page too (their own
-        # newest event), but "Changed by <you>" would be no explanation.
-        # So the newest event by anyone else is preferred, and only when
-        # there is none (the same person in another tab, or a change with no
-        # user) is the newest event itself named.
-        (Current.user && newest.where.not(user_id: Current.user.id).or(newest.where(user_id: nil)).first) || newest.first
+        scope.includes(:user).order(last_occurred_at: :desc, id: :desc)
       end
     end
   end
