@@ -42,7 +42,7 @@ module Admin
       streams = [ turbo_stream.remove(Admin::TranslationScreen::OutdatedNoteComponent.dom_id(record.class.name, record.id, params[:field])) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record
       unless Translations::Status.outdated_locales(switcher_record).include?(params[:locale].to_s)
-        streams << turbo_stream.remove(Admin::LanguageSwitcherComponent.outdated_marker_id(params[:locale]))
+        streams << turbo_stream.remove(Admin::LanguageTabsComponent.outdated_marker_id(params[:locale]))
       end
       streams
     end

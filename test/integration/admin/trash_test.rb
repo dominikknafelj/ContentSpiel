@@ -45,11 +45,43 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
 
     get admin_trash_path
     assert_select "tbody tr", count: 50
-    assert_select "a", text: "Next"
+    assert_select "nav[aria-label='Pagination'] a[rel=next]", text: "Next"
+    assert_select "nav[aria-label='Pagination']", text: /1–50 OF 54/
 
-    get admin_trash_path(offset: 50)
+    get admin_trash_path(page: 2)
     assert_select "tbody tr", count: 4
     assert_select "tr", text: /Section/
+  end
+
+  test "junk and out-of-range page numbers never error" do
+    sign_in_as users(:one)
+    %w[0 abc -1].each do |junk|
+      get admin_trash_path(page: junk)
+      assert_response :success
+    end
+    get admin_trash_path(page: 9999)
+    assert_response :success
+    assert_select "a", text: "Back to page 1"
+  end
+
+  # A page past the end has nothing to list, so nothing is loaded for it:
+  # the window `listed_items` reads is `offset + 50` rows per type, i.e.
+  # everything in the trash for a large enough `?page=`.
+  test "an out-of-range page loads no trashed rows" do
+    sign_in_as users(:one)
+    row_queries = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      row_queries << payload[:sql] if payload[:sql].match?(/ORDER BY .*trashed_at.* DESC/i)
+    end
+    get admin_trash_path(page: 9999)
+    assert_response :success
+    assert_empty row_queries
+
+    row_queries.clear
+    get admin_trash_path
+    assert_not_empty row_queries, "the probe does see the list's own queries on a real page"
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
   end
 
   test "restore brings an item back and says where" do
@@ -177,10 +209,10 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
   test "the sidebar shows Trash to holders of any delete right, not to a reader" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "nav[aria-label='Modules'] a", text: "Trash", count: 0
+    assert_select "nav[aria-label='Modules'] a", text: /\ATrash/, count: 0
     sign_in_as users(:two)
     get admin_root_path
-    assert_select "nav[aria-label='Modules'] a", text: "Trash"
+    assert_select "nav[aria-label='Modules'] a", text: /\ATrash/
   end
 
   test "a trashed id outside the trash, or of the wrong type, 404s" do
@@ -190,5 +222,34 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     post admin_restore_trash_item_path("page", @post)
     assert_response :not_found
+  end
+
+  # The sidebar's Trash badge (design pass spec §4): the same delete-right
+  # scopes the screen lists with, so each viewer's number is what they'd
+  # see on the Trash screen itself -- an owner counts the page branch (one
+  # root, not its members), the post and the image; an author holding only
+  # `media.upload` counts just the images they uploaded.
+  test "the sidebar's Trash badge counts what this viewer could act on" do
+    mine = create_media_asset
+    mine.update!(created_by_id: users(:author).id)
+    Current.set(actor: users(:one)) { Trash::Move.call(mine) }
+
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "4"
+
+    sign_in_as users(:author)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "1"
+    get admin_trash_path
+    assert_select "[id^=trash-]", count: 1
+  end
+
+  test "an empty trash shows no badge" do
+    Current.set(actor: users(:one)) { Trash::Empty.call }
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}']"
+    assert_select "nav[aria-label='Modules'] [data-badge]", count: 0
   end
 end

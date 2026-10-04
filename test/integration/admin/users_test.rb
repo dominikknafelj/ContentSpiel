@@ -21,7 +21,7 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
   test "creating a user" do
     assert_difference -> { User.count }, 1 do
       post "/cs-studio/users", params: { user: {
-        email_address: "new@example.com", password: "password123", password_confirmation: "password123"
+        email_address: "new@example.com", password: "password12345", password_confirmation: "password12345"
       } }
     end
 
@@ -29,13 +29,13 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     user = User.find_by!(email_address: "new@example.com")
-    assert user.authenticate("password123")
+    assert user.authenticate("password12345")
   end
 
   test "creating a user with mismatched confirmation fails" do
     assert_no_difference -> { User.count } do
       post "/cs-studio/users", params: { user: {
-        email_address: "new@example.com", password: "password123", password_confirmation: "nope"
+        email_address: "new@example.com", password: "password12345", password_confirmation: "nope"
       } }
     end
 
@@ -43,15 +43,34 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "doesn&#39;t match"
   end
 
+  test "a refused create shows the error summary with a link to each field and marks the field invalid" do
+    post "/cs-studio/users", params: { user: { email_address: users(:one).email_address, password: "short", password_confirmation: "short" } }
+
+    assert_response :unprocessable_entity
+    assert_select ".admin-error-summary[role=alert]", text: /2 things need fixing/
+    assert_select ".admin-error-summary a[href='#user_email_address']", text: "Email address has already been taken"
+    assert_select ".admin-error-summary a[href='#user_password']", text: "Use at least 12 characters."
+    assert_select "input#user_email_address[aria-invalid=true]"
+  end
+
   test "creating a user with an email already taken (case-insensitively) fails" do
     assert_no_difference -> { User.count } do
       post "/cs-studio/users", params: { user: {
-        email_address: users(:one).email_address.upcase, password: "password123", password_confirmation: "password123"
+        email_address: users(:one).email_address.upcase, password: "password12345", password_confirmation: "password12345"
       } }
     end
 
     assert_response :unprocessable_entity
     assert_includes response.body, "has already been taken"
+  end
+
+  # The edit form is an explicit-save form with a leave guard that only sees
+  # Turbo Drive visits: a link inside the content frame would discard typed
+  # changes without asking, so the one there breaks out of the frame.
+  test "the Activity link on the edit screen leaves the content frame" do
+    get "/cs-studio/users/#{users(:two).id}/edit"
+    assert_select "a[data-turbo-frame='_top']", text: "Activity"
+    assert_select "#user-form noscript", count: 1
   end
 
   test "editing a user's email without touching the password" do

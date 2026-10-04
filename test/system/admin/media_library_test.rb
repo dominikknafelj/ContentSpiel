@@ -16,7 +16,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     # `admin--media-upload#filesSelected` fires one POST per file (global
     # constraints' own upload ruling) and reloads the page once both have
     # settled.
-    attach_file("Upload images", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
+    attach_file("media-upload-input", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
 
     assert_selector ".admin-media-grid li", count: 2, wait: 10
     assert_equal 2, Media::Asset.count
@@ -29,7 +29,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     within("nav[aria-label='Languages']") { press "Deutsch" }
     # Waits for the language switch's own full top-level Turbo visit
-    # (`data-turbo-frame="_top"`, `Admin::LanguageSwitcherComponent`'s own
+    # (`data-turbo-frame="_top"`, `Admin::LanguageTabsComponent`'s own
     # comment) to actually land before typing -- alt/caption have no
     # read-only "original" hint the way a translated column with one would
     # (`Admin::LanguagesSystemTest`'s own comment on why *that* test polls

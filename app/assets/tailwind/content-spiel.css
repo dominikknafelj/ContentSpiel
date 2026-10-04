@@ -44,6 +44,13 @@
   --cs-danger-tint: oklch(0.96 0.03 25);
   --cs-ph-a: #dddbd3;
   --cs-ph-b: #c9c7bd;
+  --cs-chrome: #ffffff;              /* sidebar / tree column */
+  --cs-cat-1: oklch(0.52 0.09 200);
+  --cs-cat-2: oklch(0.52 0.11 300);
+  --cs-cat-3: oklch(0.52 0.09 120);
+  --cs-cat-4: oklch(0.52 0.10 0);
+  --cs-cat-5: oklch(0.50 0.08 230);
+  --cs-cat-6: oklch(0.54 0.08 95);   /* types 7+ reuse 1-6 as rings */
   --cs-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
 }
 
@@ -71,6 +78,13 @@
   --cs-danger-tint: oklch(0.29 0.06 25);
   --cs-ph-a: #2a2b2f;
   --cs-ph-b: #1c1d20;
+  --cs-chrome: #131416;
+  --cs-cat-1: oklch(0.74 0.08 200);
+  --cs-cat-2: oklch(0.74 0.10 300);
+  --cs-cat-3: oklch(0.74 0.09 120);
+  --cs-cat-4: oklch(0.74 0.09 0);
+  --cs-cat-5: oklch(0.74 0.07 230);
+  --cs-cat-6: oklch(0.78 0.08 95);
   --cs-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
 }
 

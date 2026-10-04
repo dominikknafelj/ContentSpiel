@@ -7,7 +7,7 @@
   API tokens, or create additional tokens there later.
 </p>
 
-<div class="mt-6 flex gap-3">
+<div class="mt-6 flex items-center gap-3">
   <%# Turbo Drive refuses non-redirect 2xx form responses ("Form responses must
       redirect to another location"); update_mcp_token renders (not redirects)
       by design, since the raw token must never pass through session/flash.
@@ -15,5 +15,6 @@
       the raw token out of Turbo's page cache. %>
   <%= button_to "Generate token", setup_step_path("mcp_token"), method: :patch,
         form: { data: { turbo: false } }, class: setup_primary_button_class %>
-  <%= link_to "Skip", setup_step_path("starter_content"), class: setup_secondary_link_class %>
+  <%= link_to "Skip", setup_step_path("starter_content"), class: setup_ghost_link_class %>
+  <%= render "setup/back" %>
 </div>

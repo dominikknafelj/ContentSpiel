@@ -172,6 +172,28 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert @gone_asset.reload.trashed?
   end
 
+  test "the ⌘K jump palette lists kept pages, posts and images and never trashed ones" do
+    # Distinct titles so a match proves which record answered: the setup's
+    # kept and trashed records are titled "Kept ..."/"Gone ..." (images
+    # after their filename, shared by both).
+    @kept_asset.update!(title: "Kept image")
+    @gone_asset.update!(title: "Gone image")
+    sign_in_as users(:one)
+
+    get "/cs-studio/jump", params: { q: "kept" }
+    assert_response :success
+    assert_select "a[href=?]", "/cs-studio/pages/#{@kept_page.id}"
+    assert_select "a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
+    assert_select "a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
+
+    get "/cs-studio/jump", params: { q: "gone" }
+    assert_response :success
+    assert_select "a[href=?]", "/cs-studio/pages/#{@gone_page.id}", count: 0
+    assert_select "a[href=?]", "/cs-studio/posts/#{@gone_post.id}", count: 0
+    assert_select "a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_select "p", text: /No results for/
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 

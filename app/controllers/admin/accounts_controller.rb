@@ -32,5 +32,18 @@ module Admin
         render :edit, status: :unprocessable_entity
       end
     end
+
+    # "Your name" (design pass spec §5.1): the one profile field. Not
+    # `Users::Save` -- that needs `users.manage`; `Users::UpdateProfile` is
+    # open to every user for their own account only.
+    def update_profile
+      result = Users::UpdateProfile.call(Current.user, name: params[:name])
+      if result.ok?
+        redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+      else
+        @profile_errors = result.errors
+        render :edit, status: :unprocessable_entity
+      end
+    end
   end
 end

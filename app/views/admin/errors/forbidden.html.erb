@@ -3,12 +3,14 @@
     the admin layout, so the modules column -- already narrowed to what this
     user can open -- is right there as the way on. Only for an *area* the
     user lacks, or an action a service refused; a record outside their read
-    scope is a plain 404 instead, so its existence isn't disclosed (§3.3). %>
+    scope is a plain 404 instead (`errors/not_found`), so its existence isn't
+    disclosed (§3.3). Handoff "Studio States v3", card C33. %>
 <% content_for :title, "No access · CS Studio" %>
 
-<section class="admin-forbidden mx-auto flex max-w-xl flex-col gap-3 rounded-cs border border-line bg-surface p-6">
+<section class="admin-forbidden mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
   <p class="font-cs-mono text-label uppercase tracking-mono text-meta">403</p>
   <h1 class="text-h1 text-ink">No access</h1>
   <p role="alert" class="text-ink"><%= message %></p>
   <p class="text-sm text-meta">If you need this, ask an owner or an admin to add you to a group that has it.</p>
+  <%= link_to "Back to the dashboard", admin_root_path(**admin_url_options), class: "#{Admin::ButtonComponent::BASE_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
 </section>

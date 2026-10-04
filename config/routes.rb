@@ -27,6 +27,11 @@ Rails.application.routes.draw do
     get "sign-in", to: "sessions#new", as: :sign_in
     post "sign-in", to: "sessions#create"
     delete "sign-out", to: "sessions#destroy", as: :sign_out
+
+    # ⌘K "Jump to..." results (design pass spec §5.6): a layout-less HTML
+    # fragment for the palette's turbo-frame, read-only, open to every
+    # signed-in user (each row is already narrowed to what they may read).
+    get "jump", to: "jump#show", as: :jump
     resource :password, only: %i[new create]
     get "password/:token/edit", to: "passwords#edit", as: :edit_password
     patch "password/:token", to: "passwords#update", as: :update_password
@@ -202,6 +207,7 @@ Rails.application.routes.draw do
     # which needs `users.manage`. Singular: it's always *your* account.
     get "account/password", to: "accounts#edit", as: :account_password
     patch "account/password", to: "accounts#update"
+    patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

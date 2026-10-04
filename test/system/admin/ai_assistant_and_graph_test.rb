@@ -76,6 +76,50 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     assert_current_path admin_post_path(b)
   end
 
+  # Design pass round 1 (Task 17): the graph used to fill the whole content
+  # column and fling nodes past its edge.
+  test "the mind graph keeps to its box and every node stays inside it" do
+    posts = [ "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "A very long post title that goes on and on and on and on, well past sixty characters" ].map { |title| create_post(title: title) }
+    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    PostRelation.create!(post: posts.first, related_post: posts.last)
+
+    visit admin_mind_graph_path
+    await_admin_controllers
+    assert_selector "svg[data-admin--mind-graph-target=svg] circle", count: posts.size
+    # The controller sets data-settled once the simulation has cooled down.
+    assert_selector "svg[data-settled]", wait: 15
+
+    inside_box = <<~JS
+      (() => {
+        const svg = document.querySelector("svg[data-admin--mind-graph-target=svg]")
+        const box = svg.getBoundingClientRect()
+        const outside = Array.from(svg.querySelectorAll("circle")).filter((c) => {
+          const r = c.getBoundingClientRect()
+          return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1
+        }).length
+        const labelsOutside = Array.from(svg.querySelectorAll("text")).filter((t) => {
+          const r = t.getBoundingClientRect()
+          return r.left < box.left - 1 || r.right > box.right + 1
+        }).length
+        return { width: box.width, outside, labelsOutside }
+      })()
+    JS
+    result = page.evaluate_script(inside_box)
+    assert_operator result["width"], :<=, 960
+    assert_equal 0, result["outside"]
+    assert_equal 0, result["labelsOutside"]
+
+    # Shrinking the window moves the box; the nodes must follow it in.
+    page.current_window.resize_to(700, 800)
+    wait_until(timeout: 10) do
+      resized = page.evaluate_script(inside_box)
+      resized["outside"].zero? && resized["labelsOutside"].zero?
+    end
+  ensure
+    # Cuprite keeps the window size for the rest of the worker's session.
+    page.driver.resize(1400, 1400)
+  end
+
   # Fix round 1 (I1): Turbo snapshots the graph before `disconnect()`
   # clears it, so Back used to restore the old nodes and draw a second
   # live set on top.
@@ -104,7 +148,9 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   end
 
   test "create starter pages refreshes the tree" do
-    create_page(title: "Existing") # a root page, but no starter sections yet
+    # Starter pages are offered only while Home is the only kept page (design
+    # pass bug 4), so this starts from a site with nothing but Home.
+    root_page
 
     visit admin_pages_path
     await_admin_controllers

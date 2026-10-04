@@ -59,6 +59,8 @@ class Admin::MediaLibrary::DetailComponentTest < ViewComponent::TestCase
 
     assert_selector "button", text: "Move to trash"
     assert_no_selector "button[disabled]", text: "Move to trash"
+    # A whole-page answer, so the sidebar's Trash badge updates with it.
+    assert_selector "dialog form[data-turbo-frame='_top'] input[name='_method'][value='delete']", visible: :all
   end
 
   test "Move to trash is disabled, with the in-use reason, while a kept owner uses the image" do
@@ -69,6 +71,29 @@ class Admin::MediaLibrary::DetailComponentTest < ViewComponent::TestCase
     render_inline Admin::MediaLibrary::DetailComponent.new(asset: asset.reload, locale: "en")
 
     assert_selector "button[disabled]", text: "Move to trash"
-    assert_text asset.reload.in_use_message(kept_only: true)
+    assert_text "Remove it there first."
+  end
+
+  test "an image in use explains why it can't be trashed and links to where it's used" do
+    asset = create_media_asset
+    page = create_page(title: "Hero page")
+    Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
+
+    render_inline Admin::MediaLibrary::DetailComponent.new(asset: asset.reload, locale: "en")
+
+    assert_selector "button[disabled][aria-describedby='media-trash-help']", text: "Move to trash"
+    assert_no_selector "button[disabled][title]", text: "Move to trash"
+    assert_selector "#media-trash-help.text-dim", text: "In use on 1 page. Remove it there first."
+    assert_selector "#media-trash-help a[href='#media-used-on']", text: "See where it's used"
+    assert_selector "#media-used-on"
+  end
+
+  test "an image used in several places counts them" do
+    asset = create_media_asset
+    2.times { |i| Pages::Save.call(create_page(title: "Page #{i}"), attributes: { hero_media_asset_id: asset.id }) }
+
+    render_inline Admin::MediaLibrary::DetailComponent.new(asset: asset.reload, locale: "en")
+
+    assert_selector "#media-trash-help", text: "In use in 2 places. Remove it there first."
   end
 end

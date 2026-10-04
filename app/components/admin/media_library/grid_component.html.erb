@@ -1,5 +1,15 @@
 <% if assets.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No images", description: pick? ? "Upload one in the Upload tab, or try another search." : "Upload one above, or clear the current filters.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <% if filtered? %>
+      <%= render Admin::EmptyStateComponent.new(title: "No matches", description: "No images match the current search or filter.") do |empty_state| %>
+        <% empty_state.with_action do %>
+          <%= link_to "Clear filters", clear_filters_path, class: setup_secondary_link_class, data: clear_filters_data %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <%= render Admin::EmptyStateComponent.new(title: "No images", description: pick? ? "Upload one in the Upload tab." : "Upload one above.") %>
+    <% end %>
+  </div>
 <% else %>
   <ul class="admin-media-grid grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
     <% assets.each do |asset| %>

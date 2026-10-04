@@ -1,6 +1,6 @@
 <div id="<%= DOM_ID %>">
 <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-  <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+  <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
   <%# Translate empty fields / Use all -- see `Admin::RecordHeaderComponent`.
       Anyone on this screen holds `settings.manage`, the settings' edit
       right. %>
@@ -41,14 +41,14 @@
     <div class="admin-column mb-4" data-field-name="default_locale">
       <%= label_tag field_id("default_locale"), "Default language", class: setup_label_class %>
       <%= select_tag field_html_name("default_locale"), options_for_select(default_locale_options, site_setting.default_locale),
-            id: field_id("default_locale"), class: setup_input_class %>
+            id: field_id("default_locale"), class: setup_select_class %>
       <div id="<%= errors_id("default_locale") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 
     <div class="admin-column mb-4" data-field-name="time_zone">
       <%= label_tag field_id("time_zone"), "Time zone", class: setup_label_class %>
       <%= select_tag field_html_name("time_zone"), options_for_select(time_zone_options, selected_time_zone),
-            id: field_id("time_zone"), class: setup_input_class %>
+            id: field_id("time_zone"), class: setup_select_class %>
       <div id="<%= errors_id("time_zone") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 
@@ -56,13 +56,18 @@
       <%= label_tag field_id("trash_retention_days"), "Empty trash automatically after", class: setup_label_class %>
       <div class="flex items-center gap-2">
         <%= number_field_tag field_html_name("trash_retention_days"), site_setting.trash_retention_days,
-              id: field_id("trash_retention_days"), min: 0, step: 1, class: "#{setup_input_class} w-24" %>
-        <span class="text-ink">days (0 = never)</span>
+              id: field_id("trash_retention_days"), min: 0, step: 1, class: "#{setup_input_class} w-18",
+              aria: { describedby: field_id("trash_retention_days_help") } %>
+        <span class="whitespace-nowrap text-ink">days</span>
       </div>
+      <%# The explanation lives below the field as help, not crammed after the
+          unit (design pass bug 2: "days (0 = never)" wrapped inside the
+          column). The error slot stays a direct child of the wrapper. %>
+      <p id="<%= field_id("trash_retention_days_help") %>" class="mt-1 text-sm text-meta">Items in the trash are deleted for good after this many days. 0 keeps them until you empty the trash.</p>
       <div id="<%= errors_id("trash_retention_days") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 
-    <fieldset>
+    <fieldset class="admin-column">
       <legend class="<%= setup_label_class %>">Social links</legend>
       <div class="mt-1 space-y-2">
         <% social_link_rows.each do |name, url| %>
@@ -87,7 +92,7 @@
       <div class="admin-column mb-4" data-field-name="ai_provider">
         <%= label_tag field_id("ai_provider"), "Provider", class: setup_label_class %>
         <%= select_tag field_html_name("ai_provider"), options_for_select(ai_provider_options, site_setting.ai_provider),
-              include_blank: "None (AI translation off)", id: field_id("ai_provider"), class: setup_input_class %>
+              include_blank: "None (AI translation off)", id: field_id("ai_provider"), class: setup_select_class %>
         <div id="<%= errors_id("ai_provider") %>" class="mt-1 text-sm text-danger-ink"></div>
       </div>
 
@@ -108,7 +113,8 @@
 
   <div class="flex flex-wrap items-center gap-3">
     <%= button_to "Test connection", helpers.test_ai_connection_admin_settings_path, method: :post,
-          form: { class: "inline" }, class: setup_secondary_link_class %>
+          form: { class: "inline", data: { controller: "admin--busy" } }, class: setup_secondary_link_class,
+          data: { admin__busy_target: "button", busy_label: "Testing…" } %>
     <span class="text-sm text-meta">Uses the saved provider, model and key.</span>
   </div>
   <%= render partial: "admin/settings/ai_test_result", locals: { message: nil, ok: nil } %>

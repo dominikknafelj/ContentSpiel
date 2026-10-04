@@ -18,6 +18,20 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     assert_select "button", text: "Create starter pages"
   end
 
+  test "starter pages are offered only while Home is the only kept page" do
+    get "/cs-studio/pages"
+    assert_select "button", text: "Create starter pages"
+
+    page = create_page(title: "About")
+    get "/cs-studio/pages"
+    assert_select "button", text: "Create starter pages", count: 0
+
+    # A trashed page isn't a page the site has built: the offer is back.
+    page.update!(trashed_at: Time.current)
+    get "/cs-studio/pages"
+    assert_select "button", text: "Create starter pages"
+  end
+
   test "creating adds a page per section and redirects to the Pages index" do
     sections = StarterContent.sections.size
     assert sections.positive?

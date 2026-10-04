@@ -59,7 +59,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     editor.click
     type_text "Intro"
-    press "Image"
+    press_insert "Image"
     within("dialog[open]") do
       click_on "Upload"
       attach_file "Image file", file_fixture("tiny.png").to_s
@@ -80,7 +80,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     # The image is still selected after Done: the Image button now edits it
     # (the keyboard route to alt text) instead of opening the picker.
-    press "Image"
+    press_insert "Image"
     refute_selector "dialog[open]"
     within(".admin-rich-text-popover") do
       assert_field "Alt text", with: "A"
@@ -95,7 +95,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     visit_post
 
     editor.click
-    press "Image"
+    press_insert "Image"
     within("dialog[open]") do
       click_on "Upload"
       attach_file "Image file", file_fixture("fake.png").to_s
@@ -111,7 +111,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     visit_post
 
     editor.click
-    press "Internal link"
+    press_insert "Page link"
     within(".admin-rich-text-popover") do
       fill_in "Search pages and posts", with: "Cont"
       press "Contact"
@@ -180,6 +180,83 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     # The German editor itself starts empty -- the original is beside it,
     # not loaded into it.
     assert_no_text_in_editor "there"
+  end
+
+  # The page editor sits beside the tree, so at 1100px a translation's editor
+  # gets a column too narrow for the toolbar's single row. There the toolbar
+  # wraps -- whole groups at a time -- but stays inside its own box: no tool
+  # pokes out sideways or runs into the original's panel next to it, and the
+  # Insert menu still opens.
+  test "in a narrow translation column (page editor beside the tree) the toolbar wraps inside its box and the Insert menu stays reachable" do
+    page.driver.resize(1100, 1000)
+    page_record = create_page(title: "About")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("Hello **there**") } }).record
+    visit "/cs-studio/pages/#{page_record.id}?locale=de"
+    await_editors
+    assert_selector "[data-original-for='body']"
+
+    spill = page.evaluate_script(<<~JS)
+      (() => {
+        const toolbar = document.querySelector("#block-#{block.id} [role=toolbar], [role=toolbar]")
+        const original = document.querySelector("[data-original-for='body']").parentElement
+        const t = toolbar.getBoundingClientRect(), o = original.getBoundingClientRect()
+        const inside = Array.from(toolbar.querySelectorAll("button")).filter((b) => b.offsetParent).every((b) => {
+          const r = b.getBoundingClientRect()
+          return r.right <= t.right + 0.5 && r.left >= t.left - 0.5
+        })
+        return { inside, clear: t.right <= o.left + 0.5 }
+      })()
+    JS
+    assert spill["inside"], "a toolbar tool sits outside the toolbar's box"
+    assert spill["clear"], "the toolbar runs into the original's panel"
+    find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
+    assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
+  # Design pass round 1, bug 5: with the primary-language original shown
+  # beside the editor (half the column each) the toolbar used to wrap onto
+  # several rows. It is one row now, and the Insert menu -- which sits inside
+  # the toolbar -- is neither clipped by it nor out of reach: its items are
+  # visible, inside the viewport, and still run their command.
+  test "in a translation the toolbar is one row and the Insert menu opens and runs YouTube" do
+    page.driver.resize(1400, 1000)
+    @post.assign_body(rich_doc("Hello **there**"), locale: :en)
+    @post.save!
+    visit "/cs-studio/posts/#{@post.id}?locale=de"
+    await_editors
+    assert_selector "[data-original-for='body']"
+
+    rows = page.evaluate_script("(() => { const t = document.querySelector('[role=toolbar]'); const tops = new Set(Array.from(t.children).map(c => c.getBoundingClientRect().top)); return tops.size })()")
+    assert_equal 1, rows
+    # Nothing spills out of the toolbar sideways either.
+    assert page.evaluate_script("(() => { const t = document.querySelector('[role=toolbar]'); return t.scrollWidth <= t.clientWidth })()"),
+      "the toolbar's tools overflow its box"
+
+    editor.click
+    find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
+    assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
+    # The open panel is really on screen: the element at the item's centre is
+    # the item itself, not the toolbar or the editor clipping/covering it.
+    on_top = page.evaluate_script(<<~JS)
+      (() => {
+        const item = Array.from(document.querySelectorAll("[role=toolbar] [role=menu] button")).find((b) => b.textContent.trim() === "YouTube")
+        const box = item.getBoundingClientRect()
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+        return item === hit || item.contains(hit)
+      })()
+    JS
+    assert on_top, "the Insert menu's YouTube item is covered or clipped"
+    page.find("[role=toolbar] [role=menu] button", text: "YouTube").click
+
+    assert_no_selector "[role=toolbar] [role=menu]", visible: true
+    within(".admin-rich-text-popover") do
+      fill_in "YouTube URL or video ID", with: "https://www.youtube.com/watch?v=#{YOUTUBE_ID}"
+      press "Insert"
+    end
+    assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
   end
 
   # Turbo Stream replacement of a whole block card (task 7's lifecycle

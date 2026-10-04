@@ -82,6 +82,18 @@ module Admin
 
       private
 
+      # The input's own invalid state (design pass spec §4). The danger BORDER
+      # is not a server-rendered class: an autosave Turbo Stream replaces the
+      # error slot alone, never the input, so a class would go stale. It comes
+      # from CSS keyed on the slot's content instead (`.admin-column:has(
+      # [id$="-errors"] > p)`, content-spiel.tailwind.css). `aria-invalid` /
+      # `aria-describedby` stay server-rendered only (initial load).
+      def input_class = setup_input_class
+
+      def invalid_attrs
+        errors.any? ? { aria: { invalid: "true", describedby: errors_id } } : {}
+      end
+
       # What Use fills and how (`TranslateButtonComponent`): a plain column
       # its own input, measured as the text it is.
       def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }

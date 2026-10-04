@@ -1,17 +1,37 @@
-<div class="mx-auto md:w-2/3 w-full">
-  <% if alert = flash[:alert] %>
-    <p class="py-2 px-3 bg-red-50 mb-5 text-red-500 font-medium rounded-lg inline-block" id="alert"><%= alert %></p>
-  <% end %>
+<%# The reset flow's request page, in three of its four states (the fourth,
+    the new-password form, is edit.html.erb): "request" (the default), "sent"
+    (?sent=1, after a request) and "expired" (?expired=1, a bad or used
+    link). The sent state is the same words for a known and an unknown
+    address -- the controller redirects both identically. %>
+<div class="rounded-cs border border-line bg-surface p-6">
+  <% if params[:sent] == "1" %>
+    <h1 class="text-h2 font-semibold">Check your email</h1>
+    <p class="mt-3 text-dim">If that address belongs to an account, we've sent a link. It expires in 15 minutes.</p>
+    <p class="mt-5 text-sm"><%= link_to "← Back to sign in", admin_sign_in_path, class: "text-accent underline hover:no-underline" %></p>
+  <% elsif params[:expired] == "1" %>
+    <h1 class="text-h2 font-semibold">This link has expired</h1>
+    <p class="mt-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert">Reset links work for 15 minutes and only once.</p>
+    <p class="mt-5"><%= link_to "Send a new link", new_admin_password_path, class: "#{setup_primary_button_class} w-full text-center" %></p>
+    <p class="mt-4 text-sm"><%= link_to "← Back to sign in", admin_sign_in_path, class: "text-accent underline hover:no-underline" %></p>
+  <% else %>
+    <h1 class="text-h2 font-semibold">Reset your password</h1>
+    <p class="mt-3 text-dim">Enter the email you sign in with. We'll send a link to set a new password.</p>
 
-  <h1 class="font-bold text-4xl">Forgot your password?</h1>
+    <% if flash[:alert] %>
+      <p class="mt-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
+    <% end %>
 
-  <%= form_with url: admin_password_path, class: "contents" do |form| %>
-    <div class="my-5">
-      <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", placeholder: "Enter your email address", value: params[:email_address], class: "block shadow-sm rounded-md border border-gray-400 focus:outline-solid focus:outline-blue-600 px-3 py-2 mt-2 w-full" %>
-    </div>
+    <%= form_with url: admin_password_path, class: "mt-5 space-y-4" do |form| %>
+      <div>
+        <%= form.label :email_address, "Email", class: setup_label_class %>
+        <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
+      </div>
+      <%= render Admin::ButtonComponent.new(label: "Send reset link", type: "submit", class: "w-full") %>
+    <% end %>
 
-    <div class="inline">
-      <%= form.submit "Email reset instructions", class: "w-full sm:w-auto text-center rounded-lg px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white inline-block font-medium cursor-pointer" %>
-    </div>
+    <%# No console command is named here on purpose: this repo ships no rake
+        task for resetting a password, and a hint must not invent one. %>
+    <p class="mt-4 text-xs text-meta">No outgoing mail on this site? Ask an owner to set a new password for you.</p>
+    <p class="mt-4 text-sm"><%= link_to "← Back to sign in", admin_sign_in_path, class: "text-accent underline hover:no-underline" %></p>
   <% end %>
 </div>

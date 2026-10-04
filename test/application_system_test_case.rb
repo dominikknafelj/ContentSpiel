@@ -34,8 +34,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # real editor would: an actual POST the browser itself sends.
   def sign_in_via_form(user, password: "password")
     visit admin_sign_in_path
-    fill_in "Enter your email address", with: user.email_address
-    fill_in "Enter your password", with: password
+    fill_in "Email", with: user.email_address
+    fill_in "Password", with: password
     press "Sign in"
 
     # `press`'s own click fires a real (async) browser form submission --
@@ -60,6 +60,16 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # mouseup; `Admin::SaveStatusComponent` now reserves that line).
   def press(label)
     find(:link_or_button, label).execute_script("this.click()")
+  end
+
+  # A rich-text editor's Insert menu item (Page link, Image, YouTube,
+  # Divider): opens the menu, then presses the item -- which is only
+  # *visible* (so findable) while the menu is open, which is part of what
+  # this checks. `within:` scopes to one editor's toolbar when a page has
+  # several.
+  def press_insert(label, within: "[role=toolbar]")
+    find("#{within} button[aria-haspopup=menu]", match: :first).execute_script("this.click()")
+    find("#{within} [role=menu] button", text: label, match: :first).execute_script("this.click()")
   end
 
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered

@@ -16,7 +16,7 @@
       <%= label_tag "post_content_type", "Content type", class: setup_label_class %>
       <%= select_tag "post[content_type]",
             options_for_select(@content_types.map { |type| [ type.label, type.name ] }, @post.content_type),
-            id: "post_content_type", include_blank: "Choose a type…", required: true, class: setup_input_class %>
+            id: "post_content_type", include_blank: "Choose a type…", required: true, class: setup_select_class %>
     </div>
 
     <div class="mb-4">

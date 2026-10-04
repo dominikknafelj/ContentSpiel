@@ -7,18 +7,21 @@
 </p>
 
 <%= form_with model: @site_setting, url: setup_step_path("languages"), method: :patch, class: "mt-6 space-y-4" do |form| %>
-  <%= render "setup/errors", record: @site_setting %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
 
   <div>
     <%= form.label :default_locale, "Default language", class: setup_label_class %>
-    <%= form.select :default_locale, language_options, {}, class: setup_input_class %>
+    <%= form.select :default_locale, language_options, {}, class: setup_select_class %>
   </div>
 
   <div>
     <%= form.label :extra_locales, "Additional languages", class: setup_label_class %>
     <%= form.select :extra_locales, language_options,
-      { selected: Locales.enabled - [ Locales.default ] }, multiple: true, class: setup_input_class %>
+      { selected: Locales.enabled - [ Locales.default ] }, multiple: true, class: setup_select_class %>
   </div>
 
-  <%= form.submit "Save and continue", class: setup_primary_button_class %>
+  <div class="flex items-center gap-4">
+    <%= render Admin::ButtonComponent.new(label: "Continue", type: "submit") %>
+    <%= render "setup/back" %>
+  </div>
 <% end %>

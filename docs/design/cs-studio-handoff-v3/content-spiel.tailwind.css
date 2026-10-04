@@ -1,0 +1,55 @@
+/* Tailwind v4 entry — app/assets/tailwind/application.css
+   Utilities resolve to the runtime vars, so light/dark flips with [data-theme] alone. */
+@import "tailwindcss";
+@import "./content-spiel.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --color-paper: var(--cs-paper);
+  --color-surface: var(--cs-surface);
+  --color-sunken: var(--cs-sunken);
+  --color-ink: var(--cs-ink);
+  --color-dim: var(--cs-dim);
+  --color-meta: var(--cs-meta);
+  --color-line: var(--cs-line);
+  --color-line-strong: var(--cs-line-strong);
+  --color-accent: var(--cs-accent);
+  --color-accent-hover: var(--cs-accent-hover);
+  --color-accent-tint: var(--cs-accent-tint);
+  --color-on-accent: var(--cs-on-accent);
+  --color-ok: var(--cs-ok);
+  --color-ok-ink: var(--cs-ok-ink);
+  --color-ok-tint: var(--cs-ok-tint);
+  --color-warn: var(--cs-warn);
+  --color-warn-ink: var(--cs-warn-ink);
+  --color-warn-tint: var(--cs-warn-tint);
+  --color-danger: var(--cs-danger);
+  --color-danger-ink: var(--cs-danger-ink);
+  --color-danger-tint: var(--cs-danger-tint);
+
+  --color-chrome: var(--cs-chrome);
+  --color-cat-1: var(--cs-cat-1);
+  --color-cat-2: var(--cs-cat-2);
+  --color-cat-3: var(--cs-cat-3);
+  --color-cat-4: var(--cs-cat-4);
+  --color-cat-5: var(--cs-cat-5);
+  --color-cat-6: var(--cs-cat-6);
+
+  --font-sans: var(--cs-font);
+  --font-mono: var(--cs-mono);
+
+  --text-display: var(--cs-t-display);
+  --text-h1: var(--cs-t-h1);
+  --text-h2: var(--cs-t-h2);
+  --text-label: var(--cs-t-label);
+
+  --tracking-mono: var(--cs-track-mono);
+  --tracking-wide: var(--cs-track-wide);
+
+  --radius-cs: var(--cs-radius);
+  --shadow-menu: var(--cs-shadow-menu);
+  --ease-cs: var(--cs-ease);
+}
+/* e.g. <button class="bg-accent text-on-accent rounded-cs px-4 py-2 hover:bg-accent-hover">
+        <span class="font-mono text-label tracking-mono uppercase text-meta"> */

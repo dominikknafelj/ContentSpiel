@@ -67,7 +67,7 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
 
     blog_readers = AccessControl::Group.create!(name: "Blog readers")
     blog_readers.grants.create!(permission: "posts.read", scope: { "content_types" => [ "blog" ] })
-    reader = User.create!(email_address: "blog-reader@example.com", password: "password123")
+    reader = User.create!(email_address: "blog-reader@example.com", password: "password12345")
     AccessControl::Membership.create!(user: reader, group: blog_readers)
 
     assert_includes feed(reader).going_live_next, blog
@@ -237,7 +237,7 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
 
   test "the last change keeps the user id of a deleted user and the user of a deleted token" do
     post = Current.set(actor: @me) { create_post(title: "Gone") }
-    ghost = User.create!(email_address: "ghost@example.com", password: "password123")
+    ghost = User.create!(email_address: "ghost@example.com", password: "password12345")
     AccessControl::Membership.create!(user: ghost, group: access_control_groups(:admin))
     Current.set(actor: ghost, channel: :admin) { assert Posts::Save.call(post, translations: { Locales.default => { title: "Gone!" } }).ok? }
     ghost.memberships.delete_all

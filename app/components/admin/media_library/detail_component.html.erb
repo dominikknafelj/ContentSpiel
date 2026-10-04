@@ -1,6 +1,5 @@
 <div class="admin-media-detail flex flex-col gap-6">
   <%= link_to "← Back to media", index_path, class: "text-sm text-meta hover:text-ink" %>
-  <%= render Admin::FlashComponent.new(notice: notice, alert: alert) %>
 
   <div class="grid gap-6 md:grid-cols-[16rem_1fr]">
     <div class="flex flex-col gap-2">
@@ -18,7 +17,7 @@
 
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-3">
-        <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+        <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
         <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
       </div>
 
@@ -45,7 +44,7 @@
       <% end %>
 
       <div>
-        <h2 class="mb-2 font-semibold text-ink">Used on</h2>
+        <h2 id="media-used-on" class="mb-2 scroll-mt-4 font-semibold text-ink">Used on</h2>
         <% if unresolved_usage? %>
           <p class="text-sm text-meta">Used somewhere that can’t be shown — the record of where may be out of date.</p>
         <% elsif usage_state == :trash_only %>
@@ -70,14 +69,17 @@
       <% if can_delete? %>
         <div>
           <% if move_to_trash_disabled? %>
-            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button", disabled: true, title: in_use_reason) %>
-            <p class="mt-1 text-sm text-meta"><%= in_use_reason %></p>
+            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
+            <%# `text-dim`, not `text-meta`: the low contrast was bug 7. %>
+            <p id="media-trash-help" class="mt-1 text-sm text-dim"><%= in_use_reason %> <a href="#media-used-on" class="underline">See where it's used</a></p>
           <% else %>
-            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
-                  onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
-            <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
+            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline, type: "button",
+                  data: dialog_trigger(delete_dialog_id)) %>
+            <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
               <% dialog.with_confirm_action do %>
-                <%= form_with url: destroy_path, method: :delete do %>
+                <%# `_top`: a whole-page visit, so the sidebar's Trash badge
+                    updates and the Undo toast isn't relayed out of the frame. %>
+                <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
                   <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
                 <% end %>
               <% end %>

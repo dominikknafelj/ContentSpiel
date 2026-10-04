@@ -1,15 +1,15 @@
 <%# The group editor (access-control design spec §5): name, description,
     members and the permission matrix. Members send a blank first value so
     an empty list still arrives as one. %>
-<% if group.errors.any? %>
-  <p class="mb-4 text-danger-ink" role="alert"><%= group.errors.full_messages.to_sentence %></p>
-<% end %>
+<%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
-<%= form_with url: url, method: method do %>
+<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data(dirty: group.errors.any?) do %>
   <div class="mb-4 max-w-md">
     <%= label_tag "group_name", "Name", class: setup_label_class %>
     <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
-    <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?, class: setup_input_class %>
+    <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?,
+          aria: { invalid: (group.errors.include?(:name) ? "true" : nil) }.compact,
+          class: [ setup_input_class, ("!border-danger" if group.errors.include?(:name)) ] %>
   </div>
 
   <div class="mb-6 max-w-md">
@@ -24,7 +24,10 @@
       <% all_users.each do |user| %>
         <label class="flex items-center gap-2 text-ink">
           <%= check_box_tag "group[member_ids][]", user.id, selected_member_ids.include?(user.id), id: "group_member_#{user.id}" %>
-          <%= user.email_address %>
+          <span>
+            <%= render Admin::UserNameComponent.new(user: user) %>
+            <% if user.name.present? %><span class="block text-sm text-meta"><%= user.email_address %></span><% end %>
+          </span>
           <% if user.owner? %><span class="text-sm text-meta">(owner: has every permission anyway)</span><% end %>
         </label>
       <% end %>
@@ -36,8 +39,5 @@
     <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale) %>
   </div>
 
-  <div class="flex gap-2">
-    <%= render Admin::ButtonComponent.new(label: "Save group", variant: :primary, type: "submit") %>
-    <%= link_to "Cancel", admin_groups_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-  </div>
+  <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: "Save group") %>
 <% end %>

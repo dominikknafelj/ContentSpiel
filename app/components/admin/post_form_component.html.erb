@@ -1,20 +1,10 @@
 <header class="admin-record-header mb-6 flex flex-col gap-3 rounded-cs border border-line bg-surface p-4">
-  <% if notice.present? %>
-    <p role="status" class="text-sm text-ok-ink"><%= notice %></p>
-  <% end %>
-  <% if alert.present? %>
-    <p role="alert" class="text-sm text-danger-ink"><%= alert %></p>
-  <% end %>
-
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <h1 class="truncate text-h1 text-ink"><%= Locales.read(post, :title, locale: locale) %></h1>
 
       <div class="mt-1 flex items-center gap-2 text-sm text-meta">
-        <span class="inline-flex items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5">
-          <span class="h-2 w-2 rounded-full" style="background-color: <%= content_type_color %>" aria-hidden="true"></span>
-          <%= content_type_label %>
-        </span>
+        <%= render Admin::ContentTypeDotComponent.new(content_type: post.content_type) %>
       </div>
 
       <% if public_path.present? %>
@@ -35,9 +25,9 @@
       <% unless editable? %>
         <%= render "admin/shared/view_only_badge" %>
       <% end %>
-      <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
       <span data-status="<%= status %>">
-        <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
+        <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
       </span>
     </div>
   </div>
@@ -87,12 +77,16 @@
     <% end %>
 
     <% if can_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
-            onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline, type: "button",
+            data: dialog_trigger(delete_dialog_id)) %>
 
-      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
+      <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
         <% dialog.with_confirm_action do %>
-          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
+          <%# `_top`, as the page's own delete: the redirect is a whole-page
+              visit, so the sidebar's Trash badge is re-rendered with it and
+              the Undo toast lands in `#toasts` directly instead of being
+              relayed out of the content frame. %>
+          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
             <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
           <% end %>
         <% end %>

@@ -13,10 +13,12 @@
 </div>
 
 <% if @graph[:nodes].empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Posts and the relations between them appear here.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Posts and the relations between them appear here.") %>
+  </div>
 <% else %>
-  <div data-controller="admin--mind-graph" class="rounded-cs border border-line bg-surface">
+  <div data-controller="admin--mind-graph" class="max-w-[960px] overflow-hidden rounded-cs border border-line bg-surface">
     <script type="application/json" id="mind-graph-data" data-admin--mind-graph-target="data"><%= json_escape(@graph.to_json).html_safe %></script>
-    <svg data-admin--mind-graph-target="svg" class="block h-[600px] w-full text-ink" role="img" aria-label="Post relationship graph"></svg>
+    <svg data-admin--mind-graph-target="svg" class="block h-[560px] w-full text-ink" role="img" aria-label="Post relationship graph"></svg>
   </div>
 <% end %>

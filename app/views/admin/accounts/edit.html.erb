@@ -4,37 +4,37 @@
 <% content_for :title, "Change password" %>
 <div class="mx-auto max-w-md">
   <h1 class="mb-1 text-h1 text-ink">Change password</h1>
-  <p class="mb-4 text-meta">Signed in as <%= Current.user.email_address %>. Changing your password signs you out everywhere else.</p>
+  <p class="mb-4 text-meta">Signed in as <%= Current.user.display_name %>. Changing your password signs you out everywhere else.</p>
 
-  <% if flash[:notice].present? %>
-    <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-  <% end %>
-  <% if flash[:alert].present? %>
-    <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-  <% end %>
-  <% if @errors.present? %>
-    <p role="alert" class="mb-4 text-danger-ink"><%= @errors.to_sentence %></p>
-  <% end %>
+  <%# The service layer's `result.errors` are whole sentences with no field to
+      link to (the summary prints them as they are). One summary at a time:
+      only one of the two forms was submitted. %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@errors)) %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
-  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch do %>
+  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8", data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
     <div class="mb-4">
-      <%= label_tag "current_password", "Current password", class: setup_label_class %>
-      <%= password_field_tag "current_password", nil, id: "current_password", required: true, autofocus: true,
-            autocomplete: "current-password", class: setup_input_class %>
+      <%= label_tag "name", "Your name", class: setup_label_class %>
+      <%= text_field_tag "name", Current.user.name, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
+    </div>
+
+    <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Save name") %>
+  <% end %>
+
+  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?) do %>
+    <div class="mb-4">
+      <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
+            autocomplete: "current-password", autofocus: true) %>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "password", "New password", class: setup_label_class %>
-      <%= password_field_tag "password", nil, id: "password", required: true, maxlength: 72,
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true) %>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "password_confirmation", "Confirm new password", class: setup_label_class %>
-      <%= password_field_tag "password_confirmation", nil, id: "password_confirmation", required: true, maxlength: 72,
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password") %>
     </div>
 
-    <%= render Admin::ButtonComponent.new(label: "Change password", variant: :primary, type: "submit") %>
+    <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) %>
   <% end %>
 </div>

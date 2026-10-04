@@ -82,7 +82,7 @@ class SetupAccessTest < ActionDispatch::IntegrationTest
 
   test "once an admin exists, the wizard requires signing in" do
     start_fresh_install
-    User.create!(email_address: "owner@example.com", password: "password123")
+    User.create!(email_address: "owner@example.com", password: "password12345")
 
     get setup_step_path("site")
 
@@ -91,10 +91,10 @@ class SetupAccessTest < ActionDispatch::IntegrationTest
 
   test "signing in resumes the step that was asked for" do
     start_fresh_install
-    User.create!(email_address: "owner@example.com", password: "password123")
+    User.create!(email_address: "owner@example.com", password: "password12345")
     get setup_step_path("site")
 
-    post admin_sign_in_path, params: { email_address: "owner@example.com", password: "password123" }
+    post admin_sign_in_path, params: { email_address: "owner@example.com", password: "password12345" }
 
     assert_redirected_to setup_step_path("site")
   end

@@ -104,6 +104,46 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not ContentBlock.exists?(first.id)
   end
 
+  test "a reorder answers with an Undo toast that restores the previous order and the list" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    third = @page.content_blocks.create!(block_type: "rich_text", position: 2)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ third.id, first.id, second.id ] }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action='append'][target='toasts'] .admin-toast[data-kind='undo']", text: /order changed/i
+    undo = css_select("turbo-stream[target='toasts'] form").first
+    assert_equal "patch", css_select(undo, "input[name='_method']").first["value"]
+    query = Rack::Utils.parse_nested_query(URI.parse(undo["action"]).query)
+    assert_equal [ first.id, second.id, third.id ].map(&:to_s), query["ids"]
+    assert_equal "1", query["undo"]
+
+    # The Undo goes through the same service and answers by re-rendering the
+    # list in the restored order (the client's DOM is still the dropped one).
+    patch undo["action"], as: :turbo_stream
+    assert_response :success
+    assert_equal [ first, second, third ], @page.content_blocks.reload.to_a
+    assert_select "turbo-stream[action='update'][target='content-blocks-list']"
+    ids = Nokogiri::HTML5.fragment(response.body).css("turbo-stream[target='content-blocks-list'] [data-block-id]").map { |card| card["data-block-id"] }
+    assert_equal [ first.id, second.id, third.id ].map(&:to_s), ids
+    assert_select "turbo-stream[target='toasts'] .admin-toast form", count: 0
+  end
+
+  test "a reorder that changes nothing offers no Undo" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id, second.id ] }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[target='toasts']", count: 0
+  end
+
+  test "a refused reorder offers no Undo" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id, 0 ] }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='toasts']", count: 0
+  end
+
   # Fix round 1 (Task 7 review): regression test for the `Admin::Columns::
   # RichTextColumnComponent` fix (`name` -> `html_name`) -- the body has to
   # arrive nested as `block[body]` or `split_block_params`'s own

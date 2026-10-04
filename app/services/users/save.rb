@@ -14,6 +14,10 @@ module Users
   # to an untouched file input. A typed password, though, always needs its
   # confirmation (`#unconfirmed_password`).
   #
+  # `name` is optional (design pass spec §5.1); it rides along with the
+  # email as an ordinary attribute and reaches the event through
+  # `user_field_changes` like any other column.
+  #
   # Permissions (access-control design spec §3.3 "Users"): `users.manage`,
   # plus the owner rule in `Users::OwnerProtection`.
   #
@@ -50,7 +54,7 @@ module Users
       refusal = group_refusal(new_group_ids - old_group_ids, old_group_ids - new_group_ids)
       return refusal if refusal
 
-      attrs = @attributes.slice(:email_address, :password, :password_confirmation)
+      attrs = @attributes.slice(:email_address, :name, :password, :password_confirmation)
       attrs.except!(:password, :password_confirmation) if attrs[:password].blank?
       attrs[:owner] = !@user.owner if owner_change
 

@@ -10,9 +10,5 @@
 
   <p class="mt-1 text-sm text-meta">Comma-separated. New tags are created when you save.</p>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
-    <% errors.each do |message| %>
-      <p><%= message %></p>
-    <% end %>
-  </div>
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

@@ -1,14 +1,18 @@
 <%# locals: id, messages -- the Turbo Stream replacement target for one
-    autosaving field's error slot (cs-studio spec §6.1). Rendered with the
-    same markup every `Admin::Columns::*` component already builds inline
-    (matching classes, same "wrap every message in its own <p>" shape) so a
-    field looks identical whether its errors came from the initial page
-    load or a later autosave replace -- and always rendered, even with an
-    empty `messages`, since an empty replace is exactly what clears a
-    field's stale error once the value that caused it is fixed
-    (`Admin::AutosaveResponses#autosave_stream`). %>
+    autosaving field's error slot (cs-studio spec §6.1). The one markup for a
+    field's error slot: the `Admin::Columns::*`/`Admin::FieldComponent` slots
+    render it on page load (`helpers.render`) and `Admin::AutosaveResponses`
+    streams it on every save, so a field looks identical whether its errors
+    came from the initial page load or a later autosave replace -- and it is
+    always rendered, even with an empty `messages`, since an empty replace is
+    exactly what clears a field's stale error once the value that caused it is
+    fixed (`Admin::AutosaveResponses#autosave_stream`).
+
+    Design pass spec §4: danger-ink text with a leading "!" so the message
+    never relies on colour alone (the glyph is decorative, the message itself
+    is what a screen reader reads, tied to its input by `aria-describedby`). %>
 <div id="<%= id %>" class="mt-1 text-sm text-danger-ink">
   <% messages.each do |message| %>
-    <p><%= message %></p>
+    <p class="flex gap-1.5"><span aria-hidden="true" class="font-cs-mono font-semibold">!</span><span><%= message %></span></p>
   <% end %>
 </div>

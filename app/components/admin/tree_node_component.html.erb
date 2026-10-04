@@ -13,16 +13,21 @@
           `handle:` option), so the title link below stays a plain, clickable
           link. %>
       <% if movable? %>
-        <span class="admin-tree-node__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+        <%# A real button, so the keyboard reaches it: Space picks the row up,
+            the arrows move it, Space drops it (`admin--tree#key`). The mouse
+            drag still starts from it (SortableJS `handle:`). %>
+        <button type="button" class="admin-tree-node__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
+                data-action="keydown->admin--tree#key focusout->admin--tree#blur">⠿</button>
       <% end %>
 
-      <%= link_to title, path, data: { turbo_frame: "content" },
+      <%# `title:` is the full name for a row the narrow column truncates. %>
+      <%= link_to title, path, title: title, data: { turbo_frame: "content" },
             aria: (selected? ? { current: "page" } : {}),
             class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
-      <span data-status="<%= status %>" class="shrink-0">
-        <%= render Admin::StatusBadgeComponent.new(status: status, at: page.published_at) %>
-      </span>
+      <%# The chip carries `data-status` itself and renders nothing for Live. %>
+      <%= render Admin::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
 
       <% if incomplete_locales.any? %>
         <%# One marker for every language at once (translation helpers spec
@@ -33,7 +38,9 @@
               class: "shrink-0 rounded-cs border border-warn bg-warn-tint px-1 font-cs-mono text-label text-warn-ink" %>
       <% end %>
 
-      <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+      <% if child_count.positive? %>
+        <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+      <% end %>
 
       <% if can_add_child? %>
         <%= link_to "+", new_child_path, data: { turbo_frame: "content" },

@@ -31,7 +31,7 @@ class Admin::TranslationScreen::TranslateButtonComponentTest < ViewComponent::Te
     assert_equal "/cs-studio/translations/suggest", wrapper["data-admin--translate-url-value"]
     assert_equal "de", wrapper["data-admin--translate-locale-value"]
     assert_selector "button[type='button'][data-action='admin--translate#translate']", text: "Translate"
-    assert_selector "#translation-suggestion-post-title[data-translation-box]", visible: :all
+    assert_equal "translation-suggestion-post-title", component.box_id
   end
 
   test "rich text names its kind" do

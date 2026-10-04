@@ -51,7 +51,7 @@ module Translations
       end
     end
 
-    # What `Admin::LanguageSwitcherComponent` marks, for one record (and,
+    # What `Admin::LanguageTabsComponent` marks, for one record (and,
     # for a page or post, its blocks), with one blocks query:
     # `{ missing: [codes], outdated: [codes] }`. Unlike the single record
     # state `.for` gives the lists, the two are worked out *independently*

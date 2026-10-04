@@ -149,10 +149,25 @@ export default class extends Controller {
         return
       }
     } else {
-      input.value = button.dataset.translateText
+      // The suggestion is an editable textarea (no `name`): what the editor
+      // has typed into it now is what gets applied, not what the server sent.
+      const text = button.closest("[data-translation-suggestion]")?.querySelector("[data-translate-suggestion-text]")
+      if (!text) {
+        showError(box, this.constructor.texts.notApplied)
+        return
+      }
+      input.value = text.value
       input.dispatchEvent(new Event("input", { bubbles: true }))
     }
     box?.replaceChildren()
+  }
+
+  // Editing a suggestion is not editing the form: its textarea sits inside
+  // the autosave `<form>`, whose `input`/`change`/`focusout` listeners would
+  // otherwise save on every keystroke of text that isn't a field's value
+  // yet. The box stops them here (`SuggestionComponent` wires this).
+  contain(event) {
+    event.stopPropagation()
   }
 
   discard(event) {
@@ -187,7 +202,9 @@ function describe(element) {
     kind: translateKind,
     characters: Number(translateCharacters) || 0,
     button: element.querySelector("[data-admin--translate-target='button']"),
-    box: element.querySelector("[data-translation-box]")
+    // The box lives under the field's input, not in this wrapper (which sits
+    // in the original's panel): found by the id the server also streams to.
+    box: document.getElementById(`translation-suggestion-${translateInputId}`)
   }
 }
 

@@ -8,6 +8,23 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "sign-in uses the product shell: wordmark, theme switch, labelled fields, token button" do
+    get admin_sign_in_path
+    assert_select "header a", text: "Content·Spiel"
+    assert_select "[role=radiogroup][aria-label='Theme']"
+    assert_select "label[for=email_address]", text: "Email"
+    assert_select "label[for=password]", text: "Password"
+    assert_select "button.bg-accent", text: "Sign in"
+    assert_select "a", text: "Forgot your password?"
+    assert_no_match(/bg-blue|rounded-(md|lg|xl)/, response.body)
+  end
+
+  test "a failed sign-in shows one alert line above the form" do
+    post admin_sign_in_path, params: { email_address: @user.email_address, password: "wrong" }
+    follow_redirect!
+    assert_select "[role=alert]", text: "Try another email address or password.", count: 1
+  end
+
   test "create with valid credentials" do
     post admin_sign_in_path, params: { email_address: @user.email_address, password: "password" }
 

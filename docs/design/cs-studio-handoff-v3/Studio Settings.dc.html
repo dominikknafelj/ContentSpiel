@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="settings" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:grid;grid-template-columns:170px minmax(0,1fr);gap:28px;max-width:1100px;width:100%;box-sizing:border-box;align-items:start">
+  <nav style="position:sticky;top:28px;display:flex;flex-direction:column;gap:2px">
+    <h1 style="margin:0 0 14px;font-size:26px;font-weight:600">Settings</h1>
+    <a href="#site" style="font-size:14px;padding:6px 8px;border-radius:2px;background:var(--cs-sunken);color:var(--cs-ink);font-weight:500">Site</a>
+    <a href="#languages" style="font-size:14px;padding:6px 8px;color:var(--cs-dim)">Languages</a>
+    <a href="#publishing" style="font-size:14px;padding:6px 8px;color:var(--cs-dim)">Publishing</a>
+    <a href="#ai" style="font-size:14px;padding:6px 8px;color:var(--cs-dim)">AI translation</a>
+  </nav>
+  <div style="display:flex;flex-direction:column;gap:22px;padding-top:44px">
+
+    <section id="site" style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--cs-line)">
+        <span style="font-size:16px;font-weight:600">Site</span>
+        <div style="display:flex;gap:2px">
+          <span style="font-size:13px;padding:4px 10px;border-bottom:2px solid var(--cs-ink);font-weight:600">English</span>
+          <span style="font-size:13px;padding:4px 10px;color:var(--cs-dim);display:flex;gap:6px;align-items:center">Deutsch<span style="width:7px;height:7px;border-radius:999px;border:1px solid var(--cs-meta);box-sizing:border-box"></span></span>
+          <span style="font-size:13px;padding:4px 10px;color:var(--cs-dim);display:flex;gap:6px;align-items:center">Español<span style="width:7px;height:7px;border-radius:999px;border:1px solid var(--cs-meta);box-sizing:border-box"></span></span>
+        </div>
+      </div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TITLE · TRANSLATABLE</span><input value="Test Site" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TAGLINE · TRANSLATABLE</span><input placeholder="A short line under the title" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input></label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">LOGO</span>
+          <div style="display:flex;align-items:center;gap:14px;border:1px dashed var(--cs-line-strong);border-radius:2px;padding:12px">
+            <span style="width:44px;height:44px;background:var(--cs-sunken);display:grid;place-items:center;font-family:var(--cs-mono);font-size:9px;color:var(--cs-meta)">NONE</span>
+            <span style="flex:1;font-size:13px;color:var(--cs-dim)">SVG or PNG. Without a logo the site title is shown.</span>
+            <button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">Choose file</button>
+          </div></div>
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">SOCIAL LINKS</span>
+          <sc-for list="{{ socials }}" as="s" hint-placeholder-count="1">
+            <div style="display:grid;grid-template-columns:180px minmax(0,1fr) 32px;gap:8px;align-items:center">
+              <input value="{{ s.label }}" placeholder="Label, e.g. GitHub" style="font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input>
+              <input value="{{ s.url }}" placeholder="https://" style="font-family:var(--cs-mono);font-size:13px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input>
+              <button onClick="{{ s.remove }}" style="border:0;background:transparent;color:var(--cs-meta);font-size:16px;cursor:pointer">×</button>
+            </div>
+          </sc-for>
+          <button onClick="{{ addSocial }}" style="align-self:flex-start;border:0;background:none;padding:2px 0;font-size:13px;color:var(--cs-accent);cursor:pointer">+ Add link</button>
+        </div>
+        <label style="display:flex;flex-direction:column;gap:6px;max-width:360px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">TIME ZONE</span><span style="display:flex;justify-content:space-between;font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">(GMT+01:00) Berlin<span style="font-size:10px;color:var(--cs-meta)">▾</span></span><span style="font-size:12px;color:var(--cs-meta)">Used for scheduled publishing.</span></label>
+      </div>
+    </section>
+
+    <section id="languages" style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">Languages</span><span style="font-size:13px;color:var(--cs-dim)">Drag to set the order of the language switcher. When a translation is missing, visitors see the fallback instead. Changing the default asks for confirmation.</span></div>
+      <div style="overflow-x:auto">
+        <div style="display:grid;grid-template-columns:28px minmax(160px,1fr) 90px 200px 110px;gap:12px;min-width:620px;padding:9px 18px;border-bottom:1px solid var(--cs-line-strong);font-family:var(--cs-mono);font-size:10px;letter-spacing:0.12em;color:var(--cs-meta)"><span></span><span>LANGUAGE</span><span>DEFAULT</span><span>FALLS BACK TO</span><span></span></div>
+        <sc-for list="{{ langs }}" as="l" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:28px minmax(160px,1fr) 90px 200px 110px;gap:12px;min-width:620px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--cs-line)">
+            <span style="color:var(--cs-meta);font-size:12px;letter-spacing:-2px;cursor:grab">⋮⋮</span>
+            <span style="display:flex;gap:8px;align-items:baseline"><span style="font-size:14px">{{ l.name }}</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ l.path }}</span></span>
+            <button onClick="{{ l.makeDefault }}" style="width:16px;height:16px;border-radius:999px;border:1px solid {{ l.rb }};background:var(--cs-surface);padding:0;cursor:pointer;display:grid;place-items:center"><span style="width:8px;height:8px;border-radius:999px;background:{{ l.rd }}"></span></button>
+            <span style="display:flex;justify-content:space-between;font-size:13px;color:{{ l.fbColor }};border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 9px">{{ l.fallback }}<span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+            <span style="text-align:right;font-size:12px;color:{{ l.disColor }}">{{ l.disLabel }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px">
+        <span style="display:flex;gap:8px"><span style="display:flex;justify-content:space-between;gap:20px;font-size:13px;color:var(--cs-meta);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 9px">Choose a language…<span style="font-size:9px">▾</span></span><button style="font-weight:500;font-size:12px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 11px">Add</button></span>
+      </div>
+    </section>
+
+    <section id="publishing" style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);font-size:16px;font-weight:600">Publishing</div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:6px">
+        <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">EMPTY TRASH AUTOMATICALLY</span>
+        <div style="display:flex;gap:8px;align-items:center"><input value="30" style="width:72px;font-family:var(--cs-mono);font-size:14px;color:var(--cs-ink);background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input><span style="font-size:14px">days after an item is trashed</span></div>
+        <span style="font-size:12px;color:var(--cs-meta)">Set to 0 to keep trashed items until someone empties the trash.</span>
+      </div>
+    </section>
+
+    <section id="ai" style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--cs-line);display:flex;flex-direction:column;gap:3px"><span style="font-size:16px;font-weight:600">AI translation</span><span style="font-size:13px;color:var(--cs-dim)">Editors can ask for a suggested translation of a field. Nothing is saved until they use it.</span></div>
+      <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">PROVIDER</span><span style="display:flex;justify-content:space-between;font-size:14px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">Anthropic<span style="font-size:10px;color:var(--cs-meta)">▾</span></span></label>
+          <label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">MODEL</span><span style="font-family:var(--cs-mono);font-size:13px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px">claude-sonnet-5</span></label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">API KEY</span>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:3px 8px"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>Key saved · added 2 Oct</span>
+            <a href="#" style="font-size:13px">Replace</a><a href="#" style="font-size:13px;color:var(--cs-danger)">Remove</a>
+          </div></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button style="font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 13px">Test connection</button>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-family:var(--cs-mono);font-size:11px;color:var(--cs-ok-ink)"><span style="width:6px;height:6px;border-radius:999px;background:var(--cs-ok)"></span>CONNECTED · 412 MS</span>
+        </div>
+      </div>
+    </section>
+    <div style="position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px;background:var(--cs-surface);border:1px solid var(--cs-line);box-shadow:var(--cs-shadow-menu);border-radius:2px">
+      <span style="font-size:13px;color:var(--cs-dim)">2 unsaved changes</span>
+      <span style="display:flex;gap:8px"><button style="font-weight:500;font-size:13px;background:transparent;color:var(--cs-dim);border:1px solid transparent;border-radius:2px;padding:7px 12px">Cancel</button><button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:7px 14px">Save</button></span>
+    </div>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { socials: [{ label: 'GitHub', url: 'https://github.com/example' }], def: 'en' };
+  renderVals() {
+    const L = [['en', 'English', '/'], ['de', 'Deutsch', '/de'], ['es', 'Español', '/es']];
+    return {
+      socials: this.state.socials.map((s, i) => ({ ...s, remove: () => this.setState(st => ({ socials: st.socials.filter((_, j) => j !== i) })) })),
+      addSocial: () => this.setState(st => ({ socials: [...st.socials, { label: '', url: '' }] })),
+      langs: L.map(([code, name, path]) => {
+        const d = code === this.state.def;
+        return { name, path: d ? '/' : '/' + code, rb: d ? 'var(--cs-accent)' : 'var(--cs-line-strong)', rd: d ? 'var(--cs-accent)' : 'transparent',
+          makeDefault: () => this.setState({ def: code }),
+          fallback: d ? 'None (default)' : 'English', fbColor: d ? 'var(--cs-meta)' : 'var(--cs-ink)',
+          disLabel: d ? 'Default' : 'Turn off…', disColor: d ? 'var(--cs-meta)' : 'var(--cs-dim)' };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

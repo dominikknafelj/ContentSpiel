@@ -18,9 +18,9 @@ module Admin
   class MediaController < BaseController
     include AutosaveResponses
 
-    # "About 48 per page" (design spec §6). Same plain limit/offset shape
-    # as `Admin::AuditEventsController` -- fetching one extra row is how
-    # `@has_next` is known without a separate `COUNT(*)`.
+    # "About 48 per page" (design spec §6), by page number (`Pagination`,
+    # design pass spec §4): `@pagination.total` is a `COUNT(*)` over the same
+    # `filtered_assets` the page is loaded from.
     PER_PAGE = 48
 
     before_action -> { require_permission("media.upload") }, only: %i[index show create]
@@ -43,10 +43,9 @@ module Admin
     # constant-query load (`filtered_assets`), and the same `media.upload`
     # gate -- the picker's only permission is "may browse and choose".
     def index
-      @assets = filtered_assets.order(id: :desc).limit(PER_PAGE + 1).offset(offset).to_a
-      @has_next = @assets.size > PER_PAGE
-      @assets = @assets.first(PER_PAGE)
-      @offset = offset
+      scope = filtered_assets
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: scope.count)
+      @assets = scope.order(id: :desc).limit(PER_PAGE).offset(@pagination.offset).to_a
 
       render :picker, layout: false if params[:picker].present?
     end
@@ -141,11 +140,6 @@ module Admin
       # (trash spec §5.1, "not found, not forbidden") -- it can't be
       # viewed, edited or deleted from the library, only from the Trash.
       @asset = Media::Asset.kept.with_variants.find(params[:id])
-    end
-
-    def offset
-      raw = params[:offset].to_i
-      raw.positive? ? raw : 0
     end
 
     def filtered_assets

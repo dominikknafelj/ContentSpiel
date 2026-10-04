@@ -7,6 +7,11 @@ module Admin
   # route the caller already has in hand (e.g. "+ Add block" opens the block
   # picker; "New post" asks for a content type first) -- this component has
   # no business constructing that itself.
+  #
+  # It draws no border of its own (design pass spec §4): it sits *inside* the
+  # card a list's rows would be in, so an empty list and a full one are the
+  # same card. At most one action -- a second would be a choice the list
+  # itself should offer.
   class EmptyStateComponent < AdminComponent
     renders_one :action
 

@@ -1,0 +1,43 @@
+<nav aria-label="Modules" class="flex h-full w-60 flex-col border-r border-line bg-chrome">
+  <div class="flex flex-col gap-3 p-3">
+    <span class="px-1 font-semibold text-ink">Content·Spiel</span>
+    <%= tag.button type: "button", data: { action: "admin--command-palette#open" },
+          class: "flex w-full cursor-pointer items-center justify-between rounded-cs border border-line-strong px-2 py-1.5 text-left text-sm text-meta" do %>
+      <span>Jump to…</span><span class="font-cs-mono text-label">⌘K</span>
+    <% end %>
+  </div>
+
+  <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-3 py-2">
+    <% sections.each do |heading, entries| %>
+      <section>
+        <h2 class="px-2 pb-1 font-cs-mono text-label uppercase tracking-mono text-meta"><%= heading %></h2>
+        <ul class="flex flex-col gap-0.5">
+          <% entries.each do |entry| %>
+            <li>
+              <%= link_to module_path(entry), class: link_classes(entry), aria: { current: (current?(entry) ? "page" : nil) } do %>
+                <%= helpers.render "admin/shared/icon", name: entry[:icon] %><span><%= entry[:label] %></span>
+                <% if (badge = badge_for(entry)) %><span data-badge class="ml-auto font-cs-mono text-label text-meta"><%= badge %></span><% end %>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      </section>
+    <% end %>
+  </div>
+
+  <div class="flex flex-col gap-3 border-t border-line p-3">
+    <%= render Admin::ThemeSwitchComponent.new %>
+    <%# The account block: who is signed in, then your own password (open to
+        every user, access-control design spec §5) and sign out. `truncate`
+        plus `title` so a long name or email never widens the column. %>
+    <div class="admin-account flex min-w-0 flex-col gap-0.5">
+      <span class="truncate text-sm font-medium text-ink" title="<%= user.display_name %>"><%= user.display_name %></span>
+      <span class="truncate text-xs text-meta" title="<%= user.email_address %>"><%= user.email_address %></span>
+      <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= role_line %></span>
+      <div class="mt-1 flex items-center gap-3 text-xs">
+        <%= link_to "Change password", admin_account_password_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
+        <%= button_to "Sign out", admin_sign_out_path, method: :delete, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
+      </div>
+    </div>
+  </div>
+</nav>

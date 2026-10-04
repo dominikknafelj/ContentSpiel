@@ -12,7 +12,7 @@
         <div>
           <%= label_tag "dashboard_draft_content_type", "Content type", class: setup_label_class %>
           <%= select_tag :content_type, options_for_select(content_types.map { |type| [ type.label, type.name ] }, content_type),
-                id: "dashboard_draft_content_type", class: setup_input_class %>
+                id: "dashboard_draft_content_type", class: setup_select_class %>
         </div>
         <%= render Admin::ButtonComponent.new(label: "Create draft", variant: :primary, type: "submit") %>
       <% end %>

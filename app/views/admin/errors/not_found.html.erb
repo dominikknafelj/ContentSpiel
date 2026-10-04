@@ -1,0 +1,13 @@
+<%# The Studio 404 (design pass spec §4): a record that doesn't exist and one
+    outside the viewer's scope render this same page, word for word -- one
+    sentence that never confirms which (access-control design spec §3.3, "not
+    found, not forbidden"). Inside the admin layout so the sidebar is the
+    way on. Handoff "Studio States v3". %>
+<% content_for :title, "Not found · CS Studio" %>
+
+<section class="admin-not-found mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
+  <p class="font-cs-mono text-label uppercase tracking-mono text-meta">404</p>
+  <h1 class="text-h1 text-ink">Not found</h1>
+  <p class="text-ink">This doesn't exist, or you don't have access to it.</p>
+  <%= link_to "Back to the dashboard", admin_root_path(**admin_url_options), class: "#{Admin::ButtonComponent::BASE_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" %>
+</section>

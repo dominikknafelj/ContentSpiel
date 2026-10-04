@@ -8,6 +8,12 @@ class Admin::EmptyStateComponentTest < ViewComponent::TestCase
     assert_text "Add your first block to get started."
   end
 
+  test "draws no border of its own: it sits inside its list's card" do
+    render_inline Admin::EmptyStateComponent.new(title: "No tags yet")
+
+    assert_no_selector ".border, .border-dashed"
+  end
+
   test "description is optional" do
     render_inline Admin::EmptyStateComponent.new(title: "No tags yet")
 

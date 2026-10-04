@@ -27,6 +27,13 @@
   --color-danger: var(--cs-danger);
   --color-danger-ink: var(--cs-danger-ink);
   --color-danger-tint: var(--cs-danger-tint);
+  --color-chrome: var(--cs-chrome);
+  --color-cat-1: var(--cs-cat-1);
+  --color-cat-2: var(--cs-cat-2);
+  --color-cat-3: var(--cs-cat-3);
+  --color-cat-4: var(--cs-cat-4);
+  --color-cat-5: var(--cs-cat-5);
+  --color-cat-6: var(--cs-cat-6);
   /* font-cs / font-cs-mono, not --font-sans / --font-mono: Tailwind preflight
      wires --font-sans into --default-font-family on <html>, so mapping the
      token fonts there would restyle every existing page (public site, auth
@@ -43,3 +50,151 @@
   --shadow-menu: var(--cs-shadow-menu);
   --ease-cs: var(--cs-ease);
 }
+
+/* The active theme choice needs no JS: shared/_theme_head sets
+   <html data-theme-choice> before first paint, and Admin::ThemeSwitchComponent's
+   buttons carry their own choice as data-theme-choice-param. */
+[data-theme-choice="light"] .admin-theme-switch__choice[data-theme-choice-param="light"],
+[data-theme-choice="dark"] .admin-theme-switch__choice[data-theme-choice-param="dark"],
+[data-theme-choice="auto"] .admin-theme-switch__choice[data-theme-choice-param="auto"] {
+  background: var(--cs-sunken);
+  color: var(--cs-ink);
+}
+
+/* The shell (design pass spec §4, handoff §9 A7). Real CSS rather than
+   utilities because the drawers' open state is the `data-open` attribute
+   `admin--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
+   Below 1280px the sidebar leaves the grid and becomes a fixed drawer behind
+   the top bar; below 1024px the tree does too. A closed drawer is also
+   `visibility: hidden` (after the slide), so its links leave the tab order. */
+.admin-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; }
+.admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
+.admin-shell__sidebar { position: sticky; top: 0; height: 100vh; }
+.admin-shell__tree { border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+.admin-top-bar { display: none; }
+.admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
+
+@media (max-width: 1279px) {
+  .admin-top-bar { display: flex; }
+  .admin-shell { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell--tree { grid-template-columns: 17rem minmax(0, 1fr); }
+  .admin-shell__sidebar { position: fixed; z-index: 40; top: 0; left: 0; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__sidebar[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+}
+@media (max-width: 1023px) {
+  .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+}
+@media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
+/* The scrim belongs to a drawer, and `admin--drawer` only un-hides it when
+   one opens -- it knows nothing about widths. A drawer left open while the
+   window is widened stops being a drawer (the rules above no longer apply),
+   and its scrim would be left covering a page that has nothing over it. So
+   the scrim never shows where no drawer can exist: at all from 1280px, and
+   from 1024px unless it is the modules sidebar (still a drawer there) that
+   is open. */
+@media (min-width: 1280px) { .admin-shell__scrim { display: none; } }
+@media (min-width: 1024px) { body:not(:has(.admin-shell__sidebar[data-open])) .admin-shell__scrim { display: none; } }
+@media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
+
+/* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
+   and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
+.admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
+.admin-dialog[open] { display: flex; flex-direction: column; }
+.admin-dialog::backdrop { background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
+.admin-dialog[data-dialog-width="confirm"] { max-width: 420px; }
+.admin-dialog[data-dialog-width="form_narrow"] { max-width: 460px; }
+.admin-dialog[data-dialog-width="form"] { max-width: 560px; }
+.admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
+/* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
+.admin-palette { margin-top: 10vh; }
+
+/* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
+.admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }
+@keyframes admin-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .admin-spinner { animation-duration: 2s; } }
+
+/* Styled native select (design pass spec §4). The chevron is two CSS
+   gradients rather than an image so it takes the token colour in both
+   themes. Size/width come from the utility classes beside it.
+
+   The chevron (and `appearance: none`, and the room kept for it on the
+   right) are for a drop-down only. A `multiple` select is a list box --
+   setup's "other languages" -- with nothing to drop down: it keeps the
+   border and colours and its native list. */
+.cs-select {
+  border: 1px solid var(--cs-line-strong);
+  border-radius: var(--cs-radius);
+  background-color: var(--cs-surface);
+  color: var(--cs-ink);
+  padding: 0.5rem 0.625rem;
+}
+.cs-select:not([multiple]) {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--cs-meta) 50%), linear-gradient(135deg, var(--cs-meta) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
+
+/* Invalid field border, derived from the error slot's content (design pass
+   spec §4). Autosave streams replace a field's error slot but never its input,
+   so the border can't be a class set at render time: it would stay red after
+   a fix, or never turn red after a failed autosave. The slot's presence of a
+   message (<p>) is the single source of truth.
+
+   Wrappers that render a slot (always as their own direct child):
+   `.admin-column` (Columns::*, the settings fields, tag and related-post
+   inputs, the AI key form, a tag row's form) and `.admin-field` (the schema
+   fields of Admin::FieldComponent). Wrappers NEST: a group field's sub-fields
+   and a repeater's rows are FieldComponents inside a FieldComponent, so one
+   sub-field's error must colour only that sub-field's own controls, never its
+   siblings' (a descendant `:has` would, since the outer wrapper contains every
+   inner slot). So the colour travels as an inherited custom property that
+   EVERY wrapper first resets (`initial` = guaranteed-invalid, so `var()` falls
+   back) and only a wrapper whose own slot holds a message sets: a control
+   sees the value of its nearest wrapper. An outer wrapper's own error is
+   therefore a message only -- nothing inside its nested sub-fields turns red.
+   The rich-text popovers (link/image/YouTube, built by JS inside the editor's
+   column) reset it too: an invalid body must not redden their inputs. So does an
+   AI suggestion box (`.admin-translation-suggestion`), whose editable textarea
+   sits under the field's input inside the same wrapper.
+
+   Surfaces: native controls, the prefix input's wrapper, and the rich-text
+   editor's toolbar and body (the whole editor border). The media column has no
+   text input, so it has nothing to colour. Explicit-save forms render their
+   class server-side instead. */
+.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
+.admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
+:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
+  border-color: var(--cs-field-invalid-border, var(--cs-line-strong));
+}
+/* The prefix input's wrapper is the one surface with its own focus border
+   (`focus-within:border-accent`), which an invalid field must still override,
+   so it is spelled out with the wrapper-level `:has` instead of the variable
+   (slug columns never nest) and, once the slot is empty, reset to the normal
+   border only while unfocused. */
+.admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
+.admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
+
+/* Drag pattern (handoff §9 A9), shared by the page tree and the block list
+   (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
+   state). The ghost is the placeholder left where the row would land: a dashed
+   outline with its content hidden. The chosen row is the lifted one -- the
+   only drag state that carries a shadow (`--cs-shadow-menu`).
+
+   Both Sortables run with `forceFallback` (Firefox can't start a native drag
+   from the `<button>` handles), so what follows the pointer is a clone
+   SortableJS appends to `<body>` with `fallbackClass`: styled as the lifted
+   row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
+.admin-drag-ghost { border: 1px dashed var(--cs-line-strong); background: transparent; }
+.admin-drag-ghost > * { visibility: hidden; }
+.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius); background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+/* The placeholder is also the "chosen" element for the length of a mouse
+   drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
+.admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }

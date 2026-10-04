@@ -1,0 +1,13 @@
+<header class="admin-top-bar sticky top-0 z-20 h-12 items-center gap-2 border-b border-line bg-chrome px-3">
+  <%= drawer_button(label: "Open navigation", controls: "sidebar", name: "sidebar") { helpers.render "admin/shared/icon", name: :menu } %>
+  <span class="font-semibold text-ink">Content·Spiel</span>
+  <% if tree %>
+    <%# Under 1024 the tree column is a drawer of its own; above it the
+        column is in the grid and this button hides (`.admin-top-bar__tree`). %>
+    <%= drawer_button(label: "Open page tree", controls: "tree-column", name: "tree", classes: "admin-top-bar__tree text-sm") { "Pages ▾" } %>
+  <% end %>
+  <%= tag.button type: "button", aria: { label: "Jump to…" }, data: { action: "admin--command-palette#open" },
+        class: "ml-auto flex cursor-pointer items-center gap-2 rounded-cs border border-line-strong px-2 py-1 text-sm text-meta" do %>
+    <%= helpers.render "admin/shared/icon", name: :search %><span class="font-cs-mono text-label">⌘K</span>
+  <% end %>
+</header>

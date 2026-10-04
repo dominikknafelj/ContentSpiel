@@ -38,3 +38,17 @@ en:
         ai_provider: "AI provider"
         ai_model: "AI model"
         ai_api_key: "AI API key"
+    errors:
+      models:
+        user:
+          attributes:
+            # The password length rule's message is a whole sentence
+            # ("Use at least 12 characters.", User::MINIMUM_PASSWORD_LENGTH)
+            # that must read the same wherever it is shown, so errors on
+            # `password` carry no "Password " prefix in `full_messages`. The
+            # two other messages that can land on it are spelled out with
+            # the prefix they would otherwise have had.
+            password:
+              format: "%{message}"
+              blank: "Password can't be blank"
+              too_long: "Password is too long (maximum is %{count} characters)"

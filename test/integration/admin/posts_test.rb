@@ -92,6 +92,40 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal rich_doc("Kept"), post_record.reload.body_document(locale: "en").to_h
   end
 
+  test "Move to trash answers the whole page, so the sidebar's Trash badge updates" do
+    post_record = create_post(title: "Engineer")
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_select "dialog form[action^='/cs-studio/posts/#{post_record.id}'][data-turbo-frame='_top'] input[name='_method'][value='delete']"
+  end
+
+  # The error toast never auto-hides, so it must not pile up or outlive the
+  # error: each form owns one toast with a stable id (`toast-<error prefix>`).
+  # A failed autosave takes the previous one away before appending its own,
+  # and the next successful save removes it.
+  test "a failed autosave streams one error toast with a stable id, and the next good save removes it" do
+    post_record = create_post(title: "Engineer")
+    invalid = { "type" => "doc", "content" => [ { "type" => "youtube", "attrs" => { "id" => "nope" } } ] }
+
+    2.times do
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { body: invalid.to_json }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[action='remove'][target='toast-post']", count: 1
+      assert_select "turbo-stream[action='append'][target='toasts']", count: 1
+      assert_select "turbo-stream[action='append'][target='toasts'] .admin-toast#toast-post[role=alert]", count: 1, text: /Couldn.t save your changes\./
+      assert_operator response.body.index("action=\"remove\" target=\"toast-post\""), :<, response.body.index("target=\"toasts\""),
+        "the old toast goes before the new one arrives"
+    end
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Engineer II" }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action='remove'][target='toast-post']", count: 1
+    assert_select "turbo-stream[target='toasts']", count: 0
+  end
+
   # The interim Markdown textarea is gone (Task 7): the Tiptap editor writes
   # the document JSON into `post[body]` and that is the only body param. A
   # stray `body_markdown` (an old tab, a hand-built request) is ignored
@@ -270,8 +304,9 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   end
 
   # Translation helpers spec §4 (Task 4): the "Languages" column shows one
-  # badge per *target* language -- ✓ complete, ! missing, ↻ outdated --
+  # chip per *target* language -- plain complete, ○ missing, ↻ outdated --
   # each with a title and an accessible label, and none for the original.
+  # (Chip labels: Task 5 of the design pass; no red, no ✓/! glyphs.)
   test "the list shows a translation badge per target language" do
     with_locales(%w[en de es], default: "en")
     post_record = create_post(title: "Hello")
@@ -285,11 +320,11 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "tr#post_#{post_record.id}" do
       assert_select "[data-translation-state][data-locale='en']", count: 0
-      assert_select "[data-locale='de'][data-translation-state='complete'][title='Deutsch: complete'][aria-label='Deutsch: complete']", text: /✓/
-      assert_select "[data-locale='es'][data-translation-state='missing'][title='Español: missing'][aria-label='Español: missing']", text: /!/
+      assert_select "[data-locale='de'][data-translation-state='complete'][title='Translated'][aria-label='Deutsch: translated']", text: "de"
+      assert_select "[data-locale='es'][data-translation-state='missing'][title='Not translated'][aria-label='Español: not translated']", text: /○/
     end
     assert_select "tr#post_#{stale.id}" do
-      assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated']", text: /↻/
+      assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated'][title='English changed since translation']", text: /↻/
       assert_select "[data-locale='es'][data-translation-state='outdated']"
     end
   end

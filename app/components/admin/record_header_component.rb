@@ -8,25 +8,20 @@ module Admin
   # list), unlike a field that saves itself the moment an editor stops
   # typing.
   #
-  # `notice:`/`alert:` are the flash a publish/unpublish/schedule redirect
-  # (or a failed delete's own re-render) leaves for this header to show
-  # (`Admin::PagesController`) -- read by the view, not by this component,
-  # since a component has no controller context of its own to pull
-  # `flash` from.
+  # The flash a publish/unpublish/schedule redirect leaves is the layout's
+  # toasts (`Admin::ToastRegionComponent`), not this header's.
   class RecordHeaderComponent < AdminComponent
-    def initialize(page:, locale:, url_options: {}, notice: nil, alert: nil)
+    def initialize(page:, locale:, url_options: {})
       @page = page
       @locale = locale
       @url_options = url_options
-      @notice = notice
-      @alert = alert
     end
 
     def status = page.status
 
     def live? = page.live?
 
-    # Only meaningful for a scheduled page (`StatusBadgeComponent` itself
+    # Only meaningful for a scheduled page (`StatusChipComponent` itself
     # ignores `at:` for every other status), but harmless to pass either
     # way -- simpler than branching here on the exact same condition that
     # component already re-checks internally.
@@ -93,7 +88,7 @@ module Admin
       (page.status == "scheduled" ? page.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
-    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # The dot-marked codes for `Admin::LanguageTabsComponent` (spec
     # §6.2) -- computed here, not handed in, since every caller of this
     # component already has the one `page` it's for and nothing else this
     # check would need.
@@ -119,7 +114,7 @@ module Admin
 
     private
 
-    attr_reader :page, :locale, :url_options, :notice, :alert
+    attr_reader :page, :locale, :url_options
 
     def urls = PublicSite::Urls.new
 

@@ -7,9 +7,13 @@
   <div class="min-w-0 flex-1">
     <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
     <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
-      <span><%= type_label %></span>
+      <% if record.is_a?(Post) %>
+        <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
+      <% else %>
+        <span><%= type_label %></span>
+      <% end %>
       <% if at %>
-        <span><%= time_prefix %> <time datetime="<%= at.iso8601 %>"><%= formatted_at %></time></span>
+        <span><%= time_prefix %> <%= render Admin::TimeAgoComponent.new(time: at) %></span>
       <% end %>
       <% if (by = changed_by) %>
         <span><%= by %></span>
@@ -17,6 +21,6 @@
     </div>
   </div>
   <% unless image? %>
-    <%= render Admin::StatusBadgeComponent.new(status: record.status, at: record.published_at) %>
+    <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
   <% end %>
 </li>

@@ -68,7 +68,7 @@ groups = AccessControl::Seeds.ensure_built_in_groups!
 # true` here, a freshly seeded dev database would start with zero owners,
 # unable to grant that flag back to anyone (`User#at_least_one_owner`).
 User.find_or_create_by!(email_address: "admin@example.com") do |user|
-  user.password = "password123"
+  user.password = "password12345"
   user.owner = true
 end
 
@@ -76,13 +76,13 @@ end
 # exercising CS Studio and MCP as a non-owner Author would see them
 # (design spec §6).
 author = User.find_or_create_by!(email_address: "author@example.com") do |user|
-  user.password = "password123"
+  user.password = "password12345"
 end
 AccessControl::Membership.find_or_create_by!(user: author, group: groups.fetch(AccessControl::Seeds::AUTHOR_NAME))
 
 puts "Seeded dev accounts:"
-puts "  admin@example.com / password123 (owner)"
-puts "  author@example.com / password123 (Author group)"
+puts "  admin@example.com / password12345 (owner)"
+puts "  author@example.com / password12345 (Author group)"
 
 SiteSetting.instance.tap do |settings|
   # Translated columns (translation helpers spec §5): written in the site's

@@ -47,6 +47,13 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     within(scope) { find(:link_or_button, label, exact: true).execute_script("this.click()") }
   end
 
+  # A plain suggestion's text is the value of an editable textarea, which
+  # `text:` doesn't see.
+  def assert_suggestion(box_id, text)
+    assert_selector "##{box_id} textarea[data-translate-suggestion-text]", visible: true
+    assert_equal text, find("##{box_id} textarea[data-translate-suggestion-text]").value
+  end
+
   def slot(field) = "[data-translate-slot='#{field}']"
 
   test "Translate, then Use, fills the German title and autosaves it" do
@@ -56,7 +63,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     press_within slot("title"), "Translate"
-    assert_selector "#translation-suggestion-post-title", text: "[de] Hello"
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
     assert_nil post.reload.title(locale: "de", fallback: false), "Translate alone saves nothing"
 
     press_within "#translation-suggestion-post-title", "Use"
@@ -67,6 +74,38 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     post.reload
     assert_equal "[de] Hello", post.title(locale: "de", fallback: false)
     assert_equal :current, post.translation_state("title", "de")
+  end
+
+  test "an edited suggestion is what Use applies, and editing it saves nothing by itself" do
+    post = create_post(title: "Hello")
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+
+    press_within slot("title"), "Translate"
+    suggestion = find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]")
+    assert_equal "[de] Hello", suggestion.value
+    assert_selector "#translation-suggestion-post-title", text: /Suggested by claude-sonnet-5/i
+    # Under the field's own input, in its column -- not in the original's panel.
+    assert_selector "[data-field-name='title'] #translation-suggestion-post-title"
+    assert_no_selector "#{slot("title")} #translation-suggestion-post-title"
+
+    suggestion.fill_in with: "Edited by hand"
+    # Past the autosave debounce (1 s): had the textarea's input or focusout
+    # reached the form, a save would have run by now.
+    sleep 1.5
+    assert_no_selector "#post-save-status", text: /Saved|Saving/, wait: 0
+    assert_nil post.reload.title(locale: "de", fallback: false), "editing a suggestion is not editing the field"
+    assert_equal "", find_field(id: "post-title").value
+
+    press_within "#translation-suggestion-post-title", "Use"
+
+    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_equal "Edited by hand", find_field(id: "post-title").value
+    assert_equal "Edited by hand", post.reload.title(locale: "de", fallback: false)
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    assert_equal "Edited by hand", find_field(id: "post-title").value
   end
 
   test "Translate, then Use, loads a rich-text body into the editor and saves the document" do
@@ -99,9 +138,9 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
       press "Translate empty fields"
       assert_text "Suggestions are ready"
-      assert_selector "#translation-suggestion-page-title", text: "[de] About"
-      assert_selector "#translation-suggestion-page-subtitle", text: "[de] Who we are"
-      assert_selector "#translation-suggestion-block-#{block.id}-text", text: "[de] To be"
+      assert_suggestion "translation-suggestion-page-title", "[de] About"
+      assert_suggestion "translation-suggestion-page-subtitle", "[de] Who we are"
+      assert_suggestion "translation-suggestion-block-#{block.id}-text", "[de] To be"
 
       press "Use all"
 
@@ -127,7 +166,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       # another (it works): one record per request.
       press "Translate empty fields"
       assert_selector "#translation-suggestion-page-title [role='alert']", text: "The AI provider is unavailable."
-      assert_selector "#translation-suggestion-block-#{block.id}-text", text: "[de] To be"
+      assert_suggestion "translation-suggestion-block-#{block.id}-text", "[de] To be"
       assert_text "Suggestions are ready"
 
       press_within "#translation-suggestion-page-title", "Dismiss"

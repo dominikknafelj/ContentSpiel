@@ -8,7 +8,8 @@
   <li>one sample post for each, in your default language</li>
 </ul>
 
-<div class="mt-6 flex gap-3">
+<div class="mt-6 flex items-center gap-3">
   <%= button_to "Add starter content", setup_step_path("starter_content"), method: :patch, class: setup_primary_button_class %>
-  <%= link_to "Skip", setup_step_path("review"), class: setup_secondary_link_class %>
+  <%= link_to "Skip", setup_step_path("review"), class: setup_ghost_link_class %>
+  <%= render "setup/back" %>
 </div>

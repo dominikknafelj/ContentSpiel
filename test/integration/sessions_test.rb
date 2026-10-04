@@ -2,7 +2,7 @@ require "test_helper"
 
 class SessionsTest < ActionDispatch::IntegrationTest
   setup do
-    @user = User.create!(email_address: "admin@example.com", password: "password123")
+    @user = User.create!(email_address: "admin@example.com", password: "password12345")
   end
 
   # The only reason anyone signs in at all is to reach CS Studio -- the public
@@ -12,7 +12,7 @@ class SessionsTest < ActionDispatch::IntegrationTest
   # return_to_after_authenticating) has nothing more useful to send the
   # visitor back to than the admin itself.
   test "signing in with no page to return to redirects to CS Studio" do
-    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password123" }
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
 
     assert_redirected_to admin_root_path
   end
@@ -24,7 +24,7 @@ class SessionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings"
     assert_redirected_to "/cs-studio/sign-in"
 
-    post "/cs-studio/sign-in", params: { email_address: "admin@example.com", password: "password123" }
+    post "/cs-studio/sign-in", params: { email_address: "admin@example.com", password: "password12345" }
 
     assert_redirected_to "/cs-studio/settings"
   end
@@ -65,11 +65,11 @@ class SessionsTest < ActionDispatch::IntegrationTest
   end
 
   test "signing in and out records session.created and session.destroyed as the user" do
-    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password123" }
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
     created = Audit::Event.find_by!(action: "session.created")
     assert_equal @user, created.actor
     assert_equal @user, created.subject
-    assert_not_includes created.attributes.to_json, "password123"
+    assert_not_includes created.attributes.to_json, "password12345"
 
     delete admin_sign_out_url
     destroyed = Audit::Event.find_by!(action: "session.destroyed")

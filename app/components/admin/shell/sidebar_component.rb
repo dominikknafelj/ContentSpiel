@@ -1,0 +1,73 @@
+module Admin
+  module Shell
+    # CS Studio's modules column (design pass spec §4, handoff
+    # "StudioSidebar"): the wordmark and the "Jump to..." button, the modules
+    # in Content / People / System sections, then the theme switch and the
+    # account block. `modules` is `admin_modules` -- already narrowed to what
+    # this user may open -- so a section with nothing left in it disappears,
+    # heading and all, and a user with no grants sees only the open modules.
+    #
+    # `url_options` goes on every module link (final-fixes round, finding 5):
+    # without it, following a modules link while editing a non-default
+    # language silently dropped back to `Locales.default` -- these are the
+    # one navigation in the shell that doesn't already run through a
+    # component (`Admin::TreeNodeComponent#path`, `Admin::LanguageTabsComponent`,
+    # ...) that threads it through for its own links.
+    class SidebarComponent < Admin::AdminComponent
+      # How many group names the role line spells out before "+N".
+      ROLE_LINE_GROUPS = 2
+
+      def initialize(modules:, user:, current_path:, url_options:, trash_count: 0)
+        @modules = modules
+        @user = user
+        @current_path = current_path.to_s
+        @link_options = url_options
+        @trash_count = trash_count
+      end
+
+      # "Owner", or up to two group names then "+N", or "No groups" -- what
+      # the account block says this user is, in one short mono line.
+      def role_line
+        return "Owner" if user.owner?
+
+        names = user.groups.map(&:name)
+        return "No groups" if names.empty?
+
+        line = names.first(ROLE_LINE_GROUPS).join(", ")
+        names.size > ROLE_LINE_GROUPS ? "#{line} +#{names.size - ROLE_LINE_GROUPS}" : line
+      end
+
+      private
+
+      attr_reader :user, :current_path, :link_options, :trash_count
+
+      # The non-empty groups, in the order `MODULE_GROUPS` declares, each
+      # with its modules in `MODULES` order.
+      def sections
+        Admin::BaseController::MODULE_GROUPS.filter_map do |key, heading|
+          entries = @modules.select { |entry| entry[:group] == key }
+          [ heading, entries ] if entries.any?
+        end
+      end
+
+      def module_path(entry) = public_send(entry[:path], **link_options)
+
+      # The module whose own path (without the language param) is this
+      # request's path or a parent of it; Dashboard's path is the admin
+      # root, a prefix of everything, so it matches only exactly.
+      def current?(entry)
+        path = public_send(entry[:path])
+        return current_path.chomp("/") == path if entry[:path] == :admin_root_path
+
+        current_path == path || current_path.start_with?("#{path}/")
+      end
+
+      def link_classes(entry)
+        base = "flex items-center gap-2.5 rounded-cs px-2 py-1.5 text-sm hover:bg-sunken"
+        current?(entry) ? "#{base} bg-sunken font-medium text-ink" : "#{base} text-dim"
+      end
+
+      def badge_for(entry) = entry[:path] == :admin_trash_path && trash_count.positive? ? trash_count : nil
+    end
+  end
+end

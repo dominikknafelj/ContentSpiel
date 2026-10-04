@@ -1,0 +1,62 @@
+<%# One mark per state, shared by a tab and an overflow entry. Colour is never
+    the only cue: the shape differs (hollow ring vs solid dot) and an
+    `sr-only` sentence is what a screen reader announces. Neither uses red --
+    translation states are never errors. The `title` keeps the hover text the
+    old switcher had. %>
+<% marks = ->(code) do %>
+  <%# The `sr-only` sentence lives INSIDE the mark (no `aria-hidden` on it),
+      so when "Mark as up to date" streams the marker away by id the
+      announcement goes with the dot. %>
+  <% if missing?(code) %>
+    <%= tag.span class: "h-1.5 w-1.5 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" } do %>
+      <span class="sr-only"><%= native_name(code) %>: not translated</span>
+    <% end %>
+  <% end %>
+  <% if outdated?(code) %>
+    <%= tag.span id: outdated_marker_id(code), class: "h-1.5 w-1.5 rounded-full bg-warn", title: "Original changed", data: { language_state: "outdated" } do %>
+      <span class="sr-only"><%= native_name(code) %>: original changed</span>
+    <% end %>
+  <% end %>
+<% end %>
+<nav aria-label="Languages" class="admin-language-tabs border-b border-line">
+  <ul class="flex items-end gap-5 font-cs text-sm">
+    <% tabs.each do |code| %>
+      <li class="inline-flex items-center gap-1.5">
+        <% if current?(code) %>
+          <span class="border-b-2 border-ink pb-2 font-medium text-ink" aria-current="true"><%= native_name(code) %></span>
+        <% else %>
+          <%# `data-turbo-frame="_top"` (final-fixes round, finding 1): this
+              component lives inside the layout's own `<turbo-frame
+              id="content">`, so left to its own default frame target a click
+              here would only ever replace *that* frame -- the page tree
+              outside it (spec §4.2) never re-renders with the new locale's
+              own titles (`Admin::TreeNodeComponent#title` reads `locale`), so
+              switching language while looking at the tree left every node's
+              title showing whichever language was selected before the
+              switch. A full top-level visit re-renders the tree along with
+              the content it was already reloading. %>
+          <%= link_to native_name(code), href(code), class: "border-b-2 border-transparent pb-2 text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
+        <% end %>
+        <% marks.call(code) %>
+      </li>
+    <% end %>
+    <% if overflow.any? %>
+      <li class="relative">
+        <%# The shared popover menu (not a native <details>): arrow keys,
+            Escape and outside click come with it. The `marks` lambda is
+            still called as a silent scriptlet, never an output tag, so each
+            language's marker id renders exactly once. %>
+        <%= render Admin::MenuComponent.new(label: "+#{overflow.size} ▾", button_class: "cursor-pointer pb-2 text-meta hover:text-ink") do |menu| %>
+          <% overflow.each do |code| %>
+            <% menu.with_item do %>
+              <span class="flex items-center gap-1.5">
+                <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
+                <% marks.call(code) %>
+              </span>
+            <% end %>
+          <% end %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+</nav>

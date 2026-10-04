@@ -27,7 +27,7 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "a[href='/cs-studio/posts/#{post.id}']", text: "Coming soon"
     assert_text "Blog"
     assert_text "Scheduled"
-    assert_selector "time[datetime='#{post.published_at.iso8601}']", text: post.published_at.strftime("%b %-d, %Y %H:%M")
+    assert_selector "time[datetime='#{post.published_at.iso8601}']", text: post.published_at.strftime("%-d %b, %H:%M")
   end
 
   test "an image row shows a thumbnail, links to its detail panel, and has no status badge" do
@@ -72,6 +72,16 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
 
     render_inline row(post, change: { actor: nil, user: users(:two), user_id: users(:two).id, at: Time.current })
     assert_text "by two@example.com"
+  end
+
+  test "a named user reads by name, not email" do
+    post = create_post(title: "Named change")
+    users(:two).update!(name: "Ada Lovelace")
+
+    render_inline row(post, change: { actor: users(:two), user: users(:two), user_id: users(:two).id, at: Time.current })
+
+    assert_text "by Ada Lovelace"
+    assert_no_text "two@example.com"
   end
 
   private

@@ -15,7 +15,8 @@ module Admin
     #   a separate data value -- so an editor remounted after a drag
     #   reorder (Stimulus disconnects and reconnects the moved element)
     #   comes back with the edits made so far, not the page-load state.
-    # - the toolbar (`TOOLBAR`, spec §4.1's exact list), as real
+    # - the toolbar (`TOOLBAR_GROUPS` plus the "Insert" menu's `INSERT_MENU`,
+    #   together spec §4.1's exact list), as real
     #   server-rendered `<button type="button">`s: accessible names come
     #   from here, not from JS, and a system test can `press` them;
     # - the editor mount (empty; Tiptap fills it) and a message slot for
@@ -57,38 +58,78 @@ module Admin
       # (a mark, a heading level, a list, a block wrapper) carry
       # `aria-pressed`; the rest open a popover or insert something, so they
       # aren't toggles and don't (the controller marks them `data-active`
-      # for the visual state instead). The order and set are spec §4.1's.
-      TOOLBAR = [
-        [ "bold", "Bold", "B", true ],
-        [ "italic", "Italic", "I", true ],
-        [ "strike", "Strikethrough", "S", true ],
-        [ "code", "Inline code", "<>", true ],
-        [ "heading2", "Heading 2", "H2", true ],
-        [ "heading3", "Heading 3", "H3", true ],
-        [ "heading4", "Heading 4", "H4", true ],
-        [ "bulletList", "Bullet list", "•", true ],
-        [ "orderedList", "Numbered list", "1.", true ],
-        [ "blockquote", "Quote", "❝", true ],
-        [ "codeBlock", "Code block", "{ }", true ],
-        [ "horizontalRule", "Horizontal rule", "―", false ],
-        [ "link", "Link", "Link", false ],
-        [ "internalLink", "Internal link", "Page", false ],
-        [ "image", "Image", "Image", false ],
-        [ "youtube", "YouTube", "YouTube", false ]
+      # for the visual state instead).
+      #
+      # Design pass round 1 (bug 5): the tools are grouped, in this order,
+      # so the toolbar fits one row -- text style (heading levels; there is no
+      # paragraph/heading select, the levels stay buttons) · marks · blocks ·
+      # Link -- and everything that *inserts* something moves into the
+      # "Insert" menu (`INSERT_MENU`). Spec §4.1's set is unchanged, only its
+      # layout; every button keeps its action.
+      #
+      # The accessible name must contain the visible text (WCAG 2.5.3, "label
+      # in name"): someone using voice control says what they see. A glyph
+      # button ("B", "•") has no words to say, so its name is free; a button
+      # that shows words is named by those words -- which is why the two menu
+      # items shown as "Page link" and "Divider" are named exactly that, not
+      # by their node types ("Internal link", "Horizontal rule").
+      TOOLBAR_GROUPS = [
+        [
+          [ "heading2", "Heading 2", "H2", true ],
+          [ "heading3", "Heading 3", "H3", true ],
+          [ "heading4", "Heading 4", "H4", true ]
+        ],
+        [
+          [ "bold", "Bold", "B", true ],
+          [ "italic", "Italic", "I", true ],
+          [ "strike", "Strikethrough", "S", true ],
+          [ "code", "Inline code", "<>", true ]
+        ],
+        [
+          [ "bulletList", "Bullet list", "•", true ],
+          [ "orderedList", "Numbered list", "1.", true ],
+          [ "blockquote", "Quote", "❝", true ],
+          [ "codeBlock", "Code block", "{ }", true ]
+        ],
+        [
+          [ "link", "Link", "Link", false ]
+        ]
       ].freeze
+
+      # The "Insert ▾" menu's items, same shape as `TOOLBAR_GROUPS`'.
+      INSERT_MENU = [
+        [ "internalLink", "Page link", "Page link", false ],
+        [ "image", "Image", "Image", false ],
+        [ "youtube", "YouTube", "YouTube", false ],
+        [ "horizontalRule", "Divider", "Divider", false ]
+      ].freeze
+
+      # Which of these open a popover or dialog (`aria-haspopup="dialog"`).
+      DIALOG_ACTIONS = %w[link internalLink image youtube].freeze
 
       # What an internal link to a page or post the actor can't read shows
       # instead of its title (see `#link_titles_json`).
       UNREADABLE_TITLES = { "page" => "A page you can't open", "post" => "A post you can't open" }.freeze
 
-      # The toolbar actually rendered: `TOOLBAR` without "Image" for someone
-      # without `media.upload` (access-control design spec §5, media library
-      # design spec §5.1: browse, upload and choose) -- the button's only
-      # way to add an image is the picker, which isn't on the page without
-      # it. An image already in the document stays editable by selecting
-      # it.
-      def toolbar
-        can?("media.upload") ? TOOLBAR : TOOLBAR.reject { |action, *| action == "image" }
+      # The toolbar actually rendered: the groups above, and the Insert menu
+      # without "Image" for someone without `media.upload` (access-control
+      # design spec §5, media library design spec §5.1: browse, upload and
+      # choose) -- the button's only way to add an image is the picker, which
+      # isn't on the page without it. An image already in the document stays
+      # editable by selecting it.
+      def toolbar_groups = TOOLBAR_GROUPS
+
+      def insert_menu
+        can?("media.upload") ? INSERT_MENU : INSERT_MENU.reject { |action, *| action == "image" }
+      end
+
+      # Shared by the toolbar's buttons and the menu's items; `data-action`
+      # and the command key are what the controller runs and reports under.
+      def tool_button(action, label, text, toggle, extra_class: nil, extra_action: nil)
+        tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
+          "aria-haspopup": (DIALOG_ACTIONS.include?(action) ? "dialog" : nil),
+          class: [ "admin-rich-text-button cursor-pointer whitespace-nowrap rounded-cs px-1.5 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent", extra_class ].compact.join(" "),
+          data: { action: [ "admin--rich-text##{action}", extra_action ].compact.join(" "), "admin--rich-text-command": action }
       end
 
       def document = self.class.to_document(value)

@@ -9,6 +9,12 @@
       yet. %>
   <p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm"></p>
 
+  <%# The keyboard path for a drag (handoff §9 A9): one instruction every
+      handle points at, and the live region `admin--tree` announces a pick-up
+      and each step in. %>
+  <p id="tree-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
+  <p data-admin--tree-target="announcer" aria-live="assertive" class="sr-only"></p>
+
   <% if root %>
     <ul class="admin-tree flex flex-col gap-0.5">
       <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_states: translation_states, selected: selected, locale: locale, url_options: url_options, root: true) %>

@@ -1,9 +1,9 @@
 module Admin
   # The one button every admin screen renders through -- Save/Cancel in a
   # dialog, "+ Add block", a block card's "Duplicate"/"Delete" menu items,
-  # the tree's "+", and so on (spec §4.3). Three variants only: `:primary`
+  # the tree's "+", and so on (spec §4.3). Five variants only: `:primary`
   # (the one emphasized action per screen), `:secondary` (everything else)
-  # and `:danger` (destructive actions, usually paired with
+  # `:ghost` (a dialog's Cancel), `:danger_outline` (opens a destructive confirm) and `:danger` (destructive actions, usually paired with
   # `ConfirmDialogComponent`). Anything else a caller needs on the tag --
   # `data-action` for a Stimulus controller, `disabled`, `form`, a `name`
   # for a `button_to`-style submit -- passes straight through via `**html`
@@ -12,7 +12,15 @@ module Admin
     VARIANT_CLASSES = {
       primary: "bg-accent text-on-accent hover:bg-accent-hover",
       secondary: "border border-line-strong bg-surface text-ink hover:bg-sunken",
-      danger: "border border-danger bg-danger-tint text-danger-ink hover:bg-danger hover:text-on-accent"
+      # Solid red: a destructive action's confirm button. `text-white` is the
+      # one literal colour the design allows (handoff §9 A1) -- on the red
+      # fill white is right in both themes, unlike `on-accent`.
+      # A button that merely OPENS a destructive confirm: tinted, not solid, so
+      # the one solid red on screen is the confirm button inside the dialog.
+      danger_outline: "border border-danger bg-danger-tint text-danger-ink hover:bg-danger hover:text-on-accent",
+      danger: "bg-danger text-white hover:opacity-90",
+      # Dialog Cancel and other low-emphasis actions: no border, no fill.
+      ghost: "text-dim hover:bg-sunken hover:text-ink"
     }.freeze
 
     BASE_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-4 py-2 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"

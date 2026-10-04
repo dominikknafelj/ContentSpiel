@@ -1,9 +1,9 @@
-<div class="admin-empty-state flex flex-col items-center gap-2 rounded-cs border border-dashed border-line-strong px-6 py-10 text-center">
-  <h3 class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= title %></h3>
+<div class="admin-empty-state px-6 py-12 text-center">
+  <h3 class="text-base font-semibold text-ink"><%= title %></h3>
   <% if description.present? %>
-    <p class="text-ink"><%= description %></p>
+    <p class="mt-1 text-sm text-meta"><%= description %></p>
   <% end %>
   <% if action? %>
-    <div class="mt-2"><%= action %></div>
+    <div class="mt-4 flex justify-center"><%= action %></div>
   <% end %>
 </div>

@@ -13,12 +13,10 @@ module Admin
   class PostFormComponent < AdminComponent
     ID_PREFIX = "post"
 
-    def initialize(post:, locale:, url_options: {}, notice: nil, alert: nil)
+    def initialize(post:, locale:, url_options: {})
       @post = post
       @locale = locale
       @url_options = url_options
-      @notice = notice
-      @alert = alert
     end
 
     def status = post.status
@@ -36,16 +34,6 @@ module Admin
     def form_url = helpers.admin_post_path(post, **url_options)
 
     def definition = post.definition
-
-    # A stored `content_type` that isn't (or is no longer) registered --
-    # e.g. a removed plugin's type -- still has to render *something* here
-    # rather than raising (global constraints: an unknown stored type never
-    # 500s), so this falls back to the bare stored string with a neutral
-    # colour instead of a label/swatch pulled from a definition that no
-    # longer exists.
-    def content_type_label = definition&.label || post.content_type
-
-    def content_type_color = definition&.color || "#94a3b8"
 
     # The canonical address (spec §5.2): a `post_list` block somewhere lists
     # this post, or it doesn't -- `nil` here means "nowhere yet", the same
@@ -94,7 +82,7 @@ module Admin
       (post.status == "scheduled" ? post.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
-    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # The dot-marked codes for `Admin::LanguageTabsComponent` (spec
     # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
     # gives for its own page.
     def missing_locales = switcher_locales[:missing]
@@ -155,7 +143,9 @@ module Admin
     # front of it.
     def slug_base_url
       page = PublicSite::Paths.canonical_page(post)
-      page ? (urls.path_for(page, locale) || "") : ""
+      # No trailing slash: the listing page at "/" (or "/de/") would otherwise
+      # put "//slug" on screen (design pass bug 1); the slug field appends its own "/".
+      page ? (urls.path_for(page, locale) || "").sub(%r{/+\z}, "") : ""
     end
 
     def schema_fields = definition&.fields || []
@@ -185,7 +175,7 @@ module Admin
 
     private
 
-    attr_reader :post, :locale, :url_options, :notice, :alert
+    attr_reader :post, :locale, :url_options
 
     def urls = PublicSite::Urls.new
 

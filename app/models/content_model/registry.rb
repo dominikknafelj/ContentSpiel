@@ -36,6 +36,17 @@ module ContentModel
 
       definition = definition_class.new(name)
       block&.call(definition)
+      # A content type that states no `colour_index` gets the smallest
+      # positive integer no registered definition holds. That default lives
+      # here, not in the definition, because the next free index is a
+      # property of the whole registered set, which one definition can't
+      # see. Block types and field groups have no `colour_index`, hence the
+      # `respond_to?`. A stated (possibly invalid) value is left for
+      # `finalize!` to validate.
+      if definition.respond_to?(:colour_index) && definition.colour_index.nil?
+        taken = registry.values.filter_map { |other| other.colour_index if other.respond_to?(:colour_index) }
+        definition.colour_index = (1..).find { |index| taken.exclude?(index) }
+      end
       definition.finalize!
       registry[definition.name] = definition
     end

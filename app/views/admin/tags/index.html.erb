@@ -7,7 +7,9 @@
 <h1 class="mb-4 text-h1 text-ink">Tags</h1>
 
 <% if @tags.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+  </div>
 <% else %>
   <table class="admin-tags-table w-full border-collapse text-sm">
     <thead>
@@ -29,7 +31,7 @@
                 explains why the save-status cell, a sibling `<td>` rather
                 than a nested element, needs no Stimulus target here to
                 reach it). %>
-            <%= form_with url: admin_tag_path(tag), method: :patch, class: "flex flex-col gap-1",
+            <%= form_with url: admin_tag_path(tag), method: :patch, class: "admin-column flex flex-col gap-1",
                   data: {
                     controller: "admin--autosave",
                     action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
@@ -48,8 +50,8 @@
           <td class="py-2 pr-4"><%= render Admin::SaveStatusComponent.new(id: "tag-#{tag.id}-save-status", state: :idle) %></td>
 
           <td class="py-2 text-right">
-            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "button",
-                  onclick: "document.getElementById('#{dialog_id}').showModal()") %>
+            <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger_outline, type: "button",
+                  data: dialog_trigger(dialog_id)) %>
 
             <%# "Removes the tag from N posts" (spec §5.3) -- shown for every
                 tag, unused ones included (`pluralize` reads "0 posts" then),
@@ -57,7 +59,7 @@
                 still benefits from the same one confirmation step as any
                 other permanent delete (spec §7's "No trash" interim
                 state). %>
-            <%= render Admin::ConfirmDialogComponent.new(id: dialog_id, title: "Delete this tag?",
+            <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete this tag?",
                   body: "Removes the tag from #{pluralize(tag.posts_count, 'post')}. This can't be undone.") do |dialog| %>
               <% dialog.with_confirm_action do %>
                 <%= form_with url: admin_tag_path(tag), method: :delete do %>

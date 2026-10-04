@@ -1,0 +1,22 @@
+<nav aria-label="Pagination" class="flex items-center justify-between border-t border-line px-4 py-2">
+  <p class="font-cs-mono text-label uppercase tracking-mono text-meta">
+    <%= pagination.first_item %>–<%= pagination.last_item %> OF <%= pagination.total %>
+  </p>
+  <div class="flex items-center gap-1">
+    <% if previous? %>
+      <%= link_to "Previous", url.call(pagination.page - 1), rel: "prev", class: LINK_CLASS %>
+    <% end %>
+    <% pagination.series.each do |entry| %>
+      <% if entry == :gap %>
+        <span aria-hidden="true" class="px-1 text-sm text-meta">…</span>
+      <% elsif entry == pagination.page %>
+        <span aria-current="page" class="<%= CURRENT_CLASS %>"><%= entry %></span>
+      <% else %>
+        <%= link_to entry, url.call(entry), class: LINK_CLASS %>
+      <% end %>
+    <% end %>
+    <% if next? %>
+      <%= link_to "Next", url.call(pagination.page + 1), rel: "next", class: LINK_CLASS %>
+    <% end %>
+  </div>
+</nav>

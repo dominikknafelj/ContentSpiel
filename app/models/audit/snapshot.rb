@@ -140,7 +140,7 @@ module Audit
         # itself is what a version restore finds again, by id.
         record.attributes.merge("content_block_ids" => record.content_blocks.reorder(:position, :id).ids)
       when User
-        { "id" => record.id, "email_address" => record.email_address, "owner" => record.owner, "group_ids" => record.group_ids.sort }
+        { "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort }
       when AccessControl::Group
         {
           "id" => record.id, "name" => record.name, "description" => record.description, "built_in" => record.built_in,

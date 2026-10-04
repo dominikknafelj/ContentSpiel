@@ -1,34 +1,33 @@
 require "application_system_test_case"
 
-# Independent of the machine's colour-scheme preference: reads what the OS
-# prefers, checks the page followed it, then flips and reloads.
 class ThemeToggleTest < ApplicationSystemTestCase
-  setup do
-    # `delete_all`, not `destroy_all` -- see `SetupTestHelper#start_fresh_
-    # install`'s own comment (Task 8's `User#ensure_not_last_owner`).
-    User.delete_all
-    site_settings(:default).update!(setup_completed_at: nil)
+  test "light, dark and auto each apply, survive a reload, and mark the chosen button" do
+    visit admin_sign_in_path
+    within("[role=radiogroup][aria-label='Theme']") { press "Dark" }
+    assert_selector "html[data-theme='dark'][data-theme-choice='dark']"
+    assert_selector "button[role=radio][aria-checked='true']", text: /dark/i
+
+    visit admin_sign_in_path
+    assert_selector "html[data-theme='dark'][data-theme-choice='dark']"
+
+    within("[role=radiogroup][aria-label='Theme']") { press "Light" }
+    assert_selector "html[data-theme='light'][data-theme-choice='light']"
+
+    within("[role=radiogroup][aria-label='Theme']") { press "Auto" }
+    assert_selector "html[data-theme-choice='auto']"
+    assert_equal "auto", page.evaluate_script("localStorage.getItem('cs-theme')")
   end
 
-  test "the wizard's toggle flips the theme, scopes color-scheme, and survives a reload" do
-    visit setup_step_path("token")
-    prefers_dark = page.evaluate_script("window.matchMedia('(prefers-color-scheme: dark)').matches")
-    initial = prefers_dark ? "dark" : "light"
-    assert_equal initial, current_theme
-
-    other = initial == "dark" ? "light" : "dark"
-    click_on(initial == "dark" ? "Light mode" : "Dark mode")
-    assert_equal other, current_theme
-    assert_equal other, page.evaluate_script("getComputedStyle(document.body).colorScheme")
-
-    visit setup_step_path("token")
-    assert_equal other, current_theme
+  test "a junk stored value falls back to auto instead of breaking the page" do
+    visit admin_sign_in_path
+    page.execute_script("localStorage.setItem('cs-theme', 'blue')")
+    visit admin_sign_in_path
+    assert_selector "html[data-theme-choice='auto']"
+    assert_selector "button[role=radio][aria-checked='true']", text: /auto/i
   end
 
   test "the public site's toggle flips the theme and survives a reload" do
-    # The shared `setup` block above clears setup_completed_at for the wizard
-    # test above; the public site is a different concern and must not be sent
-    # through Setup::RedirectConstraint's /setup redirect.
+    # Must not be sent through Setup::RedirectConstraint's /setup redirect.
     site_settings(:default).update!(setup_completed_at: Time.current)
     Page.create!(page_type: :standard, title: "Home", slug: "", published_at: Time.current)
     visit "/"

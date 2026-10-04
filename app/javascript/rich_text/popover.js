@@ -104,7 +104,7 @@ export function createSelect(labelText, options) {
 
   const select = document.createElement("select")
   select.id = id
-  select.className = INPUT_CLASS
+  select.className = "cs-select mt-1 block w-full"
   options.forEach(([ value, text ]) => {
     const option = document.createElement("option")
     option.value = value

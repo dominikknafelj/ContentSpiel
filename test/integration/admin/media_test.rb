@@ -83,7 +83,20 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { picker: 1 }
     assert_select "button[data-action='admin--media-picker#pick']", count: 48
-    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='offset=48']", text: "Next"
+    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='page=2']", text: "Next"
+  end
+
+  test "junk and out-of-range page numbers never error" do
+    sign_in_as(users(:one))
+    build_asset(filename: "one.png")
+
+    %w[0 abc -1].each do |junk|
+      get "/cs-studio/media", params: { page: junk }
+      assert_response :success
+    end
+    get "/cs-studio/media", params: { page: 9999 }
+    assert_response :success
+    assert_select "a", text: "Back to page 1"
   end
 
   test "picker mode needs media.upload" do
@@ -145,7 +158,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "a", text: "Next"
     assert_select "a", text: "Previous", count: 0
 
-    get "/cs-studio/media", params: { offset: 48 }
+    get "/cs-studio/media", params: { page: 2 }
     assert_response :success
     assert_select "li[id^='media-asset-']", 2
     assert_select "a", text: "Previous"
@@ -286,7 +299,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   test "an owner the viewer can't read gets a neutral label instead of a link" do
     group = AccessControl::Group.create!(name: "Media only #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "media.upload")
-    viewer = User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password", password_confirmation: "password")
+    viewer = User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password12345", password_confirmation: "password12345")
     AccessControl::Membership.create!(user: viewer, group: group)
 
     asset = upload_asset(filename: "hero.png")
@@ -313,7 +326,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "button[disabled]", text: "Move to trash"
-    assert_includes response.body, asset.reload.in_use_message(kept_only: true)
+    assert_select "#media-trash-help", text: /In use on 1 page\. Remove it there first\./
   end
 
   # Task 10: the redirect carries a flash naming the image and an Undo that
@@ -340,7 +353,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
-    assert_select "p[role=status]", text: "Restored “#{asset.title}”"
+    assert_select "#toasts .admin-toast[role=status]", text: "Restored “#{asset.title}”"
   end
 
   # The disabled button is only ever a courtesy -- `Trash::Move` itself is
@@ -361,7 +374,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
-    assert_select "p[role=alert]", text: asset.in_use_message(kept_only: true)
+    assert_select "#toasts .admin-toast[role=alert]", text: asset.in_use_message(kept_only: true)
   end
 
   test "editing title, alt and caption autosaves per locale through Media::Save" do

@@ -7,10 +7,10 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "email address is required and unique" do
-    User.create!(email_address: "taken@example.com", password: "password123")
+    User.create!(email_address: "taken@example.com", password: "password12345")
 
-    assert_not User.new(email_address: "", password: "password123").valid?
-    assert_not User.new(email_address: "TAKEN@example.com", password: "password123").valid?
+    assert_not User.new(email_address: "", password: "password12345").valid?
+    assert_not User.new(email_address: "TAKEN@example.com", password: "password12345").valid?
   end
 
   # users(:one) is the sole owner in fixtures (test/fixtures/users.yml);
@@ -30,7 +30,7 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "a second owner allows destroying the first" do
-    User.create!(email_address: "owner2@example.com", password: "password123", owner: true)
+    User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
 
     assert users(:one).destroy
     assert_not User.exists?(users(:one).id)
@@ -45,7 +45,7 @@ class UserTest < ActiveSupport::TestCase
   end
 
   test "a second owner allows demoting the first" do
-    User.create!(email_address: "owner2@example.com", password: "password123", owner: true)
+    User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
 
     assert users(:one).update(owner: false)
     assert_not users(:one).reload.owner?
@@ -82,5 +82,52 @@ class UserTest < ActiveSupport::TestCase
 
   test "the last-owner check counts owners under a row lock" do
     assert_queries_match(/FOR UPDATE/) { users(:one).destroy }
+  end
+
+  test "display_name is the name, or the email when there is none" do
+    user = users(:one)
+    user.name = nil
+    assert_equal user.email_address, user.display_name
+    user.name = "   "
+    assert_equal user.email_address, user.display_name
+    user.name = " Ada Lovelace "
+    assert_equal "Ada Lovelace", user.display_name
+  end
+
+  test "name is optional and capped at 120 characters" do
+    user = users(:one)
+    user.name = "a" * 121
+    assert_not user.valid?
+    user.name = ""
+    assert user.valid?
+    assert_nil user.name, "a blank name is stored as nil"
+  end
+
+  test "a new password needs at least 12 characters" do
+    user = users(:one)
+    user.password = user.password_confirmation = "elevenchars"
+    assert_not user.valid?
+    assert_equal [ "Use at least 12 characters." ], user.errors[:password]
+    assert_includes user.errors.full_messages, "Use at least 12 characters.", "the rule's message reads the same everywhere, with no attribute prefix"
+    user.password = user.password_confirmation = "twelve chars"
+    assert user.valid?
+  end
+
+  test "twelve multibyte characters are enough: the rule counts characters, not bytes" do
+    user = users(:one)
+    user.password = user.password_confirmation = "üüüüüüüüüüüü"
+    assert user.valid?
+  end
+
+  test "a user whose stored password is shorter still authenticates and saves other changes" do
+    user = users(:one) # fixture digest is for "password"
+    assert user.authenticate("password")
+    assert user.update(name: "Unchanged password")
+  end
+
+  test "the other password messages keep their attribute prefix" do
+    user = User.new(email_address: "blank@example.com")
+    assert_not user.valid?
+    assert_includes user.errors.full_messages, "Password can't be blank"
   end
 end

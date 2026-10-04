@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="dashboard" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:22px;max-width:1200px;width:100%;box-sizing:border-box">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:14px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta)">SATURDAY 3 OCTOBER</span>
+      <h1 style="margin:0;font-size:26px;font-weight:600">Dashboard</h1>
+    </div>
+  </div>
+
+  <form style="display:grid;grid-template-columns:minmax(0,1fr) 180px auto;gap:8px;align-items:center;background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px;padding:12px">
+    <input placeholder="Start a draft — give it a title" style="font-size:14px;color:var(--cs-ink);background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px;outline:none"></input>
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;background:var(--cs-paper);border:1px solid var(--cs-line-strong);border-radius:2px;padding:9px 11px"><span>Blog post</span><span style="font-size:10px;color:var(--cs-meta)">▾</span></div>
+    <button style="font-weight:500;font-size:13px;background:var(--cs-accent);color:var(--cs-on-accent);border:1px solid var(--cs-accent);border-radius:2px;padding:9px 16px;cursor:pointer" style-hover="background:var(--cs-accent-hover)">Create draft</button>
+  </form>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start">
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Your drafts</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">3</span></div>
+      <sc-for list="{{ drafts }}" as="d" hint-placeholder-count="3">
+        <a href="{{ d.href }}" style="display:flex;flex-direction:column;gap:3px;padding:11px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+          <span style="font-size:14px;font-weight:500">{{ d.title }}</span>
+          <span style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--cs-meta)"><span style="width:6px;height:6px;border-radius:999px;background:{{ d.cat }}"></span>{{ d.type }} · edited {{ d.when }}</span>
+        </a>
+      </sc-for>
+      <a href="Studio%20Posts.dc.html" style="display:block;padding:10px 16px;font-size:13px">All drafts →</a>
+    </section>
+
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Going live next</span><span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">1</span></div>
+      <a href="Studio%20Post%20Editor.dc.html" style="display:grid;grid-template-columns:52px minmax(0,1fr);gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+        <span style="display:flex;flex-direction:column;align-items:center;border:1px solid var(--cs-line-strong);border-radius:2px;padding:4px 0"><span style="font-family:var(--cs-mono);font-size:9px;letter-spacing:0.12em;color:var(--cs-warn-ink)">OCT</span><span style="font-size:18px;font-weight:600;line-height:1.1">8</span></span>
+        <span style="display:flex;flex-direction:column;gap:3px"><span style="font-size:14px;font-weight:500">Autumn workshop dates</span><span style="font-size:12px;color:var(--cs-meta)">Blog post · Thu 17:30 · in 5 days</span></span>
+      </a>
+      <p style="margin:0;padding:12px 16px;font-size:13px;line-height:1.5;color:var(--cs-dim)">Nothing else is scheduled. Use <b style="font-weight:500;color:var(--cs-ink)">Schedule…</b> in the editor to queue a post.</p>
+    </section>
+
+    <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Needs translation</span><a href="Studio%20Translations.dc.html" style="font-size:13px">Open →</a></div>
+      <sc-for list="{{ langs }}" as="l" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:7px;padding:12px 16px;border-bottom:1px solid var(--cs-line)">
+          <span style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span style="font-size:14px;font-weight:500">{{ l.name }}</span><span style="font-size:12px;color:var(--cs-dim)">{{ l.summary }}</span></span>
+          <span style="display:block;height:4px;background:var(--cs-sunken);border-radius:999px;overflow:hidden"><span style="display:block;height:4px;width:{{ l.pct }};background:var(--cs-ok)"></span></span>
+        </div>
+      </sc-for>
+      <div style="display:flex;gap:10px;align-items:center;padding:11px 16px;font-size:13px;line-height:1.4">
+        <span style="font-family:var(--cs-mono);font-size:10px;color:var(--cs-warn-ink);border:1px solid var(--cs-warn);border-radius:2px;padding:1px 5px;flex-shrink:0">DE ↻</span>
+        <span style="color:var(--cs-dim)"><a href="Studio%20Post%20Editor.dc.html" style="color:var(--cs-ink);font-weight:500">Welcome to our new site</a> changed in English after it was translated.</span>
+      </div>
+    </section>
+  </div>
+
+  <section style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:13px 16px;border-bottom:1px solid var(--cs-line)"><span style="font-size:15px;font-weight:600">Recent activity</span><a href="Studio%20Audit%20Log.dc.html" style="font-size:13px">Full audit log →</a></div>
+    <sc-for list="{{ activity }}" as="a" hint-placeholder-count="7">
+      <div style="display:grid;grid-template-columns:24px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--cs-line)">
+        <span style="width:24px;height:24px;border-radius:{{ a.radius }};box-sizing:border-box;border:1px solid {{ a.avBorder }};background:{{ a.avBg }};color:{{ a.avFg }};font-family:var(--cs-mono);font-size:9px;display:grid;place-items:center">{{ a.who }}</span>
+        <span style="font-size:13px;line-height:1.4;color:var(--cs-dim);min-width:0"><b style="color:var(--cs-ink);font-weight:500">{{ a.actor }}</b> <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.08em;color:var(--cs-accent)">{{ a.via }}</span> {{ a.verb }} <a href="#" style="color:var(--cs-ink);font-weight:500">{{ a.obj }}</a></span>
+        <span style="display:{{ a.chipDisplay }};align-items:center;gap:6px;font-size:12px;border:1px solid var(--cs-line-strong);border-radius:2px;padding:2px 7px;color:var(--cs-ink)"><span style="width:6px;height:6px;border-radius:999px;background:{{ a.dot }}"></span>{{ a.status }}</span>
+        <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta);min-width:56px;text-align:right">{{ a.when }}</span>
+      </div>
+    </sc-for>
+  </section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const human = { radius: '999px', avBorder: 'var(--cs-ink)', avBg: 'var(--cs-ink)', avFg: 'var(--cs-paper)', who: 'MK', via: '' };
+    const agent = { ...human, via: 'VIA CLAUDE-DESKTOP · MCP' };
+    const st = s => s ? { chipDisplay: 'inline-flex', status: s, dot: s === 'Draft' ? 'var(--cs-meta)' : 'var(--cs-warn)' } : { chipDisplay: 'none', status: '', dot: '' };
+    return {
+      drafts: [
+        { title: 'Notes on editing in the dark', type: 'Blog post', cat: 'var(--cs-cat-1)', when: '2h ago', href: 'Studio%20Post%20Editor.dc.html' },
+        { title: 'Contact', type: 'Page', cat: 'var(--cs-line-strong)', when: '2h ago', href: 'Studio%20Pages.dc.html' },
+        { title: 'Workshops', type: 'Page', cat: 'var(--cs-line-strong)', when: 'yesterday', href: 'Studio%20Pages.dc.html' }
+      ],
+      langs: [
+        { name: 'Deutsch', summary: '12 missing · 1 outdated', pct: '14%' },
+        { name: 'Español', summary: '14 missing', pct: '0%' }
+      ],
+      activity: [
+        { ...agent, actor: 'You', verb: 'drafted', obj: 'Lab notes: shipping', ...st('Draft'), when: '12m' },
+        { ...human, actor: 'You', verb: 'published', obj: 'Now: shipping translations', ...st(''), when: '2h' },
+        { ...human, actor: 'You', verb: 'scheduled', obj: 'Autumn workshop dates', ...st('Scheduled'), when: '2h' },
+        { ...human, actor: 'You', verb: 'edited', obj: 'Notes on editing in the dark', ...st('Draft'), when: '2h' },
+        { ...human, actor: 'You', verb: 'moved to trash', obj: 'Retired announcement', ...st(''), when: '3h' },
+        { ...human, actor: 'You', verb: 'updated the English of', obj: 'Welcome to our new site', ...st(''), when: '1d' },
+        { ...human, actor: 'You', verb: 'uploaded', obj: 'Studio window', ...st(''), when: '1d' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

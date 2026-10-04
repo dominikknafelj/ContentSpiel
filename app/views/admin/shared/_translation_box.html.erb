@@ -1,0 +1,9 @@
+<%# The empty box an AI suggestion streams into (`SuggestionComponent.dom_id`), rendered
+    directly under the field's own input -- not in the original's panel with the Translate
+    button -- so the suggestion appears inside the field. It carries its own
+    `admin--translate` controller instance because Stimulus actions only fire inside a
+    controller's element, and Use/Discard live here, outside the button's wrapper. Local:
+    `button`, the field's `TranslateButtonComponent`. %>
+<% if button&.render? %>
+  <%= tag.div id: button.box_id, "aria-live": "polite", data: { translation_box: true, controller: "admin--translate" } %>
+<% end %>

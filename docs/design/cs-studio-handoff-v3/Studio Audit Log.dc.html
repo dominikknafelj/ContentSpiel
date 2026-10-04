@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="content-spiel.css">
+<script>try{var t=localStorage.getItem('cs-theme')||'auto';if(t==='auto')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t}catch(e){}</script>
+<style>body{margin:0;background:var(--cs-paper);color:var(--cs-ink);font-family:var(--cs-font);-webkit-font-smoothing:antialiased}a{color:var(--cs-accent);text-decoration:none}a:hover{color:var(--cs-accent-hover)}input,textarea,button,select{font-family:inherit}</style>
+</helmet>
+<div style="display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh;background:var(--cs-paper);color:var(--cs-ink)">
+<dc-import name="StudioSidebar" active="audit" hint-size="232px,100vh"></dc-import>
+<main style="padding:28px 32px 64px;display:flex;flex-direction:column;gap:16px;max-width:1100px;width:100%;box-sizing:border-box">
+  <h1 style="margin:0;font-size:26px;font-weight:600">Audit log</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Anyone <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Any action <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Any content <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Last 30 days · Custom… <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+    <span style="display:flex;gap:8px;align-items:center;font-size:13px;background:var(--cs-surface);border:1px solid var(--cs-line-strong);border-radius:2px;padding:6px 10px">Admin + MCP <span style="font-size:9px;color:var(--cs-meta)">▾</span></span>
+  </div>
+  <sc-for list="{{ days }}" as="d" hint-placeholder-count="2">
+    <section style="display:flex;flex-direction:column">
+      <span style="font-family:var(--cs-mono);font-size:10px;letter-spacing:0.14em;color:var(--cs-meta);padding:8px 0">{{ d.label }}</span>
+      <div style="background:var(--cs-surface);border:1px solid var(--cs-line);border-radius:2px">
+        <sc-for list="{{ d.events }}" as="e" hint-placeholder-count="5">
+          <a href="#" style="display:grid;grid-template-columns:92px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--cs-line);color:var(--cs-ink)" style-hover="background:var(--cs-paper)">
+            <span style="font-family:var(--cs-mono);font-size:11px;color:var(--cs-meta)">{{ e.t }}</span>
+            <span style="font-size:13px;color:var(--cs-dim);min-width:0"><b style="font-weight:500;color:var(--cs-ink)">{{ e.who }}</b> {{ e.verb }} <b style="font-weight:500;color:var(--cs-ink)">{{ e.obj }}</b></span>
+            <span style="font-family:var(--cs-mono);font-size:10px;color:{{ e.keyColor }}">{{ e.key }}</span>
+            <span style="font-family:var(--cs-mono);font-size:9px;letter-spacing:0.1em;color:{{ e.chFg }};background:{{ e.chBg }};border-radius:2px;padding:2px 5px">{{ e.ch }}</span>
+          </a>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+  <button style="align-self:center;font-weight:500;font-size:13px;background:var(--cs-surface);color:var(--cs-ink);border:1px solid var(--cs-line-strong);border-radius:2px;padding:7px 14px">Load older</button>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const E = (t, who, verb, obj, key, mcp, warn) => ({ t, who, verb, obj, key, keyColor: warn ? 'var(--cs-warn-ink)' : 'var(--cs-meta)', ch: mcp ? 'MCP' : 'ADMIN',
+      chFg: mcp ? 'var(--cs-accent)' : 'var(--cs-dim)', chBg: mcp ? 'var(--cs-accent-tint)' : 'var(--cs-sunken)' });
+    return { days: [
+      { label: 'TODAY · SAT 3 OCT', events: [
+        E('17:34', 'Mara König via claude-desktop', 'created the draft', 'Lab notes: shipping', 'post.created', true),
+        E('17:31', 'Failed sign-in for', 'one@example.com', 'from 203.0.113.4', 'session.failed', false, true),
+        E('17:30', 'You', 'signed in', '', 'session.created', false),
+        E('17:29', 'author@example.com', 'was refused access to', 'Settings', 'access.denied', false, true),
+        E('17:28', 'You', 'moved to trash', 'tiny', 'media.trashed', false),
+        E('17:26', 'You', 'moved to trash', 'Retired announcement', 'post.trashed', false),
+        E('17:20', 'You', 'published', 'Now: shipping translations', 'post.published', false),
+        E('17:12', 'You', 'added a Post list block to', 'Blog', 'block.created', false)
+      ] },
+      { label: 'YESTERDAY · FRI 2 OCT', events: [
+        E('16:05–16:31', 'You', 'edited (12 saves)', 'Welcome to our new site', 'post.updated', false),
+        E('11:40', 'You', 'updated alt text of', 'Studio window', 'media.updated', false)
+      ] }
+    ] };
+  }
+}
+</script>
+</body>
+</html>

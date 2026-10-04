@@ -145,4 +145,12 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal "one@example.com", users(:one).reload.email_address
     assert_equal [ access_control_groups(:read_only).id ], users(:reader).group_ids
   end
+
+  test "saves a name and records it in the event's field changes" do
+    actor = users(:one)
+    result = Users::Save.call(users(:two), attributes: { name: "Grace Hopper" }, actor: actor)
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "Grace Hopper", users(:two).reload.name
+    assert_equal [ nil, "Grace Hopper" ], Audit::Event.order(:id).last.field_changes["name"]
+  end
 end

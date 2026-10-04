@@ -10,12 +10,19 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <%# Product UI layout for sign-in and password reset: product stylesheet,
-      no public header/footer. color-scheme stays scoped to this body. %>
+  <%# Product UI layout for sign-in and password reset (handoff "Studio Sign
+      In"): product stylesheet, no public header/footer. The header is the
+      wordmark (a link home to sign-in) and the theme switch, with no rule
+      under it; the card sits in a centred max-w-sm column that is also
+      vertically centred on tall screens (64px is the header's height).
+      color-scheme stays scoped to this body. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
-    <div class="mx-auto flex max-w-xl flex-col gap-6 px-4 py-16">
-      <div class="flex justify-end"><%= render "shared/theme_toggle" %></div>
-      <main><%= yield %></main>
-    </div>
+    <header class="flex items-center justify-between px-7 py-5">
+      <%= link_to "Content·Spiel", admin_sign_in_path, class: "font-cs-mono text-xs font-bold uppercase tracking-wide text-ink" %>
+      <%= render Admin::ThemeSwitchComponent.new %>
+    </header>
+    <main class="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-sm items-center px-4 pb-16">
+      <div class="w-full"><%= yield %></div>
+    </main>
   </body>
 </html>

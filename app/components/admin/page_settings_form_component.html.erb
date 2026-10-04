@@ -35,7 +35,7 @@
     <div class="admin-column mb-4" data-field-name="page_type">
       <%= label_tag field_id("page_type"), "Page type", class: setup_label_class %>
       <%= select_tag field_html_name("page_type"), options_for_select(page_type_options, page.page_type),
-            id: field_id("page_type"), class: setup_input_class %>
+            id: field_id("page_type"), class: setup_select_class %>
       <div id="<%= errors_id("page_type") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 

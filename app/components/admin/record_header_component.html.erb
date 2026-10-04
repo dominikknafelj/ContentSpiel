@@ -1,11 +1,4 @@
 <header class="admin-record-header mb-6 flex flex-col gap-3 rounded-cs border border-line bg-surface p-4">
-  <% if notice.present? %>
-    <p role="status" class="text-sm text-ok-ink"><%= notice %></p>
-  <% end %>
-  <% if alert.present? %>
-    <p role="alert" class="text-sm text-danger-ink"><%= alert %></p>
-  <% end %>
-
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <h1 class="truncate text-h1 text-ink"><%= Locales.read(page, :title, locale: locale) %></h1>
@@ -26,9 +19,9 @@
       <% unless editable? %>
         <%= render "admin/shared/view_only_badge" %>
       <% end %>
-      <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
       <span data-status="<%= status %>">
-        <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
+        <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
       </span>
     </div>
   </div>
@@ -96,10 +89,10 @@
         (with the reason) only for the homepage -- a page with subpages
         moves its whole branch along (trash spec §4.1). %>
     <% if may_delete? && can_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button",
-            onclick: "document.getElementById('#{delete_dialog_id}').showModal()") %>
+      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline, type: "button",
+            data: dialog_trigger(delete_dialog_id)) %>
 
-      <%= render Admin::ConfirmDialogComponent.new(id: delete_dialog_id, title: "Move this page to the trash?", body: delete_dialog_body) do |dialog| %>
+      <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this page to the trash?", body: delete_dialog_body) do |dialog| %>
         <% dialog.with_confirm_action do %>
           <%= form_with url: helpers.admin_page_path(page, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
             <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
@@ -107,7 +100,7 @@
         <% end %>
       <% end %>
     <% elsif may_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "button", disabled: true, title: delete_disabled_reason) %>
+      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_outline, type: "button", disabled: true, title: delete_disabled_reason) %>
     <% end %>
   </div>
 </header>

@@ -1,7 +1,10 @@
+<% translate = show_original? ? translate_button : nil %>
 <div class="admin-column mb-4" data-field-name="<%= name %>">
   <p id="<%= label_id %>" class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></p>
 
   <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
+    <%# The editor and, under it, the suggestion box -- one grid cell. %>
+    <div class="min-w-0">
     <%# `admin--rich-text` (tiptap spec §4.1) -- see the class comment for
         every `data-*` value below. `relative` anchors the controller's own
         popovers (link, internal link, image, YouTube) to this editor. %>
@@ -21,14 +24,36 @@
           `data-field-name`'s concern. %>
       <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value, data: { "admin--rich-text-target": "input" } %>
 
+      <%# One row whenever it fits (design pass round 1, bug 5): grouped tools
+          with separators, and an Insert menu for everything that inserts. No
+          `overflow-x-auto` -- an overflow container would clip the menu's
+          absolutely positioned panel -- so a column too narrow for the whole row
+          (a translation field beside its original, in the page editor under the
+          tree column) wraps whole groups onto a second row (`flex-wrap`, and
+          groups are `shrink-0`) instead of spilling over its neighbour.
+          Children stretch (`items-stretch`) so every one shares the
+          row's top edge; the separators are full-height boxes whose rule is clipped to their
+          content box (`bg-clip-content` + `py-1`), shorter than the row without a margin that
+          would shift their top. Choosing a menu item closes the menu (`admin--menu#close`) before the
+          command runs; the command then moves focus (editor or popover). %>
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
-           class="flex flex-wrap gap-1 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
+           class="flex flex-wrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
            data-action="mousedown->admin--rich-text#keepFocus">
-        <% toolbar.each do |action, label, text, toggle| %>
-          <%= tag.button text, type: "button", title: label, "aria-label": label, "aria-pressed": (toggle ? "false" : nil),
-                "aria-haspopup": (%w[link internalLink image youtube].include?(action) ? "dialog" : nil),
-                class: "admin-rich-text-button min-w-8 cursor-pointer rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface aria-pressed:bg-accent-tint aria-pressed:text-accent data-active:bg-accent-tint data-active:text-accent",
-                data: { action: "admin--rich-text##{action}", "admin--rich-text-command": action } %>
+        <% toolbar_groups.each do |group| %>
+          <div role="group" class="flex shrink-0 items-center gap-0.5">
+            <% group.each do |action, label, text, toggle| %>
+              <%= tool_button(action, label, text, toggle, extra_class: "min-w-7") %>
+            <% end %>
+          </div>
+          <span role="separator" aria-orientation="vertical" class="mx-0.5 w-px shrink-0 bg-line bg-clip-content py-1"></span>
+        <% end %>
+        <%= render Admin::MenuComponent.new(label: "Insert ▾", align: :right,
+              button_class: "inline-flex cursor-pointer whitespace-nowrap items-center gap-1 rounded-cs px-2 py-1 font-cs-mono text-sm text-ink hover:bg-surface") do |menu| %>
+          <% insert_menu.each do |action, label, text, toggle| %>
+            <% menu.with_item do %>
+              <%= tool_button(action, label, text, toggle, extra_action: "click->admin--menu#close") %>
+            <% end %>
+          <% end %>
         <% end %>
       </div>
 
@@ -41,20 +66,18 @@
 
       <p class="mt-1 text-sm text-danger-ink" role="alert" data-admin--rich-text-target="message"></p>
     <% end %>
+    <%= render "admin/shared/translation_box", button: translate %>
+    </div>
 
     <% if show_original? %>
       <div class="rounded-cs border border-line bg-sunken px-3 py-2">
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <div data-original-for="<%= name %>" class="admin-rich-text-content text-ink"><%= original_html %></div>
-        <div data-translate-slot="<%= name %>"><% if (button = translate_button) %><%= render button %><% end %></div>
+        <div data-translate-slot="<%= name %>"><% if translate %><%= render translate %><% end %></div>
         <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>
   </div>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
-    <% errors.each do |message| %>
-      <p><%= message %></p>
-    <% end %>
-  </div>
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

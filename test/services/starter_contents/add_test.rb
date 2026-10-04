@@ -19,7 +19,7 @@ class StarterContents::AddTest < ActiveSupport::TestCase
   end
 
   test "an Editor (pages and posts, unscoped) may add it" do
-    editor = User.create!(email_address: "editor@example.com", password: "password123")
+    editor = User.create!(email_address: "editor@example.com", password: "password12345")
     AccessControl::Membership.create!(user: editor, group: access_control_groups(:editor))
 
     assert as(editor) { StarterContents::Add.call }.ok?

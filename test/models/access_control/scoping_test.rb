@@ -94,7 +94,7 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     grant!(group, "posts.edit", { "content_types" => [ "blog" ], "own" => true })
     grant!(group, "posts.create", { "own" => true })
     grant!(group, "pages.read", { "page_ids" => [ @b.id ] })
-    user = User.create!(email_address: "own-blog@example.com", password: "password")
+    user = User.create!(email_address: "own-blog@example.com", password: "password12345")
     group.memberships.create!(user: user)
     @posts.first.update!(author: user)
 

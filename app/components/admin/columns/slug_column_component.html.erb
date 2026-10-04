@@ -1,7 +1,7 @@
 <div class="admin-column mb-4" data-field-name="<%= name %>">
   <label class="<%= setup_label_class %> mb-1" for="<%= id %>">Slug</label>
 
-  <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: setup_input_class)) %>
+  <%= render Admin::PrefixInputComponent.new(name: html_name, id: id, value: value, prefix: prefix, errors: errors, **html) %>
 
   <%# `data-admin--slug-preview-target="output"` is always present, not
       passed in via `**html` the way the input's own target is (Task 4) --
@@ -12,13 +12,9 @@
       `data-controller="admin--slug-preview"` that never shows up (this
       component's own Lookbook preview, a post form before Task 6 adds this
       controller there) simply leaves the attribute inert. %>
-  <p class="mt-1 text-sm text-meta">
-    <span data-slug-preview-base><%= base_url %>/</span><span data-admin--slug-preview-target="output"><%= value %></span>
+  <p class="mt-1 font-cs-mono text-sm text-meta">
+    <span data-slug-preview-base><%= prefix %></span><span data-admin--slug-preview-target="output"><%= value %></span>
   </p>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
-    <% errors.each do |message| %>
-      <p><%= message %></p>
-    <% end %>
-  </div>
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

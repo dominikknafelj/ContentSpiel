@@ -1,15 +1,14 @@
-<dialog id="<%= id %>" class="admin-confirm-dialog rounded-cs border border-line-strong bg-surface p-6 shadow-menu">
-  <h2 class="text-h2 text-ink"><%= title %></h2>
+<%= render Admin::DialogComponent.new(id: id, title: title, width: :confirm, destructive: destructive) do |dialog| %>
   <% if body.present? %>
-    <p class="mt-2 text-ink"><%= body %></p>
+    <p class="text-ink"><%= body %></p>
   <% end %>
   <% if details? %>
     <div class="mt-2 text-ink"><%= details %></div>
   <% end %>
-  <div class="mt-4 flex justify-end gap-2">
+  <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>
-      <%= render Admin::ButtonComponent.new(label: cancel_label, variant: :secondary, type: "submit") %>
+      <%= render Admin::ButtonComponent.new(label: cancel_label, variant: :ghost, type: "submit", autofocus: destructive) %>
     <% end %>
     <%= confirm_action %>
-  </div>
-</dialog>
+  <% end %>
+<% end %>

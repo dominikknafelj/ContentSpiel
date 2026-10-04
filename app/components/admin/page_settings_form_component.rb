@@ -90,7 +90,9 @@ module Admin
     # appends to (`Admin::Columns::SlugColumnComponent`'s own doc comment).
     # Only ever called when `show_slug?` is true, so `page.parent` is never
     # nil here.
-    def slug_base_url = PublicSite::Urls.new.path_for(page.parent, locale) || ""
+    # Never ends in a slash -- the root page's path is "/", which would
+    # otherwise show "//slug" in front of its children (design pass bug 1).
+    def slug_base_url = (PublicSite::Urls.new.path_for(page.parent, locale) || "").sub(%r{/+\z}, "")
 
     def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
 

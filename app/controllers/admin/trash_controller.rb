@@ -1,6 +1,8 @@
 module Admin
   # The Trash screen (trash spec §7): everything the viewer could restore,
-  # newest first, 50 per page with the Media module's `limit(N+1)` paging.
+  # newest first, 50 per page, paged by page number (`Pagination`, design
+  # pass spec §4) with the total counted over the same scoped relations the
+  # rows are loaded from.
   # Items are loaded only through `AccessControl.scope(..., trashed: true)`
   # (pages and posts, keyed on their *delete* right, so a scoped
   # `pages.delete` narrows the list to its branch) or `Media::Asset.trashed`
@@ -24,15 +26,53 @@ module Admin
     PER_PAGE = 50
     MODELS = { "page" => Page, "post" => Post, "media" => Media::Asset }.freeze
 
+    # Trashed items of `type` ("page"/"post"/"media") that `actor` may act
+    # on, as a relation -- the one place that rule lives, shared by this
+    # screen (`visible`, `roots`) and the sidebar's Trash badge
+    # (`BaseController#trash_badge_count`), so the badge can never count
+    # something the list wouldn't show. Pages and posts go through
+    # `AccessControl.scope(..., trashed: true)` on their *delete* right;
+    # images are `Trash::ItemPermissions`' rule as a relation:
+    # `media.manage` sees every trashed image, an uploader with
+    # `media.upload` only their own (both admin-area keys, so holding one
+    # anywhere is holding it).
+    def self.visible(type, actor)
+      case type
+      when "page" then AccessControl.scope(actor, "pages.delete", Page.all, trashed: true)
+      when "post" then AccessControl.scope(actor, "posts.delete", Post.all, trashed: true)
+      when "media" then visible_assets(actor)
+      end
+    end
+
+    def self.visible_assets(actor)
+      scope = Media::Asset.trashed
+      return scope if AccessControl.holds?(actor, "media.manage")
+      return scope.where(created_by_id: actor.id) if actor.is_a?(User) && AccessControl.holds?(actor, "media.upload")
+
+      scope.none
+    end
+    private_class_method :visible_assets
+
+    # What the screen lists and counts: `visible`, narrowed for pages to
+    # branch roots (`trash_root_id = id`) -- a branch member shows as "+N
+    # subpages" under its root, never as a row (or a count) of its own.
+    def self.roots(type, actor)
+      relation = visible(type, actor)
+      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
+    end
+
+    # The total the sidebar badge shows: one COUNT per type over `roots`.
+    def self.badge_count(actor) = MODELS.keys.sum { |type| roots(type, actor).count }
+
     before_action :require_trash_access
     before_action :set_item, only: %i[restore purge]
 
     def index
       @type = params[:type].presence_in(MODELS.keys)
-      @offset = offset
-      items = listed_items
-      @has_next = items.size > PER_PAGE
-      @items = items.first(PER_PAGE)
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
+      # A page past the end shows the "back to page 1" notice and no rows:
+      # don't load `offset + 50` records per type just to drop them all.
+      @items = @pagination.out_of_range? ? [] : listed_items
       @retention_days = Current.site.trash_retention_days
     end
 
@@ -89,41 +129,36 @@ module Admin
       @item = visible(params[:type]).find(params[:id])
     end
 
-    def visible(type)
-      case type
-      when "page" then AccessControl.scope(Current.actor, "pages.delete", Page.all, trashed: true)
-      when "post" then AccessControl.scope(Current.actor, "posts.delete", Post.all, trashed: true)
-      when "media" then visible_assets
-      end
-    end
+    def visible(type) = self.class.visible(type, Current.actor)
 
-    # `Trash::ItemPermissions`' image rule, as a relation: `media.manage`
-    # sees every trashed image, an uploader with `media.upload` only their
-    # own. (`media.manage`/`media.upload` are admin-area keys, so holding
-    # one anywhere is holding it.)
-    def visible_assets
-      scope = Media::Asset.trashed
-      return scope if can?("media.manage")
-      return scope.where(created_by_id: Current.user.id) if Current.user && can?("media.upload")
+    def types = @type ? [ @type ] : MODELS.keys
 
-      scope.none
-    end
+    # What the rows are loaded from, before any eager loading: the sum of
+    # one scoped count per model. Each goes through `visible`
+    # (`AccessControl.scope` / the image rule) and, for pages, the
+    # branch-root filter -- so the total can never count a row the list
+    # wouldn't show.
+    def total_count = types.sum { |type| roots(type).count }
 
     # Merged in Ruby across the three tables: each source contributes at
-    # most `offset + PER_PAGE + 1` of its newest rows -- enough that the
-    # merged, re-sorted slice below is exactly what one query over a union
-    # would return -- and the one extra row is how `@has_next` is known
-    # without a `COUNT(*)`.
+    # most `offset + PER_PAGE` of its newest rows -- enough that the merged,
+    # re-sorted slice below is exactly what one query over a union would
+    # return -- and the merge then drops the earlier pages' rows. (The
+    # window grows with the page number, as the old offset paging's did;
+    # the page is capped at `Pagination::MAX_PAGE` only to keep the integer
+    # sane, and a page past the end simply merges to nothing.)
     def listed_items
-      window = @offset + PER_PAGE + 1
-      sources = (@type ? [ @type ] : MODELS.keys).map { |type| listed(type).order(trashed_at: :desc, id: :desc).limit(window).to_a }
-      sources.flatten.sort_by { |item| [ -item.trashed_at.to_r, -item.id ] }.drop(@offset).first(PER_PAGE + 1)
+      window = @pagination.offset + PER_PAGE
+      sources = types.map { |type| listed(type).order(trashed_at: :desc, id: :desc).limit(window).to_a }
+      sources.flatten.sort_by { |item| [ -item.trashed_at.to_r, -item.id ] }.drop(@pagination.offset).first(PER_PAGE)
     end
 
+    def roots(type) = self.class.roots(type, Current.actor)
+
     def listed(type)
-      relation = visible(type).includes(:trashed_by)
+      relation = roots(type).includes(:trashed_by)
       case type
-      when "page" then relation.where("pages.trash_root_id = pages.id").includes(:parent)
+      when "page" then relation.includes(:parent)
       when "media" then relation.with_variants
       else relation
       end
@@ -166,10 +201,5 @@ module Admin
     end
 
     def title_of(item) = item.title.presence || "Untitled"
-
-    def offset
-      raw = params[:offset].to_i
-      raw.positive? ? raw : 0
-    end
   end
 end

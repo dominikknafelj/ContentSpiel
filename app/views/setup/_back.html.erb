@@ -1,0 +1,6 @@
+<%# "Back" as a plain text link to the previous step (nothing on the first
+    step, and none from "site" back to the account step -- see
+    SetupController#previous_step). %>
+<% if previous_step %>
+  <%= link_to "Back", setup_step_path(previous_step), class: "text-sm text-accent underline hover:no-underline" %>
+<% end %>

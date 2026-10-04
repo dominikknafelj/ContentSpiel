@@ -22,7 +22,8 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   test "the pages index shows the tree with status and child counts" do
     get "/cs-studio/pages"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
-      assert_select "[data-status='live']"
+      # The tree hides Live: only a draft or scheduled page gets a chip.
+      assert_select "[data-status='live']", count: 0
       assert_select "[data-child-count]", text: "1"
     end
   end
@@ -32,6 +33,46 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal @b, @child.reload.parent
     assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+  end
+
+  test "a move answers with an Undo toast that puts the page back where it was" do
+    # @child was alone under @a (rank 0); drop it under @b at rank 0.
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action='append'][target='toasts'] .admin-toast[data-kind='undo']", text: /Moved .Child./
+    undo = css_select("turbo-stream[target='toasts'] form").first
+    assert_equal "patch", css_select(undo, "input[name='_method']").first["value"]
+    undo_query = Rack::Utils.parse_nested_query(URI.parse(undo["action"]).query)
+    assert_equal({ "page_id" => @child.id.to_s, "parent_id" => @a.id.to_s, "position" => "0", "undo" => "1" }, undo_query)
+
+    # Posting that form's own URL goes through the ordinary service again.
+    patch undo["action"], as: :turbo_stream
+    assert_response :success
+    assert_equal @a, @child.reload.parent
+    # An Undo is confirmed plainly: no second Undo to bounce between the two.
+    assert_select "turbo-stream[target='toasts'] .admin-toast", text: /undone/i
+    assert_select "turbo-stream[target='toasts'] .admin-toast form", count: 0
+  end
+
+  test "Undo records the rank among siblings, not the stored position" do
+    third = create_page(title: "Third")
+    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: root_page.id, position: 2 }, as: :turbo_stream
+    undo = css_select("turbo-stream[target='toasts'] form").first
+    assert_equal "0", Rack::Utils.parse_nested_query(URI.parse(undo["action"]).query)["position"]
+    patch undo["action"], as: :turbo_stream
+    assert_equal [ @a, @b, third ], root_page.reload.children.order(:position).to_a
+  end
+
+  test "a drop that changes nothing offers no Undo" do
+    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: root_page.id, position: 0 }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[target='toasts']", count: 0
+  end
+
+  test "a refused move offers no Undo" do
+    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: @child.id, position: 0 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[target='toasts']", count: 0
   end
 
   test "an invalid move re-renders the tree unchanged with an error" do

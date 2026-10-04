@@ -12,26 +12,45 @@
 
   <%# scheme-light/dark:scheme-dark: native controls and the canvas follow
       the token theme. Scoped to this product layout on purpose -- a global
-      color-scheme would restyle the public site for dark-OS visitors. %>
+      color-scheme would restyle the public site for dark-OS visitors.
+      Header as on sign-in (handoff "Setup Wizard"); below it a card with the
+      numbered step list on the left. Done steps carry a check and read dim,
+      the current one is ink and medium weight, optional ones are marked in
+      mono. The steps are not links: each persists as submitted and the order
+      is fixed. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
-    <div class="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-10 md:flex-row">
-      <nav aria-label="Setup steps" class="shrink-0 md:w-56">
-        <p class="font-cs-mono text-label uppercase tracking-mono text-meta">ContentSpiel setup</p>
-        <ol class="mt-4 space-y-2">
+    <header class="flex items-center justify-between px-7 py-5">
+      <span class="font-cs-mono text-xs font-bold uppercase tracking-wide">Content·Spiel</span>
+      <div class="flex items-center gap-4">
+        <span class="hidden font-cs-mono text-label uppercase tracking-mono text-meta sm:inline">First-run setup</span>
+        <%= render Admin::ThemeSwitchComponent.new %>
+      </div>
+    </header>
+
+    <div class="mx-auto grid max-w-4xl gap-0 px-4 pb-16 md:grid-cols-[14rem_minmax(0,1fr)]">
+      <nav aria-label="Setup steps" class="rounded-t-cs border border-line bg-paper px-3 py-6 md:rounded-l-cs md:rounded-tr-none md:border-r-0">
+        <ol class="space-y-0.5">
           <% SetupController::STEPS.each_with_index do |step, index| %>
-            <%= tag.li class: (step == @step ? "font-semibold text-ink" : "text-dim"), aria: { current: ("step" if step == @step) } do %>
-              <span class="font-cs-mono text-meta"><%= index + 1 %></span>
-              <%= step_label(step) %>
+            <% current = step == @step %>
+            <% done = setup_step_done?(step, @step) %>
+            <%= tag.li class: "flex items-center gap-3 rounded-cs px-2.5 py-2 #{current ? "bg-sunken font-medium text-ink" : "text-dim"}", aria: { current: ("step" if current) } do %>
+              <span class="w-4 font-cs-mono text-xs <%= done ? "text-ok-ink" : "text-meta" %>">
+                <% if done %>
+                  <span aria-hidden="true">✓</span><span class="sr-only">Done: </span>
+                <% else %>
+                  <%= index + 1 %>
+                <% end %>
+              </span>
+              <span class="flex-1"><%= step_label(step) %></span>
               <% if optional_step?(step) %>
                 <span class="font-cs-mono text-label uppercase tracking-mono text-meta">optional</span>
               <% end %>
             <% end %>
           <% end %>
         </ol>
-        <div class="mt-6"><%= render "shared/theme_toggle" %></div>
       </nav>
 
-      <main class="flex-1 rounded-cs border border-line bg-surface p-6">
+      <main class="min-h-[32rem] rounded-b-cs border border-line bg-surface p-6 md:rounded-r-cs md:rounded-bl-none md:p-10">
         <%= render "setup/flash" %>
         <%= yield %>
       </main>

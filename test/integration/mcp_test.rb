@@ -8,7 +8,7 @@ require "test_helper"
 # `update_post_tool`, a malformed call, and an invalid token.
 class McpTest < ActionDispatch::IntegrationTest
   setup do
-    @user = User.create!(email_address: "agent@example.com", password: "password123")
+    @user = User.create!(email_address: "agent@example.com", password: "password12345")
     # The token acts within the intersection of its group and its user's
     # own rights (access-control design spec §3.3), so the user needs some
     # of their own -- a user in no group can't write anything, token or not.

@@ -7,24 +7,22 @@
     ::DetailComponent`'s own). %>
 <h1 class="mb-4 text-h1 text-ink">Media</h1>
 
-<%# `flash[:undo]` (Task 10's "Moved “hero.png” to the trash", Undo) -- see
-    `admin/pages/index.html.erb`'s own comment for why `symbolize_keys` is
-    needed here. %>
-<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert], action: flash[:undo]&.symbolize_keys) %>
-
-<div class="mb-6 rounded-cs border border-dashed border-line-strong p-4"
+<%# The wrapper keeps `admin--media-upload`'s own dragover/drop (a drop anywhere
+    on it uploads); the FileDropComponent inside is the visible zone and the
+    labelled file input, and stops its own drops from reaching that handler
+    twice (file_drop_controller.js). %>
+<div class="mb-6"
      data-controller="admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
      data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
-  <%= label_tag "media-upload-input", "Upload images", class: setup_label_class %>
-  <%= file_field_tag "media-upload-input", multiple: true, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","),
-        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" },
-        class: "mt-1 block text-sm text-ink" %>
-  <p class="mt-1 text-sm text-meta">Or drag and drop images here.</p>
+  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
+        hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
+        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
   <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
 </div>
 
-<%= form_with url: admin_media_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
+<% filter_keys = %i[q filter] %>
+<%= form_with(**filter_form_options(admin_media_path(**admin_url_options))) do %>
   <% if admin_locale != Locales.default %>
     <%= hidden_field_tag :locale, admin_locale %>
   <% end %>
@@ -37,24 +35,21 @@
   <div>
     <%= label_tag :filter, "Show", class: setup_label_class %>
     <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-          class: setup_input_class %>
+          class: setup_select_class %>
   </div>
 
-  <%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %>
-  <%= link_to "Clear", admin_media_path(**admin_url_options), class: setup_secondary_link_class %>
+  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <%= filter_clear_link(admin_media_path(**admin_url_options), filter_keys) %>
 <% end %>
 
-<%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
-
-<% if @has_next || @offset.positive? %>
-  <div class="mt-4 flex items-center gap-3">
-    <% if @offset.positive? %>
-      <%= link_to "Previous", admin_media_path(request.query_parameters.merge("offset" => [ @offset - Admin::MediaController::PER_PAGE, 0 ].max)),
-            class: setup_secondary_link_class %>
-    <% end %>
-    <% if @has_next %>
-      <%= link_to "Next", admin_media_path(request.query_parameters.merge("offset" => @offset + Admin::MediaController::PER_PAGE)),
-            class: setup_secondary_link_class %>
-    <% end %>
-  </div>
+<% page_url = ->(page) { admin_media_path(list_params(:q, :filter).merge("page" => page)) } %>
+<% if @pagination.out_of_range? %>
+  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+<% else %>
+  <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
+  <% if @pagination.total_pages > 1 %>
+    <div class="mt-4 rounded-cs border border-line bg-surface">
+      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+    </div>
+  <% end %>
 <% end %>

@@ -3,7 +3,7 @@
 <p class="mt-2 text-dim">How your site introduces itself. You can change all of this later in the admin under Site settings.</p>
 
 <%= form_with model: @site_setting, url: setup_step_path("site"), method: :patch, class: "mt-6 space-y-4" do |form| %>
-  <%= render "setup/errors", record: @site_setting %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: @site_setting.errors) %>
   <div>
     <%= form.label :title, "Site title", class: setup_label_class %>
     <%= form.text_field :title, value: @site_setting.title(locale: @site_setting.default_locale), required: true, class: setup_input_class %>
@@ -14,7 +14,9 @@
   </div>
   <div>
     <%= form.label :logo, class: setup_label_class %>
-    <%= form.file_field :logo, accept: "image/*", class: "mt-1 block text-dim" %>
+    <%# The drop zone's Stimulus controller lives in controllers/ (not
+        controllers/admin/) because setup loads only the `application` entry. `form.label :logo` above points at this id. %>
+    <%= render Admin::FileDropComponent.new(name: "site_setting[logo]", id: "site_setting_logo", accept: "image/*", label: "Logo") %>
   </div>
 
   <fieldset>
@@ -33,5 +35,8 @@
     </div>
   </fieldset>
 
-  <%= form.submit "Save and continue", class: setup_primary_button_class %>
+  <div class="flex items-center gap-4">
+    <%= render Admin::ButtonComponent.new(label: "Continue", type: "submit") %>
+    <%= render "setup/back" %>
+  </div>
 <% end %>

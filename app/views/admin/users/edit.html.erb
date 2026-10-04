@@ -7,40 +7,49 @@
     <%# The Activity link (design spec §5 "Audit log module", Task 9):
         opens the audit log filtered to this user -- visible only with
         `audit.view`, the same permission `Admin::AuditEventsController`
-        itself requires (access-control design spec §5 "Everywhere"). %>
+        itself requires (access-control design spec §5 "Everywhere").
+        `_top`, not the content frame it sits in: the leave guard
+        (`admin--save-bar`) listens for Turbo Drive visits, and a frame
+        navigation fires none -- in the frame this link would throw away
+        typed changes without asking. %>
     <% if can?("audit.view") %>
-      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), class: setup_secondary_link_class %>
+      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), data: { turbo_frame: "_top" }, class: setup_secondary_link_class %>
     <% end %>
   </div>
 
-  <% if @user.errors.any? %>
-    <p class="mb-4 text-danger-ink" role="alert"><%= @user.errors.full_messages.to_sentence %></p>
-  <% end %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
-  <%= form_with url: admin_user_path(@user, **admin_url_options), method: :patch do %>
+  <%= form_with url: admin_user_path(@user, **admin_url_options), method: :patch, id: "user-form", data: save_bar_form_data(dirty: @user.errors.any?) do %>
     <div class="mb-4">
-      <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
-      <%= email_field_tag "user[email_address]", @user.email_address, id: "user_email_address", autofocus: true,
-            autocomplete: "username", class: setup_input_class %>
+      <%= label_tag "user_name", "Name", class: setup_label_class %>
+      <%= text_field_tag "user[name]", @user.name, id: "user_name", maxlength: 120, autocomplete: "name",
+            aria: { describedby: "user_name_help", invalid: (@user.errors.include?(:name) ? "true" : nil) }.compact,
+            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:name)) ] %>
+      <p id="user_name_help" class="mt-1 text-sm text-meta">Optional. Shown instead of the email.</p>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "user_password", "New password", class: setup_label_class %>
-      <%= password_field_tag "user[password]", nil, id: "user_password", autocomplete: "new-password", class: setup_input_class %>
+      <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
+      <%= email_field_tag "user[email_address]", @user.email_address, id: "user_email_address", autofocus: true,
+            autocomplete: "username", aria: { invalid: (@user.errors.include?(:email_address) ? "true" : nil) }.compact,
+            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:email_address)) ] %>
+    </div>
+
+    <%# No `data-password-submit` on this form's button: a blank password
+        means "keep the current one" here (Users::Save), so the meter must
+        not hold the submit back; the server still enforces the minimum
+        on a typed one. %>
+    <div class="mb-4">
+      <%= render Admin::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "New password", meter: true, required: false) %>
       <p class="mt-1 text-sm text-meta">Leave blank to keep the current password.</p>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "user_password_confirmation", "Confirm new password", class: setup_label_class %>
-      <%= password_field_tag "user[password_confirmation]", nil, id: "user_password_confirmation",
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm new password", required: false) %>
     </div>
 
     <%= render "admin/users/access_fields", user: @user %>
 
-    <div class="flex gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Save changes", variant: :primary, type: "submit") %>
-      <%= link_to "Cancel", admin_users_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-    </div>
+    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save changes") %>
   <% end %>
 </div>
