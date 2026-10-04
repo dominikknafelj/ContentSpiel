@@ -307,7 +307,17 @@ What exists: one application cache (the rich-text body render, `app/models/rich_
 - Shape: "Clear cache" under System (its own permission, for example `cache.clear`, seeded onto Admin; an `ApplicationService` that records `cache.cleared`), and "Clear this page's cache" in the editor's ⋯ menu for when one page looks wrong. The per-page action can delete that page's entries per language, or simply bump the site version too; start with whichever is simpler.
 - When a CDN exists, the same service also calls its purge API (C4).
 
-Order: S7's version row and S8, then C1 with C6, then C2, C3 and C4.
+### C7. Public caching is a per-instance setting — requested by the user
+- Installations differ: one box behind Thruster, a CDN in front, or nothing at all. What goes out to shared caches therefore belongs in CS Studio's Settings, not in code. This also fits the generic-CMS direction.
+- **Always on, not configurable:** the Rails-side whole-page cache (C1). It is correct for every installation and is what makes a publish or the Clear cache button instant.
+- **Settings → "Caching"** (behind `settings.manage`, reachable from ⌘K's Settings group):
+  - *Shared cache lifetime* in seconds, sent as `s-maxage`. Default 0: every request revalidates, which is safe with no CDN and no purge. The screen says plainly that a value above 0 delays a publish by up to that long unless a CDN purge is configured.
+  - *CDN*: a provider and its credentials. A registry like `AI::Providers` (`none` built in, one real provider to start, plugins as `owner/name`), each answering `purge_all`, `purge(urls)` and `test_connection`. Credentials follow the AI key's pattern exactly: `encrypts`, their own Save / Remove form outside the settings autosave, never rendered, logged or put in an audit snapshot.
+- **Purging runs in a job, never in the web request.** The AI translation calls show what an external call inside a request costs with three Puma threads. The version bump enqueues it after commit; the Clear cache button (C6) bumps the version and enqueues `purge_all`.
+- **Deploy-time, not a setting:** the asset host and where Active Storage serves images from (C2). Those are infrastructure choices made with the deploy, like the encryption keys.
+- Later, if a CDN supports it: `Cache-Tag` / `Surrogate-Key` headers per page, so a purge can be narrower than the whole site.
+
+Order: S7's version row and S8, then C1 with C6, then C7's lifetime setting, C2, C3, and C4 as C7's CDN provider.
 
 ## 10. Checked and found sound
 
