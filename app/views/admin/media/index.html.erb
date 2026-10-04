@@ -42,7 +42,7 @@
   <%= filter_clear_link(admin_media_path(**admin_url_options), filter_keys) %>
 <% end %>
 
-<% page_url = ->(page) { admin_media_path(request.query_parameters.merge("page" => page)) } %>
+<% page_url = ->(page) { admin_media_path(list_params(:q, :filter).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>

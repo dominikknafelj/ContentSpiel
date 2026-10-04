@@ -29,6 +29,20 @@ class Admin::TimeAgoComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "Nd ago counts calendar days, like yesterday does" do
+    travel_to Time.zone.local(2026, 10, 3, 14, 0) do
+      render_inline(Admin::TimeAgoComponent.new(time: 47.hours.ago)) # Oct 1, 15:00: two calendar days back
+      assert_selector "time", exact_text: "2d ago"
+    end
+  end
+
+  test "a future time in another year names the year" do
+    travel_to Time.zone.local(2026, 10, 3, 14, 0) do
+      render_inline(Admin::TimeAgoComponent.new(time: Time.zone.local(2027, 1, 5, 9, 30)))
+      assert_selector "time", exact_text: "5 Jan 2027, 09:30"
+    end
+  end
+
   test "days are the site zone's, not UTC's" do
     travel_to Time.utc(2026, 10, 3, 22, 30) do
       Time.use_zone("Europe/Berlin") do # 00:30 on the 4th

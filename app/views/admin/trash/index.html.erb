@@ -19,7 +19,7 @@
   <% end %>
 </nav>
 
-<% page_url = ->(page) { admin_trash_path(request.query_parameters.merge("page" => page)) } %>
+<% page_url = ->(page) { admin_trash_path(list_params(:type).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>

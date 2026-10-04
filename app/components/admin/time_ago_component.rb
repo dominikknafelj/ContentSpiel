@@ -30,14 +30,15 @@ module Admin
 
     def phrase
       now = Time.zone.now
-      return time.strftime("%-d %b, %H:%M") if time > now
+      return time.strftime(time.year == now.year ? "%-d %b, %H:%M" : "%-d %b %Y, %H:%M") if time > now
 
       seconds = now - time
       return "just now" if seconds < 1.minute
       return "#{(seconds / 1.minute).floor}m ago" if seconds < 1.hour && time.to_date == now.to_date
       return "#{(seconds / 1.hour).floor}h ago" if seconds < 1.day && time.to_date == now.to_date
       return "yesterday" if time.to_date == now.to_date - 1
-      return "#{(seconds / 1.day).floor}d ago" if seconds < 7.days
+      days = (now.to_date - time.to_date).to_i
+      return "#{days}d ago" if days < 7
       return time.strftime("%-d %b") if time.year == now.year
 
       time.strftime("%-d %b %Y")

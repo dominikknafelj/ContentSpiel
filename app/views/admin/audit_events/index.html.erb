@@ -103,11 +103,11 @@
   <% if @offset.positive? || @has_next %>
     <div class="flex items-center justify-center gap-3 border-t border-line px-4 py-3">
       <% if @offset.positive? %>
-        <%= link_to "Newer", admin_audit_events_path(request.query_parameters.merge("offset" => [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max)),
+        <%= link_to "Newer", admin_audit_events_path(list_params(*filter_keys).merge("offset" => [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max)),
               class: setup_secondary_link_class %>
       <% end %>
       <% if @has_next %>
-        <%= link_to "Load older", admin_audit_events_path(request.query_parameters.merge("offset" => @offset + Admin::AuditEventsController::PER_PAGE)),
+        <%= link_to "Load older", admin_audit_events_path(list_params(*filter_keys).merge("offset" => @offset + Admin::AuditEventsController::PER_PAGE)),
               class: setup_secondary_link_class %>
       <% end %>
     </div>
