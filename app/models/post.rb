@@ -133,6 +133,7 @@ class Post < ApplicationRecord
     object = fields(locale:) or return
 
     object.assign(hash)
+    object.rejected_inputs.each { |name| rejected_field_inputs[name] = "Use the form yyyy-mm-dd" }
     self.metadata = object.untranslated_hash
     self.translated_metadata = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
   end
@@ -157,8 +158,16 @@ class Post < ApplicationRecord
   # that saved correctly the moment those two locales disagree.
   def fields_are_valid
     object = fields(locale: Locales.default) or return
+    # Text a date field was handed that isn't `yyyy-mm-dd` (`#assign_fields`)
+    # never reached the stored value, so `object` can't see it: reported here,
+    # as the message alone (`post/fields.format` in en.yml leaves a message to
+    # carry its own label, so this one needn't).
+    rejected_field_inputs.each { |name, message| errors.add("fields.#{name}", :invalid, message: message) }
     return if object.valid?
 
-    object.errors.each { |error| errors.add("fields.#{error.attribute}", error.type, message: error.message) }
+    object.errors.each { |error| errors.add("fields.#{error.attribute}", error.type, message: "#{error.attribute.to_s.humanize} #{error.message}") }
   end
+
+  # field name => message, for input a typed field couldn't be built from.
+  def rejected_field_inputs = (@rejected_field_inputs ||= {})
 end

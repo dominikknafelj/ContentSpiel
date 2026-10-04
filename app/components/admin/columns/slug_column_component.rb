@@ -15,9 +15,10 @@ module Admin
     # later" pattern in `Admin::FieldComponent`) without this component
     # needing to know about that controller yet.
     class SlugColumnComponent < Base
-      def initialize(value:, base_url:, name: "slug", original: nil, errors: [], locale: nil, id: nil, html_name: nil, **html)
+      def initialize(value:, base_url:, name: "slug", original: nil, errors: [], locale: nil, id: nil, html_name: nil, help: nil, **html)
         super(name: name, value: value, original: original, errors: errors, locale: locale, id: id, html_name: html_name, **html)
         @base_url = base_url
+        @help = help
       end
 
       # The part of the public URL in front of the slug, shown in the prefix
@@ -33,7 +34,10 @@ module Admin
 
       private
 
-      attr_reader :base_url
+      # One line under the live URL telling an editor what editing the slug
+      # does ("Changing it leaves a redirect from the old address") -- the
+      # caller's, because it names the record ("page's", "post's").
+      attr_reader :base_url, :help
     end
   end
 end

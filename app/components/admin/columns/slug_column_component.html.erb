@@ -15,6 +15,9 @@
   <p class="mt-1 font-cs-mono text-sm text-meta">
     <span data-slug-preview-base><%= prefix %></span><span data-admin--slug-preview-target="output"><%= value %></span>
   </p>
+  <% if help %>
+    <p class="mt-1 text-xs text-meta"><%= help %></p>
+  <% end %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

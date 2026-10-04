@@ -17,4 +17,11 @@ class Admin::Fields::BooleanFieldTest < ViewComponent::TestCase
 
     refute_selector "input[type=checkbox][checked]"
   end
+
+  test "is a toggle: a switch-role checkbox after its hidden 0" do
+    field = Field.new(name: "featured", type: :boolean, options: {})
+    render_inline Admin::Fields::BooleanField.new(field:, form_name: "post[fields]", value: true, locale: "en")
+
+    assert_selector "input[type=hidden][name='post[fields][featured]'][value='0'] + input.cs-toggle[type=checkbox][role=switch][checked]", visible: :all
+  end
 end

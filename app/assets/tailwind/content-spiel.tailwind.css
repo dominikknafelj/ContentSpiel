@@ -153,6 +153,40 @@
 .cs-checkbox:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
 .cs-checkbox:disabled { cursor: not-allowed; opacity: 0.5; }
 
+/* Toggle switch (Admin::Fields::BooleanField, design pass round 2): still a
+   checkbox, so the form posts and autosaves it like one, drawn as a pill
+   (the one place the system allows 999px, besides avatars and tag chips).
+   The knob is a pseudo-element moved by :checked -- tokens only, so both
+   themes follow, and the motion is the system's own --cs-ease. */
+.cs-toggle {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--cs-line-strong);
+  background: var(--cs-sunken);
+  cursor: pointer;
+  transition: background-color 150ms var(--cs-ease), border-color 150ms var(--cs-ease);
+}
+.cs-toggle::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: calc(1.25rem - 8px);
+  height: calc(1.25rem - 8px);
+  border-radius: 999px;
+  background: var(--cs-meta);
+  transition: transform 150ms var(--cs-ease), background-color 150ms var(--cs-ease);
+}
+.cs-toggle:checked { background: var(--cs-accent); border-color: var(--cs-accent); }
+.cs-toggle:checked::before { transform: translateX(1rem); background: var(--cs-surface); }
+.cs-toggle:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 2px; }
+.cs-toggle:disabled { cursor: not-allowed; opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) { .cs-toggle, .cs-toggle::before { transition: none; } }
+
 /* Invalid field border, derived from the error slot's content (design pass
    spec §4). Autosave streams replace a field's error slot but never its input,
    so the border can't be a class set at render time: it would stay red after

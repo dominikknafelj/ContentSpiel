@@ -108,6 +108,13 @@ module Admin
 
     def translation_tab? = locale.to_s != ::Locales.default
 
+    # The type's own fields (and, on a translation tab, the read-only list of
+    # the ones shared by every language) are one titled group; a type with
+    # none draws no empty group.
+    def fields_group? = schema_fields.any? || shared_fields.any?
+
+    def fields_group_title = "#{definition&.label || post.content_type.to_s.humanize} fields"
+
     # `[label, value]` for every untranslated field, read from the original
     # language (an untranslated field's one value lives there). Empty off a
     # translation tab, where those fields are ordinary inputs.

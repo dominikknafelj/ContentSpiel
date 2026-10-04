@@ -19,4 +19,11 @@ class Admin::Fields::SelectFieldTest < ViewComponent::TestCase
     assert_selector "option[value='medium'][selected]", text: "medium"
     assert_selector "option[value='small']", text: "small"
   end
+
+  test "is the styled select" do
+    field = Field.new(name: "size", type: :select, options: { options: %w[small medium] })
+    render_inline Admin::Fields::SelectField.new(field:, form_name: "post[fields]", value: "small", locale: "en")
+
+    assert_selector "select.cs-select[name='post[fields][size]']"
+  end
 end

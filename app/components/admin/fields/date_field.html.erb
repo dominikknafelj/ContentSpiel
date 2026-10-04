@@ -1,1 +1,6 @@
-<%= tag.input type: "date", name: input_name, id: input_id, value: iso_value, class: setup_input_class, required: field.required? %>
+<%# A mono `yyyy-mm-dd` text input, not a browser date picker (design pass round 2, handoff §9 B23):
+    the picker's own locale format, popup and keyboard rules differ per browser. Still submitted as the
+    same param; `Post#assign_fields` refuses anything that isn't that exact form ("Use the form yyyy-mm-dd"). %>
+<%= tag.input type: "text", name: input_name, id: input_id, value: iso_value, class: [ setup_input_class, "font-cs-mono" ],
+      inputmode: "numeric", pattern: "\\d{4}-\\d{2}-\\d{2}", placeholder: "yyyy-mm-dd", maxlength: 10, autocomplete: "off",
+      required: field.required? %>

@@ -17,6 +17,12 @@ module Admin
   class PageSettingsFormComponent < AdminComponent
     ID_PREFIX = "page"
 
+    # The soft lengths under SEO (handoff §9 B22): what search results show
+    # before cutting a title or description off. Counters only -- a longer
+    # value still saves.
+    META_TITLE_LIMIT = 60
+    META_DESCRIPTION_LIMIT = 160
+
     def initialize(page:, locale:, url_options: {})
       @page = page
       @locale = locale

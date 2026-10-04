@@ -40,6 +40,13 @@ en:
         ai_api_key: "AI API key"
     errors:
       models:
+        # A content type's typed field errors are added to a post as
+        # `fields.<name>` (Post#fields_are_valid), which Rails would prefix
+        # "Fields company ...". The message carries its own label instead, so
+        # an error that is a whole instruction ("Use the form yyyy-mm-dd") can
+        # stand alone.
+        post/fields:
+          format: "%{message}"
         user:
           attributes:
             # The password length rule's message is a whole sentence

@@ -51,4 +51,18 @@ class Admin::Fields::GroupsFieldTest < ViewComponent::TestCase
       assert_selector "[data-admin--groups-target='row']", count: 0
     end
   end
+
+  # Design pass round 2 (handoff §9 B23): bordered rows with a handle, an ×
+  # that names what it removes, and "+ Add <singular>".
+  test "rows have a handle, an x remove button with an accessible name, and a + Add button" do
+    with_test_types do
+      field = Field.new(name: "speakers", type: :groups, options: { of: "test/speaker" })
+      render_inline Admin::Fields::GroupsField.new(field:, form_name: "post[fields]", value: [ { "name" => "Ada" } ], locale: "en")
+
+      singular = FieldGroups.fetch("test/speaker").label.to_s.singularize
+      assert_selector "[data-admin--groups-target='row'].border .admin-groups-field__handle"
+      assert_selector "[data-admin--groups-target='row'] button[aria-label='Remove #{singular}'][data-action='click->admin--groups#remove']", text: "×"
+      assert_selector "button[data-action='click->admin--groups#add']", text: "+ Add #{singular}"
+    end
+  end
 end

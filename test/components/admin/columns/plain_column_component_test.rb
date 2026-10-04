@@ -13,6 +13,14 @@ class Admin::Columns::PlainColumnComponentTest < ViewComponent::TestCase
     assert_selector "textarea[name=meta_description]", text: "A description"
   end
 
+  test "a soft counter counts code points and turns to a warning past its limit" do
+    render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", value: "ab😀", counter: 60)
+    assert_selector "[data-admin--char-count-target=output].text-meta", text: "3 / 60"
+
+    render_inline Admin::Columns::PlainColumnComponent.new(name: "meta_title", value: "x" * 70, counter: 60)
+    assert_selector "[data-admin--char-count-target=output].text-warn-ink", text: "70 / 60 · long"
+  end
+
   test "shows the read-only original and errors" do
     render_inline Admin::Columns::PlainColumnComponent.new(name: "caption", value: nil, original: "Bildunterschrift", errors: [ "is too long" ])
 

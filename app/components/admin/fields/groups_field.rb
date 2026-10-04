@@ -53,7 +53,12 @@ module Admin
 
       def subfield_original(index, subfield) = read_field(original_rows[index], subfield.name)
 
-      def add_label = "Add #{group_definition.label.to_s.singularize}"
+      def singular = group_definition.label.to_s.singularize
+
+      def add_label = "Add #{singular}"
+
+      # The × says only "×" on screen, so a screen reader needs what it removes.
+      def remove_label = "Remove #{singular}"
     end
   end
 end

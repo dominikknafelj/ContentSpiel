@@ -116,6 +116,41 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_select "#editor-notice:empty"
   end
 
+  # Design pass round 2 (handoff §9 B23): the type's own fields are one group
+  # between Excerpt and Body, titled with the type's label.
+  test "the content type's fields sit in their own titled group between Excerpt and Body" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_response :success
+    assert_select "[data-editor-fields-group] [data-fields-group-title]", text: "Resume entry fields"
+    assert_select "[data-editor-fields-group] input[name='post[fields][start_date]'][type=text][pattern][placeholder='yyyy-mm-dd']"
+    assert_select "[data-editor-fields-group] select.cs-select[name='post[fields][role_type]']"
+    body = response.body
+    assert body.index('data-field-name="excerpt"') < body.index("data-editor-fields-group")
+    assert body.index("data-editor-fields-group") < body.index('data-field-name="body"')
+  end
+
+  test "a date typed in the wrong form is a field error after the save, not a 500" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "2024-13-45" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select_in_stream "post-start_date-errors", /Use the form yyyy-mm-dd/
+    assert_nil post_record.reload.fields.start_date
+  end
+
+  test "only a strict yyyy-mm-dd date is accepted" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "20240101" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "2024-01-31" } }, base_updated_at: post_record.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal Date.new(2024, 1, 31), post_record.reload.fields.start_date
+  end
+
   test "typed fields and tags autosave" do
     post_record = create_post(title: "Engineer", content_type: "resume_entry")
     patch "/cs-studio/posts/#{post_record.id}",
