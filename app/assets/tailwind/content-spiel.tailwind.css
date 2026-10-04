@@ -252,6 +252,13 @@
    and never over an error, whose red border stays. Warn is a hue, not the only
    cue: the placeholder says "Add alt text" and the tile says NO ALT. */
 .admin-media-alt-warn .admin-column:not(:has(> [id$="-errors"] > p)) :is(input, textarea):placeholder-shown { border-color: var(--cs-warn); }
+/* A tag's name in the Tags list (handoff §4.9: "rename inline by clicking the
+   name") reads as text until it is hovered or focused. The row's form is an
+   `.admin-column` (its error slot colours the input red), so the rule above
+   would otherwise draw the resting border the input's own `border-transparent`
+   utility asks not to have: unlayered CSS wins over a utility. Only the resting,
+   valid state is touched -- hover, focus and an error keep their borders. */
+.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; }
 
 /* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the

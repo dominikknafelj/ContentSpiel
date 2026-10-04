@@ -25,7 +25,7 @@
           <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center justify-end gap-2", data: { turbo_frame: "_top" } do %>
             <%= hidden_field_tag :tab, tab, id: nil %>
             <%= label_tag parent_select_id, "Restore under", class: "text-sm text-meta" %>
-            <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: setup_select_class,
+            <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: "#{setup_select_class} !w-auto max-w-56",
                   disabled: parent_choices.blank? %>
             <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: parent_choices.blank?) %>
           <% end %>

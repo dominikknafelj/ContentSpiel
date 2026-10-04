@@ -13,7 +13,11 @@
         Items are deleted for good after <%= pluralize(@retention_days, "day") %>.
       <% end %>
       <% if can?("settings.manage") %>
-        <%= link_to "Change", admin_settings_path(**admin_url_options, anchor: "publishing") %>
+        <%# A whole-page visit, not a navigation of the `content` frame: a frame
+            navigation drops the `#publishing` fragment, so the link would land
+            at the top of Settings instead of on the retention field. %>
+        <%= link_to "Change", admin_settings_path(**admin_url_options, anchor: "publishing"), data: { turbo_frame: "_top" },
+              class: "text-accent hover:text-accent-hover hover:underline" %>
       <% end %>
     </p>
   </div>

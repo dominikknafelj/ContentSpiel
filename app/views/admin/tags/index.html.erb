@@ -57,7 +57,7 @@
             <td class="py-1.5 pr-4 text-ink">
               <% if @counts_visible %>
                 <%= link_to tag_posts_label(@readable_counts.fetch(row.id, 0)), admin_posts_path(tag: row.name, **admin_url_options),
-                      class: "text-accent-ink underline-offset-2 hover:underline", data: { turbo_frame: "_top" } %>
+                      class: "text-accent underline-offset-2 hover:text-accent-hover hover:underline", data: { turbo_frame: "_top" } %>
               <% else %>
                 <span class="text-dim" aria-label="Not shown: you can't read posts">—</span>
               <% end %>
