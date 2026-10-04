@@ -30,7 +30,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-view-only]", text: "View only"
     assert_no_selector "[data-controller~='admin--autosave']"
-    assert_no_button "Publish now"
+    assert_no_button "Publish"
+    assert_no_selector "button[aria-label='More actions']"
     assert_no_button "Delete"
 
     title = find_field("Title", disabled: true)

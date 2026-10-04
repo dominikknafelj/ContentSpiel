@@ -49,6 +49,13 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert_selector "nav[aria-label='Modules']"
   end
 
+  # Opens the editor header's ⋯ menu (Activity, Schedule…, Unpublish, Move to
+  # trash live in it), waiting until its panel is shown.
+  def open_editor_menu
+    find("header.admin-editor-header button[aria-label='More actions']").click
+    assert_selector "header.admin-editor-header [role=menu]"
+  end
+
   # Clicks through JavaScript (`element.click()`) instead of a native click.
   # Under Selenium this first worked around headless Chrome intermittently
   # dropping native WebDriver clicks made right after a page load. It stays
