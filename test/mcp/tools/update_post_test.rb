@@ -1,6 +1,8 @@
 require "test_helper"
 
 class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
+  include TestTypes
+
   def call_tool(**arguments)
     delivered = JSON.parse(JSON.generate(arguments), symbolize_names: true)
     Mcp::Tools::UpdatePost.call(**delivered, server_context: { user: @user })
@@ -31,6 +33,49 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
 
     assert response.error?
     assert_match(/role type/i, response.content.first[:text])
+  end
+
+  # Design pass round 2 (Task 10): the message names its field, since MCP shows
+  # it outside the editor's own slot -- a type with two dates needs that.
+  test "a date that is not yyyy-mm-dd is refused, naming the field, and the stored date stays" do
+    post = Post.create!(content_type: :resume_entry, title: "Staff Engineer", metadata: { "start_date" => "2020-02-02" })
+
+    response = call_tool(id: post.id, fields: { start_date: "2024-13-45", end_date: "2024-01-01" })
+
+    assert response.error?
+    assert_equal "Start date must use the form yyyy-mm-dd", response.content.first[:text]
+    post.reload
+    assert_equal Date.new(2020, 2, 2), post.fields.start_date
+    assert_nil post.fields.end_date
+  end
+
+  test "a required typed field's error reads as its label and message, with no Fields prefix" do
+    with_test_types do
+      ContentTypes.register "test/required_company" do |t|
+        t.label "Required company"
+        t.color "#f59e0b"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :company, :string, required: true
+      end
+      post = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
+
+      response = call_tool(id: post.id, fields: { company: "" })
+
+      assert response.error?
+      assert_equal "Company can't be blank", response.content.first[:text]
+    end
+  end
+
+  test "a groups row's error names the group, the row and the sub-field" do
+    with_test_types do
+      post = Post.create!(content_type: "test/event", title: "Launch")
+
+      response = call_tool(id: post.id, fields: { speakers: [ { name: "" } ] })
+
+      assert response.error?
+      assert_equal "Speakers, row 1: name can't be blank", response.content.first[:text]
+    end
   end
 
   test "updates only the fields given, leaving the rest alone" do

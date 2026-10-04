@@ -502,4 +502,20 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_equal "landing", @page.reload.page_type
     assert_equal "Über uns", @page.title(locale: :de)
   end
+
+  # Design pass round 2, Task 10: the new controls sit inside the form's
+  # disabled fieldset, so a viewer who can't edit can't press Reset or type.
+  test "a view-only viewer gets the Reset button and the counter inputs disabled" do
+    landing = landing_page_with_hero_image
+    Pages::Save.call(landing, attributes: {}, translations: { Locales.default => { hero_alt: "My own alt" } })
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/pages/#{landing.id}"
+    assert_response :success
+
+    assert_select "fieldset[disabled] button[data-action='admin--override-field#reset']"
+    assert_select "fieldset[disabled] [data-controller='admin--char-count'] input[name='page[meta_title]']"
+    assert_select "fieldset[disabled] [data-controller='admin--char-count'] textarea[name='page[meta_description]']"
+    assert_select "form[data-controller~='admin--autosave']", count: 0
+  end
 end

@@ -75,7 +75,10 @@ module ContentModel
           # `yyyy-mm-dd` input now, not a browser date picker) that doesn't
           # parse casts to nil, which would be stored as "no date" and so wipe
           # the stored one without a word. Remember it so the owning record
-          # can refuse the save with an error on the field instead.
+          # can refuse the save with an error on the field instead. Only `Post`
+          # consumes this: any other caller (a block's settings) still drops an
+          # unparseable date, and an integer still drops garbage -- known and
+          # accepted for now.
           rejected_inputs << key if field.type == :date && value.nil? && raw.to_s.strip.present?
           target = field.translated? ? (@translations[@locale] ||= {}) : @values
           value.nil? ? target.delete(key) : target[key] = value

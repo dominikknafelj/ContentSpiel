@@ -40,14 +40,11 @@ class OpenTypesTest < ActionDispatch::IntegrationTest
       assert_not bad.ok?
 
       # The per-field path survives all the way to the record's own errors,
-      # just humanized: `ContentModel::FieldSet#validate_group` keys the
-      # error "speakers.0.name" (spec §3.4), `Post#fields_are_valid` prefixes
-      # it "fields.speakers.0.name", and `ActiveModel::Error.full_message`
-      # renders a dotted attribute by turning every "." into "_" before
-      # humanizing (see `active_model/error.rb`), which is why the dots
-      # become spaces here rather than surviving into the message verbatim.
-      assert bad.errors.any? { |message| message.match?(/speakers.*0.*name/i) },
-        "expected a per-field error naming speakers.0.name, got #{bad.errors.inspect}"
+      # in words: `FieldSet#validate_group` keys the error "speakers.0.name"
+      # (spec §3.4), `Post#fields_are_valid` files it under "fields.speakers.0.name"
+      # and `Post.human_attribute_name` names the group, row and sub-field --
+      # no dotted path and no "Fields" prefix anywhere in the message.
+      assert_includes bad.errors, "Speakers, row 1: name can't be blank"
 
       schema = Mcp::Tools::CreatePost.input_schema.to_h
       assert_includes schema.dig(:properties, :content_type, :enum), "test/event"

@@ -135,8 +135,35 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/posts/#{post_record.id}",
       params: { post: { fields: { start_date: "2024-13-45" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
-    assert_select_in_stream "post-start_date-errors", /Use the form yyyy-mm-dd/
+    assert_select_in_stream "post-start_date-errors", /\A\s*!?\s*Start date must use the form yyyy-mm-dd\s*\z/
     assert_nil post_record.reload.fields.start_date
+  end
+
+  test "a row error in the CS Studio slot reads as group, row and sub-field" do
+    with_test_types do
+      post_record = create_post(title: "Launch", content_type: "test/event")
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { fields: { speakers: [ { name: "" } ] } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select_in_stream "post_fields_speakers_0-name-errors", /\A\s*!?\s*Speakers, row 1: name can't be blank\s*\z/
+    end
+  end
+
+  test "a required scalar's error in the slot reads as its label and message" do
+    with_test_types do
+      ContentTypes.register "test/required_company" do |t|
+        t.label "Required company"
+        t.color "#f59e0b"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :company, :string, required: true
+      end
+      post_record = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { fields: { company: "" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select_in_stream "post-company-errors", /\A\s*!?\s*Company can't be blank\s*\z/
+    end
   end
 
   test "only a strict yyyy-mm-dd date is accepted" do

@@ -505,4 +505,14 @@ class PostTest < ActiveSupport::TestCase
 
     assert post.save, post.errors.full_messages.to_sentence
   end
+
+  test "a rejected date is forgotten once the same field is assigned a valid one" do
+    post = Post.new(content_type: "resume_entry", title: "Role")
+    post.assign_fields({ start_date: "2024-13-45" }, locale: "en")
+    assert_not post.valid?
+    assert_includes post.errors.full_messages, "Start date must use the form yyyy-mm-dd"
+
+    post.assign_fields({ start_date: "2024-01-31" }, locale: "en")
+    assert post.valid?, post.errors.full_messages.to_sentence
+  end
 end

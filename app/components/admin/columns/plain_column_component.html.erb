@@ -18,7 +18,7 @@
         <%= tag.input(**input_html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
       <% end %>
       <% if counter? %>
-        <p class="mt-1 text-right font-cs-mono text-xs <%= counter_long? ? "text-warn-ink" : "text-meta" %>" data-admin--char-count-target="output"><%= counter_text %></p>
+        <p class="mt-1 text-right font-cs-mono text-xs <%= counter_long? ? "text-warn-ink" : "text-meta" %>" aria-live="polite" data-admin--char-count-target="output"><%= counter_text %></p>
       <% end %>
     <% end %>
     <% if override? %>

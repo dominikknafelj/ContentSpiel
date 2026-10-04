@@ -35,9 +35,11 @@ module Admin
 
       # "42 / 60", as first painted; `admin--char-count` keeps it current (and
       # adds " · long") from the input's own value.
-      def counter_text = "#{value.to_s.each_char.count} / #{counter}#{" · long" if value.to_s.each_char.count > counter}"
+      def counter_text = "#{counter_length} / #{counter}#{" · long" if counter_long?}"
 
-      def counter_long? = counter? && value.to_s.each_char.count > counter
+      def counter_long? = counter? && counter_length > counter
+
+      def counter_length = value.to_s.each_char.count
 
       # The input's own attributes: the caller's, plus -- with a counter -- the
       # `admin--char-count` target and the action that recounts on typing.
