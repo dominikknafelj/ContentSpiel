@@ -27,8 +27,10 @@ module Admin
     #   the row CARRIES the grant: `enabled` and its whole scope as hidden inputs,
     #   exactly as stored (content types including a removed one, `own`, page ids
     #   including an unreadable or a redundant root). A form saved as rendered
-    #   therefore posts it back identically (Review Focus 3); a forged request that
-    #   unticks or narrows it is `Groups::Save`'s to refuse (403).
+    #   therefore posts it back identically (Review Focus 3). A forged request that
+    #   unticks or narrows it is `Groups::Save`'s call: lawful narrowing is allowed
+    #   for someone who can manage the group, anything else is a 403. Defensive: no
+    #   stored state reaches it (see `PermissionMatrixComponent`).
     # - VIEW ONLY (`view_only:`, a group the viewer can't manage as it stands): the
     #   whole form sits in a `<fieldset disabled>`, which would disable "Edit
     #   scope" too, and a scope is still worth reading. So the toggle is an
@@ -55,7 +57,8 @@ module Admin
       # `kind`: :plain, :dim (the "All ..." default), :more ("+N") or :warn.
       Chip = Data.define(:label, :kind, :dot)
 
-      def initialize(permission:, scope: nil, tree: nil, open: false, form_name: "group[grants]", locked: false, view_only: false)
+      def initialize(permission:, scope: nil, tree: nil, open: false, form_name: "group[grants]", locked: false, view_only: false, removed_hint: false)
+        @removed_hint = removed_hint
         @permission = permission
         @locked = locked
         @view_only = view_only
@@ -91,7 +94,7 @@ module Admin
       def stored_page_ids = stored("page_ids").map(&:to_i)
 
       def editor
-        ScopeEditorComponent.new(permission: permission, scope: scope || {}, tree: tree, id: editor_id, open: open?, form_name: form_name)
+        ScopeEditorComponent.new(permission: permission, scope: scope || {}, tree: tree, id: editor_id, open: open?, form_name: form_name, removed_hint: @removed_hint)
       end
 
       def types_shown = permission.scopes.include?(:content_type)

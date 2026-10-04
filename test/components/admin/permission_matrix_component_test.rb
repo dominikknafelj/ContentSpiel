@@ -69,13 +69,14 @@ class Admin::PermissionMatrixComponentTest < ViewComponent::TestCase
   test "for a non-owner, exactly the ticked rows and toggles they couldn't hand out are locked; the note under the matrix appears" do
     viewer = viewer_holding("posts.read" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "tags.manage" => {})
 
-    matrix_for(viewer, [
+    grants = [
       { permission: "posts.read", scope: {} },
       { permission: "posts.edit", scope: { "content_types" => %w[blog now_update] } },
       { permission: "posts.delete", scope: {} },
       { permission: "tags.manage", scope: {} },
       { permission: "trash.empty", scope: {} }
-    ])
+    ]
+    matrix_for(viewer, grants, stored: grants)
 
     assert_selector "[data-locked]", count: 2 # posts.edit (wider than held) and posts.delete (not held)
     assert_selector "[data-permission='posts.edit'][data-locked]"
@@ -84,6 +85,15 @@ class Admin::PermissionMatrixComponentTest < ViewComponent::TestCase
     assert_selector "input[type=checkbox][name='group[grants][trash.empty][enabled]'][disabled]"
     assert_selector "input[type=checkbox][name='group[grants][tags.manage][enabled]']:not([disabled])"
     assert_selector ".admin-locked-hint"
+  end
+
+  test "a grant that isn't what the group stores (a typed tick, a changed row) is never locked" do
+    viewer = viewer_holding("posts.read" => {})
+
+    matrix_for(viewer, [ { permission: "posts.delete", scope: {} }, { permission: "posts.read", scope: { "own" => true } } ], stored: [ { permission: "posts.read", scope: {} } ])
+
+    assert_no_selector "[data-locked]"
+    assert_no_selector ".admin-locked-hint"
   end
 
   test "an owner, no actor, and a view-only render lock nothing" do

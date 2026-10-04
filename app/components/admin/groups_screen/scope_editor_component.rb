@@ -30,7 +30,8 @@ module Admin
       NOTE_INCLUDED = "included".freeze
       NOTE_PARTIAL = "contains a chosen page".freeze
 
-      def initialize(permission:, scope:, tree:, id:, open: false, form_name: "group[grants]")
+      def initialize(permission:, scope:, tree:, id:, open: false, form_name: "group[grants]", removed_hint: false)
+        @removed_hint = removed_hint
         @permission = permission
         @scope = scope.to_h.stringify_keys
         @tree = tree

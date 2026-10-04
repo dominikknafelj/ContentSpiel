@@ -94,6 +94,8 @@ module Admin
       @view_only = @group.persisted? && !AccessControl.can_manage_group?(Current.actor, @group)
       ids = @member_ids || (@group.persisted? ? @group.memberships.pluck(:user_id) : [])
       @members = User.where(id: ids).order(:email_address).to_a
+      # What the group stores, as the editor carries it: the matrix locks a row only while it still is this.
+      @stored_grants = @group.persisted? ? AccessControl::LiveGrants.new(@group.grants.to_a).carried_attributes : []
       return unless @group.persisted? && !@view_only
 
       @member_count = @group.memberships.count

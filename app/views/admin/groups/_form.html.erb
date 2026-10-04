@@ -34,7 +34,7 @@
     </div>
 
     <div class="mb-6">
-      <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only) %>
+      <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || [], view_only: view_only, stored: @stored_grants || []) %>
     </div>
   <% end %>
 

@@ -103,29 +103,22 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
   # --- Locked ticks -------------------------------------------------------------
 
-  test "a grant the viewer couldn't hand out is a greyed, carried tick: no Edit scope, the whole scope in hidden inputs, and an untouched save changes nothing" do
+  test "a grant carrying a removed type the viewer's own grant doesn't name is editable, with its Remove chip and the hint; an untouched save changes nothing" do
     group = locked_scenario_group
     sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {}, "tags.manage" => {} }))
 
     get "/cs-studio/groups/#{group.id}/edit"
     assert_response :success
 
-    # posts.edit {blog, retired_type, own}: the viewer holds {blog} only -> locked.
-    assert_select "[data-permission='posts.edit'][data-locked]" do
-      assert_select "input[type=checkbox][name='group[grants][posts.edit][enabled]'][checked][disabled]"
-      assert_select ".admin-locked-note", text: "You can't grant this"
-      assert_select "button", count: 0
-      assert_select "[data-scope-editor]", count: 0
-      assert_select "input[type=hidden][name='group[grants][posts.edit][enabled]'][value='1']"
-      assert_select "input[type=hidden][name='group[grants][posts.edit][content_types][]']", count: 2
-      assert_select "input[type=hidden][name='group[grants][posts.edit][content_types][]'][value=retired_type]"
-      assert_select "input[type=hidden][name='group[grants][posts.edit][own]'][value='1']"
-      assert_select "[data-chips]", text: /Blog/
+    # Judged on the LIVE scope (as `can_manage_group?` does): not locked, so the lawful Remove is there.
+    assert_select "[data-locked]", count: 0
+    assert_select "[data-permission='posts.edit']" do
+      assert_select "input[type=checkbox][name='group[grants][posts.edit][enabled]'][checked]:not([disabled])"
+      assert_select "button", text: "Edit scope"
+      assert_select "[data-removed-type=retired_type] button", text: "Remove"
+      assert_select ".admin-removed-type-hint", text: "Remove this type before changing the row."
     end
-    # posts.read {} the viewer does hold: an ordinary row; and a locked toggle too.
-    assert_select "[data-permission='posts.read']:not([data-locked]) button", text: "Edit scope"
-    assert_select ".admin-locked-hint", text: /greyed tick/
-    assert_select "input[type=hidden][name='group[grants][tags.manage][enabled]']", count: 0
+    assert_select ".admin-locked-hint", count: 0
     assert_select "fieldset[disabled]", count: 0
 
     before = grants_snapshot(group)
@@ -143,34 +136,46 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal [ users(:reader) ], group.users.reload.to_a
   end
 
-  test "a locked toggle is carried too" do
-    manager = manager_user(grants: { "groups.manage" => {}, "tags.manage" => {} })
-    group = AccessControl::Group.create!(name: "Toggled")
-    AccessControl::Grant.create!(group: group, permission: "tags.manage", scope: {})
-    sign_in_as(manager)
+  test "the removed-type hint is shown to a viewer who couldn't hand the name out, and not to an unscoped holder or an owner" do
+    group = locked_scenario_group
 
-    # The viewer holds tags.manage, so it is NOT locked...
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => {}, "posts.read" => {} }))
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "input[type=checkbox][name='group[grants][tags.manage][enabled]'][checked]:not([disabled])"
+    assert_select "[data-removed-type=retired_type]"
+    assert_select ".admin-removed-type-hint", count: 0
 
-    # ...but a posted unheld one that comes back on a 422 is.
-    post "/cs-studio/groups", params: { group: { name: "", member_ids: [ "" ], grants: { "tags.manage" => { enabled: "1" }, "trash.empty" => { enabled: "1" } } } }
-    assert_response :unprocessable_entity
-    assert_select "input[type=checkbox][name='group[grants][trash.empty][enabled]'][checked][disabled]"
-    assert_select "input[type=hidden][name='group[grants][trash.empty][enabled]'][value='1']"
-    assert_select "input[type=checkbox][name='group[grants][tags.manage][enabled]'][checked]:not([disabled])"
+    sign_in_as(users(:one))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "[data-removed-type=retired_type]"
+    assert_select ".admin-removed-type-hint", count: 0
   end
 
-  test "after a refused save a non-owner's posted grant they couldn't hand out comes back locked and carried, not editable" do
+  test "a tick the viewer typed comes back ticked and editable after a refused save, never locked" do
     sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.read" => {} }))
 
-    post "/cs-studio/groups", params: { group: { name: "", member_ids: [ "" ], grants: { "posts.publish" => { enabled: "1", content_types: [ "", "blog" ] } } } }
+    post "/cs-studio/groups", params: { group: { name: "", member_ids: [ "" ], grants: {
+      "posts.publish" => { enabled: "1", content_types: [ "", "blog" ] }, "trash.empty" => { enabled: "1" } } } }
 
     assert_response :unprocessable_entity
-    assert_select "[data-permission='posts.publish'][data-locked]" do
-      assert_select "input[type=hidden][name='group[grants][posts.publish][content_types][]'][value=blog]"
-      assert_select "button", count: 0
-    end
+    assert_select "[data-locked]", count: 0
+    assert_select ".admin-locked-note", count: 0
+    assert_select "[data-permission='posts.publish'] input[type=checkbox][name$='[enabled]'][checked]:not([disabled])"
+    assert_select "[data-permission='posts.publish'] input[type=checkbox][value=blog][checked]"
+    assert_select "[data-permission='posts.publish'] button", text: "Edit scope"
+    assert_select "input[type=checkbox][name='group[grants][trash.empty][enabled]'][checked]:not([disabled])"
+  end
+
+  test "a tick the editor changed on an existing group comes back editable after a refused save" do
+    group = AccessControl::Group.create!(name: "Stored", description: "x")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.read" => {} }))
+
+    patch "/cs-studio/groups/#{group.id}", params: { group: { name: "", member_ids: [ "" ], grants: {
+      "posts.read" => { enabled: "1" }, "trash.empty" => { enabled: "1" } } } }
+
+    assert_response :unprocessable_entity
+    assert_select "[data-locked]", count: 0
+    assert_select "input[type=checkbox][name='group[grants][trash.empty][enabled]'][checked]:not([disabled])"
   end
 
   test "an owner sees no locks" do
@@ -184,7 +189,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_select "[data-permission='posts.edit'] button", text: "Edit scope"
   end
 
-  test "forged requests against a locked grant are refused by the service: widening it is a 403 with one access.denied and nothing stored" do
+  test "forged requests against a grant carrying a removed type are refused by the service: widening it is a 403 with one access.denied and nothing stored" do
     group = locked_scenario_group
     sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
     before = grants_snapshot(group)
@@ -201,8 +206,8 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
   # Fix round 2 of Task 10: the request the editor makes when "Own only" is unticked
   # on a row that carries a removed type, without pressing Remove first -- the form as
-  # rendered, minus `own`. (While that row is a locked tick for this viewer the request
-  # can only be forged; either way the service decides.) `Groups::Save` judges a grant
+  # rendered, minus `own`. (The row is editable for this viewer, with the hint; the
+  # service decides.) `Groups::Save` judges a grant
   # that changed with a removed type still on it raw, so the name the viewer can't
   # hand out -- they hold {blog} -- refuses it.
   test "Own only unticked on a row that carries a removed type, without Remove, is a 403 with one access.denied and nothing stored" do
@@ -242,7 +247,52 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     # Four ticked rows, one of them a branch: the branch's own lookup(s) are the only addition.
     with_more = count_queries { get "/cs-studio/groups/#{many.id}/edit" }
 
-    assert_operator with_more - base, :<=, 4, "ticked rows must not each run their own queries (#{base} -> #{with_more})"
+    # The branch row's own closure-table lookup, the one `LiveGrants` existence check for its page ids,
+    # and the editor's tree/visibility reads; never a query per ticked row.
+    assert_operator with_more - base, :<=, 5, "ticked rows must not each run their own queries (#{base} -> #{with_more})"
+  end
+
+  # --- Review Focus 3, non-owner, editable form, page tree --------------------------
+
+  test "a non-owner who can manage the group, with an unreadable carried root, a redundant root, a removed type and an owner member, saves it untouched: nothing changes" do
+    section = as_owner { create_page(title: "Section") }
+    a = as_owner { create_page(title: "Branch A", parent: section) }
+    a1 = as_owner { create_page(title: "Leaf A1", parent: a) }
+    gone = as_owner { create_page(title: "Soon trashed", parent: section) }
+    as_owner { assert Trash::Move.call(gone).ok? }
+
+    sign_in_as(manager_user(grants: {
+      "groups.manage" => {}, "posts.edit" => {}, "posts.read" => {}, "tags.manage" => {},
+      "pages.read" => { "page_ids" => [ section.id ] }, "pages.edit" => { "page_ids" => [ section.id ] }, "pages.publish" => { "page_ids" => [ section.id ] }
+    }))
+
+    group = AccessControl::Group.create!(name: "Target", description: "Everything at once")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type], "own" => true })
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => [ "now_update" ] })
+    AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ a.id, gone.id ].sort })
+    AccessControl::Grant.create!(group: group, permission: "pages.publish", scope: { "page_ids" => [ section.id, a1.id ].sort })
+    AccessControl::Grant.create!(group: group, permission: "tags.manage", scope: {})
+    AccessControl::Membership.create!(user: users(:author), group: group)
+    AccessControl::Membership.create!(user: users(:one), group: group)
+
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_response :success
+    assert_select "fieldset[disabled]", count: 0
+    assert_select "[data-locked]", count: 0
+    assert_select ".admin-save-bar"
+    assert_select "li[data-chip-value='#{users(:one).id}']"
+    assert_select "[data-permission='pages.edit'] input[type=hidden][name$='[page_ids][]'][value='#{gone.id}']"
+
+    grants_before = grants_snapshot(group)
+    members_before = group.memberships.reload.pluck(:user_id).sort
+    assert_no_difference -> { Audit::Event.count } do
+      patch "/cs-studio/groups/#{group.id}", params: params_as_rendered
+    end
+
+    assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
+    assert_equal 303, response.status
+    assert_equal grants_before, grants_snapshot(group)
+    assert_equal members_before, group.memberships.reload.pluck(:user_id).sort
   end
 
   # --- View only ----------------------------------------------------------------
@@ -391,7 +441,7 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     user
   end
 
-  # posts.edit {blog, retired_type, own} (the viewer of the locked tests holds {blog} only: locked)
+  # posts.edit {blog, retired_type, own} (the viewer of these tests holds {blog} only: the removed type is one they couldn't hand out)
   # and posts.read {} (the viewer holds it: ordinary), with one member.
   def locked_scenario_group
     group = AccessControl::Group.create!(name: "Locked scenario", description: "Locks")

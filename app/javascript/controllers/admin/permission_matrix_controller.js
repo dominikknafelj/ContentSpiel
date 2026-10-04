@@ -106,6 +106,8 @@ export default class extends Controller {
     const carried = chip.querySelector("input[type=hidden]")
     if (carried) carried.disabled = true
     chip.hidden = true
+    const hint = row.querySelector(".admin-removed-type-hint")
+    if (hint) hint.hidden = !row.querySelector("[data-removed-type]:not([hidden])")
     this.rewriteChips(row)
     // The chip itself, not the disabled input: it is inside the form, so the
     // footer hears it, and `scopeChanged` rewrites nothing new.

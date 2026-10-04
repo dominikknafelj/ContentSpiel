@@ -24,6 +24,9 @@
           </span>
         <% end %>
       </div>
+      <% if @removed_hint && removed_types.any? %>
+        <p class="admin-removed-type-hint text-sm text-warn-ink">Remove this type before changing the row.</p>
+      <% end %>
     </fieldset>
   <% end %>
 
