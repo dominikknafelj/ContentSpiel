@@ -102,6 +102,12 @@
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
 
+    <%# The rich-text editor's image, YouTube and Page link dialogs (design pass
+        round 2, Task 13): one of each, here for the same reason as the picker
+        -- outside `#content` and every autosave form. The editor that opens
+        one is the only one that hears its answer. %>
+    <%= render Admin::EditorScreen::RichTextDialogsComponent.new %>
+
     <%# The one form every "Mark as up to date" button submits
         (`Admin::EditorScreen::ReferenceCardComponent`): empty, here
         outside `#content` and every autosave form for the same reason as

@@ -1,8 +1,8 @@
 import { Controller } from "@hotwired/stimulus"
 import { Editor } from "@tiptap/core"
 import { extensions, safeHref, normalizeHref } from "rich_text/schema"
-import { youtubeIdFrom } from "rich_text/youtube"
-import { createPopover, createField, createSelect, createButton } from "rich_text/popover"
+import { createPopover, createField, createButton } from "rich_text/popover"
+import { createTargetSearch } from "rich_text/target_search"
 
 // The Tiptap rich-text editor in CS Studio (tiptap spec §4.1), on
 // `Admin::Columns::RichTextColumnComponent` -- see that component's comment
@@ -32,9 +32,19 @@ import { createPopover, createField, createSelect, createButton } from "rich_tex
 // handlers check the editor is still the one they started with.
 //
 // Images come from the library (media library Task 8): the Image button
-// opens the one picker (`admin--media-picker`, `Media::PickerComponent`)
-// and the picked asset is inserted as `image{asset_id}` (`#picked`). The
-// editor has no upload of its own; the picker's Upload tab covers it.
+// opens the one picker (`admin--media-picker`, `Media::PickerComponent`),
+// and the picked asset goes on to the image dialog (alt text and caption),
+// whose "Insert image" adds `image{asset_id}` (`#picked`, `#dialogClosed`).
+// The editor has no upload of its own; the picker's Upload tab covers it.
+//
+// Dialogs (design pass round 2, Task 13): the image, YouTube and "Page link"
+// forms are three shared `<dialog>`s rendered once by the layout
+// (`Admin::EditorScreen::RichTextDialogsComponent`, `admin--rich-text-dialog`).
+// `openDialog` asks for one on `window`, naming this element as the opener;
+// the answer is a `rich-text-dialog:closed` event on this element alone (so
+// two editors on a page never cross wires), applied by `#dialogClosed`
+// through a Tiptap command -- the one path that writes the hidden input and
+// fires the autosave `input` event. The Link stays an anchored popover.
 export default class extends Controller {
   static targets = [ "input", "editor", "message" ]
 
@@ -47,16 +57,13 @@ export default class extends Controller {
 
   static texts = {
     badLink: "Use an http(s), mailto or relative link",
-    badYoutube: "That isn't a YouTube URL or video ID",
-    invalidContent: "This text contains something the editor can't show, so it's read-only here. Nothing has been changed.",
-    searchFailed: "Search failed — check your connection",
-    noResults: "No pages or posts match",
-    searchHint: "Type to search titles"
+    invalidContent: "This text contains something the editor can't show, so it's read-only here. Nothing has been changed."
   }
 
   connect() {
     this.aborter = new AbortController()
     this.popover = null
+    this.dialogContext = null
     this.contentInvalid = false
     this.edited = false
     // A view-only editor (access-control design spec §5): the form wraps
@@ -86,7 +93,7 @@ export default class extends Controller {
       extensions: extensions({
         resolveAssetUrl: (id) => this.assets[id]?.url || null,
         resolveLinkTitle: (type, id) => this.linkTitles[`${type}:${id}`] || null,
-        onEditImage: (position) => this.openImagePopover(position)
+        onEditImage: (position) => this.openImageDialog(position)
       }),
       injectCSS: false,
       editable: !this.readOnly,
@@ -113,6 +120,10 @@ export default class extends Controller {
   disconnect() {
     this.aborter?.abort()
     this.closePopover({ refocus: false })
+    // A dialog this editor opened is no use to anyone once it is gone (a
+    // Turbo Stream replaced its block card): close it, answer nobody.
+    if (this.dialogContext) window.dispatchEvent(new CustomEvent("rich-text-dialog:withdraw", { detail: { opener: this.element } }))
+    this.dialogContext = null
     this.editor?.destroy()
     this.editor = null
     this.editorTarget.replaceChildren()
@@ -196,7 +207,8 @@ export default class extends Controller {
   horizontalRule() { this.run((chain) => chain.setHorizontalRule()) }
 
   // With an image node selected (keyboard users get there with the arrow
-  // keys), the Image button edits that image's alt text and caption instead
+  // keys), the Image button edits that image's alt text and caption (the image
+  // dialog) instead
   // of adding another one. Enter on a selected image does the same
   // (`rich_text/image.js`). Otherwise it opens the media picker, with this
   // button as the opener focus returns to on Cancel/Escape.
@@ -206,7 +218,7 @@ export default class extends Controller {
 
     const { selection } = this.editor.state
     if (selection.node?.type.name === "image") {
-      this.openImagePopover(selection.from)
+      this.openImageDialog(selection.from)
       return
     }
     this.closePopover({ refocus: false })
@@ -268,22 +280,19 @@ export default class extends Controller {
   // --- Media picker (media library Task 8) ---------------------------------
   //
   // `media-picker:picked` from the picker, bubbling up from the Image
-  // button: inserts `image{asset_id, alt: "", caption: ""}` at the
-  // selection the editor still holds from before the picker opened, then
-  // opens the image popover so alt text can be written straight away (the
-  // picker has already handed focus back by now). The picked `url` is only
-  // for showing the image here, and its `alt`/`caption` defaults only for
-  // the popover's placeholders -- the node stores the id alone.
+  // button: nothing is inserted yet. The image dialog opens for the picked
+  // asset (the picked `url` is only for showing it, and its `alt`/`caption`
+  // defaults only for the dialog's placeholders -- the node stores the id
+  // alone), and "Insert image" there adds `image{asset_id, alt, caption}` at
+  // the selection the editor still holds from before the picker opened.
+  // Cancelling inserts nothing.
   picked(event) {
     const { id, url } = event.detail || {}
     if (!Number.isInteger(id) || !this.editable()) return
 
     this.showMessage("")
     if (url) this.assets[id] = { url, alt: event.detail.alt || "", caption: event.detail.caption || "" }
-    this.editor.chain().focus().insertImage({ asset_id: id }).run()
-
-    const position = this.insertedImagePosition(id)
-    if (position !== null) this.openImagePopover(position)
+    this.openDialog("image", { mode: "insert", assetId: id, ...this.imageDefaults(id), alt: "", caption: "" })
   }
 
   // --- AI translation (translation helpers spec §6.4) -----------------------
@@ -318,25 +327,6 @@ export default class extends Controller {
     detail.applied = true
   }
 
-  // The image just inserted -- not simply the first `image` node for this
-  // asset in the document, since the same library image may already
-  // appear earlier in it. `insertContent` leaves the selection either *on*
-  // the new node (a NodeSelection, when it replaced an empty paragraph) or
-  // just after it; in the second case it's the last such node starting
-  // before the selection.
-  insertedImagePosition(assetId) {
-    const { selection } = this.editor.state
-    if (selection.node?.type.name === "image" && selection.node.attrs.asset_id === assetId) return selection.from
-
-    const { from } = selection
-    let found = null
-    this.editor.state.doc.descendants((node, position) => {
-      if (position < from && node.type.name === "image" && node.attrs.asset_id === assetId) found = position
-      return position < from
-    })
-    return found
-  }
-
   showMessage(text) {
     if (this.hasMessageTarget) this.messageTarget.textContent = text || ""
   }
@@ -353,27 +343,60 @@ export default class extends Controller {
   closePopover({ refocus = true } = {}) {
     if (!this.popover) return
 
-    clearTimeout(this.searchTimer)
-    this.searchAborter?.abort()
+    this.popoverSearch?.destroy()
+    this.popoverSearch = null
     this.popover.root.remove()
     this.popover = null
     if (refocus) this.editor?.commands.focus()
   }
 
-  // Link (external): http(s), mailto or relative only, checked here before
-  // anything is applied (the server validates again on save). With text
-  // selected it links that text; inside an existing link, it edits that
-  // link; with nothing selected it inserts the URL itself as the link text.
+
+  // The Link popover: one input that takes either a URL or a title to search
+  // for (`rich_text/target_search.js`, the same rows the related-posts chip
+  // input shows). Choosing a row makes an internal link
+  // (`internalLink{type, id}` -- never a URL, see `rich_text/internal_link.js`);
+  // Enter or Apply on typed text makes an external one: http(s), mailto or
+  // relative only, checked here before anything is applied (the server
+  // validates again on save). Text that already looks like a URL is not
+  // searched. Enter picks a row only once one is highlighted (arrow keys):
+  // otherwise the typed text is the link, so "https://example.org" + Enter
+  // never links to whichever page happened to match first.
+  //
+  // With text selected it links that text; inside an existing link, it edits
+  // that link; with nothing selected it inserts the URL itself (or the
+  // target's title) as the link text. "Remove link" shows whenever the
+  // selection is already a link of either kind.
   link() {
     if (!this.editable()) return
 
+    const internal = this.editor.isActive("internalLink")
     const current = this.editor.isActive("link") ? this.editor.getAttributes("link").href || "" : ""
     const popover = createPopover({ title: "Link", onSubmit: () => apply(), onClose: () => this.closePopover() })
-    const url = createField("URL", { value: current, placeholder: "https://…" })
-    popover.body.append(url.wrapper)
+    const field = createField("URL or search", { value: current, placeholder: "Paste a URL or search pages and posts" })
+    const results = document.createElement("ul")
+    results.className = "flex max-h-60 flex-col gap-0.5 overflow-y-auto"
+    results.setAttribute("aria-label", "Pages and posts")
+    const hint = document.createElement("p")
+    hint.className = "text-sm text-meta"
+    hint.setAttribute("role", "status")
+    hint.setAttribute("aria-live", "polite")
+    popover.body.append(field.wrapper, results, hint)
+
+    this.popoverSearch = createTargetSearch({
+      input: field.input,
+      listbox: results,
+      message: hint,
+      url: this.linkTargetsUrlValue,
+      locale: this.localeValue,
+      skip: looksLikeUrl,
+      onPick: (row) => this.applyInternalLink({ type: row.type, id: row.id }, row.title || `(untitled ${row.type} #${row.id})`)
+    })
+    // The search clears its own error; a bad-URL message from a previous
+    // Apply goes the moment the text changes.
+    field.input.addEventListener("input", () => popover.setError(""))
 
     const apply = () => {
-      const typed = url.input.value.trim()
+      const typed = field.input.value.trim()
       const href = normalizeHref(typed)
       if (!safeHref(href)) {
         popover.setError(this.constructor.texts.badLink)
@@ -396,9 +419,12 @@ export default class extends Controller {
     }
 
     popover.actions.append(createButton("Apply", apply, { variant: "primary" }))
-    if (current) {
+    if (current || internal) {
       popover.actions.append(createButton("Remove link", () => {
-        this.editor.chain().focus().extendMarkRange("link").unsetLink().run()
+        const chain = this.editor.chain().focus()
+        if (internal) chain.unsetInternalLink()
+        else chain.extendMarkRange("link").unsetLink()
+        chain.run()
         this.closePopover()
       }, { variant: "danger" }))
     }
@@ -406,95 +432,13 @@ export default class extends Controller {
     this.openPopover(popover)
   }
 
-  // Internal link: searches `<admin>/link_targets` (pages and posts by
-  // title, in this column's own editing locale, optionally one type) and
-  // stores `internalLink{type, id}` -- never a URL (see
-  // `rich_text/internal_link.js`). Same selection rules as `link()`: with
-  // nothing selected the target's title is inserted as the link text.
+  // Insert > Page link: the "Page link" dialog (search, pick one). Same
+  // selection rules as the Link popover: with nothing selected the target's
+  // title is inserted as the link text.
   internalLink() {
     if (!this.editable()) return
 
-    const popover = createPopover({ title: "Internal link", onSubmit: () => this.search(query, type, results, popover, { now: true }), onClose: () => this.closePopover() })
-    const query = createField("Search pages and posts", { placeholder: "Title…" })
-    const type = createSelect("Type", [ [ "", "Pages and posts" ], [ "page", "Pages" ], [ "post", "Posts" ] ])
-    const results = document.createElement("ul")
-    results.className = "flex max-h-60 flex-col gap-1 overflow-y-auto"
-    results.setAttribute("aria-label", "Link targets")
-
-    const hint = document.createElement("li")
-    hint.className = "text-sm text-meta"
-    hint.textContent = this.constructor.texts.searchHint
-    results.append(hint)
-
-    query.input.addEventListener("input", () => this.search(query, type, results, popover))
-    type.select.addEventListener("change", () => this.search(query, type, results, popover, { now: true }))
-
-    popover.body.append(query.wrapper, type.wrapper, results)
-    if (this.editor.isActive("internalLink")) {
-      popover.actions.append(createButton("Remove link", () => {
-        this.editor.chain().focus().unsetInternalLink().run()
-        this.closePopover()
-      }, { variant: "danger" }))
-    }
-    popover.actions.append(createButton("Cancel", () => this.closePopover()))
-    this.openPopover(popover)
-  }
-
-  search(query, type, results, popover, { now = false } = {}) {
-    clearTimeout(this.searchTimer)
-    this.searchTimer = setTimeout(() => this.fetchTargets(query.input.value, type.select.value, results, popover), now ? 0 : 200)
-  }
-
-  async fetchTargets(q, type, results, popover) {
-    if (q.trim() === "" && type === "") return
-
-    this.searchAborter?.abort()
-    this.searchAborter = new AbortController()
-    const url = new URL(this.linkTargetsUrlValue, window.location.origin)
-    url.searchParams.set("q", q.trim())
-    url.searchParams.set("locale", this.localeValue)
-    if (type) url.searchParams.set("type", type)
-
-    let targets
-    try {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: this.searchAborter.signal })
-      if (!response.ok) throw new Error(`link_targets answered ${response.status}`)
-      targets = await response.json()
-    } catch (error) {
-      if (error.name !== "AbortError" && this.popover === popover) popover.setError(this.constructor.texts.searchFailed)
-      return
-    }
-    if (this.popover !== popover) return
-
-    popover.setError("")
-    // Unchanged results aren't re-rendered: a result button someone is
-    // about to click shouldn't be swapped out from under them by an
-    // identical answer to a later keystroke's search.
-    const key = JSON.stringify(targets)
-    if (results.dataset.key === key) return
-    results.dataset.key = key
-
-    results.replaceChildren(...(targets.length ? targets.map((target) => this.targetItem(target)) : [ this.emptyItem() ]))
-  }
-
-  targetItem(target) {
-    const item = document.createElement("li")
-    const title = target.title || `(untitled ${target.type} #${target.id})`
-    const button = createButton(title, () => this.applyInternalLink(target, title))
-    button.classList.add("w-full", "justify-between")
-    const kind = document.createElement("span")
-    kind.className = "font-cs-mono text-label uppercase tracking-mono text-meta"
-    kind.textContent = ` ${target.type}`
-    button.append(kind)
-    item.append(button)
-    return item
-  }
-
-  emptyItem() {
-    const item = document.createElement("li")
-    item.className = "text-sm text-meta"
-    item.textContent = this.constructor.texts.noResults
-    return item
+    this.openDialog("page", { locale: this.localeValue, linked: this.editor.isActive("internalLink") })
   }
 
   applyInternalLink(target, title) {
@@ -510,63 +454,91 @@ export default class extends Controller {
     this.closePopover()
   }
 
-  // Image: the per-use alt text and caption for the `image` node at
-  // `position` (just picked, or clicked). Applied on Done -- re-checking the node is still
-  // an image there, since the document may have changed meanwhile.
-  openImagePopover(position) {
+  // YouTube: the dialog takes a URL (any form `youtubeIdFrom` knows) or a
+  // bare 11-character id -- the same node the paste rule inserts.
+  youtube() {
+    if (!this.editable()) return
+
+    this.openDialog("youtube")
+  }
+
+  // --- Dialogs ---------------------------------------------------------------
+
+  // The library's own alt/caption for an image, in this editor's language
+  // (what blank per-use fields fall back to), and where to show it.
+  imageDefaults(assetId) {
+    const asset = this.assets[assetId] || {}
+    return { defaultAlt: asset.alt || "", defaultCaption: asset.caption || "", url: asset.url || "" }
+  }
+
+  // Asks the layout's shared dialog for `kind` to open, naming this element as
+  // the one to answer. `context` is what applying the answer needs and the
+  // dialog doesn't: it stays here, per editor.
+  openDialog(kind, detail = {}) {
+    this.closePopover({ refocus: false })
+    this.dialogContext = { kind, ...detail }
+    window.dispatchEvent(new CustomEvent("rich-text-dialog:open", { detail: { ...detail, kind, opener: this.element } }))
+  }
+
+  // Alt text and caption for the `image` node at `position` (clicked, or
+  // Enter on a selected image). Re-checks it is still an image there when the
+  // answer arrives, since the document may have changed meanwhile.
+  openImageDialog(position) {
     if (!this.editable()) return
 
     const node = this.editor.state.doc.nodeAt(position)
     if (!node || node.type.name !== "image") return
 
-    const popover = createPopover({ title: "Image", onSubmit: () => done(), onClose: () => this.closePopover() })
-    // Blank fields fall back to the image's own defaults in this language
-    // (`#assets`), which is what their placeholders show -- the generic
-    // hint only when the image has no default of its own.
-    const defaults = this.assets[node.attrs.asset_id] || {}
-    const alt = createField("Alt text", { value: node.attrs.alt || "", placeholder: defaults.alt || "Describe the image" })
-    const caption = createField("Caption", { value: node.attrs.caption || "", placeholder: defaults.caption || "" })
-    popover.body.append(alt.wrapper, caption.wrapper)
-
-    const done = () => {
-      const current = this.editor.state.doc.nodeAt(position)
-      if (current && current.type.name === "image") {
-        this.editor.chain().focus().setNodeSelection(position).updateAttributes("image", { alt: alt.input.value, caption: caption.input.value }).run()
-      }
-      this.closePopover()
-    }
-
-    popover.actions.append(createButton("Done", done, { variant: "primary" }))
-    popover.actions.append(createButton("Remove image", () => {
-      const current = this.editor.state.doc.nodeAt(position)
-      if (current && current.type.name === "image") this.editor.chain().focus().setNodeSelection(position).deleteSelection().run()
-      this.closePopover()
-    }, { variant: "danger" }))
-    popover.actions.append(createButton("Cancel", () => this.closePopover()))
-    this.openPopover(popover)
+    this.openDialog("image", {
+      mode: "edit", position, assetId: node.attrs.asset_id,
+      alt: node.attrs.alt || "", caption: node.attrs.caption || "",
+      ...this.imageDefaults(node.attrs.asset_id)
+    })
   }
 
-  // YouTube: a URL (any form `youtubeIdFrom` knows) or a bare 11-character
-  // id -- the same node the paste rule inserts.
-  youtube() {
-    if (!this.editable()) return
+  // `rich-text-dialog:closed`, dispatched on this element only by the dialog
+  // this editor opened -- after a submit and after Cancel/Escape alike. An
+  // answer is applied through the editor (a Tiptap command, so the hidden
+  // input and the autosave follow); either way focus returns to the editor,
+  // whose selection ProseMirror kept while the dialog was up.
+  dialogClosed(event) {
+    const context = this.dialogContext
+    this.dialogContext = null
+    const answer = event.detail || {}
 
-    const popover = createPopover({ title: "YouTube", onSubmit: () => insert(), onClose: () => this.closePopover() })
-    const url = createField("YouTube URL or video ID", { placeholder: "https://www.youtube.com/watch?v=…" })
-    popover.body.append(url.wrapper)
+    if (context && context.kind === answer.kind && answer.applied && this.editable()) this.applyDialog(context, answer)
+    this.editor?.commands.focus()
+  }
 
-    const insert = () => {
-      const id = youtubeIdFrom(url.input.value, { allowBareId: true })
-      if (!id) {
-        popover.setError(this.constructor.texts.badYoutube)
-        return
-      }
-      this.editor.chain().focus().insertYoutube(id).run()
-      this.closePopover()
+  applyDialog(context, answer) {
+    if (context.kind === "image") {
+      this.applyImage(context, answer)
+    } else if (context.kind === "youtube") {
+      this.editor.chain().focus().insertYoutube(answer.id).run()
+    } else if (context.kind === "page") {
+      if (answer.remove) this.editor.chain().focus().unsetInternalLink().run()
+      else this.applyInternalLink(answer.target, answer.target.title)
+    }
+  }
+
+  applyImage(context, answer) {
+    if (context.mode === "insert") {
+      this.editor.chain().focus().insertImage({ asset_id: context.assetId, alt: answer.alt, caption: answer.caption }).run()
+      return
     }
 
-    popover.actions.append(createButton("Insert", insert, { variant: "primary" }))
-    popover.actions.append(createButton("Cancel", () => this.closePopover()))
-    this.openPopover(popover)
+    const current = this.editor.state.doc.nodeAt(context.position)
+    if (!current || current.type.name !== "image") return
+
+    const chain = this.editor.chain().focus().setNodeSelection(context.position)
+    if (answer.remove) chain.deleteSelection()
+    else chain.updateAttributes("image", { alt: answer.alt, caption: answer.caption })
+    chain.run()
   }
+}
+
+// Text that is a URL rather than a title to search for: a scheme, a leading
+// slash or `//`, or a dotted token with no spaces ("example.org/docs").
+function looksLikeUrl(text) {
+  return /^[a-z][a-z0-9+.-]*:/i.test(text) || text.startsWith("/") || /^[^\s]+\.[^\s]+$/.test(text)
 }

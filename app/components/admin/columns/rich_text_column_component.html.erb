@@ -10,11 +10,11 @@
     <p id="<%= label_id %>" class="<%= setup_label_class %> mb-1"><%= name.to_s.humanize %></p>
     <%# `admin--rich-text` (tiptap spec §4.1) -- see the class comment for
         every `data-*` value below. `relative` anchors the controller's own
-        popovers (link, internal link, image, YouTube) to this editor. %>
+        Link popover (the image, YouTube and page dialogs live once in the layout) to this editor. %>
     <%= tag.div class: "admin-rich-text relative min-w-0",
           data: {
             controller: "admin--rich-text",
-            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked translate:use->admin--rich-text#applySuggestion",
+            action: "focusout->admin--rich-text#containFocus media-picker:picked->admin--rich-text#picked translate:use->admin--rich-text#applySuggestion rich-text-dialog:closed->admin--rich-text#dialogClosed",
             "admin--rich-text-link-targets-url-value": link_targets_url,
             "admin--rich-text-locale-value": editor_locale,
             "admin--rich-text-assets-value": assets_json,

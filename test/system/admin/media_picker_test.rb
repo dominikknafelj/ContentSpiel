@@ -59,13 +59,16 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     find(".ProseMirror").click
     press_insert "Image"
-    pick_from_library(@asset)
+    # Picking opens the image dialog (Task 13), so not `pick_from_library`,
+    # which waits for every dialog to close.
+    within("dialog[open]") { click_on @asset.title }
+    assert_selector "dialog#rich-text-image-dialog[open]"
     # The per-use fields show the image's own defaults as placeholders
     # (fix round 1, I1).
-    within(".admin-rich-text-popover") do
+    within("dialog#rich-text-image-dialog[open]") do
       assert_field "Alt text", with: "", placeholder: "A wide view"
       assert_field "Caption", with: "", placeholder: "Wide"
-      click_on "Done"
+      click_on "Insert image"
     end
     assert_eventually do
       post.reload.body_document(locale: :en).to_h.to_json.include?(%("asset_id":#{@asset.id}))

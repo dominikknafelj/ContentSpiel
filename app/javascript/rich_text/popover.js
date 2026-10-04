@@ -1,5 +1,5 @@
-// Small DOM builders for `admin--rich-text`'s popovers (link, internal link,
-// image, YouTube) -- task 7's "no browser dialogs" ruling: no
+// Small DOM builders for `admin--rich-text`'s Link popover (the image, YouTube
+// and page dialogs are server-rendered, `RichTextDialogsComponent`) -- task 7's "no browser dialogs" ruling: no
 // `window.prompt`/`confirm`/`alert` anywhere, just a panel under the
 // toolbar built from CS Studio's own product token classes. The class
 // strings here mirror `SetupHelper#setup_input_class`/`#setup_label_class`
@@ -90,30 +90,6 @@ export function createField(labelText, { value = "", type = "text", placeholder 
 
   wrapper.append(label, input)
   return { wrapper, input }
-}
-
-export function createSelect(labelText, options) {
-  sequence += 1
-  const id = `admin-rich-text-field-${sequence}`
-
-  const wrapper = document.createElement("div")
-  const label = document.createElement("label")
-  label.className = LABEL_CLASS
-  label.htmlFor = id
-  label.textContent = labelText
-
-  const select = document.createElement("select")
-  select.id = id
-  select.className = "cs-select mt-1 block w-full"
-  options.forEach(([ value, text ]) => {
-    const option = document.createElement("option")
-    option.value = value
-    option.textContent = text
-    select.append(option)
-  })
-
-  wrapper.append(label, select)
-  return { wrapper, select }
 }
 
 export function createButton(text, onClick, { variant = "secondary" } = {}) {
