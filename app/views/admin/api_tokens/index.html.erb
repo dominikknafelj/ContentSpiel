@@ -20,7 +20,7 @@
     <div>
       <%= label_tag "group_id", "Group", class: setup_label_class %>
       <%= select_tag "group_id", options_from_collection_for_select(@assignable_groups, :id, :name, default_group&.id),
-            id: "group_id", required: true, class: setup_input_class %>
+            id: "group_id", required: true, class: setup_select_class %>
     </div>
     <%= render Admin::ButtonComponent.new(label: "Create token", variant: :primary, type: "submit") %>
   <% end %>

@@ -5,6 +5,12 @@ module SetupHelper
     "mt-1 block w-full rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink focus:outline-2 focus:outline-accent"
   end
 
+  # A native `<select>`: `.cs-select` draws the border, chevron and focus ring
+  # from tokens (content-spiel.tailwind.css), so it needs no other styling.
+  def setup_select_class
+    "cs-select w-full"
+  end
+
   def setup_label_class
     "block font-cs-mono text-label uppercase tracking-mono text-meta"
   end

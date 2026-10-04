@@ -34,7 +34,7 @@
       <% if needs_parent? %>
         <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center gap-2", data: { turbo_frame: "_top" } do %>
           <%= label_tag parent_select_id, "Restore under", class: "text-meta" %>
-          <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: setup_input_class,
+          <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: setup_select_class,
                 disabled: parent_choices.blank? %>
           <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: parent_choices.blank?) %>
         <% end %>

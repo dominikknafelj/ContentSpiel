@@ -28,7 +28,7 @@
           <td class="py-2 pr-4">
             <%= label_tag "language-#{code}-position", "Position", class: "sr-only" %>
             <%= select_tag "languages[#{code}][position]", options_for_select((1..@site_setting.locales.size).to_a, index + 1),
-                  id: "language-#{code}-position", class: setup_input_class %>
+                  id: "language-#{code}-position", class: setup_select_class %>
           </td>
           <td class="py-2">
             <% (@site_setting.locale_codes - [ code ]).each do |other| %>
@@ -71,7 +71,7 @@
   <div>
     <%= label_tag "language_code", "Language", class: setup_label_class %>
     <%= select_tag "code", options_for_select(language_options.reject { |(_, code)| @site_setting.locale_codes.include?(code) }),
-          id: "language_code", include_blank: "Choose a language…", class: setup_input_class %>
+          id: "language_code", include_blank: "Choose a language…", class: setup_select_class %>
   </div>
   <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit") %>
 <% end %>

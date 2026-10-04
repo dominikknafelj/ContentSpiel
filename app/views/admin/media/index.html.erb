@@ -33,7 +33,7 @@
   <div>
     <%= label_tag :filter, "Show", class: setup_label_class %>
     <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-          class: setup_input_class %>
+          class: setup_select_class %>
   </div>
 
   <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>

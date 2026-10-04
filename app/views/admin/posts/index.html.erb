@@ -23,18 +23,18 @@
   <div>
     <%= label_tag :type, "Type", class: setup_label_class %>
     <%= select_tag :type, options_for_select(@content_types.map { |type| [ type.label, type.name ] }, params[:type]),
-          include_blank: "All types", class: setup_input_class %>
+          include_blank: "All types", class: setup_select_class %>
   </div>
 
   <div>
     <%= label_tag :status, "Status", class: setup_label_class %>
     <%= select_tag :status, options_for_select(Publishable::STATUSES.map { |status| [ status.humanize, status ] }, params[:status]),
-          include_blank: "All statuses", class: setup_input_class %>
+          include_blank: "All statuses", class: setup_select_class %>
   </div>
 
   <div>
     <%= label_tag :tag, "Tag", class: setup_label_class %>
-    <%= select_tag :tag, options_for_select(@tags.map(&:name), params[:tag]), include_blank: "All tags", class: setup_input_class %>
+    <%= select_tag :tag, options_for_select(@tags.map(&:name), params[:tag]), include_blank: "All tags", class: setup_select_class %>
   </div>
 
   <div>

@@ -15,7 +15,7 @@
   <div>
     <%= label_tag :user_id, "User", class: setup_label_class %>
     <%= select_tag :user_id, options_for_select(@users.map { |user| [ user.display_name, user.id ] }, params[:user_id]),
-          include_blank: "All users", class: setup_input_class %>
+          include_blank: "All users", class: setup_select_class %>
   </div>
 
   <div>
@@ -23,13 +23,13 @@
         own comment explains why `params[:action]` can't be reused here
         (it's Rails' own routing parameter). %>
     <%= label_tag :event_action, "Action", class: setup_label_class %>
-    <%= select_tag :event_action, options_for_select(@actions, params[:event_action]), include_blank: "All actions", class: setup_input_class %>
+    <%= select_tag :event_action, options_for_select(@actions, params[:event_action]), include_blank: "All actions", class: setup_select_class %>
   </div>
 
   <div>
     <%= label_tag :subject_type, "Subject type", class: setup_label_class %>
     <%= select_tag :subject_type, options_for_select(@subject_types.map { |type, label| [ label, type ] }, params[:subject_type]),
-          include_blank: "All types", class: setup_input_class %>
+          include_blank: "All types", class: setup_select_class %>
   </div>
 
   <div>

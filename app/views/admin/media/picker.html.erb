@@ -22,7 +22,7 @@
     <div>
       <%= label_tag "media-picker-filter", "Show", class: setup_label_class %>
       <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-            id: "media-picker-filter", class: setup_input_class %>
+            id: "media-picker-filter", class: setup_select_class %>
     </div>
 
     <%= render Admin::ButtonComponent.new(label: "Search", variant: :secondary, type: "submit") %>
