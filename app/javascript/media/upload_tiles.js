@@ -113,7 +113,11 @@ export class UploadTiles {
         try {
           await this.upload(entry, generation)
         } catch {
-          if (generation === this.generation && entry.li.isConnected) this.fail(entry, TEXTS.failedGeneric)
+          // And marking it failed is itself only that tile's business: a tile
+          // whose markup is gone must not stop the loop either.
+          try {
+            if (generation === this.generation && entry.li.isConnected) this.fail(entry, TEXTS.failedGeneric)
+          } catch { /* the rest still go */ }
         }
       }
     } finally {

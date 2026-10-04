@@ -42,7 +42,13 @@
       <%= render Admin::Shell::AccountIdentityComponent.new(user: user) %>
       <div class="mt-1 flex items-center gap-3 text-xs">
         <%= link_to "Change password", admin_account_password_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
-        <%= button_to "Sign out", admin_sign_out_path, method: :delete, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
+        <%# A real navigation, not a Turbo submission (`data-turbo="false"`):
+            signing out must end the DOCUMENT. Turbo would swap the body and
+            keep every module's state -- the upload queue's failed tiles with
+            their file names, focus notes -- for whoever signs in next on this
+            tab. With unsaved work the browser's own "Leave site?" asks (the
+            footer's and the write queue's `beforeunload` guards). %>
+        <%= button_to "Sign out", admin_sign_out_path, method: :delete, form: { data: { turbo: false } }, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
       </div>
     </div>
   </div>

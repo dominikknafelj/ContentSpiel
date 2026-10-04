@@ -180,6 +180,45 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "", page.evaluate_script("location.hash")
   end
 
+  # Ledger C-M6: Cancel on Settings leads to Settings. A reload is no new place.
+  test "the footer's Cancel reloads the screen without a second history entry" do
+    visit admin_settings_path
+    await_admin_controllers
+    fill_in "settings-en-title", with: "Typed, then cancelled"
+    entries = page.evaluate_script("history.length")
+    page.execute_script("document.querySelector('#settings-form').dataset.before = 'yes'")
+
+    within(footer) { click_link "Cancel" }
+    assert_no_selector "#settings-form[data-before]"
+    assert_selector footer, text: /No unsaved changes/i
+    assert_equal entries, page.evaluate_script("history.length")
+    assert_no_selector "#{footer} a[data-turbo-action]"
+  end
+
+  # Task 9 M14: a file dropped beside a drop zone must not navigate away.
+  test "a file dropped on a screen that takes none is refused, not navigated to" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    prevented = page.evaluate_script(<<~JS)
+      (() => {
+        const data = new DataTransfer()
+        data.items.add(new File(["x"], "stray.png", { type: "image/png" }))
+        const over = new DragEvent("dragover", { dataTransfer: data, bubbles: true, cancelable: true })
+        const drop = new DragEvent("drop", { dataTransfer: data, bubbles: true, cancelable: true })
+        const heading = document.querySelector("h1")
+        heading.dispatchEvent(over)
+        heading.dispatchEvent(drop)
+        const text = new DataTransfer()
+        text.setData("text/plain", "words")
+        const words = new DragEvent("drop", { dataTransfer: text, bubbles: true, cancelable: true })
+        heading.dispatchEvent(words)
+        return [over.defaultPrevented, drop.defaultPrevented, words.defaultPrevented]
+      })()
+    JS
+    assert_equal [ true, true, false ], prevented
+  end
+
   # -- Languages (round 3, Task 6) ---------------------------------------------------
 
   def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)

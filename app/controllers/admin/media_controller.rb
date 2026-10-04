@@ -188,6 +188,11 @@ module Admin
     def selected_asset
       raw = params[:selected]
       return nil if raw.blank?
+
+      # The not-found page's way on is the library itself, as it was listed
+      # (decision D12: the search and the segment kept, the page dropped with
+      # the image it may have belonged to).
+      @not_found_back = { label: "Back to Media", url: admin_media_path(**list_query.except(:page), **admin_url_options) }
       raise ActiveRecord::RecordNotFound, "Couldn't find Media::Asset" unless raw.is_a?(String)
 
       Media::Asset.kept.with_variants.find(raw)

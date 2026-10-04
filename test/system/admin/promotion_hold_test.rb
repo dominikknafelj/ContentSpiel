@@ -83,6 +83,8 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert @page.reload.trashed?
   end
 
+  # Sign out is a real navigation (`data-turbo="false"`), which no Turbo
+  # visit can stop: it is never held, and signs out at once.
   test "Sign out pressed during a frame fetch signs out" do
     slow_frame_fetches(600)
     page.execute_script(<<~JS)
@@ -95,30 +97,26 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_equal 0, users(:one).sessions.count
   end
 
-  test "a refused frame form is promoted to nothing, and the next press is not held" do
+  test "a refused frame form is promoted to nothing, and the next submission is not held" do
     visit admin_account_password_path
     await_admin_controllers
     fill_in "Current password", with: "not the password"
     fill_in "New password", with: "a-long-enough-password"
     fill_in "Confirm new password", with: "a-long-enough-password"
-    # Sign out is pressed the moment the 422 has been rendered into the frame
-    # -- where a promoted render would hold it until `turbo:load`.
+    # The name form is submitted the moment the 422 has been rendered into the
+    # frame -- where a promoted render would hold it until `turbo:load`.
     page.execute_script(<<~JS)
       document.addEventListener("turbo:frame-render", () => {
-        const button = Array.from(document.querySelectorAll("button")).find((b) => b.textContent.trim() === "Sign out")
-        button.click()
-        window.__heldAfterRefusal = button.form.hasAttribute("aria-busy")
+        const form = document.getElementById("profile-form")
+        form.requestSubmit()
+        window.__heldAfterRefusal = form.hasAttribute("aria-busy")
       }, { once: true })
     JS
     within("#password-form") { press "Change password" }
 
-    # Not held: it went straight on, to the leave guard of the refused form.
-    assert_selector "dialog#leave-dialog[open]", wait: 5
+    assert_text "That's not your current password.", wait: 5
+    assert_text "Name saved.", wait: 5
     assert_equal false, page.evaluate_script("window.__heldAfterRefusal")
-    within("dialog#leave-dialog") { press "Discard changes" }
-    assert_field "Email", wait: 5
-    assert_current_path admin_sign_in_path
-    assert_equal 0, users(:one).sessions.count
   end
 
   private

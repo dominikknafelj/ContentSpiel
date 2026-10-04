@@ -2,6 +2,8 @@
     with a stale `base_updated_at` (or a stale NO ALT chip or segment count) from
     Turbo's page cache, and a hover-prefetched tile answer older than a save is
     never used for a click. %>
+<%# The tab's title names the chosen image (the panel is a URL of its own). %>
+<% content_for :title, [ @selected&.title.presence, "Media", "CS Studio" ].compact.join(" · ") %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
   <meta name="turbo-prefetch" content="false">
@@ -66,8 +68,11 @@
   </div>
 
   <% if @selected %>
-    <aside class="min-w-0 rounded-cs border border-line bg-surface p-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto" aria-label="Image details">
+    <%# A plain box: the panel inside is the one landmark (a `section` named by
+        the image's title, and the focus target). An `aside` around it was a
+        second landmark for the same thing. %>
+    <div class="min-w-0 rounded-cs border border-line bg-surface p-4 lg:sticky lg:top-[calc(var(--admin-top-offset)+1.5rem)] lg:max-h-[calc(100vh-var(--admin-top-offset)-3rem)] lg:overflow-y-auto">
       <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
-    </aside>
+    </div>
   <% end %>
 </div>

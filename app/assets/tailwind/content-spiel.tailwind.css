@@ -68,6 +68,15 @@
    the top bar; below 1024px the tree does too. A closed drawer is also
    `visibility: hidden` (after the slide), so its links leave the tab order. */
 .admin-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; }
+/* How far a sticky top has to stay clear of the window's top edge: nothing on
+   the desktop, the top bar's height (`h-12`) where there is one. Every sticky
+   top inside the shell uses it -- the editor header, Settings' in-page nav,
+   the media panel (and its max-height) -- so none slides under the bar. */
+:root { --admin-top-offset: 0px; }
+@media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
+/* A save footer sticks to the bottom of the window; toasts rise above it, or
+   on a narrow window (where the form's column is the window) they cover Save. */
+body:has(.admin-save-bar) #toasts { bottom: 5.5rem; }
 .admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a

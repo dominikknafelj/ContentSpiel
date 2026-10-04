@@ -172,6 +172,66 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_equal 0, Media::Asset.count
   end
 
+  # Ledger C-M3: a tile's thumbnail dragged within the page carries `Files` too.
+  test "a drag that starts in the page never shows the overlay and uploads nothing; a drag from outside afterwards still does" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset(filename: "tiny.png")
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+
+    page.execute_script("document.querySelector('#media-asset-#{asset.id} img').dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true }))")
+    dispatch_file_drag("dragenter", "tiny.png")
+    dispatch_file_drag("dragover", "tiny.png")
+    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    dispatch_file_drop("tiny.png")
+    sleep 0.5
+    assert_no_selector "li[data-upload-tile]"
+    assert_equal 1, Media::Asset.count
+
+    dispatch_file_drag("dragenter", "tiny.png")
+    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    page.driver.browser.keyboard.type(:escape)
+  end
+
+  # Task 8 M-5: no wait for the promoted visit (`click_tile` waits for it).
+  test "typing into Alt the moment the panel exists is saved and stays in the field" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Quick one") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+
+    find("#media-asset-#{asset.id} a").click
+    find("#media-panel #media-alt").set("Typed at once")
+    assert_selector "#media-save-status", text: /SAVED/, wait: 8
+    assert_equal "Typed at once", asset.reload.alt(locale: :en)
+    assert_equal "Typed at once", find("#media-alt").value
+    assert_title(/\AQuick one · Media/)
+  end
+
+  # Ledger C-M10 and Task 8's × fallback.
+  test "a language tab in the panel keeps the focus at the panel; × with the tile not listed goes to the search" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    with_locales(%w[en de], default: "en")
+    asset = create_media_asset(filename: "tiny.png").tap { |a| a.update!(title: "Tabbed") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    click_tile(asset)
+
+    within("#media-panel") { click_link "Deutsch" }
+    assert_current_path(/locale=de/)
+    assert_eventually(message: "focus never came back to the panel") { page.evaluate_script("document.activeElement.id") == "media-panel" }
+
+    visit "/cs-studio/media?q=no-such-image&selected=#{asset.id}"
+    await_admin_controllers
+    assert_no_selector "#media-asset-#{asset.id}"
+    find("#media-panel a[aria-label='Close panel']").click
+    assert_no_selector "#media-panel"
+    assert_eventually(message: "focus fell to the body") { page.evaluate_script("document.activeElement.name") == "q" }
+  end
+
   test "an upload that finishes while the editor types in the panel leaves the panel and the text alone, and the counts follow" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }

@@ -28,7 +28,7 @@
      "social_links" => "settings-social-0-name" } %>
 
 <div class="grid max-w-[1100px] grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,1fr)]">
-  <div class="lg:sticky lg:top-7">
+  <div class="lg:sticky lg:top-[calc(var(--admin-top-offset)+1.75rem)]">
     <h1 class="mb-3.5 text-h1 text-ink">Settings</h1>
     <%= render Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent.sections_for { |permission| can?(permission) }) %>
   </div>

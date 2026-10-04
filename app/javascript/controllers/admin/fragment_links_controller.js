@@ -29,6 +29,16 @@ import { Controller } from "@hotwired/stimulus"
 // - A target that isn't there, or a hash that can't be decoded, is still no
 //   navigation: nothing moves, and the console says which link it was, so
 //   whoever wrote the id notices.
+//
+// A LINK TO THE VERY URL THAT IS SHOWING (ledger C-M6) -- the save footer's
+// Cancel on a screen that cancels to itself, the 409 notice's Reload, the tab
+// or tile that is already the current one -- is a reload, and a reload is no
+// new place: left as an `advance` it pushed a second history entry for the
+// same URL, and Back then "went back" to the screen one was on. For that one
+// click the link says `data-turbo-action="replace"` (Turbo reads the
+// attribute as it handles the click, synchronously), and gets what it had
+// back straight after.
+//
 // `admin--save-bar` stands back from these links for the same reason (its
 // `onFrameLink`); the two listeners may run in either order.
 export default class extends Controller {
@@ -45,7 +55,7 @@ export default class extends Controller {
     const link = event.target
     if (event.defaultPrevented || !(link instanceof Element)) return
     const within = targetWithinThePage(event.detail.url)
-    if (!within) return
+    if (!within) return this.replaceWhenSame(link, event.detail.url)
 
     event.preventDefault()
     event.stopPropagation()
@@ -57,6 +67,20 @@ export default class extends Controller {
     const dialog = link.closest("dialog[open]")
     if (dialog && !dialog.contains(within.element)) dialog.close()
     jumpTo(within.element)
+  }
+
+  // See "A LINK TO THE VERY URL THAT IS SHOWING".
+  replaceWhenSame(link, url) {
+    let target
+    try { target = new URL(url, document.baseURI) } catch { return }
+    if (target.href !== location.href) return
+
+    const before = link.getAttribute("data-turbo-action")
+    link.setAttribute("data-turbo-action", "replace")
+    setTimeout(() => {
+      if (before === null) link.removeAttribute("data-turbo-action")
+      else link.setAttribute("data-turbo-action", before)
+    }, 0)
   }
 }
 

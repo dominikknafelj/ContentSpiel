@@ -587,7 +587,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: asset.id, q: "sel", filter: "unused", page: 1 }
     assert_response :success
-    assert_select "aside #media-panel form[data-controller='admin--autosave'][action^='/cs-studio/media/#{asset.id}?']"
+    assert_select "div #media-panel form[data-controller='admin--autosave'][action^='/cs-studio/media/#{asset.id}?']"
     assert_select "#media-panel form input[name='media_asset[alt]']"
     assert_select "#media-panel #media-save-status"
     assert_select "#media-asset-#{asset.id} a[aria-current='true']"
@@ -792,7 +792,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { selected: asset.id }
 
-    assert_select "[data-controller='admin--media-panel'] > div + aside #media-panel[tabindex='-1']"
+    assert_select "[data-controller='admin--media-panel'] > div + div #media-panel[tabindex='-1']"
     assert_no_match(/\border-[12]\b/, css_select("[data-controller='admin--media-panel']").first.to_s)
     assert_select "#media-asset-#{asset.id} a[data-action='click->admin--media-panel#choose']"
   end
@@ -931,5 +931,27 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
     count
+  end
+
+  # Decision D12: a bad `?selected=` stays a 404, and its way on is the
+  # library as it was listed.
+  test "a selected id that names nothing is the 404 with a link back to Media that keeps the search and the segment" do
+    sign_in_as(users(:one))
+    get "/cs-studio/media", params: { selected: "999999999", q: "wall", filter: "unused", page: "3" }
+
+    assert_response :not_found
+    assert_select "a", text: "Back to Media" do |links|
+      href = links.first["href"]
+      assert_match(/\A\/cs-studio\/media\?/, href)
+      assert_includes href, "q=wall"
+      assert_includes href, "filter=unused"
+      assert_not_includes href, "page="
+      assert_not_includes href, "selected="
+    end
+    assert_select "a", text: "Back to the dashboard", count: 0
+
+    get "/cs-studio/posts/999999999"
+    assert_response :not_found
+    assert_select "a", text: "Back to the dashboard"
   end
 end

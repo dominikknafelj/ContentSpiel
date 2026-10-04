@@ -94,4 +94,12 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     render_sidebar(labels: %w[Dashboard])
     assert_selector "button[data-action='admin--command-palette#open']", text: "Jump to…"
   end
+
+  # Signing out ends the document (ledger C-M2): never a Turbo submission,
+  # which would keep module state for the next user of the tab.
+  test "Sign out is a real navigation" do
+    render_inline Admin::Shell::SidebarComponent.new(modules: [], user: users(:one), current_path: "/cs-studio", url_options: {})
+
+    assert_selector "form[data-turbo=false][action$='/sign-out'] button", text: "Sign out"
+  end
 end

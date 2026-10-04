@@ -22,6 +22,14 @@ import { Controller } from "@hotwired/stimulus"
 // document), and when no `dragover` has arrived for a second -- a drag that is
 // alive reports one at least every ~350 ms.
 //
+// A drag that STARTS in the page is never an upload (ledger C-M3): dragging a
+// tile's thumbnail carries `Files` too (the browser offers the image as one),
+// so the overlay said "Drop images to upload" over a drag of an image that is
+// already in the library, and a drop would have uploaded it again. `dragstart`
+// only fires in the document a drag began in, so it marks the drag as the
+// page's own until its `dragend` or `drop`; an own drag is left entirely to
+// the browser.
+//
 // The listeners are on `document` (the whole screen is the target), so they
 // are removed in `disconnect`, or each visit to the screen would add another set.
 const STALE_MS = 1000
@@ -36,7 +44,8 @@ export default class extends Controller {
       dragover: (event) => this.over(event),
       dragleave: (event) => this.leave(event),
       drop: (event) => this.drop(event),
-      dragend: () => this.hide(),
+      dragstart: () => { this.own = true },
+      dragend: () => { this.own = false; this.hide() },
       keydown: (event) => { if (event.key === "Escape") this.hide() }
     }
     Object.entries(this.handlers).forEach(([ name, handler ]) => document.addEventListener(name, handler, name === "drop"))
@@ -52,6 +61,14 @@ export default class extends Controller {
 
     this.depth += 1
     this.show()
+    // From the first sign of the drag, not only its first `dragover`: a drag
+    // that enters and stops reporting at once would leave the overlay up.
+    this.armStale()
+  }
+
+  armStale() {
+    clearTimeout(this.stale)
+    this.stale = setTimeout(() => this.hide(), STALE_MS)
   }
 
   over(event) {
@@ -61,8 +78,7 @@ export default class extends Controller {
     // never fires).
     event.preventDefault()
     if (event.dataTransfer) event.dataTransfer.dropEffect = this.dialogOpen ? "none" : "copy"
-    clearTimeout(this.stale)
-    this.stale = setTimeout(() => this.hide(), STALE_MS)
+    this.armStale()
     if (this.depth === 0) this.enter(event)
   }
 
@@ -70,15 +86,22 @@ export default class extends Controller {
     if (!this.carriesFiles(event)) return
 
     this.depth = Math.max(0, this.depth - 1)
-    // A leave that goes to no element at all is the pointer leaving the window.
-    if (this.depth === 0 || event.relatedTarget === null) this.hide()
+    // A leave that goes to no element at all MAY be the pointer leaving the
+    // window -- but some browsers report no `relatedTarget` for leaves inside
+    // the page too, and hiding on each of those made the overlay flicker (the
+    // next `dragover` put it back). So it only counts at the window's edge.
+    const { clientX: x, clientY: y } = event
+    const outside = x <= 0 || y <= 0 || x >= window.innerWidth || y >= window.innerHeight
+    if (this.depth === 0 || (event.relatedTarget === null && outside)) this.hide()
   }
 
   // Capture phase: the file zone's own `drop` stops propagation (so a drop inside
   // it is not handled twice -- file_drop_controller.js), which would otherwise
   // leave this overlay up.
   drop(event) {
-    if (!this.carriesFiles(event)) return
+    const own = this.own
+    this.own = false
+    if (own || !this.carriesFiles(event)) return
 
     event.preventDefault()
     this.hide()
@@ -103,6 +126,7 @@ export default class extends Controller {
   }
 
   carriesFiles(event) {
+    if (this.own) return false
     return Array.from(event.dataTransfer?.types || []).includes("Files")
   }
 
