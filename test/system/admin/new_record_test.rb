@@ -203,15 +203,16 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
   private
 
   # A row's "+" is drawn only while the pointer is over the row (or the link
-  # has keyboard focus), so it is invisible to Capybara until then. Hovering
-  # the ROW and then looking for a visible link is two separate pointer
-  # moves, and on a slow runner the row has lost its hover by the second
-  # look (CI failed exactly there). Hovering the link itself puts the pointer
-  # where the click will land, and the click is asserted against the link
-  # once it is visible.
+  # has keyboard focus): Tailwind puts every `hover:` style inside
+  # `@media (hover: hover)`, and the headless Chrome on the CI runner reports
+  # a device that cannot hover, so there the link never becomes visible
+  # however the pointer moves (it failed on every CI run and never locally).
+  # The link is in the page and clickable either way -- only its opacity
+  # differs -- so the click doesn't wait for visibility; the hover stays for
+  # the browsers where it is what a person would do.
   def add_page_under(parent)
-    selector = "li[data-page-id='#{parent.id}'] > div a[aria-label^='Add a page under']"
-    find(selector, visible: :all).hover
-    find(selector).click
+    link = find("li[data-page-id='#{parent.id}'] > div a[aria-label^='Add a page under']", visible: :all)
+    link.hover
+    link.click
   end
 end
