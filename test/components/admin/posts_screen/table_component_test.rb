@@ -51,7 +51,8 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_selector "tr#post_#{live.id} [role=menu] a", text: "Open", visible: :all
     assert_selector "tr#post_#{live.id} [role=menu] a[href='/blog/live-one']", text: "View on site", visible: :all
     assert_no_selector "tr#post_#{draft.id} [role=menu] a", text: "View on site", visible: :all
-    assert_selector "tr#post_#{draft.id} [role=menu] form[action='/cs-studio/posts/#{draft.id}'] input[name=_method][value=delete] ~ button", text: "Move to trash", visible: :all
+    assert_selector "tr#post_#{draft.id} [role=menu] button[data-action='admin--bulk-select#only admin--dialog#open'][data-admin--bulk-select-id-param='#{draft.id}'][data-admin--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
+    assert_no_selector "tr#post_#{draft.id} form", visible: :all
     assert_selector "tr#post_#{draft.id} button[aria-label='Actions for Draft one']"
 
     Current.actor = users(:reader)

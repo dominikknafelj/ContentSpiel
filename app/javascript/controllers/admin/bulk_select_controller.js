@@ -5,7 +5,11 @@ import { Controller } from "@hotwired/stimulus"
 // forms, and does four things:
 //
 // 1. Tracks which row checkboxes are ticked and shows the bulk bar (accent
-//    tint, `aria-live="polite"`) with "N selected" only while there are some.
+//    tint) with "N selected" only while there are some. The bar itself is
+//    toggled `hidden`, which makes a poor live region (a region that appears
+//    with its text is often not announced), so the announcement is a separate,
+//    always-present `status` target ("2 posts selected" / "Selection cleared"),
+//    written on every change after the first.
 // 2. Keeps the header checkbox honest: ticked when every row on the page is,
 //    `indeterminate` when only some are, so "select all on this page" is
 //    also "clear all" and a half-selected page reads as half.
@@ -26,9 +30,22 @@ import { Controller } from "@hotwired/stimulus"
 // Keyboard: all of it is native checkboxes and buttons (Space ticks, Tab
 // moves), nothing here intercepts a key.
 export default class extends Controller {
-  static targets = [ "row", "all", "bar", "count", "ids", "confirmCount" ]
+  static targets = [ "row", "all", "bar", "count", "ids", "confirmCount", "status" ]
 
-  connect() { this.sync() }
+  connect() {
+    this.sync()
+    this.announced = this.rowTargets.filter((box) => box.checked).length
+  }
+
+  // A row's own "Move to trash": selects just that post (unticking the rest)
+  // and lets the same click open the bulk trash confirmation, so a single
+  // trash goes through `posts/bulk` -- confirmed, filters and page kept, with
+  // the same Undo -- instead of a second path of its own.
+  only(event) {
+    const id = String(event.params.id)
+    this.rowTargets.forEach((box) => { box.checked = box.value === id })
+    this.sync()
+  }
 
   toggleAll() {
     this.rowTargets.forEach((box) => { box.checked = this.allTarget.checked })
@@ -58,6 +75,8 @@ export default class extends Controller {
     if (this.hasCountTarget) this.countTarget.textContent = selected.length
     this.confirmCountTargets.forEach((el) => { el.textContent = `${selected.length} ${selected.length === 1 ? "post" : "posts"}` })
 
+    this.announce(selected.length)
+
     this.idsTargets.forEach((container) => {
       container.replaceChildren(...selected.map((box) => {
         const input = document.createElement("input")
@@ -67,5 +86,12 @@ export default class extends Controller {
         return input
       }))
     })
+  }
+
+  announce(count) {
+    if (!this.hasStatusTarget || count === this.announced) return
+
+    this.statusTarget.textContent = count > 0 ? `${count} ${count === 1 ? "post" : "posts"} selected` : "Selection cleared"
+    this.announced = count
   }
 }

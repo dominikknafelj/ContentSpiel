@@ -26,7 +26,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
 
     tick(@first)
     tick(@second)
-    assert_selector "[data-admin--bulk-select-target=bar][aria-live=polite]", text: "2 selected"
+    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
     assert_selector "thead input[data-admin--bulk-select-target=all]:indeterminate"
 
     within("[data-admin--bulk-select-target=bar]") { press "Publish" }
@@ -73,6 +73,24 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast", text: "Restored 1 post.", wait: 10
     assert_not @third.reload.trashed?
     assert_selector "tr#post_#{@third.id}"
+  end
+
+  test "a row's Move to trash asks first, keeps the filter, and Undo restores it" do
+    visit admin_posts_path(q: "draft")
+    await_admin_controllers
+    find("tr#post_#{@second.id} button[aria-label^='Actions for']").click
+    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash").click
+    within("dialog#bulk-trash-dialog[open]") do
+      assert_text "This moves 1 post to the trash."
+      press "Move to trash"
+    end
+    assert_selector "#toasts .admin-toast", text: "Moved 1 post to the trash.", wait: 10
+    assert_current_path(/q=draft/)
+    assert @second.reload.trashed?
+    assert_not @first.reload.trashed?
+    within("#toasts") { press "Undo" }
+    assert_selector "#toasts .admin-toast", text: "Restored 1 post.", wait: 10
+    assert_not @second.reload.trashed?
   end
 
   test "the Translation filter narrows the list without a button" do

@@ -1,4 +1,7 @@
-<div hidden aria-live="polite" aria-atomic="true" data-admin--bulk-select-target="bar"
+<%# The announcement lives outside the bar: the bar is toggled `hidden`, and a
+    live region that appears together with its text is often not read out. %>
+<p role="status" aria-live="polite" aria-atomic="true" class="sr-only" data-admin--bulk-select-target="status"></p>
+<div hidden data-admin--bulk-select-target="bar"
      class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2 text-sm text-ink">
   <span><b class="font-semibold" data-admin--bulk-select-target="count">0</b> selected</span>
   <span class="flex flex-wrap items-center gap-2">

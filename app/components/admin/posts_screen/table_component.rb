@@ -7,7 +7,7 @@ module Admin
     # It reads nothing it isn't handed, which is what keeps the list's cost
     # flat: `paths` (each post's current public path, one query for the page),
     # `translation_states` (`Translations::StateIndex.states_for`, one query)
-    # and the posts with their tags preloaded come from the controller.
+    # and the posts themselves come from the controller (no tags are shown or preloaded).
     #
     # Selection is `admin--bulk-select`'s (on the wrapper around this and the
     # bulk bar): every row's checkbox is a `row` target, the header one is the
@@ -17,8 +17,9 @@ module Admin
     # Each language chip links to that language's tab of the post's editor.
     # "⋯" is the row's menu: Open, View on site (only while live and listed on
     # a page -- there is no public address otherwise) and Move to trash
-    # (only where the viewer may delete that post; a one-post move offers Undo
-    # like the editor's).
+    # (only where the viewer may delete that post; it ticks just that row and opens
+    # the bulk trash confirmation, so it keeps the list's filters and offers the
+    # same Undo).
     class TableComponent < Admin::AdminComponent
       renders_one :footer
 

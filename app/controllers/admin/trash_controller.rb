@@ -102,18 +102,21 @@ module Admin
     # (the service's), nothing else. Posts only -- the one bulk trash there
     # is. Ids are looked up through `visible("post")`, the trashed posts the
     # viewer may act on: an id that is kept, gone, or out of scope is
-    # *counted as not found* and changes nothing. A restore the service
-    # refuses (a denial, a post whose type is no longer registered) is
-    # reported as refused and never stops the others.
+    # *counted as not found* and changes nothing. The loop is
+    # `Posts::BulkRestore`'s: a restore the service refuses (a denial) or that
+    # fails (a post whose type is no longer registered, an exception) is
+    # reported and never stops the others.
     def restore_many
       return head :unprocessable_entity unless params[:type] == "post" && params[:ids].is_a?(Array)
 
-      ids = params[:ids].grep(String).uniq
-      return head :unprocessable_entity if ids.size > Posts::Bulk::MAX_IDS
+      begin
+        result = Posts::BulkRestore.call(ids: params[:ids].grep(String))
+      rescue ArgumentError
+        return head :unprocessable_entity
+      end
 
-      posts = self.class.visible("post", Current.actor).where(id: ids.grep(Posts::Bulk::ID_FORMAT)).order(:id).to_a
-      done, refused = posts.partition { |post| Trash::Restore.call(post).ok? }
-      flash_bulk_result(done:, refused:, not_found: ids.size - posts.size, verb: "Restored")
+      flash_bulk_result(done: result.restored, refused: result.refused, failed: result.failed, reasons: result.reasons,
+        not_found: result.not_found, verb: "Restored", failed_phrase: "restored")
       redirect_to admin_posts_path(**restore_return_params), status: :see_other
     end
 

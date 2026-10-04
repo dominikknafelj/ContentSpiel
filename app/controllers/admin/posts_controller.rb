@@ -26,8 +26,11 @@ module Admin
     before_action -> { require_permission("posts.create") }, only: %i[new create]
 
     # Filters as query params (spec §5.2's "filters: content type, status,
-    # tag, title search"): `type` is the bare registered name, `status` is
-    # one of `Publishable::STATUSES`, `tag` is a tag's own name, `q` is a
+    # tag, title search"; design pass round 2, Task 17): `type` is the bare
+    # registered name, `scope` is `all|live|drafts|scheduled` (the old `status`
+    # still reads, see `list_scope`), `tag` is a tag's own name, `translation`
+    # is `needs|outdated|complete` (`filter_by_translation`), `page` is the
+    # 50-row page (`Pagination`), `q` is a
     # title substring matched in the *editing* locale (not every locale --
     # an editor filtering the list they're currently reading in one
     # language expects that language's titles to match, not some other
@@ -76,12 +79,19 @@ module Admin
       trashing = action == "trash"
       # One Undo for the whole batch, restoring exactly the posts this action
       # moved (`done`, never "whatever is in the trash"): a route of its own,
-      # which carries the ids and the list's filters.
-      # The list's filters ride in `back`: they have their own `type`, which
-      # must not collide with the Undo route's `type=post`.
-      undo_url = admin_restore_many_trash_path(type: "post", ids: result.done.map(&:id), back: list_filters, **admin_url_options) if trashing && undo_offered?(result.done)
-      flash_bulk_result(done: result.done, refused: result.refused, not_found: result.not_found,
-        verb: trashing ? "Moved" : "Published", suffix: trashing ? " to the trash" : "", undo_url:)
+      # which carries the ids and the list's filters. The filters ride in
+      # `back`: they have their own `type`, which must not collide with the
+      # Undo route's `type=post`. They are free text (the search), so an Undo
+      # whose URL would be too long for the session cookie is not offered.
+      undo_url = nil
+      if trashing && result.done.any?
+        url = admin_restore_many_trash_path(type: "post", ids: result.done.map(&:id), back: list_filters, **admin_url_options)
+        undo_url = url if undo_offered?(url)
+      end
+      flash_bulk_result(done: result.done, refused: result.refused, failed: result.failed, reasons: result.reasons,
+        already_live: result.already_live, skipped_scheduled: result.skipped_scheduled, not_found: result.not_found,
+        verb: trashing ? "Moved" : "Published", suffix: trashing ? " to the trash" : "",
+        failed_phrase: trashing ? "moved to the trash" : "published", undo_url:, undo_dropped: trashing && result.done.any? && undo_url.nil?)
       redirect_to posts_list_path, status: :see_other
     end
 
@@ -281,7 +291,10 @@ module Admin
       # filtered down to just the matching tag, that's also all `post.tags`
       # sees for the rest of that row, not every tag the post actually has.
       # Filtering by a subquery's `id`s instead leaves the outer scope with no
-      # `tags` reference of its own, so `includes` stays a real `includes`.
+      # `tags` reference of its own. (The list shows no tags and preloads none
+      # today; the subquery is what keeps it that way if tags are ever
+      # preloaded here again -- `posts_test.rb` pins that no `LEFT OUTER JOIN
+      # "tags"` appears.)
       scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].is_a?(String) && params[:tag].present?
       scope = filter_by_translation(scope, params[:translation]) if params[:translation].is_a?(String)
       scope = filter_by_title(scope, params[:q]) if params[:q].is_a?(String) && params[:q].present?
@@ -323,7 +336,11 @@ module Admin
     # `translation_states` rows -- a post with no row reads as complete, the
     # same rule `Translations::StateIndex` applies everywhere. An EXISTS over
     # the target languages rather than `StateIndex.joins`, which narrows by
-    # one language: this filter asks about the post as a whole.
+    # one language: this filter asks about the post as a whole. The states
+    # are the *rolled-up* ones the row's chips show (`Translations::Status`:
+    # a language that is both missing and outdated reads as missing), so
+    # "Outdated" lists exactly the posts with an outdated chip -- never one
+    # whose only chip in that language is missing.
     def filter_by_translation(scope, name)
       states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
       return scope unless states || name == "complete"
@@ -360,11 +377,29 @@ module Admin
     # editing locale.
     def list_query = admin_url_options.merge(list_filters.symbolize_keys)
 
+    # Where to send the editor back to: the list they came from, filters and
+    # page kept -- except that emptying the last page (a bulk trash, or a
+    # bulk publish under Drafts) would land on "Nothing on this page", so a
+    # page past the end of the *returned* filters goes to the last page that
+    # exists (and no `page` at all when nothing is left). `index` itself still
+    # reports an out-of-range page, as ever.
+    def posts_list_path
+      query = list_query
+      if query.key?(:page)
+        @scope = list_scope
+        pagination = Pagination.new(page: query[:page], per_page: PER_PAGE, total: scope_counts.fetch(@scope))
+        if pagination.out_of_range? || pagination.total.zero?
+          query = query.except(:page)
+          query[:page] = pagination.total_pages if pagination.out_of_range? && pagination.total_pages > 1
+        end
+      end
+      admin_posts_path(**query)
+    end
+
     def list_filters
       params.to_unsafe_h.slice(*LIST_KEYS.map(&:to_s)).select { |_, value| value.is_a?(String) }
     end
 
-    def posts_list_path = admin_posts_path(**list_query)
 
     # A request no screen of ours sends (a forged action, more ids than the
     # list can show): a plain 422, no redirect to a list that did nothing.

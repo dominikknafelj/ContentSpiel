@@ -49,9 +49,13 @@
                 <% menu.with_item { link_to "View on site", site_path(post), target: "_blank", rel: "noopener" } %>
               <% end %>
               <% if can?("posts.delete", post) %>
+                <%# Selects just this row and opens the bulk trash confirmation
+                    (`admin--bulk-select#only`): one path for trashing, with
+                    its confirmation, its filters and its Undo. %>
                 <% menu.with_item do %>
-                  <%= helpers.button_to "Move to trash", helpers.admin_post_path(post, **url_options), method: :delete,
-                        form: { data: { turbo_frame: "_top" } }, class: "text-danger-ink" %>
+                  <%= tag.button "Move to trash", type: "button", class: "text-danger-ink",
+                        data: { action: "admin--bulk-select#only admin--dialog#open", "admin--bulk-select-id-param": post.id,
+                                "admin--dialog-id-param": Admin::PostsScreen::BulkBarComponent::TRASH_DIALOG_ID } %>
                 <% end %>
               <% end %>
             <% end %>

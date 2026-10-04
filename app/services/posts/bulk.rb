@@ -29,20 +29,37 @@ module Posts
   # action. A duplicated id counts once.
   #
   # audit: none (each post's own service authorizes it and records its event)
+  #
+  # Publish never changes what it shouldn't: an already-live post is left as
+  # it is (`already_live`, not counted as published) and a *scheduled* post
+  # (a future `published_at`) is skipped (`skipped_scheduled`) -- "publish"
+  # here must not silently discard a schedule an editor set; scheduled posts
+  # are published from their own editor. Results are four-way for the posts
+  # it acted on: `done`, `refused` (a permission denial -- the viewer may read
+  # the post but not do this to it), `failed` (the service said no for any
+  # other reason, or raised; `reasons` has the message per post id).
   class Bulk < ApplicationService
     ACTIONS = %w[publish trash].freeze
     MAX_IDS = 200
-    # A bigint column's largest id has 19 digits; anything longer (or not
-    # digits at all) can't be a post and must not reach the query.
-    ID_FORMAT = /\A\d{1,18}\z/
 
-    Result = Data.define(:done, :refused, :not_found, :reasons)
+    Result = Data.define(:done, :refused, :failed, :already_live, :skipped_scheduled, :not_found, :reasons)
+
+    # The ids a request names, each once: a positive integer (so "1", "01"
+    # and " 1 " are one post, and nothing past a bigint reaches a query) or,
+    # for anything that isn't one, the raw string -- which can only be "not
+    # found". Shared with `Posts::BulkRestore`.
+    def self.normalize_ids(ids)
+      Array(ids).map do |id|
+        number = Integer(id.to_s, 10, exception: false)
+        number && number.between?(1, 10**18) ? number : id.to_s
+      end.uniq
+    end
 
     def initialize(action:, ids:, actor: Current.actor)
       raise ArgumentError, "unknown bulk action #{action.inspect}" unless ACTIONS.include?(action.to_s)
 
       @action = action.to_s
-      @ids = Array(ids).map(&:to_s).uniq
+      @ids = self.class.normalize_ids(ids)
       raise ArgumentError, "at most #{MAX_IDS} posts per call" if @ids.size > MAX_IDS
 
       @actor = actor
@@ -50,27 +67,31 @@ module Posts
 
     def call
       posts = readable_posts
-      done = []
-      refused = []
-      reasons = {}
+      done, refused, failed, already_live, skipped, reasons = [], [], [], [], [], {}
 
       posts.each do |post|
-        result = act_on(post)
-        if result.ok?
-          done << post
+        if @action == "publish" && post.status == "live"
+          already_live << post
+        elsif @action == "publish" && post.status == "scheduled"
+          skipped << post
         else
-          refused << post
-          reasons[post.id] = result.errors.to_sentence
+          result = act_on(post)
+          if result.ok?
+            done << post
+          else
+            (result.denied? ? refused : failed) << post
+            reasons[post.id] = result.errors.to_sentence
+          end
         end
       end
 
-      Result.new(done:, refused:, not_found: @ids.size - posts.size, reasons:)
+      Result.new(done:, refused:, failed:, already_live:, skipped_scheduled: skipped, not_found: @ids.size - posts.size, reasons:)
     end
 
     private
 
     def readable_posts
-      numeric = @ids.grep(ID_FORMAT)
+      numeric = @ids.grep(Integer)
       return [] if numeric.empty?
 
       AccessControl.scope(actor, "posts.read", Post.where(id: numeric)).order(:id).to_a

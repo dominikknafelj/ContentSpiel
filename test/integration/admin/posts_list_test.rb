@@ -181,7 +181,8 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
   test "a viewer who can't publish or delete sees no bulk actions; one who can sees the bar, the trash dialog and the toolbar" do
     create_post(title: "One")
     get "/cs-studio/posts"
-    assert_select "[aria-live=polite][data-admin--bulk-select-target=bar][hidden]"
+    assert_select "[data-admin--bulk-select-target=bar][hidden]"
+    assert_select "p[role=status][aria-live=polite][data-admin--bulk-select-target=status]"
     assert_select "[data-admin--bulk-select-target=bar] form[action=?] button", "/cs-studio/posts/bulk", text: "Publish"
     assert_select "dialog#bulk-trash-dialog form[action=?]", "/cs-studio/posts/bulk"
     assert_select "tbody input.cs-checkbox[type=checkbox][data-admin--bulk-select-target=row]", 1
@@ -216,7 +217,8 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
   test "bulk publish: 'Published 3 posts.' and the filters survive the redirect" do
     posts = Array.new(3) { |i| create_post(title: "Draft #{i}", published: false) }
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: posts.map(&:id), scope: "drafts", q: "Draft", page: "1", evil: "x" }
-    assert_redirected_to "/cs-studio/posts?page=1&q=Draft&scope=drafts"
+    # Under Drafts nothing is left, so page 1 of the returned list is simply the list.
+    assert_redirected_to "/cs-studio/posts?q=Draft&scope=drafts"
     assert_equal "Published 3 posts.", flash[:notice]
     assert posts.all? { |record| record.reload.live? }
     assert_equal 3, Audit::Event.where(action: "post.published").count
@@ -308,6 +310,96 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     sign_in_as(group_less)
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ "1" ] }
     assert_response :forbidden
+  end
+
+  test "an invalid post is 'couldn't be published' with its reason, apart from a denied one; plural-correct" do
+    ok = create_post(title: "Ok", published: false)
+    bad1 = create_post(title: "Bad one", published: false)
+    bad2 = create_post(title: "Bad two", published: false)
+    [ bad1, bad2 ].each { |bad| bad.update_columns(content_type: "not_registered") }
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ ok.id, bad1.id ] }
+    assert_match(/\APublished 1 post\. 1 couldn't be published: “Bad one” \(.+\)\.\z/, flash[:notice])
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ bad1.id, bad2.id ] }
+    assert_match(/\ANothing was changed\. 2 couldn't be published: “Bad one” and “Bad two” \(.+\)\.\z/, flash[:alert])
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ bad1.id ] }
+    assert_match(/Moved 1 post to the trash\./, flash[:notice]) # a trash doesn't validate; sanity that the phrase is per action
+  end
+
+  test "a denied post and an invalid one in one batch are two sentences" do
+    mine = create_post(title: "Mine", published: false)
+    other = create_post(title: "Not mine", published: false)
+    bad = create_post(title: "Broken", published: false)
+    bad.update_columns(content_type: "not_registered", author_id: users(:reader).id)
+    mine.update_columns(author_id: users(:reader).id)
+    group = AccessControl::Group.create!(name: "Own publishers 2")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+    AccessControl::Grant.create!(group: group, permission: "posts.publish", scope: { "own" => true })
+    AccessControl::Membership.create!(group: group, user: users(:reader))
+    sign_in_as(users(:reader))
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ mine.id, other.id, bad.id ] }
+    assert_match(/\APublished 1 post\. 1 was refused: “Not mine”\. 1 couldn't be published: “Broken” \(.+\)\.\z/, flash[:notice])
+  end
+
+  test "bulk publish skips a scheduled post and says so; an already-live one is not counted as published" do
+    live = create_post(title: "Live", published: true)
+    draft = create_post(title: "Draft", published: false)
+    later = create_post(title: "Later", published: false)
+    Posts::Save.call(later, attributes: { published_at: 3.days.from_now })
+    at = later.reload.published_at
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ live.id, draft.id, later.id ] }
+    assert_equal "Published 1 post. 1 was already live. 1 scheduled post was left as scheduled.", flash[:notice]
+    assert_equal at, later.reload.published_at
+  end
+
+  test "a long title or reason is cut so the toast fits the session cookie" do
+    long = "x" * 500
+    bad = create_post(title: long, published: false)
+    bad.update_columns(content_type: "not_registered")
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ bad.id ] }
+    assert_response :see_other
+    assert_operator flash[:alert].length, :<, 400
+    assert_includes flash[:alert], "x" * 50
+    assert_not_includes flash[:alert], "x" * 100
+  end
+
+  test "a 2 KB search string: no 500, the posts are trashed, the toast shows, and Undo is replaced by where to find them" do
+    posts = Array.new(2) { |i| create_post(title: "Long q #{i}") }
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: posts.map(&:id), q: "q" * 2048 }
+    assert_response :see_other
+    assert posts.all? { |record| record.reload.trashed? }
+    assert_equal "Moved 2 posts to the trash. Find them in the Trash.", flash[:notice]
+    assert_nil flash[:undo]
+    follow_redirect!
+    assert_response :ok
+    assert_select "#toasts .admin-toast", text: /Find them in the Trash\./
+  end
+
+  test "emptying the last page lands on the last page that exists; the index still reports a bad page" do
+    insert_posts(51, published_at: nil, prefix: "Page")
+    last = Post.order(:updated_at).first # the 51st row, alone on page 2
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ last.id ], page: "2", q: "Page" }
+    assert_redirected_to "/cs-studio/posts?q=Page"
+    # Two pages left, page 3 asked for after emptying page 2 completely:
+    insert_posts(60, published_at: nil, prefix: "More")
+    ids = Post.where("title ->> 'en' LIKE 'More%'").order(updated_at: :desc, id: :desc).offset(50).pluck(:id) # rows 51+ of the More list
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: ids, page: "2", q: "More" }
+    assert_redirected_to "/cs-studio/posts?q=More"
+    get "/cs-studio/posts", params: { page: "9" }
+    assert_select "h3", text: "Nothing on this page"
+  end
+
+  test "the toolbar counts of a content_types-scoped viewer count each readable post once" do
+    2.times { |i| create_post(title: "Blog #{i}", tags: [ "a", "b" ]) }
+    create_post(title: "Resume", content_type: "resume_entry")
+    scoped = User.create!(email_address: "scoped-counts@example.com", password: "a long enough password")
+    group = AccessControl::Group.create!(name: "Blog readers")
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => %w[blog] })
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "own" => false, "content_types" => %w[blog] })
+    AccessControl::Membership.create!(group: group, user: scoped)
+    sign_in_as(scoped)
+    get "/cs-studio/posts"
+    assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "2"
+    assert_equal 2, row_titles.size
   end
 
   # --- POST /trash/restore_many ------------------------------------------------

@@ -4,9 +4,10 @@ class Admin::PostsScreen::BulkBarComponentTest < ViewComponent::TestCase
   setup { Current.actor = users(:one) }
   teardown { Current.reset }
 
-  test "a hidden, polite live region with the count, Publish, Move to trash and Clear" do
+  test "a hidden bar with the count, Publish, Move to trash and Clear, and an always-present polite status beside it" do
     render_inline Admin::PostsScreen::BulkBarComponent.new(list_fields: { "q" => "x", "scope" => "drafts" })
-    assert_selector "[aria-live=polite][hidden][data-admin--bulk-select-target=bar]", visible: :all
+    assert_selector "[hidden][data-admin--bulk-select-target=bar]:not([aria-live])", visible: :all
+    assert_selector "p.sr-only[role=status][aria-live=polite][aria-atomic=true][data-admin--bulk-select-target=status]", visible: :all
     assert_selector "[data-admin--bulk-select-target=count]", text: "0", visible: :all
     assert_selector "[data-admin--bulk-select-target=bar] button[data-action='admin--bulk-select#clear']", text: "Clear", visible: :all
     assert_selector "button[data-admin--dialog-id-param=bulk-trash-dialog]", text: "Move to trash", visible: :all
