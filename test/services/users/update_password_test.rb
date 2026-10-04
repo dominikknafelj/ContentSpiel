@@ -83,4 +83,48 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     assert users(:two).reload.authenticate("password")
     assert users(:reader).reload.authenticate("reset-pass-1")
   end
+
+  # --- A password change ends that user's sessions ---------------------------
+
+  test "an admin changing someone's password ends every session of that user, the admin's own untouched" do
+    target = users(:reader).sessions.create!
+    mine = users(:two).sessions.create!
+
+    result = Current.set(session: mine) { as(users(:two)) { change(users(:reader), actor: users(:two)) } }
+
+    assert result.ok?, result.errors.inspect
+    assert_not Session.exists?(target.id)
+    assert Session.exists?(mine.id)
+  end
+
+  test "changing your own password keeps the session you act in and ends the others" do
+    current = users(:reader).sessions.create!
+    other = users(:reader).sessions.create!
+
+    result = Current.set(session: current) { as(users(:reader)) { change(users(:reader), actor: users(:reader)) } }
+
+    assert result.ok?, result.errors.inspect
+    assert Session.exists?(current.id)
+    assert_not Session.exists?(other.id)
+  end
+
+  # The reset flow: the emailed token is what authenticated the change, no
+  # session is acting, so there is none to keep.
+  test "the reset flow ends every session of the user" do
+    2.times { users(:reader).sessions.create! }
+
+    result = as(nil) { change(users(:reader), actor: users(:reader), keep_acting_session: false) }
+
+    assert result.ok?, result.errors.inspect
+    assert_empty users(:reader).sessions.reload
+  end
+
+  test "a failed change ends no session" do
+    session = users(:reader).sessions.create!
+
+    result = as(users(:reader)) { change(users(:reader), actor: users(:reader), current_password: "wrong") }
+
+    assert_not result.ok?
+    assert Session.exists?(session.id)
+  end
 end

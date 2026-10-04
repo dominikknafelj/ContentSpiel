@@ -19,17 +19,26 @@ module Users
   # match, so a borrowed signed-in session can't take over the account
   # without knowing the password. The reset flow omits it.
   #
+  # A change ends the user's sessions, in the same transaction
+  # (`OwnerProtection#end_sessions_after_password_change`): all of them,
+  # except -- for a signed-in user changing their own password -- the
+  # session they are doing it in. The reset flow passes
+  # `keep_acting_session: false`: its `actor:` is the user too, but the
+  # emailed token made the change, not a session, so a session that happens
+  # to be signed in in the same browser goes with the rest.
+  #
   # The password itself never reaches the log (Review Focus 5): the event
   # is `user.updated` with a `"credentials"` marker (`OwnerProtection#
   # user_field_changes`).
   class UpdatePassword < ApplicationService
     include OwnerProtection
 
-    def initialize(user, password:, password_confirmation:, current_password: nil, actor: Current.actor)
+    def initialize(user, password:, password_confirmation:, current_password: nil, keep_acting_session: true, actor: Current.actor)
       @user = user
       @password = password.to_s
       @password_confirmation = password_confirmation.to_s
       @current_password = current_password
+      @keep_acting_session = keep_acting_session
       @actor = actor
     end
 
@@ -46,6 +55,7 @@ module Users
       @user.assign_attributes(password: @password, password_confirmation: @password_confirmation)
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
+        end_sessions_after_password_change(keep_acting_session: @keep_acting_session)
 
         record_event("user.updated", subject: @user, field_changes: user_field_changes(@user))
         true

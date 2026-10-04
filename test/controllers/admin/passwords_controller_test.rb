@@ -110,6 +110,29 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_notice "Password has been reset"
   end
 
+  # A reset is what someone does who has lost the account to someone else:
+  # every session goes, including one in the very browser that follows the
+  # emailed link (`Users::UpdatePassword` ends them with the write).
+  test "update ends every session of the user, a signed-in one in this browser included" do
+    elsewhere = @user.sessions.create!
+    sign_in_as(@user)
+    here = Current.session
+
+    patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
+
+    assert_redirected_to admin_sign_in_path
+    assert_not Session.exists?(elsewhere.id)
+    assert_not Session.exists?(here.id)
+  end
+
+  test "a refused update ends no session" do
+    session = @user.sessions.create!
+
+    patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "another" }
+
+    assert Session.exists?(session.id)
+  end
+
   test "update with non matching passwords" do
     token = @user.password_reset_token
     assert_no_changes -> { @user.reload.password_digest } do

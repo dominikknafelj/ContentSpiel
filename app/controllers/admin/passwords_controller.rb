@@ -31,11 +31,13 @@ module Admin
       # is denied), but the emailed reset token `set_user_by_token` just
       # verified authenticated this request as @user -- so it's their own
       # password change, which `Users::UpdatePassword` allows and records
-      # as theirs.
-      result = Users::UpdatePassword.call(@user, password: params[:password], password_confirmation: params[:password_confirmation], actor: @user)
+      # as theirs. The service also ends every session of the user with the
+      # write (`keep_acting_session: false`: the token made this change, so
+      # not even a session signed in in this browser is kept).
+      result = Users::UpdatePassword.call(@user, password: params[:password], password_confirmation: params[:password_confirmation],
+        actor: @user, keep_acting_session: false)
 
       if result.ok?
-        @user.sessions.destroy_all
         redirect_to admin_sign_in_path, notice: "Password has been reset."
       else
         redirect_to admin_edit_password_path(params[:token]), alert: result.errors.to_sentence

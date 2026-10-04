@@ -14,6 +14,12 @@ module Users
   # to an untouched file input. A typed password, though, always needs its
   # confirmation (`#unconfirmed_password`).
   #
+  # A password that did change ends that user's sessions, in the same
+  # transaction (`OwnerProtection#end_sessions_after_password_change`): an
+  # admin who resets a colleague's password after a leak signs out whoever
+  # is using it. An admin changing their *own* password here stays signed
+  # in on this session and loses the others, as on "Change my password".
+  #
   # `name` is optional (design pass spec §5.1); it rides along with the
   # email as an ordinary attribute and reaches the event through
   # `user_field_changes` like any other column.
@@ -63,6 +69,7 @@ module Users
 
       saved = User.transaction do
         @user.save || raise(ActiveRecord::Rollback)
+        end_sessions_after_password_change
         sync_groups(old_group_ids, new_group_ids)
         record_changes(old_group_ids, new_group_ids)
         true

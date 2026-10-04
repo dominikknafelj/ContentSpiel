@@ -8,7 +8,9 @@ module Admin
   # `current_password:`), so a session left signed in on someone else's
   # screen can't be turned into a takeover of the account. A success signs
   # out every *other* session of the user -- a password change is what
-  # someone does when they think it leaked -- and keeps this one.
+  # someone does when they think it leaked -- and keeps this one; the
+  # service does that itself, together with the write
+  # (`Users::OwnerProtection#end_sessions_after_password_change`).
   class AccountsController < BaseController
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
@@ -25,7 +27,6 @@ module Admin
         password: params[:password], password_confirmation: params[:password_confirmation])
 
       if result.ok?
-        Current.user.sessions.where.not(id: Current.session.id).destroy_all
         redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Password changed. Your other sessions were signed out."
       else
         @errors = result.errors
