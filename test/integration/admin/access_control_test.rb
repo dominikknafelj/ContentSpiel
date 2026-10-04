@@ -272,7 +272,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     data = JSON.parse(css_select("script#mind-graph-data").first.text)
     assert_equal [ @own_post.id, second_own.id ].sort, data["nodes"].map { |node| node["id"] }.sort
-    assert_equal [ { "source" => @own_post.id, "target" => second_own.id } ], data["edges"]
+    assert_equal [ { "source" => @own_post.id, "target" => second_own.id, "kind" => "related" } ], data["edges"]
   end
 
   test "the post editor names no related post the actor can't read" do

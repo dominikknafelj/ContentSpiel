@@ -341,3 +341,37 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .admin-card-table td:last-child {
   padding-right: 14px;
 }
+
+/* The mind graph (round 3, D27). Everything the graph draws takes its colour
+   from tokens through these classes -- the controller sets a class, never a
+   colour -- so light and dark both work and `admin_design_rules_test` finds no
+   literal in the JS. A post's hue is `--mg-hue`: `--cs-cat-1..6` by its type's
+   `colour_index` (7-12 reuse the six hues, 13+ cycle), `--cs-meta` for a type
+   that isn't registered any more. The status cue is the FILL, so it can't be
+   confused with the index cue: a live post is filled; a draft or scheduled one
+   is hollow (surface fill, a thicker stroke); and an index 7-12 type, which
+   `Admin::ContentTypeDotComponent` draws as a ring, is a pale TINT of its hue
+   here (a hollow node already means "not live"). Edges differ by line style,
+   not colour alone: related is solid, a shared tag dashed. */
+.mg-node { --mg-hue: var(--cs-meta); cursor: pointer; user-select: none; }
+.mg-cat-1 { --mg-hue: var(--cs-cat-1); }
+.mg-cat-2 { --mg-hue: var(--cs-cat-2); }
+.mg-cat-3 { --mg-hue: var(--cs-cat-3); }
+.mg-cat-4 { --mg-hue: var(--cs-cat-4); }
+.mg-cat-5 { --mg-hue: var(--cs-cat-5); }
+.mg-cat-6 { --mg-hue: var(--cs-cat-6); }
+.mg-node circle { fill: var(--mg-hue); stroke: var(--mg-hue); stroke-width: 1.5; }
+.mg-node.mg-tint circle { fill: color-mix(in oklab, var(--mg-hue) 30%, var(--cs-surface)); }
+.mg-node.mg-hollow circle { fill: var(--cs-surface); stroke-width: 2.5; }
+.mg-node:focus { outline: none; }
+.mg-node:focus-visible circle { stroke: var(--cs-accent); stroke-width: 3; }
+.mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
+.mg-tag text { fill: var(--cs-meta); }
+.mg-edge { fill: none; }
+.mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }
+.mg-edge-tag { stroke: var(--cs-meta); stroke-opacity: 0.8; stroke-width: 1; stroke-dasharray: 4 3; }
+.mg-hidden { display: none; }
+/* The legend's own swatches reuse the same classes at a small size. */
+.mg-key { flex-shrink: 0; overflow: visible; }
+.mg-key .mg-edge-related, .mg-key .mg-edge-tag { stroke-opacity: 1; }
+.mg-key-hollow { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 2; }

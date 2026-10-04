@@ -380,6 +380,27 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
   end
 
+  # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
+  # readable posts carrying it, so a trashed one neither lists it nor makes a tag
+  # that only it shared a node.
+  test "the mind graph's tag nodes count kept posts only" do
+    sign_in_as users(:one)
+    tag = Tag.create!(name: "graph-shared")
+    other = create_post(title: "Second kept")
+    [ @kept_post, other, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+
+    get "/cs-studio/mind_graph"
+    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2 } ], data["tags"]
+    assert_equal [ @kept_post.id, other.id ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
+
+    other.update_column(:trashed_at, Time.current)
+    get "/cs-studio/mind_graph"
+    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    assert_empty data["tags"], "one kept post is not a connection"
+    assert_empty data["edges"]
+  end
+
   # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the
   # viewer may read, and links to the posts list for the tag, which shows the same
   # ones. The dialogs' number is the one place a trashed post is counted on
