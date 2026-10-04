@@ -27,7 +27,8 @@ class Admin::ChipInputComponentTest < ViewComponent::TestCase
   test "track: marks the sentinel, every chip's input and the clone template for the explicit-save footer; untracked is unmarked" do
     render_chips(track: true)
 
-    assert_selector "input[type=hidden][name='post[tag_names][]'][data-save-bar-track]", count: 4, visible: :all # sentinel, two chips, template
+    assert_selector "input[type=hidden][name='post[tag_names][]'][data-save-bar-track]", count: 3, visible: :all # sentinel and two chips
+    assert_equal 4, rendered_content.scan("data-save-bar-track").size # ...and the template the controller clones
     render_chips
     assert_no_selector "input[data-save-bar-track]", visible: :all
   end
