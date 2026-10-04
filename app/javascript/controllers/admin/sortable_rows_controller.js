@@ -45,6 +45,7 @@ export default class extends Controller {
       fallbackOnBody: true,
       fallbackClass: "admin-drag-fallback",
       fallbackTolerance: 3,
+      onChoose: () => this.rememberRadios(),
       onStart: () => this.makeCloneInert(),
       onEnd: () => this.commit()
     })
@@ -55,12 +56,27 @@ export default class extends Controller {
     this.sortable = null
   }
 
+  // SortableJS appends the fallback clone to <body> BEFORE `onStart`. A cloned,
+  // CHECKED radio (the default language's Default) has the original's name and
+  // form owner, so it joins the group and unchecks the original -- and removing
+  // its `name` afterwards doesn't give the check back. So the checked radios of
+  // the list are noted when the row is chosen (before any clone exists) and
+  // checked again once the clone has been made inert.
+  rememberRadios() {
+    this.checkedRadios = Array.from(this.listTarget.querySelectorAll("input[type=radio]:checked"))
+  }
+
+  restoreRadios() {
+    (this.checkedRadios || []).forEach((radio) => { radio.checked = true })
+    this.checkedRadios = null
+  }
+
   // The dragged clone is a picture of the row, appended to <body> outside the
   // form: stripped of ids and Stimulus wiring (as `admin--blocks` does) so
   // nothing exists twice or connects in it.
   makeCloneInert() {
     const clone = Sortable.ghost
-    if (!clone) return
+    if (!clone) return this.restoreRadios()
     for (const element of [clone, ...clone.querySelectorAll("*")]) {
       for (const { name } of Array.from(element.attributes)) {
         if (name === "id" || name === "name" || name === "data-controller" || name === "data-action" || /^data-.+-target$/.test(name)) {
@@ -68,6 +84,7 @@ export default class extends Controller {
         }
       }
     }
+    this.restoreRadios()
   }
 
   // The order field follows the rows. Only an actual change is announced to

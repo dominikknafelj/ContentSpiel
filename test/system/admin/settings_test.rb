@@ -262,4 +262,30 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast", text: "Français added"
     assert_selector "#language-fr"
   end
+
+  # SortableJS's fallback drag appends a clone of the row to <body> BEFORE
+  # `onStart`; the cloned, checked Default radio shares the original's name and
+  # form owner, joins the group and unchecks the original.
+  test "dragging the default language's row with the mouse keeps its Default radio checked" do
+    visit admin_settings_path
+    await_admin_controllers
+    assert find("#language-default-en").checked?
+
+    # A real pointer drag in small steps: SortableJS's fallback needs
+    # `fallbackTolerance` of movement and then moves over the target row.
+    mouse = page.driver.browser.mouse
+    from = find("button[aria-label='Move English']").evaluate_script("(function(r){return [r.x + r.width / 2, r.y + r.height / 2]})(this.getBoundingClientRect())")
+    target = find("#language-de").evaluate_script("(function(r){return [r.x + r.width / 2, r.y + r.height * 0.8]})(this.getBoundingClientRect())")
+    mouse.move(x: from[0], y: from[1])
+    mouse.down
+    10.times { |step| mouse.move(x: from[0] + (target[0] - from[0]) * (step + 1) / 10.0, y: from[1] + (target[1] - from[1]) * (step + 1) / 10.0, steps: 3) }
+    assert_selector "body > .admin-drag-fallback", visible: :all
+    assert page.evaluate_script("document.querySelector('#language-default-en').checked"), "the Default radio stays checked while the row is being dragged"
+    mouse.up
+
+    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_selector footer, text: /\b1 unsaved change\b/i
+    assert find("#language-default-en").checked?
+    assert_not find("#language-default-de").checked?
+  end
 end

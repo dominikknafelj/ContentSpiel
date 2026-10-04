@@ -189,17 +189,46 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_equal %w[de en], @site.reload.locale_codes
   end
 
-  test "a languages.manage-only viewer's Save is a languages-only call that leaves the site row's fields alone" do
+  test "a languages.manage-only viewer's Save (rows and the base, no site field) is a languages-only call that leaves the site row alone" do
     @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
     sign_in_as(user_holding("languages.manage"))
 
+    get "/cs-studio/settings"
+    # Their form carries the rows and the order, and nothing of the site's.
+    assert_select "form#settings-form input[name^='site_setting[']:not([name^='site_setting[language'])", count: 0
+
     assert_no_difference -> { Audit::Event.where(action: "settings.updated").count } do
-      save_languages([ { code: "de" }, { code: "en" } ], trash_retention_days: 1)
+      save_languages([ { code: "de" }, { code: "en" } ])
     end
 
     assert_response :see_other
     assert_equal %w[de en], @site.reload.locale_codes
     assert_equal 30, @site.trash_retention_days
+  end
+
+  test "a site field forged by a languages.manage-only viewer is refused with the rows: 403, one denial, nothing written" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+    sign_in_as(user_holding("languages.manage"))
+
+    assert_difference -> { Audit::Event.where(action: "access.denied").count }, 1 do
+      save_languages([ { code: "de" }, { code: "en" } ], trash_retention_days: 1)
+    end
+
+    assert_response :forbidden
+    assert_equal %w[en de], @site.reload.locale_codes
+    assert_equal 30, @site.trash_retention_days
+  end
+
+  test "a languages-only Save on a stale base is a 409 and writes nothing" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+    sign_in_as(user_holding("languages.manage"))
+    stale = base
+    @site.touch
+
+    patch "/cs-studio/settings", params: { site_setting: { languages: [ { code: "de" }, { code: "en" } ] }, base_updated_at: stale }
+
+    assert_response :conflict
+    assert_equal %w[en de], @site.reload.locale_codes
   end
 
   test "a settings.manage-only viewer can't post languages: refused as the 403, nothing changes" do

@@ -21,6 +21,20 @@ class Locales::MakeDefaultTest < ActiveSupport::TestCase
     assert_equal %w[en es], Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale).sort, "the states were rebuilt for the new default"
   end
 
+  test "clears the new default's own fallbacks (in the event too), leaving every other language's alone" do
+    Current.site.update!(locales: [ { "code" => "en", "fallbacks" => [ "es" ] }, { "code" => "de", "fallbacks" => [ "en" ] }, { "code" => "es", "fallbacks" => [ "de", "en" ] } ])
+
+    assert as_owner { Locales::MakeDefault.call("de") }.ok?
+
+    site = Current.site.reload
+    assert_nil site.locale_entry("de")["fallbacks"]
+    assert_equal [ "es" ], site.locale_entry("en")["fallbacks"], "the old default keeps what it had"
+    assert_equal %w[de en], site.locale_entry("es")["fallbacks"]
+    assert_equal %w[en de es], site.locale_codes
+    event = Audit::Event.find_by!(action: "language.default_changed")
+    assert event.field_changes.key?("locales"), event.field_changes.inspect
+  end
+
   def state_of(record, locale) = Translations::State.find_by(record_type: record.class.polymorphic_name, record_id: record.id, locale: locale)&.state
 
   test "rebuilds the translation states synchronously" do

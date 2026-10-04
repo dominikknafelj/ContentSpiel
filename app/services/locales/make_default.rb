@@ -33,6 +33,14 @@ module Locales
       return failure(site, "#{@code} isn't an enabled language") unless site.locale_codes.include?(@code)
 
       site.default_locale = @code
+      # The new default has nothing to fall back to: the default IS the last
+      # resort of every chain (`Locales.fallback_chain`), and the card shows its
+      # select as a disabled "None (default)", so no screen could clear fallbacks
+      # it was stored with while the chain would still apply them. Cleared here,
+      # in the same save (and so in the event's field changes). Nobody else's
+      # fallbacks change, and the OLD default keeps whatever it had: it is an
+      # ordinary language now and its select shows its first entry.
+      site.locales = site.locales.map { |entry| entry["code"] == @code ? entry.except("fallbacks") : entry }
       saved = SiteSetting.transaction do
         site.save || raise(ActiveRecord::Rollback)
 

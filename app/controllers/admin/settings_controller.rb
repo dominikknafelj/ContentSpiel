@@ -43,16 +43,15 @@ module Admin
     # `translations[<code>][title|tagline]`.
     #
     # `Settings::Save` decides "this call has a site part" from what is PASSED,
-    # so the arguments are built from what the viewer may manage: a
-    # `settings.manage` holder's attributes and per-language texts (only the
-    # languages and fields actually posted, never an empty hash); a viewer
-    # without it passes neither. `languages:` is passed whenever rows were
-    # posted -- NOT only for a `languages.manage` holder -- so a settings-only
-    # viewer who forges them gets the service's refusal (a 403 and one
-    # `access.denied`) instead of a silent drop; their own form never carries
-    # the rows, because the card isn't rendered for them. A languages-only
-    # viewer's form carries just the rows, and the call is a languages-only
-    # one, which needs only `languages.manage` and leaves the site row alone.
+    # so the arguments are built from what was POSTED (only the languages and
+    # fields actually posted, never an empty hash), whoever the viewer is, and
+    # the service decides: a field outside the viewer's right -- site fields
+    # from a languages-only viewer, `languages` rows from a settings-only one --
+    # is REFUSED (a 403 and one `access.denied`, nothing written), never
+    # silently dropped. Neither viewer's own form carries such a field (the card
+    # isn't rendered for them), so their Save stays a one-part call: a
+    # languages-only viewer's form carries just the rows and a languages-only
+    # call needs only `languages.manage` and leaves the site row alone.
     def update
       site = Current.site
       permitted = params.fetch(:site_setting, ActionController::Parameters.new).permit(
@@ -73,7 +72,7 @@ module Admin
         return render(:show, status: :conflict)
       end
 
-      attributes, translated = can?("settings.manage") ? site_arguments(permitted) : [ {}, {} ]
+      attributes, translated = site_arguments(permitted)
       result = Settings::Save.call(site, attributes: attributes, translations: translated, languages: language_arguments(site, permitted))
 
       if result.ok?
