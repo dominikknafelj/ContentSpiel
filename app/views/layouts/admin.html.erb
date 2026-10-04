@@ -9,8 +9,9 @@
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
-        token reveal (admin/api_tokens/create) and on the page and post
-        editors (admin/pages/show, admin/posts/show). %>
+        token reveal (admin/api_tokens/create), on the page and post
+        editors (admin/pages/show, admin/posts/show) and on every screen with
+        an explicit-save form (`Admin::SaveBarHelper#save_bar_form_data`). %>
     <%= yield :head %>
   </head>
 
@@ -87,14 +88,27 @@
         do nothing here, and it sits outside every form. %>
     <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
 
-    <%# The one Leave dialog (design pass spec §4): `admin--save-bar` opens it
-        when a Turbo visit would drop unsaved changes, and wires its Leave
-        button (`data-leave-confirm`) per open, as a listener rather than an
-        inline handler. Here, outside `#content` and every form, like every
-        dialog. Stay is the Cancel button. %>
-    <%= render Admin::ConfirmDialogComponent.new(id: "leave-dialog", title: "Leave without saving?", body: "Your changes on this screen will be lost.", cancel_label: "Stay") do |dialog| %>
-      <% dialog.with_confirm_action do %>
-        <%= render Admin::ButtonComponent.new(label: "Leave", variant: :primary, type: "button", data: { leave_confirm: true }) %>
+    <%# The one Leave dialog (design pass spec §4; round 3 decision D24):
+        `admin--save-bar` opens it when a Turbo visit, a link into the content
+        frame or Back / Forward would drop unsaved changes. Here, outside
+        `#content` and every form, like every dialog.
+        "Keep editing" is the primary button and holds the initial focus, so
+        Enter by reflex keeps the text; it is a plain `method="dialog"` submit
+        (as are Escape, the × and a click on the backdrop) -- closing is all
+        it does, because the guard stopped the way out before anything had
+        started. "Discard changes" (`data-leave-confirm`) is wired per open,
+        as a listener rather than an inline handler; its label alone is red,
+        the dialog's one destructive choice without competing with the
+        primary. The sentence is written by the controller as it opens the
+        dialog ("You have 3 unsaved changes on this screen."); what is
+        rendered here is the form without a number. %>
+    <%= render Admin::DialogComponent.new(id: "leave-dialog", title: "Leave without saving?", width: :confirm) do |dialog| %>
+      <p class="text-ink" data-leave-count>You have unsaved changes on this screen.</p>
+      <% dialog.with_footer do %>
+        <%= render Admin::ButtonComponent.new(label: "Discard changes", variant: :danger_text, type: "button", data: { leave_confirm: true }) %>
+        <%= tag.form method: "dialog" do %>
+          <%= render Admin::ButtonComponent.new(label: "Keep editing", variant: :primary, type: "submit", autofocus: true) %>
+        <% end %>
       <% end %>
     <% end %>
 

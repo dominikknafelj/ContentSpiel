@@ -297,6 +297,12 @@
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
 
+/* A link `admin--pending-lock` has locked (an instant action waiting for the
+   main form's unsaved changes, round 3 decision D10): it can't be `disabled`
+   like a button, so it is dimmed the way a disabled button is. The controller
+   swallows its click. */
+a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
+
 /* A post list's Limit is a 72px column, and its error slot is a child of that
    column: "Limit must be at least 1" wrapped word by word in 72px. Hanging the
    slot from the column's RIGHT edge (an RTL containing block, everything else

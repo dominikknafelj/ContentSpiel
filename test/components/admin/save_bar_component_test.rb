@@ -10,6 +10,13 @@ class Admin::SaveBarComponentTest < ViewComponent::TestCase
     assert_selector "button[type=submit][form='user-form'][data-admin--save-bar-target=save]", text: "Save"
   end
 
+  # Cancel is a link into the content frame, and the one such link the leave
+  # guard lets through without asking (`admin--save-bar` looks for the marker).
+  test "Cancel carries the marker that exempts it from the leave guard" do
+    render_inline(Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: "/users"))
+    assert_selector "a[href='/users'][data-save-bar-cancel][data-turbo-frame=content]", text: "Cancel"
+  end
+
   # Save comes first, then Cancel, then the count: the buttons sit where the
   # form's fields end, not at the far side of the screen.
   test "Save comes before Cancel" do

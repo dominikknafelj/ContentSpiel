@@ -1,14 +1,32 @@
 require "application_system_test_case"
 
 # The explicit-save footer and the Leave dialog in a real browser (cs-studio
-# design pass, Task 11): the footer is always there with Save and Cancel,
-# counts changed fields against what was loaded, keeps Save disabled while an
-# existing record has nothing to save, and leaving with changes asks first.
+# design pass, Task 11; round 3, Task 1): the footer is always there with Save
+# and Cancel, counts changed fields against what was loaded, keeps Save
+# disabled while an existing record has nothing to save, and leaving with
+# changes asks first -- by a sidebar link (a Turbo visit), by a link inside
+# the content frame (a frame navigation) and by the browser's Back. The
+# footer's own Cancel is the one way out that never asks.
 class SaveBarSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     @owner = users(:one)
     @target = users(:two)
+  end
+
+  # The edit screen reached the way an editor reaches it: by the list's Edit
+  # link, a frame navigation that adds a history entry -- so Back from it stays
+  # inside the document. It waits for the visit that navigation is promoted to
+  # (`turbo:load`): a test pressing Back before Turbo has finished arriving is
+  # racing Turbo itself, whose late promoted visit cancels the restoration.
+  def open_edit_from_the_list
+    visit admin_users_path
+    await_admin_controllers
+    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
+    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    assert_current_path edit_admin_user_path(@target)
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
   end
 
   test "the footer is always there, counts changes, disables Save when nothing changed, and guards leaving" do
@@ -36,15 +54,163 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
-    within("dialog#leave-dialog") { press "Stay" }
+    within("dialog#leave-dialog") do
+      assert_text "Leave without saving?"
+      assert_text "You have 1 unsaved change on this screen."
+      press "Keep editing"
+    end
     assert_no_selector "dialog#leave-dialog[open]"
     assert_current_path edit_admin_user_path(@target)
     assert_equal "Typed again", find_field("Name").value
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
-    within("dialog#leave-dialog") { press "Leave" }
+    within("dialog#leave-dialog") { press "Discard changes" }
     assert_current_path admin_posts_path
+  end
+
+  # "Keep editing" is where focus lands, so Enter by reflex keeps the text.
+  test "the Leave dialog puts focus on Keep editing" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    fill_in "Name", with: "Focus"
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_selector "dialog#leave-dialog[open]"
+    assert_equal "Keep editing", page.evaluate_script("document.activeElement.textContent.trim()")
+  end
+
+  # A link inside `#content` is a Turbo FRAME navigation: no
+  # `turbo:before-visit` until the frame has already been replaced. The
+  # edit-user screen's own Activity link breaks out to `_top`; here it is put
+  # back into the frame, which is what any link in the content area is unless
+  # it says otherwise.
+  test "a link inside the content frame asks first, and works again after Keep editing" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    page.execute_script("Array.from(document.querySelectorAll('#content a')).find((a) => a.textContent.trim() === 'Activity').removeAttribute('data-turbo-frame')")
+
+    fill_in "Name", with: "Typed in the frame"
+    click_link "Activity"
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_current_path edit_admin_user_path(@target)
+    assert_equal "Typed in the frame", find_field("Name").value
+    # Nothing was left half-started: the frame isn't busy and has not been
+    # pointed anywhere.
+    assert_no_selector "turbo-frame#content[busy]"
+    assert_no_selector "turbo-frame#content[src]"
+
+    click_link "Activity"
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_current_path admin_audit_events_path, ignore_query: true
+    assert_no_field "Name"
+  end
+
+  # Back is a restoration visit, which fires no `turbo:before-visit`.
+  test "Back with a typed change asks first; Keep editing leaves the URL and the form as they were" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+
+    fill_in "Name", with: "Typed before Back"
+    page.execute_script("history.back()")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_current_path edit_admin_user_path(@target)
+    assert_equal "Typed before Back", find_field("Name").value
+
+    # The history is as it was: Back still leads to the list, once asked.
+    page.execute_script("history.back()")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_current_path admin_users_path
+    assert_no_field "Name"
+    assert_no_selector "dialog#leave-dialog[open]"
+  end
+
+  # A screen opened by a link in the content frame is rendered first, and only
+  # then does Turbo propose the visit that navigation is promoted to -- to the
+  # screen's own URL. Typing in that moment once made the guard take the
+  # promoted visit for a way out and ask about the screen that had just opened.
+  test "typing straight after arriving by a frame link doesn't ask to leave the screen just opened" do
+    sign_in_via_form(@owner)
+    visit admin_users_path
+    await_admin_controllers
+    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
+    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    fill_in "Name", with: "Typed at once"
+
+    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_equal "Typed at once", find_field("Name").value
+    assert_selector ".admin-save-bar", text: /1 unsaved change/i
+  end
+
+  test "Back with nothing typed just goes back" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+
+    page.execute_script("history.back()")
+    assert_current_path admin_users_path
+    assert_no_field "Name"
+    assert_no_selector "dialog#leave-dialog[open]"
+  end
+
+  test "the footer's Cancel leaves without asking" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    fill_in "Name", with: "Thrown away"
+    assert_selector ".admin-save-bar", text: /1 unsaved change/i
+
+    within(".admin-save-bar") { click_link "Cancel" }
+    assert_current_path admin_users_path
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_not_equal "Thrown away", @target.reload.name
+  end
+
+  # Rows that share one `name` (a list of links, `…[][name]`) are separate
+  # controls, and a hidden input is part of the form's state only when it says
+  # so (`data-save-bar-track`: a chip, a row order). No screen has either yet,
+  # so the controls are added to the edit-user form and the form re-inserted,
+  # which reconnects the controller with them in its baseline.
+  test "repeated names count per row, a tracked hidden input counts, and the dialog names the count" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const form = document.getElementById("user-form")
+      form.insertAdjacentHTML("afterbegin", `
+        <input id="row-1" name="extra[links][][name]" value="one">
+        <input id="row-2" name="extra[links][][name]" value="two">
+        <input id="tracked" type="hidden" name="extra[order]" value="1,2" data-save-bar-track>
+        <input id="untracked" type="hidden" name="extra[token]" value="a">`)
+      const parent = form.parentNode, next = form.nextSibling
+      form.remove()
+      parent.insertBefore(form, next)
+    JS
+    await_admin_controllers
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+
+    fill_in "row-1", with: "uno"
+    assert_selector ".admin-save-bar", text: /1 unsaved change\b/i
+    fill_in "row-2", with: "dos"
+    assert_selector ".admin-save-bar", text: /2 unsaved changes/i
+
+    set_hidden = "const f = document.getElementById(arguments[0]); f.value = arguments[1]; f.dispatchEvent(new Event('input', { bubbles: true }))"
+    page.execute_script(set_hidden, "untracked", "b")
+    assert_selector ".admin-save-bar", text: /2 unsaved changes/i
+    page.execute_script(set_hidden, "tracked", "2,1")
+    assert_selector ".admin-save-bar", text: /3 unsaved changes/i
+
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { assert_text "You have 3 unsaved changes on this screen." }
   end
 
   # A failed save re-renders the form (the controller reconnects with the typed
@@ -76,6 +242,8 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar button[type=submit]", text: "Create user"
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
+    # Nothing differs from the re-rendered form, so there is no number to name.
+    within("dialog#leave-dialog") { assert_text "You have unsaved changes on this screen." }
   end
 
   # Reached through the Groups LIST, i.e. a Turbo *frame* navigation: the
@@ -163,7 +331,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
     assert_selector "dialog[open]", count: 1
-    within("dialog#leave-dialog") { press "Leave" }
+    # The count is the page's, not one form's.
+    within("dialog#leave-dialog") do
+      assert_text "You have 2 unsaved changes on this screen."
+      press "Discard changes"
+    end
     assert_current_path admin_posts_path
   end
 

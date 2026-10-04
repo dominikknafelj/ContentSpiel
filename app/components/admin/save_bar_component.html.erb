@@ -4,9 +4,13 @@
     permissions) scrolls. `admin--save-bar#refresh` writes the count -- a
     polite live region, so a screen reader hears the number change -- and
     disables Save while an existing record has nothing to save. Without
-    JavaScript nothing disables it, so it is a plain working submit button. %>
+    JavaScript nothing disables it, so it is a plain working submit button.
+
+    Cancel is a link into the content frame, which the leave guard asks about
+    like any other (round 3) -- except this one: `data-save-bar-cancel` marks
+    it as the way to discard, so it leaves without "Leave without saving?". %>
 <div data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3">
   <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
-  <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
+  <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
   <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
 </div>

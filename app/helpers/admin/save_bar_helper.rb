@@ -14,7 +14,21 @@ module Admin
   # `always:` -- Save is enabled even with nothing changed. For a form that
   # is there to be submitted (a new record): Save must be pressable before
   # any typing. The leave guard still waits for a real change.
+  #
+  # A screen with one of these forms is never restored from Turbo's page
+  # cache (`turbo-cache-control: no-cache`, added to the head once however
+  # many forms the screen has): a snapshot holds the footer as it stood when
+  # the screen was left -- a count, an enabled Save -- over fields that are
+  # back to what the server rendered. With this, Back or Forward TO such a
+  # screen fetches it afresh, as the page and post editors do. (A frame
+  # navigation's answer carries the tag too, and the promoted visit merges it
+  # into the head.)
   def save_bar_form_data(dirty: false, always: false)
+    unless @save_bar_no_cache
+      @save_bar_no_cache = true
+      content_for :head, tag.meta(name: "turbo-cache-control", content: "no-cache")
+    end
+
     {
       controller: "admin--save-bar",
       "admin--save-bar-dirty-value": dirty,

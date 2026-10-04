@@ -106,6 +106,33 @@ Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag
 | Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 — done in round 2 of the CS Studio design pass (PR pending): "Page" in quick create opens the New page dialog |
 | Public site dates in the site time zone (today: `ThemeHelper#post_date` on the public site and `/preview` still renders in UTC — only CS Studio and MCP run inside `Time.use_zone`) | Could | Needs the rich-text/page render cache to vary on the zone (a zone change must invalidate cached renders); dashboard spec §5 kept the public site unchanged |
 
+## Technical health (staff review, 2026-10-04)
+
+From `docs/architecture/2026-10-04-staff-review.md` (findings referenced as `S<n>`, `M<n>`, `L<n>`; read-only review, nothing measured). Bugs first, then the items that share a cause.
+
+| Item | Priority | Ref |
+|---|---|---|
+| Five bugs: trashed subpages listed on the public site; an admin's password change leaves the user's sessions alive; block reorder and tree move render any response as a stream and fail silently; no unload guard on autosave; multi-upload reloads over its own errors | Must | S1–S5 |
+| Stop recomputing URLs on every page save: sync `public_paths` only when slug, parent, position, publication or trash state changed, set-based, from the services rather than `after_save` | Must | S6, M2 |
+| A content version that moves only on changes to published output (one version row), instead of 15 aggregates per public request that any draft autosave invalidates; preload after `stale?` | Must | S7, S8 |
+| API token lookup by indexed SHA-256 digest (closes the bcrypt-per-token interim state below, and its unauthenticated cost) | Must | S9 |
+| Guarantees by behaviour, not grep: a behavioural service contract test, permitted-attribute slices in `Pages::Save`/`Posts::Save`/`Settings::Save`, the restore parent picker through the read scope | Must | S19, S21, S24 |
+| System tests fail on JavaScript errors and click natively; pin `turbo-rails` and test the Turbo internals `queue.js` relies on; a Tiptap schema drift test | Should | S22, S23, S25 |
+| Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
+| Public read path: no `posts` scan on a 404, batched URL and internal-link lookups, a cap on unlimited listings | Should | S11, S14, S15 |
+| MCP `list_posts` paginated, without rendering bodies | Should | S12 |
+| Lazy-load Tiptap and d3-force instead of evaluating them on every admin page | Should | S13 |
+| One shared `fetchStream` helper and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
+| Write down a dependency direction between the domains and fix the four inversions (a model calling `ApplicationController.render`, a model calling services, a query building a component, models using route helpers) | Should | M1 |
+| Public-site strings in German and Spanish (about 15), then a key scheme for the admin UI before more strings land | Should | M8 |
+| Script CSP with nonces; correct the four `CLAUDE.md` claims the code doesn't match | Should | S20, review §7 |
+| Sibling position lock; dashboard drafts without the per-row audit join; missing indexes and FK | Could | S16, S17, S18 |
+| Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
+| One plugin registration facade over the four registries | Could | M4 (with Plugin API v1) |
+| Remove leftovers: the ActionText import path, unused Action Mailbox / Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
+| Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | Must (before a first deploy) | L1–L4 |
+| Smaller defects: unbounded titles in single-record flashes, forged param shapes that 500, a held Turbo submission cancelled by the next, translate timeout that doesn't abort, inconsistent result handling, two ways to enable a language, Duplicate across two transactions | Could | S26–S32 |
+
 ## Known interim states
 
 Deliberate gaps shipped ahead of the item that closes them (greenfield: fine while tracked here).
@@ -132,7 +159,7 @@ Deliberate gaps shipped ahead of the item that closes them (greenfield: fine whi
 | ~~The Translations overview filtered in Ruby, walking every readable record per request~~ — resolved by round 2 of the design pass (PR pending): the stored `translation_states` table (`Translations::StateIndex`) replaces `Translations::CachedStatus`; the matrix, the posts list's Translation filter, the tree counts and the dashboard card read it in SQL | Translation helpers (Task 4) | CS Studio design pass, round 2 (spec §5.3) — done |
 | ~~The mind graph fills the whole content column and some nodes animate outside its box~~ — resolved by round 1 of the design pass (PR pending): the graph fills the view (the content column's width, the window's remaining height) and clamps its nodes and labels to that box (its fallback node colour is a token now). Still open: node colours, legend and edges | Found 2026-10-02 | CS Studio design pass, round 3 (colours, legend and edges) |
 | The error toast has no "Retry" action (design pass spec §4): nothing raises an error a retry could repeat yet. Upload progress on a media tile is deferred with it (the chip input and the pending suggestion box landed in round 2) | CS Studio design pass, round 1 | CS Studio design pass, round 3 (each lands with its first caller) |
-| The explicit-save leave guard (`admin--save-bar`, "Leave without saving?") only sees Turbo Drive visits (`turbo:before-visit`) and a page unload: a Turbo *frame* navigation inside `#content` and the browser's Back button both leave a dirty form without asking. The save-bar screens' own in-frame links break out with `data-turbo-frame="_top"` for that reason | CS Studio design pass, round 1 | CS Studio design pass, round 3 — before Settings moves onto the save bar |
+| ~~The explicit-save leave guard (`admin--save-bar`, "Leave without saving?") only sees Turbo Drive visits (`turbo:before-visit`) and a page unload: a Turbo *frame* navigation inside `#content` and the browser's Back button both leave a dirty form without asking~~ — resolved by round 3 of the design pass (PR pending): the guard also asks about a link into the `#content` frame (stopped at `turbo:click`) and about Back / Forward within the document (`popstate`, heard ahead of Turbo). Still open: a GET *form* submitted into `#content` and a script setting the frame's `src` are not asked about (no explicit-save screen has either), and Back to an entry from before a full page load gets only the browser's own prompt | CS Studio design pass, round 1 | CS Studio design pass, round 3 — done; the two remaining gaps when a screen first needs them |
 | ~~`test/system/admin/translations_test.rb` "Suggest translations for N empty fields, then Use all" flaked under load; suspected race between the page's autosave and a block autosave's touch of the page~~ — the race was real and is closed by round 2 (PR pending): a stale save is now refused outright and every autosave of one screen goes through one write queue (`app/javascript/autosave/queue.js`), so a block's answer moves the page form's base before the next request is sent; "Use all" can no longer trip its own "Changed elsewhere" (two system tests pin it: the page's own fields and its block's, and two blocks). Rerun it alone if it ever fails again under load | CS Studio design pass, round 1 (final review) | CS Studio design pass, round 2 — done |
 | After a Back or Forward, the toast controller's "this render came from the cache" flag stays set until the next Turbo visit, so a top-level form that then fails with a 4xx re-render (a refused "Move to trash" on a page) loses its error toast | CS Studio design pass, round 1 (final review) | Clear the flag once the restored page has loaded (`turbo:load`) — a small follow-up fix |
 | A drag clone can stay on the page if the tree or block list is re-rendered while a row is being dragged with the mouse (SortableJS's fallback clone lives on `<body>` and `destroy` doesn't remove it) | CS Studio design pass, round 1 (final review) | Remove `Sortable.ghost` in the controllers' `disconnect` — a small follow-up fix |
