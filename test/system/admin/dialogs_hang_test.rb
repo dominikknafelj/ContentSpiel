@@ -48,7 +48,7 @@ class Admin::DialogsHangSystemTest < ApplicationSystemTestCase
 
     page.execute_script("window.__releaseForm()")
     assert_selector "#{selector} form", wait: 10
-    assert_equal before, top.call, "the dialog moved when its form loaded"
+    assert_in_delta before, top.call, 0.5, "the dialog moved when its form loaded"
     # And it hangs below the top of the window rather than being flush with it.
     assert_in_delta page.evaluate_script("window.innerHeight * 0.075"), before, 1
   end

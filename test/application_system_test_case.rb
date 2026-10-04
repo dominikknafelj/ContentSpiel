@@ -110,6 +110,32 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     find(:link_or_button, label).execute_script("this.click()")
   end
 
+  # Follows a link into the `#content` frame and waits until Turbo has finished
+  # with it. Such a link (a media tile, a trash tab, a list row, the users
+  # list's "New user") renders the frame and is then promoted to a page visit
+  # (`data-turbo-action="advance"`): `turbo:load` fires a few dozen ms AFTER the
+  # new content is on the page, and until then the page is still arriving -- a
+  # field typed into can be re-rendered, a Back pressed can be cancelled by the
+  # late visit, a link clicked can lose to it. No person is that fast; a
+  # scripted browser is. So a test that goes on to READ or use the new screen
+  # clicks through here, and no test keeps its own copy of this wait.
+  #
+  #   click_frame_link "New user"                              # a link, by text
+  #   click_frame_link { find("#media-asset-7 a").click }      # anything else
+  #
+  # The block form also serves a form whose answer redirects inside the frame
+  # (Create user): that render is promoted the same way.
+  #
+  # The write queue itself holds a non-GET form pressed in that window (the
+  # "promotion hold", `autosave/queue.js`), so a write is no longer lost
+  # there; `test/system/admin/promotion_hold_test.rb` presses without this
+  # wait on purpose, and must keep doing so.
+  def click_frame_link(locator = nil, **options)
+    page.execute_script("window.__frameLinkLoaded = false; document.addEventListener('turbo:load', () => { window.__frameLinkLoaded = true }, { once: true })")
+    block_given? ? yield : click_link(locator, **options)
+    assert_eventually(message: "the visit the frame navigation is promoted to never finished (no turbo:load)") { page.evaluate_script("window.__frameLinkLoaded === true") }
+  end
+
   # A rich-text editor's Insert menu item (Page link, Image, YouTube,
   # Divider): opens the menu, then presses the item -- which is only
   # *visible* (so findable) while the menu is open, which is part of what

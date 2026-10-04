@@ -318,11 +318,13 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/media"
     await_admin_controllers
     page.execute_script("document.querySelector('#media-asset-#{asset.id} a').focus()")
-    find("#media-asset-#{asset.id} a").send_keys(:enter)
+    # Enter on a tile is the same frame navigation a click is, promoted visit
+    # included -- and the panel takes the focus only when that visit is over.
+    click_frame_link { find("#media-asset-#{asset.id} a").send_keys(:enter) }
 
     assert_eventually(message: "focus never reached the panel") { active_element_id == "media-panel" }
 
-    find("a[aria-label='Close panel']").send_keys(:enter)
+    click_frame_link { find("a[aria-label='Close panel']").send_keys(:enter) }
 
     assert_no_selector "#media-panel", wait: 5
     assert_eventually(message: "focus never returned to the tile") do
@@ -427,17 +429,12 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   end
 
   # Clicks a tile and waits until the panel is open AND Turbo has finished with
-  # the click. A tile is a link into the `content` frame with `data-turbo-action
-  # ="advance"`, which Turbo promotes to a page visit once the frame has loaded:
-  # a few dozen ms after the panel's DOM appears it fires `turbo:visit` and
-  # re-renders the body. A test that clicked or typed in that gap would have its
-  # visit superseded (a language tab) or its text replaced (a field) -- a gap no
-  # person lives in, but a scripted browser does.
+  # the click (`click_frame_link`, which says why): a test that clicked or typed
+  # before that would have its visit superseded (a language tab) or its text
+  # replaced (a field).
   def click_tile(asset)
-    page.execute_script("window.__tileVisitDone = false; document.addEventListener('turbo:load', () => { window.__tileVisitDone = true }, { once: true })")
-    find("#media-asset-#{asset.id} a").click
+    click_frame_link { find("#media-asset-#{asset.id} a").click }
     assert_selector "#media-panel", wait: 5
-    assert_eventually(message: "the tile's promoted visit never finished") { page.evaluate_script("window.__tileVisitDone") }
     await_admin_controllers
   end
 

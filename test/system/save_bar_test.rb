@@ -17,16 +17,15 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # The edit screen reached the way an editor reaches it: by the list's Edit
   # link, a frame navigation that adds a history entry -- so Back from it stays
   # inside the document. It waits for the visit that navigation is promoted to
-  # (`turbo:load`): a test pressing Back before Turbo has finished arriving is
-  # racing Turbo itself, whose late promoted visit cancels the restoration.
+  # (`click_frame_link`): a test pressing Back before Turbo has finished
+  # arriving is racing Turbo itself, whose late promoted visit cancels the
+  # restoration.
   def open_edit_from_the_list
     visit admin_users_path
     await_admin_controllers
-    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
-    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address }
+    click_frame_link { within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address } }
     assert_current_path edit_admin_user_path(@target)
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
-    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
   end
 
   test "the footer is always there, counts changes, disables Save when nothing changed, and guards leaving" do
@@ -207,13 +206,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     sign_in_via_form(@owner)
     visit admin_groups_path
     await_admin_controllers
-    page.execute_script("document.addEventListener('turbo:load', () => { window.turboLoads = (window.turboLoads || 0) + 1 })")
-    within("nav[aria-label='Modules']") { click_link "Users" }
+    click_frame_link { within("nav[aria-label='Modules']") { click_link "Users" } }
     assert_current_path admin_users_path
-    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address }
+    click_frame_link { within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address } }
     assert_current_path edit_admin_user_path(@target)
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
-    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.turboLoads >= 2") }
 
     fill_in "Name", with: "Typed before going back two"
     page.execute_script("history.go(-2)")
@@ -279,10 +276,8 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     sign_in_via_form(@owner)
     visit admin_users_path
     await_admin_controllers
-    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
-    click_link "New user"
+    click_frame_link "New user"
     assert_current_path new_admin_user_path
-    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
     await_admin_controllers
 
     fill_in "Email address", with: @target.email_address
@@ -307,10 +302,12 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     fill_in "Email address", with: "someone.new@example.com"
     fill_in "Password", with: "a much Longer passw0rd"
     fill_in "Confirm password", with: "a much Longer passw0rd"
-    press "Create user"
+    # The answer redirects inside the frame and is promoted to a visit like a
+    # link's: Back is pressed only once that visit is over (`turbo:load`), not
+    # after a guessed pause.
+    click_frame_link { press "Create user" }
     assert_text "User created"
     assert_selector "h1", text: "someone.new@example.com"
-    sleep 0.5
     page.execute_script("history.back()")
     assert_current_path new_admin_user_path
     assert_equal "", page.evaluate_script("location.hash")

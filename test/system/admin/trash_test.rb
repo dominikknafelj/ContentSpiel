@@ -141,16 +141,13 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
 
   private
 
-  # A tab is a link into the `content` frame that Turbo promotes to a page
-  # visit once the frame has loaded -- a few dozen ms after the rows appear.
-  # A form pressed in that gap is sent (the server restores the page) but its
-  # answer is dropped when the promoted visit starts, so the redirect and the
-  # toast never arrive: a gap no person lives in, but a scripted browser does
-  # (the media library's `click_tile` waits for the same reason).
+  # A tab is a link into the `content` frame, so the tests here that go on to
+  # read the new rows wait for the whole navigation (`click_frame_link`, which
+  # says why). A form pressed before it is over is held by the write queue and
+  # sent afterwards -- `promotion_hold_test.rb` presses Restore straight after a
+  # raw tab click to prove that.
   def click_tab(label)
-    page.execute_script("window.__tabVisitDone = false; document.addEventListener('turbo:load', () => { window.__tabVisitDone = true }, { once: true })")
-    within("nav[aria-label='Filter by type']") { click_link label }
+    click_frame_link { within("nav[aria-label='Filter by type']") { click_link label } }
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: label
-    assert_eventually(message: "the tab's promoted visit never finished") { page.evaluate_script("window.__tabVisitDone") }
   end
 end

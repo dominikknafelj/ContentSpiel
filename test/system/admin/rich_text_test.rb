@@ -624,6 +624,8 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       press "Insert video"
     end
     assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+  ensure
+    page.driver.resize(1400, 1400)
   end
 
   test "the YouTube dialog rejects text that is not a video, shows the id live, and Enter inserts" do
