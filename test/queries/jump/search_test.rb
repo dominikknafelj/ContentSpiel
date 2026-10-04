@@ -57,6 +57,12 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_equal [ "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
     assert_match(/\/settings#ai\z/, settings[:rows].first[:url])
 
+    # Languages moved into Settings (round 3, Task 6): its destination is the
+    # `#languages` anchor like the others, not a screen of its own.
+    languages = search("languages", actor: @owner).find { |g| g[:label] == "Settings" }
+    assert_equal [ "Settings › Languages" ], languages[:rows].map { |r| r[:title] }
+    assert_match(/\/settings#languages\z/, languages[:rows].first[:url])
+
     nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")
     assert_nil search("", actor: nobody, modules: []).find { |g| g[:label] == "Settings" }
   end

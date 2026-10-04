@@ -36,24 +36,35 @@ module Admin
     end
 
     # What this form may carry, deliberately short: the default language is
-    # NOT here (it becomes its own instant action behind a dialog,
+    # NOT here (it is its own instant action behind a dialog,
     # `Locales::MakeDefault`; the service still accepts `default_locale` for
     # the setup wizard, so this list is what keeps a settings-only user from
-    # changing it from here), and neither are `locales`/`languages` (round 3,
-    # Task 6). Every enabled language's title and tagline arrive together,
+    # changing it from here), and neither is `locales`. The language ORDER and
+    # fallbacks are `languages` (rows of `code` and `fallback`; round 3, Task 6).
+    # Every enabled language's title and tagline arrive together,
     # `translations[<code>][title|tagline]`.
     #
     # `Settings::Save` decides "this call has a site part" from what is PASSED,
     # so the arguments are built from what the viewer may manage: a
     # `settings.manage` holder's attributes and per-language texts (only the
     # languages and fields actually posted, never an empty hash); a viewer
-    # without it passes neither, and the service answers with the refusal.
+    # without it passes neither. `languages:` is passed whenever rows were
+    # posted -- NOT only for a `languages.manage` holder -- so a settings-only
+    # viewer who forges them gets the service's refusal (a 403 and one
+    # `access.denied`) instead of a silent drop; their own form never carries
+    # the rows, because the card isn't rendered for them. A languages-only
+    # viewer's form carries just the rows, and the call is a languages-only
+    # one, which needs only `languages.manage` and leaves the site row alone.
     def update
       site = Current.site
       permitted = params.fetch(:site_setting, ActionController::Parameters.new).permit(
-        :logo, :remove_logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model,
+        :logo, :remove_logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
-        social_links: [ :name, :url ]
+        social_links: [ :name, :url ],
+        # `language_order` is the one tracked field that makes a reorder a
+        # single change for the footer (`admin--sortable-rows`); the rows
+        # themselves are what is read.
+        languages: [ :code, :fallback ]
       )
 
       if stale?(site, params[:base_updated_at])
@@ -65,7 +76,7 @@ module Admin
       end
 
       attributes, translated = can?("settings.manage") ? site_arguments(permitted) : [ {}, {} ]
-      result = Settings::Save.call(site, attributes: attributes, translations: translated)
+      result = Settings::Save.call(site, attributes: attributes, translations: translated, languages: language_arguments(site, permitted))
 
       if result.ok?
         redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: "Settings saved"
@@ -156,6 +167,32 @@ module Admin
 
       translated = (permitted[:translations]&.to_h || {}).transform_values { |fields| fields.slice(*Settings::Save::TRANSLATED.map(&:to_s)) }.reject { |_, fields| fields.empty? }
       [ attributes, translated ]
+    end
+
+    # The complete ordered `[{ "code", "fallbacks" }]` for `Settings::Save`, or
+    # nil when no rows were posted (the language part is then not in the call).
+    # Rows arrive as `languages[][code]`/`languages[][fallback]` in row order.
+    #
+    # DECISION D7: the card's select stores ONE fallback, but a language may be
+    # stored with several. A row's stored list is rewritten only when the
+    # posted value differs from the stored FIRST entry -- the one the select
+    # showed -- so an untouched row keeps all of its fallbacks, and a row whose
+    # select was changed (to another language, or to "None") keeps only the
+    # new choice. A row posting no `fallback` at all (the default's select is
+    # disabled) is untouched too.
+    def language_arguments(site, permitted)
+      rows = permitted[:languages]
+      return nil unless rows.is_a?(Array)
+
+      rows = rows.grep(ActionController::Parameters).select { |row| row[:code].present? }
+      return nil if rows.empty?
+
+      rows.map do |row|
+        code = row[:code].to_s
+        stored = Array(site.locale_entry(code)&.dig("fallbacks")).map(&:to_s)
+        changed = row.key?(:fallback) && row[:fallback].to_s != stored.first.to_s
+        { "code" => code, "fallbacks" => changed ? [ row[:fallback].to_s ].reject(&:blank?) : stored }
+      end
     end
 
     # `social_links[0][name]`-style rows arrive as a hash keyed by row number

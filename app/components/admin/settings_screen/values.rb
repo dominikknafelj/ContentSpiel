@@ -62,6 +62,32 @@ module Admin
         rows.presence || [ [ "", "" ] ]
       end
 
+      # The Languages card's rows, `[{ code:, fallback: }]` in the order shown,
+      # `fallback` the ONE code the row's select shows ("" for none). Typed
+      # beats stored, like every other field: after a refused or stale save the
+      # order and the selects come back as typed (a code the form didn't carry
+      # keeps its stored place at the end; one that is no longer enabled is
+      # dropped). The stored side is read from the database (`attribute_in_
+      # database`), not the in-memory row: a refused `Locales::Configure` leaves
+      # the typed entries assigned to it.
+      #
+      # DECISION D7: a language stored with several fallbacks shows the FIRST;
+      # the others are dropped only when that row's select is changed and saved
+      # (`Admin::SettingsController#language_arguments` compares the posted
+      # value with this same first entry).
+      def language_rows
+        stored = Array(site.attribute_in_database(:locales)).map { |entry| entry.to_h.stringify_keys }
+        typed = Array(submitted&.dig(:languages)).select { |row| row.respond_to?(:key?) && row[:code].present? }
+        typed_codes = typed.map { |row| row[:code].to_s }
+        codes = stored.map { |entry| entry["code"] }
+        ordered = (typed_codes & codes) + (codes - typed_codes)
+        ordered.map do |code|
+          typed_row = typed.find { |row| row[:code].to_s == code }
+          stored_first = Array(stored.find { |entry| entry["code"] == code }&.dig("fallbacks")).first.to_s
+          { code: code, fallback: typed_row&.key?(:fallback) ? typed_row[:fallback].to_s : stored_first }
+        end
+      end
+
       private
 
       def field(name)

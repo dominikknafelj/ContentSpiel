@@ -1,84 +1,62 @@
 module Admin
-  # The Languages module (cs-studio spec §6.1, Task 8): every enabled
-  # language with its fallbacks, "Add language" (a supported-language
-  # select, `Locales::Enable`), Disable (`Locales::Disable` -- refused for
-  # the default) and editing fallbacks/reordering in bulk (`Locales::
-  # Configure`). Every action here is a plain redirect-with-flash, not an
-  # autosave endpoint: enabling, disabling and reconfiguring a site's
-  # languages are deliberate, infrequent actions (closer to a page's own
-  # Publish/Delete than a field that saves itself as an editor types), and
-  # each one can change what `Locales.enabled` returns for *every other*
-  # admin screen mid-session, which a Turbo Stream partial-page swap has no
-  # natural way to reflect -- a full reload is exactly what's wanted here.
+  # The Languages card's INSTANT actions (cs-studio spec §6.1; round 3, Task 6).
+  # The Languages screen is gone: its card lives in Settings, and what the
+  # screen's bulk form did -- the order and each language's fallback -- is a
+  # pair of fields of the Settings form, saved by its footer (`Settings::Save`'s
+  # `languages:`). What stays here are the three actions that happen at once,
+  # each a form of its own behind (for the two that need it) a dialog:
+  #
+  #   - `create`       -- Add language, `Locales::Enable`, no dialog;
+  #   - `destroy`      -- Turn off, `Locales::Disable` (refused for the default);
+  #   - `make_default` -- `Locales::MakeDefault`.
+  #
+  # Every one answers with a 303 to the card (`#languages`) and a toast. That
+  # is a full reload of Settings, which renders a fresh `base_updated_at` for
+  # the main form, so no base needs moving; and it would throw away anything
+  # typed there, which is why the card's controls are disabled while that form
+  # has unsaved changes (`admin--pending-lock`, decision D10). A request made
+  # anyway (a script, a second tab) still just reloads the screen.
+  #
+  # `languages.manage`, checked again by each service.
   class LanguagesController < BaseController
-    # `languages.manage` (access-control design spec §3.4), checked again
-    # by `Locales::*` for every write.
     before_action -> { require_permission("languages.manage") }
 
-    def index
-      @site_setting = Current.site
-    end
-
-    # "Add language" (spec §6.1): a supported-language select handing this
-    # straight to `Locales::Enable` -- no fallbacks are set here (an editor
-    # configures those afterwards, in the bulk form `update` answers), so
-    # a freshly enabled language starts with the fallback chain's own
-    # built-in tiers (the default language, then every other enabled one).
+    # "Add language": a supported-language select handing the code straight to
+    # `Locales::Enable`. No fallback is set (an editor picks one afterwards in
+    # the card), so a new language starts with the fallback chain's built-in
+    # tiers: the default language, then every other enabled one.
     def create
-      result = Locales::Enable.call(params[:code])
-      redirect_after(result)
+      code = params[:code].to_s
+      redirect_after(Locales::Enable.call(code), "#{Locales.name(code, native: true)} added")
     end
 
-    # The bulk fallbacks/reorder form (spec §6.1, `Locales::Configure`):
-    # every enabled language's row is submitted together as `languages[code]
-    # = { position:, fallbacks: }`, keyed by code rather than index so a
-    # stray/duplicate row can't silently shift another language's fields --
-    # sorted back into an ordered Array by `position` before being handed to
-    # the service, which is the one thing that actually cares about order.
-    def update
-      entries = language_rows.sort_by { |entry| entry["position"] }.map { |entry| entry.except("position") }
-
-      result = Locales::Configure.call(entries)
-      redirect_after(result)
-    end
-
-    # Disable (spec §6.1, `Locales::Disable`) -- refused outright for the
-    # default language; the service itself is the one source of truth for
-    # that rule (this controller doesn't re-check it), the row's own Disable
-    # button is just never rendered for it in the first place.
+    # Turn off. The service refuses the default (and is the one place that rule
+    # lives); the card just never shows the button for it.
     def destroy
-      result = Locales::Disable.call(params[:id])
-      redirect_after(result)
+      code = params[:id].to_s
+      redirect_after(Locales::Disable.call(code), "#{Locales.name(code, native: true)} turned off")
+    end
+
+    # Make the language the default. A code that isn't an enabled language is a
+    # forged request (the card only offers enabled ones), answered 422 at once
+    # rather than redirected to a toast nobody asked for.
+    def make_default
+      code = params[:id].to_s
+      return head(:unprocessable_entity) unless Locales.enabled?(code)
+
+      redirect_after(Locales::MakeDefault.call(code), "#{Locales.name(code, native: true)} is now the default language")
     end
 
     private
 
-    # `languages[code] = { position:, fallbacks: [] }`, read through strong
-    # parameters row by row (final fix wave, P18) rather than
-    # `to_unsafe_h`: the keys are language codes (dynamic, so no single
-    # `permit` call can name them), but each row's own shape is fixed, so
-    # each is `permit`ted to exactly those two fields. A row that isn't a
-    # Hash at all counts as "no position, no fallbacks"; a submission that
-    # isn't a Hash of rows is no rows -- `Locales::Configure` then refuses
-    # it ("must list exactly the enabled languages") like any other invalid
-    # submission, instead of this raising.
-    def language_rows
-      languages = params[:languages]
-      return [] unless languages.is_a?(ActionController::Parameters)
-
-      languages.keys.map do |code|
-        row = languages[code]
-        permitted = row.is_a?(ActionController::Parameters) ? row.permit(:position, fallbacks: []) : {}
-        { "code" => code.to_s, "position" => permitted[:position].to_i, "fallbacks" => Array(permitted[:fallbacks]) }
-      end
-    end
-
-    def redirect_after(result)
+    def redirect_after(result, notice)
       if result.ok?
-        redirect_to admin_settings_languages_path(**admin_url_options), status: :see_other, notice: "Saved"
+        redirect_to card_path, status: :see_other, notice: notice
       else
-        forbidden_or(result) { redirect_to admin_settings_languages_path(**admin_url_options), status: :see_other, alert: result.errors.to_sentence }
+        forbidden_or(result) { redirect_to card_path, status: :see_other, alert: result.errors.to_sentence }
       end
     end
+
+    def card_path = admin_settings_path(**admin_url_options, anchor: "languages")
   end
 end

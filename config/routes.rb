@@ -186,22 +186,22 @@ Rails.application.routes.draw do
       patch :ai_key
     end
 
-    # The Languages module (cs-studio spec §6.1, Task 8), nested under
-    # "settings" by *path* only (`scope`, not `namespace` -- the brief calls
-    # for a plain `Admin::LanguagesController`, not `Admin::Settings::
-    # LanguagesController`) so its URLs read as part of the Settings module
-    # the way the spec's own module list ("Languages (settings/languages)")
-    # names it. `create`/`destroy` are `Locales::Enable`/`Locales::Disable`
-    # (one language at a time, by its code as `:id`); the bulk `update`
-    # (fallbacks + reorder, `Locales::Configure`) has no `:id` of its own --
-    # the languages screen's one form always submits every enabled
-    # language's row together, the same way `ContentBlocks::Reorder` is
-    # handed a complete order rather than a delta -- so it's a bare `patch`
-    # on the collection path rather than a `resources` member/collection
-    # action.
+    # Languages (cs-studio spec §6.1; round 3, Task 6 moved them INTO the
+    # Settings screen as its `#languages` card). Still under "settings" by
+    # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
+    # What is left is the card's INSTANT actions, each answering with a 303 back
+    # to the card: `create` is `Locales::Enable`, `destroy` `Locales::Disable`
+    # (one language at a time, by its code as `:id`), `make_default`
+    # `Locales::MakeDefault`. The order and fallbacks are not here: they are
+    # fields of the Settings form (`Settings::Save`'s `languages:`). The old
+    # screen's URL redirects (301) to the card, so bookmarks and links keep working.
     scope "settings", as: "settings" do
-      resources :languages, only: %i[index create destroy]
-      patch "languages", to: "languages#update"
+      get "languages", to: redirect(status: 301) { |_params, request|
+        query = request.query_string.presence
+        "#{request.path.delete_suffix("/languages")}#{"?#{query}" if query}#languages"
+      }, as: :languages_screen
+      resources :languages, only: %i[create destroy]
+      patch "languages/:id/default", to: "languages#make_default", as: :default_language
     end
 
     # The Users module (cs-studio spec §6.1, Task 8): list, new/create,

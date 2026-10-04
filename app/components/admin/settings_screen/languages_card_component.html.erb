@@ -1,0 +1,68 @@
+<%# The card's ids sit on its heading, as the other cards' do (`#languages` is the
+    nav's and ⌘K's anchor). The whole section is the `admin--pending-lock`
+    scope: every `control` below is an instant action. %>
+<section id="settings-languages-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="languages"
+         data-controller="admin--pending-lock admin--sortable-rows admin--default-language">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="languages" class="text-h2 text-ink">Languages</h2>
+    <p class="mt-1 text-sm text-dim">The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default.</p>
+    <p id="language-drag-help" class="sr-only">Press Space on a handle to pick a language up, the arrow keys to move it, Space to drop it and Escape to put it back.</p>
+    <p class="mt-1 text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+  </div>
+
+  <%# The order as ONE tracked value: see `admin--sortable-rows`. %>
+  <%= hidden_field_tag "site_setting[language_order]", order_value, id: "settings-language-order",
+        data: { "save-bar-track": true, "admin--sortable-rows-target": "order" } %>
+  <p class="sr-only" aria-live="assertive" data-admin--sortable-rows-target="announcer"></p>
+
+  <ul class="m-0 list-none p-0" data-admin--sortable-rows-target="list">
+    <% rows.each do |row| %>
+      <% code = row[:code] %>
+      <li id="language-<%= code %>" class="admin-language-row flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3"
+          data-admin--sortable-rows-target="row" data-code="<%= code %>" data-label="<%= name(code) %>">
+        <button type="button" class="shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="Move <%= name(code) %>" aria-describedby="language-drag-help"
+                data-admin--sortable-rows-target="handle"
+                data-action="keydown->admin--sortable-rows#key focusout->admin--sortable-rows#blur">⠿</button>
+        <%# Row inputs, in row order: the code first, then the fallback (the
+            default's select is disabled and so not posted). %>
+        <%= hidden_field_tag "site_setting[languages][][code]", code, id: nil %>
+
+        <div class="min-w-[9rem] flex-1">
+          <span class="font-semibold text-ink"><%= name(code) %></span>
+          <span class="ml-1.5 font-cs-mono text-label text-meta"><%= path(code) %></span>
+        </div>
+
+        <label class="inline-flex items-center gap-1.5 text-sm text-ink">
+          <%= radio_button_tag "default_language", code, default?(code), id: "language-default-#{code}", form: DEFAULT_FORM,
+                data: { "admin--pending-lock-target": "control", "admin--default-language-target": "radio",
+                        current: (true if default?(code)),
+                        action: ("change->admin--dialog#open" unless default?(code)),
+                        "admin--dialog-id-param": (self.class.default_dialog_id(code) unless default?(code)) } %>
+          Default
+        </label>
+
+        <div class="inline-flex items-center gap-2 text-sm text-ink">
+          <label for="language-<%= code %>-fallback">Falls back to<span class="sr-only"> for <%= name(code) %></span></label>
+          <%= select_tag "site_setting[languages][][fallback]", options_for_select(fallback_options(code), (default?(code) ? "" : row[:fallback])),
+                id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto" %>
+        </div>
+
+        <% if default?(code) %>
+          <span class="w-24"></span>
+        <% else %>
+          <%= render Admin::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
+                data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+
+  <div class="flex flex-wrap items-center gap-3 p-4">
+    <label for="language-add-code" class="text-sm text-ink">Add a language</label>
+    <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
+          class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--pending-lock-target": "control" } %>
+    <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
+          data: { "admin--pending-lock-target": "control" }) %>
+  </div>
+</section>

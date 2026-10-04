@@ -417,7 +417,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "form#settings-form"
   end
 
-  test "a languages.manage-only user gets the screen with the Languages link and card and no form" do
+  test "a languages.manage-only user gets the screen with the Languages link and card, and a form of just the languages and the footer" do
     sign_in_as(user_holding("languages.manage"))
 
     get "/cs-studio/settings"
@@ -425,10 +425,11 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "nav[aria-label='Settings sections'] a", 1
     assert_select "nav[aria-label='Settings sections'] a[href='#languages']", text: "Languages"
-    assert_select "section[aria-labelledby=languages] a[href='/cs-studio/settings/languages']", text: "Open languages"
+    assert_select "form#settings-form section[aria-labelledby=languages]"
+    assert_select "form#settings-form .admin-save-bar"
     assert_select "#settings-site-card", count: 0
-    assert_select "form#settings-form", count: 0
-    assert_select ".admin-save-bar", count: 0
+    assert_select "#publishing, #ai", count: 0
+    assert_select "form#settings-form input[name^='site_setting[translations]']", count: 0
     assert_select "nav[aria-label='Modules'] a", text: "Settings"
   end
 

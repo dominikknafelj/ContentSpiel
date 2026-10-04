@@ -155,4 +155,111 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-en-title"
     assert_equal "settings-en-title", page.evaluate_script("document.activeElement.id")
   end
+
+  # -- Languages (round 3, Task 6) ---------------------------------------------------
+
+  def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)
+
+  test "a keyboard reorder is one pending change, locks the instant actions, and Save puts the tabs in the new order" do
+    visit admin_settings_path
+    await_admin_controllers
+    assert_selector "#settings-languages-card input[type=radio]:not([disabled])", count: 3
+
+    handle = find("button[aria-label='Move English']")
+    handle.send_keys(:space)
+    assert_selector "[data-admin--sortable-rows-target=announcer]", text: /Picked up English\. Position 1 of 3/, visible: :all
+    handle.send_keys(:down)
+    handle.send_keys(:space)
+    assert_selector "[data-admin--sortable-rows-target=announcer]", text: /Dropped English\. Position 2 of 3/, visible: :all
+    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_selector footer, text: /\b1 unsaved change\b/i
+
+    # D10: Default, Turn off and Add wait for Save or Cancel, and say so.
+    assert_selector "#settings-languages-card input[type=radio][disabled]", count: 3
+    assert_selector "#settings-languages-card button[disabled]", text: "Turn off…", count: 2
+    assert_selector "#settings-languages-card button[disabled]", text: "Add language"
+    assert_selector "#settings-languages-card select#language-add-code[disabled]"
+    assert_selector "#settings-languages-card", text: "Save or cancel your changes first."
+
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    assert_selector footer, text: /No unsaved changes/i
+    assert_equal %w[de en es], site_settings(:default).reload.locale_codes
+    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_equal "Deutsch", language_tab_names.first
+    assert_selector "#settings-languages-card input[type=radio]:not([disabled])", count: 3
+    assert_no_text "Save or cancel your changes first."
+  end
+
+  test "Escape puts a picked row back and counts nothing" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    handle = find("button[aria-label='Move English']")
+    handle.send_keys(:space)
+    handle.send_keys(:down)
+    handle.send_keys(:escape)
+
+    assert_equal %w[en de es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_selector footer, text: /No unsaved changes/i
+  end
+
+  test "choosing a fallback is one pending change; Save stores it" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    select "English", from: "language-de-fallback"
+    assert_selector footer, text: /\b1 unsaved change\b/i
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    assert_equal [ "en" ], site_settings(:default).reload.locale_entry("de")["fallbacks"]
+  end
+
+  test "choosing another Default opens the dialog with its count, Cancel puts the radio back, and confirming changes the default" do
+    Mobility.with_locale(:de) { site_settings(:default).update!(title: "Danas Notizen") }
+    visit admin_settings_path
+    await_admin_controllers
+
+    find("#language-default-de").click
+    assert_selector "dialog#language-default-dialog-de[open]"
+    within("dialog#language-default-dialog-de") do
+      assert_text "Make Deutsch the default?"
+      assert_text(/Deutsch becomes the source language, so every translation is marked outdated \(\d+ items?\)\./)
+      click_on "Cancel"
+    end
+    assert_no_selector "dialog[open]"
+    assert find("#language-default-en").checked?
+    assert_not find("#language-default-de").checked?
+    assert_selector footer, text: /No unsaved changes/i
+
+    find("#language-default-de").click
+    within("dialog#language-default-dialog-de") { click_on "Change default language" }
+
+    assert_selector "#toasts .admin-toast", text: "Deutsch is now the default language"
+    assert_current_path(/\/settings(\?.*)?#languages|\/settings/)
+    assert find("#language-default-de").checked?
+    site = site_settings(:default).reload
+    assert_equal "de", site.default_locale.to_s
+    assert_equal "Danas Notizen", site.title(locale: "de")
+    assert_equal "Dana's Notes", site.title(locale: "en")
+  end
+
+  test "Turn off asks first and turns the language off; Add language adds it" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    find("button[aria-label='Turn off Español']").click
+    within("dialog#language-off-dialog-es") do
+      assert_text "Turn off Español?"
+      click_on "Turn off Español"
+    end
+    assert_selector "#toasts .admin-toast", text: "Español turned off"
+    assert_no_selector "#language-es"
+    assert_equal %w[en de], site_settings(:default).reload.locale_codes
+
+    select "Français (FR)", from: "language-add-code"
+    click_on "Add language"
+    assert_selector "#toasts .admin-toast", text: "Français added"
+    assert_selector "#language-fr"
+  end
 end

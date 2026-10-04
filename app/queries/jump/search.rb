@@ -30,16 +30,15 @@ module Jump
 
     # The Settings group (spec §7, round 1 second review): destinations
     # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
-    # id of the section on `admin_settings_path` (`site`, `publishing`, `ai`; see `Admin::SettingsScreen::NavComponent`),
-    # nil for Languages, which keeps its own screen until round 3's Task 6
-    # moves it into the Settings screen as `#languages`. Each needs the permission its section's own controller asks for,
+    # id of the section on `admin_settings_path` (`site`, `languages`, `publishing`, `ai`; see
+    # `Admin::SettingsScreen::NavComponent`). Each needs the permission its section's own controller asks for,
     # so a viewer is never offered a link that would 403. Sections (CS Studio's
     # modules) used to share this group's label -- "Settings" listing
     # Dashboard and Pages -- and are a group of their own now.
     SETTINGS_DESTINATIONS = [
       { title: "Settings › Site", path: :admin_settings_path, anchor: "site", permission: "settings.manage" },
       { title: "Settings › Publishing", path: :admin_settings_path, anchor: "publishing", permission: "settings.manage" },
-      { title: "Settings › Languages", path: :admin_settings_languages_path, anchor: nil, permission: "languages.manage" },
+      { title: "Settings › Languages", path: :admin_settings_path, anchor: "languages", permission: "languages.manage" },
       { title: "Settings › AI translation", path: :admin_settings_path, anchor: "ai", permission: "settings.manage" }
     ].freeze
 

@@ -64,13 +64,19 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   test "an author opening an admin area gets the 403 page in the CS Studio layout" do
     sign_in_as(users(:author))
 
-    %w[/cs-studio/users /cs-studio/users/new /cs-studio/tags /cs-studio/settings
-       /cs-studio/settings/languages /cs-studio/system_status].each do |path|
+    %w[/cs-studio/users /cs-studio/users/new /cs-studio/tags /cs-studio/settings /cs-studio/system_status].each do |path|
       get path
       assert_response :forbidden, path
       assert_select "nav[aria-label='Modules']"
       assert_select "h1", text: "No access"
     end
+
+    # The old Languages screen's URL is a redirect to the Settings card now.
+    get "/cs-studio/settings/languages"
+    assert_response :moved_permanently
+    follow_redirect!
+    assert_response :forbidden
+    assert_select "h1", text: "No access"
   end
 
   test "an area write without the permission is refused before reaching the service" do
