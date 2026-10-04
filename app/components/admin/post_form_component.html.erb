@@ -67,9 +67,13 @@
     <% end %>
 
     <% if may_publish? %>
-      <details class="admin-record-header__schedule">
+      <%# The date field opens as a small panel under the button (absolute,
+          so the open form no longer pushes into the buttons' row and knocks
+          them out of line). Interim: the design pass's round 2 replaces
+          this with the Schedule dialog. %>
+      <details class="admin-record-header__schedule relative">
         <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
-        <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "mt-2 flex items-center gap-2" do %>
+        <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "absolute left-0 top-full z-20 mt-1 flex w-max items-center gap-2 rounded-cs border border-line bg-surface p-2 shadow-menu" do %>
           <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
           <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
         <% end %>
