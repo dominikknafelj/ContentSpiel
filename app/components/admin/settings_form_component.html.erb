@@ -1,7 +1,7 @@
 <div id="<%= DOM_ID %>">
 <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
   <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
-  <%# Translate empty fields / Use all -- see `Admin::RecordHeaderComponent`.
+  <%# Translate empty fields / Use all -- see `Admin::EditorScreen::HeaderComponent`.
       Anyone on this screen holds `settings.manage`, the settings' edit
       right. %>
   <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: true) %>

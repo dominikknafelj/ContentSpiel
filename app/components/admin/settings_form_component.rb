@@ -52,7 +52,7 @@ module Admin
 
     def outdated_locales = switcher_locales[:outdated]
 
-    # See `Admin::RecordHeaderComponent#switcher_locales`.
+    # See `Admin::EditorScreen::HeaderComponent#switcher_locales`.
     def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(site_setting)
 
     def language_url

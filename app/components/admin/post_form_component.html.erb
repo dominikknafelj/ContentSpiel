@@ -1,107 +1,12 @@
-<header class="admin-record-header mb-6 flex flex-col gap-3 rounded-cs border border-line bg-surface p-4">
-  <div class="flex flex-wrap items-start justify-between gap-3">
-    <div class="min-w-0">
-      <h1 class="truncate text-h1 text-ink"><%= Locales.read(post, :title, locale: locale) %></h1>
-
-      <div class="mt-1 flex items-center gap-2 text-sm text-meta">
-        <%= render Admin::ContentTypeDotComponent.new(content_type: post.content_type) %>
-      </div>
-
-      <% if public_path.present? %>
-        <div class="mt-1 flex items-center gap-2 text-sm text-meta">
-          <span class="truncate"><%= public_path %></span>
-          <button type="button" data-controller="admin--clipboard" data-admin--clipboard-url-value="<%= public_url %>"
-            data-action="click->admin--clipboard#copy" class="shrink-0 rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
-          <% if live? %>
-            <%# The path, not the absolute URL: the public site is served by
-                this same app, so a same-origin link opens the live page
-                wherever CS Studio is running -- on a local checkout too,
-                where the configured public domain doesn't point here. %>
-            <%= link_to "View on site", public_path, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
-          <% end %>
-        </div>
-      <% else %>
-        <p class="mt-1 text-sm text-meta">Not listed on any page yet — add a post list block for this type</p>
-      <% end %>
-    </div>
-
-    <div class="flex shrink-0 items-center gap-3">
-      <% unless editable? %>
-        <%= render "admin/shared/view_only_badge" %>
-      <% end %>
-      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
-      <span data-status="<%= status %>">
-        <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
-      </span>
-    </div>
-  </div>
-
-  <% if live? %>
-    <p role="status" class="text-sm text-warn-ink">Live — changes appear on the site as you edit</p>
+<%# The header (breadcrumb, title, publish state, actions, language tabs) is
+    `Admin::EditorScreen::HeaderComponent`, shared with the page editor. Its
+    dialogs are siblings of it, so they sit outside this form. %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options) do |header| %>
+  <% header.with_suggest do %>
+    <%# Translate empty fields / Use all (translation helpers spec §6.4). %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: editable?) %>
   <% end %>
-
-  <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle) %>
-
-  <%# Translate empty fields / Use all -- see `Admin::RecordHeaderComponent`. %>
-  <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: editable?) %>
-
-  <div class="flex flex-wrap items-center gap-2">
-    <%# Unlike a page (always somewhere in the tree, so it always has a
-        would-be path even as a draft), a post with no canonical listing
-        page yet has no path at all -- `preview_path` would be nil, and
-        `link_to` a nil URL raises rather than rendering a dead link, so
-        there's simply nothing to preview until some page lists it. %>
-    <% if preview_path.present? %>
-      <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
-    <% end %>
-
-    <%# The Activity link (design spec §5 "Audit log module", Task 9): see
-        `Admin::RecordHeaderComponent`'s own comment -- same reasoning,
-        just for a post rather than a page. %>
-    <% if can?("audit.view") %>
-      <%= link_to "Activity", helpers.admin_audit_events_path(subject_type: "Post", subject_id: post.id, **url_options), class: setup_secondary_link_class %>
-    <% end %>
-
-    <% if can_publish? %>
-      <%= button_to "Publish now", helpers.publish_admin_post_path(post, **url_options), method: :post, class: setup_primary_button_class %>
-    <% end %>
-
-    <% if can_unpublish? %>
-      <%= button_to "Unpublish", helpers.unpublish_admin_post_path(post, **url_options), method: :post, class: setup_secondary_link_class %>
-    <% end %>
-
-    <% if may_publish? %>
-      <%# The date field opens as a small panel under the button (absolute,
-          so the open form no longer pushes into the buttons' row and knocks
-          them out of line). Interim: the design pass's round 2 replaces
-          this with the Schedule dialog. %>
-      <details class="admin-record-header__schedule relative">
-        <summary class="cursor-pointer <%= setup_secondary_link_class %>">Schedule…</summary>
-        <%= form_with url: helpers.schedule_admin_post_path(post, **url_options), method: :post, class: "absolute left-0 top-full z-20 mt-1 flex w-max items-center gap-2 rounded-cs border border-line bg-surface p-2 shadow-menu" do %>
-          <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, class: setup_input_class %>
-          <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
-        <% end %>
-      </details>
-    <% end %>
-
-    <% if can_delete? %>
-      <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_text, type: "button",
-            data: dialog_trigger(delete_dialog_id)) %>
-
-      <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
-        <% dialog.with_confirm_action do %>
-          <%# `_top`, as the page's own delete: the redirect is a whole-page
-              visit, so the sidebar's Trash badge is re-rendered with it and
-              the Undo toast lands in `#toasts` directly instead of being
-              relayed out of the content frame. %>
-          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
-            <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
-          <% end %>
-        <% end %>
-      <% end %>
-    <% end %>
-  </div>
-</header>
+<% end %>
 
 <%# `data-controller="admin--autosave"` sits on this form directly, same as
     `Admin::PageSettingsFormComponent`'s own (see that component's own

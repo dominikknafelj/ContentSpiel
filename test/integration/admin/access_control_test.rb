@@ -395,8 +395,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_response :success
-    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Move to trash/, count: 0
-    assert_select "details.admin-record-header__schedule", count: 0
+    assert_select "button, input[type=submit]", text: /Publish|Unpublish|Move to trash/, count: 0
+    assert_select ".admin-editor-header__schedule", count: 0
     assert_select "#block-picker-end", count: 0
 
     sign_in_as(users(:two))
@@ -414,7 +414,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "form[data-controller~='admin--autosave']"
-    assert_select "button, input[type=submit]", text: /Publish now|Move to trash/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish|Move to trash/, count: 0
   end
 
   test "new posts offer only the content types the author may create" do
@@ -499,7 +499,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/posts/#{@other_post.id}"
     assert_select "[data-view-only]", text: "View only"
-    assert_select "button", text: "Publish now"
+    assert_select "button", text: "Publish"
     post "/cs-studio/posts/#{@other_post.id}/publish"
     assert_redirected_to "/cs-studio/posts/#{@other_post.id}"
     assert @other_post.reload.live?
@@ -509,7 +509,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_nil @other_post.reload.published_at
 
     get "/cs-studio/pages/#{@outside.id}"
-    assert_select "button", text: "Publish now"
+    assert_select "button", text: "Publish"
     post "/cs-studio/pages/#{@outside.id}/publish"
     assert @outside.reload.live?
     post "/cs-studio/pages/#{@outside.id}/unpublish"

@@ -101,7 +101,7 @@ module Admin
     # A page the user can read but not edit (access-control design spec §5,
     # `can_edit?`: `pages.edit`, plus `pages.publish` once published): every
     # field disabled by one `<fieldset disabled>`, and no `admin--autosave`,
-    # so nothing is ever sent (Review Focus 4). `Admin::RecordHeaderComponent`
+    # so nothing is ever sent (Review Focus 4). `Admin::EditorScreen::HeaderComponent`
     # shows the "View only" badge above.
     def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
 

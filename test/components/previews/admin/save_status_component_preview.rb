@@ -14,6 +14,10 @@ module Admin
       render Admin::SaveStatusComponent.new(id: "save-status-saved", state: :saved, at: Time.current)
     end
 
+    def saved_live
+      render Admin::SaveStatusComponent.new(id: "save-status-saved-live", state: :saved, at: Time.current, live: true)
+    end
+
     def error
       render Admin::SaveStatusComponent.new(id: "save-status-error", state: :error, count: 2)
     end

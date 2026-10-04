@@ -18,8 +18,8 @@
     <% end %>
 
     <%# The "⋯" menu (spec §5.1) is a plain, single-level `<details>` --
-        the same disclosure pattern `Admin::RecordHeaderComponent`'s own
-        "Schedule…" already uses -- not nested inside the collapse toggle
+        the same disclosure pattern the page settings' own `<details>` uses --
+        not nested inside the collapse toggle
         above, so a click inside it never also fires that button's own
         `data-action`. %>
     <% if editable? %>

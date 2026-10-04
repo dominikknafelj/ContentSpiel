@@ -12,7 +12,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", "About"
     assert_select "[data-status='live']"
-    assert_includes response.body, "Live — changes appear on the site as you edit"
+    assert_includes response.body, "This page is live. Changes appear on the site as soon as they’re saved."
     assert_select "form[data-controller~='admin--autosave'] input[name='page[title]'][value='About']"
   end
 
@@ -45,12 +45,14 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@page.id}"
 
     assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{@page.id}/unpublish"
-    assert_select "details form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{@page.id}/schedule"
     assert_select "form[action=?][data-turbo-frame='_top'] input[name='_method'][value='delete']", "/cs-studio/pages/#{@page.id}"
 
+    # A draft: Publish, and the (interim) schedule form -- scheduling is for
+    # a draft only now; a live page is unpublished first.
     draft = create_page(title: "Draft", published: false)
     get "/cs-studio/pages/#{draft.id}"
     assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/publish"
+    assert_select ".admin-editor-header__schedule form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/schedule"
 
     get "/cs-studio/pages/new"
     assert_select "form[action='/cs-studio/pages'][data-turbo-frame='_top']"

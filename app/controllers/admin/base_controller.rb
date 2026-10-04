@@ -77,7 +77,7 @@ module Admin
     # HH:MM", the trash and audit screens, the dashboard -- is in the
     # site's zone (dashboard spec §5). Wrapping the request is what lets
     # the existing `Time.zone.parse`/`strftime` call sites (schedule
-    # inputs, `record_header_component.rb`/`post_form_component.rb`,
+    # inputs, `editor_screen/header_component.rb`/`post_form_component.rb`,
     # `occurred_at`/`trashed_at` reads) stay exactly as they are --
     # they've always read/written through `Time.zone`, which was simply
     # always UTC until now.

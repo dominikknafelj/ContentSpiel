@@ -2,7 +2,7 @@
     language, its position and fallbacks (one bulk form, `Locales::
     Configure`), "Add language" (`Locales::Enable`) and Disable
     (`Locales::Disable`, refused for the default -- no button is rendered
-    for it at all, matching `Admin::RecordHeaderComponent`'s own "just don't
+    for it at all, matching `Admin::EditorScreen::HeaderComponent`'s own "just don't
     show the control" answer for a page that can't be deleted either).
     Three separate `<form>`s, not one -- HTML forbids nesting a form inside
     another, and the reorder/fallbacks form's own table already has one row

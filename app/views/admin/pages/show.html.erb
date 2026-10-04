@@ -2,7 +2,15 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do |header| %>
+  <% header.with_suggest do %>
+    <%# Translate empty fields / Use all (translation helpers spec §6.4): only
+        in a non-default language, for a viewer who may edit the page, with AI
+        set up and `ai.translate`. It asks for the page's own fields and its
+        blocks' alike -- whatever has a Translate button below. %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: admin_locale, editable: can_edit?(@page)) %>
+  <% end %>
+<% end %>
 
 <%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
