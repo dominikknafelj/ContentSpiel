@@ -67,7 +67,9 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "#{row(users(:one))}", text: /\(you\)/
     assert_select "#{row(users(:one))}", text: /Owner/
     assert_select "#{row(users(:one))} [data-column=groups]", text: "No groups"
-    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: "Never"
+    # Each row says what its time is (the heading is not a table header).
+    assert_select "#{row(users(:one))} [data-column=last-sign-in]", text: /\ALast sign-in:\s*Never\z/
+    assert_select "#{row(users(:one))} [data-column=last-sign-in] .sr-only", text: /Last sign-in:/
     assert_select "#{row(users(:reader))} [data-column=groups]", text: "Read only"
     assert_select ".admin-users-list a", text: /\A(Edit|Delete)\z/, count: 0
     assert_select ".admin-users-list button", count: 0
