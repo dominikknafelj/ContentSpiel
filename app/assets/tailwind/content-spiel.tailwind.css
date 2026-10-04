@@ -98,6 +98,8 @@
 .admin-dialog[data-dialog-width="form_narrow"] { max-width: 460px; }
 .admin-dialog[data-dialog-width="form"] { max-width: 560px; }
 .admin-dialog[data-dialog-width="picker"] { max-width: 880px; }
+/* The ⌘K palette (Admin::Shell::CommandPaletteComponent): high on the screen, not centred. */
+.admin-palette { margin-top: 10vh; }
 
 /* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }

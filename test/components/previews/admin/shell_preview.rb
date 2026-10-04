@@ -7,4 +7,6 @@ class Admin::ShellPreview < ViewComponent::Preview
   def top_bar = render(Admin::Shell::TopBarComponent.new)
 
   def top_bar_with_tree = render(Admin::Shell::TopBarComponent.new(tree: true))
+
+  def command_palette = render(Admin::Shell::CommandPaletteComponent.new)
 end

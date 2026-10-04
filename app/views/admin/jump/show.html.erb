@@ -2,7 +2,7 @@
     a bare fragment, no layout. Rows are links that leave the frame
     (`_top`), so following one is an ordinary Turbo visit and the page
     replacement closes the dialog. %>
-<turbo-frame id="jump-results" data-admin--command-palette-target="results">
+<turbo-frame id="jump-results">
   <% @groups.each do |group| %>
     <section class="py-1">
       <h3 class="px-4 pb-1 pt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group[:label] %></h3>
