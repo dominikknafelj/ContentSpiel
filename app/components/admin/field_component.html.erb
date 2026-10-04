@@ -18,9 +18,5 @@
     <p class="mt-1 text-sm text-meta">Same in all languages</p>
   <% end %>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
-    <% errors.each do |message| %>
-      <p><%= message %></p>
-    <% end %>
-  </div>
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

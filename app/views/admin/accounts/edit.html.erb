@@ -6,13 +6,11 @@
   <h1 class="mb-1 text-h1 text-ink">Change password</h1>
   <p class="mb-4 text-meta">Signed in as <%= Current.user.display_name %>. Changing your password signs you out everywhere else.</p>
 
-  <% if @errors.present? %>
-    <p role="alert" class="mb-4 text-danger-ink"><%= @errors.to_sentence %></p>
-  <% end %>
-
-  <% if @profile_errors.present? %>
-    <p role="alert" class="mb-4 text-danger-ink"><%= @profile_errors.to_sentence %></p>
-  <% end %>
+  <%# The service layer's `result.errors` are whole sentences with no field to
+      link to (the summary prints them as they are). One summary at a time:
+      only one of the two forms was submitted. %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@errors)) %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
   <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, class: "mb-8" do %>
     <div class="mb-4">

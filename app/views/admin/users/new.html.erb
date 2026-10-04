@@ -4,22 +4,22 @@
 <div class="mx-auto max-w-md">
   <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New user</h1>
 
-  <% if @user.errors.any? %>
-    <p class="mb-4 text-danger-ink" role="alert"><%= @user.errors.full_messages.to_sentence %></p>
-  <% end %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
   <%= form_with url: admin_users_path(**admin_url_options), method: :post do %>
     <div class="mb-4">
       <%= label_tag "user_name", "Name", class: setup_label_class %>
       <%= text_field_tag "user[name]", @user.name, id: "user_name", maxlength: 120, autocomplete: "name",
-            aria: { describedby: "user_name_help" }, class: setup_input_class %>
+            aria: { describedby: "user_name_help", invalid: (@user.errors.include?(:name) ? "true" : nil) }.compact,
+            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:name)) ] %>
       <p id="user_name_help" class="mt-1 text-sm text-meta">Optional. Shown instead of the email.</p>
     </div>
 
     <div class="mb-4">
       <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
       <%= email_field_tag "user[email_address]", @user.email_address, id: "user_email_address", autofocus: true,
-            autocomplete: "username", class: setup_input_class %>
+            autocomplete: "username", aria: { invalid: (@user.errors.include?(:email_address) ? "true" : nil) }.compact,
+            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:email_address)) ] %>
     </div>
 
     <div class="mb-4">

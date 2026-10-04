@@ -43,6 +43,16 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "doesn&#39;t match"
   end
 
+  test "a refused create shows the error summary with a link to each field and marks the field invalid" do
+    post "/cs-studio/users", params: { user: { email_address: users(:one).email_address, password: "short", password_confirmation: "short" } }
+
+    assert_response :unprocessable_entity
+    assert_select ".admin-error-summary[role=alert]", text: /2 things need fixing/
+    assert_select ".admin-error-summary a[href='#user_email_address']", text: "Email address has already been taken"
+    assert_select ".admin-error-summary a[href='#user_password']", text: "Use at least 12 characters."
+    assert_select "input#user_email_address[aria-invalid=true]"
+  end
+
   test "creating a user with an email already taken (case-insensitively) fails" do
     assert_no_difference -> { User.count } do
       post "/cs-studio/users", params: { user: {

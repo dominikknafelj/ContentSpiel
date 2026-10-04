@@ -48,7 +48,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/account/password", params: { current_password: "password", password: "elevenchars", password_confirmation: "elevenchars" }
 
     assert_response :unprocessable_entity
-    assert_select "[role=alert]", text: "Use at least 12 characters."
+    assert_select ".admin-error-summary[role=alert] li", text: "Use at least 12 characters."
     assert users(:reader).reload.authenticate("password")
   end
 

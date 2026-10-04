@@ -4,9 +4,9 @@
   <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
     <div>
       <% if multiline %>
-        <%= tag.textarea value, **html.merge(name: html_name, id: id, class: setup_input_class, rows: 3) %>
+        <%= tag.textarea value, **html.merge(name: html_name, id: id, class: input_class, rows: 3, **invalid_attrs) %>
       <% else %>
-        <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: setup_input_class)) %>
+        <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
       <% end %>
     </div>
 
@@ -20,9 +20,5 @@
     <% end %>
   </div>
 
-  <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink">
-    <% errors.each do |message| %>
-      <p><%= message %></p>
-    <% end %>
-  </div>
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

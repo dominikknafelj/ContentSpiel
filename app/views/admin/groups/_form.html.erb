@@ -1,15 +1,15 @@
 <%# The group editor (access-control design spec §5): name, description,
     members and the permission matrix. Members send a blank first value so
     an empty list still arrives as one. %>
-<% if group.errors.any? %>
-  <p class="mb-4 text-danger-ink" role="alert"><%= group.errors.full_messages.to_sentence %></p>
-<% end %>
+<%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
 <%= form_with url: url, method: method do %>
   <div class="mb-4 max-w-md">
     <%= label_tag "group_name", "Name", class: setup_label_class %>
     <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
-    <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?, class: setup_input_class %>
+    <%= text_field_tag "group[name]", group.name, id: "group_name", required: true, readonly: group.built_in?,
+          aria: { invalid: (group.errors.include?(:name) ? "true" : nil) }.compact,
+          class: [ setup_input_class, ("!border-danger" if group.errors.include?(:name)) ] %>
   </div>
 
   <div class="mb-6 max-w-md">

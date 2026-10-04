@@ -82,6 +82,18 @@ module Admin
 
       private
 
+      # The input's own invalid state (design pass spec §4): a danger border,
+      # `aria-invalid` and `aria-describedby` pointing at the error slot this
+      # component renders. Only what the server rendered -- an autosave
+      # Turbo Stream replaces the error slot alone, never the input.
+      def input_class
+        errors.any? ? "#{setup_input_class} !border-danger" : setup_input_class
+      end
+
+      def invalid_attrs
+        errors.any? ? { aria: { invalid: "true", describedby: errors_id } } : {}
+      end
+
       # What Use fills and how (`TranslateButtonComponent`): a plain column
       # its own input, measured as the text it is.
       def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }
