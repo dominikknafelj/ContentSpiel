@@ -43,7 +43,7 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     assert_selector "#{row} [data-chips]", text: "Under About"
     assert_selector "#{row} [data-chips]", text: "All pages", count: 0
 
-    press "Save"
+    press "Create group"
     assert_text "Group saved"
 
     group = AccessControl::Group.find_by!(name: "About editors")
@@ -107,7 +107,7 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
 
     assert_no_selector "#{row} [data-chips]", text: "retired_type"
     assert_selector ".admin-save-bar", text: /\b1 unsaved change\b/i
-    press "Save"
+    press "Save group"
     assert_text "Group saved"
     assert_equal({ "content_types" => [ "blog" ] }, group.grants.find_by!(permission: "posts.edit").scope)
   end

@@ -249,6 +249,12 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
   # (indeterminate, unchecked) and a descendant shown as a greyed tick
   # (disabled) must never be submitted, a stored root the viewer can't open must
   # be carried, and a removed content type must be carried too.
+  # NOTE (round 3 Task 11): `editor_branch` can't hand out most of this group's
+  # grants, so the editor draws it read-only (a disabled fieldset, no footer) and
+  # nothing here is really "pressed Save". The form's inputs are still rendered, and
+  # this test posts them as a forged untouched save: what it pins is that the
+  # SERVICE changes nothing for it. The non-owner who can manage a group and presses
+  # Save is `Admin::GroupsEditorStatesTest`.
   test "a group holding an unreadable page, a removed type, scoped grants and an own scope, saved untouched, changes nothing" do
     fixture = review_focus_group
     sign_in_as(users(:editor_branch))
