@@ -19,7 +19,8 @@
   <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
 </div>
 
-<%= form_with url: admin_media_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
+<% filter_keys = %i[q filter] %>
+<%= form_with(**filter_form_options(admin_media_path(**admin_url_options))) do %>
   <% if admin_locale != Locales.default %>
     <%= hidden_field_tag :locale, admin_locale %>
   <% end %>
@@ -35,8 +36,8 @@
           class: setup_input_class %>
   </div>
 
-  <%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %>
-  <%= link_to "Clear", admin_media_path(**admin_url_options), class: setup_secondary_link_class %>
+  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <%= filter_clear_link(admin_media_path(**admin_url_options), filter_keys) %>
 <% end %>
 
 <% page_url = ->(page) { admin_media_path(request.query_parameters.merge("page" => page)) } %>

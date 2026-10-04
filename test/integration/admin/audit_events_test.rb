@@ -102,7 +102,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
-  test "paginates 50 per page, with Next and Previous" do
+  test "pages 50 at a time, with Load older and Newer" do
     sign_in_as(users(:one))
     51.times do |n|
       Audit::Event.create!(action: "test.paginate", subject_label: "Item #{n}", channel: "admin",
@@ -112,14 +112,14 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events", params: { event_action: "test.paginate" }
     assert_response :success
     assert_select "tbody tr", 50
-    assert_select "a", { text: "Next" }
-    assert_select "a", { text: "Previous", count: 0 }
+    assert_select "a", { text: "Load older" }
+    assert_select "a", { text: "Newer", count: 0 }
 
     get "/cs-studio/audit_events", params: { event_action: "test.paginate", offset: 50 }
     assert_response :success
     assert_select "tbody tr", 1
-    assert_select "a", { text: "Next", count: 0 }
-    assert_select "a", { text: "Previous" }
+    assert_select "a", { text: "Load older", count: 0 }
+    assert_select "a", { text: "Newer" }
   end
 
   test "the event page renders field changes and an escaped snapshot" do

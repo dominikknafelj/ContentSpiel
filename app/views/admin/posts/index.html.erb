@@ -14,7 +14,8 @@
   <% end %>
 </div>
 
-<%= form_with url: admin_posts_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
+<% filter_keys = %i[type status tag q] %>
+<%= form_with(**filter_form_options(admin_posts_path(**admin_url_options))) do %>
   <% if admin_locale != Locales.default %>
     <%= hidden_field_tag :locale, admin_locale %>
   <% end %>
@@ -41,7 +42,8 @@
     <%= text_field_tag :q, params[:q], placeholder: "Search titles…", class: setup_input_class %>
   </div>
 
-  <%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %>
+  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <%= filter_clear_link(admin_posts_path(**admin_url_options), filter_keys) %>
 <% end %>
 
 <% if @posts.empty? %>

@@ -1,0 +1,30 @@
+module Admin
+  # The shared shape of a list's filter form (design pass spec §4): a GET form
+  # that applies as you change it (`admin--auto-submit`) and reloads only the
+  # `content` frame, replacing the history entry rather than adding one per
+  # keystroke pause. The controller's actions sit on the form so every field
+  # in it -- select, date, text -- is covered without per-field wiring: a
+  # `change` submits at once, `input` (typing) waits for the delay. Text
+  # inputs need a stable `id` (the field helpers' defaults give one) so focus
+  # and caret can be restored after the reload.
+  module FilterHelper
+    FILTER_ACTIONS = "change->admin--auto-submit#submit input->admin--auto-submit#submitLater".freeze
+
+    def filter_form_options(url)
+      {
+        url: url, method: :get, class: "mb-4 flex flex-wrap items-end gap-3",
+        data: { controller: "admin--auto-submit", action: FILTER_ACTIONS, turbo_frame: "content", turbo_action: "replace" }
+      }
+    end
+
+    # "Clear", shown only while one of the form's own params is set -- the
+    # editing `locale` is never a filter.
+    def filter_clear_link(path, keys)
+      return unless keys.any? { |key| params[key].present? }
+
+      link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" }
+    end
+
+    def filters_active?(keys) = keys.any? { |key| params[key].present? }
+  end
+end
