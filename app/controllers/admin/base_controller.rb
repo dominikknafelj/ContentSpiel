@@ -102,7 +102,13 @@ module Admin
       if request.format.symbol == :html
         render "admin/errors/not_found", status: :not_found
       else
-        head :not_found
+        # `head` would label the empty body with the *request's* format --
+        # for a Turbo Stream request, "text/vnd.turbo-stream.html" -- and
+        # a `fetch` like `admin--translate`'s suggest request takes that
+        # content type to mean "a stream, render it" (an empty one) rather
+        # than "not a stream, show the generic error". An explicit
+        # text/plain keeps a bare 404 reading as what it is.
+        head :not_found, content_type: "text/plain"
       end
     end
 

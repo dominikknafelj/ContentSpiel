@@ -38,6 +38,7 @@ class AdminNotFoundTest < ActionDispatch::IntegrationTest
     patch admin_post_path(id: 999_999), params: { post: { title: "x" } }, as: :turbo_stream
     assert_response :not_found
     assert_no_match(/Not found/, response.body)
+    assert_no_match(/turbo-stream/, response.media_type, "a fetch must not take the bare 404 for a stream")
   end
 
   test "a Turbo Frame request still gets the content frame" do
