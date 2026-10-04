@@ -27,12 +27,14 @@ module Admin
       ghost: "text-dim hover:bg-sunken hover:text-ink"
     }.freeze
 
-    BASE_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-4 py-2 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+    COMMON_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50".freeze
+
+    BASE_CLASS = "#{COMMON_CLASS} px-4 py-2".freeze
 
     # `size: :small` is the compact button of an inline box (the AI
-    # suggestion's Use): `BASE_CLASS`'s padding swapped for a tighter one.
-    # Spelled out whole because Tailwind only sees complete class names.
-    SMALL_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-2 py-0.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+    # suggestion's Use): the same classes with a tighter padding and a smaller
+    # type. Built from `COMMON_CLASS` as whole strings, which Tailwind sees.
+    SMALL_CLASS = "#{COMMON_CLASS} px-2 py-0.5 text-sm".freeze
 
     def initialize(label:, variant: :primary, type: "button", size: :regular, **html)
       raise ArgumentError, "unknown button variant #{variant.inspect}" unless VARIANT_CLASSES.key?(variant)

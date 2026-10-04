@@ -228,9 +228,10 @@ module Admin
       # input (`translate:use`, dispatched there, bubbles to
       # `admin--rich-text#applySuggestion`), and the original counts as the
       # Markdown `AI::Translate` actually sends.
-      def translation_field_empty? = self.class.to_document(value).blank?
-
       def translate_target = { input_id: "#{id}-json", kind: :rich, characters: original_document.to_markdown.length }
+
+      # Empty means no text and no embed in the document as rendered.
+      def translation_field_empty? = self.class.to_document(value).blank?
 
       def self.to_document(value)
         case value

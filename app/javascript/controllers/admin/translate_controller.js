@@ -68,6 +68,16 @@ export default class extends Controller {
     ready: (count) => `${count} ${count === 1 ? "suggestion" : "suggestions"} ready`
   }
 
+  // A request must not outlive the page it was asked on: after a language
+  // tab or any Turbo navigation the same input ids exist again, in another
+  // language, and a late answer would land under the wrong field. So jobs
+  // whose boxes left the page, and this header's run, stop here (and every
+  // job at `turbo:before-visit`, below).
+  disconnect() {
+    this.runController?.abort()
+    cancelDetachedJobs()
+  }
+
   // --- Asking ---------------------------------------------------------------
 
   async translate() {
@@ -89,8 +99,8 @@ export default class extends Controller {
 
     const fields = emptyFields()
     if (fields.length === 0) {
-      this.showStatus(this.constructor.texts.nothingEmpty)
       this.refresh()
+      this.showStatus(this.constructor.texts.nothingEmpty)
       return
     }
 
@@ -107,6 +117,7 @@ export default class extends Controller {
         await this.request(part, { url: this.urlValue, locale: this.localeValue, signal: run.signal })
         answered += part.length
       }
+      this.setBar(answered / fields.length)
     } finally {
       this.runController = null
     }
@@ -126,8 +137,8 @@ export default class extends Controller {
 
   // One POST for `fields`, which all belong to the same record: the pending
   // boxes go in first, so they exist the instant the button is pressed.
-  async request(fields, { url, locale, signal }) {
-    const job = startJob(fields, { url, locale, signal })
+  async request(fields, { url, locale, signal, focus = false }) {
+    const job = startJob(fields, { url, locale, signal, focus })
     const [ first ] = fields
     const body = new FormData()
     body.append("record_type", first.recordType)
@@ -158,8 +169,12 @@ export default class extends Controller {
       if (job.over || job.timedOut) return
 
       if (stream) {
-        Turbo.renderStreamMessage(text)
+        // Where focus sits now: a pending box that held it (its Cancel button)
+        // is about to be replaced, and focus must not fall to the page.
+        const focused = fields.filter(({ box }) => box?.contains(document.activeElement))
+        Turbo.renderStreamMessage(guardStreams(text, job))
         await settle()
+        focused.forEach(({ box }) => box.querySelector("[data-translate-use]")?.focus())
         // A box nothing answered (the stream named no such field) must not
         // wait forever.
         fields.forEach((field) => { if (isPendingOf(field.box, job)) showError(field.box, this.constructor.texts.noAnswer) })
@@ -179,10 +194,12 @@ export default class extends Controller {
   // The pending box's Cancel: this request only -- its whole record's part of
   // a bulk run, since that was one request -- and the run goes on to the next.
   cancelPending(event) {
-    const job = jobOf(event.currentTarget.closest("[data-translation-box]"))
+    const box = event.currentTarget.closest("[data-translation-box]")
+    const job = jobOf(box)
     if (!job) return
 
     cancelJob(job)
+    refocus(box)
     announceChange()
   }
 
@@ -192,7 +209,8 @@ export default class extends Controller {
     if (!job) return
 
     cancelJob(job)
-    await this.request(job.fields, { url: job.url, locale: job.locale })
+    // Focus stays in the box: the new pending box takes Try again's place.
+    await this.request(job.fields, { url: job.url, locale: job.locale, signal: job.signal, focus: true })
     await settle()
     announceChange()
   }
@@ -207,6 +225,7 @@ export default class extends Controller {
       showError(box, this.constructor.texts.gone)
       return
     }
+    const hadFocus = box?.contains(document.activeElement)
 
     if (button.dataset.translateKind === "rich") {
       const detail = {
@@ -235,6 +254,9 @@ export default class extends Controller {
       input.dispatchEvent(new Event("input", { bubbles: true }))
     }
     box?.replaceChildren()
+    // The box (and the button the editor pressed) is gone: focus moves to the
+    // field the text went into.
+    if (hadFocus) fieldFocusTarget(input)?.focus()
     announceChange()
   }
 
@@ -247,7 +269,10 @@ export default class extends Controller {
   }
 
   discard(event) {
-    event.currentTarget.closest("[data-translation-box]")?.replaceChildren()
+    const box = event.currentTarget.closest("[data-translation-box]")
+    const hadFocus = box?.contains(document.activeElement)
+    box?.replaceChildren()
+    if (hadFocus) refocus(box)
     announceChange()
   }
 
@@ -258,7 +283,13 @@ export default class extends Controller {
     const uses = Array.from(document.querySelectorAll("[data-translate-use]"))
     const plain = uses.filter((button) => button.dataset.translateKind !== "rich")
     const rich = uses.filter((button) => button.dataset.translateKind === "rich")
-    ;[ ...plain, ...rich ].forEach((button) => button.click())
+    // One refresh at the end, not one per Use.
+    muteChanges = true
+    try {
+      ;[ ...plain, ...rich ].forEach((button) => button.click())
+    } finally {
+      muteChanges = false
+    }
     this.showStatus("")
     this.refresh()
   }
@@ -283,9 +314,13 @@ export default class extends Controller {
     const suggestions = document.querySelectorAll("[data-translate-use]").length
     if (suggestions > 0) {
       this.show("ready")
-      this.readyTarget.querySelector("[data-translate-ready-text]").textContent = this.constructor.texts.ready(suggestions)
+      const text = this.constructor.texts.ready(suggestions)
+      this.readyTarget.querySelector("[data-translate-ready-text]").textContent = text
+      this.showStatus(text)
       return
     }
+
+    this.showStatus("")
 
     const empty = emptyFields().length
     this.idleTarget.querySelector("[data-translate-label]").textContent = this.constructor.texts.label(empty)
@@ -294,9 +329,18 @@ export default class extends Controller {
 
   showRunning(answered, total) {
     this.show("running")
-    this.runningTarget.querySelector("[data-translate-progress-text]").textContent = this.constructor.texts.progress(Math.min(answered + 1, total), total)
-    // The bar's width through the CSSOM: the strict CSP refuses a style attribute.
-    this.runningTarget.querySelector("[data-translate-progress-bar]").style.width = `${Math.round((answered / total) * 100)}%`
+    // Counted per field: the one being waited on (never past the total).
+    const text = this.constructor.texts.progress(Math.min(answered + 1, total), total)
+    this.runningTarget.querySelector("[data-translate-progress-text]").textContent = text
+    // Also in the persistent live region: the running line itself is shown and
+    // hidden with the state, and a region that appears is not announced.
+    this.showStatus(text)
+    this.setBar(answered / total)
+  }
+
+  // The bar's width through the CSSOM: the strict CSP refuses a style attribute.
+  setBar(fraction) {
+    this.runningTarget.querySelector("[data-translate-progress-bar]").style.width = `${Math.round(fraction * 100)}%`
   }
 
   show(state) {
@@ -316,6 +360,14 @@ export default class extends Controller {
 // and the pending box in it.
 const pending = new WeakMap()
 
+// Requests still out (or timed out and waiting for Try again), and the id the
+// next one gets.
+const liveJobs = new Set()
+let jobCounter = 0
+
+// Set while Use all presses its buttons, so the header refreshes once.
+let muteChanges = false
+
 // The seconds a request may take before the pending box gives up, as the
 // layout's template declares it (`PendingComponent::TIMEOUT_SECONDS`).
 function timeoutSeconds(template) {
@@ -326,9 +378,10 @@ function timeoutSeconds(template) {
 // POST: `fields` (all one record's), where it goes (`url`, `locale`, so a
 // Try again from a box's own controller instance knows them) and its abort
 // controller, which the run's signal also aborts.
-function startJob(fields, { url, locale, signal }) {
+function startJob(fields, { url, locale, signal, focus }) {
   const controller = new AbortController()
-  const job = { fields, url, locale, controller, over: false, timedOut: false, startedAt: Date.now(), timers: [] }
+  const job = { id: ++jobCounter, fields, url, locale, signal, controller, over: false, timedOut: false, startedAt: Date.now(), timers: [] }
+  liveJobs.add(job)
   signal?.addEventListener("abort", () => cancelJob(job), { once: true })
 
   const template = document.getElementById("translation-pending-template")
@@ -339,6 +392,7 @@ function startJob(fields, { url, locale, signal }) {
       box.replaceChildren(node)
       pending.set(box, { job, node })
     })
+    if (focus) fields[0]?.box?.querySelector("[data-translation-pending] button")?.focus()
 
     const interval = setInterval(() => {
       const seconds = Math.floor((Date.now() - job.startedAt) / 1000)
@@ -367,6 +421,7 @@ function startJob(fields, { url, locale, signal }) {
 function endJob(job) {
   job.timers.forEach((stop) => stop())
   job.timers = []
+  liveJobs.delete(job)
 }
 
 // Stops the request and takes its pending boxes away. A box already holding
@@ -375,9 +430,64 @@ function cancelJob(job) {
   job.over = true
   job.controller.abort()
   endJob(job)
-  job.fields.forEach(({ box }) => {
+  job.fields.forEach(({ box, button }) => {
+    // The busy Translate button is usable again at once (and can take focus).
+    setBusy(button, false)
     if (isPendingOf(box, job)) box.replaceChildren()
   })
+}
+
+// Every job whose boxes are no longer on the page.
+function cancelDetachedJobs() {
+  liveJobs.forEach((job) => {
+    if (job.fields.some(({ box }) => box && !box.isConnected)) cancelJob(job)
+  })
+}
+
+// A Turbo visit replaces the page: nothing in flight is wanted any more.
+document.addEventListener("turbo:before-visit", () => Array.from(liveJobs).forEach(cancelJob))
+
+// The streams of one answer, each tagged with the job that asked, so that
+// `turbo:before-stream-render` can refuse one whose box is no longer that
+// job's pending box -- cancelled, replaced by Try again or gone with its page
+// in the frame between the answer arriving and Turbo applying it.
+function guardStreams(text, job) {
+  const holder = document.createElement("template")
+  holder.innerHTML = text
+  holder.content.querySelectorAll("turbo-stream").forEach((stream) => stream.setAttribute("data-translate-job", String(job.id)))
+  return holder.innerHTML
+}
+
+document.addEventListener("turbo:before-stream-render", (event) => {
+  const stream = event.target
+  const id = stream.getAttribute?.("data-translate-job")
+  if (!id) return
+
+  const entry = pending.get(document.getElementById(stream.getAttribute("target")))
+  if (!entry || String(entry.job.id) !== id || entry.job.over || !entry.node.isConnected) event.preventDefault()
+})
+
+// Where focus goes when a box is emptied: the field's Translate / Suggest
+// update button (the box's id is keyed by the input it fills).
+function refocus(box) {
+  const inputId = box?.id.replace(/^translation-suggestion-/, "")
+  if (!inputId) return
+
+  const wrappers = document.querySelectorAll(`[data-translate-input-id="${CSS.escape(inputId)}"]`)
+  for (const wrapper of wrappers) {
+    const button = wrapper.querySelector("button")
+    if (button && !button.disabled) {
+      button.focus()
+      return
+    }
+  }
+}
+
+// What takes focus after Use: the input itself, or for a rich-text body (whose
+// input is a hidden JSON field) its editable area.
+function fieldFocusTarget(input) {
+  if (input.type !== "hidden") return input
+  return input.closest("[data-controller~='admin--rich-text']")?.querySelector("[contenteditable='true']")
 }
 
 function isPendingOf(box, job) {
@@ -393,6 +503,7 @@ function jobOf(box) {
 // Something about the suggestions on the page changed: the header
 // (`translate:changed@document->admin--translate#refresh`) works out its state.
 function announceChange() {
+  if (muteChanges) return
   document.dispatchEvent(new CustomEvent("translate:changed"))
 }
 

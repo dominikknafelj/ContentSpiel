@@ -288,7 +288,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
 
-    within("[data-admin--translate-target='running']") { find(:button, "Cancel").execute_script("this.click()") }
+    within("[data-admin--translate-target='running']") { click_on "Cancel" }
 
     assert_no_selector "[data-translation-pending]"
     assert_button "Suggest translations for 2 empty fields"
@@ -312,6 +312,73 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     sleep 3
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
     assert_nil post.reload.title(locale: "de", fallback: false)
+  end
+
+  # The layout's template carries the seconds a request may take; a test
+  # shortens it so the 25 second state needs one second, not 25.
+  def shorten_pending_timeout(seconds)
+    page.execute_script(<<~JS)
+      document.getElementById("translation-pending-template").content.firstElementChild.dataset.pendingTimeoutSeconds = "#{seconds}"
+    JS
+  end
+
+  test "a request that takes too long turns into the timeout box; its late answer is ignored; Try again asks anew" do
+    post = post_with_excerpt
+    StubProvider.delay = 2.5
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    shorten_pending_timeout(1)
+    press_within slot("title"), "Translate"
+
+    assert_selector "#translation-suggestion-post-title", text: "No suggestion after 25 seconds.", wait: 4
+    # The server answers after 2.5 s: the box must stay as it is.
+    sleep 3
+    assert_selector "#translation-suggestion-post-title", text: "No suggestion after 25 seconds."
+    assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
+
+    StubProvider.delay = 0
+    press_within "#translation-suggestion-post-title", "Try again"
+
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
+    assert_no_selector "[data-translation-pending]"
+  end
+
+  test "switching language mid-run drops the request: nothing lands on the new page" do
+    post = post_with_excerpt
+    StubProvider.delay = 2
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    press "Suggest translations for 2 empty fields"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+
+    click_on "Español"
+    assert_current_path(/locale=es/)
+    await_admin_controllers
+    sleep 3
+    assert_no_selector "[data-translation-suggestion]"
+    assert_no_selector "[data-translation-pending]"
+    assert_equal "", find_field(id: "post-title").value
+    assert_nil post.reload.title(locale: "es", fallback: false)
+  end
+
+  test "the header announces progress and readiness in one live region, and focus follows Use and Discard" do
+    post = post_with_excerpt
+    StubProvider.delay = 1
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    press "Suggest translations for 2 empty fields"
+    assert_selector "[role='status'][aria-live='polite'][data-admin--translate-target='status']", text: /Suggesting 1 of 2 fields/, visible: :all
+    assert_selector "[data-admin--translate-target='status']", text: "2 suggestions ready", visible: :all, wait: 8
+
+    # Focus inside the box moves to the field after Use, to Translate-ish after Discard.
+    find("#translation-suggestion-post-title [data-translate-use]").execute_script("this.focus(); this.click()")
+    assert_equal "post-title", page.evaluate_script("document.activeElement.id")
+    find("#translation-suggestion-post-excerpt button", text: "Discard").execute_script("this.focus(); this.click()")
+    assert_no_selector "#translation-suggestion-post-excerpt [data-translation-suggestion]"
+    assert page.evaluate_script("document.activeElement.closest('[data-translate-slot]') !== null"), "focus lands on the field's Translate button"
   end
 
   test "Suggest update on an outdated field shows the full new text and the current translation, and Use replaces the value" do

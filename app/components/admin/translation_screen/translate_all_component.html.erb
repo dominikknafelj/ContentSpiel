@@ -26,5 +26,5 @@
     <%= render Admin::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translate#discardAll" }) %>
   <% end %>
 
-  <p role="status" class="text-sm text-meta" data-admin--translate-target="status"></p>
+  <p role="status" aria-live="polite" class="text-sm text-meta" data-admin--translate-target="status"></p>
 <% end %>
