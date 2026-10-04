@@ -1,3 +1,16 @@
+<%# Never restored from Turbo's page cache (final fix wave 1, ledger m1): a
+    snapshot of an editor holds its forms as they stood when it was left --
+    typed text whose save was only sent as the page was torn down (Back
+    drains nothing), next to the base from before that save. Restored, the
+    form took that text for what the server holds and sent the next edit on
+    the old base: refused as "Changed elsewhere" against one's own save. With
+    this, Back/Forward to an editor fetches it afresh. (A frame navigation's
+    answer carries the tag too, and the promoted visit merges it into the
+    head, so it also holds for an editor opened from the tree.) %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
 <% content_for :tree do %>
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
