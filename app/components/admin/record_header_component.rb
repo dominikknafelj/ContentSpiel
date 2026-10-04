@@ -93,7 +93,7 @@ module Admin
       (page.status == "scheduled" ? page.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
-    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # The dot-marked codes for `Admin::LanguageTabsComponent` (spec
     # §6.2) -- computed here, not handed in, since every caller of this
     # component already has the one `page` it's for and nothing else this
     # check would need.

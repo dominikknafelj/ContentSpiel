@@ -26,7 +26,7 @@
       <% unless editable? %>
         <%= render "admin/shared/view_only_badge" %>
       <% end %>
-      <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
       <span data-status="<%= status %>">
         <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
       </span>

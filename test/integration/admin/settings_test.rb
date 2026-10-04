@@ -206,9 +206,9 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "[data-original-for='tagline']", text: "Things I learned"
     assert_select "[data-translate-slot='title']"
     # The language switcher, keeping the editing language in the form's URL.
-    assert_select "nav.admin-language-switcher a[href='/cs-studio/settings']", text: "English"
-    assert_select "nav.admin-language-switcher a[href='/cs-studio/settings?locale=es']", text: "Español"
-    assert_select "nav.admin-language-switcher [aria-current]", text: "Deutsch"
+    assert_select "nav.admin-language-tabs a[href='/cs-studio/settings']", text: "English"
+    assert_select "nav.admin-language-tabs a[href='/cs-studio/settings?locale=es']", text: "Español"
+    assert_select "nav.admin-language-tabs [aria-current]", text: "Deutsch"
     assert_select "form[action='/cs-studio/settings?locale=de']"
     assert_select "##{Admin::SettingsFormComponent::DOM_ID} form"
     # Untranslated settings render once, the same in every language.

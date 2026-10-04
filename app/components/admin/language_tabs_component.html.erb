@@ -1,0 +1,55 @@
+<%# One mark per state, shared by a tab and an overflow entry. Colour is never
+    the only cue: the shape differs (hollow ring vs solid dot) and an
+    `sr-only` sentence is what a screen reader announces. Neither uses red --
+    translation states are never errors. The `title` keeps the hover text the
+    old switcher had. %>
+<% marks = ->(code) do %>
+  <% if missing?(code) %>
+    <%= tag.span "", class: "h-1.5 w-1.5 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" }, aria: { hidden: true } %>
+    <span class="sr-only"><%= native_name(code) %>: not translated</span>
+  <% end %>
+  <% if outdated?(code) %>
+    <%= tag.span "", id: outdated_marker_id(code), class: "h-1.5 w-1.5 rounded-full bg-warn", title: "Original changed", data: { language_state: "outdated" }, aria: { hidden: true } %>
+    <span class="sr-only"><%= native_name(code) %>: original changed</span>
+  <% end %>
+<% end %>
+<nav aria-label="Languages" class="admin-language-tabs border-b border-line">
+  <ul class="flex items-end gap-5 font-cs text-sm">
+    <% tabs.each do |code| %>
+      <li class="inline-flex items-center gap-1.5">
+        <% if current?(code) %>
+          <span class="border-b-2 border-ink pb-2 font-medium text-ink" aria-current="true"><%= native_name(code) %></span>
+        <% else %>
+          <%# `data-turbo-frame="_top"` (final-fixes round, finding 1): this
+              component lives inside the layout's own `<turbo-frame
+              id="content">`, so left to its own default frame target a click
+              here would only ever replace *that* frame -- the page tree
+              outside it (spec §4.2) never re-renders with the new locale's
+              own titles (`Admin::TreeNodeComponent#title` reads `locale`), so
+              switching language while looking at the tree left every node's
+              title showing whichever language was selected before the
+              switch. A full top-level visit re-renders the tree along with
+              the content it was already reloading. %>
+          <%= link_to native_name(code), href(code), class: "border-b-2 border-transparent pb-2 text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
+        <% end %>
+        <%= instance_exec(code, &marks) %>
+      </li>
+    <% end %>
+    <% if overflow.any? %>
+      <li class="relative">
+        <%# A native <details> for now; the shared menu component restyles it. %>
+        <details class="admin-language-tabs__more">
+          <summary class="cursor-pointer list-none pb-2 text-meta hover:text-ink">+<%= overflow.size %> ▾</summary>
+          <ul class="absolute right-0 z-20 mt-1 min-w-40 rounded-cs border border-line bg-surface p-1 shadow-menu">
+            <% overflow.each do |code| %>
+              <li class="flex items-center gap-1.5 px-2 py-1">
+                <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
+                <%= instance_exec(code, &marks) %>
+              </li>
+            <% end %>
+          </ul>
+        </details>
+      </li>
+    <% end %>
+  </ul>
+</nav>

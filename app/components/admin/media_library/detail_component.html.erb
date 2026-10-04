@@ -18,7 +18,7 @@
 
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-3">
-        <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+        <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
         <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
       </div>
 

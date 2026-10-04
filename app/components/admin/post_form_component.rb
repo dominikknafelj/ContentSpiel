@@ -94,7 +94,7 @@ module Admin
       (post.status == "scheduled" ? post.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
     end
 
-    # The dot-marked codes for `Admin::LanguageSwitcherComponent` (spec
+    # The dot-marked codes for `Admin::LanguageTabsComponent` (spec
     # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
     # gives for its own page.
     def missing_locales = switcher_locales[:missing]
