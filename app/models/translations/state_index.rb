@@ -105,6 +105,42 @@ module Translations
       { total: totals.values.sum, complete: totals["complete"], missing: totals["missing"], outdated: totals["outdated"] }
     end
 
+    # `{ locale => { total:, complete:, missing:, outdated: } }` for every
+    # given language over the (already read-scoped) relations, items not
+    # fields -- the same numbers as `summary`, but in two grouped queries per
+    # relation however many languages there are (the translations matrix's
+    # summary cards). `complete` is what is left of the total, so a record
+    # with no row for a language reads complete, as everywhere else.
+    def summaries(locales, relations)
+      locales = locales.map(&:to_s)
+      result = locales.index_with { { total: 0, missing: 0, outdated: 0 } }
+      Array(relations).each do |relation|
+        base = relation.unscope(:order)
+        total = base.count
+        result.each_value { |counts| counts[:total] += total }
+        table = relation.klass.quoted_table_name
+        join = ActiveRecord::Base.sanitize_sql_array([
+          "INNER JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{table}.id " \
+          "AND translation_states.locale IN (?)", relation.klass.polymorphic_name, locales
+        ])
+        base.joins(join).where("translation_states.state IN ('missing', 'outdated')")
+          .group("translation_states.locale", "translation_states.state").count
+          .each { |(locale, state), count| result.fetch(locale)[state.to_sym] += count }
+      end
+      result.transform_values { |counts| counts.merge(complete: counts[:total] - counts[:missing] - counts[:outdated]) }
+    end
+
+    # SQL for "this record is in one of `states` in any of `locales`", for
+    # embedding in a `WHERE` (or a `SELECT` list) over `model`'s table: an
+    # EXISTS rather than `joins`, which narrows by one language. The posts
+    # list's Translation filter and the translations matrix both ask about a
+    # record as a whole this way; a record with no row never matches.
+    def exists_in_any_locale_sql(model, states:, locales:)
+      rows = State.where(record_type: model.polymorphic_name, locale: Array(locales).map(&:to_s), state: Array(states).map(&:to_s))
+        .where("translation_states.record_id = #{model.quoted_table_name}.id")
+      "EXISTS (#{rows.to_sql})"
+    end
+
     def join_sql(model, locale)
       ActiveRecord::Base.sanitize_sql_array([
         "LEFT JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{model.quoted_table_name}.id " \

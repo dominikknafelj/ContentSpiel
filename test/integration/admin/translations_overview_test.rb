@@ -9,6 +9,10 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de es], default: "en")
+    # The settings row has no `translation_states` rows until something
+    # saves it (a record with no row reads complete): index it, so the matrix
+    # has a Site settings row to show.
+    Translations::StateIndex.rebuild_all
     sign_in_as(users(:one))
   end
 
@@ -40,40 +44,60 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge])").text.strip }
   end
 
-  test "lists missing and outdated pages, posts and images for one language, grouped, linking to the editor there" do
+  def row(type, record) = "##{row_id(type, record)}"
+
+  test "one matrix lists items needing work in any language, a chip per language linking to that editor tab" do
     missing_page = create_page(title: "Untranslated page")
     outdated_page = complete_page("Changed page")
     assert Pages::Save.call(outdated_page, translations: { "en" => { title: "Changed page!" } }).ok?
-    missing_post = create_post(title: "Untranslated post")
     stale_post = outdated_post("Stale post")
     image = image_with_alt("A cat")
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
 
     assert_response :success
     assert_select "h1", text: "Translations"
-    assert_select "section#translations-pages" do
-      assert_select "h2", text: "Pages"
-      assert_select "##{row_id("page", missing_page)} a[href='/cs-studio/pages/#{missing_page.id}?locale=de']", text: "Untranslated page"
-      assert_select "##{row_id("page", missing_page)} [data-translation-state='missing']"
-      assert_select "##{row_id("page", outdated_page)} [data-translation-state='outdated']"
-    end
-    assert_select "section#translations-posts" do
-      assert_select "h2", text: "Posts"
-      assert_select "##{row_id("post", missing_post)} a[href='/cs-studio/posts/#{missing_post.id}?locale=de']"
-      assert_select "##{row_id("post", missing_post)} [data-translation-state='missing']"
-      assert_select "##{row_id("post", stale_post)} a[href='/cs-studio/posts/#{stale_post.id}?locale=de']"
-      assert_select "##{row_id("post", stale_post)} [data-translation-state='outdated']"
-    end
-    assert_select "section#translations-media" do
-      assert_select "h2", text: "Images"
-      assert_select "##{row_id("media", image)} a[href='/cs-studio/media/#{image.id}?locale=de']"
-      assert_select "##{row_id("media", image)} [data-translation-state='missing']"
-    end
-    # The tabs list the target languages only, the chosen one current.
-    assert_select "nav[aria-label='Target languages'] a", count: 2
-    assert_select "nav[aria-label='Target languages'] a[aria-current='page']", text: /Deutsch/
-    assert_select "nav[aria-label='Target languages'] a", text: /English/, count: 0
+    assert_select "thead th[scope=col]", text: "Deutsch"
+    assert_select "thead th[scope=col]", text: "Español"
+    assert_select "#{row("page", missing_page)} th[scope=row] a[href='/cs-studio/pages/#{missing_page.id}?locale=de']", text: "Untranslated page"
+    assert_select "#{row("page", missing_page)} [data-locale=de][data-translation-state=missing]"
+    assert_select "#{row("page", missing_page)} [data-locale=es][data-translation-state=missing]"
+    assert_select "#{row("page", missing_page)} td a", text: "Translate →"
+    assert_select "#{row("page", outdated_page)} [data-locale=es][data-translation-state=outdated]"
+    assert_select "#{row("page", outdated_page)} td a", text: "Review changes →"
+    assert_select "#{row("post", stale_post)} a[href='/cs-studio/posts/#{stale_post.id}?locale=de'] [data-translation-state=outdated]"
+    assert_select "#{row("media", image)} a[href='/cs-studio/media/#{image.id}?locale=es']"
+    # One card per target language, none for the original.
+    assert_select "[data-translation-summary] [data-locale]", count: 2
+    assert_select "[data-translation-summary] [data-locale=en]", count: 0
+  end
+
+  test "rows with an outdated language come first, newest change first, then missing-only rows by updated_at" do
+    old_missing = create_post(title: "Old missing")
+    old_missing.update_columns(updated_at: 5.days.ago)
+    new_missing = create_post(title: "New missing")
+    older_outdated = outdated_post("Older outdated")
+    older_outdated.update_columns(updated_at: 3.days.ago)
+    newer_outdated = outdated_post("Newer outdated")
+    newer_outdated.update_columns(updated_at: 1.day.ago)
+    # The homepage is missing everywhere too; push it to the very end.
+    Page.update_all(updated_at: 30.days.ago)
+
+    get "/cs-studio/translations", params: { type: "post" }
+
+    ids = css_select("tbody tr").map { |tr| tr["id"] }
+    assert_equal [ newer_outdated, older_outdated, new_missing, old_missing ].map { |post| row_id("post", post) }, ids
+  end
+
+  test "the order also holds across types" do
+    outdated = outdated_post("Outdated post")
+    page = create_page(title: "Missing page")
+    page.update_columns(updated_at: 1.hour.from_now)
+
+    get "/cs-studio/translations"
+
+    ids = css_select("tbody tr").map { |tr| tr["id"] }
+    assert_operator ids.index(row_id("post", outdated)), :<, ids.index(row_id("page", page))
   end
 
   test "excludes complete and trashed items" do
@@ -81,47 +105,94 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     trashed = create_post(title: "Trashed post")
     assert Trash::Move.call(trashed).ok?
     done_page = complete_page("Done page")
-    done_image = image_with_alt("A dog", "de" => { alt: "Ein Hund" })
-    no_alt = create_media_asset
+    done_image = image_with_alt("A dog", "de" => { alt: "Ein Hund" }, "es" => { alt: "Un perro" })
     trashed_image = image_with_alt("A bird")
     assert Trash::Move.call(trashed_image).ok?
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
 
     assert_response :success
-    assert_select "##{row_id("post", done)}", count: 0
-    assert_select "##{row_id("post", trashed)}", count: 0
-    assert_select "##{row_id("page", done_page)}", count: 0
-    assert_select "##{row_id("media", done_image)}", count: 0
-    assert_select "##{row_id("media", no_alt)}", count: 0
-    assert_select "##{row_id("media", trashed_image)}", count: 0
+    [ [ "post", done ], [ "post", trashed ], [ "page", done_page ], [ "media", done_image ], [ "media", trashed_image ] ].each do |type, record|
+      assert_select row(type, record), count: 0
+    end
   end
 
-  test "a section is left out when nothing of its type needs work, and an empty language says so" do
-    Page.find_each { |page| assert Pages::Save.call(page, translations: { "de" => { title: "Startseite #{page.id}" } }).ok? }
+  test "a language that is done in an incomplete row is the solid chip and still links" do
+    post = create_post(title: "Half done")
+    assert Posts::Save.call(post, translations: { "de" => { title: "Halb fertig" } }).ok?
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
+
+    assert_select "#{row("post", post)} a[href='/cs-studio/posts/#{post.id}?locale=de'] [data-translation-state=complete]"
+    assert_select "#{row("post", post)} th[scope=row] a[href='/cs-studio/posts/#{post.id}?locale=es']"
+  end
+
+  test "summary cards count items over what the viewer can read" do
+    complete_post("Done")
+    create_post(title: "Not done")
+    outdated_post("Stale")
+    expected = Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])
+
+    get "/cs-studio/translations"
+
+    assert_select "[data-translation-summary] [data-locale=de]" do
+      assert_select "[role=progressbar][aria-valuenow='#{(expected[:complete] * 100.0 / expected[:total]).round}']"
+      assert_select "span", text: /#{expected[:missing]} missing/
+    end
+    summary = Translations::StateIndex.summaries(%w[de es], [ Page.kept, Post.kept, Media::Asset.kept ])
+    assert_equal expected, summary["de"].slice(:total, :complete, :missing, :outdated)
+  end
+
+  test "a section the matrix has nothing for says everything is translated" do
+    Page.find_each { |page| assert Pages::Save.call(page, translations: { "de" => { title: "Startseite #{page.id}" }, "es" => { title: "Inicio #{page.id}" } }).ok? }
+    Translations::State.where(record_type: "SiteSetting").update_all(state: "complete", missing_count: 0, outdated_count: 0)
+
+    get "/cs-studio/translations"
 
     assert_response :success
-    assert_select "section#translations-pages", count: 0
-    assert_select "section#translations-posts", count: 0
-    assert_select "section#translations-media", count: 0
-    assert_select "h3", text: /Everything is translated into Deutsch/
+    assert_select "tbody tr", count: 0
+    assert_select "h3", text: "Everything is translated."
   end
 
-  test "filters by type" do
+  test "filters by type, the segments carrying counts" do
     page = create_page(title: "Untranslated page")
     post_record = create_post(title: "Untranslated post")
 
-    get "/cs-studio/translations", params: { locale: "de", type: "post" }
+    get "/cs-studio/translations", params: { type: "post" }
 
     assert_response :success
-    assert_select "##{row_id("post", post_record)}"
-    assert_select "##{row_id("page", page)}", count: 0
-    assert_select "nav[aria-label='Filter by type'] a[aria-current='page']", text: "Posts"
+    assert_select row("post", post_record)
+    assert_select row("page", page), count: 0
+    assert_select "input[name=type][value=post][checked]"
+    assert_select "label", text: /Posts\s*1/
   end
 
-  test "is read-scoped: an author whose reads stop at their own posts doesn't see anyone else's" do
+  test "the Site settings row appears only for settings.manage and only while incomplete" do
+    get "/cs-studio/translations"
+    assert_select "#translation-item-settings th[scope=row] a[href='/cs-studio/settings?locale=de']", text: /Site settings/
+    assert_select "label", text: /Site settings/
+
+    sign_out
+    sign_in_as(users(:reader))
+    get "/cs-studio/translations"
+    assert_response :success
+    assert_select "#translation-item-settings", count: 0
+    assert_select "label", text: /Site settings/, count: 0
+  end
+
+  test "an old ?locale= link is accepted and ignored" do
+    post_record = create_post(title: "Anything")
+
+    get "/cs-studio/translations", params: { locale: "de" }
+    assert_response :success
+    assert_select row("post", post_record)
+
+    get "/cs-studio/translations", params: { locale: "xx", type: "post" }
+    assert_response :success
+    assert_select row("post", post_record)
+  end
+
+  test "is read-scoped: an author whose reads stop at their own posts doesn't see anyone else's, nor count them" do
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
     own = create_post(title: "Own post")
@@ -131,12 +202,14 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     sign_out
     sign_in_as(users(:author))
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
 
     assert_response :success
-    assert_select "##{row_id("post", own)}"
-    assert_select "##{row_id("post", other)}", count: 0
+    assert_select row("post", own)
+    assert_select row("post", other), count: 0
     assert_not_includes response.body, "Other post"
+    scoped = Translations::StateIndex.summaries(%w[de], [ AccessControl.scope(users(:author), "posts.read", Post.all, channel: :admin) ]).fetch("de")
+    assert_select "[data-translation-summary] [data-locale=de] [role=progressbar][aria-valuenow='#{(scoped[:complete] * 100.0 / scoped[:total]).round}']"
   end
 
   test "images are listed only for someone holding media.upload" do
@@ -144,28 +217,33 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     sign_out
     sign_in_as(users(:reader))
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
 
     assert_response :success
-    assert_select "##{row_id("media", image)}", count: 0
-    assert_select "nav[aria-label='Filter by type'] a", text: "Images", count: 0
+    assert_select row("media", image), count: 0
+    assert_select "label", text: /Images/, count: 0
   end
 
-  test "pages through results, about 50 per page" do
+  test "pages through results, 50 per page, the settings row topping page 1 only" do
     posts = Array.new(51) { |index| create_post(title: "Post #{index}") }
+    posts.each_with_index { |post, index| post.update_columns(updated_at: (index + 1).minutes.ago) }
+    Page.update_all(updated_at: 30.days.ago)
 
-    get "/cs-studio/translations", params: { locale: "de", type: "post" }
+    # 51 posts: one past a page.
+    get "/cs-studio/translations"
 
     assert_response :success
-    assert_select "section#translations-posts li[id^='translation-item-post-']", count: Admin::TranslationsController::PER_PAGE
+    assert_select "tbody tr[id^='translation-item-']", count: Admin::TranslationsController::PER_PAGE + 1
+    assert_select "tbody tr#translation-item-settings", count: 1
     assert_select "a", text: "Previous", count: 0
     assert_select "a[href*='page=2']", text: "Next"
 
-    get "/cs-studio/translations", params: { locale: "de", type: "post", page: 2 }
+    get "/cs-studio/translations", params: { page: 2 }
 
     assert_response :success
-    assert_select "section#translations-posts li[id^='translation-item-post-']", count: 1
-    assert_select "##{row_id("post", posts.last)}"
+    assert_select "tbody tr[id^='translation-item-']", count: 1
+    assert_select row("post", posts.last)
+    assert_select "tbody tr#translation-item-settings", count: 0
     assert_select "a", text: "Next", count: 0
     assert_select "a", text: "Previous"
   end
@@ -174,20 +252,49 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     create_post(title: "One post")
 
     %w[0 abc -1].each do |junk|
-      get "/cs-studio/translations", params: { locale: "de", page: junk }
+      get "/cs-studio/translations", params: { page: junk }
       assert_response :success
     end
-    get "/cs-studio/translations", params: { locale: "de", page: 9999 }
+    get "/cs-studio/translations", params: { page: 9999 }
     assert_response :success
     assert_select "a", text: "Back to page 1"
   end
 
-  test "an unknown, default or absent locale redirects to the first target language" do
-    [ { locale: "en" }, { locale: "xx" }, {} ].each do |params|
-      get "/cs-studio/translations", params: params.merge(type: "post")
+  test "a page of results runs across the types, in order, with a real total" do
+    # 1 homepage + 48 pages, then 3 posts = 52 items (settings aside).
+    48.times { |i| create_page(title: "Page #{i}") }
+    posts = 3.times.map { |i| create_post(title: "Post #{i}") }
+    Page.update_all(updated_at: 1.day.ago)
+    posts.each { |post| post.update_columns(updated_at: 1.minute.ago) }
 
-      assert_redirected_to "/cs-studio/translations?locale=de&type=post", "for #{params.inspect}"
+    get admin_translations_path(page: 2)
+    assert_response :success
+    assert_select "tbody tr[id^='translation-item-']", 2
+    get admin_translations_path(page: 1)
+    assert_select "tbody tr[id^='translation-item-']", 51 # 50 + the settings row
+    posts.each { |post| assert_select row("post", post) }
+  end
+
+  test "the number of queries does not depend on the rows or the languages" do
+    count_queries = lambda do
+      queries = 0
+      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| queries += 1 unless payload[:name] == "SCHEMA" }
+      get "/cs-studio/translations"
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+      assert_response :success
+      assert_operator queries, :>, 0
+      queries
     end
+    5.times { |i| outdated_post("Few #{i}") }
+    get "/cs-studio/translations" # warm lazily loaded things
+    few = count_queries.call
+
+    60.times { |i| i.even? ? create_post(title: "Many #{i}") : create_page(title: "Many page #{i}") }
+    assert_equal few, count_queries.call, "more rows"
+
+    with_locales(%w[en de es fr it], default: "en")
+    count_queries.call # the first request after a language change loads the new languages' own settings
+    assert_equal few, count_queries.call, "more languages"
   end
 
   test "with one language enabled there is nothing to translate into" do
@@ -202,7 +309,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     sign_out
     sign_in_as(users(:editor_branch))
 
-    get "/cs-studio/translations", params: { locale: "de" }
+    get "/cs-studio/translations"
 
     assert_response :forbidden
   end
@@ -231,22 +338,5 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_not_includes sidebar_labels, "Translations"
-  end
-
-  test "a page of results runs across the types, in order, with a real total" do
-    # The homepage counts too: 1 + 48 pages, then 3 posts = 52 items.
-    48.times { |i| create_page(title: "Page #{i}") }
-    posts = 3.times.map { |i| create_post(title: "Post #{i}") }
-
-    get admin_translations_path(locale: "de", page: 2)
-    assert_response :success
-    assert_select "[data-translation-state]", 2
-    assert_select "##{row_id("post", posts.second)}"
-    assert_select "##{row_id("post", posts.third)}"
-
-    get admin_translations_path(locale: "de", page: 1)
-    assert_select "[data-translation-state]", 50
-    assert_select "##{row_id("post", posts.first)}"
-    assert_select "##{row_id("post", posts.second)}", 0
   end
 end

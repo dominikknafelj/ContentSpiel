@@ -258,6 +258,37 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # The translations matrix keeps a trashed record's `translation_states` rows
+  # (a restore needs no work), so only the readers' scopes hide it: not as a
+  # row, not in the type filter's counts, not in a language's percentage.
+  test "the translations matrix lists, counts and filters kept records only" do
+    with_locales(%w[en de], default: "en") do
+      # An image is only missing a translation once its original has an alt.
+      [ @kept_asset, @gone_asset ].each { |asset| asset.update_columns(alt: { "en" => "An image" }) }
+      Translations::StateIndex.rebuild_all
+      sign_in_as users(:one)
+
+      get admin_translations_path
+      assert_response :ok
+      assert_select "th[scope=row] a", text: "Kept post"
+      assert_select "th[scope=row] a", text: "Kept page"
+      assert_select "#translation-item-media-#{@kept_asset.id}"
+      assert_select "th[scope=row] a", text: "Gone post", count: 0
+      assert_select "th[scope=row] a", text: "Gone page", count: 0
+      assert_select "#translation-item-media-#{@gone_asset.id}", count: 0
+      assert_no_match "Gone post", response.body
+      assert_no_match "Gone page", response.body
+
+      get admin_translations_path(type: "post")
+      assert_select "tbody tr[id^='translation-item-post-']", count: 1
+      assert_select "label", text: /Posts\s*1\b/
+
+      kept_total = Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total]
+      assert_equal kept_total, Translations::StateIndex.summaries(%w[de], [ Page.kept, Post.kept, Media::Asset.kept ]).dig("de", :total)
+      assert_operator kept_total, :<, Translations::StateIndex.summary("de", [ Page.all, Post.all, Media::Asset.all ])[:total]
+    end
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 

@@ -1,43 +1,60 @@
 module Admin
-  # The Translations overview (translation helpers spec §4): for one target
-  # language (`?locale=de`, the editing locale too, so the sidebar and every
-  # link keep it), the readable pages, posts and images that are `:missing`
-  # or `:outdated` there, grouped by type, each linking to its editor in
-  # that language. `?type=page|post|media` narrows it to one type.
+  # The Translations matrix (design pass round 2, Task 18, handoff §4.4): one
+  # screen for every target language instead of one page per language.
+  # Summary cards on top (per language: "% done", a bar, "12 missing · 1
+  # outdated"), a type filter, then a matrix whose rows are the items that
+  # need work in ANY target language and whose columns are the languages;
+  # each cell is that language's state chip linking to the item's editor in
+  # that language. `?type=page|post|media|settings` narrows it; `?locale=` is
+  # a retired parameter from the one-page-per-language screen and is ignored,
+  # so old links (the dashboard card's, bookmarks) still answer 200.
   #
   # `suggest` (the editor's AI Translate buttons, spec §6.4) lives here too,
-  # on its own route -- so every filter of the overview is `only: :index`.
+  # on its own route -- so every filter of the matrix is `only: :index`.
   #
-  # What's listed is exactly what the actor may read: pages and posts
-  # through `AccessControl.scope` (kept records only, so the trash never
-  # shows up here), images -- which have no per-record read scope -- only
-  # for a `media.upload` holder, the same gate the Media module opens on,
-  # and only kept ones. A type the actor can't read at all isn't offered
-  # as a filter either.
+  # What's listed, and counted, is exactly what the actor may read: pages and
+  # posts through `AccessControl.scope` (kept records only, so the trash
+  # never shows up here), images -- which have no per-record read scope --
+  # only for a `media.upload` holder, the same gate the Media module opens
+  # on, and only kept ones, and the site settings row (title, tagline) only
+  # for `settings.manage`. The summary percentages are over that same set,
+  # and a type the actor can't read isn't offered as a filter either.
   #
   # Where a record stands is the stored `translation_states` row
-  # (`Translations::StateIndex`, kept current by the save services), so the
-  # list is a real query: each readable relation is narrowed to `missing`
-  # or `outdated` in this language with `StateIndex.joins`, counted with
-  # `COUNT`, and this page is cut out of the types in order with
-  # `offset`/`limit` -- cost proportional to the page, not the site. A
-  # record with no row reads complete and isn't listed (`StateIndex`).
+  # (`Translations::StateIndex`, kept current by the save services), so none
+  # of this loads records to filter them: the cards come from
+  # `StateIndex.summaries` (grouped SQL, two queries per type whatever the
+  # number of languages), each type's rows from an EXISTS over the target
+  # languages (`exists_in_any_locale_sql`), counted with `COUNT`, and this
+  # page is cut out of the types the way the trash list does it: every type
+  # contributes its own ordered window of `offset + per_page` rows, they are
+  # merged in Ruby by the same sort key and sliced. Cost is proportional to
+  # the page (and to how deep it is), not the site, and one `states_for`
+  # query supplies every cell. A record with no row reads complete and isn't
+  # listed (`StateIndex`).
   #
-  # Paging is by page number (`Pagination`, design pass spec §4).
+  # Order (§4.4): rows with an outdated language first -- they are already
+  # visible on the site -- the most recently changed first, then rows that
+  # only miss something, also by `updated_at`. Paging is by page number
+  # (`Pagination`, design pass spec §4); the Site settings row isn't paged,
+  # it tops the first page.
   class TranslationsController < BaseController
     include TranslatableRecordLoading
 
     PER_PAGE = 50
 
-    # In display order; `label` heads the group.
+    # In display order; `label` heads the filter segment, `short` is the
+    # Type column's word.
     TYPES = {
-      "page" => { label: "Pages", permission: "pages.read" },
-      "post" => { label: "Posts", permission: "posts.read" },
-      "media" => { label: "Images", permission: "media.upload" }
+      "page" => { label: "Pages", short: "Page", permission: "pages.read" },
+      "post" => { label: "Posts", short: "Post", permission: "posts.read" },
+      "media" => { label: "Images", short: "Image", permission: "media.upload" },
+      "settings" => { label: "Site settings", short: "Settings", permission: "settings.manage" }
     }.freeze
 
-    # One row of the list.
-    Item = Data.define(:type, :record, :state)
+    # One row of the matrix: `states` is `{ locale => :complete|:missing|:outdated }`
+    # for every target language.
+    Item = Data.define(:type, :record, :states)
 
     # What a field gets back when its original is blank -- `AI::Translate`
     # skips it rather than failing the rest of the request.
@@ -50,18 +67,25 @@ module Admin
     INPUT_ID = /\A[A-Za-z][\w-]*\z/
 
     before_action :require_read_access, only: :index
-    before_action :require_target_locale, only: :index
+    before_action :require_target_languages, only: :index
 
     def index
-      @locale = params[:locale].to_s
       @target_locales = Translations.target_locales
-      @types = TYPES.keys.select { |type| can?(TYPES.dig(type, :permission)) }
+      readable = readable_relations
+      @types = TYPES.keys.select { |type| readable.key?(type) || (type == "settings" && can?("settings.manage")) }
       @type = params[:type].presence_in(@types)
 
-      relations = needing_work
-      sizes = relations.transform_values(&:count)
-      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: sizes.values.sum)
-      @items = items_on_page(relations, sizes)
+      @summaries = Translations::StateIndex.summaries(@target_locales, readable.values)
+      # What each type would list: the filter's counts, grouped SQL over the
+      # index. "Site settings" is one row or none.
+      @counts = readable.transform_values { |relation| relation.where(needs_work_sql(relation.klass)).count }
+      settings = settings_item
+      @counts["settings"] = settings ? 1 : 0 if @types.include?("settings")
+
+      shown = (@type ? [ @type ] : readable.keys).select { |type| readable.key?(type) }
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: shown.sum { |type| @counts.fetch(type) })
+      @items = @pagination.out_of_range? ? [] : items_on_page(readable.slice(*shown))
+      @items.unshift(settings) if settings && [ nil, "settings" ].include?(@type) && @pagination.page == 1
     end
 
     # AI suggestions for some of one record's fields (translation helpers
@@ -154,59 +178,54 @@ module Admin
       forbidden! unless holds_any?(%w[pages.read posts.read])
     end
 
-    # Always a real target language in the URL: an unknown, disabled or
-    # default code (or none) goes to the first target language, keeping
-    # the type filter. With a single language enabled there's nothing to
-    # translate into (the sidebar hides the entry then), so the dashboard.
-    def require_target_locale
-      targets = Translations.target_locales
-      return redirect_to(admin_root_path, status: :see_other) if targets.empty?
-      return if targets.include?(params[:locale].to_s)
-
-      redirect_to admin_translations_path(locale: targets.first, type: params[:type].presence), status: :see_other
+    # With a single language enabled there's nothing to translate into (the
+    # sidebar hides the entry then), so the dashboard.
+    def require_target_languages
+      redirect_to admin_root_path, status: :see_other if Translations.target_locales.empty?
     end
 
-    # `{ type => relation }`, types in `TYPES` order, each narrowed to the
-    # readable records that aren't complete in this language.
-    def needing_work
-      types = @type ? [ @type ] : @types
-      types.index_with do |type|
-        Translations::StateIndex.joins(readable(type), locale: @locale, states: %w[missing outdated]).order(:id)
-      end
+    # `{ type => relation }` of the read-scoped, kept records, in `TYPES`
+    # order, only for the types the actor may read.
+    def readable_relations
+      relations = {}
+      relations["page"] = admin_scope(Page.all) if can?("pages.read")
+      relations["post"] = admin_scope(Post.all) if can?("posts.read")
+      relations["media"] = Media::Asset.kept if can?("media.upload")
+      relations
     end
 
-    # This page's `Item`s: the relations are laid end to end in type order
-    # and `offset`/`limit` cut across them, so a page costs one COUNT per
-    # type (`sizes`, shared with the total) plus at most one query per type
-    # and one for the states.
-    def items_on_page(relations, sizes)
-      skip = @pagination.offset
-      want = PER_PAGE
-      items = []
-      relations.each do |type, relation|
-        break if want <= 0
-
-        size = sizes.fetch(type)
-        if skip >= size
-          skip -= size
-          next
-        end
-
-        records = relation.offset(skip).limit(want).to_a
-        states = Translations::StateIndex.states_for(records, locales: [ @locale ])
-        items.concat(records.map { |record| Item.new(type:, record:, state: states.dig(record, @locale)) })
-        want -= records.size
-        skip = 0
-      end
-      items
+    def needs_work_sql(model, states: %w[missing outdated])
+      Translations::StateIndex.exists_in_any_locale_sql(model, states:, locales: @target_locales)
     end
 
-    def readable(type)
-      case type
-      when "page" then admin_scope(Page.all)
-      when "post" then admin_scope(Post.all)
-      when "media" then Media::Asset.kept
+    # The settings row, when the actor may manage settings and the title or
+    # tagline isn't complete in every target language.
+    def settings_item
+      return unless can?("settings.manage")
+
+      site = Current.site
+      states = Translations::StateIndex.states_for([ site ], locales: @target_locales).fetch(site)
+      Item.new(type: "settings", record: site, states:) unless states.values.all?(:complete)
+    end
+
+    # This page's `Item`s. Each type's relation is ordered outdated-first then
+    # newest-changed-first and cut to `offset + per_page` rows; the windows are
+    # merged by the same key (ties: type order, then newest id) and sliced.
+    def items_on_page(relations)
+      window = @pagination.offset + PER_PAGE
+      type_order = relations.keys
+      candidates = relations.flat_map do |type, relation|
+        table = relation.klass.quoted_table_name
+        outdated = needs_work_sql(relation.klass, states: %w[outdated])
+        relation.where(needs_work_sql(relation.klass))
+          .reorder(Arel.sql("#{outdated} DESC"), Arel.sql("#{table}.updated_at DESC"), Arel.sql("#{table}.id DESC"))
+          .select(Arel.sql("#{table}.*"), Arel.sql("#{outdated} AS has_outdated"))
+          .limit(window).map { |record| [ type, record ] }
       end
+      page = candidates.sort_by { |type, record| [ record[:has_outdated] ? 0 : 1, -record.updated_at.to_r, type_order.index(type), -record.id ] }
+        .slice(@pagination.offset, PER_PAGE) || []
+      states = Translations::StateIndex.states_for(page.map(&:last), locales: @target_locales)
+      page.map { |type, record| Item.new(type:, record:, states: states.fetch(record)) }
     end
   end
 end

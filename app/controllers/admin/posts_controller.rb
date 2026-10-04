@@ -328,10 +328,8 @@ module Admin
       states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
       return scope unless states || name == "complete"
 
-      exists = Translations::State.where(record_type: Post.polymorphic_name, locale: Translations.target_locales.map(&:to_s))
-        .where("translation_states.record_id = posts.id")
-        .where(state: states || %w[missing outdated]).arel.exists
-      states ? scope.where(exists) : scope.where.not(exists)
+      exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states || %w[missing outdated], locales: Translations.target_locales)
+      states ? scope.where(exists) : scope.where("NOT #{exists}")
     end
 
     def filter_by_title(scope, q)

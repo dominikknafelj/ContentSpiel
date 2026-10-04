@@ -442,16 +442,51 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_equal "Hallo", post.title(locale: "de", fallback: false)
   end
 
-  test "the overview lists a post missing in German and links into its German editor" do
+  test "the matrix lists a post missing in German and links into its German editor" do
     post = create_post(title: "Only in English")
 
-    visit "/cs-studio/translations?locale=de"
+    visit "/cs-studio/translations"
 
     assert_text "Posts"
     click_on "Only in English"
 
     assert_current_path "/cs-studio/posts/#{post.id}?locale=de"
     assert_selector "[data-original-for='title']", text: "Only in English"
+  end
+
+  test "the matrix lists an outdated post first; its DE chip opens the outdated card; marking it up to date clears the row and raises the card" do
+    missing = create_post(title: "Never translated")
+    missing.update_columns(updated_at: 1.minute.from_now)
+    stale = create_post(title: "Hello")
+    assert Posts::Save.call(stale, translations: { "de" => { title: "Hallo" }, "es" => { title: "Hola" } }).ok?
+    assert Posts::Save.call(stale, translations: { "en" => { title: "Hello there" } }).ok?
+    Translations::StateIndex.rebuild_all
+    stale_row = "#translation-item-post-#{stale.id}"
+
+    visit "/cs-studio/translations"
+
+    rows = all("tbody tr[id^='translation-item-post-']").map { |row| row[:id] }
+    assert_equal [ stale_row.delete("#"), "translation-item-post-#{missing.id}" ], rows
+    assert_selector "#{stale_row} td a", text: "Review changes →"
+    before = find("[data-translation-summary] [data-locale=de] [role=progressbar]")["aria-valuenow"].to_i
+
+    find("#{stale_row} a[aria-label$='Deutsch, outdated']").click
+    assert_current_path "/cs-studio/posts/#{stale.id}?locale=de"
+    await_admin_controllers
+    assert_selector "[data-original-for='title'] ins", text: "there"
+    click_on "Still correct — mark up to date"
+    assert_no_selector "[data-original-for='title'] ins", wait: 5
+
+    visit "/cs-studio/posts/#{stale.id}?locale=es"
+    await_admin_controllers
+    click_on "Still correct — mark up to date"
+    assert_no_selector "[data-original-for='title'] ins", wait: 5
+
+    visit "/cs-studio/translations"
+    assert_no_selector stale_row
+    assert_selector "#translation-item-post-#{missing.id}"
+    after = find("[data-translation-summary] [data-locale=de] [role=progressbar]")["aria-valuenow"].to_i
+    assert_operator after, :>, before
   end
 
   test "Settings in German show the tagline's original, and the German tagline reaches /de" do
