@@ -11,14 +11,15 @@ class Admin::UserSuggestionsTest < ActionDispatch::IntegrationTest
 
   def suggest(q, **headers) = get("/cs-studio/users/suggest", params: { q: q }, headers: headers) && response.parsed_body
 
-  test "matches the email or the name, with the display name as label and the email as hint" do
+  # A user with no name is labelled by the email: the hint doesn't say it again.
+  test "matches the email or the name, with the display name as label and the email as hint only beside a name" do
     users(:reader).update_columns(name: "Rita Reader")
 
     by_email = suggest("author@")
-    assert_equal [ { "value" => users(:author).id, "label" => "author@example.com", "hint" => "author@example.com" } ], by_email
+    assert_equal [ { "value" => users(:author).id, "label" => "author@example.com" } ], by_email
 
     by_name = suggest("rita")
-    assert_equal [ { "value" => users(:reader).id, "label" => "Rita Reader", "hint" => "reader@example.com" } ], by_name
+    assert_equal [ { "value" => users(:reader).id, "label" => "Rita Reader", "hint" => "reader@example.com", "chip_hint" => "reader@example.com" } ], by_name
   end
 
   test "owners are never offered" do
@@ -29,7 +30,7 @@ class Admin::UserSuggestionsTest < ActionDispatch::IntegrationTest
   test "prefix matches come before substring matches" do
     User.create!(email_address: "zed.author@example.com", password: "a-long-enough-password")
 
-    assert_equal %w[author@example.com zed.author@example.com], suggest("author").map { |row| row["hint"] }
+    assert_equal %w[author@example.com zed.author@example.com], suggest("author").map { |row| row["label"] }
   end
 
   test "answers at most 8 rows" do
@@ -63,7 +64,7 @@ class Admin::UserSuggestionsTest < ActionDispatch::IntegrationTest
     User.create!(email_address: "a_b@example.org", password: "a-long-enough-password")
     User.create!(email_address: "axb@example.org", password: "a-long-enough-password")
 
-    assert_equal [ "a_b@example.org" ], suggest("a_b").map { |row| row["hint"] }
+    assert_equal [ "a_b@example.org" ], suggest("a_b").map { |row| row["label"] }
     assert_equal [], suggest("%%")
     assert_equal [], suggest("x') OR 1=1 --")
   end

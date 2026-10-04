@@ -106,14 +106,15 @@ export default class extends Controller {
 
   // Two row shapes: `{ value, label, hint }` (tag suggestions) and the link
   // targets' `{ id, title, status, dot }`. A status other than live reads as
-  // "Draft" / "Scheduled" -- in the list and, after "·", on the chip.
+  // "Draft" / "Scheduled" -- in the list and, after "·", on the chip. A row
+  // may name the chip's hint itself (`chip_hint`: a member's email).
   normalize(row) {
     const status = statusLabel(row)
     return {
       value: String(row.value ?? row.id),
       label: row.label ?? row.title ?? "(untitled)",
       hint: row.hint ?? status,
-      chipHint: status,
+      chipHint: row.chip_hint ?? status,
       dot: row.dot ?? null
     }
   }

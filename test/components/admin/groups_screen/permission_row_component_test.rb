@@ -21,7 +21,7 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_selector "[data-permission='posts.delete']"
     assert_selector "label", text: "Move to trash"
     assert_selector "code[title='posts.delete']", text: "posts.delete"
-    assert_selector "input[type=checkbox][name='group[grants][posts.delete][enabled]'][value='1']:not([checked])[aria-label='Delete posts']"
+    assert_selector "input[type=checkbox][name='group[grants][posts.delete][enabled]'][value='1']:not([checked])[aria-label='Move to trash: Delete posts']"
     assert_no_selector "[data-chips] > *"
     assert_selector "button[aria-expanded='false'][aria-controls]", text: "Edit scope", visible: :all
     assert_selector "button[hidden]", text: "Edit scope", visible: :all
@@ -33,6 +33,14 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
       assert_selector "label > span:first-child", text: label, exact_text: true
     end
     assert_equal "Delete posts", AccessControl::Permissions.fetch("posts.delete").label
+  end
+
+  # Label in name: the accessible name contains the words the row shows.
+  test "the checkbox's accessible name contains the visible label" do
+    { "posts.read" => "Read posts", "pages.move" => "Move pages", "pages.delete" => "Move to trash: Delete pages" }.each do |key, name|
+      row(key)
+      assert_selector "[data-permission='#{key}'] input[type=checkbox][aria-label='#{name}']"
+    end
   end
 
   test "a ticked posts row with no scope says All content types" do

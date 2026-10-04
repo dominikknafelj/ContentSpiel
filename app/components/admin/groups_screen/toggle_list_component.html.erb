@@ -3,7 +3,7 @@
     <section class="rounded-cs border border-line bg-surface">
       <h3 class="border-b border-line px-4 py-3 text-base font-semibold text-ink"><%= title %></h3>
       <% permissions.each do |permission| %>
-        <label for="<%= field_id(permission) %>" class="flex cursor-pointer items-center justify-between gap-3 border-b border-line px-4 py-2 last:border-b-0">
+        <label for="<%= field_id(permission) %>" class="flex <%= locked?(permission) ? "cursor-default" : "cursor-pointer" %> items-center justify-between gap-3 border-b border-line px-4 py-2 last:border-b-0">
           <span class="flex min-w-0 flex-col">
             <span class="text-sm <%= locked?(permission) ? "text-dim" : "text-ink" %>"><%= permission.label %></span>
             <code class="font-cs-mono text-xs text-meta" title="<%= permission.key %>"><%= permission.key %></code>

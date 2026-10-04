@@ -31,6 +31,12 @@ module Admin
 
     private
 
+    # The email after the name -- for a user with no name the label already IS
+    # the email, and saying it twice helps nobody. `chip_hint` is what the chip
+    # a pick makes shows after its label, the same as a rendered member chip
+    # (`Admin::GroupsScreen::MembersComponent#chips`).
+    def email_hint(user) = user.name.present? ? user.email_address : nil
+
     def query = params[:q].to_s.strip.first(MAX_QUERY_LENGTH)
 
     # The ids the members field already holds as chips, a JSON array in
@@ -55,7 +61,7 @@ module Admin
         .where("LOWER(users.name) LIKE :any OR LOWER(users.email_address) LIKE :any", any: "%#{pattern}%")
         .order(prefix_first, Arel.sql("LOWER(users.email_address) ASC"))
         .limit(LIMIT)
-        .map { |user| { value: user.id, label: user.display_name, hint: user.email_address } }
+        .map { |user| { value: user.id, label: user.display_name, hint: email_hint(user), chip_hint: email_hint(user) }.compact }
     end
   end
 end

@@ -1,13 +1,14 @@
 <div class="admin-permission-row border-b border-line" data-permission="<%= permission.key %>" <%= "data-locked" if locked? %> id="permission-row-<%= slug %>">
   <div class="grid grid-cols-[1.25rem_minmax(7rem,12rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
-    <%# The accessible name is the registry's full label ("Edit pages"): the short label is only what a row under a "Pages" heading needs to say. %>
+    <%# The accessible name is the registry's full label ("Edit pages"): the short label is only what a row under a "Pages" heading needs to say
+        (`accessible_label` puts the short one in front where the full one doesn't contain it). %>
     <% if locked? %>
       <%# Greyed, ticked, disabled: it is not submitted, so the hidden inputs below are what carries the grant. %>
       <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: true, disabled: true, id: checkbox_id,
-            aria: { label: permission.label, describedby: "#{checkbox_id}-locked" }, class: "opacity-60") %>
+            aria: { label: accessible_label, describedby: "#{checkbox_id}-locked" }, class: "opacity-60") %>
       <% carried_inputs.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
     <% else %>
-      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: permission.label },
+      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: accessible_label },
             data: { action: "change->admin--permission-matrix#toggle" }) %>
     <% end %>
     <label for="<%= checkbox_id %>" class="flex min-w-0 <%= locked? ? "cursor-default" : "cursor-pointer" %> flex-col">

@@ -43,7 +43,10 @@ module Admin
 
       def trigger_label = owner? ? "Remove owner rights…" : "Make owner…"
       def dialog_title = owner? ? "Remove owner rights from #{name}?" : "Make #{name} an owner?"
-      def dialog_body = owner? ? "They keep their groups and the permissions those give." : "Owners have every permission, including managing other owners and removing your owner rights."
+      # Removing your OWN owner rights is said to you, not about you.
+      def own_account? = user.persisted? && user == ::Current.user
+
+      def dialog_body = owner? ? (own_account? ? "You keep your groups and the permissions those give." : "They keep their groups and the permissions those give.") : "Owners have every permission, including managing other owners and removing your owner rights."
       def confirm_label = owner? ? "Remove owner rights" : "Make owner"
       def requested_value = owner? ? "0" : "1"
     end

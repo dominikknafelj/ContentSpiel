@@ -68,6 +68,14 @@ module Admin
         @form_name = form_name
       end
 
+      # The checkbox's accessible name: the registry's full label, which names
+      # the subject ("Edit pages"). It has to CONTAIN what the row shows (speech
+      # input finds a control by its visible words): "Move to trash" is not in
+      # "Delete posts", so that row is "Move to trash: Delete posts".
+      def accessible_label
+        permission.label.downcase.include?(short_label.downcase) ? permission.label : "#{short_label}: #{permission.label}"
+      end
+
       private
 
       attr_reader :permission, :scope, :tree, :form_name
