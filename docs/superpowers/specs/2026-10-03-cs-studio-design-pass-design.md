@@ -211,7 +211,7 @@ One PR.
 
 ## 8. Round 3: settings, media, people, system
 
-One PR.
+One PR. **Status: built** (branch `studio-design-round-3`, plan `docs/superpowers/plans/2026-10-04-cs-studio-design-pass-round-3.md`). §12 lists where the build departs from the text below and from the plan's decisions.
 
 - **Settings:** in-page nav, a card per section, the save bar, Languages merged in (§5.6), sections hidden by permission (handoff §10 A9), the all-languages Site form, the AI key chip and its own form, Test connection rules (handoff §10 A10). `ai_api_key_saved_at` (§5.4).
 - **Media:** grid plus side panel, filters, tile chips, drop-anywhere upload, the picker reusing the grid (handoff §4.6, §10 C36).
@@ -252,3 +252,19 @@ Update `docs/roadmap.md` when this spec lands:
 - Any change to permissions, audit rules or the public site's look (except the preview banner).
 - Translating the admin UI.
 - New AI features.
+
+## 12. Amendments (round 3)
+
+Rulings made while round 3 was built. Each overrides the text above it and the plan's decision of the same number.
+
+- **Instant-action hint (plan D10/D11, handoff §10 A9–A10).** "Save or cancel your changes first." is shown per control, not once per screen: on the AI card the Test connection row and the key row may each show their own hint, and Test connection's more specific "Save provider and model first. Tests the saved settings." wins on its row.
+- **Media detail URL (plan D12).** `/media?selected=ID` with a missing, trashed or malformed id is a 404 inside the shell, not the grid without a panel. `GET /media/:id` still redirects there.
+- **Media panel at 1024–1279px (handoff §9 A7).** Not built as an overlay. The panel is a 340px column beside the grid from 1024px and stacks under the grid below that.
+- **Picker segments (plan D13/D14).** All / Unused / Missing alt / Mine. "Untranslated" is not offered in the picker; "Mine" is kept so nothing the old picker offered is lost.
+- **Locked ticks (plan D15, handoff §10 A2).** Superseded by the view-only rule (handoff §10 C37): a stored grant the viewer couldn't hand out makes the whole group view-only, so no stored state shows a locked tick inside an editable form. The locked rendering stays as a defensive fallback. A row carrying a removed content type stays editable with its Remove chip and, for a viewer who couldn't grant the carried scope, the hint "Remove this type before changing the row."; changing such a row without pressing Remove is refused by `Groups::Save`.
+- **Saving a user (plan D17/D18).** A successful save stays on the editor with the toast "User saved" (a new user: that user's editor, "User created"), as the group editor does; only a delete returns to the list. An owner can't be created in one step: the owner zone exists on an existing user only.
+- **Tag dialogs (plan D20).** The merge and delete dialogs count every post carrying the tag, trashed ones included (what the action touches and what `tag.merged` records), while the list's Posts column counts kept posts the viewer may read.
+- **Audit log paging (plan D23).** "Load older" replaces the page (offset paging) rather than appending; "Newer" goes back. Day headers are drawn per page, so a day that crosses the boundary has its header on both.
+- **Exit preview (plan D26).** For a record that isn't live, Exit preview goes to CS Studio's list (the pages landing for a page, the posts list for a post), not to the editor — Edit already goes there. A live record's Exit preview goes to its public URL.
+- **Save footer (handoff mocks).** As in round 2: Save first, in the form's own column, sticky at the bottom of the window — not the mocks' right-aligned bar across the content area.
+
