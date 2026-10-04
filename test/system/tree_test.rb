@@ -53,6 +53,46 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal %w[Beta Alpha Gamma], children_titles
   end
 
+  # The mouse path. Both Sortables run with `forceFallback` (Firefox can't
+  # start a native HTML5 drag from the `<button>` handle), so the drag is
+  # ordinary pointer events and a real browser test can drive it -- by hand
+  # rather than with `drag_to`, which presses, jumps and releases in one go:
+  # SortableJS only notices what is under the pointer on its own 50 ms tick,
+  # so the pointer has to travel in steps and rest before the release.
+  test "dragging a page by its handle with the mouse moves it, and a clone follows the pointer" do
+    sign_in_via_form(users(:one))
+    visit admin_pages_path
+    await_admin_controllers
+
+    centre = lambda do |label|
+      page.evaluate_script(<<~JS, label)
+        (() => { const r = document.querySelector(`button[aria-label='${arguments[0]}']`).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2] })()
+      JS
+    end
+    from_x, from_y = centre.call("Move Alpha")
+    _, gamma_y = centre.call("Move Gamma")
+    to_y = gamma_y + 8
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    6.times do |step|
+      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
+      sleep 0.08
+    end
+
+    # Mid-drag: the lifted clone hangs off <body>, the dashed slot is in the tree.
+    assert_selector "body > .admin-drag-fallback", text: "Alpha"
+    assert_selector "#tree li.admin-drag-ghost"
+    sleep 0.2
+    mouse.up
+
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Alpha./, wait: 10
+    assert_no_selector ".admin-drag-fallback"
+    assert_equal %w[Beta Gamma Alpha], children_titles
+    assert_equal %w[Beta Gamma Alpha], tree_order
+  end
+
   test "Escape puts a picked page back without saving" do
     sign_in_via_form(users(:one))
     visit admin_pages_path

@@ -168,7 +168,16 @@
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed
    outline with its content hidden. The chosen row is the lifted one -- the
-   only drag state that carries a shadow (`--cs-shadow-menu`). */
+   only drag state that carries a shadow (`--cs-shadow-menu`).
+
+   Both Sortables run with `forceFallback` (Firefox can't start a native drag
+   from the `<button>` handles), so what follows the pointer is a clone
+   SortableJS appends to `<body>` with `fallbackClass`: styled as the lifted
+   row. It is a tree `<li>` outside its `<ul>` there, hence the list-style. */
 .admin-drag-ghost { border: 1px dashed var(--cs-line-strong); background: transparent; }
 .admin-drag-ghost > * { visibility: hidden; }
 .admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+.admin-drag-fallback { list-style: none; border-radius: var(--cs-radius); background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+/* The placeholder is also the "chosen" element for the length of a mouse
+   drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
+.admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }

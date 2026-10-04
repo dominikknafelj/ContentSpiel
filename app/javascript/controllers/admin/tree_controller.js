@@ -31,6 +31,20 @@ export default class extends Controller {
         // would land, and the lifted row itself with a shadow.
         ghostClass: "admin-drag-ghost",
         chosenClass: "admin-drag-chosen",
+        // SortableJS's own pointer-driven drag instead of native HTML5
+        // drag-and-drop: the handle is a `<button>` (so the keyboard reaches
+        // it), and Firefox never starts a native drag from a button -- with
+        // the default, the mouse path would be dead there. The fallback
+        // drags a clone of the row (`fallbackClass`, styled like the lifted
+        // row), appended to `<body>` so no scrolling or transformed ancestor
+        // (the tree column is a drawer on a narrow screen) can clip or
+        // offset it. `fallbackTolerance`: a press has to travel a few pixels
+        // before it is a drag, so a slightly shaky click that only means to
+        // focus the handle doesn't lift the row.
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackClass: "admin-drag-fallback",
+        fallbackTolerance: 3,
         onEnd: (event) => this.onDrop(event)
       })
     )

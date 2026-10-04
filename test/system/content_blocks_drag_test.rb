@@ -49,6 +49,47 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
     assert_equal [ @second.id, @first.id, @third.id ], order_on_screen
   end
 
+  # The mouse path, driven by hand for the reason test/system/tree_test.rb
+  # gives. The clone that follows the pointer is a deep copy of the card and
+  # must be a picture only: no controller, target or id of its own
+  # (`admin--blocks#makeCloneInert`).
+  test "dragging a card by its handle with the mouse reorders, and the clone is inert" do
+    sign_in_via_form(users(:one))
+    visit admin_page_path(@page)
+    await_admin_controllers
+
+    centre = lambda do |selector|
+      page.evaluate_script("(() => { const r = document.querySelector(arguments[0]).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2] })()", selector)
+    end
+    # The pointer works in viewport coordinates: bring the list into view first.
+    page.execute_script("document.querySelector(arguments[0]).scrollIntoView({ block: 'center' })", card(@second))
+    from_x, from_y = centre.call("#{card(@third)} .admin-block-card__handle")
+    _, first_y = centre.call("#{card(@first)} .admin-block-card__handle")
+    to_y = first_y - 4
+    assert_operator from_y, :<, page.evaluate_script("window.innerHeight"), "the dragged handle is on screen"
+    assert_operator to_y, :>, 0, "and so is where it is going"
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    6.times do |step|
+      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
+      sleep 0.08
+    end
+
+    assert_selector "body > .admin-drag-fallback"
+    assert_no_selector "body > .admin-drag-fallback[id], body > .admin-drag-fallback [id]", visible: :all
+    assert_no_selector "body > .admin-drag-fallback [data-controller], body > .admin-drag-fallback[data-admin--blocks-target]", visible: :all
+    assert_selector "#content-blocks-list > [data-block-id]", count: 3
+    sleep 0.2
+    mouse.up
+
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /order changed/i, wait: 10
+    assert_no_selector ".admin-drag-fallback"
+    assert_equal [ @third, @first, @second ], @page.content_blocks.reload.to_a
+    assert_equal [ @third.id, @first.id, @second.id ], order_on_screen
+  end
+
   test "Escape puts a picked block back without saving" do
     sign_in_via_form(users(:one))
     visit admin_page_path(@page)

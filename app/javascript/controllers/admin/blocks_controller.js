@@ -62,8 +62,40 @@ export default class extends Controller {
       // would land, and the lifted card itself with a shadow.
       ghostClass: "admin-drag-ghost",
       chosenClass: "admin-drag-chosen",
+      // SortableJS's own pointer-driven drag instead of native HTML5
+      // drag-and-drop, for the reason `admin--tree` spells out: the handle
+      // is a `<button>`, and Firefox never starts a native drag from one.
+      // The fallback drags a clone of the card (`fallbackClass`), appended
+      // to `<body>` -- so the list's direct children stay exactly the cards.
+      // `fallbackTolerance` keeps a shaky click on the handle from lifting
+      // the card.
+      forceFallback: true,
+      fallbackOnBody: true,
+      fallbackClass: "admin-drag-fallback",
+      fallbackTolerance: 3,
+      onStart: () => this.makeCloneInert(),
       onEnd: () => this.reorder()
     })
+  }
+
+  // The dragged clone is a deep copy of a card: its forms' autosave and
+  // rich-text controllers, its `card` target and every id would otherwise
+  // exist twice for as long as the drag lasts -- a second Tiptap editor
+  // booting in the clone, a Turbo Stream finding the copy by id. SortableJS
+  // fires `onStart` synchronously right after appending the clone, before
+  // Stimulus's mutation observer has seen it, so stripping the wiring here
+  // means nothing ever connects: the clone is a picture of the card, no more.
+  makeCloneInert() {
+    const clone = Sortable.ghost
+    if (!clone) return
+
+    for (const element of [clone, ...clone.querySelectorAll("*")]) {
+      for (const { name } of Array.from(element.attributes)) {
+        if (name === "id" || name === "data-controller" || name === "data-action" || /^data-.+-target$/.test(name)) {
+          element.removeAttribute(name)
+        }
+      }
+    }
   }
 
   disconnect() {
