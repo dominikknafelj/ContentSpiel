@@ -283,6 +283,13 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_not @site.reload.ai_api_key_set?
   end
 
+  test "a client that takes neither a stream nor HTML is redirected after a key write, never told 406" do
+    patch admin_settings_ai_key_path, params: { site_setting: { ai_api_key: KEY } }, headers: { "Accept" => "application/json" }
+
+    assert_redirected_to admin_settings_path(anchor: "ai")
+    assert @site.reload.ai_api_key_set?
+  end
+
   test "a forged scalar site_setting is a blank key and an empty Settings form, never a 500" do
     patch admin_settings_ai_key_path, params: { site_setting: "x" }, as: :turbo_stream
     assert_response :unprocessable_entity

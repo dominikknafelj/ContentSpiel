@@ -136,6 +136,15 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "<i>L</i>"
   end
 
+  # The format is decided without `respond_to`: the name is saved by then.
+  test "a client that takes neither a stream nor HTML is redirected, never told 406 about a save that happened" do
+    sign_in_as(users(:one))
+    patch admin_account_profile_path, params: { name: "Json Client" }, headers: { "Accept" => "application/json" }
+
+    assert_redirected_to "/cs-studio/account/password"
+    assert_equal "Json Client", users(:one).reload.name
+  end
+
   test "signed out, saving a name redirects to sign-in" do
     patch "/cs-studio/account/profile", params: { name: "Ada" }
     assert_redirected_to "/cs-studio/sign-in"

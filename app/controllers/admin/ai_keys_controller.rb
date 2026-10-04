@@ -82,14 +82,16 @@ module Admin
       streams << turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: notice, kind: :success)) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: error, kind: :error)) if toast && error
-      respond_to do |format|
-        format.turbo_stream { render turbo_stream: streams, status: status }
-        # Without Turbo (no JavaScript, a scripted client) a stream body would
-        # be shown as text: the same outcome as a redirect to the card instead.
-        format.html do
-          flash[error ? :alert : :notice] = error || notice if error || notice
-          redirect_to admin_settings_path(**admin_url_options, anchor: "ai"), status: :see_other
-        end
+      # Without Turbo (no JavaScript, a scripted client) a stream body would
+      # be shown as text: the same outcome as a redirect to the card instead.
+      # Decided by "does the client take a stream", not `respond_to`: the
+      # write has happened, and a client that accepts neither must not be
+      # answered 406 for it.
+      if request.accepts.any? { |type| type.symbol == :turbo_stream }
+        render turbo_stream: streams, status: status
+      else
+        flash[error ? :alert : :notice] = error || notice if error || notice
+        redirect_to admin_settings_path(**admin_url_options, anchor: "ai"), status: :see_other
       end
     end
 

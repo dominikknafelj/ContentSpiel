@@ -307,10 +307,14 @@ export default class extends Controller {
     // the string itself can split an emoji or any other astral character in
     // two and leave half of it, a lone surrogate, at the end of the label.
     // A tag's label carries its count: how many readable posts share it was
-    // only in the tooltip, which a touch screen and a keyboard never see.
+    // only in the tooltip, which a touch screen and a keyboard never see. The
+    // NAME is what is cut to fit; the count is appended whole, or a long name
+    // would cut it off.
     const title = String(node.title)
-    const characters = Array.from(node.kind === "tag" ? `${title} (${node.count})` : title)
-    label.textContent = characters.length > MAX_LABEL_CHARACTERS ? `${characters.slice(0, MAX_LABEL_CHARACTERS - 1).join("")}\u2026` : characters.join("")
+    const suffix = node.kind === "tag" ? ` (${node.count})` : ""
+    const room = MAX_LABEL_CHARACTERS - Array.from(suffix).length
+    const characters = Array.from(title)
+    label.textContent = (characters.length > room ? `${characters.slice(0, room - 1).join("")}\u2026` : characters.join("")) + suffix
     label.setAttribute("x", 12)
     label.setAttribute("y", 4)
     label.setAttribute("font-size", "12")

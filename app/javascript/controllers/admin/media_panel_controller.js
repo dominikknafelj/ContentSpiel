@@ -21,14 +21,16 @@ import { Controller } from "@hotwired/stimulus"
 // The click only leaves a note (module state, which outlives the DOM it was
 // made in); the NEXT `connect` carries it out -- the controller's element is
 // re-rendered by the frame navigation, or by the visit a language tab is. The
-// note is NOT spent by that first connect: on the way through a frame
-// navigation and the visit Turbo promotes it to, the element connects again
-// and the focus just given is dropped with the element that had it (measured:
-// spending the note at once fails the keyboard system test every time). So it
-// is kept until the navigation is over (`turbo:load`) and every connect in
-// between acts on it. A note older than WINDOW_MS (a click that went nowhere:
-// a link opened in a new tab, a refused visit) is ignored, never acted on by
-// some later, unrelated render.
+// note is NOT spent by that first connect but kept until the navigation is
+// over (`turbo:load`), and every connect in between acts on it: the element
+// can be rendered more than once on the way -- known for certain for a tile
+// activated twice in quick succession (a double click; Cuprite's
+// `send_keys(:enter)`, which clicks before it types), which gets two frame
+// renders, the second dropping the focus the first one gave. Such a double
+// activation is promoted to no visit at all, so no `turbo:load` follows and
+// the note then simply expires. A note older than WINDOW_MS (also a click
+// that went nowhere: a link opened in a new tab, a refused visit) is ignored,
+// never acted on by some later, unrelated render.
 const WINDOW_MS = 3000
 let pending = null
 

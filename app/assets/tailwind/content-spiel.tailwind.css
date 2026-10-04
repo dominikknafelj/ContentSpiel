@@ -75,8 +75,11 @@
 :root { --admin-top-offset: 0px; }
 @media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
 /* A save footer sticks to the bottom of the window; toasts rise above it, or
-   on a narrow window (where the form's column is the window) they cover Save. */
-body:has(.admin-save-bar) #toasts { bottom: 5.5rem; }
+   on a narrow window (where the form's column is the window) they cover Save.
+   By the footer's MEASURED height (`admin--save-bar` writes it: a footer that
+   wraps onto two or three lines is taller than any fixed offset), 4rem until
+   it has been measured. */
+body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
 .admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a

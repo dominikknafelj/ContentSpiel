@@ -169,6 +169,8 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_admin_controllers
     assert_selector "svg[data-admin--mind-graph-target=svg] g.mg-tag", count: 1
+    # The name is cut to fit, the count never: 34 characters of name, "(3)" whole.
+    assert_selector "svg[data-admin--mind-graph-target=svg] g.mg-tag text", text: /\Aa-long-shared-tag-name-for-…\s\(3\)\z/
     assert_selector "svg[data-admin--mind-graph-target=svg] line.mg-edge-related", count: 1
     assert_selector "svg[data-admin--mind-graph-target=svg] line.mg-edge-tag", count: 3
     assert_selector "svg[data-admin--mind-graph-target=svg] g[data-post-id]", count: 5

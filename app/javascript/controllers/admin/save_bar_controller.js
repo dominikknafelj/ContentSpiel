@@ -323,6 +323,14 @@ function announce() {
   }))
 }
 
+// The tallest footer on the screen (the account screen has two; one sticks at
+// a time), as `--admin-save-bar-height` on the root; gone with the last form.
+function measureBars() {
+  const heights = [...instances].filter((instance) => instance.hasBarTarget).map((instance) => instance.barTarget.offsetHeight)
+  if (heights.length === 0) document.documentElement.style.removeProperty("--admin-save-bar-height")
+  else document.documentElement.style.setProperty("--admin-save-bar-height", `${Math.max(...heights)}px`)
+}
+
 // ONE FORM AFTER ANOTHER (final wave B, ledger C-I1). A screen with two of
 // these forms (the account screen: name, password) must not let one Save throw
 // away what the other form holds. A form whose answer re-renders the screen
@@ -358,11 +366,19 @@ export default class extends Controller {
     }
     instances.add(this)
     shared.leaving = false
+    // How tall the footer is, for the toasts that sit above it (`#toasts` in
+    // content-spiel.tailwind.css): it wraps on a narrow window.
+    if (this.hasBarTarget) {
+      this.barObserver = new ResizeObserver(measureBars)
+      this.barObserver.observe(this.barTarget)
+    }
     this.refresh()
   }
 
   disconnect() {
+    this.barObserver?.disconnect()
     instances.delete(this)
+    measureBars()
     if (instances.size === 0) {
       document.removeEventListener("turbo:before-visit", onVisit)
       document.removeEventListener("turbo:click", onFrameLink, true)

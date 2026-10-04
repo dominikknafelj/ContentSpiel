@@ -12,6 +12,8 @@ module Admin
   # service does that itself, together with the write
   # (`Users::OwnerProtection#end_sessions_after_password_change`).
   class AccountsController < BaseController
+    include AutosaveResponses
+
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
@@ -53,14 +55,17 @@ module Admin
     def update_profile
       result = Users::UpdateProfile.call(Current.user, name: params[:name])
       if result.ok?
-        respond_to do |format|
-          format.turbo_stream do
-            render turbo_stream: [
-              turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
-              turbo_stream.append("toasts", Admin::ToastComponent.new(message: "Name saved.", kind: :success))
-            ]
-          end
-          format.html { redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved." }
+        # Decided by "does the client take a stream", not `respond_to`: the
+        # name is saved by now, and a client that accepts neither format must
+        # not be told 406 about a save that happened. Everything else gets
+        # the redirect.
+        if request.accepts.any? { |type| type.symbol == :turbo_stream }
+          render turbo_stream: [
+            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
+            toast_stream("Name saved.")
+          ]
+        else
+          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
         end
       else
         @profile_errors = result.errors
