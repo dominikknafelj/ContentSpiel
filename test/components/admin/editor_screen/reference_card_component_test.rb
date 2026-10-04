@@ -56,8 +56,11 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     render_outdated(post)
 
     assert_selector ".admin-reference-card.border-warn[data-translation-state='outdated']"
-    assert_selector "del[aria-label='removed']", text: "spare"
-    assert_selector "ins[aria-label='added']", text: "small"
+    assert_selector "del", text: "Removed: spare"
+    assert_selector "ins", text: "Added: small"
+    assert_selector "del > .sr-only", text: "Removed:"
+    assert_selector "ins > .sr-only", text: "Added:"
+    assert_no_selector "del[aria-label], ins[aria-label]"
     assert_selector ".admin-reference-card time"
     assert_selector ".admin-reference-card", text: /CHANGED/i
     assert_no_text "changed since this was translated"
@@ -67,7 +70,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     render_outdated(outdated_post)
 
     assert_selector "del.text-danger-ink.bg-danger-tint"
-    assert_selector "ins.text-ok-ink.bg-ok-tint"
+    assert_selector "ins.text-ok-ink.bg-ok-tint.underline"
   end
 
   test "the confirm button posts through the layout's confirm form, and says it is still correct" do
@@ -190,23 +193,58 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button"
   end
 
-  test "the Suggest update button renders only when a button is handed over, with its mode" do
-    Current.actor = users(:one)
-    stub = Class.new { def initialize(api_key:, model:); end }
-    AI::Providers.register("test/stub", stub)
-    Current.site.update!(ai_provider: "test/stub", ai_api_key: "sk-test")
-    post = outdated_post
-    suggest = Admin::TranslationScreen::TranslateButtonComponent.new(
-      confirm: confirm_for(post), input_id: "post-title", characters: 12, mode: :update
-    )
+  class StubProvider
+    def initialize(api_key:, model:); end
+  end
 
+  def suggest_for(post)
+    Admin::TranslationScreen::TranslateButtonComponent.new(confirm: confirm_for(post), input_id: "post-title", characters: 12, mode: :update)
+  end
+
+  def render_with_suggest(post)
     render_inline(Admin::EditorScreen::ReferenceCardComponent.new(
-      field: "title", locale: "de", original: "A small room", state: :outdated, record: post, confirm: confirm_for(post), suggest: suggest
+      field: "title", locale: "de", original: "A small room", state: :outdated, record: post, confirm: confirm_for(post), suggest: suggest_for(post)
     ))
+  end
+
+  # The registry and `Current` are process-wide: put both back whatever happens.
+  def with_ai(provider: "test/stub")
+    Current.actor = users(:one)
+    AI::Providers.register("test/stub", StubProvider)
+    Current.site.update!(ai_provider: provider, ai_api_key: "sk-test")
+    yield
+  ensure
+    Current.reset
+    Rails.application.reloader.prepare!
+  end
+
+  test "the Suggest update button renders with its mode when AI is set up and the viewer may translate" do
+    post = outdated_post
+
+    with_ai { render_with_suggest(post) }
 
     assert_selector ".admin-reference-card [data-translate-mode='update'] button[data-action='admin--translate#translate']", text: "Suggest update"
-  ensure
-    Rails.application.reloader.prepare!
+  end
+
+  test "no Suggest update button without AI set up" do
+    post = outdated_post
+
+    with_ai(provider: nil) { render_with_suggest(post) }
+
+    assert_no_selector "[data-translate-mode='update']"
+    assert_no_text "Suggest update"
+    assert_selector "button", text: "Still correct — mark up to date"
+  end
+
+  test "no Suggest update button for a viewer without ai.translate" do
+    post = outdated_post
+
+    with_ai do
+      Current.actor = users(:reader)
+      render_with_suggest(post)
+    end
+
+    assert_no_text "Suggest update"
   end
 
   test "a current card has no note" do

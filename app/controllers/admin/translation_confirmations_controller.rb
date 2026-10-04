@@ -40,12 +40,12 @@ module Admin
     # writes only `translation_sources`, never `updated_at`, so the open form
     # stays valid) and -- when the record (for a block: its page or post,
     # whose switcher it rolls up into) has nothing left outdated in this
-    # language -- the switcher's marker. A value no card can show (a schema
-    # group) has no card to swap; removing its id is a no-op.
+    # language -- the switcher's marker.
     def confirmed_streams(record)
       field = params[:field].to_s
+      card_id = Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field)
       card = Admin::EditorScreen::ReferenceCardComponent.current_for(record, field, locale: params[:locale].to_s)
-      streams = [ card ? turbo_stream.replace(Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field), card) : turbo_stream.remove(Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field)) ]
+      streams = [ turbo_stream.replace(card_id, card) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record
       unless Translations::Status.outdated_locales(switcher_record).include?(params[:locale].to_s)
         streams << turbo_stream.remove(Admin::LanguageTabsComponent.outdated_marker_id(params[:locale]))

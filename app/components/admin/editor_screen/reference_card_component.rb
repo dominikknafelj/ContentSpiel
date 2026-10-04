@@ -41,8 +41,9 @@ module Admin
     #
     # The diff is built with `content_tag` over the segments -- user text is
     # only ever an escaped child of `del`/`ins`/`span`, never `html_safe`.
-    # `del` is the one place red marks removed text, per the handoff; it and
-    # `ins` carry an `aria-label` so a screen reader hears what changed.
+    # `del` is the one place red marks removed text, per the handoff; `ins` keeps
+    # its underline (colour is never the only cue) and each carries a
+    # visually hidden "Removed: "/"Added: " cue so a screen reader hears what changed.
     # Rich text is diffed as plain text per paragraph
     # (`RichText::Document#plain_paragraphs`) and shown one `<p>` per
     # paragraph (a `"\n"` segment ends one).
@@ -96,13 +97,12 @@ module Admin
       # The `:current`-state card for `record`'s `field` as it reads now --
       # what a confirmation streams in place of the outdated one. The original
       # is the record's own primary-language value (a rich body is a
-      # `RichText::Document`, so it renders as rich); nil for a value no card
-      # can show (a schema group's raw Hash), where there is nothing to swap.
+      # `RichText::Document`, so it renders as rich); a schema group's raw Hash
+      # is handed over as it is, exactly as `Admin::FieldComponent` does, so the
+      # card never vanishes on confirm.
       def self.current_for(record, field, locale:)
         original = record.translation_value(field, ::Locales.default)
         kind = original.is_a?(RichText::Document) ? :rich : :plain
-        return unless original.is_a?(String) || kind == :rich
-
         new(field: field, locale: locale, original: original, kind: kind, state: record.translation_state(field, locale), record: record)
       end
 
@@ -143,7 +143,11 @@ module Admin
       end
 
       def changed_at
-        @changed_at ||= record&.translation_original_changed_at_for(field) if outdated?
+        return unless outdated?
+
+        return @changed_at if defined?(@changed_at)
+
+        @changed_at = record&.translation_original_changed_at_for(field)
       end
 
       def no_source_note = "#{language_name} changed since this was translated."
@@ -153,7 +157,9 @@ module Admin
       def outdated_body
         return unless outdated?
 
-        @outdated_body ||=
+        return @outdated_body if defined?(@outdated_body)
+
+        @outdated_body =
           if diff.nil? then :no_source
           elsif diff.too_long? then :too_long
           elsif diff.formatting_only? then :formatting
@@ -208,10 +214,14 @@ module Admin
         @diff = (Translations::SourceDiff.call(from: source.text, to: current) if source&.comparable? && !current.nil?)
       end
 
+      # A screen-reader-only cue inside the element: `aria-label` on `del`/`ins`
+      # (name-prohibited roles) is unreliable and may replace the word itself.
+      def cue(label) = content_tag(:span, label, class: "sr-only")
+
       def segment_tag(segment_kind, text)
         case segment_kind
-        when :delete then content_tag(:del, text, class: "text-danger-ink bg-danger-tint", aria: { label: "removed" })
-        when :insert then content_tag(:ins, text, class: "text-ok-ink bg-ok-tint no-underline", aria: { label: "added" })
+        when :delete then content_tag(:del, safe_join([ cue("Removed: "), text ]), class: "text-danger-ink bg-danger-tint")
+        when :insert then content_tag(:ins, safe_join([ cue("Added: "), text ]), class: "text-ok-ink bg-ok-tint underline decoration-ok-ink")
         else content_tag(:span, text)
         end
       end
