@@ -79,7 +79,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   # Design pass round 1 (Task 17): the graph used to fill the whole content
   # column and fling nodes past its edge.
   test "the mind graph keeps to its box and every node stays inside it" do
-    posts = %w[Alpha Beta Gamma Delta Epsilon Zeta].map { |title| create_post(title: title) }
+    posts = [ "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "A very long post title that goes on and on and on and on, well past sixty characters" ].map { |title| create_post(title: title) }
     posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
     PostRelation.create!(post: posts.first, related_post: posts.last)
 
@@ -97,16 +97,27 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
           const r = c.getBoundingClientRect()
           return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1
         }).length
-        return { width: box.width, outside }
+        const labelsOutside = Array.from(svg.querySelectorAll("text")).filter((t) => {
+          const r = t.getBoundingClientRect()
+          return r.left < box.left - 1 || r.right > box.right + 1
+        }).length
+        return { width: box.width, outside, labelsOutside }
       })()
     JS
     result = page.evaluate_script(inside_box)
     assert_operator result["width"], :<=, 960
     assert_equal 0, result["outside"]
+    assert_equal 0, result["labelsOutside"]
 
     # Shrinking the window moves the box; the nodes must follow it in.
     page.current_window.resize_to(700, 800)
-    wait_until(timeout: 10) { page.evaluate_script(inside_box)["outside"].zero? }
+    wait_until(timeout: 10) do
+      resized = page.evaluate_script(inside_box)
+      resized["outside"].zero? && resized["labelsOutside"].zero?
+    end
+  ensure
+    # Cuprite keeps the window size for the rest of the worker's session.
+    page.driver.resize(1400, 1400)
   end
 
   # Fix round 1 (I1): Turbo snapshots the graph before `disconnect()`

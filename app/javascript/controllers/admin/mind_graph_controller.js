@@ -24,6 +24,12 @@ const CLICK_DRAG_THRESHOLD = 5
 // radius (8) plus some air, so no node is ever cut off by the box.
 const EDGE_PADDING = 16
 
+// A label longer than this is drawn cut off with an ellipsis, so even a very
+// long title can't be wider than the box. The full title stays reachable as
+// the node's <title> (tooltip and accessible name).
+const MAX_LABEL_CHARACTERS = 32
+const LABEL_OFFSET = 12
+
 export default class extends Controller {
   static targets = ["data", "svg"]
 
@@ -34,6 +40,10 @@ export default class extends Controller {
     // copies with no simulation behind them. Start from an empty canvas
     // every time rather than drawing a second live set on top.
     this.svgTarget.replaceChildren()
+    // The same snapshot carries `data-settled` if it was taken after the
+    // previous visit's simulation cooled down; the new simulation is only
+    // just starting.
+    this.svgTarget.removeAttribute("data-settled")
 
     const { nodes, edges } = JSON.parse(this.dataTarget.textContent)
     this.nodes = nodes
@@ -72,6 +82,11 @@ export default class extends Controller {
     this.svgTarget.replaceChildren()
   }
 
+  // If the SVG has no layout at connect time (a hidden tab, a Turbo cache
+  // preview) the rect is 0x0, so the clamp would pin every node to a corner
+  // (min wins over max). That recovers by itself: the ResizeObserver fires
+  // when the box gets its real size, `resize()` sees it differs, re-centres,
+  // re-clamps and reheats.
   measure() {
     const { width, height } = this.svgTarget.getBoundingClientRect()
     this.width = width
@@ -135,7 +150,23 @@ export default class extends Controller {
 
     this.nodes.forEach((node, index) => {
       this.nodeElements[index].setAttribute("transform", `translate(${node.x}, ${node.y})`)
+      this.placeLabel(index, node)
     })
+  }
+
+  // A node clamped near the right edge would have its label cut off by the
+  // box's overflow-hidden, so such a label is drawn on the node's left
+  // instead (text-anchor end), and flips back as the node moves away.
+  placeLabel(index, node) {
+    const label = this.nodeElements[index].querySelector("text")
+    this.labelWidths ||= []
+    // Measured once the text is laid out; 0 (not yet laid out) is retried.
+    if (!this.labelWidths[index]) this.labelWidths[index] = label.getComputedTextLength()
+
+    const crossesRight = node.x + LABEL_OFFSET + this.labelWidths[index] > this.width
+    const onLeft = crossesRight && node.x > this.width / 2
+    label.setAttribute("x", onLeft ? -LABEL_OFFSET : LABEL_OFFSET)
+    label.setAttribute("text-anchor", onLeft ? "end" : "start")
   }
 
   buildEdgeElement() {
@@ -162,12 +193,18 @@ export default class extends Controller {
     // `textContent`, never markup -- a title is plain text whatever it
     // contains.
     const label = document.createElementNS(SVG_NS, "text")
-    label.textContent = node.title
+    const title = String(node.title)
+    label.textContent = title.length > MAX_LABEL_CHARACTERS ? `${title.slice(0, MAX_LABEL_CHARACTERS - 1)}\u2026` : title
     label.setAttribute("x", 12)
     label.setAttribute("y", 4)
     label.setAttribute("font-size", "12")
     label.setAttribute("fill", "currentColor")
     group.appendChild(label)
+
+    // The full title as tooltip and accessible name, whatever the label shows.
+    const tooltip = document.createElementNS(SVG_NS, "title")
+    tooltip.textContent = title
+    group.appendChild(tooltip)
 
     this.svgTarget.appendChild(group)
     this.attachDragHandlers(group, node)
