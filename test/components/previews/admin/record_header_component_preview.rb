@@ -15,7 +15,7 @@ module Admin
 
     def live
       page = PreviewFixtures.page(title: "Live page")
-      render Admin::RecordHeaderComponent.new(page: page, locale: "en", notice: "Published")
+      render Admin::RecordHeaderComponent.new(page: page, locale: "en")
     end
 
     def with_children_delete_disabled

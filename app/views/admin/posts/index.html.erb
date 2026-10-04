@@ -7,11 +7,6 @@
     (`Admin::PostsController#filtered_posts`). %>
 <% may_create = can?("posts.create") %>
 
-<%# `flash[:undo]` (Task 10's "Moved “Hello” to the trash", Undo) -- see
-    `admin/pages/index.html.erb`'s own comment for why `symbolize_keys` is
-    needed here. %>
-<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert], action: flash[:undo]&.symbolize_keys) %>
-
 <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
   <h1 class="text-h1 text-ink">Posts</h1>
   <% if may_create %>

@@ -73,10 +73,20 @@
 
       <main class="p-6">
         <turbo-frame id="content" data-turbo-action="advance">
+          <%# A frame request's response keeps only this frame, so the flash
+              it carries is rendered here (as bare toasts that `admin--toast`
+              moves into `#toasts`) instead of in the region below, where it
+              would be consumed and dropped. %>
+          <%= render Admin::ToastRegionComponent.new(flash: flash, relay: true) if turbo_frame_request? %>
           <%= yield %>
         </turbo-frame>
       </main>
     </div>
+
+    <%# The one toast region (handoff §10): outside `#content` so a frame
+        navigation never wipes it, and a Turbo Stream's `toast_stream` has a
+        fixed target. Empty on a frame request -- see the relay above. %>
+    <%= render Admin::ToastRegionComponent.new(flash: turbo_frame_request? ? {} : flash) %>
 
     <%# The one media picker (media library Task 8) -- here, outside the
         `#content` frame and every form, so there's exactly one per page

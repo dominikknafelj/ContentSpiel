@@ -30,12 +30,6 @@
   <% end %>
 </div>
 
-<% if flash[:notice].present? %>
-  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-<% end %>
-<% if flash[:alert].present? %>
-  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-<% end %>
 <% if @group.built_in? %>
   <p class="mb-4 text-meta">A built-in group: you can change it, but not delete it.</p>
 <% end %>

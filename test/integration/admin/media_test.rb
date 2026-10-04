@@ -340,7 +340,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
-    assert_select "p[role=status]", text: "Restored “#{asset.title}”"
+    assert_select "#toasts .admin-toast[role=status]", text: "Restored “#{asset.title}”"
   end
 
   # The disabled button is only ever a courtesy -- `Trash::Move` itself is
@@ -361,7 +361,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
-    assert_select "p[role=alert]", text: asset.in_use_message(kept_only: true)
+    assert_select "#toasts .admin-toast[role=alert]", text: asset.in_use_message(kept_only: true)
   end
 
   test "editing title, alt and caption autosaves per locale through Media::Save" do

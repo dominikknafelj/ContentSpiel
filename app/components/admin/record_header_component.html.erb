@@ -1,11 +1,4 @@
 <header class="admin-record-header mb-6 flex flex-col gap-3 rounded-cs border border-line bg-surface p-4">
-  <% if notice.present? %>
-    <p role="status" class="text-sm text-ok-ink"><%= notice %></p>
-  <% end %>
-  <% if alert.present? %>
-    <p role="alert" class="text-sm text-danger-ink"><%= alert %></p>
-  <% end %>
-
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div class="min-w-0">
       <h1 class="truncate text-h1 text-ink"><%= Locales.read(page, :title, locale: locale) %></h1>

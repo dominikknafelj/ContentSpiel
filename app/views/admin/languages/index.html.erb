@@ -10,12 +10,6 @@
 <% content_for :title, "Languages" %>
 <h1 class="mb-4 text-h1 text-ink">Languages</h1>
 
-<% if flash[:notice].present? %>
-  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-<% end %>
-<% if flash[:alert].present? %>
-  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-<% end %>
 
 <%= form_with url: admin_settings_languages_path(**admin_url_options), method: :patch, class: "mb-6" do %>
   <table class="admin-languages-table w-full border-collapse text-sm">

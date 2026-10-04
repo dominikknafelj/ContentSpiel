@@ -43,8 +43,8 @@ class Admin::LanguageTabsComponentTest < ViewComponent::TestCase
       render_inline(Admin::LanguageTabsComponent.new(current: "pt", url: @url, visible: 4))
       assert_selector "nav > ul > li", count: 5 # four tabs + the overflow
       assert_selector "[aria-current=true]", text: "PT"
-      assert_selector "details summary", text: "+2"
-      assert_selector "details a", count: 2, visible: :all
+      assert_selector "button[aria-haspopup=menu]", text: "+2"
+      assert_selector "[role=menu] a", count: 2, visible: :all
     end
   end
 

@@ -1,0 +1,9 @@
+<%= tag.div class: "relative inline-block", data: { controller: "admin--menu", action: "click@window->admin--menu#closeOutside keydown->admin--menu#keydown" } do %>
+  <button type="button" aria-haspopup="menu" aria-expanded="false" class="<%= button_classes %>"
+          data-admin--menu-target="button" data-action="admin--menu#toggle"><%= label %></button>
+  <div role="menu" hidden class="<%= panel_classes %>" data-admin--menu-target="panel">
+    <% items.each do |item| %>
+      <div role="none"><%= item %></div>
+    <% end %>
+  </div>
+<% end %>

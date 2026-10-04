@@ -26,12 +26,6 @@
   <% end %>
 </div>
 
-<% if flash[:notice].present? %>
-  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-<% end %>
-<% if flash[:alert].present? %>
-  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-<% end %>
 
 <% if @api_tokens.empty? %>
   <%= render Admin::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>

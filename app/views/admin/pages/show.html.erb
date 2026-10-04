@@ -2,7 +2,7 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options, notice: flash[:notice], alert: flash[:alert]) %>
+<%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
 <%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 

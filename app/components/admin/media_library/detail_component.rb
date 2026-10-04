@@ -22,18 +22,10 @@ module Admin
     class DetailComponent < Admin::AdminComponent
       ROLE_LABELS = { "hero" => "Hero image", "block_image" => "Image block", "rich_text" => "Rich text" }.freeze
 
-      # `notice:`/`alert:` are the flash a restore-via-Undo redirect
-      # (`Admin::TrashController#restore`, Task 10) or a failed delete's own
-      # `alert:` (`Admin::MediaController#destroy`) leaves for this panel to
-      # show -- the same "the controller's flash, read by the view, handed
-      # to the component" shape `Admin::RecordHeaderComponent`/`Admin::
-      # PostFormComponent` already use for a page/post.
-      def initialize(asset:, locale:, url_options: {}, notice: nil, alert: nil)
+      def initialize(asset:, locale:, url_options: {})
         @asset = asset
         @locale = locale.to_s
         @url_options = url_options
-        @notice = notice
-        @alert = alert
       end
 
       def editable?
@@ -207,7 +199,7 @@ module Admin
 
       private
 
-      attr_reader :asset, :locale, :url_options, :notice, :alert
+      attr_reader :asset, :locale, :url_options
 
       # The raw, ungrouped-by-visibility `usages_summary` rows, memoized
       # once: `#usage_entries` and `#unresolved_usage?` both need to walk

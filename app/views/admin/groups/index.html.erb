@@ -10,12 +10,6 @@
   <%= link_to "+ New group", new_admin_group_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
 </div>
 
-<% if flash[:notice].present? %>
-  <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-<% end %>
-<% if flash[:alert].present? %>
-  <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-<% end %>
 
 <table class="admin-groups-table w-full border-collapse text-sm">
   <thead>

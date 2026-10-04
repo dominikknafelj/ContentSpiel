@@ -7,11 +7,6 @@
     ::DetailComponent`'s own). %>
 <h1 class="mb-4 text-h1 text-ink">Media</h1>
 
-<%# `flash[:undo]` (Task 10's "Moved “hero.png” to the trash", Undo) -- see
-    `admin/pages/index.html.erb`'s own comment for why `symbolize_keys` is
-    needed here. %>
-<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert], action: flash[:undo]&.symbolize_keys) %>
-
 <div class="mb-6 rounded-cs border border-dashed border-line-strong p-4"
      data-controller="admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"

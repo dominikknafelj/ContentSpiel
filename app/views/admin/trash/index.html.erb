@@ -11,8 +11,6 @@
   <% end %>
 </p>
 
-<%= render Admin::FlashComponent.new(notice: flash[:notice], alert: flash[:alert]) %>
-
 <nav aria-label="Filter by type" class="mb-4 flex flex-wrap gap-2">
   <% [ [ "All", nil ], [ "Pages", "page" ], [ "Posts", "post" ], [ "Images", "media" ] ].each do |label, type| %>
     <%= link_to label, admin_trash_path(type:, **admin_url_options),

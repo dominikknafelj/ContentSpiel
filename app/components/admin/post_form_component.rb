@@ -13,12 +13,10 @@ module Admin
   class PostFormComponent < AdminComponent
     ID_PREFIX = "post"
 
-    def initialize(post:, locale:, url_options: {}, notice: nil, alert: nil)
+    def initialize(post:, locale:, url_options: {})
       @post = post
       @locale = locale
       @url_options = url_options
-      @notice = notice
-      @alert = alert
     end
 
     def status = post.status
@@ -185,7 +183,7 @@ module Admin
 
     private
 
-    attr_reader :post, :locale, :url_options, :notice, :alert
+    attr_reader :post, :locale, :url_options
 
     def urls = PublicSite::Urls.new
 

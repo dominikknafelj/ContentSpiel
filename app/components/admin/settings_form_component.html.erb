@@ -108,7 +108,8 @@
 
   <div class="flex flex-wrap items-center gap-3">
     <%= button_to "Test connection", helpers.test_ai_connection_admin_settings_path, method: :post,
-          form: { class: "inline" }, class: setup_secondary_link_class %>
+          form: { class: "inline", data: { controller: "admin--busy" } }, class: setup_secondary_link_class,
+          data: { admin__busy_target: "button", busy_label: "Testing…" } %>
     <span class="text-sm text-meta">Uses the saved provider, model and key.</span>
   </div>
   <%= render partial: "admin/settings/ai_test_result", locals: { message: nil, ok: nil } %>

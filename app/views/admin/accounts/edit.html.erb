@@ -6,12 +6,6 @@
   <h1 class="mb-1 text-h1 text-ink">Change password</h1>
   <p class="mb-4 text-meta">Signed in as <%= Current.user.display_name %>. Changing your password signs you out everywhere else.</p>
 
-  <% if flash[:notice].present? %>
-    <p role="status" class="mb-4 text-ok-ink"><%= flash[:notice] %></p>
-  <% end %>
-  <% if flash[:alert].present? %>
-    <p role="alert" class="mb-4 text-danger-ink"><%= flash[:alert] %></p>
-  <% end %>
   <% if @errors.present? %>
     <p role="alert" class="mb-4 text-danger-ink"><%= @errors.to_sentence %></p>
   <% end %>

@@ -42,18 +42,20 @@
     <% end %>
     <% if overflow.any? %>
       <li class="relative">
-        <%# A native <details> for now; the shared menu component restyles it. %>
-        <details class="admin-language-tabs__more">
-          <summary class="cursor-pointer list-none pb-2 text-meta hover:text-ink">+<%= overflow.size %> ▾</summary>
-          <ul class="absolute right-0 z-20 mt-1 min-w-40 rounded-cs border border-line bg-surface p-1 shadow-menu">
-            <% overflow.each do |code| %>
-              <li class="flex items-center gap-1.5 px-2 py-1">
+        <%# The shared popover menu (not a native <details>): arrow keys,
+            Escape and outside click come with it. The `marks` lambda is
+            still called as a silent scriptlet, never an output tag, so each
+            language's marker id renders exactly once. %>
+        <%= render Admin::MenuComponent.new(label: "+#{overflow.size} ▾", button_class: "cursor-pointer pb-2 text-meta hover:text-ink") do |menu| %>
+          <% overflow.each do |code| %>
+            <% menu.with_item do %>
+              <span class="flex items-center gap-1.5">
                 <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
                 <% marks.call(code) %>
-              </li>
+              </span>
             <% end %>
-          </ul>
-        </details>
+          <% end %>
+        <% end %>
       </li>
     <% end %>
   </ul>

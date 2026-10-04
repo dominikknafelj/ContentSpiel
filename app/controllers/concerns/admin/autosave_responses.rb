@@ -46,7 +46,23 @@ module Admin
         streams << turbo_stream.replace(base_id, partial: "admin/shared/base_updated_at_field", locals: { id: base_id, value: record.updated_at.iso8601(6) })
       end
 
+      # A failed save also raises an error toast (handoff §10): the status
+      # line and the per-field slots can be scrolled out of sight, and an
+      # error toast stays until dismissed. It only restates that the save
+      # didn't happen -- the reasons stay in the field slots, never here.
+      unless result.ok?
+        streams << toast_stream(result.denied? ? "You don't have permission to make this change." : "Couldn't save your changes.", kind: :error)
+      end
+
       streams
+    end
+
+    # One toast appended to the layout's `#toasts` region
+    # (`Admin::ToastRegionComponent`) from a Turbo Stream answer -- for a
+    # response that has no redirect and so no flash to carry the message.
+    # `action` is `{ label:, url:, method: }`, as for `Admin::ToastComponent`.
+    def toast_stream(message, kind: :success, action: nil)
+      turbo_stream.append("toasts", Admin::ToastComponent.new(message: message, kind: kind, action: action))
     end
 
     # The HTTP status an autosave answers with: 200, 403 for a permission

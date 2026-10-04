@@ -8,18 +8,13 @@ module Admin
   # list), unlike a field that saves itself the moment an editor stops
   # typing.
   #
-  # `notice:`/`alert:` are the flash a publish/unpublish/schedule redirect
-  # (or a failed delete's own re-render) leaves for this header to show
-  # (`Admin::PagesController`) -- read by the view, not by this component,
-  # since a component has no controller context of its own to pull
-  # `flash` from.
+  # The flash a publish/unpublish/schedule redirect leaves is the layout's
+  # toasts (`Admin::ToastRegionComponent`), not this header's.
   class RecordHeaderComponent < AdminComponent
-    def initialize(page:, locale:, url_options: {}, notice: nil, alert: nil)
+    def initialize(page:, locale:, url_options: {})
       @page = page
       @locale = locale
       @url_options = url_options
-      @notice = notice
-      @alert = alert
     end
 
     def status = page.status
@@ -119,7 +114,7 @@ module Admin
 
     private
 
-    attr_reader :page, :locale, :url_options, :notice, :alert
+    attr_reader :page, :locale, :url_options
 
     def urls = PublicSite::Urls.new
 
