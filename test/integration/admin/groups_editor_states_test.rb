@@ -53,6 +53,48 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_empty group.users.reload
   end
 
+  # Final fix wave (Task 11): the chip input posts ids; a forged one is the
+  # service's to judge. An id that names nobody is no member (never a 500, and
+  # no change recorded); an owner's id -- never offered by the suggestions --
+  # is still a user id, so it is added like any other: owners already hold
+  # everything, the membership gives them nothing.
+  test "a forged member id: one that names nobody is ignored, an owner's is an ordinary member" do
+    group = AccessControl::Group.create!(name: "Writers")
+    AccessControl::Membership.create!(user: users(:reader), group: group)
+    sign_in_as(users(:one))
+    missing = User.maximum(:id) + 1000
+
+    assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
+      patch "/cs-studio/groups/#{group.id}", params: { group: { name: "Writers", member_ids: [ "", users(:reader).id, missing, "abc" ], grants: {} } }
+    end
+    assert_response :see_other
+    assert_equal [ users(:reader) ], group.users.reload.to_a
+
+    patch "/cs-studio/groups/#{group.id}", params: { group: { name: "Writers", member_ids: [ "", users(:reader).id, users(:one).id ], grants: {} } }
+    assert_response :see_other
+    assert_equal [ users(:one), users(:reader) ].sort_by(&:id), group.users.reload.sort_by(&:id)
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "input[type=hidden][name='group[member_ids][]'][value='#{users(:one).id}']"
+  end
+
+  test "a non-owner manager's forged member ids are judged the same way: nobody for a missing id, the escalation rule for a real one" do
+    group = AccessControl::Group.create!(name: "Everything")
+    AccessControl::Grant.create!(group: group, permission: "users.manage", scope: {})
+    sign_in_as(manager_user(grants: { "groups.manage" => {} }))
+
+    as_stored = { "users.manage" => { enabled: "1" } }
+
+    patch "/cs-studio/groups/#{group.id}", params: { group: { name: "Everything", member_ids: [ "", User.maximum(:id) + 1000 ], grants: as_stored } }
+    assert_response :see_other
+    assert_empty group.users.reload
+
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/groups/#{group.id}", params: { group: { name: "Everything", member_ids: [ "", users(:one).id ], grants: as_stored } }
+    end
+    assert_response :forbidden
+    assert_empty group.users.reload
+  end
+
   test "an owner who is already a member stays as a chip until removed, and an untouched save keeps them (owner and non-owner viewers)" do
     group = AccessControl::Group.create!(name: "Mixed crew", description: "Everyone")
     AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
@@ -230,26 +272,28 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal before, grants_snapshot(group)
   end
 
-  test "the lock check costs no query per row: ticking every row asks nothing a few rows didn't, bar one lookup per page-scoped row" do
-    section = as_owner { create_page(title: "Section") }
-    manager = manager_user(grants: { "groups.manage" => {}, "posts.read" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "pages.read" => {}, "pages.edit" => {} })
+  # Final fix wave (Task 11): the two groups differ ONLY in how many unscoped
+  # rows and toggles are ticked (one against seven), every one of them a grant
+  # the viewer holds and so has to be checked for a lock. Exactly the same
+  # number of queries -- not "at most a few more", which a query per row could
+  # hide behind for a small enough difference.
+  test "the lock check costs no query per row: seven ticked unscoped rows ask exactly what one does" do
+    keys = %w[posts.read posts.create posts.edit posts.publish pages.read tags.manage media.upload]
+    manager = manager_user(grants: keys.index_with { {} }.merge("groups.manage" => {}))
     few = AccessControl::Group.create!(name: "Few")
     AccessControl::Grant.create!(group: few, permission: "posts.read", scope: {})
     many = AccessControl::Group.create!(name: "Many")
-    AccessControl::Grant.create!(group: many, permission: "posts.read", scope: {})
-    AccessControl::Grant.create!(group: many, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
-    AccessControl::Grant.create!(group: many, permission: "pages.read", scope: {})
-    AccessControl::Grant.create!(group: many, permission: "pages.edit", scope: { "page_ids" => [ section.id ] })
+    keys.each { |key| AccessControl::Grant.create!(group: many, permission: key, scope: {}) }
     sign_in_as(manager)
 
     get "/cs-studio/groups/#{few.id}/edit"
     base = count_queries { get "/cs-studio/groups/#{few.id}/edit" }
-    # Four ticked rows, one of them a branch: the branch's own lookup(s) are the only addition.
+    assert_select "[data-locked]", count: 0
     with_more = count_queries { get "/cs-studio/groups/#{many.id}/edit" }
+    assert_select "[data-locked]", count: 0
+    assert_select "[data-permission] input[type=checkbox][name$='[enabled]'][checked]", minimum: 5
 
-    # The branch row's own closure-table lookup, the one `LiveGrants` existence check for its page ids,
-    # and the editor's tree/visibility reads; never a query per ticked row.
-    assert_operator with_more - base, :<=, 5, "ticked rows must not each run their own queries (#{base} -> #{with_more})"
+    assert_equal base, with_more, "ticked rows must not run queries of their own"
   end
 
   # --- Review Focus 3, non-owner, editable form, page tree --------------------------
@@ -385,7 +429,8 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
       assert_select "button[type=submit]", text: "Delete group"
     end
     assert_not_includes response.body, raw
-    assert_not_includes response.body, token.token_digest.to_s if token.respond_to?(:token_digest) && token.token_digest.present?
+    assert token.token_digest.present?
+    assert_not response.body.include?(token.token_digest), "the token's digest is in the page"
     assert_select "form#group-form dialog", count: 0
     assert_select "form#group-form form", count: 0
 

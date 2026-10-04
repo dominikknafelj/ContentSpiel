@@ -96,6 +96,28 @@ class Admin::PermissionMatrixComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-locked-hint"
   end
 
+  # Final fix wave (Task 11): the case a lock on POSTED values got wrong. The
+  # group stores `posts.edit {blog}` (the viewer's own right, so no lock); the
+  # editor widened the row to `{blog, now_update}` and the save was refused.
+  # The row now holds a scope the viewer couldn't hand out -- but it is what
+  # they typed, not what is stored, so it comes back editable.
+  test "a stored row the editor widened beyond their own right is not locked" do
+    viewer = viewer_holding("posts.edit" => { "content_types" => [ "blog" ] })
+    stored = [ { permission: "posts.edit", scope: { "content_types" => %w[blog] } } ]
+    posted = [ { permission: "posts.edit", scope: { "content_types" => %w[blog now_update] } } ]
+
+    matrix_for(viewer, posted, stored: stored)
+
+    assert_no_selector "[data-locked]"
+    assert_no_selector ".admin-locked-hint"
+    assert_selector "[data-permission='posts.edit'] input[type=checkbox][name$='[enabled]'][checked]:not([disabled])", visible: :all
+    assert_selector "[data-permission='posts.edit'] button", text: "Edit scope", visible: :all
+
+    # The same scope, when it IS what the group stores, locks.
+    matrix_for(viewer, posted, stored: posted)
+    assert_selector "[data-permission='posts.edit'][data-locked]"
+  end
+
   test "an owner, no actor, and a view-only render lock nothing" do
     grants = [ { permission: "posts.delete", scope: {} }, { permission: "trash.empty", scope: {} } ]
 

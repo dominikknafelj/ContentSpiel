@@ -361,6 +361,31 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
   end
 
+  # Final fix wave (Task 10 re-review, c): every refusal above is the
+  # ESCALATION check's. Here it has nothing to say -- the actor holds `{own:
+  # true}`, which covers `{[blog, retired], own: true}` -- and the posted grant
+  # is not the stored one read back (`#live`: its scope minus the removed name
+  # is `{[blog], own}`, not the entry's `{[blog]}`). So the stored `{[blog]}`
+  # counts as removed (narrowing is a removal), and the refusal comes from
+  # `#removal_refusal` alone: the actor couldn't hand out the group as it
+  # stands.
+  test "narrowing a grant that carries a removed type is refused by the removal check alone, for an actor the escalation check lets through" do
+    group = AccessControl::Group.create!(name: "Narrowed")
+    grant(group, "posts.edit", "content_types" => %w[blog retired])
+    grant(@manager_group, "posts.edit", "own" => true)
+    posted = { permission: "posts.edit", scope: { content_types: %w[blog retired], own: true } }
+
+    as(users(:editor_branch)) do
+      assert AccessControl.can_grant?(users(:editor_branch), "posts.edit", { "content_types" => %w[blog retired], "own" => true }), "the escalation check must have nothing to refuse"
+      assert_not AccessControl.can_manage_group?(users(:editor_branch), group)
+    end
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Narrowed", grants: [ posted ] })
+    end
+    assert_equal "groups.manage", Audit::Event.where(action: "access.denied").order(:id).last.metadata["permission"]
+  end
+
   # `LiveGrants` files a grant whose every type is gone under `dead`; the editor
   # never renders or submits it, so nothing of it is "carried".
   test "B: a dead grant's removed type can't be revived inside a wider live grant" do
