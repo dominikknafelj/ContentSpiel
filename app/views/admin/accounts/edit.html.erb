@@ -31,23 +31,18 @@
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch do %>
     <div class="mb-4">
-      <%= label_tag "current_password", "Current password", class: setup_label_class %>
-      <%= password_field_tag "current_password", nil, id: "current_password", required: true, autofocus: true,
-            autocomplete: "current-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
+            autocomplete: "current-password", autofocus: true) %>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "password", "New password", class: setup_label_class %>
-      <%= password_field_tag "password", nil, id: "password", required: true, maxlength: 72,
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true) %>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "password_confirmation", "Confirm new password", class: setup_label_class %>
-      <%= password_field_tag "password_confirmation", nil, id: "password_confirmation", required: true, maxlength: 72,
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password") %>
     </div>
 
-    <%= render Admin::ButtonComponent.new(label: "Change password", variant: :primary, type: "submit") %>
+    <%= render Admin::ButtonComponent.new(label: "Change password", variant: :primary, type: "submit", data: { password_submit: true }) %>
   <% end %>
 </div>

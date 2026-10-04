@@ -42,6 +42,16 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert users(:reader).reload.authenticate("password")
   end
 
+  test "a new password under 12 characters is refused with the rule's own message" do
+    sign_in_as(users(:reader))
+
+    patch "/cs-studio/account/password", params: { current_password: "password", password: "elevenchars", password_confirmation: "elevenchars" }
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert]", text: "Use at least 12 characters."
+    assert users(:reader).reload.authenticate("password")
+  end
+
   test "a success changes the password and signs out other sessions only" do
     user = users(:reader)
     other_session = user.sessions.create!

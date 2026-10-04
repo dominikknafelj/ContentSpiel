@@ -23,20 +23,17 @@
     </div>
 
     <div class="mb-4">
-      <%= label_tag "user_password", "Password", class: setup_label_class %>
-      <%= password_field_tag "user[password]", nil, id: "user_password", autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "Password", meter: true) %>
     </div>
 
     <div class="mb-4">
-      <%= label_tag "user_password_confirmation", "Confirm password", class: setup_label_class %>
-      <%= password_field_tag "user[password_confirmation]", nil, id: "user_password_confirmation",
-            autocomplete: "new-password", class: setup_input_class %>
+      <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
     </div>
 
     <%= render "admin/users/access_fields", user: @user %>
 
     <div class="flex gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Create user", variant: :primary, type: "submit") %>
+      <%= render Admin::ButtonComponent.new(label: "Create user", variant: :primary, type: "submit", data: { password_submit: true }) %>
       <%= link_to "Cancel", admin_users_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
     </div>
   <% end %>
