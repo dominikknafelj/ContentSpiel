@@ -21,6 +21,10 @@
 
   <div class="flex flex-col gap-3">
     <h2 class="text-h2 text-ink">Other permissions</h2>
-    <%= render Admin::GroupsScreen::ToggleListComponent.new(grants: toggle_grants, form_name: form_name) %>
+    <%= render Admin::GroupsScreen::ToggleListComponent.new(grants: toggle_grants, form_name: form_name, locked: locked_toggle_keys) %>
   </div>
+
+  <% if any_locked? %>
+    <p class="admin-locked-hint text-sm text-meta">A greyed tick is a permission you can't hand out yourself. It stays as it is; ask an owner to change it.</p>
+  <% end %>
 </div>

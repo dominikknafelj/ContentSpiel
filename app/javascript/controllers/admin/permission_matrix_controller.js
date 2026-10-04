@@ -18,6 +18,11 @@ import { Controller } from "@hotwired/stimulus"
 //   restriction, a chip with the type's dot per chosen type, "Own only",
 //   "Under <page>" per branch root ("A page you can't open" per kept one), at
 //   most three and then "+N", and a warn chip per removed content type.
+// - A LOCKED row (`data-locked`: a grant the viewer can't hand out, carried by hidden
+//   inputs) has no button and no editor and never reacts; a VIEW-ONLY form's
+//   toggle is an `<a role="button">` (a link survives the disabled fieldset that
+//   would disable a `<button>`), so `toggleEditor` cancels the link and also
+//   answers Space.
 // - Remove (a removed content type's chip) disables the carried hidden input
 //   -- a disabled control is not submitted, so that is the removal -- and
 //   announces it with a bubbling `change`, since a hidden input is invisible to
@@ -25,6 +30,7 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   connect() {
     this.rows.forEach((row) => {
+      if (row.hasAttribute("data-locked")) return
       const ticked = this.checkbox(row).checked
       this.button(row).hidden = !ticked
       this.setOpen(row, ticked && this.editor(row).dataset.open === "true")
@@ -44,7 +50,7 @@ export default class extends Controller {
   }
 
   button(row) {
-    return row.querySelector("button[aria-controls]")
+    return row.querySelector("[aria-controls][data-open-label]")
   }
 
   editor(row) {
@@ -61,6 +67,7 @@ export default class extends Controller {
   }
 
   toggleEditor(event) {
+    event.preventDefault()
     const row = event.currentTarget.closest("[data-permission]")
     const open = this.editor(row).hidden
     this.setOpen(row, open)
@@ -85,7 +92,7 @@ export default class extends Controller {
   }
 
   focusInto(row) {
-    this.editor(row).querySelector("input:not([type=hidden]):not(:disabled), button")?.focus()
+    this.editor(row).querySelector("input:not([type=hidden]):not(:disabled), button:not(:disabled)")?.focus()
   }
 
   // Something inside a scope editor changed (a box, the Own only switch).

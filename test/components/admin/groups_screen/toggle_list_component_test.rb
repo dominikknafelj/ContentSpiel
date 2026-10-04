@@ -43,6 +43,16 @@ class Admin::GroupsScreen::ToggleListComponentTest < ViewComponent::TestCase
     assert_no_selector "input[name='group[grants][posts.read][enabled]']"
   end
 
+  test "a locked toggle is a greyed disabled switch with the note, carried by a hidden enabled input; an unticked one is never locked" do
+    render_inline Admin::GroupsScreen::ToggleListComponent.new(grants: { "tags.manage" => {} }, locked: %w[tags.manage media.upload])
+
+    assert_selector "input.cs-toggle[type=checkbox][name='group[grants][tags.manage][enabled]'][checked][disabled]"
+    assert_selector "input[type=hidden][name='group[grants][tags.manage][enabled]'][value='1']", visible: :all
+    assert_selector ".admin-locked-note", text: "You can't grant this", count: 1
+    assert_selector "input[name='group[grants][media.upload][enabled]']:not([checked]):not([disabled])"
+    assert_no_selector "input[type=hidden][name='group[grants][media.upload][enabled]']", visible: :all
+  end
+
   private
 
   def keys_in(title) = page.find("section", text: /\A\s*#{title}/).all("code").map(&:text)

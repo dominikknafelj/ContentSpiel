@@ -5,10 +5,17 @@
       <% permissions.each do |permission| %>
         <label for="<%= field_id(permission) %>" class="flex cursor-pointer items-center justify-between gap-3 border-b border-line px-4 py-2 last:border-b-0">
           <span class="flex min-w-0 flex-col">
-            <span class="text-sm text-ink"><%= permission.label %></span>
+            <span class="text-sm <%= locked?(permission) ? "text-dim" : "text-ink" %>"><%= permission.label %></span>
             <code class="font-cs-mono text-xs text-meta" title="<%= permission.key %>"><%= permission.key %></code>
+            <% if locked?(permission) %><span id="<%= field_id(permission) %>-locked" class="admin-locked-note text-xs text-meta">You can't grant this</span><% end %>
           </span>
-          <%= check_box_tag field_name(permission), "1", ticked?(permission), id: field_id(permission), class: "cs-toggle", role: "switch" %>
+          <% if locked?(permission) %>
+            <%# Greyed and not submitted; the hidden input carries the grant. %>
+            <%= check_box_tag field_name(permission), "1", true, id: field_id(permission), class: "cs-toggle opacity-60", role: "switch", disabled: true, aria: { describedby: "#{field_id(permission)}-locked" } %>
+            <%= hidden_field_tag field_name(permission), "1", id: nil %>
+          <% else %>
+            <%= check_box_tag field_name(permission), "1", ticked?(permission), id: field_id(permission), class: "cs-toggle", role: "switch" %>
+          <% end %>
         </label>
       <% end %>
     </section>

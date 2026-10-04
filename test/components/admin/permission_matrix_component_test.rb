@@ -51,4 +51,54 @@ class Admin::PermissionMatrixComponentTest < ViewComponent::TestCase
     AccessControl::Permissions.reset!
     AccessControl::BuiltIns.register
   end
+
+  # --- Locked ticks and view-only (round 3 Task 11) ---------------------------------
+
+  def viewer_holding(grants)
+    user = User.create!(email_address: "viewer-#{SecureRandom.hex(3)}@example.org", password: "a-long-enough-password")
+    group = AccessControl::Group.create!(name: "Held #{SecureRandom.hex(3)}")
+    grants.each { |permission, scope| group.grants.create!(permission: permission, scope: scope) }
+    AccessControl::Membership.create!(user: user, group: group)
+    user
+  end
+
+  def matrix_for(viewer, grants, **options)
+    as(viewer) { render_inline Admin::PermissionMatrixComponent.new(grants: grants, **options) }
+  end
+
+  test "for a non-owner, exactly the ticked rows and toggles they couldn't hand out are locked; the note under the matrix appears" do
+    viewer = viewer_holding("posts.read" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "tags.manage" => {})
+
+    matrix_for(viewer, [
+      { permission: "posts.read", scope: {} },
+      { permission: "posts.edit", scope: { "content_types" => %w[blog now_update] } },
+      { permission: "posts.delete", scope: {} },
+      { permission: "tags.manage", scope: {} },
+      { permission: "trash.empty", scope: {} }
+    ])
+
+    assert_selector "[data-locked]", count: 2 # posts.edit (wider than held) and posts.delete (not held)
+    assert_selector "[data-permission='posts.edit'][data-locked]"
+    assert_selector "[data-permission='posts.delete'][data-locked]"
+    assert_selector "[data-permission='posts.read']:not([data-locked]) button", text: "Edit scope", visible: :all
+    assert_selector "input[type=checkbox][name='group[grants][trash.empty][enabled]'][disabled]"
+    assert_selector "input[type=checkbox][name='group[grants][tags.manage][enabled]']:not([disabled])"
+    assert_selector ".admin-locked-hint"
+  end
+
+  test "an owner, no actor, and a view-only render lock nothing" do
+    grants = [ { permission: "posts.delete", scope: {} }, { permission: "trash.empty", scope: {} } ]
+
+    matrix_for(users(:one), grants)
+    assert_no_selector "[data-locked]"
+    assert_no_selector ".admin-locked-hint"
+
+    render_inline Admin::PermissionMatrixComponent.new(grants: grants)
+    assert_no_selector "[data-locked]"
+
+    matrix_for(viewer_holding({}), grants, view_only: true)
+    assert_no_selector "[data-locked]"
+    assert_selector "a[role=button]", text: "View scope", visible: :all
+    assert_no_selector "button", text: "Edit scope", visible: :all
+  end
 end

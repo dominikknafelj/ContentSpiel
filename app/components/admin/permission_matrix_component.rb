@@ -34,10 +34,30 @@ module Admin
   # -- and a grant whose only roots were unreadable doesn't turn into an
   # unscoped one.
   #
+  # LOCKED TICKS (round 3 Task 11, D15). In an editable form, a ticked grant the
+  # viewer couldn't hand out themselves (`AccessControl.can_grant?` false -- an
+  # owner can always) is drawn locked: greyed, "You can't grant this", no scope
+  # editor, and carried by hidden inputs holding the whole scope as stored
+  # (`PermissionRowComponent`), so a form saved as rendered changes nothing. The
+  # answer is asked ONCE per ticked permission (a row is one grant), only for a
+  # non-owner (an owner asks nothing), on the scope the form carries -- so a grant
+  # holding a content type that no longer exists, which the viewer's own grant
+  # doesn't name, is locked too (they could not hand out that name; the group as a
+  # whole is still one they may manage, `AccessControl.can_manage_group?` reads the
+  # live scope) -- and costs at most one closure-table query for a pages row
+  # (`can_grant?` resolves its page ids), never one per page in the tree or per
+  # member. After a refused save (422) the posted grants are asked the same way, so
+  # a re-render never offers an editor for a grant the viewer couldn't hand out. `Groups::Save` still decides every write; this is
+  # only what the form shows and carries. `view_only:` is a group the viewer can't
+  # manage at all: no locks (the whole form is disabled anyway) and the rows' scope
+  # toggle becomes a link that survives the disabled fieldset.
+  #
   # Showing and hiding the editors and rewriting the chips is
   # `admin--permission-matrix`; the tri-state tree is `admin--branch-picker`.
   class PermissionMatrixComponent < AdminComponent
-    def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default, open_keys: [], tree: nil)
+    def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default, open_keys: [], tree: nil, view_only: false)
+      @view_only = view_only
+      @locked = {}
       @grants = Array(grants).to_h { |grant| [ grant[:permission].to_s, grant[:scope].to_h.stringify_keys ] }
       @stale = stale
       @form_name = form_name
@@ -57,8 +77,23 @@ module Admin
 
     def row_for(permission)
       GroupsScreen::PermissionRowComponent.new(permission: permission, scope: @grants[permission.key], tree: permission.scopes.include?(:branch) ? tree : nil,
-        open: @open_keys.include?(permission.key), form_name: form_name)
+        open: @open_keys.include?(permission.key), form_name: form_name, locked: locked?(permission), view_only: @view_only)
     end
+
+    # See "LOCKED TICKS" above. Memoised per key: the rows and the footnote ask.
+    def locked?(permission)
+      # No actor is the trusted console/preview case (the checker lets it through).
+      return false if @view_only || Current.actor.nil? || !@grants.key?(permission.key)
+
+      @locked.fetch(permission.key) do
+        @locked[permission.key] = !AccessControl.owner?(Current.actor) &&
+          !AccessControl.can_grant?(Current.actor, permission.key, @grants[permission.key])
+      end
+    end
+
+    def any_locked? = AccessControl::Permissions.all.any? { |permission| locked?(permission) }
+
+    def locked_toggle_keys = AccessControl::Permissions.all.select { |permission| permission.scopes.empty? && locked?(permission) }.map(&:key)
 
     # Notes about what saving will drop, for one permission. A removed content
     # type is not among them (it is a chip, `PermissionRowComponent`).

@@ -101,7 +101,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_select "input[type=checkbox][name='group[grants][posts.edit][own]'][checked]"
     assert_select "input[type=checkbox][name='group[grants][posts.edit][content_types][]'][value=blog][checked]"
     assert_select "input[type=checkbox][name='group[grants][posts.delete][enabled]']:not([checked])"
-    assert_select "input[type=checkbox][name='group[member_ids][]'][value='#{users(:author).id}'][checked]"
+    assert_select "input[type=hidden][name='group[member_ids][]'][value='#{users(:author).id}']"
 
     patch "/cs-studio/groups/#{group.id}", params: { group: {
       name: "Bloggers", description: "",
@@ -144,7 +144,8 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     group = access_control_groups(:read_only)
 
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "button", text: "Delete group", count: 0
+    assert_select "button", text: /Delete group/, count: 0
+    assert_select ".admin-delete-zone", text: "A built-in group can be changed but not deleted."
 
     delete "/cs-studio/groups/#{group.id}"
     assert_redirected_to "/cs-studio/groups/#{group.id}/edit"
@@ -160,7 +161,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "dialog#delete-group-#{group.id}" do
-      assert_select "*", text: /revokes 1 token/
+      assert_select "*", text: /its 1 AI token is revoked/
       assert_select "li", text: /#{Regexp.escape(token.name)} — .*#{Regexp.escape(users(:reader).email_address)}/
     end
 

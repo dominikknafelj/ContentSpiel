@@ -154,4 +154,49 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_equal ids.uniq, ids
     assert(ids.all? { |id| id.include?("posts-read") })
   end
+
+  def locked_row(key, scope, tree: nil)
+    render_inline Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch(key), scope: scope, tree: tree || tree_for([]), locked: true)
+  end
+
+  test "a locked row: greyed disabled tick, the note, the chips, no Edit scope and no editor -- and the grant carried by hidden inputs" do
+    locked_row("posts.edit", { "content_types" => %w[blog retired_type], "own" => true })
+
+    assert_selector "[data-permission='posts.edit'][data-locked]"
+    assert_selector "input[type=checkbox][name='group[grants][posts.edit][enabled]'][checked][disabled]"
+    assert_selector ".admin-locked-note", text: "You can't grant this"
+    assert_selector "[data-chips] .admin-scope-chip", text: "Blog"
+    assert_no_selector "button", visible: :all
+    assert_no_selector "[data-scope-editor]", visible: :all
+    assert_selector "input[type=hidden][name='group[grants][posts.edit][enabled]'][value='1']", visible: :all
+    assert_selector "input[type=hidden][name='group[grants][posts.edit][content_types][]'][value=blog]", visible: :all
+    assert_selector "input[type=hidden][name='group[grants][posts.edit][content_types][]'][value=retired_type]", visible: :all
+    assert_selector "input[type=hidden][name='group[grants][posts.edit][own]'][value='1']", visible: :all
+  end
+
+  test "a locked pages row carries every stored root as it is, an unreadable one and a redundant one included" do
+    a = create_page(title: "Branch A")
+    a1 = create_page(title: "Leaf", parent: a)
+    locked_row("pages.edit", { "page_ids" => [ a.id, a1.id, 999_999 ] }, tree: tree_for([ a, a1 ]))
+
+    [ a.id, a1.id, 999_999 ].each do |id|
+      assert_selector "input[type=hidden][name='group[grants][pages.edit][page_ids][]'][value='#{id}']", visible: :all
+    end
+    assert_no_selector "input[type=checkbox][name$='[page_ids][]']", visible: :all
+  end
+
+  test "a locked row that isn't ticked is just an unticked row" do
+    render_inline Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch("posts.edit"), scope: nil, tree: tree_for([]), locked: true)
+
+    assert_no_selector "[data-locked]"
+    assert_selector "button", text: "Edit scope", visible: :all
+  end
+
+  test "view-only: the scope toggle is a link (a disabled fieldset leaves it alone), not a button, and the editor is still there to read" do
+    render_inline Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch("posts.edit"), scope: { "content_types" => [ "blog" ] }, tree: tree_for([]), view_only: true)
+
+    assert_selector "a[role=button][aria-controls='scope-editor-posts-edit'][aria-expanded='false']", text: "View scope", visible: :all
+    assert_no_selector "button", visible: :all
+    assert_selector "[data-scope-editor] input[type=checkbox][value=blog][checked]", visible: :all
+  end
 end

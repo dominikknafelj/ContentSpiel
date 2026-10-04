@@ -1,20 +1,36 @@
-<div class="admin-permission-row border-b border-line" data-permission="<%= permission.key %>" id="permission-row-<%= slug %>">
+<div class="admin-permission-row border-b border-line" data-permission="<%= permission.key %>" <%= "data-locked" if locked? %> id="permission-row-<%= slug %>">
   <div class="grid grid-cols-[1.25rem_minmax(7rem,12rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
     <%# The accessible name is the registry's full label ("Edit pages"): the short label is only what a row under a "Pages" heading needs to say. %>
-    <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: permission.label },
-          data: { action: "change->admin--permission-matrix#toggle" }) %>
-    <label for="<%= checkbox_id %>" class="flex min-w-0 cursor-pointer flex-col">
-      <span class="text-ink"><%= short_label %></span>
+    <% if locked? %>
+      <%# Greyed, ticked, disabled: it is not submitted, so the hidden inputs below are what carries the grant. %>
+      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: true, disabled: true, id: checkbox_id,
+            aria: { label: permission.label, describedby: "#{checkbox_id}-locked" }, class: "opacity-60") %>
+      <% carried_inputs.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
+    <% else %>
+      <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: permission.label },
+            data: { action: "change->admin--permission-matrix#toggle" }) %>
+    <% end %>
+    <label for="<%= checkbox_id %>" class="flex min-w-0 <%= locked? ? "cursor-default" : "cursor-pointer" %> flex-col">
+      <span class="<%= locked? ? "text-dim" : "text-ink" %>"><%= short_label %></span>
       <code class="font-cs-mono text-xs text-meta" title="<%= permission.key %>"><%= permission.key %></code>
+      <% if locked? %><span id="<%= checkbox_id %>-locked" class="admin-locked-note text-xs text-meta">You can't grant this</span><% end %>
     </label>
     <div class="flex min-w-0 flex-wrap items-center gap-1.5" data-chips>
       <% chips.each do |chip| %>
         <span class="<%= chip_class(chip) %>"><% if chip.dot %><span aria-hidden="true" class="h-[7px] w-[7px] shrink-0 rounded-full <%= chip.dot %>"></span><% end %><%= chip.label %></span>
       <% end %>
     </div>
-    <button type="button" class="px-0.5 py-1 text-sm font-medium text-accent hover:text-accent-hover" <%= "hidden" unless ticked? %>
-      aria-expanded="<%= open? %>" aria-controls="<%= editor_id %>" data-open-label="Done" data-closed-label="Edit scope"
-      data-action="click->admin--permission-matrix#toggleEditor"><%= open? ? "Done" : "Edit scope" %></button>
+    <% if locked? %>
+      <span></span>
+    <% elsif view_only? %>
+      <a href="#<%= editor_id %>" role="button" class="px-0.5 py-1 text-sm font-medium text-accent hover:text-accent-hover" <%= "hidden" unless ticked? %>
+         aria-expanded="<%= open? %>" aria-controls="<%= editor_id %>" data-open-label="Hide scope" data-closed-label="View scope"
+         data-action="click->admin--permission-matrix#toggleEditor keydown.space->admin--permission-matrix#toggleEditor"><%= open? ? "Hide scope" : "View scope" %></a>
+    <% else %>
+      <button type="button" class="px-0.5 py-1 text-sm font-medium text-accent hover:text-accent-hover" <%= "hidden" unless ticked? %>
+        aria-expanded="<%= open? %>" aria-controls="<%= editor_id %>" data-open-label="Done" data-closed-label="Edit scope"
+        data-action="click->admin--permission-matrix#toggleEditor"><%= open? ? "Done" : "Edit scope" %></button>
+    <% end %>
   </div>
-  <%= render editor %>
+  <% unless locked? %><%= render editor %><% end %>
 </div>

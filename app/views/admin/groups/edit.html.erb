@@ -1,38 +1,14 @@
-<%# Editing a group, plus its delete (access-control design spec §3.2/§5):
-    built-in groups have none. The confirmation names every active token
-    the delete revokes (`Groups::Destroy`). %>
+<%# Editing a group (access-control design spec §5, round 3 Task 11): the form,
+    then -- for a custom group the viewer can manage -- the delete zone and the
+    confirm dialog that names the active tokens `Groups::Destroy` revokes, both
+    outside the form (forms don't nest). A built-in group shows the note in the
+    zone's place; a group the viewer can only view shows neither. %>
 <% content_for :title, @group.name_was.presence || "Group" %>
-<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-  <h1 class="text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
+<h1 class="mb-4 text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
 
-  <% unless @group.built_in? %>
-    <% dialog_id = "delete-group-#{@group.id}" %>
-    <% tokens = @group.api_tokens.active.includes(:user).order(:id).to_a %>
-    <%= render Admin::ButtonComponent.new(label: "Delete group", variant: :danger_text, type: "button",
-          data: dialog_trigger(dialog_id)) %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete the group “#{@group.name_was}”?",
-          body: tokens.empty? ? "Its members lose its permissions. This can't be undone." : "Its members lose its permissions, and deleting it revokes #{pluralize(tokens.size, "token")}. Any assistant using one stops working immediately. This can't be undone.") do |dialog| %>
-      <% if tokens.any? %>
-        <% dialog.with_details do %>
-          <ul class="list-disc pl-5">
-            <% tokens.each do |token| %>
-              <li><%= token.name %> — <%= render Admin::UserNameComponent.new(user: token.user, user_id: token.user_id) %></li>
-            <% end %>
-          </ul>
-        <% end %>
-      <% end %>
-      <% dialog.with_confirm_action do %>
-        <%= form_with url: admin_group_path(@group, **admin_url_options), method: :delete, data: { turbo_frame: "_top" } do %>
-          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
-        <% end %>
-      <% end %>
-    <% end %>
-  <% end %>
-</div>
-
-<% if @group.built_in? %>
-  <p class="mb-4 text-meta">A built-in group: you can change it, but not delete it.</p>
-<% end %>
-
-<%= render "admin/groups/form", group: @group, grants: @grants, stale: @stale,
+<%= render "admin/groups/form", group: @group, grants: @grants, stale: @stale, members: @members, view_only: @view_only,
       url: admin_group_path(@group, **admin_url_options), method: :patch %>
+
+<% unless @view_only %>
+  <%= render Admin::GroupsScreen::DeleteZoneComponent.new(group: @group, member_count: @member_count, tokens: @tokens, url_options: admin_url_options) %>
+<% end %>

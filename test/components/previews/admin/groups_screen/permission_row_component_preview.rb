@@ -12,6 +12,18 @@ module Admin
           scope: { "content_types" => %w[blog now_update retired_type], "own" => true }, open: true)
       end
 
+      # A grant the viewer couldn't hand out: greyed, carried, no Edit scope.
+      def locked
+        render Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch("posts.edit"),
+          scope: { "content_types" => %w[blog retired_type], "own" => true }, locked: true)
+      end
+
+      # A group the viewer can only view: the scope toggle is a link.
+      def view_only
+        render Admin::GroupsScreen::PermissionRowComponent.new(permission: AccessControl::Permissions.fetch("posts.edit"),
+          scope: { "content_types" => %w[blog now_update] }, view_only: true)
+      end
+
       def pages_tree
         home = PreviewFixtures.page(title: "Home")
         about = home.children.create!(page_type: :standard, title: "About #{SecureRandom.hex(4)}", published_at: Time.current)
