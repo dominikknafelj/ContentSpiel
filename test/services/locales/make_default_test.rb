@@ -18,7 +18,7 @@ class Locales::MakeDefaultTest < ActiveSupport::TestCase
     assert_equal [ "en", "de" ], event.field_changes["default_locale"]
     assert_equal "de", event.metadata["code"]
     assert_equal site, event.subject
-    assert page.reload
+    assert_equal %w[en es], Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale).sort, "the states were rebuilt for the new default"
   end
 
   def state_of(record, locale) = Translations::State.find_by(record_type: record.class.polymorphic_name, record_id: record.id, locale: locale)&.state
@@ -62,5 +62,38 @@ class Locales::MakeDefaultTest < ActiveSupport::TestCase
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "languages.manage", scope: {})
     assert as(users(:editor_branch)) { Locales::MakeDefault.call("de") }.ok?
     assert_equal "de", Current.site.reload.default_locale
+  end
+
+  test "a supported but disabled language is refused, and nothing stays assigned on the shared site" do
+    Current.site.update_columns(locales: [ { "code" => "en" }, { "code" => "de" } ])
+    site = Current.site.reload
+
+    result = as_owner { Locales::MakeDefault.call("es") }
+
+    assert_not result.ok?
+    assert_equal [ "es isn't an enabled language" ], result.errors
+    assert_equal "en", site.default_locale
+    assert_not site.changed?
+  end
+
+  test "a blank code asks for an enabled language" do
+    result = as_owner { Locales::MakeDefault.call("") }
+
+    assert_equal [ "Choose an enabled language" ], result.errors
+  end
+
+  test "a failed save restores the default and the carried title on the shared site" do
+    Current.site.update_columns(title: { "en" => "Test Site" })
+    site = Current.site.reload
+    # A row invalid for an unrelated reason makes the save fail after the
+    # model has already carried the title across.
+    site.update_columns(locales: [ { "code" => "en", "fallbacks" => [ "fr" ] }, { "code" => "de" } ])
+
+    result = as_owner { Locales::MakeDefault.call("de") }
+
+    assert_not result.ok?
+    assert_equal "en", site.default_locale
+    assert_nil site.read_attribute(:title)["de"]
+    assert_not site.changed?, site.changes.inspect
   end
 end

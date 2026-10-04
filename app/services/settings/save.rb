@@ -58,7 +58,11 @@ module Settings
       @ai_key_given = @attributes.key?(:ai_api_key)
       @new_ai_key = @attributes.delete(:ai_api_key).to_s.strip.presence
 
-      @translations = translations.to_h
+      # Only the translated keys count, and a language left with none is
+      # dropped: `{ "en" => {} }` is no site part, so a languages-only call
+      # carrying it still needs only `languages.manage`.
+      @translations = translations.to_h.transform_values { |values| values.to_h.symbolize_keys.slice(*TRANSLATED) }
+        .reject { |_locale, values| values.empty? }
       @languages = languages
       @actor = actor
     end
@@ -69,41 +73,49 @@ module Settings
       if site_part? && !authorize!("settings.manage", @site)
         return denied("settings.manage", @site)
       end
-      if (@languages || @attributes.key?(:locales)) && !authorize!("languages.manage", @site)
+      if languages_part? && !authorize!("languages.manage", @site)
         return denied("languages.manage", @site)
       end
 
-      assign
-      logo_changing = @site.attachment_changes.key?("logo")
+      if site_part?
+        assign
+        logo_changing = @site.attachment_changes.key?("logo")
+      end
 
       language_errors = []
       saved = SiteSetting.transaction do
-        @site.save || raise(ActiveRecord::Rollback)
-        ai_key_change = write_ai_key if @ai_key_given
-        # A new default language (or a changed language list) changes what
-        # every record's state is relative to; anything else only the
-        # site's own title and tagline (`translation_states`).
-        locales_changed = @site.saved_change_to_default_locale? || @site.saved_change_to_locales?
+        # A languages-only call never touches the site fields: saving the row
+        # first would run its validations (a row invalid for an unrelated
+        # reason would block a reorder with errors this actor can't fix),
+        # normalise columns and record a `settings.updated` for an actor who
+        # may not hold `settings.manage`.
+        if site_part?
+          @site.save || raise(ActiveRecord::Rollback)
+          ai_key_change = write_ai_key if @ai_key_given
+          # A new default language (or a changed language list through the
+          # wizard's `attributes`) changes what every record's state is
+          # relative to; anything else only the site's own title and tagline
+          # (`translation_states`). The `languages:` path can't change the set
+          # of codes (`Locales::Configure` refuses that), so a reorder or a
+          # fallback change never rebuilds the whole index.
+          locales_changed = @site.saved_change_to_default_locale? || @site.saved_change_to_locales?
 
-        # The settings event is built from THIS save's changes, before the
-        # languages write below saves the row a second time (which replaces
-        # `saved_changes`).
-        changes = Audit::Snapshot.field_changes_for(@site)
-        changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
-        changes["AI key"] = ai_key_change if ai_key_change
-        record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
+          # The settings event is built from THIS save's changes, before the
+          # languages write below saves the row a second time (which replaces
+          # `saved_changes`).
+          changes = Audit::Snapshot.field_changes_for(@site)
+          changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
+          changes["AI key"] = ai_key_change if ai_key_change
+          record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
+        end
 
         if @languages
           language_errors = Locales::Configure.new(@languages, actor: @actor).apply(@site)
           raise ActiveRecord::Rollback if language_errors.any?
-
-          locales_changed ||= @site.saved_change_to_locales?
         end
 
-        if locales_changed
-          Translations::StateIndex.rebuild_all
-        else
-          Translations::StateIndex.refresh(@site)
+        if site_part?
+          locales_changed ? Translations::StateIndex.rebuild_all : Translations::StateIndex.refresh(@site)
         end
         true
       end
@@ -147,6 +159,16 @@ module Settings
     # always meant a settings save); false for a call that is only `languages:`.
     def site_part?
       @languages.nil? || @attributes.any? || @ai_key_given || @translations.any?
+    end
+
+    # Whether the call needs `languages.manage`: the order (`languages:`), the
+    # wizard's `locales`, or a CHANGED default language. The default is a
+    # `Locales::MakeDefault` matter in CS Studio (it needs `languages.manage`),
+    # so a `settings.manage`-only actor can't reach the same write through
+    # here, even if a controller ever permitted the field.
+    def languages_part?
+      @languages || @attributes.key?(:locales) ||
+        (@attributes.key?(:default_locale) && @attributes[:default_locale].to_s != @site.default_locale.to_s)
     end
 
     def assign

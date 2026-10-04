@@ -38,15 +38,20 @@ module Locales
       success(site)
     end
 
-    # The write itself, minus the permission check and the transaction: what
+    # The write itself, minus the transaction: what
     # `Settings::Save` runs inside ITS transaction when one save carries the
     # language order as well as site fields (decision D5), so the two are
     # all-or-nothing and no second top-level transaction commits on its own.
-    # The caller has already authorized `languages.manage` (and answers a
-    # denial itself, as the one `access.denied`), and rolls back when this
-    # returns errors. Still records `language.configured`, and only when
+    # It exists ONLY to run inside another service's transaction, which rolls
+    # back when this returns errors. It fails closed: it checks
+    # `languages.manage` itself and answers a refusal as an error WITHOUT
+    # recording an `access.denied` -- the caller has already authorized (and
+    # answers a denial itself, as the one event), so this never fires there.
+    # Still records `language.configured`, and only when
     # something changed. Returns the errors, empty on success.
     def apply(site)
+      return [ "You don't have permission to #{AccessControl::Permissions.fetch("languages.manage").label.downcase}" ] unless authorize!("languages.manage", site)
+
       # A code this call doesn't already recognize as enabled -- an
       # attempt to sneak `Enable`/`Disable` in through this endpoint
       # instead, or a stale form submitted after another tab already

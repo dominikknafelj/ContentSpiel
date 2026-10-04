@@ -226,4 +226,61 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert_not_includes event.field_changes.keys, "ai_api_key_saved_at"
     assert_not_includes event.to_json, "sk-test-1"
   end
+
+  test "an empty per-language hash is no site part: a languages-only actor still succeeds" do
+    grant_to_branch_editors("languages.manage")
+
+    result = as(users(:editor_branch)) do
+      Settings::Save.call(Current.site, translations: { "en" => {}, "de" => { logo: nil } }, languages: reorder("de", "en", "es"))
+    end
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[de en es], Current.site.reload.locale_codes
+  end
+
+  test "a reorder does not rebuild the whole translation index" do
+    create_page(title: "About")
+    rebuilt = false
+    with_singleton_override(Translations::StateIndex, :rebuild_all, -> { rebuilt = true }) do
+      assert as_owner { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }.ok?
+      assert as_owner { Settings::Save.call(Current.site, translations: { "en" => { tagline: "T" } }, languages: reorder("en", "de", "es")) }.ok?
+    end
+
+    assert_not rebuilt
+  end
+
+  test "a languages-only call leaves the site row alone: an unrelated invalid value neither blocks it nor is saved over" do
+    grant_to_branch_editors("languages.manage")
+    Current.site.update_columns(time_zone: "Nowhere/Land")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }
+
+    assert result.ok?, result.errors.inspect
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "changing the default language through attributes needs languages.manage" do
+    grant_to_branch_editors("settings.manage")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { default_locale: "de" }) }
+
+    assert result.denied?
+    assert_equal "en", Current.site.reload.default_locale
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_equal "languages.manage", Audit::Event.find_by!(action: "access.denied").metadata["permission"]
+
+    # Resending the stored default is no change, so settings.manage suffices.
+    assert as(users(:editor_branch)) { Settings::Save.call(Current.site, attributes: { default_locale: "en" }) }.ok?
+  end
+
+  test "an API token actor on languages: is judged on its effective rights" do
+    token = ApiToken.generate!(users(:one), group: access_control_groups(:admin)).first
+    result = as(token, channel: :mcp) { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }
+    assert result.ok?, result.errors.inspect
+
+    token = ApiToken.generate!(users(:one), group: access_control_groups(:read_only)).first
+    result = as(token, channel: :mcp) { Settings::Save.call(Current.site, languages: reorder("es", "de", "en")) }
+    assert result.denied?
+    assert_equal %w[de en es], Current.site.reload.locale_codes
+  end
 end

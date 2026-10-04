@@ -29,6 +29,7 @@ module Locales
 
       # Asking for what is already true is a no-op success, like `Enable`.
       return success(site) if site.default_locale.to_s == @code
+      return failure(site, "Choose an enabled language") if @code.blank?
       return failure(site, "#{@code} isn't an enabled language") unless site.locale_codes.include?(@code)
 
       site.default_locale = @code
@@ -40,7 +41,15 @@ module Locales
           field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
         true
       end
-      return failure(site) unless saved
+      unless saved
+        # The model object is `Current.site`, shared for the rest of the
+        # request: take the messages, then reload, which drops the default and the carried
+        # title/tagline that were only assigned in memory (`restore_attributes`
+        # doesn't reach Mobility's jsonb values).
+        errors = site.errors.full_messages
+        site.reload
+        return failure(site, errors)
+      end
 
       success(site)
     end
