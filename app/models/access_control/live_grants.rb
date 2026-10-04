@@ -27,8 +27,23 @@ module AccessControl
   # Scopes come out normalized (`.normalize_scope`) so two spellings of
   # the same scope compare equal.
   class LiveGrants
-    Entry = Data.define(:permission, :scope, :removed) do
+    # `gone_types`: the content types taken out of `scope` because they are no
+    # longer registered, by name. The editor shows each as a warn chip and
+    # CARRIES it (`#carried_attributes`) until its Remove is pressed, so a form
+    # saved as rendered changes nothing (`Groups::Save#live`).
+    Entry = Data.define(:permission, :scope, :removed, :gone_types) do
       def attributes = { permission: permission, scope: scope }
+
+      # `attributes`, with the removed content types put back: what the editor
+      # renders (and so submits) for this grant.
+      def carried_attributes
+        return attributes if gone_types.empty?
+
+        { permission: permission, scope: scope.merge("content_types" => (scope.fetch("content_types", []) + gone_types).sort) }
+      end
+
+      # The removed values that are not content types, as notes.
+      def removed_notes = removed.grep_v(/\Acontent type /)
     end
     Dead = Data.define(:permission, :removed)
 
@@ -70,6 +85,10 @@ module AccessControl
 
     def attributes = entries.map(&:attributes)
 
+    # What the group editor renders: the live scope plus any removed content
+    # types, carried (see `Entry#carried_attributes`).
+    def carried_attributes = entries.map(&:carried_attributes)
+
     def entry_for(key) = entries.find { |entry| entry.permission == key }
     def dead_for(key) = dead.select { |grant| grant.permission == key }
 
@@ -80,11 +99,13 @@ module AccessControl
 
       scope = self.class.normalize_scope(grant.scope)
       removed = []
+      gone_types = []
       alive = true
 
       if scope.key?("content_types")
         gone = scope["content_types"].reject { |name| @content_types.include?(name) }
         removed += gone.map { |name| "content type “#{name}” (no longer exists)" }
+        gone_types = gone
         scope["content_types"] -= gone
         alive &&= scope["content_types"].any?
       end
@@ -99,7 +120,7 @@ module AccessControl
       alive &&= (scope.keys - %w[content_types page_ids own]).empty?
 
       if alive
-        @entries << Entry.new(permission: grant.permission, scope: scope, removed: removed)
+        @entries << Entry.new(permission: grant.permission, scope: scope, removed: removed, gone_types: gone_types)
       else
         @dead << Dead.new(permission: grant.permission, removed: removed)
       end

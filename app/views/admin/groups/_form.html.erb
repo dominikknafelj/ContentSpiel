@@ -1,6 +1,8 @@
 <%# The group editor (access-control design spec §5): name, description,
-    members and the permission matrix. Members send a blank first value so
+    members and the permission rows (up to 1000px wide, left-aligned: round 3
+    Task 10). Members send a blank first value so
     an empty list still arrives as one. %>
+<div class="max-w-[1000px]">
 <%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
 <%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data(dirty: group.errors.any?, always: group.new_record?) do %>
@@ -34,10 +36,10 @@
     </div>
   </fieldset>
 
-  <h2 class="mb-2 text-h2 text-ink">Permissions</h2>
   <div class="mb-6">
-    <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale) %>
+    <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale, open_keys: @open_keys || []) %>
   </div>
 
   <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: "Save") %>
 <% end %>
+</div>

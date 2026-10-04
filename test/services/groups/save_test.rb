@@ -236,6 +236,50 @@ class Groups::SaveTest < ActiveSupport::TestCase
       group.grants.reload.order(:permission).map { |g| [ g.permission, g.scope ] }
   end
 
+  # Round 3 (Task 10): the editor now CARRIES a removed content type
+  # (a hidden input, until the editor presses Remove) so an untouched save
+  # changes nothing -- the carried value is a dead scope value, not a change.
+  test "an unchanged save that carries a removed content type changes nothing, even for a non-owner" do
+    group = AccessControl::Group.create!(name: "Carrying")
+    grant(group, "posts.edit", "content_types" => %w[blog retired_type], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    AccessControl::Membership.create!(user: users(:author), group: group) # a member the manager can't hand to
+    carried = group.grants.map { |g| { permission: g.permission, scope: g.scope } }
+
+    assert_no_difference -> { Audit::Event.count } do
+      result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Carrying", grants: carried }) }
+      assert result.ok?, result.errors.inspect
+    end
+    assert_equal [ { "content_types" => %w[blog retired_type], "own" => true } ], group.grants.reload.map(&:scope)
+  end
+
+  test "dropping the carried removed type is the explicit change, and narrowing is not charged for it" do
+    group = AccessControl::Group.create!(name: "Dropping")
+    grant(group, "posts.edit", "content_types" => %w[blog retired_type])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Dropping", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog] } } ] })
+    end
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ { "content_types" => %w[blog] } ], group.grants.reload.map(&:scope)
+    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
+  end
+
+  test "a carried removed type does not let a non-owner widen a grant they can't hand out" do
+    group = AccessControl::Group.create!(name: "Widening")
+    grant(group, "posts.edit", "content_types" => %w[blog retired_type])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Widening", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog now_update retired_type] } } ] })
+    end
+
+    assert result.denied?
+    assert_equal [ { "content_types" => %w[blog retired_type] } ], group.grants.reload.map(&:scope)
+  end
+
   private
 
   def grant(group, permission, scope = {})

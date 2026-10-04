@@ -16,7 +16,9 @@ module Admin
 
     def index
       @groups = AccessControl::Group.order(:name)
+      # One grouped query each, however many groups: never a count per row.
       @member_counts = AccessControl::Membership.group(:group_id).count
+      @token_counts = ApiToken.active.group(:group_id).count
     end
 
     def new
@@ -30,7 +32,9 @@ module Admin
 
     def edit
       @stale = AccessControl::LiveGrants.new(@group.grants.to_a)
-      @grants = @stale.attributes
+      # What the editor shows -- and so submits: the live values plus a removed
+      # content type, carried until Remove (`LiveGrants::Entry#carried_attributes`).
+      @grants = @stale.carried_attributes
     end
 
     def update
@@ -65,6 +69,8 @@ module Admin
         forbidden_or(result) do
           @group = result.record
           @grants = attributes[:grants]
+          @stale = AccessControl::LiveGrants.new(@group.grants.to_a) if @group.persisted?
+          @open_keys = open_keys_from(result)
           @member_ids = attributes[:member_ids].map(&:to_i)
           render template, status: :unprocessable_entity
         end
@@ -100,12 +106,22 @@ module Admin
 
         scope = {}
         types = Array(values["content_types"]).compact_blank
-        scope["content_types"] = types if permission.scopes.include?(:content_type) && types.any?
+        # A removed type is carried by the editor (`ScopeEditorComponent`) but
+        # means nothing on its own: with no live type ticked the editor says "all
+        # content types", so a scope of only carried ones would instead match
+        # nothing. Read that as the editor shows it.
+        scope["content_types"] = types if permission.scopes.include?(:content_type) && (types & AccessControl::Permissions.content_type_choices).any?
         scope["own"] = true if permission.scopes.include?(:own) && values["own"] == "1"
         page_ids = Array(values["page_ids"]).compact_blank
         scope["page_ids"] = page_ids.map { |id| AccessControl::LiveGrants.integer_or_self(id) } if permission.scopes.include?(:branch) && page_ids.any?
         { permission: permission.key, scope: scope }
       end
+    end
+
+    # After a refusal, the rows whose editor should start open: the ones an
+    # error names ("posts.edit: ..."), so the editor sees what was refused.
+    def open_keys_from(result)
+      result.record.errors.full_messages.filter_map { |message| message[/\A([a-z0-9_\/]+\.[a-z0-9_]+):/, 1] }
     end
 
     # For the editor: every user, for the members list.

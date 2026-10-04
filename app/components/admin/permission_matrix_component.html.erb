@@ -3,73 +3,24 @@
     <p class="admin-stale-grant rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-warn-ink"><%= note %></p>
   <% end %>
 
-  <% areas.each do |area, permissions| %>
-    <fieldset class="rounded-cs border border-line p-4">
-      <legend class="px-1 font-cs-mono text-label uppercase tracking-mono text-meta"><%= area %></legend>
-
-      <div class="flex flex-col gap-3">
-        <% permissions.each do |permission| %>
-          <% scope = scope_for(permission) %>
-          <div data-permission="<%= permission.key %>">
-            <label for="<%= field_id(permission, "enabled") %>" class="flex items-center gap-2 text-ink">
-              <%= render Admin::CheckboxComponent.new(name: field_name(permission, "enabled"), value: "1", checked: ticked?(permission), id: field_id(permission, "enabled"),
-                    data: { action: "admin--permission-matrix#toggle" }) %>
-              <span><%= permission.label %></span>
-              <code class="font-cs-mono text-sm text-meta"><%= permission.key %></code>
-            </label>
-
-            <% stale_notes(permission).each do |note| %>
-              <p class="admin-stale-grant mt-1 ml-6 text-sm text-warn-ink"><%= note %></p>
-            <% end %>
-
-            <% if permission.scopes.any? %>
-              <div class="mt-2 ml-6 flex flex-col gap-3 rounded-cs bg-sunken p-3" data-admin--permission-matrix-target="scope" <%= "hidden" unless ticked?(permission) %>>
-                <% if permission.scopes.include?(:content_type) %>
-                  <fieldset>
-                    <legend class="text-sm text-meta"><%= SCOPE_LABELS[:content_type] %> <span class="text-dim">(none ticked: all)</span></legend>
-                    <div class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <% content_type_choices.each do |name| %>
-                        <% id = field_id(permission, "type", name.parameterize) %>
-                        <label for="<%= id %>" class="flex items-center gap-2 text-ink">
-                          <%= render Admin::CheckboxComponent.new(name: field_name(permission, "content_types") + "[]", value: name, checked: Array(scope["content_types"]).include?(name), id: id) %>
-                          <%= content_type_label(name) %>
-                        </label>
-                      <% end %>
-                    </div>
-                  </fieldset>
-                <% end %>
-
-                <% if permission.scopes.include?(:own) %>
-                  <label for="<%= field_id(permission, "own") %>" class="flex items-center gap-2 text-ink">
-                    <%= render Admin::CheckboxComponent.new(name: field_name(permission, "own"), value: "1", checked: scope["own"] == true, id: field_id(permission, "own")) %>
-                    <%= SCOPE_LABELS[:own] %> <span class="text-sm text-dim">(posts the user wrote)</span>
-                  </label>
-                <% end %>
-
-                <% if permission.scopes.include?(:branch) %>
-                  <details class="admin-branch-picker" data-controller="admin--branch-picker">
-                    <summary class="cursor-pointer text-sm text-meta">
-                      <%= SCOPE_LABELS[:branch] %> ·
-                      <span data-admin--branch-picker-target="summary"><%= branch_summary(permission) %></span>
-                    </summary>
-                    <p class="mt-1 text-sm text-dim">Tick a page to include it and everything below it. None ticked: all pages.</p>
-                    <% if hidden_page_ids(permission).any? %>
-                      <p class="admin-unreadable-branches mt-1 text-sm text-warn-ink">Some of these branches are pages you can't open. Only someone who can open them can change this permission.</p>
-                    <% end %>
-                    <% hidden_page_ids(permission).each do |page_id| %>
-                      <%= hidden_field_tag field_name(permission, "page_ids") + "[]", page_id, id: nil, data: { admin__branch_picker_target: "kept" } %>
-                      <p class="text-sm text-dim">A page you can't open (kept)</p>
-                    <% end %>
-                    <div class="mt-2">
-                      <%= branch_list(permission, tree[:roots]) %>
-                    </div>
-                  </details>
-                <% end %>
-              </div>
-            <% end %>
-          </div>
+  <section class="rounded-cs border border-line bg-surface">
+    <div class="flex flex-col gap-1 border-b border-line px-4 py-3.5">
+      <h2 class="text-h2 text-ink">Content permissions</h2>
+      <p class="text-sm text-dim">Each permission has its own scope. No scope means everything.</p>
+    </div>
+    <% sections.each do |area, permissions| %>
+      <div class="admin-area-heading border-b border-line bg-paper px-4 py-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= area %></div>
+      <% permissions.each do |permission| %>
+        <%= render row_for(permission) %>
+        <% stale_notes(permission).each do |note| %>
+          <p class="admin-stale-grant border-b border-line px-4 py-1.5 pl-12 text-sm text-warn-ink"><%= note %></p>
         <% end %>
-      </div>
-    </fieldset>
-  <% end %>
+      <% end %>
+    <% end %>
+  </section>
+
+  <div class="flex flex-col gap-3">
+    <h2 class="text-h2 text-ink">Other permissions</h2>
+    <%= render Admin::GroupsScreen::ToggleListComponent.new(grants: toggle_grants, form_name: form_name) %>
+  </div>
 </div>

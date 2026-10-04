@@ -460,7 +460,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     sign_in_via_form(@owner)
     visit admin_groups_path
     await_admin_controllers
-    within("##{ActionView::RecordIdentifier.dom_id(group)}") { click_link "Edit" }
+    within("##{ActionView::RecordIdentifier.dom_id(group)}") { click_link "About editors" }
 
     assert_field "Name", with: "About editors"
     assert_selector "[data-permission='pages.edit'] input[type=checkbox][disabled]", visible: :all

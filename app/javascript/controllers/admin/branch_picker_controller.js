@@ -1,54 +1,83 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The page-branch picker (`Admin::PermissionMatrixComponent`, access-control
-// design spec §5): a page tree with a checkbox per page, whose ticked
-// boxes are submitted as the grant's `page_ids` -- branch *roots*.
+// The page-branch tree of a `pages.*` row's scope editor
+// (`Admin::GroupsScreen::ScopeEditorComponent`, round 3 Task 10): a checkbox
+// per page whose ticked boxes are submitted as the grant's `page_ids` --
+// branch ROOTS. Tri-state:
 //
-// A page under a ticked page is already covered by it (a `page_ids` scope
-// matches a root and everything below it), so ticking it too would only
-// store a redundant root. This keeps the submitted list to roots: every box
-// under a ticked one is shown ticked and disabled -- a disabled input isn't
-// submitted -- and gets its own choice back when the ancestor is unticked
-// (`data-chosen` remembers it). The summary counts the roots.
+//   chosen   ticked, submitted (a stored root);
+//   implied  below a chosen page, so covered by it (a `page_ids` scope matches a
+//            root and everything below it): a greyed tick, DISABLED, so never
+//            submitted;
+//   partial  an ancestor of a chosen page, itself neither: `indeterminate`
+//            ("-"), UNCHECKED, so never submitted.
 //
-// The markup is nested `<li>` nodes (`node` targets) each holding its own
-// box (`box`) and its children's `<ul>`; hidden inputs for stored roots the
-// user can't see (`kept`) count towards the summary but are never touched.
+// The server renders exactly these states (the form is correct with scripts
+// off); this keeps them true as boxes are ticked. The truth is on the `<li>`
+// nodes (`data-chosen`), not on the boxes, because not every node has one: a
+// context-only ancestor (a page the viewer can't open, shown only as the path
+// to one they can) is greyed text with a mark, and a chosen one still implies
+// everything below it. `chosen` is remembered apart from what a box shows --
+// an implied box is shown ticked and disabled, but gets its own choice back
+// when the ancestor is unticked.
+//
+// Stored roots the viewer has no place for in the tree at all are hidden
+// inputs (`kept`), never touched. A change on a box bubbles to the row's
+// editor, whose `admin--permission-matrix` rewrites the chips from the state
+// this has just settled (the box's own action runs first); the form's footer
+// reads the same event.
 export default class extends Controller {
-  static targets = ["box", "node", "summary", "kept"]
+  static targets = ["node", "kept"]
 
   connect() {
-    this.boxTargets.forEach((box) => { box.dataset.chosen = box.checked ? "1" : "" })
     this.refresh()
   }
 
+  // A box was ticked or unticked.
   change(event) {
-    event.target.dataset.chosen = event.target.checked ? "1" : ""
+    const node = event.target.closest("li")
+    if (node) node.dataset.chosen = event.target.checked ? "1" : ""
     this.refresh()
   }
 
   refresh() {
-    this.boxTargets.forEach((box) => {
-      const implied = this.ancestorBoxes(box).some((ancestor) => ancestor.dataset.chosen === "1")
-      box.disabled = implied
-      box.checked = implied || box.dataset.chosen === "1"
-    })
+    this.nodeTargets.forEach((node) => {
+      const chosen = node.dataset.chosen === "1"
+      const implied = this.ancestorNodes(node).some((ancestor) => ancestor.dataset.chosen === "1")
+      const below = this.descendantNodes(node)
+      const partial = !chosen && !implied && below.some((descendant) => descendant.dataset.chosen === "1")
 
-    const roots = this.boxTargets.filter((box) => box.checked && !box.disabled).length + this.keptTargets.length
-    if (this.hasSummaryTarget) {
-      this.summaryTarget.textContent = roots === 0 ? "All pages" : `${roots} ${roots === 1 ? "branch" : "branches"}`
-    }
+      const box = node.querySelector(":scope > div input[type=checkbox]")
+      if (box) {
+        box.disabled = implied
+        box.checked = chosen || implied
+        box.indeterminate = partial
+      }
+
+      const mark = node.querySelector(":scope > div [data-admin--branch-picker-target='mark']")
+      if (mark) mark.textContent = implied || chosen ? "✓" : partial ? "–" : ""
+
+      const note = node.querySelector(":scope > div [data-admin--branch-picker-target='note']")
+      if (note) note.textContent = implied ? "included" : partial ? "contains a chosen page" : chosen ? this.includes(below.length) : ""
+    })
   }
 
-  // The boxes of the `node`s enclosing this box's own node, nearest first.
-  ancestorBoxes(box) {
-    const boxes = []
-    let node = box.closest("li")?.parentElement?.closest("li")
-    while (node && this.element.contains(node)) {
-      const own = this.boxTargets.find((candidate) => candidate.closest("li") === node)
-      if (own) boxes.push(own)
-      node = node.parentElement?.closest("li")
+  includes(count) {
+    return count === 0 ? "" : `includes ${count} ${count === 1 ? "subpage" : "subpages"}`
+  }
+
+  // The `node`s enclosing this one, nearest first.
+  ancestorNodes(node) {
+    const nodes = []
+    let parent = node.parentElement?.closest("li")
+    while (parent && this.element.contains(parent)) {
+      nodes.push(parent)
+      parent = parent.parentElement?.closest("li")
     }
-    return boxes
+    return nodes
+  }
+
+  descendantNodes(node) {
+    return Array.from(node.querySelectorAll("li"))
   }
 }

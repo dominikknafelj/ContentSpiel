@@ -30,8 +30,10 @@ module Groups
   #   right to manage the group as it stands (`#removal_refusal`, final fix
   #   wave): every grant it holds must be one the actor could hand out.
   #
-  # The editor submits only live values, so saving a group drops its stale
-  # values (and its dead grants, which match nothing) for good.
+  # The editor submits the live values, plus -- carried, so an untouched save
+  # changes nothing -- a content type that is no longer registered until the
+  # editor presses Remove on it (`#live`). A deleted page and a dead grant
+  # are still dropped by the next save.
   class Save < ApplicationService
     def initialize(group = AccessControl::Group.new, attributes:, actor: Current.actor)
       @group = group
@@ -82,6 +84,25 @@ module Groups
       end.uniq.sort_by { |grant| [ grant[:permission], grant[:scope].to_json ] }
     end
 
+    # The desired grants as `LiveGrants` would read them: a content type that
+    # is no longer registered is a dead scope value, not part of what the
+    # grant means. The editor CARRIES such a value (a chip with Remove, a
+    # hidden input until it is pressed) so that a form submitted as rendered
+    # changes nothing; compared raw, that carried value would make every
+    # untouched save look like a changed -- or, for the escalation and
+    # removal rules, a widened -- grant. Only the *comparisons* use this;
+    # what is stored, and what the audit event lists, is the raw list, so
+    # pressing Remove (the value gone from the submission) is a real change.
+    def live(grants)
+      registered = AccessControl::Permissions.content_type_choices
+      grants.map do |grant|
+        types = grant[:scope]["content_types"]
+        next grant unless types
+
+        { permission: grant[:permission], scope: grant[:scope].merge("content_types" => types & registered) }
+      end
+    end
+
     def grant_list(grants)
       normalize_grants(grants.map { |grant| { permission: grant.permission, scope: grant.scope } })
     end
@@ -108,7 +129,7 @@ module Groups
     def removal_refusal(stored, desired, removed_member_ids)
       return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
 
-      removed_grants = desired ? stored.attributes - desired : []
+      removed_grants = desired ? stored.attributes - live(desired) : []
       return if removed_member_ids.empty? && removed_grants.empty?
       return if AccessControl.can_manage_group?(actor, @group)
 
@@ -123,6 +144,7 @@ module Groups
       return if actor.nil? || AccessControl.owner?(actor)
 
       unchanged = stored.attributes
+      desired = live(desired) if desired
       Array(desired).each do |grant|
         next if unchanged.include?(grant)
         return denied(grant[:permission], @group) unless AccessControl.can_grant?(actor, grant[:permission], grant[:scope])

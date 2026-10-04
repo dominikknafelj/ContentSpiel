@@ -1,0 +1,20 @@
+<div class="admin-permission-row border-b border-line" data-permission="<%= permission.key %>" id="permission-row-<%= slug %>">
+  <div class="grid grid-cols-[1.25rem_minmax(7rem,12rem)_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5">
+    <%# The accessible name is the registry's full label ("Edit pages"): the short label is only what a row under a "Pages" heading needs to say. %>
+    <%= render Admin::CheckboxComponent.new(name: field_name("enabled"), value: "1", checked: ticked?, id: checkbox_id, aria: { label: permission.label },
+          data: { action: "change->admin--permission-matrix#toggle" }) %>
+    <label for="<%= checkbox_id %>" class="flex min-w-0 cursor-pointer flex-col">
+      <span class="text-ink"><%= short_label %></span>
+      <code class="font-cs-mono text-xs text-meta" title="<%= permission.key %>"><%= permission.key %></code>
+    </label>
+    <div class="flex min-w-0 flex-wrap items-center gap-1.5" data-chips>
+      <% chips.each do |chip| %>
+        <span class="<%= chip_class(chip) %>"><% if chip.dot %><span aria-hidden="true" class="h-[7px] w-[7px] shrink-0 rounded-full <%= chip.dot %>"></span><% end %><%= chip.label %></span>
+      <% end %>
+    </div>
+    <button type="button" class="px-0.5 py-1 text-sm font-medium text-accent hover:text-accent-hover" <%= "hidden" unless ticked? %>
+      aria-expanded="<%= open? %>" aria-controls="<%= editor_id %>" data-open-label="Done" data-closed-label="Edit scope"
+      data-action="click->admin--permission-matrix#toggleEditor"><%= open? ? "Done" : "Edit scope" %></button>
+  </div>
+  <%= render editor %>
+</div>
