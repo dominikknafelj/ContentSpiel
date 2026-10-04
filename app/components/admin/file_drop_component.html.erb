@@ -1,11 +1,11 @@
 <div class="admin-file-drop rounded-cs border border-dashed border-line-strong px-4 py-6 text-center data-[dragging]:border-accent data-[dragging]:bg-accent-tint"
-     data-controller="admin--file-drop"
-     data-action="dragover->admin--file-drop#dragOver dragleave->admin--file-drop#dragLeave drop->admin--file-drop#drop change->admin--file-drop#changed">
+     data-controller="file-drop"
+     data-action="dragover->file-drop#dragOver dragleave->file-drop#dragLeave drop->file-drop#drop change->file-drop#changed">
   <%= tag.input(**input_attrs) %>
   <p class="text-ink">Drop an image here or</p>
   <label for="<%= id %>" class="mt-2 inline-flex cursor-pointer items-center justify-center rounded-cs border border-line-strong bg-surface px-4 py-2 font-semibold text-ink transition-colors hover:bg-sunken peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-accent">Choose file</label>
   <% if hint %>
     <p id="<%= hint_id %>" class="mt-2 text-sm text-meta"><%= hint %></p>
   <% end %>
-  <p class="mt-2 min-h-5 text-sm text-ink" data-admin--file-drop-target="name" aria-live="polite"></p>
+  <p class="mt-2 min-h-5 text-sm text-ink" data-file-drop-target="name" aria-live="polite"></p>
 </div>

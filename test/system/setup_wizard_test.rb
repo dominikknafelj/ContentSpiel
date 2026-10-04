@@ -29,6 +29,10 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     assert_selector "h1", text: "Site identity"
     fill_in "Site title", with: "Dana's Notes"
+    # The logo's drop zone works on setup, which loads only the `application`
+    # JS entry: attaching through "Choose file" echoes the chosen name.
+    attach_file("site_setting_logo", file_fixture("tiny.png").to_s, visible: :all)
+    assert_selector "[data-file-drop-target=name]", text: "tiny.png"
     press "Save and continue"
 
     assert_selector "h1", text: "Languages"

@@ -93,3 +93,14 @@
 }
 .cs-select:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .cs-select[aria-invalid="true"] { border-color: var(--cs-danger); }
+
+/* Invalid field border, derived from the error slot's content (design pass
+   spec §4). Autosave streams replace a field's error slot but never its input,
+   so the border can't be a class set at render time: it would stay red after
+   a fix, or never turn red after a failed autosave. The slot's presence of a
+   message (<p>) is the single source of truth. Only inside `.admin-column`
+   (autosaving forms); explicit-save forms render their class server-side. */
+.admin-column:has([id$="-errors"] > p) :is(input:not([type="file"]), textarea, select, .admin-prefix-input) { border-color: var(--cs-danger); }
+/* The prefix input's own wrapper carries `border-danger` when it is rendered
+   invalid; once a stream empties the slot the border must go again. */
+.admin-column:not(:has([id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }

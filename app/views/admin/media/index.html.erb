@@ -15,7 +15,7 @@
      data-controller="admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
      data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
-  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true,
+  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
         hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
         data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
   <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
