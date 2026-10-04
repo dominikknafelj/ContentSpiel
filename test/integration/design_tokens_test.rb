@@ -26,9 +26,9 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes css, "--th-paper"
     assert_includes css, "cs-prose"
     assert_not_includes css, "--cs-"
-    # `md:w-56` is only used by the setup wizard's layout.
-    assert_not_includes css, "md\\:w-56"
-    assert_includes stylesheet("tailwind.css"), "md\\:w-56"
+    # `md:rounded-l-cs` is only used by the setup wizard's layout.
+    assert_not_includes css, "md\\:rounded-l-cs"
+    assert_includes stylesheet("tailwind.css"), "md\\:rounded-l-cs"
   end
 
   test "both builds point at the digested, served font files" do
