@@ -3,8 +3,7 @@ require "test_helper"
 # The page tree's cost profile with translation markers on (final fix wave,
 # I1/T4): the tree is re-rendered after every page-settings autosave, so it
 # must cost the same handful of queries however many pages (and blocks) it
-# shows, and a re-render after one page's save must not recompute every
-# other page's markers (`Translations::CachedStatus`).
+# shows; its markers are one read of the stored `translation_states`.
 class Admin::TreeComponentTest < ViewComponent::TestCase
   setup { Current.actor = users(:one) }
 
@@ -31,21 +30,6 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
     count
   end
 
-  def cache_hits(&block)
-    hits = []
-    counter = ->(*, payload) { hits.concat(Array(payload[:hits])) }
-    ActiveSupport::Notifications.subscribed(counter, "cache_read_multi.active_support", &block)
-    hits
-  end
-
-  def with_memory_cache
-    original = Rails.cache
-    Rails.cache = ActiveSupport::Cache::MemoryStore.new
-    yield
-  ensure
-    Rails.cache = original
-  end
-
   test "the tree with translation markers costs the same queries for 3 pages as for 15" do
     with_locales(%w[en de es], default: "en") do
       add_pages(3, "Small")
@@ -60,37 +44,16 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
     end
   end
 
-  test "with a cache, the same holds -- and an unchanged tree is all cache hits" do
-    with_memory_cache do
-      with_locales(%w[en de es], default: "en") do
-        add_pages(3, "Small")
-        render_tree
-        small = count_queries { render_tree }
+  test "a re-render after one page's save shows that page's new marker and leaves the others alone" do
+    with_locales(%w[en de], default: "en") do
+      pages = add_pages(4, "Page")
+      render_tree
 
-        add_pages(12, "Large")
-        render_tree
-        large = count_queries { render_tree }
-        assert_equal small, large, "the tree ran a query per page"
+      assert Pages::Save.call(pages.first, translations: { "en" => { title: "Page 0, revised" } }).ok?
+      render_tree
 
-        assert_equal Page.count, cache_hits { render_tree }.size, "an unchanged tree recomputes nothing"
-      end
-    end
-  end
-
-  test "a re-render after one page's save recomputes that page only" do
-    with_memory_cache do
-      with_locales(%w[en de], default: "en") do
-        pages = add_pages(4, "Page")
-        render_tree
-        listed = Page.count
-
-        assert Pages::Save.call(pages.first, translations: { "en" => { title: "Page 0, revised" } }).ok?
-        hits = cache_hits { render_tree }
-
-        assert_equal listed - 1, hits.size, "every page but the saved one is a cache hit"
-        assert_selector "li[data-page-id='#{pages.first.id}'] > div [data-translation-marker][title*='Deutsch (outdated)']"
-        assert_no_selector "li[data-page-id='#{pages.second.id}'] [data-translation-marker][title*='Deutsch (outdated)']"
-      end
+      assert_selector "li[data-page-id='#{pages.first.id}'] > div [data-translation-marker][title*='Deutsch (outdated)']"
+      assert_no_selector "li[data-page-id='#{pages.second.id}'] [data-translation-marker][title*='Deutsch (outdated)']"
     end
   end
 

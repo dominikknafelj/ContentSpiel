@@ -232,4 +232,21 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not_includes sidebar_labels, "Translations"
   end
+
+  test "a page of results runs across the types, in order, with a real total" do
+    # The homepage counts too: 1 + 48 pages, then 3 posts = 52 items.
+    48.times { |i| create_page(title: "Page #{i}") }
+    posts = 3.times.map { |i| create_post(title: "Post #{i}") }
+
+    get admin_translations_path(locale: "de", page: 2)
+    assert_response :success
+    assert_select "[data-translation-state]", 2
+    assert_select "##{row_id("post", posts.second)}"
+    assert_select "##{row_id("post", posts.third)}"
+
+    get admin_translations_path(locale: "de", page: 1)
+    assert_select "[data-translation-state]", 50
+    assert_select "##{row_id("post", posts.first)}"
+    assert_select "##{row_id("post", posts.second)}", 0
+  end
 end

@@ -157,8 +157,7 @@ module Admin
       # render costs a fixed handful of queries however many pages it shows
       # (`Admin::TreeComponent`'s own comment; pinned by
       # test/components/admin/tree_component_test.rb), its translation
-      # markers come from `Translations::CachedStatus` so only the page this
-      # save touched is worked out again, and there's no cheaper way to know
+      # markers are one read of the stored `translation_states`, and there's no cheaper way to know
       # from here whether *this* save happened to be the one that mattered
       # to it.
       streams << tree_replace_stream if result.ok?

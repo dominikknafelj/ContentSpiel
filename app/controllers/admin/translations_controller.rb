@@ -15,28 +15,19 @@ module Admin
   # and only kept ones. A type the actor can't read at all isn't offered
   # as a filter either.
   #
-  # Where a record stands is `Translations::Status`, which is computed per
-  # record in Ruby (field digests, block roll-ups, schema fields) -- there
-  # is no column to `WHERE` on. So the list is built by walking every
-  # readable record in id-ordered batches, computing each batch's states in
-  # one go (one blocks query per batch), and keeping the ones that aren't
-  # complete -- lazily, stopping as soon as this page (plus the one extra
-  # row that tells whether there's a next page, the Media module's
-  # `limit(N+1)` shape) is filled. The first pages are therefore cheap; a
-  # late page, or a language with few gaps, walks the whole content once
-  # per request. That's acceptable at CMS scale (hundreds to a few
-  # thousand records) and tracked in the roadmap: a stored per-locale
-  # state, kept current by the save services, is the way out if it isn't.
+  # Where a record stands is the stored `translation_states` row
+  # (`Translations::StateIndex`, kept current by the save services), so the
+  # list is a real query: each readable relation is narrowed to `missing`
+  # or `outdated` in this language with `StateIndex.joins`, counted with
+  # `COUNT`, and this page is cut out of the types in order with
+  # `offset`/`limit` -- cost proportional to the page, not the site. A
+  # record with no row reads complete and isn't listed (`StateIndex`).
   #
-  # Paging is by page number (`Pagination`, design pass spec §4): the total
-  # is `needing_work.size`, which walks the whole set -- the same cost a
-  # late page already paid. Round 2 replaces this with a query once the
-  # state is stored.
+  # Paging is by page number (`Pagination`, design pass spec §4).
   class TranslationsController < BaseController
     include TranslatableRecordLoading
 
     PER_PAGE = 50
-    BATCH_SIZE = 200
 
     # In display order; `label` heads the group.
     TYPES = {
@@ -67,9 +58,9 @@ module Admin
       @types = TYPES.keys.select { |type| can?(TYPES.dig(type, :permission)) }
       @type = params[:type].presence_in(@types)
 
-      all_items = needing_work.to_a
-      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: all_items.size)
-      @items = all_items.drop(@pagination.offset).first(PER_PAGE)
+      relations = needing_work
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: relations.values.sum(&:count))
+      @items = items_on_page(relations)
     end
 
     # AI suggestions for some of one record's fields (translation helpers
@@ -156,17 +147,38 @@ module Admin
       redirect_to admin_translations_path(locale: targets.first, type: params[:type].presence), status: :see_other
     end
 
-    # A lazy enumerator of `Item`s, types in `TYPES` order, each by id.
+    # `{ type => relation }`, types in `TYPES` order, each narrowed to the
+    # readable records that aren't complete in this language.
     def needing_work
       types = @type ? [ @type ] : @types
-      types.lazy.flat_map do |type|
-        readable(type).find_in_batches(batch_size: BATCH_SIZE).lazy.flat_map do |batch|
-          Translations::Status.for(batch, locales: [ @locale ]).filter_map do |record, states|
-            state = states.fetch(@locale)
-            Item.new(type:, record:, state:) unless state == :complete
-          end
-        end
+      types.index_with do |type|
+        Translations::StateIndex.joins(readable(type), locale: @locale, states: %w[missing outdated]).order(:id)
       end
+    end
+
+    # This page's `Item`s: the relations are laid end to end in type order
+    # and `offset`/`limit` cut across them, so a page costs at most one
+    # query per type plus one for the states.
+    def items_on_page(relations)
+      skip = @pagination.offset
+      want = PER_PAGE
+      items = []
+      relations.each do |type, relation|
+        break if want <= 0
+
+        size = relation.count
+        if skip >= size
+          skip -= size
+          next
+        end
+
+        records = relation.offset(skip).limit(want).to_a
+        states = Translations::StateIndex.states_for(records, locales: [ @locale ])
+        items.concat(records.map { |record| Item.new(type:, record:, state: states.dig(record, @locale)) })
+        want -= records.size
+        skip = 0
+      end
+      items
     end
 
     def readable(type)

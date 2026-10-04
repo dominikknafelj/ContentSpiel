@@ -41,12 +41,9 @@ module Admin
       # The "Languages" column (translation helpers spec §4): every listed
       # post's state per target language, worked out once for the whole
       # list, so the column costs the same queries however many rows it
-      # shows. Cached per post (`Translations::CachedStatus`, final fix
-      # wave I1): this list isn't paginated, so recomputing every post's
-      # every tracked field per language on each visit would grow with the
-      # whole site; only posts changed since the last visit are worked out
-      # again.
-      @translation_states = Translations::CachedStatus.for(@posts)
+      # shows. Read from the stored `translation_states` rows
+      # (`Translations::StateIndex`), one query for the whole list.
+      @translation_states = Translations::StateIndex.states_for(@posts)
     end
 
     # "New post" (spec §5.2): asks for the content type up front, in the
