@@ -139,7 +139,13 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
 
     find("body").send_keys([ :control, "k" ])
     find("dialog#command-palette input").set("New p")
-    assert_selector "#jump-results [role=option]", text: "New page"
+    # The results FOR THIS QUERY, not the unfiltered list the palette opened
+    # with -- it has a "New page" row too, so waiting for the row alone was
+    # satisfied at once, and the click then raced the re-render: the list
+    # shrank under the pointer and the click landed on the dialog's backdrop,
+    # which closes the palette (seen in a looped run: `click DIALOG`, then
+    # the render for "New p"). About one full-suite run in three.
+    assert_selector "#jump-results [data-query='New p'] [role=option]", text: "New page"
     find("#jump-results [role=option] a", text: "New page").click
 
     assert_selector "dialog#new-page-dialog[open]"
@@ -157,6 +163,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
 
     find("body").send_keys([ :control, "k" ])
     find("dialog#command-palette input").set("New p")
+    assert_selector "#jump-results [data-query='New p'] [role=option]", text: "New page" # see the test above
     find("#jump-results [role=option] a", text: "New page").click
 
     assert_selector "dialog#new-page-dialog[open] form#new-page-form"
