@@ -25,16 +25,42 @@ module Pages
   # (`Media::Choosing`). Every save then refreshes the page's own
   # `media_usages` rows inside the transaction (`Media::UsageIndex`). A
   # hero deleted in the meantime fails the save as "doesn't exist".
+  #
+  # `attributes:` is an allow-list (`ATTRIBUTES`), and any other key is an
+  # `ArgumentError` -- a programming error, raised before anything is
+  # checked or written, as `Settings::Save` does for a translated key.
+  # What isn't on the list isn't this service's to write: `attributes` go
+  # straight to `assign_attributes`, so `parent_id` or `position` would
+  # move the page around `Pages::Move` (the homepage rule, the
+  # own-descendant rule, `pages.move` and `pages.create` on the target),
+  # and `trashed_at`, `trashed_by_id` or `trash_root_id` would trash or
+  # restore it around `Trash::Move`/`Restore` (the delete right, the
+  # branch, the URLs) -- all on the strength of `pages.edit`. No caller
+  # passes them (the controllers build the hash from their own short
+  # lists); this is what keeps the next one from doing it by accident, and
+  # raising rather than dropping the key is what makes such a caller find
+  # out. A translated attribute belongs in `translations:` -- here it
+  # would land in whatever locale happens to be ambient.
   class Save < ApplicationService
     include Media::Choosing
 
     TRANSLATED = %i[title slug subtitle meta_title meta_description hero_alt].freeze
+    # Everything `attributes:` may carry. `parent` (a `Page`, never
+    # `parent_id`) places a NEW page and is dropped on an update (see
+    # `#assign`); `published`/`published_at` are the publish state
+    # (`#assign_publishing`); the hero goes through `Media::Choosing`. A new
+    # page's rank among its siblings is not on the list: it joins at the
+    # end, and `Pages::Move` puts it anywhere else.
+    ATTRIBUTES = %i[parent page_type hero_media_asset_id published published_at].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
 
     def initialize(page = Page.new, attributes: {}, translations: {}, actor: Current.actor)
       @page = page
       @attributes = attributes.to_h.symbolize_keys
+      unknown = @attributes.keys - ATTRIBUTES
+      raise ArgumentError, "Pages::Save doesn't take #{unknown.join(", ")} in attributes: (see ATTRIBUTES)" if unknown.any?
+
       @translations = translations.to_h
       @actor = actor
     end

@@ -35,8 +35,20 @@ module Trash
   # target. Everything is assigned before one save (parent, position and the
   # cleared flags together), so `Page::TreeRanking#place_among_siblings`
   # never runs while the page still reads as trashed.
+  #
+  # The target itself must be a page the actor can READ ("not found, not
+  # forbidden"): one outside their read scope is answered exactly like one
+  # that is in the trash or doesn't exist -- the plain failure
+  # `UNKNOWN_PARENT`, not a permission refusal, and with no `access.denied`
+  # event. Refusing `pages.create` there would tell someone who chose (or
+  # forged) the id of a page they aren't supposed to know about that it
+  # exists. Only a parent they can read is worth the ordinary refusal.
+  # (`Admin::TrashController#chosen_parent` gives an id that names nothing
+  # the same answer, so the three can't be told apart from outside either.)
   class Restore < ApplicationService
     include ItemPermissions
+
+    UNKNOWN_PARENT = "Choose a parent page that still exists".freeze
 
     attr_reader :slug_changes, :restored_assets
 
@@ -95,12 +107,16 @@ module Trash
     def page_problem
       if @parent
         return denied("pages.move", @record) unless authorize!("pages.move", @record)
-        return denied("pages.create", @record) unless may_create_under_target?
+        # Before anything else is said about the target: see the class
+        # comment. (`pages.move` above is about the page being restored,
+        # which the actor was already shown.)
+        return failure(@record, [ UNKNOWN_PARENT ]) unless authorize!("pages.read", @parent)
         # The more specific answer first: a trashed page's subpages are
         # (usually) trashed with it, so checking the trash first would hide
         # why picking one of them can never work.
         return failure(@record, [ "A page can't be restored under itself or one of its own subpages" ]) if @parent.self_and_ancestors.include?(@record)
-        return failure(@record, [ "Choose a page that isn't in the trash" ]) if @parent.trashed?
+        return failure(@record, [ UNKNOWN_PARENT ]) if @parent.trashed?
+        return denied("pages.create", @record) unless may_create_under_target?
       elsif @record.parent_id.nil? || !Page.exists?(@record.parent_id)
         return failure(@record, [ "Its parent page no longer exists: choose a new parent" ])
       elsif @record.trash_root_id != @record.id

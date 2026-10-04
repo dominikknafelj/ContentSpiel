@@ -67,6 +67,36 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Gone page"
   end
 
+  # The list of subpages under a page's blocks (`pages/show.html.erb`) is its
+  # own query, apart from the navigation: asserted inside `.page-children`,
+  # because the header's navigation names the kept page on every page anyway.
+  # A trashed page keeps its `published_at`, so "published" alone doesn't
+  # hide it -- and it has no URL any more, so its link would point nowhere.
+  test "a page's list of subpages leaves out a trashed subpage, publicly and in preview" do
+    kept_child = create_page(title: "Kept child", parent: @kept_page)
+    gone_child = create_page(title: "Gone child", parent: @kept_page)
+    gone_child.update!(trashed_at: Time.current)
+    assert_predicate gone_child.reload.published_at, :present?
+
+    get "/kept-page"
+    assert_response :ok
+    assert_select ".page-children a", text: kept_child.title, count: 1
+    assert_select ".page-children a", text: "Gone child", count: 0
+    assert_not_includes response.body, "Gone child"
+
+    sign_in_as users(:one)
+    get "/preview/kept-page"
+    assert_response :ok
+    assert_select ".page-children a", text: "Kept child", count: 1
+    assert_not_includes response.body, "Gone child"
+
+    # With its only subpage trashed, a page draws no (empty) list at all.
+    kept_child.update!(trashed_at: Time.current)
+    get "/kept-page"
+    assert_response :ok
+    assert_select ".page-children", count: 0
+  end
+
   test "a post list block never lists a trashed post, published or not" do
     block = @blog.content_blocks.listing.sole
     assert_includes block.listed_posts, @kept_post

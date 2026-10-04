@@ -165,4 +165,53 @@ class Pages::SaveTest < ActiveSupport::TestCase
     assert_nil page.reload.hero_media_asset_id
     assert_empty hero_usages(page)
   end
+
+  # --- `attributes:` is an allow-list ----------------------------------------
+  #
+  # Where a page stands in the tree and whether it is in the trash are other
+  # services' to change (`Pages::Move`, `Trash::Move`/`Restore`), each with
+  # checks of its own that this one doesn't make. No caller passes these
+  # keys; one that ever did must fail loudly, not move or trash a page on
+  # the strength of `pages.edit`.
+
+  test "attributes that belong to another service are an ArgumentError, and nothing is written" do
+    other = create_page(title: "Elsewhere")
+    page = create_page(title: "Stays put")
+    before = page.reload.attributes
+
+    forbidden = {
+      parent_id: other.id, position: 0, trashed_at: Time.current, trashed_by_id: users(:one).id, trashed_by: users(:one),
+      trash_root_id: page.id, id: 1, created_at: 1.year.ago, updated_at: 1.year.ago, translation_sources: {},
+      title: "Smuggled", slug: "smuggled"
+    }
+    forbidden.each do |key, value|
+      error = assert_raises(ArgumentError, "#{key} was accepted") { Pages::Save.call(page, attributes: { key => value, published: true }) }
+      assert_includes error.message, key.to_s
+      assert_raises(ArgumentError, "#{key} was accepted as a String key") { Pages::Save.call(page, attributes: { key.to_s => value }) }
+      assert_raises(ArgumentError, "#{key} was accepted on create") { Pages::Save.call(attributes: { parent: root_page, key => value }, translations: { "en" => { title: "New" } }) }
+    end
+
+    assert_equal before, page.reload.attributes
+    assert_equal root_page, page.parent
+    assert_not page.trashed?
+  end
+
+  test "every attribute the service is meant to take is still taken" do
+    asset = create_media_asset
+    result = as_owner do
+      Pages::Save.call(attributes: { parent: root_page, page_type: "standard", hero_media_asset_id: asset.id, published_at: 1.day.from_now },
+        translations: { "en" => { title: "Allowed" } })
+    end
+    assert result.ok?, result.errors.to_sentence
+    assert_equal asset.id, result.record.hero_media_asset_id
+
+    assert as_owner { Pages::Save.call(result.record, attributes: { published: true }) }.ok?
+    assert result.record.reload.live?
+
+    # `parent` on an update is the one key that is dropped, not refused, as
+    # before: a stale `parent` riding along is no move (see `#assign`).
+    other = create_page(title: "Elsewhere")
+    assert as_owner { Pages::Save.call(result.record, attributes: { parent: other }) }.ok?
+    assert_equal root_page, result.record.reload.parent
+  end
 end

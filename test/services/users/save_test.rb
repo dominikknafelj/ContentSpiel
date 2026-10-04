@@ -153,4 +153,59 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal "Grace Hopper", users(:two).reload.name
     assert_equal [ nil, "Grace Hopper" ], Audit::Event.order(:id).last.field_changes["name"]
   end
+
+  # --- A password change ends that user's sessions ---------------------------
+  #
+  # Someone who changes a password does it because the old one is, or may
+  # be, in the wrong hands -- and whoever holds it may already be signed in.
+
+  test "changing another user's password ends every session of that user" do
+    user = users(:reader)
+    2.times { user.sessions.create! }
+    bystander = users(:author).sessions.create!
+
+    result = as(users(:one)) { Users::Save.call(user, attributes: { password: "new-password-1", password_confirmation: "new-password-1" }) }
+
+    assert result.ok?, result.errors.to_sentence
+    assert_empty user.sessions.reload
+    assert Session.exists?(bystander.id)
+  end
+
+  test "changing anything but the password leaves the user's sessions alone" do
+    user = users(:reader)
+    session = user.sessions.create!
+
+    result = as(users(:one)) do
+      Users::Save.call(user, attributes: { name: "A new name", email_address: "renamed@example.com",
+        password: "", password_confirmation: "", group_ids: [ AccessControl::Group.find_by!(name: "Editor").id ] })
+    end
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "A new name", user.reload.name
+    assert Session.exists?(session.id)
+  end
+
+  test "changing your own password in the Users module keeps the session you act in and ends the others" do
+    owner = users(:one)
+    current = owner.sessions.create!
+    other = owner.sessions.create!
+
+    result = Current.set(session: current) do
+      as(owner) { Users::Save.call(owner, attributes: { password: "new-password-1", password_confirmation: "new-password-1" }) }
+    end
+
+    assert result.ok?, result.errors.to_sentence
+    assert Session.exists?(current.id)
+    assert_not Session.exists?(other.id)
+  end
+
+  test "a refused password change ends no session" do
+    user = users(:reader)
+    session = user.sessions.create!
+
+    result = as(users(:one)) { Users::Save.call(user, attributes: { password: "new-password-1", password_confirmation: "something else" }) }
+
+    assert_not result.ok?
+    assert Session.exists?(session.id)
+  end
 end

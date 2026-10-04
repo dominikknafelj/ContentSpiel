@@ -274,4 +274,45 @@ class Posts::SaveTest < ActiveSupport::TestCase
     end
     assert_equal "Pictures", post.reload.title
   end
+
+  # --- `attributes:` is an allow-list ----------------------------------------
+  #
+  # Putting a post in the trash is `Trash::Move`'s to do, with the delete
+  # right; no caller passes these keys, and one that ever did must fail
+  # loudly rather than trash (or backdate) a post on the strength of
+  # `posts.edit`.
+
+  test "attributes that belong to another service are an ArgumentError, and nothing is written" do
+    post = create_post(title: "Stays put")
+    before = post.reload.attributes
+
+    forbidden = {
+      trashed_at: Time.current, trashed_by_id: users(:one).id, trashed_by: users(:one), id: 1, created_at: 1.year.ago,
+      updated_at: 1.year.ago, translation_sources: {}, title: "Smuggled", slug: "smuggled", body: {}, tags: [], related_posts: []
+    }
+    forbidden.each do |key, value|
+      error = assert_raises(ArgumentError, "#{key} was accepted") { Posts::Save.call(post, attributes: { key => value, published: true }) }
+      assert_includes error.message, key.to_s
+      assert_raises(ArgumentError, "#{key} was accepted as a String key") { Posts::Save.call(post, attributes: { key.to_s => value }) }
+      assert_raises(ArgumentError, "#{key} was accepted on create") { Posts::Save.call(attributes: { content_type: "blog", key => value }, translations: { "en" => { title: "New" } }) }
+    end
+
+    assert_equal before, post.reload.attributes
+    assert_not post.trashed?
+  end
+
+  test "every attribute the service is meant to take is still taken" do
+    other = create_post(title: "Related")
+    result = as_owner do
+      Posts::Save.call(attributes: { content_type: "blog", author_id: users(:two).id, published_at: 1.day.from_now, tag_names: [ "ruby" ],
+        fields: {}, related_post_ids: [ other.id.to_s ] }, translations: { "en" => { title: "Allowed" } })
+    end
+    assert result.ok?, result.errors.to_sentence
+    assert_equal users(:two).id, result.record.author_id
+    assert_equal [ "ruby" ], result.record.tags.map(&:name)
+    assert_equal [ other ], result.record.related_posts.to_a
+
+    assert as_owner { Posts::Save.call(result.record, attributes: { published: true }) }.ok?
+    assert result.record.reload.live?
+  end
 end

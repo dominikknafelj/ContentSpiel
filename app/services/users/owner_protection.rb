@@ -15,6 +15,10 @@ module Users
   #   `user_field_changes` records that it changed as `"credentials"`
   #   instead -- a key no `filter_parameters` entry matches, with no value
   #   derived from the password.
+  # - A password change ends that user's sessions
+  #   (`#end_sessions_after_password_change`), in the transaction that
+  #   writes the password -- here rather than in a controller, so no path
+  #   to a new password can forget it.
   module OwnerProtection
     private
 
@@ -48,6 +52,32 @@ module Users
 
     def owner_only_denial
       denied("users.manage", @user, message: "You don't have permission to change an owner's account")
+    end
+
+    # Someone changes a password because the old one is, or may be, in the
+    # wrong hands -- and whoever holds it may already be signed in, so a new
+    # password that left the old sessions alive would lock nobody out. Every
+    # session of the user is destroyed, called inside the saving transaction
+    # right after the save: a rolled-back change ends none, and a committed
+    # one never leaves a window with the new password and the old sessions.
+    #
+    # The one session kept is the one the change is being made *in*, when a
+    # signed-in user changes their own password (`keep_acting_session`,
+    # which the reset flow turns off -- there the emailed token made the
+    # change, not a session, and a reset is what someone does who has lost
+    # the account). It is only ever a session of this very user: an admin
+    # changing someone else's password keeps their own session simply
+    # because it isn't among that user's, and an API token has no session.
+    #
+    # Only a *changed* digest counts -- a blank password field, a new name or
+    # new groups touch no session -- and a user being created has none.
+    def end_sessions_after_password_change(keep_acting_session: true)
+      return unless @user.saved_change_to_password_digest? && !@user.previously_new_record?
+
+      sessions = @user.sessions
+      kept = Current.session if keep_acting_session && actor.is_a?(User) && actor == @user
+      sessions = sessions.where.not(id: kept.id) if kept && kept.user_id == @user.id
+      sessions.destroy_all
     end
 
     def user_field_changes(user)

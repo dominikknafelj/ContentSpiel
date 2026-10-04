@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
 import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
+import { orderErrorToast, sendOrder } from "autosave/order_request"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::TreeNodeComponent); they all
@@ -15,7 +16,9 @@ import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 // nothing else applies that response for us. The controller always answers
 // with a full re-render of the tree, success or failure alike (see its own
 // comment for why), so this never has to guess at what the drop actually
-// did -- it only ever displays what the server says happened.
+// did -- it only ever displays what the server says happened. When the
+// server says nothing (offline, signed out, an error page), nothing is
+// rendered: the row is put back where it was and a toast says why (`save`).
 //
 // A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor (final
 // fix wave 1, reviews A I1 / B I1). `Pages::Move` saves the page, so its
@@ -113,8 +116,17 @@ export default class extends Controller {
   // SortableJS's `onEnd`: where the dragged <li> landed (`event.to`, the
   // children <ul> of its new parent) and at what index among that list's
   // <li>s.
+  //
+  // Where it came from (`event.from`, `event.oldIndex`) is kept as the
+  // sibling it stood before, for `save` to put it back if the move fails:
+  // SortableJS has already moved the row, so its old neighbours are the
+  // old list's children without it.
   onDrop(event) {
-    return this.save(event.item, event.to, event.newIndex)
+    const origin = event.from && {
+      list: event.from,
+      next: Array.from(event.from.children).filter((child) => child !== event.item)[event.oldIndex] || null
+    }
+    return this.save(event.item, event.to, event.newIndex, origin)
   }
 
   // The one place a move is sent -- the mouse path (`onDrop`) and the
@@ -124,10 +136,20 @@ export default class extends Controller {
   // Queued with every other write on the screen (see the class comment). A
   // move queued behind a save that never answers waits for that save's own
   // 30 s timeout at most; its own request has the same limit, so it cannot
-  // hold the queue either. A request that fails outright (offline, timed
-  // out) leaves the optimistic DOM move in place with nothing saved, as it
-  // always did: there is no answer to draw.
-  async save(item, list, index) {
+  // hold the queue either.
+  //
+  // What came back is judged by `sendOrder` (`autosave/order_request.js`,
+  // which also says what this used to do with an expired session's sign-in
+  // page):
+  // - a Turbo Stream is the endpoint's answer, at any status, and is
+  //   rendered: it redraws the whole tree as the server has it, which is
+  //   also what undoes the optimistic DOM move of a refused drop;
+  // - anything else -- the redirect to sign-in, an error page, no answer at
+  //   all (offline, timed out) -- redraws nothing, so the row would stay
+  //   where it was dropped, a place it was never saved to. It is put back
+  //   at `origin` (`{ list, next }`: where it stood before the move) and an
+  //   error toast says why.
+  async save(item, list, index, origin = null) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
     const pageId = item.dataset.pageId
     const body = JSON.stringify({ page_id: pageId, parent_id: list.dataset.parentId, position: index })
@@ -141,21 +163,37 @@ export default class extends Controller {
       const pageBase = isCurrent() && this.pageBaseFor(pageId)
       if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
 
-      const response = await fetch(this.moveUrlValue, { method: "PATCH", headers, body, signal: AbortSignal.timeout(30000) })
-      const text = await response.text()
+      const answer = await sendOrder(this.moveUrlValue, { headers, body })
       // The page was replaced while the move was on its way (a visit that
       // gave up waiting, Back): the answer's tree, toast and base belong to
       // a document that is gone.
       if (!isCurrent()) return
 
-      if (pageBase) syncBases(text, [ this.constructor.pageBaseId ])
+      if (answer.outcome !== "answered") {
+        this.putBack(item, origin)
+        orderErrorToast(answer.outcome, "toast-move-error")
+        return
+      }
+
+      if (pageBase) syncBases(answer.text, [ this.constructor.pageBaseId ])
       // The tree's own re-render (success or 422 alike) is always a Turbo
       // Stream body -- rendering it is what actually undoes SortableJS's own
       // optimistic DOM move on a failed drop, by replacing the whole frame
       // with the server's (unchanged) version of it. It also appends the
       // "Moved ... Undo" toast on a success.
-      Turbo.renderStreamMessage(text)
+      Turbo.renderStreamMessage(answer.text)
     }).catch(() => {})
+  }
+
+  // Puts a row whose move was not saved back where it stood. Not when the
+  // tree has been redrawn since the drop (an earlier move's answer replaces
+  // the whole frame, this row's element with it): what is on screen then is
+  // the server's own tree, which never had the move in it.
+  putBack(item, origin) {
+    if (!origin || !item.isConnected || !origin.list.isConnected) return
+    if (origin.next && origin.next.parentElement !== origin.list) return
+
+    origin.list.insertBefore(item, origin.next)
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------
@@ -246,12 +284,14 @@ export default class extends Controller {
   }
 
   async drop(row) {
+    // Where it was picked up: `save` puts it back there if the move fails.
+    const origin = this.origin
     this.clearPicked(row)
     const list = row.parentElement
     const index = Array.from(list.children).indexOf(row)
     const id = row.dataset.pageId
     this.announce(`Dropped ${this.titleOf(row)}. ${this.positionOf(row)}`)
-    await this.save(row, list, index)
+    await this.save(row, list, index, origin)
     // The answer replaces the whole tree (this controller's own element with
     // it), so the row the editor was on is a new element: give focus back to
     // its handle so the keyboard user isn't dropped at the top of the page.

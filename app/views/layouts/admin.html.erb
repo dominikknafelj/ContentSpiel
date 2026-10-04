@@ -74,6 +74,13 @@
         fixed target. Empty on a frame request -- see the relay above. %>
     <%= render Admin::ToastRegionComponent.new(flash: turbo_frame_request? ? {} : flash) %>
 
+    <%# The error toast a drop clones when its request got no answer the
+        server could have put a toast into -- offline, signed out, an error
+        page (`autosave/order_request.js`, which writes the message in). The
+        component's own markup, so such a toast is the same toast; inert and
+        outside `#toasts` while it is a `<template>`. %>
+    <template id="toast-error-template"><%= render Admin::ToastComponent.new(message: "Couldn't save.", kind: :error) %></template>
+
     <%# The pending-suggestion box `admin--translate` clones into a field's
         suggestion slot before each AI request (`Admin::TranslationScreen::
         PendingComponent`): a `<template>` is inert, so its buttons and spinner
