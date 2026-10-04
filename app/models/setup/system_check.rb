@@ -6,9 +6,21 @@
 # failure.
 module Setup
   class SystemCheck
-    Result = Data.define(:label, :status, :message) do
+    # `command` is a console command the reader may copy (nil for most
+    # checks) and `docs` a link to read more (nil: nothing in the repo is
+    # linked yet). Both default to nil so a Result built with only the three
+    # original keywords still works.
+    Result = Data.define(:label, :status, :message, :command, :docs) do
+      def initialize(label:, status:, message:, command: nil, docs: nil) = super
+
       def ok? = status == :ok
     end
+
+    # Shown on the System status page to anyone who may view it, and copied
+    # to a clipboard: so it is this fixed string, a placeholder address and
+    # password, and nothing computed -- never a real address, secret, path
+    # or environment value.
+    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'User.find_by(email_address: "you@example.com").update!(password: "a new password")').freeze
 
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
@@ -91,8 +103,7 @@ module Setup
         if configured
           ok("Outgoing mail", "Outgoing mail is configured.")
         else
-          warning("Outgoing mail", "Password reset by email isn't configured. To reset a password without email, " \
-            "run bin/rails console and User.find_by(email_address: \"you@example.com\").update!(password: \"new password\").")
+          warning("Outgoing mail", "Password reset by email isn't configured.", command: MAIL_FALLBACK_COMMAND)
         end
       end
 
@@ -103,6 +114,6 @@ module Setup
       end
 
       def ok(label, message) = Result.new(label:, status: :ok, message:)
-      def warning(label, message) = Result.new(label:, status: :warning, message:)
+      def warning(label, message, command: nil) = Result.new(label:, status: :warning, message:, command:)
   end
 end

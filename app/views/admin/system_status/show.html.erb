@@ -1,14 +1,19 @@
-<%# System status (design spec §6.1, Task 9): the setup wizard's own
-    `Setup::SystemCheck` results, through the wizard's own results partial
-    so both screens word every check identically. "Run again" reloads this
-    screen, which re-runs every check. %>
+<%# System status (design spec §6.1, Task 9; round 3): the setup wizard's own
+    `Setup::SystemCheck` results, through the same row component, so both
+    screens word every check identically. "Run checks again" is a plain GET
+    back to this screen, which re-runs every check -- idempotent, so a reload
+    does the same. The time is the site's (`Admin::BaseController` runs every
+    request in the site time zone). %>
 <% content_for :title, "System status" %>
-<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-  <div>
-    <h1 class="text-h1 text-ink">System status</h1>
-    <p class="mt-1 text-meta">The same checks the setup wizard runs. A warning explains what won't work and how to fix it.</p>
+<% passed = @results.count(&:ok?) %>
+<div class="max-w-[900px]">
+  <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="text-h1 text-ink">System status</h1>
+      <p class="mt-1 text-meta"><%= passed %> of <%= @results.size %> checks passed · last run <%= Time.zone.now.strftime("%H:%M") %></p>
+    </div>
+    <%= link_to "Run checks again", admin_system_status_path(**admin_url_options), class: setup_secondary_link_class %>
   </div>
-  <%= link_to "Run again", admin_system_status_path(**admin_url_options), class: setup_secondary_link_class %>
-</div>
 
-<%= render "setup/system_check_results", results: @results %>
+  <%= render "setup/system_check_results", results: @results, copyable: true %>
+</div>

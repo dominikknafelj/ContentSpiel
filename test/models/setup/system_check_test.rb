@@ -44,11 +44,29 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert result("Background jobs", run_check(queue_adapter: "solid_queue", worker_alive_probe: -> { true })).ok?
   end
 
-  test "unconfigured mail is a warning that points at the console fallback" do
+  test "unconfigured mail is a warning with a copyable command for the console fallback" do
     check = result("Outgoing mail", run_check(mail_host: "example.com"))
 
     assert_equal :warning, check.status
-    assert_includes check.message, "bin/rails console"
+    assert_equal "Password reset by email isn't configured.", check.message
+    # Static text with a placeholder address and password: it is shown to
+    # anyone who may view the status page, so it never carries a real value.
+    assert_equal %(bin/rails runner 'User.find_by(email_address: "you@example.com").update!(password: "a new password")'), check.command
+    assert_nil check.docs
+  end
+
+  test "a Result built without a command or docs link has neither" do
+    check = Setup::SystemCheck::Result.new(label: "x", status: :ok, message: "fine")
+
+    assert_nil check.command
+    assert_nil check.docs
+  end
+
+  test "only the mail warning carries a command" do
+    commands = run_check(storage_probe: -> { false }, image_probe: -> { false }, mail_host: "example.com").map(&:command)
+
+    assert_equal [ nil, nil, nil ], commands.first(3)
+    assert_predicate commands.last, :present?
   end
 
   test "configured SMTP with a real host is ok" do
