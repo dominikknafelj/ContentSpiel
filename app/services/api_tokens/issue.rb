@@ -12,9 +12,15 @@ module ApiTokens
     # (design spec §3.3 "Tokens"). CS Studio's form offers only the groups
     # the user may assign (`AccessControl.permitted_groups_for`); the setup
     # wizard passes Admin for the first (owner) account.
-    def initialize(user, group:, actor: Current.actor)
+    #
+    # `name:` -- nil means "pick the next free Token N" (the setup wizard,
+    # and a form that doesn't ask yet); any String is validated as given,
+    # so a blank "" is a "Name can't be blank" failure rather than a quiet
+    # default (round 3 decision D2).
+    def initialize(user, group:, name: nil, actor: Current.actor)
       @user = user
       @group = group
+      @name = name
       @actor = actor
     end
 
@@ -44,9 +50,14 @@ module ApiTokens
         return denied("tokens.manage", @user, message: "You don't have permission to give a token the #{@group.name} group")
       end
 
+      unless @name.nil?
+        candidate = ApiToken.new(user: @user, group: @group, name: @name)
+        return failure(candidate, candidate.errors.full_messages) unless candidate.valid?
+      end
+
       token, raw = ApiToken.transaction do
-        issued = ApiToken.generate!(@user, group: @group)
-        record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name })
+        issued = ApiToken.generate!(@user, group: @group, name: @name)
+        record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name, "name" => issued.first.name })
         issued
       end
 

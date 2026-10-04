@@ -60,4 +60,39 @@ class ApiTokenTest < ActiveSupport::TestCase
       @user.destroy!
     end
   end
+
+  test "generate! without a name picks the next free Token N for that user" do
+    first, = ApiToken.generate!(@user)
+    second, = ApiToken.generate!(@user)
+    other, = ApiToken.generate!(users(:one))
+
+    assert_equal "Token 1", first.name
+    assert_equal "Token 2", second.name
+    assert_equal "Token 1", other.name
+  end
+
+  test "a name is stripped, required and at most 60 characters" do
+    assert_equal "Claude", ApiToken.generate!(@user, name: "  Claude  ").first.name
+    assert_raises(ActiveRecord::RecordInvalid) { ApiToken.generate!(@user, name: "") }
+    assert_raises(ActiveRecord::RecordInvalid) { ApiToken.generate!(@user, name: "   ") }
+    assert ApiToken.generate!(@user, name: "n" * 60).first.persisted?
+    assert_raises(ActiveRecord::RecordInvalid) { ApiToken.generate!(@user, name: "n" * 61) }
+  end
+
+  test "a name is unique among the user's active tokens, case-insensitively" do
+    first, = ApiToken.generate!(@user, name: "Claude")
+    error = assert_raises(ActiveRecord::RecordInvalid) { ApiToken.generate!(@user, name: "claude") }
+    assert_includes error.record.errors[:name], "is already the name of one of this user's active tokens"
+
+    first.revoke!
+    assert ApiToken.generate!(@user, name: "claude").first.persisted?, "a revoked token's name is free again"
+    assert ApiToken.generate!(users(:one), name: "claude").first.persisted?, "another user's token may share a name"
+  end
+
+  test "a revoked token stays valid when a newer active token holds its name" do
+    old, = ApiToken.generate!(@user, name: "Claude")
+    old.revoke!
+    ApiToken.generate!(@user, name: "Claude")
+    assert old.reload.valid?
+  end
 end

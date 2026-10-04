@@ -117,7 +117,7 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "dialog#delete-group-#{group.id}" do
       assert_select "*", text: /revokes 1 token/
-      assert_select "li", text: /API token ##{token.id}.*#{Regexp.escape(users(:reader).email_address)}/
+      assert_select "li", text: /#{Regexp.escape(token.name)} — .*#{Regexp.escape(users(:reader).email_address)}/
     end
 
     delete "/cs-studio/groups/#{group.id}"

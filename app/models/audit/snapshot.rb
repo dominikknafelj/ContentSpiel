@@ -109,7 +109,7 @@ module Audit
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
       when Media::Asset then record.title.presence || "Image ##{record.id}"
-      when ApiToken then "API token ##{record.id}"
+      when ApiToken then record.name.presence || "API token ##{record.id}"
       when SiteSetting then "Site settings"
       else "#{record.model_name.human} ##{record.id}"
       end
@@ -164,7 +164,7 @@ module Audit
           "grants" => record.grants.order(:permission, :id).map { |grant| { "permission" => grant.permission, "scope" => grant.scope } }
         }
       when ApiToken
-        { "id" => record.id, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
+        { "id" => record.id, "name" => record.name, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
       when Media::Asset
         # Named fields, not `attributes` (media library design spec §5.1):
         # the title and every locale's alt/caption default (the raw jsonb

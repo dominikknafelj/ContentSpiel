@@ -16,7 +16,7 @@
         <% dialog.with_details do %>
           <ul class="list-disc pl-5">
             <% tokens.each do |token| %>
-              <li>API token #<%= token.id %> — <%= render Admin::UserNameComponent.new(user: token.user, user_id: token.user_id) %></li>
+              <li><%= token.name %> — <%= render Admin::UserNameComponent.new(user: token.user, user_id: token.user_id) %></li>
             <% end %>
           </ul>
         <% end %>

@@ -116,13 +116,15 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal "a deleted user", names["By a ghost"]
   end
 
-  test "a change through an API token is the user's, flagged via_token, and never names the token" do
-    token, = ApiToken.generate!(@me, group: access_control_groups(:admin))
+  test "a change through an API token is the user's, carries via_label, and the name outlives the token" do
+    token, = ApiToken.generate!(@me, group: access_control_groups(:admin), name: "Claude desktop")
     as(token, channel: :mcp) { create_post(title: "Via MCP", published: false) }
     row = activity.rows.first
 
-    assert row.via_token
+    assert_equal "Claude desktop", row.via_label
     assert_equal @me.display_name, row.actor_name
+    ApiToken.delete_all
+    assert_equal "Claude desktop", activity.rows.first.via_label
   end
 
   test "images are listed only for a media.upload holder" do

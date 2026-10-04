@@ -56,10 +56,12 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
   end
 
   test "a token snapshot has user, group and revoked_at -- and no digest or raw token" do
-    token, raw = ApiToken.generate!(users(:one))
+    token, raw = ApiToken.generate!(users(:one), name: "Claude desktop")
 
     snapshot = Audit::Snapshot.for(token)
 
+    assert_equal "Claude desktop", snapshot["name"]
+    assert_equal "Claude desktop", Audit::Snapshot.label_for(token)
     assert_equal users(:one).id, snapshot["user_id"]
     assert_equal token.group_id, snapshot["group_id"]
     assert snapshot.key?("revoked_at")

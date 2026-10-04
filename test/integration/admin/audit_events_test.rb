@@ -337,4 +337,38 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
     count
   end
+
+  test "a token-made event reads <user> via <token name>, escaped, and the name outlives the token" do
+    token, = ApiToken.generate!(users(:two), name: "<b>Claude</b>")
+    Audit::Event.create!(action: "post.created", subject_label: "Via MCP", channel: "mcp", actor: token, user_id: users(:two).id,
+      actor_label: token.name, occurred_at: Time.current, last_occurred_at: Time.current)
+    token.destroy!
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_response :success
+    assert_select "td", text: "#{users(:two).display_name} via <b>Claude</b>"
+    assert_select "td b", count: 0
+  end
+
+  test "a token event whose user is gone reads a deleted user via the name" do
+    Audit::Event.create!(action: "post.created", subject_label: "Orphan", channel: "mcp", actor_type: "ApiToken", actor_id: 999_999,
+      user_id: 999_998, actor_label: "Claude desktop", occurred_at: Time.current, last_occurred_at: Time.current)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_select "td", text: "a deleted user via Claude desktop"
+  end
+
+  test "an old token event with no label reads via an API token" do
+    Audit::Event.create!(action: "post.created", subject_label: "Old", channel: "mcp", actor_type: "ApiToken", actor_id: 999_999,
+      user_id: users(:two).id, occurred_at: Time.current, last_occurred_at: Time.current)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_select "td", text: "#{users(:two).display_name} via an API token"
+  end
 end

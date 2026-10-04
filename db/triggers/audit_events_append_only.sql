@@ -4,9 +4,10 @@
 --
 -- The one permitted UPDATE is coalescing (spec §4.2): an `*.updated` or
 -- `access.denied` event is extended in place, which only ever touches
--- `field_changes`, `snapshot` and `last_occurred_at`. Rather than listing
+-- `field_changes`, `snapshot`, `last_occurred_at` and `occurrences` (how many
+-- saves the event stands for). Rather than listing
 -- the frozen columns (and forgetting one added later), the check compares
--- the whole row as jsonb minus those three -- any other column that differs
+-- the whole row as jsonb minus those four -- any other column that differs
 -- between OLD and NEW, including one that doesn't exist yet, is refused.
 --
 -- Idempotent (CREATE OR REPLACE / DROP IF EXISTS) because it is applied
@@ -19,10 +20,10 @@ BEGIN
     RAISE EXCEPTION 'audit_events is append-only: DELETE is not allowed';
   END IF;
 
-  IF (to_jsonb(OLD) - 'field_changes' - 'snapshot' - 'last_occurred_at')
+  IF (to_jsonb(OLD) - 'field_changes' - 'snapshot' - 'last_occurred_at' - 'occurrences')
        IS DISTINCT FROM
-     (to_jsonb(NEW) - 'field_changes' - 'snapshot' - 'last_occurred_at') THEN
-    RAISE EXCEPTION 'audit_events is append-only: only field_changes, snapshot and last_occurred_at may change';
+     (to_jsonb(NEW) - 'field_changes' - 'snapshot' - 'last_occurred_at' - 'occurrences') THEN
+    RAISE EXCEPTION 'audit_events is append-only: only field_changes, snapshot, last_occurred_at and occurrences may change';
   END IF;
 
   RETURN NEW;

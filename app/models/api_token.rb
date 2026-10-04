@@ -15,14 +15,36 @@ class ApiToken < ApplicationRecord
   # `AccessControl` prefix on the association name itself to infer it from.
   belongs_to :group, class_name: "AccessControl::Group"
 
+  MAX_NAME_LENGTH = 60
+
+  # The name a person picks the token out of a list by, and what the audit
+  # log says ("via <name>", `Audit::Event#via_label`) -- round 3 decision D2.
+  # Unique per user among *active* tokens, so a revoked token's name is free
+  # to reuse; compared case-insensitively.
+  normalizes :name, with: ->(name) { name.to_s.strip }
+  validates :name, presence: true, length: { maximum: MAX_NAME_LENGTH }
+  validate :name_unique_among_active_tokens
+
   # `group:` defaults to the built-in Admin group (ruling R1, Task 2 brief)
   # for tests and the console that just want *a* token. The app itself
   # always goes through `ApiTokens::Issue`, where the group is required and
   # checked (design spec §3.3 "Tokens").
-  def self.generate!(user, group: AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME))
+  #
+  # `name: nil` means "I don't care": the next free "Token N" for that user
+  # (so tests and the console need not invent names). A String is taken as
+  # given and validated -- a blank one is an error, never a silent default.
+  def self.generate!(user, group: AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME), name: nil)
     raw_token = SecureRandom.hex(32)
-    token = create!(user: user, group: group, token: raw_token)
+    token = create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, token: raw_token)
     [ token, raw_token ]
+  end
+
+  # "Token N" with N one past the user's token count (the backfill's own
+  # numbering), moving on while that name is taken by an active token.
+  def self.next_default_name(user)
+    number = where(user_id: user.id).count
+    number += 1 while active.where(user_id: user.id).exists?([ "LOWER(name) = LOWER(?)", "Token #{number + 1}" ])
+    "Token #{number + 1}"
   end
 
   def self.authenticate(raw_token)
@@ -42,5 +64,14 @@ class ApiToken < ApplicationRecord
   # not just at creation.
   def record_usage!(ip_address)
     update!(last_used_at: Time.current, last_used_ip: ip_address)
+  end
+
+  private
+
+  def name_unique_among_active_tokens
+    return if name.blank? || revoked_at
+
+    taken = ApiToken.active.where(user_id: user_id).where.not(id: id).exists?([ "LOWER(name) = LOWER(?)", name ])
+    errors.add(:name, "is already the name of one of this user's active tokens") if taken
   end
 end

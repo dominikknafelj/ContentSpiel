@@ -41,6 +41,12 @@ module Audit
       action:,
       actor:,
       user_id: actor.is_a?(ApiToken) ? actor.user_id : actor&.id,
+      # The acting token's name, kept on the row itself (round 3 decision
+      # D1): the token can be deleted later (with its group or user) and the
+      # event must still say "via <name>". Written once, at INSERT; a
+      # coalesced merge never changes it (the Coalescer matches on actor, so
+      # the open row already carries the same token's name).
+      actor_label: actor.is_a?(ApiToken) ? actor.name : nil,
       channel: (Current.channel || default_channel).to_s,
       subject:,
       subject_label: Snapshot.label_for(subject),

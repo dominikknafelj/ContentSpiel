@@ -15,8 +15,10 @@ module Audit
     self.table_name = "audit_events"
 
     # The only columns coalescing (`Audit::Coalescer`) may change on an
-    # existing row -- must match the trigger's list.
-    COALESCING_COLUMNS = %w[field_changes snapshot last_occurred_at].freeze
+    # existing row -- must match the trigger's list. `occurrences` counts the
+    # saves a coalesced row stands for. `actor_label` is deliberately NOT
+    # here: it is written once at INSERT and frozen.
+    COALESCING_COLUMNS = %w[field_changes snapshot last_occurred_at occurrences].freeze
 
     belongs_to :actor, polymorphic: true, optional: true
     belongs_to :user, optional: true
@@ -47,6 +49,16 @@ module Audit
 
     def self.polymorphic_class_for(name)
       super(LEGACY_POLYMORPHIC_TYPES.fetch(name, name))
+    end
+
+    # "via <token name>" for an event an API token made: the name written
+    # when the event was recorded, so it outlives the token. An event from
+    # before names existed (token actor, no label) reads "an API token".
+    # nil for anything that wasn't a token.
+    def via_label
+      return unless actor_type == "ApiToken"
+
+      actor_label.presence || "an API token"
     end
 
     private

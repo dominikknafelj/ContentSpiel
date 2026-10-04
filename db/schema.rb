@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_04_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_100100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -80,6 +80,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_130000) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.bigint "group_id", null: false
+    t.string "name", null: false
     t.index ["group_id"], name: "index_api_tokens_on_group_id"
     t.index ["user_id"], name: "index_api_tokens_on_user_id"
   end
@@ -100,6 +101,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_130000) do
     t.string "ip"
     t.datetime "occurred_at", null: false
     t.datetime "last_occurred_at", null: false
+    t.string "actor_label"
+    t.integer "occurrences", default: 1, null: false
     t.index ["action", "occurred_at"], name: "index_audit_events_on_action_and_occurred_at"
     t.index ["last_occurred_at", "id"], name: "index_audit_events_on_recent", order: :desc
     t.index ["subject_type", "subject_id", "last_occurred_at"], name: "index_audit_events_on_subject_and_newest", order: { last_occurred_at: :desc }

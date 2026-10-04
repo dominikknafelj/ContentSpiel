@@ -36,17 +36,16 @@ module Admin
     end
 
     # "Who" (design spec §5: "time, who (user and token name), channel,
-    # action"). `ApiToken` has no `name` column of its own (`Audit::
-    # Snapshot.label_for`'s own fallback, "API token #id", is the same
-    # call this makes) -- so an MCP write is labelled by its acting user's
-    # email plus the token's id. `event.user_id` is the denormalised
+    # action"). `ApiToken` is named by the label written on the
+    # event itself (`Audit::Event#via_label`, which survives the token being
+    # deleted) -- so an MCP write reads "<user> via <token name>". `event.user_id` is the denormalised
     # acting user (design spec §4.1), read back through `event.user`; it
     # can be nil for a user later deleted, which still leaves the id on
     # the row as proof the event is provably theirs. A trusted code path
     # with no user at all (setup/console/system, `Audit.default_channel`)
     # is labelled by its channel instead.
     def audit_actor_label(event)
-      return "#{audit_user_label(event)} via API token ##{event.actor_id}" if event.actor_type == "ApiToken"
+      return "#{audit_user_label(event)} via #{event.via_label}" if event.via_label
       return audit_user_label(event) if event.user_id
 
       audit_channel_label(event.channel)

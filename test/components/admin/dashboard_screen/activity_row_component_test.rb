@@ -21,13 +21,24 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     assert_selector "time"
   end
 
-  test "a change through an API token has a square accent avatar, names the user and says via an API token" do
-    token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin))
+  test "a change through an API token has the user's round avatar, names the user, says via the token's name and shows the MCP chip" do
+    token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name: "Claude desktop")
     row = row_for(actor: token, channel: :mcp)
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
-    assert_selector "span.rounded-cs.bg-accent", text: users(:two).display_name[0].upcase
-    assert_text "#{users(:two).display_name} via an API token created “Hello”"
+    assert_selector "span.rounded-full", text: users(:two).display_name[0].upcase
+    assert_text "#{users(:two).display_name} via Claude desktop created “Hello”"
+    assert_selector ".admin-channel-chip[data-channel=mcp]", text: "MCP"
+  end
+
+  [ "<script>x</script>", "😀" * 60 ].each_with_index do |name, index|
+    test "a token's name is escaped, whatever it holds (#{index})" do
+      token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name:)
+      render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: token, channel: :mcp))
+
+      assert_no_selector "script"
+      assert_text "via #{name}"
+    end
   end
 
   test "a named user reads by name, not email" do
@@ -51,7 +62,7 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
   test "a coalesced burst shows its span as the time's tooltip" do
     post = Current.set(actor: users(:one), channel: :admin) { create_post(title: "Typing", published: false) }
     event = Audit::Event.find_by!(subject_type: "Post", subject_id: post.id)
-    row = Dashboard::Activity::Row.new(event:, record: post, sentence_parts: [ "edited", post, "" ], actor_name: "Ada", via_token: false,
+    row = Dashboard::Activity::Row.new(event:, record: post, sentence_parts: [ "edited", post, "" ], actor_name: "Ada", via_label: nil,
       at: Time.zone.local(2030, 1, 10, 9, 0), span_end: Time.zone.local(2030, 1, 10, 9, 40))
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 

@@ -73,4 +73,31 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
     assert result.denied?
     assert_equal 1, users(:one).api_tokens.count
   end
+
+  test "no name picks the next free Token N, and the event records the name" do
+    token, = ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only)).record
+    assert_match(/\AToken \d+\z/, token.name)
+    assert_equal token.name, Audit::Event.where(action: "token.issued", subject_id: token.id).last.metadata["name"]
+  end
+
+  test "a given name is used and recorded" do
+    token, = ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only), name: "  Claude desktop ").record
+    assert_equal "Claude desktop", token.name
+    assert_equal "Claude desktop", Audit::Event.where(action: "token.issued", subject_id: token.id).last.metadata["name"]
+  end
+
+  test "a blank name is refused with no token and no event" do
+    assert_no_difference [ "ApiToken.count", "Audit::Event.count" ] do
+      result = ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only), name: "")
+      assert_not result.ok?
+      assert_includes result.errors, "Name can't be blank"
+    end
+  end
+
+  test "a duplicate active name is refused" do
+    ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only), name: "Claude")
+    assert_no_difference "ApiToken.count" do
+      assert_not ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only), name: "claude").ok?
+    end
+  end
 end

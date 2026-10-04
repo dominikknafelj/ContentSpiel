@@ -86,4 +86,21 @@ class Audit::EventTest < ActiveSupport::TestCase
     assert_equal [ @newer ], Audit::Event.by_user(users(:two)).to_a
     assert_equal [ @newer, @event ], ours.recent.to_a
   end
+
+  test "occurrences may be updated by the model and by raw SQL, like the coalescing columns" do
+    @event.update!(occurrences: 3)
+    assert_equal 3, @event.reload.occurrences
+
+    Audit::Event.where(id: @event.id).update_all(occurrences: 4, last_occurred_at: 5.minutes.from_now)
+    assert_equal 4, @event.reload.occurrences
+  end
+
+  test "actor_label is frozen once written, by the model and by the database" do
+    assert_raises(ActiveRecord::ReadOnlyRecord) { @event.update!(actor_label: "Forged") }
+    assert_raises(ActiveRecord::StatementInvalid) { Audit::Event.where(id: @event.id).update_all(actor_label: "Forged") }
+  end
+
+  test "a raw UPDATE of another column alongside occurrences is still refused" do
+    assert_raises(ActiveRecord::StatementInvalid) { Audit::Event.where(id: @event.id).update_all(occurrences: 2, channel: "mcp") }
+  end
 end

@@ -40,8 +40,9 @@ module Dashboard
   # drops out), and one preload of the events' users.
   #
   # A change made through an API token is shown as its *user's* (the event's
-  # `user_id`, filled for a user and a token alike), flagged `via_token`;
-  # the token itself is never loaded or named (round 3 brings token names).
+  # `user_id`, filled for a user and a token alike), carrying `via_label`
+  # (the token's name as recorded on the event, `Audit::Event#via_label`);
+  # the token itself is never loaded.
   class Activity
     # How far back the feed looks: the scan bound for a large audit table.
     WINDOW = 90.days
@@ -74,7 +75,7 @@ module Dashboard
     # `span_end` when the coalesced burst last extended (nil for a single
     # moment). `record` is the page, post or image the sentence is about
     # (a block's owner).
-    Row = Data.define(:event, :record, :sentence_parts, :actor_name, :via_token, :at, :span_end)
+    Row = Data.define(:event, :record, :sentence_parts, :actor_name, :via_label, :at, :span_end)
 
     def initialize(actor:, channel: Current.channel, limit: 15)
       @actor = actor
@@ -147,7 +148,7 @@ module Dashboard
         after = "#{after} for #{date}"
       end
       Row.new(event:, record:, sentence_parts: [ before, record, after ], actor_name: Admin::UserNameComponent.new(user: event.user, user_id: event.user_id).label,
-        via_token: event.actor_type == "ApiToken", at: event.occurred_at,
+        via_label: event.via_label, at: event.occurred_at,
         span_end: (event.last_occurred_at if event.last_occurred_at > event.occurred_at))
     end
 
