@@ -18,6 +18,14 @@ class Admin::AuditScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector ".admin-channel-chip[data-channel=admin]", text: "ADMIN"
   end
 
+  test "the row's link is named by more than the time, and described by the sentence" do
+    row_for("post.published")
+
+    link = page.find("li a[href='/e/1']")
+    assert_equal "16:05, details of this change", link["aria-label"]
+    assert_selector "p##{link['aria-describedby']}", text: "published “Hello”"
+  end
+
   test "a coalesced span reads both ends" do
     row_for("post.updated", last_occurred_at: Time.zone.local(2026, 10, 2, 16, 31))
 
