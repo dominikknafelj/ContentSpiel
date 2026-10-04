@@ -4,13 +4,18 @@
     translation states are never errors. The `title` keeps the hover text the
     old switcher had. %>
 <% marks = ->(code) do %>
+  <%# The `sr-only` sentence lives INSIDE the mark (no `aria-hidden` on it),
+      so when "Mark as up to date" streams the marker away by id the
+      announcement goes with the dot. %>
   <% if missing?(code) %>
-    <%= tag.span "", class: "h-1.5 w-1.5 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" }, aria: { hidden: true } %>
-    <span class="sr-only"><%= native_name(code) %>: not translated</span>
+    <%= tag.span class: "h-1.5 w-1.5 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" } do %>
+      <span class="sr-only"><%= native_name(code) %>: not translated</span>
+    <% end %>
   <% end %>
   <% if outdated?(code) %>
-    <%= tag.span "", id: outdated_marker_id(code), class: "h-1.5 w-1.5 rounded-full bg-warn", title: "Original changed", data: { language_state: "outdated" }, aria: { hidden: true } %>
-    <span class="sr-only"><%= native_name(code) %>: original changed</span>
+    <%= tag.span id: outdated_marker_id(code), class: "h-1.5 w-1.5 rounded-full bg-warn", title: "Original changed", data: { language_state: "outdated" } do %>
+      <span class="sr-only"><%= native_name(code) %>: original changed</span>
+    <% end %>
   <% end %>
 <% end %>
 <nav aria-label="Languages" class="admin-language-tabs border-b border-line">
@@ -32,7 +37,7 @@
               the content it was already reloading. %>
           <%= link_to native_name(code), href(code), class: "border-b-2 border-transparent pb-2 text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
         <% end %>
-        <%= instance_exec(code, &marks) %>
+        <% marks.call(code) %>
       </li>
     <% end %>
     <% if overflow.any? %>
@@ -44,7 +49,7 @@
             <% overflow.each do |code| %>
               <li class="flex items-center gap-1.5 px-2 py-1">
                 <%= link_to native_name(code), href(code), class: "text-meta hover:text-ink", data: { turbo_frame: "_top" } %>
-                <%= instance_exec(code, &marks) %>
+                <% marks.call(code) %>
               </li>
             <% end %>
           </ul>

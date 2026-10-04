@@ -19,6 +19,12 @@ class Admin::LanguageTabsComponentTest < ViewComponent::TestCase
     assert_selector ".sr-only", text: "Deutsch: not translated"
     assert_selector ".sr-only", text: "Español: original changed"
     assert_no_selector "[class*=danger]"
+    # The sentences sit inside the marks, so removing the marker by id
+    # (Mark as up to date) removes the announcement too.
+    assert_selector "##{Admin::LanguageTabsComponent.outdated_marker_id('es')} .sr-only", text: "Español: original changed"
+    assert_selector "[data-language-state=missing] .sr-only", text: "Deutsch: not translated"
+    assert_selector "[title='Original changed']", count: 1
+    assert_selector "[title='Missing required fields']", count: 1
   end
 
   test "no markers when nothing is missing or outdated" do
