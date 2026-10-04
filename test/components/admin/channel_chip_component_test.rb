@@ -16,7 +16,13 @@ class Admin::ChannelChipComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-channel-chip.text-accent"
   end
 
-  test "a channel the audit log doesn't know is refused" do
-    assert_raises(ArgumentError) { Admin::ChannelChipComponent.new(channel: "ftp") }
+  test "an unknown channel is a meta chip with its upcased value, never an error" do
+    render_inline(Admin::ChannelChipComponent.new(channel: "public"))
+    assert_selector ".admin-channel-chip.text-meta", text: "PUBLIC"
+  end
+
+  test "no channel draws nothing" do
+    render_inline(Admin::ChannelChipComponent.new(channel: nil))
+    assert_no_selector ".admin-channel-chip"
   end
 end

@@ -55,10 +55,18 @@ module ApiTokens
         return failure(candidate, candidate.errors.full_messages) unless candidate.valid?
       end
 
-      token, raw = ApiToken.transaction do
-        issued = ApiToken.generate!(@user, group: @group, name: @name)
-        record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name, "name" => issued.first.name })
-        issued
+      begin
+        token, raw = ApiToken.transaction do
+          issued = ApiToken.generate!(@user, group: @group, name: @name)
+          record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name, "name" => issued.first.name })
+          issued
+        end
+      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+        # Lost a race with another create of the same name (the pre-check above
+        # is check-then-insert; the partial unique index is the backstop). The
+        # transaction rolled back, so no token and no event -- the same
+        # ordinary failure the validation gives.
+        return failure(ApiToken.new(user: @user, group: @group, name: @name), [ "Name is already the name of one of this user's active tokens" ])
       end
 
       success([ token, raw ])

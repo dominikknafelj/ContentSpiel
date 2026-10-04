@@ -35,7 +35,21 @@ class ApiToken < ApplicationRecord
   # given and validated -- a blank one is an error, never a silent default.
   def self.generate!(user, group: AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME), name: nil)
     raw_token = SecureRandom.hex(32)
-    token = create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, token: raw_token)
+    attempts = 0
+    begin
+      # A savepoint, so losing the unique-index race (below) doesn't poison
+      # an enclosing Postgres transaction and the retry can still run.
+      token = transaction(requires_new: true) do
+        create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, token: raw_token)
+      end
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+      # Only a generated name is retried: a concurrent create took "Token N"
+      # between our look and our insert, so look again. A name the caller
+      # chose is theirs to fix.
+      raise unless name.nil? && (attempts += 1) < 5
+
+      retry
+    end
     [ token, raw_token ]
   end
 

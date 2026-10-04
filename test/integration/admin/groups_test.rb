@@ -198,4 +198,15 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
   private
 
   def dom_id(record) = ActionView::RecordIdentifier.dom_id(record)
+
+  test "the delete dialog escapes a hostile token name" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Hostile bots")
+    ApiToken.generate!(users(:reader), group:, name: "<script>x</script>")
+
+    get "/cs-studio/groups/#{group.id}/edit"
+
+    assert_select "dialog#delete-group-#{group.id} li script", count: 0
+    assert_select "dialog#delete-group-#{group.id} li", text: /<script>x<\/script> — /
+  end
 end

@@ -100,4 +100,27 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
       assert_not ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only), name: "claude").ok?
     end
   end
+
+  test "losing the unique-name race is an ordinary failure, with no token and no event" do
+    group = access_control_groups(:read_only)
+    original = ApiToken.method(:generate!)
+    # Forces the race: after the service's own pre-check has passed, a
+    # duplicate active token appears (validation skipped) just before its write.
+    ApiToken.define_singleton_method(:generate!) do |user, **options|
+      ApiToken.new(user:, group: options[:group], name: options[:name], token_digest: "x").save!(validate: false)
+      original.call(user, **options)
+    end
+
+    # (The forced duplicate is written inside the service's own transaction,
+    # so it rolls back with it: the net is no token and no event.)
+    assert_no_difference [ "Audit::Event.count", "ApiToken.count" ] do
+      begin
+        result = ApiTokens::Issue.call(users(:one), group:, name: "Claude")
+        assert_not result.ok?
+        assert_includes result.errors.to_sentence, "already the name of one of this user's active tokens"
+      end
+    end
+  ensure
+    ApiToken.define_singleton_method(:generate!, original)
+  end
 end

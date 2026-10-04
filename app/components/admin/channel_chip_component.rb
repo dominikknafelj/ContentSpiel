@@ -8,16 +8,19 @@ module Admin
   class ChannelChipComponent < AdminComponent
     CHANNELS = %w[admin mcp setup console system].freeze
 
+    # Never raises on data: `audit_events.channel` can be nil (no channel) or
+    # a value this list doesn't know ("public", a plugin's), and the dashboard
+    # and audit log pass every row through here. nil draws nothing; an unknown
+    # string draws a meta chip with its upcased value.
     def initialize(channel:)
-      channel = channel.to_s
-      raise ArgumentError, "unknown channel #{channel.inspect}" unless CHANNELS.include?(channel)
-
-      @channel = channel
+      @channel = channel.to_s
     end
+
+    def render? = channel.present?
 
     def label = channel.upcase
 
-    def aria_label = "Channel: #{channel == "mcp" ? "MCP" : channel}"
+    def aria_label = "Channel: #{channel == "mcp" ? "MCP" : channel.downcase}"
 
     def tone_class
       channel == "mcp" ? "border-accent bg-accent-tint text-accent" : "border-line-strong text-meta"
