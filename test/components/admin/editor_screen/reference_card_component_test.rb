@@ -31,13 +31,182 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
     assert_no_selector "script"
   end
 
-  test "an outdated card keeps the note and its Mark as up to date button" do
-    confirm = { record_type: "Post", record_id: 7, field: "title", locale: "de" }
+  # Records built through the real services, so the stored source (text, time,
+  # primary language) is exactly what production writes.
+  def outdated_post(title: "A spare room", changed: "A small room")
+    post = create_post(title: title)
+    assert Posts::Save.call(post, translations: { "de" => { title: "Ein Ersatzzimmer" } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: changed } }).ok?
+    post.reload
+  end
 
-    render_card(state: :outdated, confirm: confirm)
+  def confirm_for(record, field = "title") = { record_type: record.class.name, record_id: record.id, field: field, locale: "de" }
 
-    assert_selector ".admin-reference-card [data-translation-state='outdated']", text: "Original changed since this was translated"
-    assert_selector ".admin-reference-card button[form='translation-confirm-form']", text: "Mark as up to date"
+  def render_outdated(record, field: "title", original: nil, kind: :plain, confirm: true)
+    original ||= record.translation_value(field, "en")
+    render_inline(Admin::EditorScreen::ReferenceCardComponent.new(
+      field: field, locale: "de", original: original, kind: kind, state: :outdated, record: record,
+      confirm: (confirm_for(record, field) if confirm)
+    ))
+  end
+
+  test "an outdated card with a stored source shows the word diff and when it changed" do
+    post = outdated_post
+
+    render_outdated(post)
+
+    assert_selector ".admin-reference-card.border-warn[data-translation-state='outdated']"
+    assert_selector "del[aria-label='removed']", text: "spare"
+    assert_selector "ins[aria-label='added']", text: "small"
+    assert_selector ".admin-reference-card time"
+    assert_selector ".admin-reference-card", text: /CHANGED/i
+    assert_no_text "changed since this was translated"
+  end
+
+  test "the diff's del and ins use the handoff's tokens" do
+    render_outdated(outdated_post)
+
+    assert_selector "del.text-danger-ink.bg-danger-tint"
+    assert_selector "ins.text-ok-ink.bg-ok-tint"
+  end
+
+  test "the confirm button posts through the layout's confirm form, and says it is still correct" do
+    post = outdated_post
+
+    render_outdated(post)
+
+    button = page.find(".admin-reference-card button[type='submit'][form='translation-confirm-form']", text: "Still correct — mark up to date")
+    assert_equal "/cs-studio/translations/confirm", URI(button["formaction"]).path
+    assert_equal({ "record_type" => "Post", "record_id" => post.id.to_s, "field" => "title", "locale" => "de" }, Rack::Utils.parse_query(URI(button["formaction"]).query))
+  end
+
+  test "a viewer who can't confirm sees the diff but no buttons" do
+    render_outdated(outdated_post, confirm: false)
+
+    assert_selector "del", text: "spare"
+    assert_no_selector "button"
+  end
+
+  test "an entry without stored text gets the current original and the no-source sentence" do
+    post = outdated_post
+    post.update_columns(translation_sources: { "title" => { "de" => Translations.digest("A spare room") } })
+    post.reload
+
+    render_outdated(post)
+
+    assert_selector ".admin-reference-card p", text: "A small room"
+    assert_text "English changed since this was translated."
+    assert_no_selector "del"
+    assert_no_selector "ins"
+  end
+
+  test "stored text taken in another primary language is never diffed" do
+    post = outdated_post
+    sources = post.translation_sources.deep_dup
+    sources["title"]["de"]["from"] = "fr"
+    post.update_columns(translation_sources: sources)
+    post.reload
+
+    render_outdated(post)
+
+    assert_text "English changed since this was translated."
+    assert_no_selector "del"
+  end
+
+  test "a card with no record falls back to the no-source sentence" do
+    render_card(state: :outdated, confirm: { record_type: "Post", record_id: 7, field: "title", locale: "de" })
+
+    assert_text "English changed since this was translated."
+    assert_selector "button[form='translation-confirm-form']", text: "Still correct — mark up to date"
+    assert_no_selector ".admin-reference-card time"
+  end
+
+  test "a bold-only change to a rich body says Formatting changed" do
+    post = create_post(title: "Rich")
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("Hello world") } }).ok?
+    assert Posts::Save.call(post, translations: { "de" => { body: rich_doc("Hallo Welt") } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("**Hello world**") } }).ok?
+    post.reload
+    assert_equal :outdated, post.translation_state("body", "de")
+
+    render_outdated(post, field: "body", kind: :rich)
+
+    assert_text "Formatting changed"
+    assert_selector "strong", text: "Hello world"
+    assert_no_selector "del"
+    assert_no_selector "ins"
+  end
+
+  test "a rich body diffs per paragraph" do
+    post = create_post(title: "Rich")
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("One\n\nTwo") } }).ok?
+    assert Posts::Save.call(post, translations: { "de" => { body: rich_doc("Eins\n\nZwei") } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { body: rich_doc("One\n\nThree") } }).ok?
+    post.reload
+
+    render_outdated(post, field: "body", kind: :rich)
+
+    assert_selector "p", text: "One"
+    assert_selector "del", text: "Two"
+    assert_selector "ins", text: "Three"
+  end
+
+  test "a text too long to compare says so and shows the current original" do
+    long = (%w[word] * (Translations::SourceDiff::MAX_WORDS + 5)).join(" ")
+    post = outdated_post(title: long, changed: "#{long} more")
+
+    render_outdated(post)
+
+    assert_text "The text is too long to compare word by word."
+    assert_no_selector "del"
+  end
+
+  test "original text and names are escaped, never trusted" do
+    post = outdated_post(title: "Fine", changed: "Fine <script>alert(1)</script>")
+
+    render_outdated(post)
+
+    assert_selector "ins", text: "<script>alert(1)</script>"
+    assert_no_selector "script"
+  end
+
+  test "the card has a stable DOM id" do
+    post = outdated_post
+
+    render_outdated(post)
+
+    assert_equal "reference-card-post-#{post.id}-title", Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")
+    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")}.admin-reference-card"
+  end
+
+  test "current_for builds the current-state card for a record's field" do
+    post = outdated_post
+    post.confirm_translation("title", "de")
+    post.save!
+
+    render_inline Admin::EditorScreen::ReferenceCardComponent.current_for(post, "title", locale: "de")
+
+    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")}[data-translation-state='current'] p", text: "A small room"
+    assert_no_selector "button"
+  end
+
+  test "the Suggest update button renders only when a button is handed over, with its mode" do
+    Current.actor = users(:one)
+    stub = Class.new { def initialize(api_key:, model:); end }
+    AI::Providers.register("test/stub", stub)
+    Current.site.update!(ai_provider: "test/stub", ai_api_key: "sk-test")
+    post = outdated_post
+    suggest = Admin::TranslationScreen::TranslateButtonComponent.new(
+      confirm: confirm_for(post), input_id: "post-title", characters: 12, mode: :update
+    )
+
+    render_inline(Admin::EditorScreen::ReferenceCardComponent.new(
+      field: "title", locale: "de", original: "A small room", state: :outdated, record: post, confirm: confirm_for(post), suggest: suggest
+    ))
+
+    assert_selector ".admin-reference-card [data-translate-mode='update'] button[data-action='admin--translate#translate']", text: "Suggest update"
+  ensure
+    Rails.application.reloader.prepare!
   end
 
   test "a current card has no note" do

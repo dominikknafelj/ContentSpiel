@@ -10,9 +10,9 @@ module Admin
     # component per column.
     class PlainColumnComponent < Base
       def initialize(name:, value:, original: nil, errors: [], locale: nil, multiline: false, id: nil, html_name: nil,
-        translation_state: nil, translation_confirm: nil, **html)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, **html)
         super(name: name, value: value, original: original, errors: errors, locale: locale, id: id, html_name: html_name,
-          translation_state: translation_state, translation_confirm: translation_confirm, **html)
+          translation_state: translation_state, translation_confirm: translation_confirm, translation_record: translation_record, **html)
         @multiline = multiline
       end
 

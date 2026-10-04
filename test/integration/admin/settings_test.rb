@@ -278,8 +278,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings", params: { locale: "de" }
 
     assert_response :success
-    assert_select "#translation-note-site-setting-#{@site.id}-title", text: /Original changed since this was translated/
-    assert_select "#translation-note-site-setting-#{@site.id}-title button[form='translation-confirm-form']", text: "Mark as up to date"
+    assert_select "#reference-card-site-setting-#{@site.id}-title[data-translation-state='outdated']"
+    assert_select "#reference-card-site-setting-#{@site.id}-title button[form='translation-confirm-form']", text: "Still correct — mark up to date"
     assert_select "#language-switcher-outdated-de"
     assert_select "#language-switcher-outdated-es", count: 0
   end

@@ -14,6 +14,33 @@ class Admin::TranslationStatusSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
   end
 
+  test "an outdated title shows the word diff; marking it up to date restores the plain card without moving updated_at" do
+    post = create_post(title: "A spare room")
+    assert Posts::Save.call(post, translations: { "de" => { title: "Ein Ersatzzimmer" } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: "A small room" } }).ok?
+    updated_at = post.reload.updated_at
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+
+    card = Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")
+    assert_selector "##{card}[data-translation-state='outdated'] del", text: "spare"
+    assert_selector "##{card} ins", text: "small"
+    assert_selector "##{card} time"
+    assert_selector "#language-switcher-outdated-de"
+
+    click_on "Still correct — mark up to date"
+
+    assert_selector "##{card}[data-translation-state='current']", wait: 5
+    assert_no_selector "##{card} del"
+    assert_no_selector "##{card} button"
+    assert_selector "##{card} p", text: "A small room"
+    assert_no_selector "#language-switcher-outdated-de"
+    assert_equal :current, post.reload.translation_state("title", "de")
+    assert_equal updated_at.to_i, post.updated_at.to_i
+    assert_equal "Ein Ersatzzimmer", post.title(locale: "de")
+  end
+
   test "marking an outdated title as up to date clears the note and the marker" do
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
@@ -22,12 +49,11 @@ class Admin::TranslationStatusSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
 
-    assert_text "Original changed since this was translated"
     assert_selector "#language-switcher-outdated-de"
 
-    click_on "Mark as up to date"
+    click_on "Still correct — mark up to date"
 
-    assert_no_text "Original changed since this was translated", wait: 5
+    assert_no_button "Still correct — mark up to date", wait: 5
     assert_no_selector "#language-switcher-outdated-de"
     assert_equal :current, post.reload.translation_state("title", "de")
     assert_equal "Hallo", post.title(locale: "de")

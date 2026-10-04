@@ -100,7 +100,7 @@ module Admin
       def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(asset)
 
       # See `Admin::PageSettingsFormComponent#translation`.
-      def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(asset, field, locale: locale, confirmable: editable?)
+      def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
 
       def language_url
         ->(code) { helpers.admin_medium_path(asset, **(code.to_s == ::Locales.default ? {} : { locale: code })) }

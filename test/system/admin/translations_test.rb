@@ -240,11 +240,11 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
-    assert_text "Original changed since this was translated"
+    assert_selector "[data-original-for='title'] ins", text: "there"
 
-    click_on "Mark as up to date"
+    click_on "Still correct — mark up to date"
 
-    assert_no_text "Original changed since this was translated", wait: 5
+    assert_no_selector "[data-original-for='title'] ins", wait: 5
     assert_equal :current, post.reload.translation_state("title", "de")
     assert_equal "Hallo", post.title(locale: "de", fallback: false)
   end

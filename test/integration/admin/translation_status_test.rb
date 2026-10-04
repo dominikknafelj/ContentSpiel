@@ -7,8 +7,6 @@ require "test_helper"
 class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
   include TestTypes
 
-  NOTE = "Original changed since this was translated".freeze
-
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de es], default: "en")
@@ -24,7 +22,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     record.reload
   end
 
-  def note_id(type, record, field) = "translation-note-#{type}-#{record.id}-#{field}"
+  def note_id(type, record, field) = "reference-card-#{type}-#{record.id}-#{field}"
 
   def confirm_params(record, field, locale = "de")
     { record_type: record.class.name, record_id: record.id, field: field, locale: locale }
@@ -36,12 +34,15 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "##{note_id("post", record, "title")}", text: /#{NOTE}/
+    assert_select "##{note_id("post", record, "title")}[data-translation-state='outdated']"
+    # The title was translated after sources kept their text, so the card diffs.
+    assert_select "##{note_id("post", record, "title")} ins", text: "Hello!"
+    assert_select "##{note_id("post", record, "title")} del", text: "Hello"
     # The button belongs to the layout's one confirm form (outside every
     # autosave form -- forms can't nest), and names its record in the
     # `formaction`.
     assert_select "form#translation-confirm-form[action='/cs-studio/translations/confirm'][method='post']"
-    assert_select "##{note_id("post", record, "title")} button[form='translation-confirm-form']", text: "Mark as up to date" do |buttons|
+    assert_select "##{note_id("post", record, "title")} button[form='translation-confirm-form']", text: "Still correct — mark up to date" do |buttons|
       action = buttons.first["formaction"]
       assert_equal "/cs-studio/translations/confirm", URI(action).path
       assert_equal confirm_params(record, "title").transform_keys(&:to_s).transform_values(&:to_s), Rack::Utils.parse_query(URI(action).query)
@@ -58,7 +59,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}"
 
     assert_response :success
-    assert_not_includes response.body, NOTE
+    assert_select "[data-translation-state='outdated']", count: 0
   end
 
   test "posting the confirm form clears the note and the marker" do
@@ -70,7 +71,8 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     assert_redirected_to "http://www.example.com/cs-studio/posts/#{record.id}?locale=de"
     assert_equal :current, record.reload.translation_state("title", "de")
     follow_redirect!
-    assert_select "##{note_id("post", record, "title")}", count: 0
+    assert_select "##{note_id("post", record, "title")}[data-translation-state='current']"
+    assert_select "##{note_id("post", record, "title")} del", count: 0
     assert_select "#language-switcher-outdated-de", count: 0
     assert_includes response.body, "Marked as up to date"
   end
@@ -85,7 +87,9 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     post "/cs-studio/translations/confirm", params: confirm_params(record, "title"), as: :turbo_stream
 
     assert_response :success
-    assert_includes response.body, %(<turbo-stream action="remove" target="#{note_id("post", record, "title")}">)
+    assert_includes response.body, %(<turbo-stream action="replace" target="#{note_id("post", record, "title")}">)
+    assert_includes response.body, %(data-translation-state="current")
+    assert_not_includes response.body, "<del"
     assert_not_includes response.body, "language-switcher-outdated-de"
 
     post "/cs-studio/translations/confirm", params: confirm_params(record, "excerpt"), as: :turbo_stream
@@ -104,8 +108,8 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
       get "/cs-studio/pages/#{page.id}", params: { locale: "de" }
 
       assert_response :success
-      assert_select "##{note_id("page", page, "title")} button", text: "Mark as up to date"
-      assert_select "##{note_id("content-block", block, "text")} button", text: "Mark as up to date"
+      assert_select "##{note_id("page", page, "title")} button", text: "Still correct — mark up to date"
+      assert_select "##{note_id("content-block", block, "text")} button", text: "Still correct — mark up to date"
       assert_select "#language-switcher-outdated-de"
     end
 
@@ -117,7 +121,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-original-for='alt'] p", text: "Sand dunes"
-    assert_select "##{note_id("media-asset", asset, "alt")} button", text: "Mark as up to date"
+    assert_select "##{note_id("media-asset", asset, "alt")} button", text: "Still correct — mark up to date"
     assert_select "#language-switcher-outdated-de"
     # Ruling: alt present in English, blank in Spanish -- missing there.
     assert_select "nav[aria-label='Languages'] [title='Missing required fields']", count: 1
@@ -138,15 +142,15 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a view-only reader sees the note but no button" do
+  test "a view-only reader sees the diff but no button" do
     record = outdated_post
     sign_in_as(users(:reader))
 
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_includes response.body, NOTE
-    assert_select "button", text: "Mark as up to date", count: 0
+    assert_select "##{note_id("post", record, "title")} ins", text: "Hello!"
+    assert_select "button", text: "Still correct — mark up to date", count: 0
   end
 
   test "a record outside the read scope is a 404, and so is a trashed one or an unknown type" do

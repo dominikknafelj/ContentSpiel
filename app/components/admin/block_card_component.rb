@@ -162,7 +162,7 @@ module Admin
     # See `Admin::PageSettingsFormComponent#translation` -- a block's own
     # fields, confirmed on the block (`block.translation_confirmed`), with
     # the page's edit right (`editable?`, blocks follow their page).
-    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(block, field, locale: locale, confirmable: editable?)
+    def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable?)
 
     # The caption/alt fields are this block's per-use overrides of its
     # image's own defaults (media library design spec §6): blank, the

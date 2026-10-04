@@ -59,7 +59,7 @@ export default class extends Controller {
   // has to finish inside the provider's timeout on its own, and a failed
   // part doesn't throw away the others' suggestions.
   async translateEmpty() {
-    const fields = Array.from(document.querySelectorAll("[data-translate-field]")).map(describe).filter(isEmpty)
+    const fields = Array.from(document.querySelectorAll("[data-translate-field]:not([data-translate-mode='update'])")).map(describe).filter(isEmpty)
     this.useAllTarget.hidden = true
     if (fields.length === 0) {
       this.showStatus(this.constructor.texts.nothingEmpty)

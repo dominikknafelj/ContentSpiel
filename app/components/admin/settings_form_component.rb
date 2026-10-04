@@ -46,7 +46,7 @@ module Admin
     # module as a whole needs `settings.manage` -- the same right
     # `Translations::Confirm` asks for a site field -- so anyone seeing this
     # form may confirm.
-    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(site_setting, field, locale: locale, confirmable: true)
+    def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(site_setting, field, locale: locale, confirmable: true)
 
     def missing_locales = switcher_locales[:missing]
 

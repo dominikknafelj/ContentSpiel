@@ -55,7 +55,7 @@ module Admin
     # changed" note beside the original -- the same contract
     # `Admin::Columns::Base` gives every column field.
     def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-      translation_state: nil, translation_confirm: nil)
+      translation_state: nil, translation_confirm: nil, translation_record: nil)
       @field = field
       @form_name = form_name
       @value = value
@@ -65,6 +65,7 @@ module Admin
       @id_prefix = id_prefix || self.class.dom_id_prefix(form_name)
       @translation_state = translation_state
       @translation_confirm = translation_confirm
+      @translation_record = translation_record
     end
 
     def label_text = field.name.humanize
@@ -94,7 +95,7 @@ module Admin
     # input -- see `Admin::Columns::Base#reference_card`.
     def reference_card
       Admin::EditorScreen::ReferenceCardComponent.new(
-        field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm
+        field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
       )
     end
 
@@ -110,8 +111,18 @@ module Admin
       Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
     end
 
+    # **Suggest update** for an outdated text field -- see
+    # `Admin::Columns::Base#suggest_update_button`.
+    def suggest_update_button
+      return unless translation_state == :outdated && translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+
+      Admin::TranslationScreen::TranslateButtonComponent.new(
+        confirm: translation_confirm, input_id: input_id, characters: original.to_s.length, mode: :update
+      )
+    end
+
     private
 
-    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm
+    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record
   end
 end

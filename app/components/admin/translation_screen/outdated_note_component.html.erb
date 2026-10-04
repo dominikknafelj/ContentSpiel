@@ -1,7 +1,0 @@
-<%= tag.div id: note_id, role: "status", class: "mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2 text-sm text-warn-ink", data: { translation_state: "outdated" } do %>
-  <span><%= self.class::TEXT %></span>
-  <% if confirmable? %>
-    <%= tag.button "Mark as up to date", type: "submit", form: self.class::FORM_ID, formaction: confirm_url,
-          class: "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken" %>
-  <% end %>
-<% end %>

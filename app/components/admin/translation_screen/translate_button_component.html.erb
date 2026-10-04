@@ -4,6 +4,6 @@
   <%= tag.button type: "button", class: self.class::BUTTON_CLASS,
         data: { action: "admin--translate#translate", "admin--translate-target": "button" } do %>
     <span hidden data-translate-spinner class="<%= self.class::SPINNER_CLASS %>" aria-hidden="true"></span>
-    <span data-translate-label><%= self.class::LABEL %></span>
+    <span data-translate-label><%= label %></span>
   <% end %>
 <% end %>

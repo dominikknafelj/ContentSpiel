@@ -11,7 +11,7 @@ module Admin
     # appears inside the field rather than in the reference card beside it.
     #
     # `confirm:` is the same `{ record_type:, record_id:, field:, locale: }`
-    # the "Mark as up to date" note gets (`OutdatedNoteComponent
+    # the "Still correct" button gets (`ReferenceCardComponent
     # .options_for`), handed over only for a viewer who may edit the
     # record -- so a view-only editor, or the primary language (which has
     # no `confirm` at all), never gets a button. On top of that the button
@@ -42,7 +42,21 @@ module Admin
         "hover:bg-sunken disabled:cursor-wait disabled:opacity-70".freeze
       SPINNER_CLASS = "inline-block size-3 animate-spin rounded-full border-2 border-current border-t-transparent".freeze
 
-      def initialize(confirm:, input_id:, kind: :plain, characters: 0)
+      UPDATE_LABEL = "Suggest update".freeze
+      MODES = %i[translate update].freeze
+
+      # `mode: :update` is the outdated reference card's **Suggest update**
+      # (`Admin::EditorScreen::ReferenceCardComponent`): the same wrapper and
+      # the same single-field request as **Translate**, carrying
+      # `data-translate-mode="update"` so the request can tell the two apart
+      # (until the suggestion endpoint gives `mode=update` its own meaning it
+      # behaves as a plain Translate). The header's "Translate empty fields"
+      # skips it (`admin--translate#translateEmpty`): its field already has
+      # another wrapper under the input.
+      def initialize(confirm:, input_id:, kind: :plain, characters: 0, mode: :translate)
+        raise ArgumentError, "unknown translate mode #{mode.inspect}" unless MODES.include?(mode.to_sym)
+
+        @mode = mode.to_sym
         @confirm = confirm&.to_h&.symbolize_keys
         @input_id = input_id.to_s
         @kind = kind.to_s
@@ -50,6 +64,8 @@ module Admin
       end
 
       def render? = confirm.present? && AI.configured? && can?("ai.translate")
+
+      def label = @mode == :update ? UPDATE_LABEL : LABEL
 
       def box_id = SuggestionComponent.dom_id(input_id)
 
@@ -63,7 +79,8 @@ module Admin
           translate_field: confirm[:field],
           translate_input_id: input_id,
           translate_kind: kind,
-          translate_characters: characters
+          translate_characters: characters,
+          translate_mode: @mode
         }
       end
 

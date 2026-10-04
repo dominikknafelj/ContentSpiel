@@ -40,7 +40,7 @@ module Admin
       # slug-preview controller, Task 4) without this component knowing
       # anything about that controller.
       def initialize(name:, value:, original: nil, errors: [], locale: nil, id: nil, html_name: nil,
-        translation_state: nil, translation_confirm: nil, **html)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, **html)
         @name = name
         @value = value
         @original = original
@@ -50,6 +50,7 @@ module Admin
         @html_name = html_name || name
         @html = html
         @translation_state = translation_state
+        @translation_record = translation_record
         @translation_confirm = translation_confirm
       end
 
@@ -66,7 +67,7 @@ module Admin
       def reference_card
         Admin::EditorScreen::ReferenceCardComponent.new(
           field: name, locale: locale, original: card_original, kind: card_kind,
-          state: translation_state, confirm: translation_confirm
+          state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
         )
       end
 
@@ -80,6 +81,15 @@ module Admin
         return unless translation_confirm
 
         Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
+      end
+
+      # **Suggest update** in an outdated card (same wrapper as Translate,
+      # `mode: :update`); the card draws it only when it is outdated, and the
+      # button itself only with AI set up and `ai.translate`.
+      def suggest_update_button
+        return unless translation_state == :outdated && translation_confirm
+
+        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
       end
 
       private
@@ -104,7 +114,7 @@ module Admin
       # its own input, measured as the text it is.
       def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }
 
-      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm
+      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm, :translation_record
     end
   end
 end

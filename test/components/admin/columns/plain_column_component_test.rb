@@ -28,7 +28,7 @@ class Admin::Columns::PlainColumnComponentTranslationTest < ViewComponent::TestC
     render_inline Admin::Columns::PlainColumnComponent.new(name: "subtitle", value: "Alt", original: "New",
       translation_state: :outdated, translation_confirm: CONFIRM)
 
-    assert_selector "[data-original-for='subtitle'] #translation-note-page-1-subtitle button", text: "Mark as up to date"
+    assert_selector "[data-original-for='subtitle'] button[form='translation-confirm-form']", text: "Still correct — mark up to date"
   end
 
   test "current, unknown or no state shows nothing" do
@@ -36,7 +36,7 @@ class Admin::Columns::PlainColumnComponentTranslationTest < ViewComponent::TestC
       render_inline Admin::Columns::PlainColumnComponent.new(name: "subtitle", value: "Alt", original: "New",
         translation_state: state, translation_confirm: CONFIRM)
 
-      refute_text "Original changed since this was translated"
+      refute_text "changed since this was translated"
     end
   end
 end
