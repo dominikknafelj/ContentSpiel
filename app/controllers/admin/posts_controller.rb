@@ -346,7 +346,7 @@ module Admin
       return scope unless states || name == "complete"
 
       exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states || %w[missing outdated], locales: Translations.target_locales)
-      states ? scope.where(exists) : scope.where("NOT #{exists}")
+      states ? scope.where(exists) : scope.where.not(exists)
     end
 
     def filter_by_title(scope, q)

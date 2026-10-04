@@ -77,9 +77,20 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   end
 
   test "the replaced components are gone" do
-    %w[status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb].each do |file|
+    %w[
+      status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb
+      record_header_component.rb tag_input_component.rb translation_screen/list_component.rb
+      translation_screen/outdated_note_component.rb dashboard_screen/column_component.rb
+    ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
+    # The translation states live in `translation_states` (`Translations::StateIndex`) now.
+    assert_not Rails.root.join("app/models/translations/cached_status.rb").exist?
+  end
+
+  test "the outlined danger button variant is gone" do
+    offenders = Dir[Rails.root.join("app/**/*")].select { |f| File.file?(f) && File.read(f).include?("danger_outline") }
+    assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
   end
 end

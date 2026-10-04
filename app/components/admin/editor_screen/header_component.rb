@@ -3,11 +3,10 @@ module Admin
     # The one sticky header of the page and the post editor (design pass
     # round 2, handoff §4.1 and §9 B15): a breadcrumb row carrying the save
     # status, Preview, ONE primary action and a ⋯ menu; the title with its
-    # status chip; the public path; the language tabs. It replaces the page's
-    # `RecordHeaderComponent` and the header that lived inside
-    # `PostFormComponent`, which had drifted apart (the post's publish forms
-    # lacked `turbo_frame: "_top"`, so a publish never refreshed the sidebar's
-    # badge or the lists).
+    # status chip; the public path; the language tabs. One component serves
+    # both editors so their publish forms can't drift apart (a publish must
+    # carry `turbo_frame: "_top"` to refresh the sidebar's badge and the
+    # lists).
     #
     # "No drafts" variant (spec §2): an edit to a live record goes live at
     # once, so a live record has no primary button at all -- only the hint
