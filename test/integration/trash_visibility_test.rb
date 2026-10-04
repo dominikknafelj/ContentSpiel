@@ -281,6 +281,50 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
   end
 
+  # The posts list's own filters, search, scope counts and pagination, and the
+  # bulk endpoints (design pass round 2, Task 17): every one of them is kept
+  # posts only, a trashed id is "not found", and Undo restores only trashed ones.
+  test "the posts list's search, scope, type, tag and translation filters, counts and pager never include a trashed post" do
+    sign_in_as users(:one)
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(content_type: "blog") }
+    tag = Tag.create!(name: "shared")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+    Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de").delete_all
+    [ @kept_post, @gone_post ].each do |post|
+      Translations::State.create!(record_type: "Post", record_id: post.id, locale: "de", state: "outdated", outdated_count: 1)
+    end
+
+    [ {}, { q: "post" }, { scope: "live" }, { type: "blog" }, { tag: "shared" }, { translation: "outdated" }, { translation: "needs" } ].each do |params|
+      get "/cs-studio/posts", params: params
+      assert_response :ok
+      assert_select "tbody tr", text: /Kept post/
+      assert_select "tbody tr", text: /Gone post/, count: 0
+      assert_not_includes response.body, "Gone post", "filters #{params}"
+    end
+    get "/cs-studio/posts", params: { q: "gone" }
+    assert_select "h3", text: "No matches"
+    get "/cs-studio/posts", params: { scope: "drafts" }
+    assert_select "label[for=posts-scope-all] span", text: "1"
+    assert_select "label[for=posts-scope-live] span", text: "1"
+  end
+
+  test "bulk publish and trash name a trashed post as not found and leave it alone; restore_many ignores a kept post" do
+    sign_in_as users(:one)
+    @gone_post.update_columns(published_at: nil)
+    events_before = Audit::Event.count
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ @gone_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_nil @gone_post.reload.published_at
+
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ @gone_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_equal events_before, Audit::Event.count, "not a single event: not even a denial"
+
+    post "/cs-studio/trash/restore_many", params: { type: "post", ids: [ @kept_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_not @kept_post.reload.trashed?
+  end
+
   test "tag suggestions never count a trashed post, and a tag only trashed posts use still appears with 0" do
     sign_in_as users(:one)
     create_post(title: "Kept tagged", tags: [ "shared-tag" ])

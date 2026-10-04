@@ -64,6 +64,8 @@ module Admin
     # The total the sidebar badge shows: one COUNT per type over `roots`.
     def self.badge_count(actor) = MODELS.keys.sum { |type| roots(type, actor).count }
 
+    include BulkResponses
+
     before_action :require_trash_access
     before_action :set_item, only: %i[restore purge]
 
@@ -93,6 +95,26 @@ module Admin
       else
         redirect_to admin_trash_path(**admin_url_options), notice: restored_notice(service), status: :see_other
       end
+    end
+
+    # The Undo of a bulk trash from the posts list (Task 17): `Trash::Restore`
+    # once per named post, each with its own permission check and audit event
+    # (the service's), nothing else. Posts only -- the one bulk trash there
+    # is. Ids are looked up through `visible("post")`, the trashed posts the
+    # viewer may act on: an id that is kept, gone, or out of scope is
+    # *counted as not found* and changes nothing. A restore the service
+    # refuses (a denial, a post whose type is no longer registered) is
+    # reported as refused and never stops the others.
+    def restore_many
+      return head :unprocessable_entity unless params[:type] == "post" && params[:ids].is_a?(Array)
+
+      ids = params[:ids].grep(String).uniq
+      return head :unprocessable_entity if ids.size > Posts::Bulk::MAX_IDS
+
+      posts = self.class.visible("post", Current.actor).where(id: ids.grep(Posts::Bulk::ID_FORMAT)).order(:id).to_a
+      done, refused = posts.partition { |post| Trash::Restore.call(post).ok? }
+      flash_bulk_result(done:, refused:, not_found: ids.size - posts.size, verb: "Restored")
+      redirect_to admin_posts_path(**restore_return_params), status: :see_other
     end
 
     def purge
@@ -198,6 +220,15 @@ module Admin
       images = service.restored_assets.size
       notice << " and #{helpers.pluralize(images, "image")}" if images.positive?
       notice
+    end
+
+    # The list the bulk trash came from (`back[...]`, the filters the Undo URL
+    # carries), so Undo lands back on it with its filters: the list's own keys,
+    # plain strings only.
+    def restore_return_params
+      back = params[:back].respond_to?(:to_unsafe_h) ? params[:back].to_unsafe_h : {}
+      keys = Admin::PostsController::LIST_KEYS.map(&:to_s)
+      back.slice(*keys).select { |_, value| value.is_a?(String) }.symbolize_keys.merge(admin_url_options)
     end
 
     def title_of(item) = item.title.presence || "Untitled"

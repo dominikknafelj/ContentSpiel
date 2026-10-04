@@ -20,12 +20,12 @@
     list there is. It shows every readable post in that state, not only mine
     and not pages; it's the fuller list, not the same list longer. Only for
     someone who can open the posts list. %>
-<% posts_list = ->(status, label) { [ admin_posts_path(status:, **admin_url_options), label ] if can?("posts.read") } %>
+<% posts_list = ->(status, label) { [ admin_posts_path(scope: status, **admin_url_options), label ] if can?("posts.read") } %>
 <% going_live = @feed.going_live_next %>
 
 <div class="grid grid-cols-[repeat(auto-fit,minmax(min(300px,100%),1fr))] gap-4">
   <%= render Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "dashboard-drafts", empty: (quick_create.render? ? "No drafts — start one above." : "No drafts."),
-        link: posts_list.call("draft", "All drafts")) do |card| %>
+        link: posts_list.call("drafts", "All drafts")) do |card| %>
     <% @feed.drafts.each do |record| %>
       <% card.with_row { render Admin::DashboardScreen::RowComponent.new(record:, variant: :draft) } %>
     <% end %>

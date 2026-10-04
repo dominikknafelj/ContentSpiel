@@ -104,6 +104,8 @@ Rails.application.routes.draw do
     # into a routing 404 before `Admin::TrashController` is ever reached.
     get "trash", to: "trash#index", as: :trash
     delete "trash", to: "trash#empty", as: :empty_trash
+    # A bulk trash's Undo (Task 17): restores exactly the posts it names.
+    post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
 
@@ -143,6 +145,10 @@ Rails.application.routes.draw do
     # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
     # comment explains why each is a one-shot POST kept deliberately outside
     # the post form's own autosave, not folded into `update`).
+    # The posts list's bulk bar (Task 17): publish or trash the ticked posts,
+    # one `Posts::Bulk` call. Declared before the resource so "bulk" can never
+    # be read as a post id.
+    post "posts/bulk", to: "posts#bulk", as: :posts_bulk
     resources :posts, only: %i[index new create show update destroy] do
       member do
         post :publish

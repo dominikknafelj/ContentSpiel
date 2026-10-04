@@ -10,17 +10,19 @@ module Admin
   class PostsController < BaseController
     include AutosaveResponses
     include Scheduling
+    include BulkResponses
 
     # `Posts::Save`'s own translated-column list, not a second hand-kept
     # copy -- same reasoning `Admin::ContentBlocksController::TRANSLATED_
     # COLUMNS` already gives for its own settings columns.
     TRANSLATED_COLUMNS = Posts::Save::TRANSLATED.map(&:to_s).freeze
+    PER_PAGE = 50
 
     before_action :set_post, only: %i[show update destroy publish unpublish schedule]
     # The list (and the module itself) needs `posts.read` somewhere; the
     # rows are then narrowed to the readable ones (`filtered_posts`).
     # "New post" needs `posts.create` for at least one content type.
-    before_action -> { require_permission("posts.read") }, only: :index
+    before_action -> { require_permission("posts.read") }, only: %i[index bulk]
     before_action -> { require_permission("posts.create") }, only: %i[new create]
 
     # Filters as query params (spec §5.2's "filters: content type, status,
@@ -38,13 +40,49 @@ module Admin
     def index
       @content_types = ContentTypes.all
       @tags = Tag.order(:name)
-      @posts = filtered_posts.includes(:tags).order(updated_at: :desc).to_a
+      @scope = list_scope
+      @counts = scope_counts
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: @counts.fetch(@scope))
+      # A page past the end shows the "back to page 1" notice and no rows:
+      # don't query rows that were never going to be shown.
+      @posts = @pagination.out_of_range? ? [] : page_of_posts
+      @paths = listed_paths(@posts)
       # The "Languages" column (translation helpers spec §4): every listed
       # post's state per target language, worked out once for the whole
-      # list, so the column costs the same queries however many rows it
+      # page, so the column costs the same queries however many rows it
       # shows. Read from the stored `translation_states` rows
-      # (`Translations::StateIndex`), one query for the whole list.
+      # (`Translations::StateIndex`), one query for the whole page.
       @translation_states = Translations::StateIndex.states_for(@posts)
+    end
+
+    # Publishes or moves to the trash the posts ticked on the list (Task 17).
+    # All the rules live in `Posts::Bulk` (one single-record service per
+    # post, so each post is authorised, audited and answered on its own);
+    # this turns its `Result` into one toast and sends the editor back to
+    # the list they were on, filters and page kept (`list_params`).
+    def bulk
+      action = params[:bulk_action].to_s
+      return refuse_bulk("Unknown bulk action") unless Posts::Bulk::ACTIONS.include?(action)
+
+      ids = bulk_ids
+      return redirect_to(posts_list_path, alert: "Select at least one post.", status: :see_other) if ids.empty?
+
+      begin
+        result = Posts::Bulk.call(action:, ids:)
+      rescue ArgumentError
+        return refuse_bulk("Select at most #{Posts::Bulk::MAX_IDS} posts at a time")
+      end
+
+      trashing = action == "trash"
+      # One Undo for the whole batch, restoring exactly the posts this action
+      # moved (`done`, never "whatever is in the trash"): a route of its own,
+      # which carries the ids and the list's filters.
+      # The list's filters ride in `back`: they have their own `type`, which
+      # must not collide with the Undo route's `type=post`.
+      undo_url = admin_restore_many_trash_path(type: "post", ids: result.done.map(&:id), back: list_filters, **admin_url_options) if trashing && undo_offered?(result.done)
+      flash_bulk_result(done: result.done, refused: result.refused, not_found: result.not_found,
+        verb: trashing ? "Moved" : "Published", suffix: trashing ? " to the trash" : "", undo_url:)
+      redirect_to posts_list_path, status: :see_other
     end
 
     # The no-JS fallback of the New post dialog (design pass round 2, Task 15):
@@ -216,38 +254,123 @@ module Admin
       end
     end
 
-    def filtered_posts
+    # The list's own query params, the ones its links carry (`list_params`).
+    # `status` is the old name of `scope` (the dashboard's "All drafts" links
+    # and bookmarks used `status=draft|scheduled|live`): still read, `scope`
+    # wins when both are there.
+    LIST_KEYS = %i[q scope status type tag translation page].freeze
+    SCOPES = %w[all live drafts scheduled].freeze
+
+    def list_scope
+      requested = params[:scope].presence || params[:status].presence
+      requested = "drafts" if requested == "draft"
+      requested.presence_in(SCOPES) || "all"
+    end
+
+    # Everything except the scope: the base the segmented control's counts
+    # are taken over ("counts respect the other filters, not the scope
+    # itself"), and what `filtered_posts` then narrows by scope.
+    def base_posts
       scope = admin_scope(Post.all)
-      scope = scope.where(content_type: params[:type]) if params[:type].present?
-      scope = filter_by_status(scope, params[:status]) if params[:status].present?
+      scope = scope.where(content_type: params[:type]) if params[:type].is_a?(String) && params[:type].present?
       # A subquery, not `scope.joins(:tags).where(tags: { name: ... })`
-      # directly (final-fixes round, finding 6): `index`'s own `.includes
-      # (:tags)` right after this, combined with a `where` that references
-      # the same `tags` table, is exactly what makes Rails silently upgrade
-      # that `includes` into an `eager_load` (a single LEFT OUTER JOIN) --
-      # and once the *listing* query's own join is filtered down to just the
-      # matching tag, that's also all `post.tags` sees for the rest of that
-      # row, not every tag the post actually has. Filtering by a subquery's
-      # `id`s instead leaves the outer scope with no `tags` reference of its
-      # own, so `includes` stays a real `includes` (a separate query,
-      # preloading every tag) no matter which tag this list was filtered by.
-      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].present?
-      scope = filter_by_title(scope, params[:q]) if params[:q].present?
+      # directly (final-fixes round, finding 6): `.includes(:tags)` combined
+      # with a `where` that references the same `tags` table is exactly what
+      # makes Rails silently upgrade that `includes` into an `eager_load` (a
+      # single LEFT OUTER JOIN) -- and once the *listing* query's own join is
+      # filtered down to just the matching tag, that's also all `post.tags`
+      # sees for the rest of that row, not every tag the post actually has.
+      # Filtering by a subquery's `id`s instead leaves the outer scope with no
+      # `tags` reference of its own, so `includes` stays a real `includes`.
+      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].is_a?(String) && params[:tag].present?
+      scope = filter_by_translation(scope, params[:translation]) if params[:translation].is_a?(String)
+      scope = filter_by_title(scope, params[:q]) if params[:q].is_a?(String) && params[:q].present?
       scope
     end
 
-    def filter_by_status(scope, status)
-      case status
+    def filtered_posts = filter_by_scope(base_posts, @scope)
+
+    def page_of_posts
+      filtered_posts.order(updated_at: :desc, id: :desc).offset(@pagination.offset).limit(PER_PAGE).to_a
+    end
+
+    def filter_by_scope(scope, name)
+      case name
       when "live" then scope.published
-      when "scheduled" then scope.where("published_at > ?", Time.current)
-      when "draft" then scope.where(published_at: nil)
+      when "scheduled" then scope.where("posts.published_at > ?", Time.current)
+      when "drafts" then scope.where(published_at: nil)
       else scope
       end
+    end
+
+    # "All 128 · Live 96 · Drafts 20 · Scheduled 12": one query for the four
+    # numbers (`COUNT ... FILTER`), over `base_posts` -- the other filters
+    # apply, the scope itself does not. The same instant is bound for both
+    # comparisons so a post can't be counted as live and scheduled at once.
+    def scope_counts
+      now = Time.current
+      all, live, drafts, scheduled = base_posts.reorder(nil).pick(
+        Arel.sql("COUNT(*)"),
+        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at <= ?)", now ])),
+        Arel.sql("COUNT(*) FILTER (WHERE posts.published_at IS NULL)"),
+        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at > ?)", now ]))
+      )
+      { "all" => all, "live" => live, "drafts" => drafts, "scheduled" => scheduled }
+    end
+
+    # `needs` (missing or outdated in any target language), `outdated`, or
+    # `complete` (neither, in every target language), read from the stored
+    # `translation_states` rows -- a post with no row reads as complete, the
+    # same rule `Translations::StateIndex` applies everywhere. An EXISTS over
+    # the target languages rather than `StateIndex.joins`, which narrows by
+    # one language: this filter asks about the post as a whole.
+    def filter_by_translation(scope, name)
+      states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
+      return scope unless states || name == "complete"
+
+      exists = Translations::State.where(record_type: Post.polymorphic_name, locale: Translations.target_locales.map(&:to_s))
+        .where("translation_states.record_id = posts.id")
+        .where(state: states || %w[missing outdated]).arel.exists
+      states ? scope.where(exists) : scope.where.not(exists)
     end
 
     def filter_by_title(scope, q)
       scope.where("posts.title ->> ? ILIKE ?", admin_locale, "%#{Post.sanitize_sql_like(q)}%")
     end
+
+    # Each listed post's current public path in the editing language, locale
+    # prefix included, in ONE query for the page (`PublicSite::Urls#path_for`
+    # would ask once per post). A post no page lists has no row: "Not listed".
+    def listed_paths(posts)
+      return {} if posts.empty?
+
+      prefix = PublicSite::Urls.new.prefix(admin_locale)
+      PublicPath.current.where(record_type: Post.polymorphic_name, record_id: posts.map(&:id), locale: admin_locale)
+        .pluck(:record_id, :path).to_h { |id, path| [ id, "#{prefix}#{path}" ] }
+    end
+
+    # The ids a bulk request names: an Array of Strings, nothing else (a
+    # forged `ids[a]=b` hash or nested array is no selection at all).
+    def bulk_ids
+      raw = params[:ids]
+      raw.is_a?(Array) ? raw.grep(String) : []
+    end
+
+    # Where a bulk request came from, read from the form's own hidden fields
+    # (a POST's params are not `request.query_parameters`, which is what
+    # `list_params` reads) -- the same keys, plain strings only, plus the
+    # editing locale.
+    def list_query = admin_url_options.merge(list_filters.symbolize_keys)
+
+    def list_filters
+      params.to_unsafe_h.slice(*LIST_KEYS.map(&:to_s)).select { |_, value| value.is_a?(String) }
+    end
+
+    def posts_list_path = admin_posts_path(**list_query)
+
+    # A request no screen of ours sends (a forged action, more ids than the
+    # list can show): a plain 422, no redirect to a list that did nothing.
+    def refuse_bulk(message) = render(plain: message, status: :unprocessable_entity)
 
     # `Posts::Save` expects an Array of names (its own `assign_tags` calls
     # `Array(...)` on whatever it's handed, which would treat one

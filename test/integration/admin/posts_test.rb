@@ -57,11 +57,23 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   # `eager_load` once both reference the same table -- so a post matching
   # the filter by having *one* of several tags showed only that one tag in
   # the list, not every tag it actually has.
-  test "filtering by tag still shows every tag on a matching row, not just the one it matched by" do
+  test "filtering by tag stays a subquery, never a join the listing query carries" do
     create_post(title: "Multi-tagged", tags: [ "rails", "ruby" ])
-    get "/cs-studio/posts", params: { tag: "rails" }
+    # The list no longer has a Tags column (handoff §4.3) and preloads no
+    # tags, so the bug can't show in a row; it is checked at the query
+    # instead: the tag filter must stay a subquery, never a join the listing
+    # query itself carries (and so never an `eager_load` should tags be
+    # preloaded here again).
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      get "/cs-studio/posts", params: { tag: "rails" }
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
     assert_select "tbody tr", 1
-    assert_select "tbody tr", /rails, ruby/
+    assert_select "tbody tr", /Multi-tagged/
+    assert_empty statements.grep(/LEFT OUTER JOIN "tags"/), "the tag filter must stay a subquery, not an eager_load of tags"
   end
 
   test "new asks for the type, then opens the editor" do
