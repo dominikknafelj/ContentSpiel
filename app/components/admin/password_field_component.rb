@@ -12,8 +12,15 @@ module Admin
   # (e.g. "Use at least 12 characters."), printed under the field and tied
   # to the input through `aria-describedby`/`aria-invalid`.
   #
+  # The Show/Hide button is 12px medium sans in the accent colour (handoff
+  # "Studio Password Reset"), the same on every screen that renders this.
+  # The optional `label_aside` slot puts a small link on the label row, to its
+  # right -- sign-in's "Forgot your password?".
+  #
   # The password itself is never rendered back: the input has no `value`.
   class PasswordFieldComponent < AdminComponent
+    renders_one :label_aside
+
     def initialize(name:, id:, label:, meter: false, autocomplete: "new-password", errors: [], required: true, **input_html)
       @name = name
       @id = id

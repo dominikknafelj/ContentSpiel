@@ -1,29 +1,33 @@
-<%# The sign-in card (handoff "Studio Sign In"). The labels are real <label>s:
-    the old placeholders were the fields' only accessible names. Field names
-    (email_address, password) are what the controller and every test post. %>
-<div class="rounded-cs border border-line bg-surface p-6">
-  <h1 class="text-h2 font-semibold">Sign in</h1>
+<%# The sign-in form (handoff "Studio Sign In"): directly on the page, no card,
+    in the layout's 360px column; the site name above the heading. The labels
+    are real <label>s: the old placeholders were the fields' only accessible
+    names. Field names (email_address, password) are what the controller and
+    every test post. %>
+<div class="flex flex-col gap-[18px]">
+  <%= render "admin/shared/auth_heading", title: "Sign in" %>
 
   <% if flash[:alert] %>
-    <p class="mt-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
   <% end %>
 
   <% if flash[:notice] %>
-    <p class="mt-4 rounded-cs bg-ok-tint px-3 py-2 text-sm text-ok-ink" role="status" id="notice"><%= flash[:notice] %></p>
+    <p class="rounded-cs bg-ok-tint px-3 py-2.5 text-[13px] leading-normal text-ok-ink" role="status" id="notice"><%= flash[:notice] %></p>
   <% end %>
 
-  <%= form_with url: admin_sign_in_path, class: "mt-5 space-y-4" do |form| %>
+  <%= form_with url: admin_sign_in_path, class: "flex flex-col gap-[18px]" do |form| %>
     <div>
       <%= form.label :email_address, "Email", class: setup_label_class %>
       <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address], class: setup_input_class %>
     </div>
 
-    <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") %>
+    <%# "Forgot your password?" rides the Password label row, right-aligned
+        (the field's `label_aside` slot). %>
+    <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "Password", autocomplete: "current-password") do |field| %>
+      <% field.with_label_aside do %>
+        <%= link_to "Forgot your password?", new_admin_password_path, class: "text-xs text-accent hover:text-accent-hover" %>
+      <% end %>
+    <% end %>
 
     <%= render Admin::ButtonComponent.new(label: "Sign in", type: "submit", class: "w-full") %>
   <% end %>
-
-  <p class="mt-4 text-sm">
-    <%= link_to "Forgot your password?", new_admin_password_path, class: "text-accent underline hover:no-underline" %>
-  </p>
 </div>

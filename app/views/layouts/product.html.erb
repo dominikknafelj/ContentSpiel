@@ -13,16 +13,17 @@
   <%# Product UI layout for sign-in and password reset (handoff "Studio Sign
       In"): product stylesheet, no public header/footer. The header is the
       wordmark (a link home to sign-in) and the theme switch, with no rule
-      under it; the card sits in a centred max-w-sm column that is also
-      vertically centred on tall screens (64px is the header's height).
+      under it; the form sits directly on the page (no card) in a
+      centred 360px column, 64px below the header (handoff "Studio Sign In":
+      `padding: 64px 22px`, not vertically centred).
       color-scheme stays scoped to this body. %>
   <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <header class="flex items-center justify-between px-7 py-5">
-      <%= link_to "Content·Spiel", admin_sign_in_path, class: "font-cs-mono text-xs font-bold uppercase tracking-wide text-ink" %>
+      <%= link_to "CONTENT·SPIEL", admin_sign_in_path, class: "font-cs text-xs font-bold uppercase tracking-wide text-ink" %>
       <%= render Admin::ThemeSwitchComponent.new %>
     </header>
-    <main class="mx-auto flex min-h-[calc(100vh-64px)] w-full max-w-sm items-center px-4 pb-16">
-      <div class="w-full"><%= yield %></div>
+    <main class="px-[22px] pb-16 pt-16">
+      <div class="mx-auto w-full max-w-[360px]"><%= yield %></div>
     </main>
   </body>
 </html>

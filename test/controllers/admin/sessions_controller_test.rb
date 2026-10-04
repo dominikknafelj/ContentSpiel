@@ -10,13 +10,27 @@ class Admin::SessionsControllerTest < ActionDispatch::IntegrationTest
 
   test "sign-in uses the product shell: wordmark, theme switch, labelled fields, token button" do
     get admin_sign_in_path
-    assert_select "header a", text: "Content·Spiel"
+    assert_select "header a", text: "CONTENT·SPIEL"
     assert_select "[role=radiogroup][aria-label='Theme']"
     assert_select "label[for=email_address]", text: "Email"
     assert_select "label[for=password]", text: "Password"
     assert_select "button.bg-accent", text: "Sign in"
     assert_select "a", text: "Forgot your password?"
     assert_no_match(/bg-blue|rounded-(md|lg|xl)/, response.body)
+  end
+
+  # Handoff "Studio Sign In": the form sits directly on the page, 360px wide, no
+  # card; the site name (default language) above a 28px heading; "Forgot your
+  # password?" right-aligned on the Password label row, 12px, not underlined.
+  test "sign-in has no card, the site name above the heading, and the forgot link on the password label row" do
+    get admin_sign_in_path
+    assert_select "main div.bg-surface.border", count: 0
+    assert_select "main > div.max-w-\\[360px\\]"
+    assert_select ".admin-site-name + h1.font-semibold", text: "Sign in"
+    assert_select ".admin-site-name", text: site_settings(:default).title
+    assert_select ".admin-password-field > div.justify-between label[for=password]"
+    assert_select ".admin-password-field > div.justify-between a.text-xs", text: "Forgot your password?"
+    assert_select "a.underline", count: 0
   end
 
   test "a failed sign-in shows one alert line above the form" do

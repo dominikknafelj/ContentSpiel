@@ -18,10 +18,6 @@ module Admin
     # `dialog_trigger(id)`: the `data:` that opens a dialog (no inline JS).
     include Admin::DialogHelper
 
-    # The site's name in the default language -- the shell's wordmark
-    # subline (handoff StudioSidebar) and the sign-in screens' eyebrow. The
-    # default language, never the editor's current one: the shell is the
-    # same whichever language a screen is being edited in.
-    def site_name = ::Locales.read(Current.site, :title, locale: ::Locales.default)
+    include Admin::SiteNameHelper
   end
 end
