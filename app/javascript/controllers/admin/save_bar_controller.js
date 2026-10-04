@@ -62,6 +62,20 @@ function clearPendingLeave() {
   shared.pending = null
 }
 
+// The bar is full-bleed: it spans <main> edge to edge, with a top border,
+// however narrow the column holding its form is (users and groups forms sit in
+// a `max-w-md` column, so no fixed negative margin would reach). Measured, not
+// assumed: the margins make up the gap between the bar's parent and <main>.
+function bleed(bar) {
+  const main = bar.closest("main")
+  const parent = bar.parentElement
+  if (!main || !parent) return
+  const outer = main.getBoundingClientRect()
+  const inner = parent.getBoundingClientRect()
+  bar.style.marginLeft = `${outer.left - inner.left}px`
+  bar.style.marginRight = `${inner.right - outer.right}px`
+}
+
 // Visible bars stack from the bottom in document order, so two dirty forms'
 // sticky bars never cover each other: the last one sits at the bottom, each
 // earlier one above the bars after it.
@@ -70,6 +84,7 @@ function layoutBars() {
   visible.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
   let offset = 0
   for (const bar of visible.reverse()) {
+    bleed(bar)
     bar.style.bottom = `${offset}px`
     offset += bar.offsetHeight
   }
@@ -85,6 +100,7 @@ export default class extends Controller {
     if (instances.size === 0) {
       document.addEventListener("turbo:before-visit", onVisit)
       window.addEventListener("beforeunload", onUnload)
+      window.addEventListener("resize", layoutBars)
     }
     instances.add(this)
     shared.leaving = false
@@ -96,6 +112,7 @@ export default class extends Controller {
     if (instances.size === 0) {
       document.removeEventListener("turbo:before-visit", onVisit)
       window.removeEventListener("beforeunload", onUnload)
+      window.removeEventListener("resize", layoutBars)
       clearPendingLeave()
     }
     layoutBars()

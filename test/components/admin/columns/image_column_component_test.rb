@@ -4,7 +4,14 @@ class Admin::Columns::ImageColumnComponentTest < ViewComponent::TestCase
   test "renders a file input named after the column" do
     render_inline Admin::Columns::ImageColumnComponent.new(name: "logo", value: nil)
 
-    assert_selector "input[type=file][name=logo]"
+    assert_selector "input[type=file][name=logo]", visible: :all
+  end
+
+  test "the file input sits in the styled drop zone, not a native control" do
+    render_inline Admin::Columns::ImageColumnComponent.new(name: "logo", value: nil)
+
+    assert_selector ".admin-file-drop input[type=file][accept='image/*'][aria-label=Logo]", visible: :all
+    assert_selector ".admin-file-drop label", text: "Choose file"
   end
 
   test "no preview when nothing is attached" do

@@ -44,4 +44,30 @@ class ShellTest < ApplicationSystemTestCase
     assert_no_selector ".admin-top-bar"
     assert_selector "#sidebar nav[aria-label='Modules']"
   end
+
+  # Round 1 departure, dark and light: the sidebar's background ran only to the
+  # viewport's bottom. Its grid cell now stretches the whole page and paints the
+  # chrome background; the nav inside stays pinned to the viewport.
+  %w[light dark].each do |theme|
+    test "the sidebar background fills the page and the nav stays pinned on a long page (#{theme})" do
+      sign_in_via_form users(:one)
+      await_admin_controllers
+      page.execute_script("document.documentElement.dataset.theme = '#{theme}'; document.querySelector('main').style.minHeight = '3000px'")
+      page.execute_script("window.scrollTo(0, 1500)")
+
+      metrics = page.evaluate_script(<<~JS)
+        (() => {
+          const cell = document.querySelector(".admin-shell__sidebar").getBoundingClientRect()
+          const nav = document.querySelector("nav[aria-label=Modules]").getBoundingClientRect()
+          return { cellHeight: cell.height, navTop: nav.top, navHeight: nav.height, viewport: window.innerHeight,
+                   cellBackground: getComputedStyle(document.querySelector(".admin-shell__sidebar")).backgroundColor,
+                   chrome: (() => { const p = document.createElement("div"); p.style.background = "var(--cs-chrome)"; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c })() }
+        })()
+      JS
+      assert_operator metrics["cellHeight"], :>=, 3000
+      assert_in_delta 0, metrics["navTop"], 1
+      assert_in_delta metrics["viewport"], metrics["navHeight"], 1
+      assert_equal metrics["chrome"], metrics["cellBackground"]
+    end
+  end
 end

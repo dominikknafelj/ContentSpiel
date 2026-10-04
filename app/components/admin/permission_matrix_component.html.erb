@@ -12,8 +12,8 @@
           <% scope = scope_for(permission) %>
           <div data-permission="<%= permission.key %>">
             <label for="<%= field_id(permission, "enabled") %>" class="flex items-center gap-2 text-ink">
-              <%= check_box_tag field_name(permission, "enabled"), "1", ticked?(permission), id: field_id(permission, "enabled"),
-                    data: { action: "admin--permission-matrix#toggle" } %>
+              <%= render Admin::CheckboxComponent.new(name: field_name(permission, "enabled"), value: "1", checked: ticked?(permission), id: field_id(permission, "enabled"),
+                    data: { action: "admin--permission-matrix#toggle" }) %>
               <span><%= permission.label %></span>
               <code class="font-cs-mono text-sm text-meta"><%= permission.key %></code>
             </label>
@@ -31,7 +31,7 @@
                       <% content_type_choices.each do |name| %>
                         <% id = field_id(permission, "type", name.parameterize) %>
                         <label for="<%= id %>" class="flex items-center gap-2 text-ink">
-                          <%= check_box_tag field_name(permission, "content_types") + "[]", name, Array(scope["content_types"]).include?(name), id: id %>
+                          <%= render Admin::CheckboxComponent.new(name: field_name(permission, "content_types") + "[]", value: name, checked: Array(scope["content_types"]).include?(name), id: id) %>
                           <%= content_type_label(name) %>
                         </label>
                       <% end %>
@@ -41,7 +41,7 @@
 
                 <% if permission.scopes.include?(:own) %>
                   <label for="<%= field_id(permission, "own") %>" class="flex items-center gap-2 text-ink">
-                    <%= check_box_tag field_name(permission, "own"), "1", scope["own"] == true, id: field_id(permission, "own") %>
+                    <%= render Admin::CheckboxComponent.new(name: field_name(permission, "own"), value: "1", checked: scope["own"] == true, id: field_id(permission, "own")) %>
                     <%= SCOPE_LABELS[:own] %> <span class="text-sm text-dim">(posts the user wrote)</span>
                   </label>
                 <% end %>

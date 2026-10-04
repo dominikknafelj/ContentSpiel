@@ -5,7 +5,12 @@
     <%= image_tag thumbnail_source, class: "mb-2 max-h-32 rounded-cs border border-line object-cover" %>
   <% end %>
 
-  <%= tag.input(**html.merge(type: "file", name: html_name, id: id, accept: "image/*", class: setup_input_class)) %>
+  <%# The shared styled drop zone (round 1's `FileDropComponent`), not the
+      browser's native "Choose File" control. Same input underneath -- same
+      name, id and `change` event -- so the settings form's autosave still
+      uploads a chosen or dropped file exactly as before. `image/*`, not the
+      library's type list: the logo is not a library image. %>
+  <%= render Admin::FileDropComponent.new(name: html_name, id: id, accept: "image/*", label: name.to_s.humanize, **html) %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

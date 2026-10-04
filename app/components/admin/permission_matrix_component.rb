@@ -125,8 +125,8 @@ module Admin
               if tree[:readable].include?(page.id)
                 id = field_id(permission, "page", page.id)
                 tag.label(for: id, class: "flex items-center gap-2 text-ink") do
-                  check_box_tag(field_name(permission, "page_ids") + "[]", page.id, selected.include?(page.id), id: id,
-                    data: { admin__branch_picker_target: "box", action: "admin--branch-picker#change" }) + page_title(page)
+                  render(Admin::CheckboxComponent.new(name: field_name(permission, "page_ids") + "[]", value: page.id, checked: selected.include?(page.id), id: id,
+                    data: { admin__branch_picker_target: "box", action: "admin--branch-picker#change" })) + page_title(page)
                 end
               else
                 tag.span(page_title(page), class: "block text-dim", title: "You can't open this page")

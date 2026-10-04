@@ -1,0 +1,8 @@
+<% if label %>
+  <span class="inline-flex items-center gap-2">
+    <%= tag.input(**input_attrs) %>
+    <%= label_tag id, label, class: "text-ink" %>
+  </span>
+<% else %>
+  <%= tag.input(**input_attrs) %>
+<% end %>

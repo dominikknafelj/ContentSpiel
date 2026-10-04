@@ -95,6 +95,35 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog#leave-dialog[open]"
   end
 
+  # Round 1 departure: the bar is full-bleed across <main> (with a top border),
+  # even though the users form sits in a narrow `max-w-md` column; the count is
+  # sans 13px, not mono capitals; and the Save button reads "Save".
+  test "the bar spans the whole content area, in sans type, and the button reads Save" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    fill_in "Name", with: "Full bleed"
+    assert_selector ".admin-save-bar"
+
+    geometry = page.evaluate_script(<<~JS)
+      (() => {
+        const bar = document.querySelector(".admin-save-bar").getBoundingClientRect()
+        const main = document.querySelector("main").getBoundingClientRect()
+        const count = getComputedStyle(document.querySelector("[data-admin--save-bar-target=count]"))
+        return { barLeft: bar.left, barRight: bar.right, mainLeft: main.left, mainRight: main.right,
+                 font: count.fontFamily, size: count.fontSize, transform: count.textTransform,
+                 borderTop: getComputedStyle(document.querySelector(".admin-save-bar")).borderTopWidth }
+      })()
+    JS
+    assert_in_delta geometry["mainLeft"], geometry["barLeft"], 1
+    assert_in_delta geometry["mainRight"], geometry["barRight"], 1
+    assert_equal "13px", geometry["size"]
+    assert_equal "none", geometry["transform"]
+    assert_no_match(/mono/i, geometry["font"])
+    assert_equal "1px", geometry["borderTop"]
+    assert_selector ".admin-save-bar button[type=submit]", text: /\ASave\z/
+  end
+
   test "the two account forms share one Leave prompt and stack their bars" do
     sign_in_via_form(@owner)
     visit admin_account_password_path
@@ -109,6 +138,10 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
     first, second = rects.sort_by(&:first)
     assert_operator first.last, :<=, second.first + 1
+
+    # Both full-bleed, even stacked.
+    edges = page.evaluate_script("(() => { const main = document.querySelector('main').getBoundingClientRect(); return Array.from(document.querySelectorAll('.admin-save-bar')).filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return [r.left - main.left, r.right - main.right] }) })()")
+    edges.each { |left, right| assert_in_delta 0, left, 1 and assert_in_delta 0, right, 1 }
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"

@@ -18,7 +18,7 @@
           token form: a disabled box sends nothing, so a ticked one keeps
           its membership through a hidden input instead. %>
       <% if locked && checked %><%= hidden_field_tag "user[group_ids][]", group.id, id: nil %><% end %>
-      <%= check_box_tag "user[group_ids][]", group.id, checked, id: "user_group_ids_#{group.id}", disabled: locked, class: "mt-1" %>
+      <%= render Admin::CheckboxComponent.new(name: "user[group_ids][]", value: group.id, checked: checked, id: "user_group_ids_#{group.id}", disabled: locked, class: "mt-1") %>
       <span>
         <%= group.name %>
         <% if group.description.present? %><span class="block text-sm text-meta"><%= group.description %></span><% end %>
@@ -32,7 +32,7 @@
   <div class="mb-4">
     <label class="flex items-start gap-2 text-ink">
       <% unless locked %><%= hidden_field_tag "user[owner]", "0", id: nil %><% end %>
-      <%= check_box_tag "user[owner]", "1", user.owner?, id: "user_owner", disabled: locked, class: "mt-1" %>
+      <%= render Admin::CheckboxComponent.new(name: "user[owner]", value: "1", checked: user.owner?, id: "user_owner", disabled: locked, class: "mt-1") %>
       <span>
         Owner
         <span class="block text-sm text-meta">

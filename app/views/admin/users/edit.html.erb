@@ -50,6 +50,6 @@
 
     <%= render "admin/users/access_fields", user: @user %>
 
-    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save changes") %>
+    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save") %>
   <% end %>
 </div>

@@ -38,4 +38,25 @@ class Admin::LanguagesSystemTest < ApplicationSystemTestCase
     assert_equal "Über uns", @page.title(locale: :de)
     assert_equal "About", @page.title(locale: :en)
   end
+
+  # Round 1 departure: the state dot is 7px and vertically centred on the label
+  # (it rode low when the underline's padding sat on the label).
+  test "a tab's state dot is 7px and centred on its label" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    geometry = page.evaluate_script(<<~JS)
+      (() => {
+        const dot = document.querySelector(".admin-language-tabs [data-language-state]").getBoundingClientRect()
+        const label = document.querySelector(".admin-language-tabs li [data-language-state]").previousElementSibling
+        const text = document.createRange()
+        text.selectNodeContents(label)
+        const box = text.getBoundingClientRect()
+        return { width: dot.width, height: dot.height, dotMid: dot.top + dot.height / 2, labelMid: box.top + box.height / 2 }
+      })()
+    JS
+    assert_in_delta 7, geometry["width"], 0.5
+    assert_in_delta 7, geometry["height"], 0.5
+    assert_in_delta geometry["labelMid"], geometry["dotMid"], 1.5
+  end
 end
