@@ -15,6 +15,10 @@ export default class extends Controller {
   disconnect() {
     this.element.removeEventListener("turbo:submit-start", this.begin)
     this.element.removeEventListener("turbo:submit-end", this.finish)
+    // A form replaced while its submit is in flight never hears the end
+    // (Turbo dispatches it on the document element instead): the button, which
+    // may live outside the form, would keep its spinner for good.
+    this.finish()
   }
 
   // The button is a target inside the form, or -- when the form can't hold it

@@ -54,7 +54,11 @@ module Admin
     # call needs only `languages.manage` and leaves the site row alone.
     def update
       site = Current.site
-      permitted = params.fetch(:site_setting, ActionController::Parameters.new).permit(
+      # A forged scalar (`site_setting=x`) is no form at all: read as an empty
+      # one (nothing posted, nothing saved) rather than a 500 from `permit`.
+      posted = params[:site_setting]
+      posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
+      permitted = posted.permit(
         :logo, :remove_logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
         translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
         social_links: [ :name, :url ],

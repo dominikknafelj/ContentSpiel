@@ -4,7 +4,7 @@ class Admin::SettingsScreen::LanguageDialogsComponentTest < ViewComponent::TestC
   test "the two empty forms and a neutral pair of dialogs per non-default language" do
     render_inline Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: SiteSetting.instance)
 
-    assert_selector "form#language-default-form", visible: :all
+    assert_no_selector "form#language-default-form", visible: :all
     assert_selector "form#language-add-form[action='/cs-studio/settings/languages']", visible: :all
     %w[de es].each do |code|
       assert_selector "dialog#language-default-dialog-#{code}", visible: :all

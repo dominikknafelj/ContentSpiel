@@ -2,8 +2,9 @@ module Admin
   module SettingsScreen
     # The Languages card (round 3, Task 6; handoff §4.5, A8, A9): one row per
     # enabled language -- a drag handle, the native name with its public path
-    # (`/` for the default, `/<code>` for the rest), a Default radio, a "Falls
-    # back to" select and "Turn off…" -- and "Add language" below. Rendered
+    # (`/` for the default, `/<code>` for the rest), a "Default" tag or a
+    # "Make default" button, a "Falls back to" select and "Turn off…" -- and
+    # "Add language" below. Rendered
     # only for `languages.manage` (decision D9).
     #
     # TWO KINDS OF CONTROL, and which form each belongs to is the point:
@@ -20,17 +21,16 @@ module Admin
     # dialog trigger. They answer with a 303 to the screen, which reloads it, so
     # they are disabled while the main form has unsaved changes
     # (`admin--pending-lock`, decision D10): otherwise the reload would throw
-    # the typed changes away. The Default radios are the one place a "field"
-    # looks like part of the form and must not be: they are named
-    # `default_language` but belong to `#language-default-form` (the empty
-    # form below the screen), so the footer never counts or submits them and
-    # `admin--pending-lock` -- which skips a NAMED control of the save-bar form
-    # itself -- can lock them. Choosing one opens its dialog; the radio only
-    # really moves when the page reloads as the new default.
+    # the typed changes away.
+    #
+    # The default language is NOT a radio group (final wave B, ledger C-M9; the
+    # handoff drew radios): a radio moves on every arrow key, and each move
+    # opened the "Make <Name> the default?" dialog -- a keyboard user could not
+    # walk the group without being asked. The default row carries a "Default"
+    # tag; every other row a "Make default" button that opens that dialog.
     #
     # `values:` -- `Values` (typed order and fallbacks beat stored).
     class LanguagesCardComponent < Admin::AdminComponent
-      DEFAULT_FORM = "language-default-form".freeze
       ADD_FORM = "language-add-form".freeze
 
       def self.default_dialog_id(code) = "language-default-dialog-#{code}"

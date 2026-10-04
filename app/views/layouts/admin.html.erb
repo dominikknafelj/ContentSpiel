@@ -32,7 +32,7 @@
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
       read it via `closest` without a server round trip. %>
-  <body data-controller="admin--dialog admin--drawer admin--command-palette" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded"
         data-admin-locale="<%= admin_locale %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>

@@ -259,6 +259,41 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=append][target=toasts]", /API key removed/
   end
 
+  test "Remove with no key stored writes nothing and announces nothing" do
+    assert_no_difference -> { Audit::Event.count } do
+      remove_key
+    end
+    assert_response :ok
+    assert_not_includes response.body, "API key removed"
+  end
+
+  test "without Turbo the key actions redirect to the card with a flash" do
+    patch admin_settings_ai_key_path, params: { site_setting: { ai_api_key: KEY } }
+    assert_redirected_to admin_settings_path(anchor: "ai")
+    assert_equal "API key saved", flash[:notice]
+    assert @site.reload.ai_api_key_set?
+
+    patch admin_settings_ai_key_path, params: { site_setting: { ai_api_key: " " } }
+    assert_redirected_to admin_settings_path(anchor: "ai")
+    assert_equal Admin::AiKeysController::BLANK_KEY_MESSAGE, flash[:alert]
+
+    delete admin_settings_ai_key_path
+    assert_redirected_to admin_settings_path(anchor: "ai")
+    assert_equal "API key removed", flash[:notice]
+    assert_not @site.reload.ai_api_key_set?
+  end
+
+  test "a forged scalar site_setting is a blank key and an empty Settings form, never a 500" do
+    patch admin_settings_ai_key_path, params: { site_setting: "x" }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, Admin::AiKeysController::BLANK_KEY_MESSAGE
+
+    title = @site.title
+    patch admin_settings_path, params: { site_setting: "x" }
+    assert_includes [ 302, 303 ], response.status
+    assert_equal title, @site.reload.title
+  end
+
   test "Remove key asks first, in the confirm dialog" do
     @site.update!(ai_api_key: KEY)
 

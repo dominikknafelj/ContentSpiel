@@ -2,7 +2,7 @@
     nav's and ⌘K's anchor). The whole section is the `admin--pending-lock`
     scope: every `control` below is an instant action. %>
 <section id="settings-languages-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="languages"
-         data-controller="admin--pending-lock admin--sortable-rows admin--default-language">
+         data-controller="admin--pending-lock admin--sortable-rows">
   <div class="border-b border-line px-4 py-3.5">
     <h2 id="languages" class="text-h2 text-ink">Languages</h2>
     <p class="mt-1 text-sm text-dim">The order is the language switcher's. A language with no translation falls back to the one chosen, then to the default.</p>
@@ -33,14 +33,17 @@
           <span class="ml-1.5 font-cs-mono text-label text-meta"><%= path(code) %></span>
         </div>
 
-        <label class="inline-flex items-center gap-1.5 text-sm text-ink">
-          <%= radio_button_tag "default_language", code, default?(code), id: "language-default-#{code}", form: DEFAULT_FORM,
-                data: { "admin--pending-lock-target": "control", "admin--default-language-target": "radio",
-                        current: (true if default?(code)),
-                        action: ("change->admin--dialog#open" unless default?(code)),
-                        "admin--dialog-id-param": (self.class.default_dialog_id(code) unless default?(code)) } %>
-          Default
-        </label>
+        <%# The default: a tag on the row that is it, a button on every other
+            (an instant action behind its dialog, not a field). They share a
+            column width so the rows line up. %>
+        <div class="flex w-28 justify-start">
+          <% if default?(code) %>
+            <span class="rounded-cs border border-line-strong px-1.5 py-0.5 font-cs-mono text-label uppercase text-dim" data-default-tag>Default</span>
+          <% else %>
+            <%= render Admin::ButtonComponent.new(label: "Make default", variant: :secondary, size: :small, aria: { label: "Make #{name(code)} the default language" },
+                  data: dialog_trigger(self.class.default_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
+          <% end %>
+        </div>
 
         <div class="inline-flex items-center gap-2 text-sm text-ink">
           <label for="language-<%= code %>-fallback">Falls back to<span class="sr-only"> for <%= name(code) %></span></label>
@@ -58,11 +61,17 @@
     <% end %>
   </ul>
 
-  <div class="flex flex-wrap items-center gap-3 p-4">
-    <label for="language-add-code" class="text-sm text-ink">Add a language</label>
-    <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
-          class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--pending-lock-target": "control" } %>
-    <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
-          data: { "admin--pending-lock-target": "control" }) %>
-  </div>
+  <%# With every offered language already on there is nothing to add: a
+      sentence, not an empty select beside a button that can only fail. %>
+  <% if addable_options.any? %>
+    <div class="flex flex-wrap items-center gap-3 p-4">
+      <label for="language-add-code" class="text-sm text-ink">Add a language</label>
+      <%= select_tag "code", options_for_select(addable_options), id: "language-add-code", form: ADD_FORM,
+            class: "#{setup_select_class} !mt-0 !w-auto", data: { "admin--pending-lock-target": "control" } %>
+      <%= render Admin::ButtonComponent.new(label: "Add language", variant: :secondary, type: "submit", form: ADD_FORM,
+            data: { "admin--pending-lock-target": "control" }) %>
+    </div>
+  <% else %>
+    <p class="p-4 text-sm text-meta">Every available language is already on.</p>
+  <% end %>
 </section>

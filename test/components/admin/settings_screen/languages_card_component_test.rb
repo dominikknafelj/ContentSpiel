@@ -8,7 +8,7 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     render_inline Admin::SettingsScreen::LanguagesCardComponent.new(site_setting: @site, values: values)
   end
 
-  test "rows in stored order with name, path, Default radio, fallback select and Turn off" do
+  test "rows in stored order with name, path, the Default tag or Make default, fallback select and Turn off" do
     @site.update!(locales: [ { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] }, { "code" => "es" } ], default_locale: "de")
     render_card
 
@@ -17,8 +17,12 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     assert_equal %w[de en es], page.all("li[data-code]").map { |li| li["data-code"] }
     assert_selector "#language-de", text: %r{Deutsch\s*/\s}
     assert_selector "#language-en", text: %r{English\s*/en}
-    assert_selector "input[type=radio][name=default_language][value=de][checked][data-current]"
-    assert_selector "input[type=radio][value=en]:not([checked])"
+    # No radio group: a tag on the default row, a dialog trigger on the others.
+    assert_no_selector "input[type=radio]"
+    assert_selector "#language-de [data-default-tag]", text: "Default"
+    assert_no_selector "#language-de button", text: "Make default"
+    assert_selector "#language-en button[aria-label='Make English the default language'][data-admin--dialog-id-param='language-default-dialog-en'][data-admin--pending-lock-target=control]", text: "Make default"
+    assert_selector "button", text: "Make default", count: 2
     assert_selector "#language-en-fallback option[selected][value=de]"
     assert_selector "#language-de-fallback[disabled]"
     assert_selector "button[aria-label='Move English']"
@@ -46,5 +50,15 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
 
     assert_selector "select#language-add-code[form=language-add-form] option[value=fr]"
     assert_no_selector "select#language-add-code option[value=de]"
+  end
+
+  test "with every offered language on there is no Add select, only a sentence" do
+    codes = ([ @site.default_locale.to_s ] + ApplicationController.helpers.language_options.map(&:last)).uniq
+    @site.update!(locales: codes.map { |code| { "code" => code } })
+    render_card
+
+    assert_no_selector "#language-add-code"
+    assert_no_selector "button", text: "Add language"
+    assert_text "Every available language is already on."
   end
 end

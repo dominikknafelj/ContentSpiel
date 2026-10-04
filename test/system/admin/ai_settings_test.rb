@@ -100,6 +100,59 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /No unsaved changes/i
   end
 
+  # Final wave B, ledger C-M8 and Task 7 minor 7: the main Save re-renders the
+  # screen and dropped a typed key without a word; and Cancel / Save key left
+  # the focus on <body>.
+  test "a typed, unsaved key holds the main Save back; Cancel and Save key hand the focus on" do
+    visit "/cs-studio/settings"
+    await_admin_controllers
+
+    fill_in "settings-ai_model", with: "another-model"
+    assert_selector "#{footer} button[type=submit]:not([disabled])", text: "Save"
+    # (The main form is unsaved now, so the key's own controls are locked;
+    # put it back and open the entry.)
+    fill_in "settings-ai_model", with: ""
+    within("#settings-ai-key") { click_on "Add key" }
+    fill_in "API key", with: KEY
+    fill_in "settings-ai_model", with: "another-model"
+
+    assert_selector "#{footer} button[type=submit][disabled]", text: "Save"
+    assert_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
+
+    fill_in "settings-ai_model", with: ""
+    within("#settings-ai-key") { click_on "Cancel" }
+    assert_no_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
+    assert_equal "Add key", page.evaluate_script("document.activeElement.textContent.trim()")
+
+    within("#settings-ai-key") { click_on "Add key" }
+    fill_in "API key", with: KEY
+    click_on "Save key"
+    assert_selector "#toasts .admin-toast", text: "API key saved"
+    assert_selector "#settings-ai-key [data-ai-key-state=set]"
+    assert_no_selector "#{footer} [role=status]", text: "Save or cancel the API key first."
+    assert_eventually { page.evaluate_script("document.activeElement.textContent.trim()") == "Replace" }
+  end
+
+  # Task 7 minor 11: a key write that lands while a Test is in flight replaces
+  # the test's form; its end never reached the controller and the button
+  # stayed disabled, with its spinner, until a reload.
+  test "a key saved while a test is in flight leaves Test connection usable afterwards" do
+    site_settings(:default).update!(ai_api_key: KEY)
+    visit "/cs-studio/settings"
+    await_admin_controllers
+    StubProvider.delay = 1.0
+
+    click_on "Test connection"
+    assert_selector "button[disabled]", text: "Testing…"
+    within("#settings-ai-key") { click_on "Replace" }
+    fill_in "API key", with: KEY
+    click_on "Save key"
+    assert_selector "#toasts .admin-toast", text: "API key saved"
+
+    assert_selector "button:not([disabled])", text: "Test connection", wait: 5
+    assert_no_selector "button", text: "Testing…"
+  end
+
   test "a wrong key shows the provider's message in Test connection" do
     site_settings(:default).update!(ai_api_key: "sk-ant-wrong")
     visit "/cs-studio/settings"

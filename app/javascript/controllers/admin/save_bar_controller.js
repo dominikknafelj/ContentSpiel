@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { targetWithinThePage } from "controllers/admin/fragment_links_controller"
 
 // The explicit-save pattern for configuration screens (design pass spec §4,
 // handoff §9 B12): the form's footer (Save, Cancel) is always there, counts
@@ -60,7 +61,7 @@ import { Controller } from "@hotwired/stimulus"
 //    A `#field` link to the page itself (the error summary's) is no way out
 //    and is never asked about; while one of these forms is on the screen it
 //    is neither a frame navigation nor a history entry -- the focus is moved
-//    by hand (`onFrameLink`, `jumpTo`).
+//    by hand (`admin--fragment-links`, for every such link in CS Studio).
 //    NOT covered: a GET *form* submitted into `#content`, and a script setting
 //    the frame's `src`. No explicit-save screen has either.
 //
@@ -154,6 +155,8 @@ function onVisit(event) {
   const expected = promoted
   promoted = null
   if (expected && expected === absolute(event.detail.url)) return
+  // (A `_top` link to a section of this very screen never gets here:
+  // `admin--fragment-links` takes it at `turbo:click`.)
   if (event.defaultPrevented || !mustAsk()) return
   event.preventDefault()
   const url = event.detail.url
@@ -170,62 +173,13 @@ function navigatesContentFrame(link) {
   return frame?.id === "content"
 }
 
-// A `#field` link to the page that is showing (the error summary's links,
-// `Admin::ErrorSummaryComponent`): the element it names, or null. Turbo skips
-// a link whose `href` begins with "#" -- but tests the absolute `link.href`,
-// which never does (`findLinkFromClickTarget`), so it takes these for
-// navigations too.
-function targetWithinThePage(url) {
-  try {
-    const target = new URL(url, document.baseURI)
-    if (target.hash.length < 2 || target.origin !== location.origin ||
-        target.pathname !== location.pathname || target.search !== location.search) return null
-    return { element: document.getElementById(decodeURIComponent(target.hash.slice(1))) }
-  } catch {
-    return null
-  }
-}
-
-// What following the fragment would have done, without the history entry: the
-// focus on the element (one that can't take it is made able to, as a skip
-// link's target is) and the element in view. `scrollIntoView` with no
-// `behavior` jumps unless the page's CSS asks for smooth scrolling, so it is
-// named: no animation for a reader who asked for reduced motion.
-function jumpTo(element) {
-  if (!element) return
-  if (element.tabIndex < 0 && !element.hasAttribute("tabindex")) element.setAttribute("tabindex", "-1")
-  element.focus({ preventScroll: true })
-  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  element.scrollIntoView({ block: "center", behavior: still ? "instant" : "auto" })
-}
-
 function onFrameLink(event) {
   const link = event.target
   if (event.defaultPrevented || !(link instanceof Element)) return
 
-  // A jump within the page leaves nothing, so nobody asks -- but left to
-  // Turbo it is a frame navigation that fetches this screen again, without
-  // the typed values and without the errors the link belongs to (the summary
-  // only exists after a refused save, when the form is unsaved). And left to
-  // the BROWSER it adds a history entry (`…/new#user_email_address`) that
-  // Turbo didn't write and never adopts: after the save went through, Back to
-  // that entry found no form unsaved, so Turbo took it over without rendering
-  // -- the users list on screen under the form's URL, its snapshot cached
-  // under that URL, Turbo's index one off from then on.
-  // So neither gets it. Turbo is kept out (cancelling `turbo:click` makes the
-  // session stand back, stopping it here keeps it from the frames), the click
-  // itself is cancelled, and the jump is made by hand (`jumpTo`): no
-  // `location.hash`, no history entry. Whether or not a form is unsaved --
-  // neither the fetch nor the entry was ever wanted on a screen whose Back
-  // has to mean "the previous screen".
-  const within = targetWithinThePage(event.detail.url)
-  if (within && navigatesContentFrame(link)) {
-    event.preventDefault()
-    event.stopPropagation()
-    event.detail.originalEvent?.preventDefault()
-    jumpTo(within.element)
-    return
-  }
+  // A jump within the page leaves nothing, so nobody asks: `admin--fragment-
+  // links` (on <body>) makes it by hand, with no fetch and no history entry.
+  if (targetWithinThePage(event.detail.url)) return
 
   if (!mustAsk()) return
   if (link.closest("[data-save-bar-cancel]") || !navigatesContentFrame(link)) return
@@ -381,6 +335,11 @@ function announce() {
 // that controller on every keystroke; it reads `data-save-bar-blocked` on the
 // button and keeps it disabled, and is asked to measure again when the block
 // lifts.
+// The same lock serves something typed BESIDE the form that its Save would
+// drop (ledger C-M8: Settings' API key entry, a field of the key's own form,
+// open and filled in while the main Save re-renders the screen): the element
+// holding it carries `data-save-bar-holds="<sentence>"` while it does, and
+// asks for a new look with `admin--save-bar:query`.
 const BLOCKED_HINT = "Save or cancel your changes first."
 
 export default class extends Controller {
@@ -432,19 +391,24 @@ export default class extends Controller {
     announce()
   }
 
-  // See "ONE FORM AFTER ANOTHER".
-  get blocked() {
+  // See "ONE FORM AFTER ANOTHER". The sentence to show, or "" when nothing
+  // blocks this form's Save.
+  get blockedBy() {
     const ids = this.afterValue.split(/\s+/).filter(Boolean)
-    if (ids.length === 0) return false
-    return [...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)
+    if ([...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)) return BLOCKED_HINT
+    // Something typed beside the form that is no field of it and that its
+    // Save would throw away: whoever holds it says so, in its own words.
+    return document.querySelector("[data-save-bar-holds]")?.getAttribute("data-save-bar-holds") || ""
   }
+
+  get blocked() { return this.blockedBy !== "" }
 
   // Called for every form whenever any form's state changes (`announce`).
   applyBlock() {
-    if (!this.afterValue) return
-    const blocked = this.blocked
+    const hint = this.blockedBy
+    const blocked = hint !== ""
     if (this.hasBlockedTarget) {
-      this.blockedTarget.textContent = blocked ? BLOCKED_HINT : ""
+      if (this.blockedTarget.textContent !== hint) this.blockedTarget.textContent = hint
       this.blockedTarget.hidden = !blocked
     }
     if (!this.hasSaveTarget) return

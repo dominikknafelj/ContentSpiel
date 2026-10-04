@@ -348,6 +348,34 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_no_field "Name"
   end
 
+  # Deferred g1-g3: the keyboard follows such a link the same way, and a link
+  # whose target isn't on the screen (or whose hash can't be decoded) is still
+  # no navigation -- nothing is fetched, nothing asked, no history entry.
+  test "Enter on a fragment link jumps too, and a missing or malformed target goes nowhere" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+    page.execute_script(<<~JS)
+      document.getElementById("user-form").insertAdjacentHTML("beforebegin",
+        '<a id="jump-field" href="#user_email_address">To the email</a> <a id="jump-nowhere" href="#no_such_field">Nowhere</a> <a id="jump-broken" href="#%E0%A4%A">Broken</a>')
+      document.getElementById("user-form").dataset.sameForm = "yes"
+    JS
+    fill_in "Name", with: "Typed before the jumps"
+    entries = page.evaluate_script("history.length")
+
+    page.execute_script("document.getElementById('jump-field').focus()")
+    page.driver.browser.keyboard.type(:Enter)
+    assert_eventually(message: "focus never reached the field") { page.evaluate_script("document.activeElement.id") == "user_email_address" }
+
+    find("#jump-nowhere").click
+    find("#jump-broken").click
+    sleep 0.3
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_selector "#user-form[data-same-form=yes]"
+    assert_equal "Typed before the jumps", find_field("Name").value
+    assert_equal entries, page.evaluate_script("history.length")
+    assert_equal "", page.evaluate_script("location.hash")
+  end
+
   test "Back with nothing typed just goes back" do
     sign_in_via_form(@owner)
     open_edit_from_the_list

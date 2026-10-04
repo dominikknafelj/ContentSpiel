@@ -5,8 +5,6 @@ module Admin
     # dialog's own form can't be inside one either) and that the card reaches
     # by `form=` or a dialog trigger. Rendered after the Settings form.
     #
-    #   - `#language-default-form` -- the empty form the Default radios belong
-    #     to, so they are not fields of the Settings form;
     #   - `#language-add-form` -- Add language: `POST settings/languages`, no
     #     dialog (nothing is lost by it);
     #   - per non-default language, "Make <Name> the default?" (`PATCH
@@ -22,8 +20,6 @@ module Admin
       def initialize(site_setting:)
         @site_setting = site_setting
       end
-
-      def default_form = LanguagesCardComponent::DEFAULT_FORM
 
       def add_form = LanguagesCardComponent::ADD_FORM
 

@@ -45,8 +45,10 @@ export default class extends Controller {
       fallbackOnBody: true,
       fallbackClass: "admin-drag-fallback",
       fallbackTolerance: 3,
-      onChoose: () => this.rememberRadios(),
-      onStart: () => this.makeCloneInert(),
+      onStart: (event) => {
+        this.endKeyboardPickUp(event.item)
+        this.makeCloneInert()
+      },
       onEnd: () => this.commit()
     })
   }
@@ -56,19 +58,16 @@ export default class extends Controller {
     this.sortable = null
   }
 
-  // SortableJS appends the fallback clone to <body> BEFORE `onStart`. A cloned,
-  // CHECKED radio (the default language's Default) has the original's name and
-  // form owner, so it joins the group and unchecks the original -- and removing
-  // its `name` afterwards doesn't give the check back. So the checked radios of
-  // the list are noted when the row is chosen (before any clone exists) and
-  // checked again once the clone has been made inert.
-  rememberRadios() {
-    this.checkedRadios = Array.from(this.listTarget.querySelectorAll("input[type=radio]:checked"))
-  }
-
-  restoreRadios() {
-    (this.checkedRadios || []).forEach((radio) => { radio.checked = true })
-    this.checkedRadios = null
+  // A pointer drag that starts while a row is still picked up by the keyboard
+  // ends that pick-up: two rows "held" at once, one by each path, left the
+  // announcer and the picked styling describing a move that was no longer
+  // happening, and a later Escape put a row "back" over the drag's result.
+  // Another row goes back where it was picked up; the dragged row itself is
+  // only un-picked -- it is in SortableJS's hands now, from where it stands.
+  endKeyboardPickUp(dragged) {
+    if (!this.picked) return
+    if (this.picked === dragged) this.clearPicked(dragged)
+    else this.cancel(this.picked, { refocus: false })
   }
 
   // The dragged clone is a picture of the row, appended to <body> outside the
@@ -76,7 +75,7 @@ export default class extends Controller {
   // nothing exists twice or connects in it.
   makeCloneInert() {
     const clone = Sortable.ghost
-    if (!clone) return this.restoreRadios()
+    if (!clone) return
     for (const element of [clone, ...clone.querySelectorAll("*")]) {
       for (const { name } of Array.from(element.attributes)) {
         if (name === "id" || name === "name" || name === "data-controller" || name === "data-action" || /^data-.+-target$/.test(name)) {
@@ -84,7 +83,6 @@ export default class extends Controller {
         }
       }
     }
-    this.restoreRadios()
   }
 
   // The order field follows the rows. Only an actual change is announced to

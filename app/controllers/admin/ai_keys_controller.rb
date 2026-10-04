@@ -30,14 +30,22 @@ module Admin
 
     before_action -> { require_permission("settings.manage") }
 
+    # `site_setting` is read only when it is the hash the form posts: a forged
+    # scalar (`site_setting=x`) has nothing to dig into and is a blank key, not
+    # a 500.
     def update
-      key = params.dig(:site_setting, :ai_api_key).to_s.strip
+      posted = params[:site_setting]
+      key = (posted.is_a?(ActionController::Parameters) ? posted[:ai_api_key] : nil).to_s.strip
       return answer(nil, error: BLANK_KEY_MESSAGE, status: :unprocessable_entity) if key.blank?
 
       write({ "ai_api_key" => key }, notice: "API key saved")
     end
 
+    # With no key stored there is nothing to remove: nothing is written and
+    # nothing is announced (a second press, a stale tab).
     def destroy
+      return answer(nil) unless Current.site.ai_api_key_set?
+
       write({ "ai_api_key" => nil }, notice: "API key removed")
     end
 
@@ -74,7 +82,15 @@ module Admin
       streams << turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: notice, kind: :success)) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: error, kind: :error)) if toast && error
-      render turbo_stream: streams, status: status
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: streams, status: status }
+        # Without Turbo (no JavaScript, a scripted client) a stream body would
+        # be shown as text: the same outcome as a redirect to the card instead.
+        format.html do
+          flash[error ? :alert : :notice] = error || notice if error || notice
+          redirect_to admin_settings_path(**admin_url_options, anchor: "ai"), status: :see_other
+        end
+      end
     end
 
     # The same comparison the Settings form makes (`SettingsController#stale?`).

@@ -70,6 +70,15 @@ export default class extends Controller {
     if (this.locked) this.lock(control)
   }
 
+  // So is a hint: the key component a write's answer replaces carries its own
+  // (targets of the first render connect before `connect()`; `apply` there
+  // covers them).
+  hintTargetConnected(hint) {
+    if (this.locked === undefined) return
+    if (!hint.textContent.trim()) hint.textContent = HINT
+    hint.hidden = !this.locked
+  }
+
   apply(locked) {
     this.locked = locked
     this.controlTargets.forEach((control) => (locked ? this.lock(control) : this.unlock(control)))

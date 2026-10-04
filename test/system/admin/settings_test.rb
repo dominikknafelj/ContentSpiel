@@ -156,6 +156,30 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal "settings-en-title", page.evaluate_script("document.activeElement.id")
   end
 
+  # ⌘K "Settings › AI translation" used ON Settings is a `_top` link to a
+  # section of the screen that is showing. As a visit it asked "Leave without
+  # saving?" about a jump that leaves nothing (final wave B).
+  test "a ⌘K row for a section of this screen jumps there without asking, changes kept" do
+    visit admin_settings_path
+    await_admin_controllers
+    fill_in "settings-en-title", with: "Typed, not saved"
+    assert_selector footer, text: /\b1 unsaved change\b/i
+    entries = page.evaluate_script("history.length")
+
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("AI translation")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: "Settings › AI translation"
+    input.send_keys(:enter)
+
+    assert_no_selector "dialog[open]"
+    assert_eventually(message: "focus never reached the section") { page.evaluate_script("document.activeElement.id") == "ai" }
+    assert_equal "Typed, not saved", find_field("settings-en-title").value
+    assert_selector footer, text: /\b1 unsaved change\b/i
+    assert_equal entries, page.evaluate_script("history.length")
+    assert_equal "", page.evaluate_script("location.hash")
+  end
+
   # -- Languages (round 3, Task 6) ---------------------------------------------------
 
   def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)
@@ -163,7 +187,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
   test "a keyboard reorder is one pending change, locks the instant actions, and Save puts the tabs in the new order" do
     visit admin_settings_path
     await_admin_controllers
-    assert_selector "#settings-languages-card input[type=radio]:not([disabled])", count: 3
+    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default", count: 2
 
     handle = find("button[aria-label='Move English']")
     handle.send_keys(:space)
@@ -175,7 +199,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector footer, text: /\b1 unsaved change\b/i
 
     # D10: Default, Turn off and Add wait for Save or Cancel, and say so.
-    assert_selector "#settings-languages-card input[type=radio][disabled]", count: 3
+    assert_selector "#settings-languages-card button[disabled]", text: "Make default", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Turn off…", count: 2
     assert_selector "#settings-languages-card button[disabled]", text: "Add language"
     assert_selector "#settings-languages-card select#language-add-code[disabled]"
@@ -187,7 +211,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal %w[de en es], site_settings(:default).reload.locale_codes
     assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
     assert_equal "Deutsch", language_tab_names.first
-    assert_selector "#settings-languages-card input[type=radio]:not([disabled])", count: 3
+    assert_selector "#settings-languages-card button:not([disabled])", text: "Make default", count: 2
     assert_no_text "Save or cancel your changes first."
   end
 
@@ -215,12 +239,14 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal [ "en" ], site_settings(:default).reload.locale_entry("de")["fallbacks"]
   end
 
-  test "choosing another Default opens the dialog with its count, Cancel puts the radio back, and confirming changes the default" do
+  test "Make default opens the dialog with its count, Cancel changes nothing, and confirming changes the default" do
     Mobility.with_locale(:de) { site_settings(:default).update!(title: "Danas Notizen") }
     visit admin_settings_path
     await_admin_controllers
+    assert_selector "#language-en [data-default-tag]", text: /default/i
+    assert_no_selector "#settings-languages-card input[type=radio]"
 
-    find("#language-default-de").click
+    find("button[aria-label='Make Deutsch the default language']").click
     assert_selector "dialog#language-default-dialog-de[open]"
     within("dialog#language-default-dialog-de") do
       assert_text "Make Deutsch the default?"
@@ -228,16 +254,22 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
       click_on "Cancel"
     end
     assert_no_selector "dialog[open]"
-    assert find("#language-default-en").checked?
-    assert_not find("#language-default-de").checked?
+    assert_selector "#language-en [data-default-tag]"
+    assert_no_selector "#language-de [data-default-tag]"
     assert_selector footer, text: /No unsaved changes/i
 
-    find("#language-default-de").click
+    # A button opens its dialog when pressed, never on arriving: focus alone
+    # asks nothing (the radios opened a dialog per arrow key).
+    page.execute_script("document.querySelector(\"button[aria-label='Make Deutsch the default language']\").focus()")
+    assert_no_selector "dialog[open]"
+
+    find("button[aria-label='Make Deutsch the default language']").click
     within("dialog#language-default-dialog-de") { click_on "Change default language" }
 
     assert_selector "#toasts .admin-toast", text: "Deutsch is now the default language"
     assert_current_path(/\/settings(\?.*)?#languages|\/settings/)
-    assert find("#language-default-de").checked?
+    assert_selector "#language-de [data-default-tag]", text: /default/i
+    assert_selector "button[aria-label='Make English the default language']"
     site = site_settings(:default).reload
     assert_equal "de", site.default_locale.to_s
     assert_equal "Danas Notizen", site.title(locale: "de")
@@ -263,13 +295,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#language-fr"
   end
 
-  # SortableJS's fallback drag appends a clone of the row to <body> BEFORE
-  # `onStart`; the cloned, checked Default radio shares the original's name and
-  # form owner, joins the group and unchecks the original.
-  test "dragging the default language's row with the mouse keeps its Default radio checked" do
+  # SortableJS's fallback drag appends a clone of the row to <body>; it must
+  # stay a picture (no ids, no names, no Stimulus wiring) and the drop is one
+  # pending change.
+  test "dragging the default language's row with the mouse reorders it and keeps its Default tag" do
     visit admin_settings_path
     await_admin_controllers
-    assert find("#language-default-en").checked?
+    assert_selector "#language-en [data-default-tag]"
 
     # A real pointer drag in small steps: SortableJS's fallback needs
     # `fallbackTolerance` of movement and then moves over the target row.
@@ -280,12 +312,33 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     mouse.down
     10.times { |step| mouse.move(x: from[0] + (target[0] - from[0]) * (step + 1) / 10.0, y: from[1] + (target[1] - from[1]) * (step + 1) / 10.0, steps: 3) }
     assert_selector "body > .admin-drag-fallback", visible: :all
-    assert page.evaluate_script("document.querySelector('#language-default-en').checked"), "the Default radio stays checked while the row is being dragged"
+    assert_no_selector "body > .admin-drag-fallback [id], body > .admin-drag-fallback [name]", visible: :all
     mouse.up
 
     assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
     assert_selector footer, text: /\b1 unsaved change\b/i
-    assert find("#language-default-en").checked?
-    assert_not find("#language-default-de").checked?
+    assert_selector "#language-en [data-default-tag]", count: 1
+  end
+
+  test "a pointer drag ends a keyboard pick-up" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    handle = find("button[aria-label='Move English']")
+    handle.send_keys(:space)
+    assert_selector "#language-en[data-picked]"
+
+    mouse = page.driver.browser.mouse
+    from = handle.evaluate_script("(function(r){return [r.x + r.width / 2, r.y + r.height / 2]})(this.getBoundingClientRect())")
+    target = find("#language-de").evaluate_script("(function(r){return [r.x + r.width / 2, r.y + r.height * 0.8]})(this.getBoundingClientRect())")
+    mouse.move(x: from[0], y: from[1])
+    mouse.down
+    10.times { |step| mouse.move(x: from[0] + (target[0] - from[0]) * (step + 1) / 10.0, y: from[1] + (target[1] - from[1]) * (step + 1) / 10.0, steps: 3) }
+    assert_selector "body > .admin-drag-fallback", visible: :all
+    assert_no_selector "#settings-languages-card li[data-picked]"
+    mouse.up
+
+    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_selector footer, text: /\b1 unsaved change\b/i
   end
 end

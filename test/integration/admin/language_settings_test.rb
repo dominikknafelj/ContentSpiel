@@ -52,13 +52,17 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "#language-de button[data-admin--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
   end
 
-  test "the Default radios are not fields of the Settings form, and the instant actions sit outside it" do
+  test "the default is a tag and buttons, never a field of the Settings form, and the instant actions sit outside it" do
     get "/cs-studio/settings"
 
-    assert_select "input[type=radio][name=default_language][form='language-default-form']", 3
-    assert_select "input[type=radio][value=en][checked]"
+    # No radio group (final wave B, C-M9): a tag on the default row, a dialog
+    # trigger with no name on the others -- nothing the form could submit.
+    assert_select "#settings-languages-card input[type=radio]", count: 0
+    assert_select "#language-en [data-default-tag]", text: "Default"
+    assert_select "#settings-languages-card button[type=button]:not([name])", text: "Make default", count: 2
+    assert_select "#language-de button[data-admin--dialog-id-param='language-default-dialog-de'][aria-label='Make Deutsch the default language']"
     assert_select "form#settings-form form", count: 0
-    assert_select "form#language-default-form"
+    assert_select "form#language-default-form", count: 0
     assert_select "form#language-add-form[action='/cs-studio/settings/languages'][method=post]"
     assert_select "#language-add-code[form='language-add-form'] option[value='fr']"
     assert_select "#language-add-code option[value='de']", count: 0
@@ -74,7 +78,7 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
 
     assert_select "#settings-languages-card[data-controller~='admin--pending-lock']"
     assert_select "#settings-languages-card [data-admin--pending-lock-target=hint]"
-    assert_select "#settings-languages-card input[type=radio][data-admin--pending-lock-target=control]", 3
+    assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Make default", count: 2
     assert_select "#settings-languages-card button[data-admin--pending-lock-target=control]", text: "Turn off…", count: 2
     assert_select "#settings-languages-card #language-add-code[data-admin--pending-lock-target=control]"
     assert_select "#settings-languages-card button[type=submit][form='language-add-form'][data-admin--pending-lock-target=control]", text: "Add language"
