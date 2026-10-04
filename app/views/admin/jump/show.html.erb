@@ -1,0 +1,30 @@
+<%# The palette's results frame (`Admin::Shell::CommandPaletteComponent`):
+    a bare fragment, no layout. Rows are links that leave the frame
+    (`_top`), so following one is an ordinary Turbo visit and the page
+    replacement closes the dialog. %>
+<turbo-frame id="jump-results" data-admin--command-palette-target="results">
+  <% @groups.each do |group| %>
+    <section class="py-1">
+      <h3 class="px-4 pb-1 pt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group[:label] %></h3>
+      <ul role="listbox" aria-label="<%= group[:label] %>">
+        <% group[:rows].each do |row| %>
+          <li role="option" aria-selected="false">
+            <%= link_to row[:url], data: { turbo_frame: "_top" }, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
+              <span class="min-w-0 flex-1 truncate"><%= row[:title] %></span>
+              <% if row[:hint] %><%= render Admin::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
+              <% if row[:status] %><%= render Admin::StatusChipComponent.new(status: row[:status], hide_live: true) %><% end %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+  <% if @groups.empty? && @query.strip.present? %>
+    <div class="px-4 py-4 text-sm text-dim">
+      <p>No results for “<%= @query.strip.first(Jump::Search::MAX_QUERY) %>”.</p>
+      <% if can?("posts.create") %>
+        <p class="pt-2"><%= link_to "New blog post “#{@query.strip.first(Jump::Search::MAX_QUERY)}”", new_admin_post_path(title: @query.strip.first(Jump::Search::MAX_QUERY), **admin_url_options), data: { turbo_frame: "_top" }, class: "underline" %></p>
+      <% end %>
+    </div>
+  <% end %>
+</turbo-frame>

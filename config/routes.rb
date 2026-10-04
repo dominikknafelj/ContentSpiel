@@ -27,6 +27,11 @@ Rails.application.routes.draw do
     get "sign-in", to: "sessions#new", as: :sign_in
     post "sign-in", to: "sessions#create"
     delete "sign-out", to: "sessions#destroy", as: :sign_out
+
+    # ⌘K "Jump to..." results (design pass spec §5.6): a layout-less HTML
+    # fragment for the palette's turbo-frame, read-only, open to every
+    # signed-in user (each row is already narrowed to what they may read).
+    get "jump", to: "jump#show", as: :jump
     resource :password, only: %i[new create]
     get "password/:token/edit", to: "passwords#edit", as: :edit_password
     patch "password/:token", to: "passwords#update", as: :update_password
