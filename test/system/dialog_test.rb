@@ -4,6 +4,13 @@ require "application_system_test_case"
 # trigger opens a dialog by id, a destructive one starts on Cancel, Esc
 # closes without acting, and the confirm button does the write.
 class DialogSystemTest < ApplicationSystemTestCase
+  # The Tags list's row menu (round 3): "Delete tag…" opens the list's one Delete dialog.
+  def open_delete_tag_dialog(tag)
+    row = "##{ActionView::RecordIdentifier.dom_id(tag)}"
+    find("#{row} button[aria-label^='Actions for']").click
+    find("#{row} [role=menu] button", text: "Delete tag…").click
+  end
+
   test "a destructive confirm opens on Cancel, Escape backs out, confirming deletes" do
     site_settings(:default).update!(setup_completed_at: Time.current)
     tag = Tag.create!(name: "dialog-tag")
@@ -12,7 +19,7 @@ class DialogSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/tags"
     await_admin_controllers
 
-    within("##{ActionView::RecordIdentifier.dom_id(tag)}") { press "Delete" }
+    open_delete_tag_dialog(tag)
     assert_selector "dialog[open]"
     assert_equal "Cancel", page.evaluate_script("document.activeElement.textContent.trim()")
 
@@ -20,8 +27,8 @@ class DialogSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
     assert_selector "##{ActionView::RecordIdentifier.dom_id(tag)}"
 
-    within("##{ActionView::RecordIdentifier.dom_id(tag)}") { press "Delete" }
-    within("dialog[open]") { press "Delete" }
+    open_delete_tag_dialog(tag)
+    within("dialog[open]") { press "Delete tag" }
     assert_no_selector "##{ActionView::RecordIdentifier.dom_id(tag)}"
     assert_not Tag.exists?(tag.id)
   end
@@ -37,7 +44,7 @@ class DialogSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/tags"
     await_admin_controllers
 
-    within("##{ActionView::RecordIdentifier.dom_id(tag)}") { press "Delete" }
+    open_delete_tag_dialog(tag)
     assert_selector "dialog[open]"
 
     box = page.evaluate_script("(() => { const r = document.querySelector('dialog[open]').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom] })()")
@@ -79,7 +86,7 @@ class DialogSystemTest < ApplicationSystemTestCase
     expected = page.evaluate_script(probe)
     assert_match(/\A(rgba?|color|oklab)\(/, expected)
 
-    within("##{ActionView::RecordIdentifier.dom_id(tag)}") { press "Delete" }
+    open_delete_tag_dialog(tag)
     assert_selector "dialog[open]"
     assert_equal expected, page.evaluate_script('getComputedStyle(document.querySelector("dialog[open]"), "::backdrop").backgroundColor')
     # Not the old ~50%: the alpha is the 38% (0.38) the expression asks for.
