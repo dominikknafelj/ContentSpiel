@@ -6,7 +6,7 @@
           drag starts from it too (SortableJS `handle:`). %>
       <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
               aria-label="Move <%= label %>" aria-describedby="block-drag-help"
-              data-action="keydown->admin--blocks#key">⠿</button>
+              data-action="keydown->admin--blocks#key focusout->admin--blocks#blur">⠿</button>
     <% end %>
 
     <% if unavailable? %>

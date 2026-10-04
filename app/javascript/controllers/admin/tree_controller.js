@@ -83,11 +83,15 @@ export default class extends Controller {
   // it out one level; Space drops it (`save`, the mouse path's own request)
   // and Escape puts it back without saving. Only drops the mouse path could
   // also make are offered: the destination must be one of this controller's
-  // own `list` targets (never the homepage's own level -- the homepage is the
-  // one root and `Pages::Move` refuses to move a page out of it -- nor a
-  // context-only page's list, which is no drop target), and a page never goes
-  // under itself (it can only nest under a *sibling*, never into its own
-  // subtree).
+  // own `list` targets (`data-admin--tree-target="list"`): the homepage's own
+  // level has none (the homepage is the one root; a page can't leave it), and
+  // neither does a context-only page's list, so ArrowRight under such a
+  // sibling and ArrowLeft out to such a level do nothing. A page can only nest
+  // under a *sibling*, never into its own subtree.
+  //
+  // A picked row whose handle loses focus is put back (`blur`): the DOM move
+  // has saved nothing, so leaving it displaced and styled would show an order
+  // that isn't real.
   key(event) {
     const row = event.currentTarget.closest("li[data-page-id]")
     if (!row) return
@@ -115,6 +119,7 @@ export default class extends Controller {
   }
 
   pickUp(row) {
+    if (this.picked && this.picked !== row) this.cancel(this.picked, { refocus: false })
     this.picked = row
     this.origin = { list: row.parentElement, next: row.nextElementSibling }
     row.dataset.picked = "true"
@@ -169,10 +174,22 @@ export default class extends Controller {
     document.querySelector(`li[data-page-id='${id}'] .admin-tree-node__handle`)?.focus()
   }
 
-  cancel(row) {
+  // Focus leaving the handle. A DOM move (`moved`) blurs it too and refocuses
+  // straight away, so judge after the current task: only a handle that is
+  // still unfocused means the editor really left.
+  blur(event) {
+    // `currentTarget` is only set during dispatch: keep the handle itself.
+    const handle = event.currentTarget
+    const row = handle.closest("li[data-page-id]")
+    setTimeout(() => {
+      if (this.picked === row && document.activeElement !== handle) this.cancel(row, { refocus: false })
+    }, 0)
+  }
+
+  cancel(row, { refocus = true } = {}) {
     this.origin.list.insertBefore(row, this.origin.next)
     this.clearPicked(row)
-    this.focusHandle(row)
+    if (refocus) this.focusHandle(row)
     this.announce(`Cancelled. ${this.titleOf(row)} is back where it was.`)
   }
 

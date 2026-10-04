@@ -39,4 +39,65 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     within("dialog#leave-dialog") { press "Leave" }
     assert_current_path admin_posts_path
   end
+
+  # A failed save re-renders the form (the controller reconnects with the typed
+  # values as its baseline): the bar and the leave guard must survive that.
+  test "a new user form shows its Save from the start and keeps the bar after a 422" do
+    sign_in_via_form(@owner)
+    visit new_admin_user_path
+    await_admin_controllers
+
+    # Reachable before any typing, without the leave guard armed yet.
+    assert_selector ".admin-save-bar", text: /Create user/
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_current_path admin_posts_path
+    assert_no_selector "dialog#leave-dialog[open]"
+
+    visit new_admin_user_path
+    await_admin_controllers
+    fill_in "Email address", with: @target.email_address
+    fill_in "Password", with: "a much Longer passw0rd"
+    fill_in "Confirm password", with: "a much Longer passw0rd"
+    press "Create user"
+
+    assert_selector "[role=alert], .admin-error-summary, [aria-invalid=true]", wait: 10
+    assert_selector ".admin-save-bar", text: /unsaved/i
+    assert_selector ".admin-save-bar button[type=submit]", text: "Create user"
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_selector "dialog#leave-dialog[open]"
+  end
+
+  test "the two account forms share one Leave prompt and stack their bars" do
+    sign_in_via_form(@owner)
+    visit admin_account_password_path
+    await_admin_controllers
+
+    fill_in "Your name", with: "Someone New"
+    assert_selector ".admin-save-bar", count: 1
+    fill_in "Current password", with: "whatever"
+    assert_selector ".admin-save-bar", count: 2
+
+    # Stacked, not covering each other.
+    rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
+    first, second = rects.sort_by(&:first)
+    assert_operator first.last, :<=, second.first + 1
+
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_selector "dialog#leave-dialog[open]"
+    assert_selector "dialog[open]", count: 1
+    within("dialog#leave-dialog") { press "Leave" }
+    assert_current_path admin_posts_path
+  end
+
+  test "saving one account form is not blocked by the other being pristine" do
+    sign_in_via_form(@owner)
+    visit admin_account_password_path
+    await_admin_controllers
+
+    fill_in "Your name", with: "Saved Name"
+    press "Save name"
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_text "Saved Name", wait: 10
+    assert_equal "Saved Name", @owner.reload.name
+  end
 end

@@ -18,7 +18,7 @@
             drag still starts from it (SortableJS `handle:`). %>
         <button type="button" class="admin-tree-node__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
                 aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
-                data-action="keydown->admin--tree#key">⠿</button>
+                data-action="keydown->admin--tree#key focusout->admin--tree#blur">⠿</button>
       <% end %>
 
       <%= link_to title, path, data: { turbo_frame: "content" },

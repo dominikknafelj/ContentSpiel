@@ -3,7 +3,7 @@
     an empty list still arrives as one. %>
 <%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
-<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data do %>
+<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data(dirty: group.errors.any?) do %>
   <div class="mb-4 max-w-md">
     <%= label_tag "group_name", "Name", class: setup_label_class %>
     <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>

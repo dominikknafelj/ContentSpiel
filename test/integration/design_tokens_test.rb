@@ -11,6 +11,15 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_not_includes css, "cs-prose"
   end
 
+  # Once deleted by accident in an unrelated commit: SortableJS and the
+  # keyboard path both style the dragged row through these classes.
+  test "the product build carries the drag pattern classes" do
+    css = stylesheet("tailwind.css")
+
+    assert_includes css, ".admin-drag-ghost"
+    assert_includes css, ".admin-drag-chosen"
+  end
+
   test "the theme build carries theme tokens and no product tokens or product-only classes" do
     css = stylesheet("theme-default.css")
 

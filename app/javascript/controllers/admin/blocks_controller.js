@@ -144,6 +144,7 @@ export default class extends Controller {
   }
 
   pickUp(card) {
+    if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
     this.picked = card
     this.originNext = card.nextElementSibling
     card.dataset.picked = "true"
@@ -170,10 +171,22 @@ export default class extends Controller {
     return this.reorder()
   }
 
-  cancel(card) {
+  // Focus leaving the handle puts a picked card back: the DOM move has saved
+  // nothing. A move blurs the handle too and refocuses at once, so judge
+  // after the current task.
+  blur(event) {
+    // `currentTarget` is only set during dispatch: keep the handle itself.
+    const handle = event.currentTarget
+    const card = this.cardFor(event)
+    setTimeout(() => {
+      if (this.picked === card && document.activeElement !== handle) this.cancel(card, { refocus: false })
+    }, 0)
+  }
+
+  cancel(card, { refocus = true } = {}) {
     this.listTarget.insertBefore(card, this.originNext)
     this.clearPicked(card)
-    this.focusHandle(card)
+    if (refocus) this.focusHandle(card)
     this.announce(`Cancelled. ${this.titleOf(card)} is back where it was.`)
   }
 

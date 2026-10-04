@@ -6,7 +6,7 @@
 
   <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
-  <%= form_with url: admin_users_path(**admin_url_options), method: :post, id: "user-form", data: save_bar_form_data do %>
+  <%= form_with url: admin_users_path(**admin_url_options), method: :post, id: "user-form", data: save_bar_form_data(dirty: @user.errors.any?, always: true) do %>
     <div class="mb-4">
       <%= label_tag "user_name", "Name", class: setup_label_class %>
       <%= text_field_tag "user[name]", @user.name, id: "user_name", maxlength: 120, autocomplete: "name",

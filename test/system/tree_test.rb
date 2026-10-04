@@ -86,4 +86,17 @@ class TreeSystemTest < ApplicationSystemTestCase
     assert_equal root_page, @child.reload.parent
     assert_equal %w[Alpha Child Beta Gamma], children_titles
   end
+
+  test "a picked page is put back when focus leaves its handle" do
+    sign_in_via_form(users(:one))
+    visit admin_pages_path
+    await_admin_controllers
+
+    find("button[aria-label='Move Alpha']").send_keys(:space, :down)
+    assert_selector "[data-admin--tree-target=announcer]", text: /Position 2 of 3/, visible: :all
+    find("button[aria-label='Move Gamma']").send_keys(:space)
+    assert_selector "[data-admin--tree-target=announcer]", text: /Picked up Gamma/, visible: :all
+    assert_equal %w[Alpha Beta Gamma], tree_order
+    assert_equal %w[Alpha Beta Gamma], children_titles
+  end
 end
