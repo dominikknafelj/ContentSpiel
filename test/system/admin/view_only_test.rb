@@ -59,6 +59,17 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_equal "Hands off", @post.reload.title
   end
 
+  test "a read-only user clicking an image in the body opens no dialog" do
+    asset = create_media_asset
+    Posts::Save.call(@post, translations: { "en" => { body: { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } } ] } } })
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    sleep 0.5
+    assert_no_selector "dialog[open]"
+  end
+
   test "a read-only user's page editor says why, shows no tools, and cannot type" do
     page_record = create_page(title: "Look only")
     page_record.content_blocks.create!(block_type: :rich_text, position: 0)

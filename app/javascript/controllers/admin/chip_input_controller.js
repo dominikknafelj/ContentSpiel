@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { createSuggestions, statusLabel } from "search/suggestions"
 
 // A multi-value input that shows each value as a removable chip, with
 // autocomplete (`Admin::ChipInputComponent`; its class comment has the form
@@ -33,7 +34,6 @@ import { Controller } from "@hotwired/stimulus"
 //
 // Every string reaches the DOM through `textContent`/attributes -- a tag
 // name or a post title is data, never markup.
-const DEBOUNCE_MS = 150
 const MAX_OPTIONS = 8
 
 export default class extends Controller {
@@ -43,13 +43,22 @@ export default class extends Controller {
   connect() {
     this.items = []
     this.active = -1
-    this.sequence = 0
+    // Debounce, abort and stale-answer handling are `search/suggestions`'
+    // (shared with the rich-text link search); this controller renders.
+    this.suggestions = createSuggestions({
+      url: () => this.searchUrlValue,
+      getQuery: () => this.query,
+      onRows: (query, rows) => this.showSuggestions(query, rows.map((row) => this.normalize(row))),
+      // A field that takes free text (`create`) just offers no suggestions --
+      // what was typed still commits -- and one that doesn't says so, in
+      // words, once.
+      onError: () => this.searchFailed()
+    })
   }
 
   disconnect() {
-    clearTimeout(this.timer)
     clearTimeout(this.announceTimer)
-    this.aborter?.abort()
+    this.suggestions?.destroy()
   }
 
   // --- Events that must not reach the form ---------------------------------
@@ -66,10 +75,10 @@ export default class extends Controller {
   // --- Searching -----------------------------------------------------------
 
   search() {
-    clearTimeout(this.timer)
+    this.suggestions.unschedule()
     if (this.createValue && this.inputTarget.value.includes(",")) return this.commitCommaSeparated()
     if (this.query === "") return this.close()
-    this.timer = setTimeout(() => this.fetchSuggestions(this.query), DEBOUNCE_MS)
+    this.suggestions.schedule()
   }
 
   // A comma typed on a keyboard that doesn't report it as a key (Android),
@@ -88,44 +97,11 @@ export default class extends Controller {
     return this.inputTarget.value.trim()
   }
 
-  async fetchSuggestions(query) {
-    this.aborter?.abort()
-    this.aborter = new AbortController()
-    const sequence = ++this.sequence
-    this.inFlight = true
-
-    const url = new URL(this.searchUrlValue, window.location.origin)
-    url.searchParams.set("q", query)
-
-    let rows
-    try {
-      const response = await fetch(url, { headers: { Accept: "application/json" }, signal: this.aborter.signal })
-      if (!response.ok) throw new Error(`suggestions answered ${response.status}`)
-      rows = await response.json()
-    } catch (error) {
-      if (error.name === "AbortError") return
-      if (sequence === this.sequence) this.inFlight = false
-      // An older request failing must not replace what a newer one shows. A
-      // field that takes free text (`create`) just offers no suggestions --
-      // what was typed still commits -- and one that doesn't says so, in
-      // words, once.
-      if (sequence === this.sequence) this.searchFailed()
-      return
-    }
-
-    if (sequence === this.sequence) this.inFlight = false
-
-    // An answer for text that is no longer in the field (or superseded by a
-    // newer request) is dropped, never rendered under the wrong query.
-    if (sequence !== this.sequence || query !== this.query) return
-    this.showSuggestions(query, rows.map((row) => this.normalize(row)))
-  }
-
   // Two row shapes: `{ value, label, hint }` (tag suggestions) and the link
   // targets' `{ id, title, status, dot }`. A status other than live reads as
   // "Draft" / "Scheduled" -- in the list and, after "·", on the chip.
   normalize(row) {
-    const status = row.status && row.status !== "live" ? row.status[0].toUpperCase() + row.status.slice(1) : null
+    const status = statusLabel(row)
     return {
       value: String(row.value ?? row.id),
       label: row.label ?? row.title ?? "Untitled",
@@ -185,11 +161,8 @@ export default class extends Controller {
   }
 
   close() {
-    clearTimeout(this.timer)
     // A request still in flight must not reopen the list once it answers.
-    this.aborter?.abort()
-    this.sequence++
-    this.inFlight = false
+    this.suggestions.cancel()
     this.listboxTarget.hidden = true
     this.inputTarget.setAttribute("aria-expanded", "false")
     this.inputTarget.removeAttribute("aria-activedescendant")
@@ -238,7 +211,7 @@ export default class extends Controller {
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault()
-        if (this.listboxTarget.hidden) this.fetchSuggestions(this.query)
+        if (this.listboxTarget.hidden) this.suggestions.fetchNow()
         else this.move(1)
         break
       case "ArrowUp":
@@ -260,7 +233,7 @@ export default class extends Controller {
       case "Escape":
         // Also while a search is still on its way: it is cancelled, and
         // won't reopen the list when it answers.
-        if (this.listboxTarget.hidden && !this.inFlight) return
+        if (this.listboxTarget.hidden && !this.suggestions.inFlight) return
         event.preventDefault()
         event.stopPropagation()
         this.close()

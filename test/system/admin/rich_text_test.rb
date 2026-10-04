@@ -219,6 +219,233 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     refute_selector ".ProseMirror [data-youtube-id]"
   end
 
+  # --- Fix round 1 (Task 13) ------------------------------------------------
+
+  test "reopening the page dialog never piles up listeners: one pick applies exactly one link, to the picked page" do
+    target = create_page(title: "Contact")
+    create_page(title: "Contract")
+    visit_post
+
+    editor.click
+    2.times do
+      press_insert "Page link"
+      within("dialog#rich-text-page-dialog[open]") do
+        fill_in "Search pages and posts", with: "Cont"
+        assert_selector "[role=option]", minimum: 1
+        press "Cancel"
+      end
+      refute_selector "dialog[open]"
+      # A closed dialog's search is torn down: nothing of it is left in the
+      # persistent list.
+      assert_no_selector "#rich-text-page-dialog [role=option]", visible: :all
+    end
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Cont"
+      assert_selector "[role=option]", text: "Contact"
+      find("[role=option]", text: "Contact").click
+    end
+    refute_selector "dialog[open]"
+
+    document = saved_post_document { |doc| doc_text(doc).include?("Contact") }
+    assert_equal "Contact", doc_text(document)
+    marks = text_nodes(document).flat_map { |node| Array(node["marks"]) }
+    assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ], marks
+  end
+
+  test "Escape closes the suggestion list first and only a second Escape closes the dialog" do
+    create_page(title: "Contact")
+    visit_post
+
+    editor.click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Cont"
+      assert_selector "[role=option]"
+      find_field("Search pages and posts").send_keys(:escape)
+      assert_no_selector "[role=option]"
+    end
+    assert_selector "dialog#rich-text-page-dialog[open]"
+    find_field("Search pages and posts").send_keys(:escape)
+    refute_selector "dialog[open]"
+
+    # The same in the Link popover.
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "Cont"
+      assert_selector "[role=option]"
+      find_field("URL or search").send_keys(:escape)
+      assert_no_selector "[role=option]"
+    end
+    assert_selector ".admin-rich-text-popover"
+    find_field("URL or search").send_keys(:escape)
+    refute_selector ".admin-rich-text-popover"
+  end
+
+  test "picking a page with the caret inside an external link converts that link instead of inserting text" do
+    target = create_page(title: "About")
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "link", "attrs" => { "href" => "https://example.org/" } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[href]").click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Abo"
+      find("[role=option]", text: "About").click
+    end
+    refute_selector "dialog[open]"
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    assert_equal "linked", doc_text(document)
+    assert_equal [ [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] ], text_nodes(document).map { |node| node["marks"] }
+  end
+
+  test "Enter on a plain word applies nothing and says what to do; real URLs and paths are accepted" do
+    visit_post
+    editor.click
+    type_text "target"
+
+    [ "abo", "v1.2" ].each do |word|
+      select_editor_text
+      press "Link"
+      within(".admin-rich-text-popover") do
+        fill_in "URL or search", with: word
+        find_field("URL or search").send_keys(:enter)
+        assert_selector "[role=alert]", text: "Pick a page, or enter a URL"
+        find_field("URL or search").send_keys(:escape)
+      end
+      refute_selector ".admin-rich-text-popover"
+    end
+    sleep 0.6
+    assert_empty text_nodes(@post.reload.body_document(locale: :en)).flat_map { |node| Array(node["marks"]) }
+
+    { "example.com" => "example.com", "/about" => "/about", "#top" => "#top", "mailto:a@b.c" => "mailto:a@b.c" }.each do |typed, saved|
+      select_editor_text
+      press "Link"
+      within(".admin-rich-text-popover") do
+        fill_in "URL or search", with: typed
+        find_field("URL or search").send_keys(:enter)
+      end
+      refute_selector ".admin-rich-text-popover"
+      saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark.dig("attrs", "href").to_s.include?(saved) } } }
+    end
+  end
+
+  test "arrow keys move through the rows with aria-activedescendant and Enter picks the highlighted one" do
+    target = create_page(title: "Zeta")
+    create_page(title: "Zebra")
+    visit_post
+
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "Ze"
+      assert_selector "[role=option]", count: 2
+      field = find_field("URL or search")
+      assert_nil field["aria-activedescendant"]
+      field.send_keys(:down)
+      first = find("[role=option][aria-selected=true]")
+      assert_equal first[:id], field["aria-activedescendant"]
+      field.send_keys(:down)
+      second = find("[role=option][aria-selected=true]")
+      assert_not_equal first[:id], second[:id]
+      assert_equal second[:id], field["aria-activedescendant"]
+      chosen = second.text
+      field.send_keys(:enter)
+      @chosen = chosen
+    end
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    assert_includes @chosen, doc_text(document)
+    assert_equal target.id, text_nodes(document).first["marks"].first.dig("attrs", "id") if doc_text(document) == "Zeta"
+  end
+
+  test "a slow answer for an earlier query never replaces the rows for the current one" do
+    create_page(title: "Alpha")
+    create_page(title: "Beta")
+    visit_post
+
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (url, options) => {
+        if (String(url).includes("link_targets") && String(url).includes("q=alp")) return new Promise((resolve) => setTimeout(() => resolve(original(url, { ...options, signal: undefined })), 1200))
+        return original(url, options)
+      }
+    JS
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "alp"
+      sleep 0.4
+      fill_in "URL or search", with: "bet"
+      assert_selector "[role=option]", text: "Beta"
+      sleep 1.6
+      assert_selector "[role=option]", text: "Beta"
+      assert_no_selector "[role=option]", text: "Alpha"
+    end
+  end
+
+  test "the Link popover is prefilled with an existing link's URL" do
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "link", "attrs" => { "href" => "https://example.org/docs" } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[href]").click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      assert_field "URL or search", with: "https://example.org/docs"
+      assert_button "Remove link"
+    end
+  end
+
+  test "Remove image in the image dialog deletes the node, and an unchanged Save writes nothing" do
+    asset = create_media_asset
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "A", "caption" => "" } } ] }, locale: :en)
+    @post.save!
+    visit_post
+    updated_at = @post.reload.updated_at
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    within("dialog#rich-text-image-dialog[open]") { press "Save" }
+    refute_selector "dialog[open]"
+    sleep 1.5
+    assert_equal updated_at, @post.reload.updated_at
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    within("dialog#rich-text-image-dialog[open]") { press "Remove image" }
+    refute_selector "dialog[open]"
+    refute_selector ".ProseMirror figure"
+    saved_post_document { |doc| nodes(doc).none? { |node| node["type"] == "image" } }
+  end
+
+  test "Remove link in the page dialog removes an internal link" do
+    target = create_page(title: "About")
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[data-internal-link]").click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") { press "Remove link" }
+    refute_selector "dialog[open]"
+    saved_post_document { |doc| text_nodes(doc).none? { |node| Array(node["marks"]).any? } }
+  end
+
+  test "an inserted image is selected, so Enter edits it" do
+    create_media_asset
+    visit_post
+
+    editor.click
+    press_insert "Image"
+    within("dialog[open]") { click_on Media::Asset.last.title }
+    within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror figure.is-selected"
+    page.driver.browser.keyboard.type(:enter)
+    assert_selector "dialog#rich-text-image-dialog[open] h2", text: "Edit image"
+  end
+
   test "Remove link in the Link popover removes an internal link" do
     target = create_page(title: "About")
     @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] } ] } ] }, locale: :en)

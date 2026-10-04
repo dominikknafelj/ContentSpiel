@@ -57,6 +57,7 @@ export default class extends Controller {
 
   static texts = {
     badLink: "Use an http(s), mailto or relative link",
+    pickOrUrl: "Pick a page, or enter a URL",
     invalidContent: "This text contains something the editor can't show, so it's read-only here. Nothing has been changed."
   }
 
@@ -397,6 +398,13 @@ export default class extends Controller {
 
     const apply = () => {
       const typed = field.input.value.trim()
+      // A plain word is not a link target: "abo" would otherwise be stored as
+      // the relative link `abo`, which goes nowhere. It is either a title to
+      // pick from the list or a URL.
+      if (!looksLikeUrl(typed)) {
+        popover.setError(this.constructor.texts.pickOrUrl)
+        return
+      }
       const href = normalizeHref(typed)
       if (!safeHref(href)) {
         popover.setError(this.constructor.texts.badLink)
@@ -446,8 +454,12 @@ export default class extends Controller {
     this.linkTitles[`${target.type}:${target.id}`] = title
 
     const { empty } = this.editor.state.selection
-    if (empty && !this.editor.isActive("internalLink")) {
-      this.editor.chain().focus().unsetMark("link").insertContent({ type: "text", text: title, marks: [ { type: "internalLink", attrs } ] }).run()
+    if (empty && this.editor.isActive("link")) {
+      // The caret is inside an external link: that link is converted (the
+      // whole run re-pointed), never split by new text inserted mid-link.
+      this.editor.chain().focus().extendMarkRange("link").setInternalLink(attrs).run()
+    } else if (empty && !this.editor.isActive("internalLink")) {
+      this.editor.chain().focus().insertContent({ type: "text", text: title, marks: [ { type: "internalLink", attrs } ] }).run()
     } else {
       this.editor.chain().focus().extendMarkRange("internalLink").setInternalLink(attrs).run()
     }
@@ -460,6 +472,25 @@ export default class extends Controller {
     if (!this.editable()) return
 
     this.openDialog("youtube")
+  }
+
+  // The image just inserted -- not simply the first `image` node for this
+  // asset in the document, since the same library image may already appear
+  // earlier in it. `insertContent` leaves the selection either *on* the new
+  // node (a NodeSelection, when it replaced an empty paragraph) or just after
+  // it; in the second case it's the last such node starting before the
+  // selection.
+  insertedImagePosition(assetId) {
+    const { selection } = this.editor.state
+    if (selection.node?.type.name === "image" && selection.node.attrs.asset_id === assetId) return selection.from
+
+    const { from } = selection
+    let found = null
+    this.editor.state.doc.descendants((node, position) => {
+      if (position < from && node.type.name === "image" && node.attrs.asset_id === assetId) found = position
+      return position < from
+    })
+    return found
   }
 
   // --- Dialogs ---------------------------------------------------------------
@@ -524,11 +555,16 @@ export default class extends Controller {
   applyImage(context, answer) {
     if (context.mode === "insert") {
       this.editor.chain().focus().insertImage({ asset_id: context.assetId, alt: answer.alt, caption: answer.caption }).run()
+      // Selected, so Enter edits it again (`rich_text/image.js`).
+      const position = this.insertedImagePosition(context.assetId)
+      if (position !== null) this.editor.chain().focus().setNodeSelection(position).run()
       return
     }
 
     const current = this.editor.state.doc.nodeAt(context.position)
     if (!current || current.type.name !== "image") return
+    // Nothing changed: no transaction, so no autosave and no undo entry.
+    if (!answer.remove && (current.attrs.alt || "") === answer.alt && (current.attrs.caption || "") === answer.caption) return
 
     const chain = this.editor.chain().focus().setNodeSelection(context.position)
     if (answer.remove) chain.deleteSelection()
@@ -537,8 +573,9 @@ export default class extends Controller {
   }
 }
 
-// Text that is a URL rather than a title to search for: a scheme, a leading
-// slash or `//`, or a dotted token with no spaces ("example.org/docs").
+// Text that is a URL rather than a title to search for: a scheme (http:,
+// mailto:, ...), a leading `/` or `#`, or a host with a letters-only TLD of
+// two or more ("example.com/docs", `münchen.de`) -- so "v1.2" is a title.
 function looksLikeUrl(text) {
-  return /^[a-z][a-z0-9+.-]*:/i.test(text) || text.startsWith("/") || /^[^\s]+\.[^\s]+$/.test(text)
+  return /^[a-z][a-z0-9+.-]*:/i.test(text) || /^[/#]/.test(text) || /^[^\s/]+\.\p{L}{2,}(?:[/?#:].*)?$/u.test(text)
 }

@@ -65,7 +65,13 @@ export default class extends Controller {
   open(event) {
     const detail = event.detail || {}
     const dialog = this.dialogs[detail.kind]
-    if (!dialog || !detail.opener || dialog.open) return
+    if (!dialog || !detail.opener) return
+    // Ignored (this dialog is already up for someone else): say so, so the
+    // editor drops what it was waiting to apply.
+    if (dialog.open) {
+      detail.opener.dispatchEvent(new CustomEvent("rich-text-dialog:closed", { detail: { kind: detail.kind, applied: false } }))
+      return
+    }
 
     this.session = { kind: detail.kind, opener: detail.opener, result: null }
     this[`prepare${detail.kind[0].toUpperCase()}${detail.kind.slice(1)}`](detail)

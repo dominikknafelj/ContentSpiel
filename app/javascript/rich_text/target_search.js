@@ -1,47 +1,51 @@
+import { createSuggestions, statusLabel, TEXTS as SEARCH_TEXTS } from "search/suggestions"
+
 // A search box over pages and posts, shared by the editor's Link popover and
 // the "Page link" dialog (design pass round 2, Task 13): both ask
 // `Admin::LinkTargetsController` (`admin_link_targets_path`) for rows --
 // `{ type, id, title, path, status, dot }` -- and show them in a listbox
-// under a combobox input. It is the same search the chip input
-// (`admin--chip-input`) runs for related posts, but that controller is
-// welded to chips and hidden inputs in a form, which neither of these has:
-// a pick here is a callback, never a value in a form. The row shape, the
-// status wording ("Draft" / "Scheduled", live shows nothing) and the
-// combobox pattern (`aria-activedescendant`, focus stays in the input, a
-// mousedown on a row must not blur it) are the chip input's.
+// under a combobox input. The search core is the chip input's own
+// (`search/suggestions`); a pick here is a callback, never a value in a
+// form. The row shape, the status wording ("Draft" / "Scheduled", live shows
+// nothing) and the combobox pattern (`aria-activedescendant`, focus stays in
+// the input, a mousedown on a row must not blur it) are the chip input's.
 //
 // Nothing here writes to a form: the input has no `name`, and the owner
 // (popover or dialog) is outside the autosave form or stops `input`/`change`
 // at its own root, so typing a query never queues a save.
 //
+// The fetch / debounce / abort / stale-answer logic and the status wording
+// are `search/suggestions`, the same module the chip input runs on; this file
+// is only the rendering and the combobox keys.
+//
 // Every string reaches the DOM through `textContent`/attributes -- a title is
 // data, never markup.
-const DEBOUNCE_MS = 200
-
 export const TEXTS = {
   hint: "Type to search titles",
   noResults: "No pages or posts match",
-  searchFailed: "Search failed — check your connection"
+  searchFailed: SEARCH_TEXTS.searchFailed
 }
 
 let sequence = 0
 
 // `input`      the combobox text input (gets role/aria wiring)
-// `listbox`    an empty <ul> the rows go in
+// `listbox`    an empty <ul> the rows go in (may be a persistent element)
 // `message`    an element for the hint / "No pages or posts match" / failure line
 // `url`        the link-targets endpoint; `locale` the language titles are searched in
 // `autoSelect` highlight the first row as soon as results arrive, so Enter picks it
 // `skip(q)`    true for text that is not a title search (a pasted URL): no request, no rows
 // `onPick(row)` called with the chosen row
+//
+// Every listener is registered with one AbortController signal, so `destroy()`
+// removes them all -- a dialog that creates a new search on every open
+// against the same list element never accumulates old ones.
 export function createTargetSearch({ input, listbox, message, url, locale, autoSelect = false, skip = () => false, onPick }) {
   sequence += 1
   const prefix = `rich-text-target-${sequence}`
+  const lifetime = new AbortController()
+  const { signal } = lifetime
   let rows = []
   let active = -1
-  let timer = null
-  let aborter = null
-  let counter = 0
-  let destroyed = false
 
   listbox.id ||= `${prefix}-listbox`
   listbox.setAttribute("role", "listbox")
@@ -51,6 +55,14 @@ export function createTargetSearch({ input, listbox, message, url, locale, autoS
   input.setAttribute("aria-expanded", "false")
 
   const say = (text) => { if (message) message.textContent = text || "" }
+
+  const suggestions = createSuggestions({
+    url,
+    params: () => ({ locale }),
+    getQuery: () => input.value.trim(),
+    onRows: (_query, found) => render(found),
+    onError: () => { clear(); say(TEXTS.searchFailed) }
+  })
 
   function highlight(index) {
     active = index
@@ -105,52 +117,26 @@ export function createTargetSearch({ input, listbox, message, url, locale, autoS
     where.textContent = [ row.type === "post" ? "Post" : "Page", row.path ].filter(Boolean).join(" · ")
     item.append(where)
 
-    if (row.status && row.status !== "live") {
-      const status = document.createElement("span")
-      status.className = "shrink-0 text-meta"
-      status.textContent = `· ${row.status[0].toUpperCase()}${row.status.slice(1)}`
-      item.append(status)
+    const status = statusLabel(row)
+    if (status) {
+      const label = document.createElement("span")
+      label.className = "shrink-0 text-meta"
+      label.textContent = `· ${status}`
+      item.append(label)
     }
     return item
   }
 
-  async function fetchRows(query) {
-    aborter?.abort()
-    aborter = new AbortController()
-    const mine = ++counter
-
-    const endpoint = new URL(url, window.location.origin)
-    endpoint.searchParams.set("q", query)
-    endpoint.searchParams.set("locale", locale)
-
-    let found
-    try {
-      const response = await fetch(endpoint, { headers: { Accept: "application/json" }, signal: aborter.signal })
-      if (!response.ok) throw new Error(`link_targets answered ${response.status}`)
-      found = await response.json()
-    } catch (error) {
-      // An older request failing must not replace what a newer one shows.
-      if (error.name !== "AbortError" && mine === counter && !destroyed) { clear(); say(TEXTS.searchFailed) }
-      return
-    }
-    // An answer for text no longer in the field, or one a newer request
-    // superseded, is dropped rather than shown under the wrong query.
-    if (destroyed || mine !== counter || input.value.trim() !== query) return
-    render(found)
-  }
-
   function search() {
-    clearTimeout(timer)
-    const query = input.value.trim()
     // Whatever was in flight is stale the moment the text changes.
-    counter += 1
-    aborter?.abort()
+    suggestions.cancel()
+    const query = input.value.trim()
     if (query === "" || skip(query)) {
       clear()
       say(query === "" ? TEXTS.hint : "")
       return
     }
-    timer = setTimeout(() => fetchRows(query), DEBOUNCE_MS)
+    suggestions.schedule()
   }
 
   function pick(index) {
@@ -158,59 +144,48 @@ export function createTargetSearch({ input, listbox, message, url, locale, autoS
     if (row) onPick(row)
   }
 
-  // Returns true when the key was a combobox key and has been handled, so the
-  // owner knows not to treat Enter as "apply the typed text".
   function keydown(event) {
     if (event.key === "ArrowDown" && rows.length) {
       event.preventDefault()
       highlight((active + 1) % rows.length)
-      return true
-    }
-    if (event.key === "ArrowUp" && rows.length) {
+    } else if (event.key === "ArrowUp" && rows.length) {
       event.preventDefault()
       highlight((active - 1 + rows.length) % rows.length)
-      return true
-    }
-    if (event.key === "Enter" && active >= 0) {
+    } else if (event.key === "Enter" && active >= 0) {
       // Stopped here as well: the popover's own Enter handler would otherwise
       // also run its primary action ("apply the typed text as a URL").
       event.preventDefault()
       event.stopPropagation()
       pick(active)
-      return true
+    } else if (event.key === "Escape" && (!listbox.hidden || suggestions.inFlight)) {
+      // The first Escape closes the list (and cancels a search on its way);
+      // only a second one reaches the popover or dialog and closes it.
+      event.preventDefault()
+      event.stopPropagation()
+      suggestions.cancel()
+      clear()
+      say("")
     }
-    return false
   }
 
   // mousedown on a row must not move focus out of the input.
-  listbox.addEventListener("mousedown", (event) => event.preventDefault())
+  listbox.addEventListener("mousedown", (event) => event.preventDefault(), { signal })
   listbox.addEventListener("click", (event) => {
     const item = event.target.closest("[role=option]")
     if (item && listbox.contains(item)) pick(Array.from(listbox.children).indexOf(item))
-  })
-  input.addEventListener("input", search)
-  input.addEventListener("keydown", keydown)
+  }, { signal })
+  input.addEventListener("input", search, { signal })
+  input.addEventListener("keydown", keydown, { signal })
 
   clear()
   say(TEXTS.hint)
 
   return {
-    keydown,
-    search,
-    // Back to the empty state (the dialog reopening, say).
-    reset() {
-      clearTimeout(timer)
-      counter += 1
-      aborter?.abort()
-      clear()
-      say(TEXTS.hint)
-    },
     destroy() {
-      destroyed = true
-      clearTimeout(timer)
-      aborter?.abort()
-      input.removeEventListener("input", search)
-      input.removeEventListener("keydown", keydown)
+      lifetime.abort()
+      suggestions.destroy()
+      clear()
+      say("")
     }
   }
 }
