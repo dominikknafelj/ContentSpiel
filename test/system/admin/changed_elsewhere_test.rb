@@ -218,6 +218,117 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_current_path(/cs-studio\/?\z/, wait: 15)
   end
 
+  # The rule holds for a Turbo FRAME navigation inside `#content` too (final
+  # fix wave 1, review B I2): the page tree's links, the header's breadcrumb
+  # and its menu's Activity link render the frame BEFORE any
+  # `turbo:before-visit`, so the drain hangs on `turbo:before-frame-render`.
+  #
+  # Scenario A: an edit typed while the same form's save is in flight, then a
+  # tree link. The follow-up used to be skipped (the form had left the
+  # document when its first save was answered) -- "second" was lost silently.
+  # The frame's page is also fetched ONCE (review B M1): the promoted visit
+  # used to be intercepted by the still-busy queue and issued again.
+  test "an edit typed while a save is in flight is saved before a tree link replaces the editor, which loads once" do
+    other = create_page(title: "Other")
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(SLOW_PATCHES)
+    page.execute_script(<<~JS)
+      const countedFetch = window.fetch
+      window.__gets = []
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "GET") window.__gets.push(new URL(String(url.url || url), location.href).pathname)
+        return countedFetch(url, options)
+      }
+    JS
+
+    fill_in "Subtitle", with: "first"
+    page.execute_script("document.activeElement.blur()") # the save for "first" goes out, and is slow
+    fill_in "Subtitle", with: "second, typed while that save is in flight"
+    find("li[data-page-id='#{other.id}'] a", text: "Other").click
+
+    assert_field "Title", with: "Other", wait: 15
+    assert_eventually(wait: 10) { @page.reload.subtitle == "second, typed while that save is in flight" }
+    sleep 1 # a second fetch of the page would have gone out by now
+    assert_equal 1, page.evaluate_script("window.__gets").count("/cs-studio/pages/#{other.id}"), "the tree link's page was fetched more than once"
+    assert_no_text "CHANGED ELSEWHERE"
+
+    # The editor that came in saves on its own base.
+    await_admin_controllers
+    fill_in "Subtitle", with: "Typed on the next page"
+    assert_eventually { other.reload.subtitle == "Typed on the next page" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # Scenario B: a value written by code with focus outside the form ("Use
+  # all"), then a frame link inside the 1 s debounce -- no `focusout` ever
+  # sends it, and the form's disconnect used to clear the timer. Through the
+  # header's breadcrumb, which is a frame link like the tree's.
+  test "a debounced edit is saved before a breadcrumb link replaces the editor" do
+    child = create_page(title: "Child", parent: @page)
+    visit "/cs-studio/pages/#{child.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const field = document.getElementById("page-subtitle")
+      field.value = "Set like Use all"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      Array.from(document.querySelectorAll("nav[aria-label=Breadcrumb] a")).find((a) => a.textContent.trim() === "About").click()
+    JS
+
+    assert_field "Title", with: "About", wait: 15
+    assert_eventually { child.reload.subtitle == "Set like Use all" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # ...and through a tree link.
+  test "a debounced edit is saved before a tree link replaces the editor" do
+    other = create_page(title: "Other")
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const field = document.getElementById("page-subtitle")
+      field.value = "Set like Use all"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      document.querySelector('li[data-page-id="#{other.id}"] a').click()
+    JS
+
+    assert_field "Title", with: "Other", wait: 15
+    assert_eventually { @page.reload.subtitle == "Set like Use all" }
+  end
+
+  # A form belongs to the document it was rendered into, and that document is
+  # replaced only when the body (or the `#content` frame's content) really is
+  # (final fix wave 1). Turbo fires `turbo:before-render` a SECOND time, for a
+  # visit that renders nothing, after a redirected visit (the sidebar's Pages
+  # link answers with a redirect to Home's editor) and after a frame
+  # navigation is promoted to a visit (a tree link). Counting those as page
+  # changes left the editor that had just come in a generation behind for
+  # good: every answer was thrown away as "stale", so the status line stuck on
+  # "SAVING…", no base was ever written back, and the second edit was refused
+  # (409) without a word.
+  test "an editor reached through the sidebar's redirected Pages link shows its saves and keeps saving" do
+    visit admin_root_path
+    await_admin_controllers
+    within("nav[aria-label='Modules']") { click_link "Pages" }
+    assert_field "Title", with: root_page.title, wait: 10
+    await_admin_controllers
+
+    assert_saves_twice(root_page)
+  end
+
+  test "an editor reached through a tree link shows its saves and keeps saving" do
+    other = create_page(title: "Other")
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    find("li[data-page-id='#{other.id}'] a", text: "Other").click
+    assert_field "Title", with: "Other", wait: 10
+    await_admin_controllers
+
+    assert_saves_twice(other)
+  end
+
   # C: a flushed save that was refused stops the action, and says so.
   test "Publish does not run when the save it waited for was refused, and says why" do
     draft = create_page(title: "Draft", published: false)
@@ -360,5 +471,21 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     # ...and spent exactly once: the next navigation shows no toast.
     visit admin_root_path
     assert_no_selector "#toasts .admin-toast"
+  end
+
+  private
+
+  # Two saves in a row from the page settings form: the first has to draw its
+  # answer (the status line), the second is only accepted when the first
+  # answer's base was written back.
+  def assert_saves_twice(record)
+    fill_in "Subtitle", with: "one"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    fill_in "Subtitle", with: "two"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually { record.reload.subtitle == "two" }
+    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    assert_no_text "CHANGED ELSEWHERE"
   end
 end

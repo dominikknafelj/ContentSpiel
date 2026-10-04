@@ -28,24 +28,31 @@
 // own block form submissions -- add, duplicate, delete, the Undo toast
 // (`holdTurboRequest`).
 //
-// THE RULE (fix round 3): nothing that REPLACES THE PAGE starts until the
-// queue is empty. Two kinds of thing replace the page: a Turbo visit (a
-// sidebar link, a locale switch, Reload) and the editor header's actions
-// (Publish, Unpublish, Schedule, Move to trash, which redirect). Both wait on
-// `drained()`: a promise that resolves when no task is queued or in flight AND
-// no autosave form has a debounced, queued, in-flight or retrying save --
-// forms are asked to send what they hold (`flush()`) in a loop until a pass
-// finds nothing new, bounded by `DRAIN_LIMIT_MS` -- the whole wait, including
-// the wait for a request already on the wire (fix round 4: a save that never
-// answers no longer holds a visit for its own 30 s timeout). It resolves to
-// whether every form ended CLEAN (last answer a success, not paused by a 409,
-// not failed).
+// THE RULE (fix round 3; final fix wave 1): nothing that REPLACES AN EDITOR
+// starts until the queue is empty. Three kinds of thing replace an editor:
+// - a Turbo visit (a sidebar link, a locale switch, Reload);
+// - the editor header's actions (Publish, Unpublish, Schedule, Move to trash,
+//   which redirect);
+// - a Turbo FRAME navigation inside `#content` (the page tree's links, the
+//   header's breadcrumb, its menu's Activity link). Turbo fetches and RENDERS
+//   the frame first and only then proposes the promoted visit, so by
+//   `turbo:before-visit` the editor's forms are long gone -- their debounce
+//   timers cleared, a save's follow-up skipped. This one is held on
+//   `turbo:before-frame-render` (see the handler at the end of this file).
+// All of them wait on `drained()`: a promise that resolves when no task is
+// queued or in flight AND no autosave form has a debounced, queued, in-flight
+// or retrying save -- forms are asked to send what they hold (`flush()`) in a
+// loop until a pass finds nothing new, bounded by `DRAIN_LIMIT_MS` -- the
+// whole wait, including the wait for a request already on the wire (fix round
+// 4: a save that never answers no longer holds a visit for its own 30 s
+// timeout). It resolves to whether every form ended CLEAN (last answer a
+// success, not paused by a 409, not failed).
 // So no edit is dropped on the way out: before this, a queued save was either
 // cancelled by the visit (lost silently) or sent on a base the action had just
 // moved (refused). The header action additionally refuses to run when a form
 // ended unclean (`admin--queue-hold`): its redirect would throw away the very
-// text a 409 bar promised to keep. A plain visit still goes on (the editor
-// chose to leave; do not trap them), after the drain.
+// text a 409 bar promised to keep. A plain visit or frame navigation still
+// goes on (the editor chose to leave; do not trap them), after the drain.
 //
 // Failure never blocks the queue. A task that throws releases its slot
 // (`finally`); a fetch that never answers is cut by the caller's own timeout;
@@ -53,33 +60,57 @@
 // aborted OR its form leaves the DOM (see `holdTurboRequest`), and after
 // `HOLD_LIMIT_MS` regardless.
 //
-// PAGE GENERATIONS. `generation` is bumped on `turbo:before-render`. A task
-// belongs to the page its FORM was rendered on, not to the moment it was
-// queued (fix round 4): a controller reads `currentGeneration()` when it
-// connects and hands it to `enqueue`, and the task is told `isCurrent()`. One
-// that belongs to a replaced page is still SENT -- a debounced edit is not
-// lost to Back/Forward, a restoration visit having no `before-visit` to drain
-// on -- but renders no streams and writes no bases into the NEW document,
-// whose `page-base-updated-at` has the same id. That holds whether the page
-// was replaced while the answer was on its way, while the task waited its
-// turn (a drain that timed out leaves tasks behind), or BEFORE the task was
-// even queued: as Turbo swaps the body, the field that still holds focus gets
-// a `focusout`, after `turbo:before-render`, and the outgoing form's own
-// action is still bound -- stamped at queue time, that save counted as the new
-// page's and drew its 409 bar there (a false "Changed elsewhere" after
-// Publish). The chain is never reset: the new page's first request waits for
-// the old page's in-flight one.
+// PAGE GENERATIONS. A task belongs to the page its FORM was rendered on, not
+// to the moment it was queued (fix round 4): a controller reads
+// `currentGeneration()` when it connects and hands it to `enqueue`, and the
+// task is told `isCurrent()`. One that belongs to a replaced page is still
+// SENT -- a debounced edit is not lost to Back/Forward, a restoration visit
+// having no `before-visit` to drain on -- but renders no streams and writes no
+// bases into the NEW document, whose `page-base-updated-at` has the same id.
+// That holds whether the page was replaced while the answer was on its way,
+// while the task waited its turn (a drain that timed out leaves tasks behind),
+// or BEFORE the task was even queued: as Turbo swaps the body, the field that
+// still holds focus gets a `focusout`, after `turbo:before-render`, and the
+// outgoing form's own action is still bound -- stamped at queue time, that
+// save counted as the new page's and drew its 409 bar there (a false "Changed
+// elsewhere" after Publish). The chain is never reset: the new page's first
+// request waits for the old page's in-flight one.
 //
-// (Turbo's morphing page refresh would keep the forms and still fire
-// `turbo:before-render`, leaving them a generation behind for good. CS Studio
-// does not use it; whoever turns it on must re-stamp the controllers.)
+// WHAT A GENERATION IS (final fix wave 1). The document an editor lives in is
+// replaced in exactly two ways, and a generation names both: the `<body>`
+// ELEMENT it was rendered into (a Turbo page render puts a new one in), and
+// the number of times the `#content` frame has been rendered since
+// (`frameRenders`: a frame navigation keeps the body and swaps the editor).
+// It is deliberately NOT a count of `turbo:before-render` events, which it
+// used to be: Turbo fires that event a second time, for a visit that renders
+// nothing (`willRender: false`), after every REDIRECTED visit
+// (`Visit#followRedirect` -- the sidebar's Pages link answers with a redirect
+// to Home's editor) and when a frame navigation is promoted to a visit
+// (`proposeVisitIfNavigatedWithAction` -- every tree link). The forms that had
+// just connected were left a generation behind for good: every answer thrown
+// away as stale, the status stuck on "Saving…", no base written back, and
+// every edit after the first refused 409 without a word.
+// The body's identity cannot be miscounted. One thing it cannot say is that a
+// body is ABOUT to be replaced: between `turbo:before-render` and the swap an
+// answer would still be drawn (a stream is applied on the next frame -- into
+// the new document). So a body is also `retired` at `turbo:before-render`,
+// when Turbo's current visit says it will render. That reads a Turbo internal
+// (`Turbo.navigator.currentVisit.willRender`, turbo-rails 2.0.23), and only
+// an explicit `true` retires: were it ever to go away, nothing is retired
+// early and the identity check alone still holds.
+//
+// (Turbo's morphing page refresh keeps the forms and the body, and would
+// retire that body: forms a generation behind for good. CS Studio does not use
+// it; whoever turns it on must re-stamp the controllers.)
 import { Turbo } from "@hotwired/turbo-rails"
 
 const HOLD_LIMIT_MS = 30000
 const DRAIN_LIMIT_MS = 10000
 
 let tail = Promise.resolve()
-let generation = 0
+// See "WHAT A GENERATION IS".
+let frameRenders = 0
+const retired = new WeakSet()
 let queued = 0
 // Set while an editor header action's own submission is on its way (see
 // `beginAction`).
@@ -87,8 +118,13 @@ let actionInFlight = false
 const forms = new Set()
 
 // The page a controller was rendered on: read in `connect()`, handed back to
-// `enqueue`.
-export function currentGeneration() { return generation }
+// `enqueue`. Opaque to the caller.
+export function currentGeneration() { return { body: document.body, frame: frameRenders } }
+
+// Whether that page is still the one showing.
+export function isCurrentGeneration(generation) {
+  return generation.body === document.body && generation.frame === frameRenders && !retired.has(generation.body)
+}
 
 // Autosave controllers register themselves so `drained()` can ask them to
 // flush and report whether they ended clean. A form offers `flush(drain)`,
@@ -151,10 +187,10 @@ export function acquire() {
 // `generation` is the page the task belongs to (the caller's
 // `currentGeneration()` at connect -- see "PAGE GENERATIONS"); left out, it is
 // the page showing as the task is queued.
-export async function enqueue(task, { generation: belongsTo = generation } = {}) {
+export async function enqueue(task, { generation: belongsTo = currentGeneration() } = {}) {
   const release = await acquire()
   try {
-    return await task(() => belongsTo === generation)
+    return await task(() => isCurrentGeneration(belongsTo))
   } finally {
     release()
   }
@@ -201,18 +237,18 @@ export function syncBases(streamText, ids) {
 //   another request's;
 // - `HOLD_LIMIT_MS` passes.
 // `resume()` is always called, even if `before` throws, so Turbo's submission
-// is never left waiting. A request whose page is gone (a generation bump while
+// is never left waiting. A request whose page is gone (replaced while
 // it waited) or that was already aborted just resumes at once, unmodified.
 export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}) {
   event.preventDefault()
   const target = event.target
   const request = event.detail
   const signal = request.fetchOptions?.signal
-  const queuedUnder = generation
+  const queuedUnder = currentGeneration()
   const url = request.url?.href
 
   acquire().then((release) => {
-    if (signal?.aborted || queuedUnder !== generation) {
+    if (signal?.aborted || !isCurrentGeneration(queuedUnder)) {
       release()
       request.resume()
       return
@@ -238,7 +274,7 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
     const onResponse = async (responseEvent) => {
       if (!isMyResponse(responseEvent)) return
       try {
-        if (queuedUnder === generation) syncBases(await responseEvent.detail.fetchResponse.response.clone().text(), baseIds)
+        if (isCurrentGeneration(queuedUnder)) syncBases(await responseEvent.detail.fetchResponse.response.clone().text(), baseIds)
       } finally {
         finish()
       }
@@ -267,15 +303,28 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
 // 409 bar and the leave handling already say what was not saved). `reentry`
 // lets the visit this handler starts through without being intercepted again.
 //
-// One visit is never held: the redirect that answers an editor header action
-// (`actionInFlight`). Turbo proposes it WITH the answer it already fetched;
-// the `Turbo.visit(url)` below would fetch the page a second time, and the
-// flash -- the "Moved to trash · Undo" toast -- was spent on the first.
-// (An edit that lands between that submission and its answer is the price:
-// its save belongs to the page being replaced.) The flag is spent on the
-// first visit it lets through, so it never excuses a second one.
+// Two visits are never held, because holding one means issuing it again with
+// `Turbo.visit(url)`, and each of them arrives WITH the answer Turbo already
+// fetched -- a second fetch of a page that is, or is about to be, on screen:
+// - the redirect that answers an editor header action (`actionInFlight`). The
+//   flash -- the "Moved to trash · Undo" toast -- was spent on the first
+//   fetch. (An edit that lands between that submission and its answer is the
+//   price: its save belongs to the page being replaced.) The flag is spent on
+//   the first visit it lets through, so it never excuses a second one;
+// - the visit a `#content` frame navigation is promoted to (`promotedVisit`,
+//   the frame's own URL, set as the frame is let render below). It replaces
+//   nothing: the frame has rendered. Held, the page a tree link had just
+//   loaded was loaded a second time, and the old page's answer drawn into it
+//   in between (review B, M1). Normally nothing is outstanding by then anyway
+//   -- the frame's render waited for the drain. Spent on the next visit,
+//   whichever it is.
 let reentry = false
+let promotedVisit = null
+const absolute = (url) => { try { return new URL(url, document.baseURI).href } catch { return null } }
 document.addEventListener("turbo:before-visit", (event) => {
+  const promoted = promotedVisit
+  promotedVisit = null
+  if (promoted && promoted === absolute(event.detail.url)) return
   if (actionInFlight) {
     actionInFlight = false
     return
@@ -294,6 +343,37 @@ document.addEventListener("turbo:before-visit", (event) => {
   })
 })
 
+// A frame navigation inside `#content` replaces the editor exactly as a visit
+// does (see "THE RULE"), but Turbo renders the frame BEFORE it proposes the
+// promoted visit, so the drain has to hang on the frame's render:
+// `turbo:before-frame-render` is cancelable and carries `resume` (turbo-rails
+// 2.0.23, `FrameController#allowsImmediateRender`). While the drain runs the
+// outgoing forms are still connected, so `flush()` sends debounced edits and a
+// save's follow-up goes out; the render then goes on whatever the outcome,
+// after `DRAIN_LIMIT_MS` at the latest. With nothing outstanding the render
+// is not touched. Either way the render is a page change (`frameRenders`):
+// counted just before it happens, so the outgoing forms' late answers draw
+// nothing into the editor that comes in.
+//
+// Only `#content`: the lazily loaded dialog frames (New page / New post), the
+// ⌘K results and the media picker's library replace no editor.
+document.addEventListener("turbo:before-frame-render", (event) => {
+  const frame = event.target
+  if (frame.id !== "content" || event.defaultPrevented) return
+
+  const render = () => {
+    frameRenders += 1
+    promotedVisit = absolute(frame.getAttribute("src"))
+  }
+  if (!busy()) return render()
+
+  event.preventDefault()
+  drained().then(() => {
+    render()
+    event.detail.resume()
+  })
+})
+
 // `admin--queue-hold` brackets a header action's real submission with these:
 // `beginAction()` as it lets the submit through, `endAction()` when the
 // submission ends without a redirect to follow (aborted, failed, refused).
@@ -305,7 +385,9 @@ document.addEventListener("turbo:before-visit", (event) => {
 export function beginAction() { actionInFlight = true }
 export function endAction() { actionInFlight = false }
 
+// See "WHAT A GENERATION IS": the body Turbo is about to replace is retired
+// now, a moment before the swap.
 document.addEventListener("turbo:before-render", () => {
-  generation += 1
+  if (Turbo.navigator?.currentVisit?.willRender === true) retired.add(document.body)
   actionInFlight = false
 })
