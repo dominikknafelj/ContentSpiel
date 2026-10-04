@@ -4,8 +4,17 @@
 # one instance per request renders every nav/listing link off it.
 module PublicSite
   class Urls
+    # The site's public origin when one is configured (`PUBLIC_HOST`, else
+    # `SITEMAP_HOST`), nil otherwise -- a local checkout has neither. Callers
+    # that sit inside a request (CS Studio's "Copy" address) fall back to
+    # the request's own origin then, rather than to the placeholder below,
+    # which would hand an editor a link to a domain that isn't theirs.
+    def self.configured_host
+      ENV["PUBLIC_HOST"].presence || ENV["SITEMAP_HOST"].presence
+    end
+
     def self.default_host
-      ENV.fetch("PUBLIC_HOST") { ENV.fetch("SITEMAP_HOST", "https://www.example.com") }
+      configured_host || "https://www.example.com"
     end
 
     def initialize(preview: false, host: self.class.default_host)

@@ -116,7 +116,11 @@ module Admin
 
     attr_reader :page, :locale, :url_options
 
-    def urls = PublicSite::Urls.new
+    # Absolute addresses (the "Copy" button) use the configured public
+    # origin, or -- with none configured, as on a local checkout -- the
+    # origin this very request came in on, which is where the site is
+    # actually being served.
+    def urls = PublicSite::Urls.new(host: PublicSite::Urls.configured_host || helpers.request.base_url)
 
     def preview_urls = PublicSite::Urls.new(preview: true)
   end

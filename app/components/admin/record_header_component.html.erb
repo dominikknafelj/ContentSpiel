@@ -9,7 +9,11 @@
           <button type="button" data-controller="admin--clipboard" data-admin--clipboard-url-value="<%= public_url %>"
             data-action="click->admin--clipboard#copy" class="shrink-0 rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
           <% if live? %>
-            <%= link_to "View on site", public_url, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
+            <%# The path, not the absolute URL: the public site is served by
+                this same app, so a same-origin link opens the live page
+                wherever CS Studio is running -- on a local checkout too,
+                where the configured public domain doesn't point here. %>
+            <%= link_to "View on site", public_path, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
           <% end %>
         </div>
       <% end %>
