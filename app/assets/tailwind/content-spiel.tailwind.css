@@ -284,3 +284,14 @@
 /* The chip input's frame is a div around its input, so the rule above misses
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
+
+/* A post list's Limit is a 72px column, and its error slot is a child of that
+   column: "Limit must be at least 1" wrapped word by word in 72px. Hanging the
+   slot from the column's RIGHT edge (an RTL containing block, everything else
+   reset to LTR) lets it run leftwards under Tag and Type instead, as wide as
+   the message needs. Only where the row is three columns (`sm`, 40rem). */
+@media (min-width: 40rem) {
+  .admin-block-settings-row > .admin-field:last-child { direction: rtl; }
+  .admin-block-settings-row > .admin-field:last-child > * { direction: ltr; }
+  .admin-block-settings-row > .admin-field:last-child > [id$="-errors"] { width: max-content; max-width: 20rem; }
+}

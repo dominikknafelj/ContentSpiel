@@ -1,7 +1,10 @@
 <div id="<%= dom_id %>" data-block-id="<%= block.id %>" data-admin--blocks-target="card"
      class="admin-block-card rounded-cs border bg-surface <%= unavailable? ? "border-danger" : "border-line" %>">
   <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
-    <% if editable? %>
+    <%# Not for an unavailable card: it has no body, no menu with Move up / Move
+        down, and a handle that only moves a card nobody can read would be the one
+        move a keyboard user couldn't undo with the menu. %>
+    <% if editable? && !unavailable? %>
       <%# A real button for the keyboard path (`admin--blocks#key`); the mouse
           drag starts from it too (SortableJS `handle:`). %>
       <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"

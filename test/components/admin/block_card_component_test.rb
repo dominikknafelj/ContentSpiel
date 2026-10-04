@@ -113,10 +113,29 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_text "Its content is kept but can’t be shown or edited."
     assert_selector "button", text: "Delete block…"
     assert_no_selector "[role=menu]", visible: :all
+    assert_no_selector ".admin-block-card__handle", visible: :all
     assert_no_selector "form[data-controller~='admin--autosave']"
     assert_no_selector "[data-block-body], input[name^='block['], textarea, select", visible: :all
     refute_text "Duplicate"
     refute_text "Move up"
+  end
+
+  # Task 12's b5: a viewer who can't edit the page sees an unavailable card
+  # with no action at all, and a post list with every field disabled.
+  test "a view-only unavailable card has no Delete, no handle and no menu; a view-only post list's fields are disabled" do
+    page = create_page(title: "View only")
+    gone = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    gone.update_column(:block_type, "gone/thing")
+    render_card(gone.reload, page: page, editable: false)
+    assert_text "Unavailable type — gone/thing"
+    assert_no_selector "button", text: "Delete block…"
+    assert_no_selector ".admin-block-card__handle, [role=menu]", visible: :all
+
+    list = page.content_blocks.create!(block_type: "post_list", position: 1, settings: { "limit" => 3, "tag" => "news" })
+    render_card(list, page: page, editable: false)
+    assert_selector "fieldset[disabled].admin-view-only .admin-block-settings-row"
+    assert_no_selector ".admin-block-card__handle, [role=menu]", visible: :all
+    assert_no_selector "form[data-controller~='admin--autosave']"
   end
 
   test "an image block's alt and caption are per-use overrides with the library text as placeholder and Reset" do

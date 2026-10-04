@@ -1,4 +1,4 @@
-<%= render Admin::DashboardScreen::CardComponent.new(title: "Needs translation", id: "dashboard-needs-translation", empty: "Nothing to translate.", link: link) do |card| %>
+<%= render Admin::DashboardScreen::CardComponent.new(title: "Needs translation", id: "dashboard-needs-translation", empty: "Nothing to translate.", link: link, limit: nil) do |card| %>
   <% entries.each do |entry| %>
     <% card.with_row do %>
       <div class="flex min-w-0 flex-1 flex-col gap-1.5" data-locale="<%= entry.locale %>">

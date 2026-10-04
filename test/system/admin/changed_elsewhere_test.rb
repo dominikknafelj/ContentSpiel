@@ -466,8 +466,9 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
       field.dispatchEvent(new Event("input", { bubbles: true }))
     JS
 
-    # /pages answers with a second redirect, to Home's editor; the flash is
-    # kept across that hop, so the Undo toast is still there.
+    # The trash redirect goes straight to Home's editor (`pages_landing_path`,
+    # no second hop through /pages), carrying the flash, so the Undo toast is
+    # there.
     assert_current_path(admin_page_path(root_page), wait: 10)
     assert_selector "#toasts button", text: "Undo"
     assert @page.reload.trashed?

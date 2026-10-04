@@ -217,6 +217,22 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Unavailable type — gone/thing"
   end
 
+  # Task 12's b5: the one action an unavailable card has works end to end --
+  # the block is deleted although its type is no longer registered, and the
+  # page's other blocks stay.
+  test "an unavailable block can be deleted" do
+    keep = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    gone = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    gone.update_column(:block_type, "gone/thing")
+
+    assert_difference -> { @page.content_blocks.count }, -1 do
+      delete "#{blocks_path}/#{gone.id}", as: :turbo_stream
+    end
+    assert_response :success
+    assert_not ContentBlock.exists?(gone.id)
+    assert ContentBlock.exists?(keep.id)
+  end
+
   # Media library Task 4: an image block's image is a library asset, so a
   # duplicate points at the same asset -- nothing is copied, and the asset
   # can't be deleted while either block uses it (the FK restricts), which

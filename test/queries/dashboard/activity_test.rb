@@ -62,6 +62,31 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert block.persisted?
   end
 
+  # Task 16's d1: only a page or post can be "scheduled"; a block event whose
+  # only change names published_at must not be a KeyError on the landing page.
+  test "a block event that only names a future published_at still reads as a block edit" do
+    page = as(@me) { create_page(title: "About") }
+    block = as(@me) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: "rich_text")).record }
+    as(@me) { Audit.record("block.updated", subject: block, field_changes: { "published_at" => [ nil, Time.zone.local(2031, 10, 6, 9).iso8601 ] }) }
+
+    rows = activity.rows.select { |r| r.event.action == "block.updated" }
+    assert_equal 1, rows.size
+    assert_equal "edited a block on", rows.first.sentence_parts[0]
+  end
+
+  # Task 16's d3: the class comment promises "a viewer with no grants runs no
+  # query"; the old `1=0` condition still ran one.
+  test "a viewer who can read nothing sends no query at all" do
+    as(@me) { create_post(title: "Hidden from them") }
+    nobody = User.create!(email_address: "nogrants@example.com", password: "a long enough password")
+    queries = []
+    counter = ->(*, payload) { queries << payload[:sql] unless payload[:name].in?(%w[SCHEMA TRANSACTION]) || payload[:cached] }
+    rows = ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { activity(nobody).rows }
+
+    assert_empty rows
+    assert_empty queries.grep(/audit_events/)
+  end
+
   test "a coalesced event carries both ends of its span" do
     post = as(@me) { create_post(title: "Typing", published: false) }
     first = nil

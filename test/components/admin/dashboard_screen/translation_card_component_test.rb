@@ -25,6 +25,16 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
     assert_selector "[data-locale=de] [role=progressbar][aria-valuenow='#{(summary[:complete] * 100.0 / summary[:total]).round}']"
   end
 
+  # Task 16's d2: the shared card caps its rows at five; a language is a row,
+  # so a sixth and seventh must not disappear.
+  test "every language gets its row, however many there are" do
+    fake = %w[aa bb cc dd ee ff gg].map do |code|
+      Dashboard::TranslationNeeds::Entry.new(locale: code, name: code.upcase, total: 4, complete: 2, missing: 1, outdated: 1, item: nil)
+    end
+    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries: fake)
+    assert_selector "[data-locale]", count: 7
+  end
+
   test "an outdated item is offered as a link to its editor in that language" do
     post = create_post(title: "Changing")
     Translations::State.where(record_type: "Post", record_id: post.id, locale: "de").update_all(state: "outdated", outdated_count: 1, missing_count: 0)

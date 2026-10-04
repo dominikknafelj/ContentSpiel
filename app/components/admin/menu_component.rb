@@ -2,9 +2,9 @@ module Admin
   # A popover menu (handoff §10): a button that owns a hidden `role="menu"`
   # panel, with what a native `<details>` lacks -- arrow-key movement,
   # Escape, closing on an outside click. It is what new menus use (the
-  # rich-text toolbar's Insert menu, the language tabs' overflow). It has
-  # NOT replaced the older `<details>` menus: a block card's "⋯" and the page
-  # header's "More" are still `<details>`.
+  # rich-text toolbar's Insert menu, the language tabs' overflow, the editor
+  # header's "⋯", a block card's "⋯", a posts-list row's "⋯" and the New post
+  # split button's caret) -- there is no `<details>` menu left.
   # Each item is arbitrary content -- a `link_to` or a `button_to` -- and
   # `admin--menu` gives every link or button inside the panel
   # `role="menuitem"` and the keyboard behaviour.

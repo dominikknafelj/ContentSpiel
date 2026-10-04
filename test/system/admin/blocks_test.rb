@@ -122,6 +122,42 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ second.id, first.id, added.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
   end
 
+  # Task 12's b5: a card's menu Move pressed while that card's own autosave is
+  # still out. The reorder waits behind the save (one write queue per
+  # screen), the save lands, then the move: both persist, the typed caption
+  # on the moved card included.
+  test "a menu Move queued behind an in-flight autosave waits for it, then both land" do
+    first = @page.content_blocks.create!(block_type: "image", position: 0)
+    second = @page.content_blocks.create!(block_type: "image", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__writes = []
+      window.fetch = (url, options = {}) => {
+        const method = (options.method || "GET").toUpperCase()
+        if (method === "GET") return originalFetch(url, options)
+        window.__writes.push(method)
+        if (method !== "PATCH" || window.__writes.filter((m) => m === "PATCH").length > 1) return originalFetch(url, options)
+        return new Promise((resolve) => { window.__releaseSave = () => resolve(originalFetch(url, options)) })
+      }
+    JS
+
+    caption = find("[data-block-id='#{first.id}'] textarea[name='block[caption]'], [data-block-id='#{first.id}'] input[name='block[caption]']")
+    caption.set("Typed before the move")
+    caption.send_keys(:tab)
+    await_js "typeof window.__releaseSave === 'function'"
+    page.execute_script("document.querySelector('[data-block-id=\"#{first.id}\"] [data-move=\"down\"]').click()")
+    sleep 0.5
+    assert_equal [ "PATCH" ], page.evaluate_script("window.__writes"), "the move was sent before the save it queued behind finished"
+
+    page.execute_script("window.__releaseSave()")
+    assert_eventually(timeout: 10) { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
+    assert_equal "Typed before the move", first.reload.caption
+    assert_equal [ "PATCH", "PATCH" ], page.evaluate_script("window.__writes")
+  end
+
   # Ledger m2 (final fix wave 1): moving a card in the DOM (a drag, Move
   # up/down) disconnects and reconnects its form's `admin--autosave`. The
   # reconnect used to take whatever the form held for "what the server
@@ -334,5 +370,29 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     deadline = Time.current + timeout
     sleep 0.05 until yield || Time.current > deadline
     assert yield, "condition never became true"
+  end
+
+  # Task 12's b4: a post list's Limit is a 72px column; its error slot hangs
+  # from the column's right edge and runs leftwards instead of wrapping word by
+  # word in 72px.
+  test "the Limit error is wider than its 72px column and ends at the column's right edge" do
+    block = @page.content_blocks.create!(block_type: "post_list", position: 0, settings: { "limit" => 3 })
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    card = "##{ActionView::RecordIdentifier.dom_id(block)}"
+    find("#{card} input[name='block[settings][limit]']").set("0")
+    find("#{card} input[name='block[settings][limit]']").send_keys(:tab)
+    assert_selector "##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors p", wait: 6
+
+    rects = page.evaluate_script(<<~JS)
+      (() => {
+        const error = document.querySelector("##{Admin::BlockCardComponent.error_prefix(block)}-limit-errors").getBoundingClientRect()
+        const input = document.querySelector("#{card} input[name='block[settings][limit]']").getBoundingClientRect()
+        return { errorWidth: error.width, errorRight: error.right, inputRight: input.right }
+      })()
+    JS
+    assert_operator rects["errorWidth"], :>, 120
+    assert_in_delta rects["inputRight"], rects["errorRight"], 2
   end
 end

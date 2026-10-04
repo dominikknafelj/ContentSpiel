@@ -42,7 +42,7 @@
 </div>
 
 <div class="mt-8 flex flex-col gap-2">
-  <%= render Admin::DashboardScreen::CardComponent.new(title: "Recent activity", id: "dashboard-activity", empty: "No activity yet.", limit: nil) do |card| %>
+  <%= render Admin::DashboardScreen::CardComponent.new(title: "Recent activity", id: "dashboard-activity", empty: "No recent activity.", limit: nil) do |card| %>
     <% @activity.rows.each do |row| %>
       <% card.with_row { render Admin::DashboardScreen::ActivityRowComponent.new(row:) } %>
     <% end %>

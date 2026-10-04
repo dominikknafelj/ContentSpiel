@@ -104,7 +104,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     get admin_root_path
     assert_match "No drafts.", response.body
     assert_match "Nothing scheduled on the site.", response.body
-    assert_match "No activity yet.", response.body
+    assert_match "No recent activity.", response.body
   end
 
   test "a user who can read nothing gets empty cards and no activity" do
@@ -113,7 +113,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     get admin_root_path
     assert_response :ok
     assert_no_match "Not for you", response.body
-    assert_match "No activity yet.", response.body
+    assert_match "No recent activity.", response.body
     assert_select "section[aria-labelledby=dashboard-needs-translation]", count: 0
   end
 

@@ -89,8 +89,11 @@ module Dashboard
     private
 
     def build_rows
+      condition = readable_subjects_sql
+      return [] unless condition # nothing readable: no query at all
+
       events = Audit::Event.where(action: ACTIONS).where(last_occurred_at: WINDOW.ago..)
-        .where(readable_subjects_sql).order(last_occurred_at: :desc, id: :desc).limit(@limit).to_a
+        .where(condition).order(last_occurred_at: :desc, id: :desc).limit(@limit).to_a
       return [] if events.empty?
 
       records = readable_records(events)
@@ -98,7 +101,7 @@ module Dashboard
       events.filter_map { |event| row_for(event, records) }
     end
 
-    # The SQL condition on an event's subject (see the class comment); "1=0"
+    # The SQL condition on an event's subject (see the class comment); nil
     # for a viewer who can read nothing.
     def readable_subjects_sql
       pages = readable_ids(Page, "pages.read")
@@ -118,7 +121,7 @@ module Dashboard
         branches << "(audit_events.subject_type IN (#{types}) AND audit_events.subject_id IN " \
                     "(SELECT id FROM #{Media::Asset.quoted_table_name} WHERE trashed_at IS NULL))"
       end
-      branches.any? ? "(#{branches.join(' OR ')})" : "1=0"
+      branches.any? ? "(#{branches.join(' OR ')})" : nil
     end
 
     # `SELECT id` SQL of the records of `model` the viewer may read, or nil
@@ -135,7 +138,10 @@ module Dashboard
       record = records[subject]
       return unless record
 
-      verb = "scheduled" if verb == "updated" && scheduled_only?(event)
+      # Only a page or post can be scheduled: `BLOCK_SENTENCES` (and an image's
+      # wording) have no "scheduled", and a block event whose only change was a
+      # `published_at` would otherwise be a KeyError on the landing page.
+      verb = "scheduled" if verb == "updated" && %w[page post].include?(prefix) && scheduled_only?(event)
       before, after = (prefix == "block" ? BLOCK_SENTENCES : SENTENCES).fetch(verb)
       if verb == "scheduled" && (date = scheduled_for(event, record))
         after = "#{after} for #{date}"
