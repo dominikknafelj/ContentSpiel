@@ -4,7 +4,18 @@ require "test_helper"
 # and none of the components the shared parts replaced. These rules are easy to
 # break one innocent edit at a time, so they are pinned here.
 class AdminDesignRulesTest < ActiveSupport::TestCase
-  ADMIN_SOURCES = Dir[Rails.root.join("app/{views/admin,views/layouts,views/setup,components/admin,javascript/controllers}/**/*.{erb,rb,js}")]
+  # Everything that draws CS Studio, or is drawn inside it: its views and
+  # components, the media components it shares with the public site
+  # (`components/media`: the picker and the picture tag), the public site's own
+  # components (`components/public`: the preview bar, whose two colours are
+  # theme tokens too), and every script -- the Stimulus controllers and the
+  # modules beside them (`media/`, `autosave/`, `search/`, `rich_text/`), which
+  # build markup and set classes as well.
+  SOURCE_DIRECTORIES = %w[
+    views/admin views/layouts views/setup components/admin components/media components/public
+    javascript/controllers javascript/media javascript/autosave javascript/search javascript/rich_text
+  ].freeze
+  ADMIN_SOURCES = Dir[Rails.root.join("app/{#{SOURCE_DIRECTORIES.join(",")}}/**/*.{erb,rb,js}")]
 
   # A raw colour literal, in any of the spellings CSS has for one:
   # - hex with 3, 4, 6 or 8 digits. The lookbehind is what keeps the things
@@ -35,6 +46,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       File.readlines(path).each_with_index.filter_map do |line, index|
         "#{Pathname(path).relative_path_from(Rails.root)}:#{index + 1}: #{line[pattern]}" if line.match?(pattern)
       end
+    end
+  end
+
+  # A directory that is renamed or emptied would otherwise drop out of every
+  # rule below without a word.
+  test "every directory the rules cover is there and has sources" do
+    SOURCE_DIRECTORIES.each do |directory|
+      root = Rails.root.join("app", directory).to_s
+      assert ADMIN_SOURCES.any? { |path| path.start_with?("#{root}/") }, "app/#{directory} has no .erb, .rb or .js file: the design rules no longer look at it"
     end
   end
 
@@ -126,7 +146,7 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
   # (sign-in, setup, a dialog) is centred. The 403 and 404 messages are the
   # two centred things inside the shell, and they are messages, not forms.
   test "nothing inside CS Studio is centred except the 403 and 404 messages" do
-    centred = Dir[Rails.root.join("app/views/admin/**/*.erb"), Rails.root.join("app/components/admin/**/*.erb")]
+    centred = Dir[Rails.root.join("app/views/admin/**/*.erb"), Rails.root.join("app/components/{admin,media}/**/*.{erb,rb}")]
       .select { |f| File.read(f).match?(/\bmx-auto\b/) }
       .map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
     assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort

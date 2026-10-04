@@ -3,7 +3,7 @@ module Admin
   # top-level `Trash` module (`app/models/trash.rb`, `app/services/trash/*`)
   # for every bare `Trash::` reference lexically nested under `module Admin`
   # -- the same trap `Admin::MediaLibrary`'s own comment describes for
-  # `Media`. `test/lib/admin_trash_namespace_test.rb` guards it.
+  # `Media`. `test/lib/admin_namespace_shadow_test.rb` guards it.
   module TrashScreen
     # The Trash screen's list (trash spec §7): one table row per trashed item,
     # newest first, as `Admin::TrashController#index` loaded them (the Empty
