@@ -18,8 +18,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     visit admin_page_path(@about)
     await_admin_controllers
 
-    find("li[data-page-id='#{@services.id}'] > div").hover
-    find("li[data-page-id='#{@services.id}'] > div a[aria-label^='Add a page under']").click
+    add_page_under(@services)
 
     assert_selector "dialog#new-page-dialog[open]"
     assert_equal @services.id.to_s, find("#new-page-inside").value
@@ -52,8 +51,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     send_keys(:escape)
     assert_no_selector "dialog#new-page-dialog[open]"
 
-    find("li[data-page-id='#{@services.id}'] > div").hover
-    find("li[data-page-id='#{@services.id}'] > div a[aria-label^='Add a page under']").click
+    add_page_under(@services)
     assert_selector "dialog#new-page-dialog[open]"
     assert_equal "", find("#new-page-title").value
     assert_equal @services.id.to_s, find("#new-page-inside").value
@@ -201,5 +199,19 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal "Offline attempt", find("#new-page-title").value
     assert_button "Create page", disabled: false
     assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+  end
+  private
+
+  # A row's "+" is drawn only while the pointer is over the row (or the link
+  # has keyboard focus), so it is invisible to Capybara until then. Hovering
+  # the ROW and then looking for a visible link is two separate pointer
+  # moves, and on a slow runner the row has lost its hover by the second
+  # look (CI failed exactly there). Hovering the link itself puts the pointer
+  # where the click will land, and the click is asserted against the link
+  # once it is visible.
+  def add_page_under(parent)
+    selector = "li[data-page-id='#{parent.id}'] > div a[aria-label^='Add a page under']"
+    find(selector, visible: :all).hover
+    find(selector).click
   end
 end
