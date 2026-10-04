@@ -112,6 +112,25 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "##{dom_id(created)} span.text-warn-ink", count: 0
   end
 
+  test "a stored block verb nothing knows renders as the generic sentence, list and event page" do
+    odd = event(Time.current, action: "block.whatever", subject_type: "ContentBlock", subject_id: 999_999, subject_label: "Rich text block #999999")
+
+    get "/cs-studio/audit_events"
+    assert_response :success
+    assert_select "##{dom_id(odd)} p", text: /did block\.whatever on “Rich text block #999999”/
+
+    get "/cs-studio/audit_events/#{odd.id}"
+    assert_response :success
+  end
+
+  test "the channel chip comes before the raw key at the right end of a row" do
+    one = event(Time.current, action: "post.created")
+
+    get "/cs-studio/audit_events"
+
+    assert_operator response.body.index("data-channel=\"admin\"", response.body.index(dom_id(one))), :<, response.body.index(">post.created<", response.body.index(dom_id(one)))
+  end
+
   # --- filters ---------------------------------------------------------------------
 
   test "the toolbar is one row of selects that apply on change" do

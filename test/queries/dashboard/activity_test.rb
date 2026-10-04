@@ -232,6 +232,14 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal [ "scheduled", "Later", " for 6 Oct" ], words(row)
   end
 
+  test "a page scheduled through the Schedule dialog's service reads as scheduled for that date" do
+    page = as(@me) { create_page(title: "About", published: false) }
+    as(@me) { Pages::Save.call(page, attributes: { published_at: Time.zone.local(2031, 10, 6, 9) }) }
+    row = activity.rows.find { |r| r.record == page && r.event.action != "page.created" }
+
+    assert_equal [ "scheduled", "About", " for 6 Oct" ], words(row)
+  end
+
   test "a malformed stored published_at neither raises nor leaves a dangling for" do
     post = as(@me) { create_post(title: "Odd", published: false) }
     as(@me) { Audit.record("post.scheduled", subject: post, field_changes: { "published_at" => [ nil, "not a time" ] }) }

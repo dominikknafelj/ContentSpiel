@@ -158,7 +158,7 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
     assert_equal "#{users(:author).display_name} was refused permission to manage settings", read(sentence)
     assert sentence.security
-    assert_equal "You was refused access", read(sentence_for(event("access.denied", metadata: {})))
+    assert_equal "You were refused access", read(sentence_for(event("access.denied", metadata: {})))
   end
 
   test "owner changes read from the new value" do
@@ -217,6 +217,58 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
     assert_equal "You did acme/audit.exported on “Report”", read(sentence_for(plugin))
     assert_equal "You did acme/audit.exported", read(sentence_for(event("acme/audit.exported", user_id: @me.id)))
+  end
+
+
+  # --- derived verbs, through the real service paths -----------------------------
+
+  def latest_event(record) = Audit::Event.where(subject: record).order(:id).last
+
+  def each_kind
+    { "page" => ->(title) { as(@me) { create_page(title:, published: false) } }, "post" => ->(title) { as(@me) { create_post(title:, published: false) } } }
+  end
+
+  def save_at(record, at)
+    as(@me) { (record.is_a?(Page) ? Pages::Save : Posts::Save).call(record, attributes: { published_at: at }) }
+    latest_event(record.reload)
+  end
+
+  test "scheduling, rescheduling, removing a schedule, publishing now and unpublishing read right for pages and posts" do
+    each_kind.each do |kind, make|
+      record = make.call("Sched #{kind}")
+      later = 3.days.from_now.change(usec: 0)
+
+      assert_match(/\AYou scheduled “Sched #{kind}” for \d{1,2} \w{3}\z/, read(sentence_for(save_at(record, later))), "schedule #{kind}")
+      assert_match(/\AYou scheduled “Sched #{kind}” for /, read(sentence_for(save_at(record, later + 2.days))), "reschedule #{kind}")
+      assert_equal "You unpublished “Sched #{kind}”", read(sentence_for(save_at(record, nil))), "remove schedule #{kind}"
+      save_at(record, later)
+      assert_equal "You published “Sched #{kind}”", read(sentence_for(save_at(record, Time.current - 1.minute))), "publish now #{kind}"
+      assert_equal "You unpublished “Sched #{kind}”", read(sentence_for(save_at(record, nil))), "unpublish #{kind}"
+      assert_no_match(/\bdid\b/, read(sentence_for(latest_event(record))))
+    end
+  end
+
+  test "a block verb nothing knows reads as the generic sentence, with or without a readable owner" do
+    page = as(@me) { create_page(title: "Blog") }
+    block = as(@me) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: "rich_text")).record }
+    odd = event("block.whatever", subject_type: "ContentBlock", subject_id: block.id, subject_label: "Rich text block ##{block.id}")
+
+    assert_equal "You did block.whatever on “Blog”", read(sentence_for(odd))
+    assert_equal "did block.whatever on “Rich text block ##{block.id}”", read(sentence_for(odd, viewer: audit_only_viewer)).sub(/\A\S+ /, "")
+  end
+
+  test "junk in stored data never raises" do
+    junk = [
+      { field_changes: nil, metadata: nil, snapshot: "x" }, { field_changes: [ 1 ], metadata: [ 2 ], snapshot: [ 3 ] },
+      { field_changes: { "published_at" => { "a" => 1 }, "owner" => "x" }, metadata: { "code" => 5, "permission" => {} }, snapshot: { "block_type" => 7, "owner_type" => "Nope", "owner_id" => "z" } }
+    ]
+    junk.each do |attributes|
+      (Audit::Sentence::ACTIONS + %w[block.x nope.nope]).each do |action|
+        %w[ContentBlock Page Nope].each do |type|
+          assert_nothing_raised { Audit::Sentence.for_events([ Audit::Event.new({ action:, subject_type: type, subject_id: 1, subject_label: "L", occurred_at: Time.current, last_occurred_at: Time.current }.merge(attributes)) ], viewer: @me, channel: :admin) }
+        end
+      end
+    end
   end
 
   # --- who ---------------------------------------------------------------------

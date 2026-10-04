@@ -107,9 +107,10 @@ module Audit
       # "scheduled" sentence names when the event itself carries none.
       def build(event, viewer:, target:, fallback_scheduled_at: nil)
         action = effective_action(event)
-        parts = Wording.new(event, action, target, fallback_scheduled_at).parts
+        actor = actor_for(event, viewer, none: action == "session.failed")
+        parts = Wording.new(event, action, target, fallback_scheduled_at, you: actor.you).parts
         new(
-          actor: actor_for(event, viewer, none: action == "session.failed"),
+          actor:,
           parts:,
           subject_label: target&.label || event.subject_label,
           subject_route: target&.route,
@@ -160,7 +161,8 @@ module Audit
         nil
       end
 
-      def initialize(event, action, target, fallback_scheduled_at)
+      def initialize(event, action, target, fallback_scheduled_at, you: false)
+        @you = you
         @event = event
         @action = action
         @target = target
@@ -169,10 +171,12 @@ module Audit
 
       def parts
         prefix, verb = @action.split(".", 2)
-        if @action.start_with?("block.") then block_parts(verb)
+        # Only the known block verbs; any other `block.*` (a plugin's, a retired
+        # one) is the generic sentence, never a lookup that can raise.
+        if BLOCK_ACTIONS.include?(@action) then block_parts(verb)
         elsif SPECIAL_ACTIONS.include?(@action) then special_parts
         elsif OTHER_VERBS.key?(@action) then subject_parts(*OTHER_VERBS[@action])
-        elsif CONTENT_ACTIONS[prefix]&.include?(verb) then content_parts(verb)
+        elsif CONTENT_ACTIONS[prefix]&.include?(verb) || derived_schedule?(prefix, verb) then content_parts(verb)
         else generic_parts
         end
       end
@@ -180,6 +184,11 @@ module Audit
       private
 
       attr_reader :event, :target
+
+      # `Sentence.effective_action` turns a page's or post's `*.updated` that only
+      # set a future `published_at` into `*.scheduled`. `Pages::Save` records no
+      # `page.scheduled` itself (so it isn't in ACTIONS), but it must read as one.
+      def derived_schedule?(prefix, verb) = verb == "scheduled" && %w[page post].include?(prefix)
 
       def text(string) = Part.new(:text, string)
 
@@ -266,8 +275,11 @@ module Audit
 
       def denied_parts
         label = AccessControl::Permissions.find(event.metadata.is_a?(Hash) ? event.metadata["permission"] : nil)&.label
-        label ? [ text("was refused permission to "), strong(label.downcase) ] : [ text("was refused access") ]
+        label ? [ text("#{were} refused permission to "), strong(label.downcase) ] : [ text("#{were} refused access") ]
       end
+
+      # "You were", "Ada was".
+      def were = @you ? "were" : "was"
 
       def owner_parts
         owner = Array(event.field_changes.is_a?(Hash) ? event.field_changes["owner"] : nil).last
