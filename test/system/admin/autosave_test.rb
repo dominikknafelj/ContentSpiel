@@ -233,31 +233,6 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_nil @page.reload.subtitle
   end
 
-  # Ledger m3 (final fix wave 1): "nothing is sent when the form holds what
-  # its last save sent" compares what the form would submit. An EMPTY file
-  # input submits a File whose `lastModified` is the moment it was read, so
-  # a form with one (Settings, with its logo) never compared equal to itself
-  # and sent a save on every `focusout`.
-  test "leaving a field of a form with an empty file input, without typing, sends nothing" do
-    visit admin_settings_path
-    await_admin_controllers
-    assert_selector "form[data-controller~='admin--autosave'] input[type=file]", visible: :all
-    page.execute_script(<<~JS)
-      const originalFetch = window.fetch
-      window.__patches = 0
-      window.fetch = (url, options = {}) => {
-        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
-        return originalFetch(url, options)
-      }
-      const field = document.querySelector("form[data-controller~='admin--autosave'] input[type=text]")
-      field.focus()
-    JS
-    sleep 0.05 # `lastModified` has millisecond precision
-    page.execute_script("document.activeElement.blur()")
-    sleep 0.5
-    assert_equal 0, page.evaluate_script("window.__patches"), "a save was sent though nothing had changed"
-  end
-
   # Ledger m1 (final fix wave 1): a record editor is never restored from
   # Turbo's page cache. Back is a restoration visit: nothing drains first, and
   # the snapshot is taken with whatever the forms held at that moment -- here

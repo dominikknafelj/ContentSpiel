@@ -22,7 +22,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     record.reload
   end
 
-  def note_id(type, record, field) = "reference-card-#{type}-#{record.id}-#{field}"
+  def note_id(type, record, field, locale = "de") = "reference-card-#{type}-#{record.id}-#{field}-#{locale}"
 
   def confirm_params(record, field, locale = "de")
     { record_type: record.class.name, record_id: record.id, field: field, locale: locale }

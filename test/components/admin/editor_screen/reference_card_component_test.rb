@@ -178,8 +178,8 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
     render_outdated(post)
 
-    assert_equal "reference-card-post-#{post.id}-title", Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")
-    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")}.admin-reference-card"
+    assert_equal "reference-card-post-#{post.id}-title-de", Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")
+    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")}.admin-reference-card"
   end
 
   test "current_for builds the current-state card for a record's field" do
@@ -189,7 +189,7 @@ class Admin::EditorScreen::ReferenceCardComponentTest < ViewComponent::TestCase
 
     render_inline Admin::EditorScreen::ReferenceCardComponent.current_for(post, "title", locale: "de")
 
-    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")}[data-translation-state='current'] p", text: "A small room"
+    assert_selector "##{Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")}[data-translation-state='current'] p", text: "A small room"
     assert_no_selector "button"
   end
 

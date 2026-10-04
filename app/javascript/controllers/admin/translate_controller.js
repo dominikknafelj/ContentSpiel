@@ -280,7 +280,7 @@ export default class extends Controller {
   // form's autosave queues (one save in flight per form, edits coalescing
   // into the next), and the editors' own writes come last.
   useAll() {
-    const uses = Array.from(document.querySelectorAll("[data-translate-use]"))
+    const uses = Array.from(document.querySelectorAll("[data-translate-use]")).filter(onScreen)
     const plain = uses.filter((button) => button.dataset.translateKind !== "rich")
     const rich = uses.filter((button) => button.dataset.translateKind === "rich")
     // One refresh at the end, not one per Use.
@@ -298,7 +298,7 @@ export default class extends Controller {
   // is its way out), nothing saved.
   discardAll() {
     document.querySelectorAll("[data-translation-box]").forEach((box) => {
-      if (box.querySelector("[data-translation-suggestion]")) box.replaceChildren()
+      if (onScreen(box) && box.querySelector("[data-translation-suggestion]")) box.replaceChildren()
     })
     this.showStatus("")
     this.refresh()
@@ -311,7 +311,7 @@ export default class extends Controller {
   refresh() {
     if (!this.hasIdleTarget || this.runController) return
 
-    const suggestions = document.querySelectorAll("[data-translate-use]").length
+    const suggestions = Array.from(document.querySelectorAll("[data-translate-use]")).filter(onScreen).length
     if (suggestions > 0) {
       this.show("ready")
       const text = this.constructor.texts.ready(suggestions)
@@ -519,7 +519,16 @@ async function settle() {
 // Every field with a Translate wrapper whose input is empty now. A Suggest
 // update wrapper is no empty field's: its field already has a translation.
 function emptyFields() {
-  return Array.from(document.querySelectorAll("[data-translate-field]:not([data-translate-mode='update'])")).map(describe).filter(isEmpty)
+  return Array.from(document.querySelectorAll("[data-translate-field]:not([data-translate-mode='update'])")).filter(onScreen).map(describe).filter(isEmpty)
+}
+
+// A screen that holds several languages' fields at once (Settings' Site card)
+// hides all but one language's panel (`[data-language-panel][hidden]`). The
+// header's bulk run, Use all, Discard all and its counts act on what is on
+// screen, i.e. the language being looked at -- never on a language whose panel
+// is hidden. The editors have no such panel, so for them everything counts.
+function onScreen(element) {
+  return !element.closest("[data-language-panel][hidden]")
 }
 
 // A field's Translate wrapper, as the request needs it.

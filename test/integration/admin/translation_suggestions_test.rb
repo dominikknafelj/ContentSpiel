@@ -212,10 +212,10 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
   # `to_prepare` registrations, which drops the stub provider.
   test "the site settings and a block's fields answer too" do
     site_settings(:default).update!(title: "My site")
-    suggest(site_settings(:default), %w[title], inputs: { title: "settings-title" })
+    suggest(site_settings(:default), %w[title], inputs: { title: "settings-de-title" })
 
     assert_response :success
-    assert_includes stream_fragment("translation-suggestion-settings-title").text, "[de] My site"
+    assert_includes stream_fragment("translation-suggestion-settings-de-title").text, "[de] My site"
     assert_nil site_settings(:default).reload.title(locale: "de", fallback: false)
 
     with_test_types do
@@ -293,8 +293,12 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings", params: { locale: "de" }
 
     assert_response :success
-    assert_select "[data-translate-slot='title'] [data-translate-record-type='SiteSetting'][data-translate-input-id='settings-title']"
-    assert_select "button", text: /Suggest translations for \d+ empty field/
+    # Every language's fields are in the page, so the ids carry the language;
+    # only a non-default one has the buttons, each in its own panel.
+    assert_select "[data-language-panel='de'] [data-translate-slot='title'] [data-translate-record-type='SiteSetting'][data-translate-input-id='settings-de-title']"
+    assert_select "[data-language-panel='es'] [data-translate-slot='title'] [data-translate-input-id='settings-es-title']"
+    assert_select "[data-language-panel='en'] [data-translate-field]", count: 0
+    assert_select "[data-language-panel='de'] button", text: /Suggest translations for \d+ empty field/
 
     with_test_types do
       page = create_page(title: "About")

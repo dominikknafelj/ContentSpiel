@@ -1,0 +1,5 @@
+<nav aria-label="Settings sections" class="admin-settings-nav flex flex-col gap-0.5">
+  <% sections.each do |section| %>
+    <a href="#<%= section[:id] %>" class="rounded-cs px-2 py-1.5 text-sm text-dim hover:bg-sunken hover:text-ink"><%= section[:label] %></a>
+  <% end %>
+</nav>

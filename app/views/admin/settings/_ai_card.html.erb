@@ -1,0 +1,42 @@
+<%# locals: site_setting, values, errors -- the AI translation card (translation
+    helpers spec §6.2; round 3's Task 7 rebuilds it). Provider and model are
+    pending fields of the Settings form like any other. The API key and Test
+    connection are instant actions of their own, associated with the forms in
+    `#settings-ai-key-forms` by `form=` (see `show`), so they are never part
+    of what the footer counts or the Save sends. %>
+<%# Every registered provider, plus whatever is stored even if it's no longer
+    registered (a removed plugin's), so a save resends the stored value instead
+    of the browser silently switching to the first option. %>
+<% provider_names = ::AI::Providers.names %>
+<% shown = values.ai_provider.presence %>
+<% provider_names = [ shown, *provider_names ] if shown && !provider_names.include?(shown) %>
+<section class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="ai">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="ai" class="text-h2 text-ink">AI translation</h2>
+    <p class="mt-1 text-sm text-dim">Editors can ask for a suggested translation of a field. Nothing is saved until they use it.</p>
+  </div>
+  <div class="flex flex-col gap-4 p-4">
+    <div class="grid gap-3.5 sm:grid-cols-2">
+      <div class="admin-column" data-field-name="ai_provider">
+        <%= label_tag "settings-ai_provider", "Provider", class: setup_label_class %>
+        <%= select_tag "site_setting[ai_provider]", options_for_select(provider_names, values.ai_provider),
+              include_blank: "None (AI translation off)", id: "settings-ai_provider", class: setup_select_class %>
+        <%= render "admin/shared/field_errors", id: "settings-ai_provider-errors", messages: errors.grep(/provider/i) %>
+      </div>
+      <div class="admin-column" data-field-name="ai_model">
+        <%= label_tag "settings-ai_model", "Model", class: setup_label_class %>
+        <%= text_field_tag "site_setting[ai_model]", values.ai_model, placeholder: ::AI::DEFAULT_MODEL, id: "settings-ai_model",
+              autocomplete: "off", spellcheck: false, class: setup_input_class %>
+        <%= render "admin/shared/field_errors", id: "settings-ai_model-errors", messages: errors.grep(/model/i) %>
+      </div>
+    </div>
+
+    <%= render "admin/settings/ai_key_field", site_setting: site_setting %>
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" form="settings-ai-test-form" class="<%= setup_secondary_link_class %>" data-busy-label="Testing…">Test connection</button>
+      <span class="text-sm text-meta">Uses the saved provider, model and key.</span>
+    </div>
+    <%= render "admin/settings/ai_test_result", message: nil, ok: nil %>
+  </div>
+</section>

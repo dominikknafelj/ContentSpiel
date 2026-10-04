@@ -72,8 +72,11 @@ module Admin
       FORMATTING_NOTE = "Formatting changed".freeze
       TOO_LONG_NOTE = "The text is too long to compare word by word.".freeze
 
-      def self.dom_id(record, field)
-        "reference-card-#{record.class.name.underscore.tr("/_", "--")}-#{record.id}-#{field}"
+      # Per language (round 3, Task 5): Settings holds every language's fields
+      # on one screen, so two cards for the same record and field (German and
+      # Spanish) must not share an id -- the confirm stream replaces by id.
+      def self.dom_id(record, field, locale)
+        "reference-card-#{record.class.name.underscore.tr("/_", "--")}-#{record.id}-#{field}-#{locale}"
       end
 
       # The `translation_state:`/`translation_confirm:`/`translation_record:`
@@ -129,7 +132,7 @@ module Admin
 
       def language_name = ::Locales.name(::Locales.default, native: true)
 
-      def card_id = record&.persisted? ? self.class.dom_id(record, field) : nil
+      def card_id = record&.persisted? ? self.class.dom_id(record, field, locale) : nil
 
       def card_class
         "admin-reference-card min-w-0 rounded-cs border #{outdated? ? "border-warn" : "border-line"} bg-paper p-3"

@@ -1,0 +1,15 @@
+<section class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="publishing">
+  <div class="border-b border-line px-4 py-3.5">
+    <h2 id="publishing" class="text-h2 text-ink">Publishing</h2>
+  </div>
+  <div class="admin-column p-4" data-field-name="trash_retention_days">
+    <div class="flex flex-wrap items-center gap-2 text-ink">
+      <label for="<%= field_id %>">Keep trashed items for</label>
+      <%= number_field_tag "site_setting[trash_retention_days]", values.trash_retention_days, id: field_id, min: 0, step: 1,
+            class: "#{setup_input_class} !mt-0 !w-18", aria: { describedby: "#{field_id}-help" } %>
+      <span>days after an item is trashed.</span>
+    </div>
+    <p id="<%= field_id %>-help" class="mt-1.5 text-sm text-meta">Set to 0 to keep trashed items until someone empties the trash.</p>
+    <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
+  </div>
+</section>

@@ -180,6 +180,10 @@ Rails.application.routes.draw do
       # Translation helpers spec §6.2: checks the saved AI provider, model
       # and key with one tiny request, answered inline as a Turbo Stream.
       post :test_ai_connection
+      # The API key's own save/remove (an instant action beside the Settings
+      # form, never part of it: the key is never in the form's data, so it
+      # can't be counted as a pending change or sent with the rest).
+      patch :ai_key
     end
 
     # The Languages module (cs-studio spec §6.1, Task 8), nested under

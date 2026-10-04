@@ -489,6 +489,29 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_operator after, :>, before
   end
 
+  # Every language's fields are on the Settings page at once (only one
+  # panel visible): the header's bulk run, and Use all, act on the language
+  # being looked at -- never on a hidden panel's fields.
+  test "Suggest translations on Settings acts on the visible language only" do
+    visit "/cs-studio/settings?locale=de"
+    await_admin_controllers
+
+    press "Suggest translations for 1 empty field"
+    assert_suggestion "translation-suggestion-settings-de-title", "[de] Test Site"
+    assert_no_selector "#translation-suggestion-settings-es-title textarea", visible: :all
+    press "Use all"
+
+    assert_equal "[de] Test Site", find_field("settings-de-title").value
+    assert_selector ".admin-save-bar", text: /1 unsaved change/i
+    click_on "Español"
+    assert_equal "", find_field("settings-es-title").value
+    assert_no_selector "#translation-suggestion-settings-es-title textarea", visible: :all
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
+    assert_equal "[de] Test Site", site_settings(:default).reload.title(locale: "de")
+    assert_nil site_settings(:default).title(locale: "es", fallback: false)
+  end
+
   test "Settings in German show the tagline's original, and the German tagline reaches /de" do
     root_page
     Mobility.with_locale(:en) { site_settings(:default).update!(title: "Dana's Notes", tagline: "Things I learned") }
@@ -497,8 +520,9 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     assert_selector "[data-original-for='tagline']", text: "Things I learned"
 
-    fill_in "settings-tagline", with: "Was ich gelernt habe"
-    assert_selector "#settings-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    fill_in "settings-de-tagline", with: "Was ich gelernt habe"
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved", wait: 5
     assert_equal "Things I learned", site_settings(:default).reload.tagline(locale: "en")
 
     # The homepage eyebrow is uppercased by CSS, hence case-insensitive.

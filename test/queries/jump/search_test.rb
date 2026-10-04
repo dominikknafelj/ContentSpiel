@@ -55,7 +55,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
   test "settings destinations anchor into the Settings screen and need the permission their section needs" do
     settings = search("ai trans").find { |g| g[:label] == "Settings" }
     assert_equal [ "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
-    assert_match(/\/settings#settings-section-ai\z/, settings[:rows].first[:url])
+    assert_match(/\/settings#ai\z/, settings[:rows].first[:url])
 
     nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")
     assert_nil search("", actor: nobody, modules: []).find { |g| g[:label] == "Settings" }

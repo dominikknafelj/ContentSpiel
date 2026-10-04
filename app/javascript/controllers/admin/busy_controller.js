@@ -17,8 +17,17 @@ export default class extends Controller {
     this.element.removeEventListener("turbo:submit-end", this.finish)
   }
 
+  // The button is a target inside the form, or -- when the form can't hold it
+  // (Settings' Test connection sits inside the main form but submits one of
+  // its own) -- a button naming this form with `form=` and a busy label.
+  get button() {
+    if (this.hasButtonTarget) return this.buttonTarget
+    return this.element.id ? document.querySelector(`[form="${CSS.escape(this.element.id)}"][data-busy-label]`) : null
+  }
+
   begin = () => {
-    const button = this.buttonTarget
+    const button = this.button
+    if (!button) return
     if (this.restore) return
     const { width, innerHTML } = { width: button.style.width, innerHTML: button.innerHTML }
     this.restore = () => {

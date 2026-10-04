@@ -65,8 +65,8 @@ class SiteSetting < ApplicationRecord
   #
   # Validated only when it changes: a value written around the model that
   # no Rails name covers (raw SQL, a restored backup) is still shown and
-  # resent unchanged by the form (`Admin::SettingsFormComponent#
-  # time_zone_options`), and mustn't block an unrelated title edit --
+  # resent unchanged by the form (`Admin::SettingsScreen::
+  # SiteCardComponent#time_zone_options`), and mustn't block an unrelated title edit --
   # `#effective_time_zone` is what keeps an unknown one from 500ing.
   before_validation :normalize_time_zone
   validate :time_zone_is_known, if: :will_save_change_to_time_zone?

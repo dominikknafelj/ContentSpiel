@@ -49,7 +49,7 @@ module Admin
       return message if field == "base" || message.end_with?(".")
 
       name = field.humanize
-      message.start_with?(name) ? message : "#{name} #{message}"
+      message.downcase.start_with?(name.downcase) ? message : "#{name} #{message}"
     end
   end
 end

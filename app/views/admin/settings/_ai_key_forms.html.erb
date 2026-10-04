@@ -1,0 +1,19 @@
+<%# locals: site_setting -- the forms of the AI card's instant actions, kept
+    OUTSIDE the Settings form (forms can't nest; a dialog's form can't be
+    inside one either). The card's controls reach them by `form=`. Replaced as
+    one element by a key save (`Admin::SettingsController#ai_key`). %>
+<%= form_with method: :post, id: "settings-ai-test-form", html: { class: "hidden" },
+      data: { controller: "admin--busy" }, url: test_ai_connection_admin_settings_path do end %>
+<%= form_with url: ai_key_admin_settings_path, method: :patch, id: "settings-ai-key-form", html: { class: "hidden" } do end %>
+
+<% if site_setting.ai_api_key_set? %>
+  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: "settings-ai-remove-key-dialog", title: "Remove the API key?",
+        body: "AI translation stops working until a new key is saved.") do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: ai_key_admin_settings_path, method: :patch do %>
+        <%= hidden_field_tag "site_setting[remove_ai_key]", "1", id: nil %>
+        <%= render Admin::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,11 +1,66 @@
-<%# The Settings module (cs-studio spec §6.1, Task 8): title, tagline,
-    logo, social links and the default language, all through one
-    autosaving form (`Admin::SettingsFormComponent`) -- the title and
-    tagline in whichever language is being edited (`admin_locale`,
-    translation helpers spec §5). %>
-<% content_for :title, "Settings" %>
-<h1 class="mb-4 text-h1 text-ink">Settings</h1>
+<%# The Settings screen (cs-studio spec §6.1; round 3, Task 5, handoff §4.5): a
+    nav of anchors at the left (`Admin::SettingsScreen::NavComponent`) and one
+    card per section in a column up to 1100px wide altogether. ONE form
+    (`#settings-form`) wraps the whole column and carries the ONE save footer
+    (`Admin::SaveBarComponent`, at its bottom): the Site and Publishing cards
+    and the AI card's provider and model are its fields. What can't be a
+    field of it -- the AI key (its own save, instantly, never rendered back),
+    Test connection -- is associated with forms of its own that sit AFTER this
+    one in `#settings-ai-key-forms` (forms can't nest, and the dialog forms
+    can't be inside it either), through the `form=` attribute.
 
-<div class="mt-2">
-  <%= render Admin::SettingsFormComponent.new(site_setting: @site_setting, locale: admin_locale) %>
+    After a refused save the same screen comes back (422), or after a stale one
+    (409): `@submitted` holds what was typed, so every field shows that and
+    nothing is lost (`Admin::SettingsScreen::Values`). %>
+<% content_for :title, "Settings" %>
+<% manage_settings = can?("settings.manage") %>
+<% manage_languages = can?("languages.manage") %>
+<% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
+<% base = params[:base_updated_at].presence || @site_setting.updated_at.iso8601(6) %>
+<% error_ids = { "title" => "settings-#{Locales.default}-title", "tagline" => "settings-#{Locales.default}-tagline", "time_zone" => "settings-time_zone",
+     "trash_retention_days" => "settings-trash_retention_days", "ai_provider" => "settings-ai_provider", "ai_model" => "settings-ai_model",
+     "social_links" => "settings-social-0-name" } %>
+
+<div class="grid max-w-[1100px] grid-cols-1 items-start gap-x-7 gap-y-4 lg:grid-cols-[170px_minmax(0,1fr)]">
+  <div class="lg:sticky lg:top-7">
+    <h1 class="mb-3.5 text-h1 text-ink">Settings</h1>
+    <%= render Admin::SettingsScreen::NavComponent.new(sections: Admin::SettingsScreen::NavComponent.sections_for { |permission| can?(permission) }) %>
+  </div>
+
+  <div class="flex min-w-0 flex-col gap-5">
+    <% if @stale %>
+      <div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">
+        <%= Admin::SettingsController::STALE_MESSAGE %>
+        <%# Reload is a way out like Cancel: it discards what is in the form on purpose. %>
+        <%= link_to "Reload", admin_settings_path(**admin_url_options), class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
+      </div>
+    <% end %>
+    <%# Full messages, so "AI provider isn't an available provider" keeps the name
+    the model gives its attribute instead of the humanized key ("Ai provider"). %>
+    <% summary = @errors.respond_to?(:group_by_attribute) ? @errors.group_by_attribute.transform_values { |errors| errors.map(&:full_message) } : (@errors || []) %>
+    <%= render Admin::ErrorSummaryComponent.new(errors: summary, field_ids: error_ids.merge("logo" => "settings-logo")) %>
+
+    <% if manage_settings %>
+      <%= form_with url: admin_settings_path, method: :patch, id: "settings-form", multipart: true, class: "flex flex-col gap-5",
+            data: save_bar_form_data(dirty: @stale || @errors.present?) do %>
+        <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "settings-base-updated-at", value: base } %>
+        <%= hidden_field_tag :locale, admin_locale, id: nil if admin_locale != Locales.default %>
+
+        <%= render Admin::SettingsScreen::SiteCardComponent.new(site_setting: @site_setting, values: values, locale: admin_locale,
+              errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
+        <% if manage_languages %><%= render "admin/settings/languages_card" %><% end %>
+        <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
+              errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
+        <%= render "admin/settings/ai_card", site_setting: @site_setting, values: values,
+              errors: (@errors.full_messages_for(:ai_provider) + @errors.full_messages_for(:ai_model) if @errors.respond_to?(:full_messages_for)).to_a %>
+
+        <%= render Admin::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
+      <% end %>
+
+      <%# Forms of their own, outside the one above (see the comment at the top). %>
+      <div id="settings-ai-key-forms"><%= render "admin/settings/ai_key_forms", site_setting: @site_setting %></div>
+    <% elsif manage_languages %>
+      <%= render "admin/settings/languages_card" %>
+    <% end %>
+  </div>
 </div>
