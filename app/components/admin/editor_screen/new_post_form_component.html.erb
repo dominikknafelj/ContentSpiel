@@ -1,6 +1,4 @@
-<%= form_with url: url, method: :post, id: form_id,
-      data: { turbo_frame: "_top", controller: "admin--new-record", admin__new_record_kind_value: "post",
-              action: "admin--dialog:opening@document->admin--new-record#opened input->admin--new-record#update change->admin--new-record#update turbo:submit-start->admin--new-record#submitting turbo:submit-end->admin--new-record#submitted" } do %>
+<%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top" } do %>
   <%= render Admin::ErrorSummaryComponent.new(errors: error_summary, field_ids: field_ids) %>
 
   <fieldset id="<%= TYPE_ID %>" class="mb-4">

@@ -9,9 +9,12 @@ module Admin
     # page and the Turbo Stream that replaces just `#new-post-form` after a
     # refused create.
     #
+    # Loaded when the dialog OPENS, into the shell's turbo-frame (see
+    # `NewPostDialogComponent`), so the listing paths are never stale.
+    #
     # A post's URL is its canonical listing page's path plus its own slug
-    # (`PublicSite::Paths.canonical_page`, asked with an unsaved post of that
-    # type), so each radio carries `data-path`: that page's path in the editing
+    # (`PublicSite::Paths.canonical_pages`, asked once for an unsaved post of
+    # every creatable type), so each radio carries `data-path`: that page's path in the editing
     # language, locale prefix included, no trailing slash -- blank when no page
     # lists the type, which is what makes `admin--new-record` print the
     # "Not listed" line. The first type is preselected unless one was asked for
@@ -43,10 +46,15 @@ module Admin
 
       def choices
         @choices ||= begin
-          urls = PublicSite::Urls.new
-          ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }.map do |type|
-            page = PublicSite::Paths.canonical_page(Post.new(content_type: type.name))
-            path = page ? urls.path_for(page, locale).to_s.sub(%r{/+\z}, "") : nil
+          prefix = PublicSite::Urls.new.prefix(locale)
+          types = ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
+          posts = types.to_h { |type| [ type, Post.new(content_type: type.name) ] }
+          pages = PublicSite::Paths.canonical_pages(posts.values)
+          # One query for every listing page's stored path, not one per page.
+          stored = PublicPath.current.where(record_type: "Page", record_id: pages.values.compact.map(&:id), locale: locale).pluck(:record_id, :path).to_h
+          types.map do |type|
+            page = pages.fetch(posts.fetch(type))
+            path = page && stored[page.id] ? "#{prefix}#{stored[page.id]}".sub(%r{/+\z}, "") : nil
             Choice.new(name: type.name, label: type.label, path: path)
           end
         end

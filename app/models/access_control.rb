@@ -105,6 +105,19 @@ module AccessControl
 
     def page_branch_ids(page) = Checker.page_branch_ids(page)
 
+    # The pages among `pages` that `actor` may create a page UNDER: `pages.create`
+    # is checked against the branch the new page would join, so each is asked as
+    # `allowed?(actor, "pages.create", Page.new(parent: page))`, with every
+    # page's branch preloaded in one query so the checks add none. The one
+    # answer for every "which parent?" picker (the New page dialog's Inside, the
+    # Trash screen's restore picker). It is deliberately NOT
+    # `scope(actor, "pages.create", Page.all)`: that narrows to pages whose
+    # *parent* is in a grant's branch, i.e. the would-be new pages, so a
+    # branch-scoped user would never be offered the branch's own root.
+    def creatable_parents(actor, pages, channel: Current.channel)
+      preload_branches(pages.to_a).select { |page| allowed?(actor, "pages.create", Page.new(parent: page), channel: channel) }
+    end
+
     # Is `actor` an owner? Only a `User` ever is: an API token -- even an
     # owner's -- acts within its group (the intersection, design spec §3.3
     # "Tokens"), so it's judged on those effective rights everywhere an

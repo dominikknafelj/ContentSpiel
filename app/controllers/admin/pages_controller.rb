@@ -78,7 +78,12 @@ module Admin
     def new
       parent = params[:parent_id].present? ? admin_scope(Page.all).find(params[:parent_id]) : nil
       @page = Page.new(parent: parent)
-      forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
+      return forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
+
+      # The New page dialog loading its form (`admin--new-record` sets the
+      # frame's `src` to this URL): just the frame, no layout. A normal request
+      # renders the standalone page.
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID
     end
 
     # From the New page dialog (title, Inside, Page type) or the standalone
@@ -97,16 +102,10 @@ module Admin
     def create
       page_type = params.dig(:page, :page_type).presence
       parent = requested_parent
+      return render_new_page_failure(gone: true) if parent == :gone
 
-      # `Page.new(page_type: "bogus")` raises ArgumentError (a Rails enum),
-      # which would be a 500 for a forged value: refuse it as a validation
-      # failure of the field instead, before it reaches the model.
-      if page_type && !Page.page_types.key?(page_type)
-        @page = Page.new(parent: parent)
-        @page.errors.add(:page_type, "isn't a page type")
-        return render_new_page_failure
-      end
-
+      # An unknown `page_type` is `Page`'s own validation failure (`enum ...
+      # validate: true`), reported on the field like any other.
       result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, page_type: page_type }.compact,
         translations: { admin_locale => { title: params.dig(:page, :title) } })
 
@@ -318,16 +317,11 @@ module Admin
       end
     end
 
-    # No `parent_id` at all (the empty state's "Add a page" names none) is
-    # "use the homepage". A named one is looked up through the read scope
-    # like every other record here, the same way `new` does: an id the
-    # actor can't read -- or one that no longer exists -- is a 404, never a
-    # silent fallback to the homepage that would put the page somewhere
-    # the editor didn't choose. `Pages::Save` then decides `pages.create`
-    # against the parent's branch.
-    def render_new_page_failure
+    def render_new_page_failure(gone: false)
+      @page ||= Page.new
+      @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
       form = Admin::EditorScreen::NewPageFormComponent.new(
-        url_options: admin_url_options, locale: admin_locale, parent_id: @page.parent_id || params.dig(:page, :parent_id),
+        url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || params.dig(:page, :parent_id) unless gone),
         title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors
       )
 
@@ -337,9 +331,29 @@ module Admin
       end
     end
 
+
+    # No `parent_id` at all (the empty state's "Add a page" names none) is
+    # "use the homepage". A named one is looked up through the read scope
+    # like every other record here, the same way `new` does: an id the
+    # actor can't read -- or one that no longer exists -- is a 404, never a
+    # silent fallback to the homepage that would put the page somewhere
+    # the editor didn't choose. `Pages::Save` then decides `pages.create`
+    # against the parent's branch.
+    #
+    # One exception to that 404, for `create` only: a parent the viewer can
+    # read that has been moved to the trash since the dialog's form was loaded
+    # is not "an id forged outside my scope" -- the editor just lost the race --
+    # so it comes back as `:gone`, answered with the form and "Choose a page
+    # that still exists." on Inside rather than a bare 404 in an empty dialog.
     def requested_parent
       parent_id = params.dig(:page, :parent_id)
-      parent_id.present? ? admin_scope(Page.all).find(parent_id) : root_page
+      return root_page if parent_id.blank?
+
+      admin_scope(Page.all).find(parent_id)
+    rescue ActiveRecord::RecordNotFound
+      raise unless AccessControl.scope(Current.actor, "pages.read", Page.all, trashed: true).exists?(id: parent_id)
+
+      :gone
     end
   end
 end

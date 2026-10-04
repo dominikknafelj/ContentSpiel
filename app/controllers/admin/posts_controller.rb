@@ -55,6 +55,11 @@ module Admin
     # never changes after that), unlike a page's type, which stays editable.
     def new
       @post = Post.new(content_type: params[:type])
+      # `posts.create` for at least one type (the `before_action`) is not yet a
+      # type to offer: the form itself is the judge, as `pages#new` is.
+      return forbidden! unless Admin::EditorScreen::NewPostFormComponent.new(url_options: admin_url_options, locale: admin_locale).creatable?
+
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPostDialogComponent::FRAME_ID
     end
 
     # From the dialog (type, title) or the standalone form: a draft of the

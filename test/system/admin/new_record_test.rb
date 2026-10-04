@@ -23,7 +23,8 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
 
     assert_selector "dialog#new-page-dialog[open]"
     assert_equal @services.id.to_s, find("#new-page-inside").value
-    assert_equal "new-page-title", page.evaluate_script("document.activeElement.id")
+    assert_selector "dialog#new-page-dialog form#new-page-form"
+    assert_eventually { page.evaluate_script("document.activeElement.id") == "new-page-title" }
     assert_selector "dialog#new-page-dialog [data-admin--new-record-target=url]", text: "URL: /services/"
 
     fill_in "new-page-title", with: "Our Team"
@@ -68,7 +69,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
 
     assert_selector "dialog#new-page-dialog[open] .admin-error-summary", text: "1 thing needs fixing", wait: 10
     assert_equal "Landing", find("#new-page-type").find("option[selected]").text
-    assert page.evaluate_script("document.activeElement.classList.contains('admin-error-summary')")
+    assert_eventually { page.evaluate_script("document.activeElement.classList.contains('admin-error-summary')") }
     assert_current_path admin_page_path(@about)
 
     fill_in "new-page-title", with: "Fixed"
@@ -97,7 +98,8 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
 
     click_link "+ New post", match: :first
     assert_selector "dialog#new-post-dialog[open]"
-    assert_equal "new-post-title", page.evaluate_script("document.activeElement.id")
+    assert_selector "dialog#new-post-dialog form#new-post-form"
+    assert_eventually { page.evaluate_script("document.activeElement.id") == "new-post-title" }
     assert_selector "dialog#new-post-dialog [data-admin--new-record-target=url]", text: "Not listed on any page yet"
 
     find("dialog#new-post-dialog label", text: ContentTypes.find("now_update").label).click
@@ -109,6 +111,23 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal "now_update", created.content_type
     assert_equal "Writing this down", created.title
     assert_current_path admin_post_path(created)
+  end
+
+  test "a form that fails to load shows a message with Try again, never an empty dialog" do
+    visit admin_page_path(@about)
+    await_admin_controllers
+    good = page.evaluate_script("document.querySelector('[data-admin--new-record-kind-value=page]').dataset['admin-NewRecordUrlValue'] || document.querySelector('[data-admin--new-record-kind-value=page]').getAttribute('data-admin--new-record-url-value')")
+    page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', '/cs-studio/pages/does-not-exist')")
+
+    click_link "+ New page"
+    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=failure]", text: "The form couldn’t be loaded.", visible: :visible
+    assert_button "Create page", disabled: true
+
+    page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', #{good.to_json})")
+    click_button "Try again"
+    assert_selector "dialog#new-page-dialog form#new-page-form"
+    assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+    assert_button "Create page", disabled: false
   end
 
   test "the palette's New page and New post entries close it and open the dialogs" do

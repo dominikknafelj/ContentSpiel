@@ -1,0 +1,7 @@
+<%# The New post dialog's form, answering the shell's turbo-frame (see
+    `Admin::EditorScreen::NewPostDialogComponent`): no layout. `type` and `title`
+    preset it. %>
+<turbo-frame id="<%= Admin::EditorScreen::NewPostDialogComponent::FRAME_ID %>">
+  <%= render Admin::EditorScreen::NewPostFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+        content_type: @post.content_type, title: params[:title]) %>
+</turbo-frame>

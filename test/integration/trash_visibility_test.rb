@@ -305,16 +305,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_empty @kept_post.reload.related_posts
   end
 
-  test "the New page dialog's Inside picker never offers a trashed page, and a forged trashed parent is a 404" do
+  test "the New page dialog's Inside picker never offers a trashed page, and a trashed parent is answered on Inside" do
     sign_in_as(users(:one))
-    get "/cs-studio/pages/#{@kept_page.id}"
+    get "/cs-studio/pages/new", headers: { "Turbo-Frame" => "new-page-form-frame" }
 
     assert_select "#new-page-inside option[value='#{@kept_page.id}']"
     assert_select "#new-page-inside option[value='#{@gone_page.id}']", count: 0
     assert_no_difference "Page.count" do
-      post "/cs-studio/pages", params: { page: { title: "Under the trash", parent_id: @gone_page.id } }
+      post "/cs-studio/pages", params: { page: { title: "Under the trash", parent_id: @gone_page.id } }, as: :turbo_stream
     end
-    assert_response :not_found
+    assert_response :unprocessable_entity
+    assert_select "template .admin-error-summary", text: /Choose a page that still exists\./
   end
 
   test "the media library, picker and search hide trashed images" do

@@ -89,9 +89,8 @@ module Admin
       # read off one load of the kept pages rather than per candidate.
       def parent_choices
         @parent_choices ||= begin
-          candidates = AccessControl.scope(Current.actor, "pages.create", Page.all).pluck(:id)
           kept = Page.kept.select(:id, :parent_id, :title).index_by(&:id)
-          candidates.filter_map { |id| kept[id] && [ path_label(kept[id], kept), id ] }.sort_by(&:first)
+          AccessControl.creatable_parents(Current.actor, kept.values).map { |page| [ path_label(page, kept), page.id ] }.sort_by(&:first)
         end
       end
 

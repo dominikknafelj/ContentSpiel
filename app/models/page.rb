@@ -100,7 +100,11 @@ class Page < ApplicationRecord
   # bookkeeping column.
   belongs_to :trash_root, class_name: "Page", optional: true
 
-  enum :page_type, { standard: 0, landing: 1 }
+  # `validate: true`: an unknown value (a forged `page[page_type]`) is an
+  # ordinary "is not included in the list" validation failure on the field,
+  # for every caller of `Pages::Save`, instead of the `ArgumentError` a plain
+  # enum raises on assignment (a 500 from a request).
+  enum :page_type, { standard: 0, landing: 1 }, validate: true
 
   # "Titled" means *some* locale has a title, not "the locale that happens to
   # be ambient when this record is saved" -- a page may legitimately exist in

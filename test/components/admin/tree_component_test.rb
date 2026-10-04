@@ -79,6 +79,13 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
     assert_selector "a[href='/cs-studio/pages/new']", text: "+ New page"
   end
 
+  test "the header's New page and each row's + open the New page dialog, the row presetting Inside" do
+    about = create_page(title: "About")
+    render_tree
+    assert_selector "a[href='/cs-studio/pages/new'][data-action='admin--dialog#open'][data-admin--dialog-id-param=new-page-dialog]", text: "+ New page"
+    assert_selector "li[data-page-id='#{about.id}'] > div a[data-action='admin--dialog#open'][data-admin--dialog-id-param=new-page-dialog][data-new-page-parent-id-param='#{about.id}'][href='/cs-studio/pages/new?parent_id=#{about.id}']", visible: :all
+  end
+
   test "the starter offer sits in the header menu only while Home is the only kept page" do
     render_tree
     assert_selector "[role=menu] button", text: "Create starter pages", visible: :all
