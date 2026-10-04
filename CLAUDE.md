@@ -23,6 +23,8 @@ bin/rails server               # or `bin/dev`, which runs server + `tailwindcss:
 
 A local run is quiet: what tests themselves print (the statements a migration test runs, the seed file's "Seeded dev accounts" lines) is swallowed, and shown only for a block that fails. `VERBOSE=1 bin/rails test` prints all of it, and CI always sets `VERBOSE` (`TestOutput` in `test/test_helper.rb`; a test that prints wraps the call in `TestOutput.quietly { ... }`).
 
+Coverage is on request: `COVERAGE=1 bin/rails test` (SimpleCov, line and branch) writes `coverage/index.html`, which `bundle exec simplecov open` shows; the parallel workers' results are merged into the one report. It is off by default, since a run of one file would report a meaningless few percent. CI turns it on for the unit suite and keeps the report as the `coverage` artifact. There is no minimum yet, so a drop doesn't fail a run.
+
 **Lint/scan** (all run in CI, see `.github/workflows/ci.yml`):
 ```sh
 bin/rubocop            # style (rubocop-rails-omakase, config in .rubocop.yml)

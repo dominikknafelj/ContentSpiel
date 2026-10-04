@@ -1,4 +1,22 @@
 ENV["RAILS_ENV"] ||= "test"
+
+# Code coverage, on request: `COVERAGE=1 bin/rails test` writes
+# coverage/index.html (`bundle exec simplecov open` shows it). It has to start
+# before any application code is loaded, hence here, above the environment.
+# Off by default: a run of one file would report a meaningless few percent
+# after every run, and coverage slows the suite down a little. CI turns it on
+# for the unit suite and keeps the report as an artifact.
+if ENV["COVERAGE"].present? && ENV["COVERAGE"] != "0"
+  require "simplecov"
+  SimpleCov.start "rails" do
+    enable_coverage :branch
+    group "Components", "app/components"
+    group "Services", "app/services"
+    group "Queries", "app/queries"
+    group "MCP", "app/mcp"
+  end
+end
+
 require_relative "../config/environment"
 require "rails/test_help"
 require_relative "test_helpers/session_test_helper"
@@ -40,6 +58,14 @@ module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
     parallelize(workers: :number_of_processors)
+
+    # Each parallel worker is a fork with its own coverage data: give each
+    # its own name so the results are merged into one report instead of the
+    # last worker's overwriting the others'.
+    if defined?(SimpleCov)
+      parallelize_setup { |worker| SimpleCov.command_name "#{SimpleCov.command_name}-#{worker}" }
+      parallelize_teardown { SimpleCov.result }
+    end
 
     # Setup all fixtures in test/fixtures/*.yml for all tests in alphabetical order.
     fixtures :all

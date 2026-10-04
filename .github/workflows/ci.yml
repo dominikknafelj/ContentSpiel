@@ -108,10 +108,21 @@ jobs:
           # Tests print everything in CI (migration statements, seed output);
           # a local run is quiet unless VERBOSE=1 is set (test/test_helper.rb).
           VERBOSE: "1"
+          # SimpleCov (test/test_helper.rb): the report is kept as an artifact.
+          COVERAGE: "1"
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
           # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test
+
+      - name: Keep the coverage report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: coverage
+          path: ${{ github.workspace }}/coverage
+          include-hidden-files: true
+          if-no-files-found: ignore
 
   system-test:
     runs-on: ubuntu-latest

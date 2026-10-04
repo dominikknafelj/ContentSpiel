@@ -75,6 +75,10 @@ group :test do
   # Use system testing [https://guides.rubyonrails.org/testing.html#system-testing]
   gem "capybara"
   gem "cuprite"
+
+  # Code coverage, on request: `COVERAGE=1 bin/rails test` writes
+  # coverage/index.html (test/test_helper.rb) [https://github.com/simplecov-ruby/simplecov]
+  gem "simplecov", require: false
 end
 
 # Translates model content per locale [https://github.com/shioyama/mobility].
