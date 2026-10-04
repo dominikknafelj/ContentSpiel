@@ -140,14 +140,52 @@ export function isCurrentGeneration(generation) {
 // Autosave controllers register themselves so `drained()` can ask them to
 // flush and report whether they ended clean. A form offers `flush(drain)`,
 // `outstanding()` (debounced, queued, in flight, retrying) and `clean()`.
-export function registerForm(form) { forms.add(form) }
-export function unregisterForm(form) { forms.delete(form) }
+//
+// The first form to register also puts up THE UNLOAD GUARD below, and the
+// last to leave takes it down: a screen with no autosave form has nothing of
+// this module's to lose (and the explicit-save screens have their own,
+// `admin--save-bar`).
+export function registerForm(form) {
+  if (forms.size === 0) window.addEventListener("beforeunload", guardUnload)
+  forms.add(form)
+}
+export function unregisterForm(form) {
+  forms.delete(form)
+  if (forms.size === 0) window.removeEventListener("beforeunload", guardUnload)
+}
 
 const idle = () => queued === 0 && !Array.from(forms).some((form) => form.outstanding())
 
 // Nothing queued, in flight or waiting to be sent, and every form's last
 // outcome clean.
 export function settled() { return idle() && Array.from(forms).every((form) => form.clean()) }
+
+// THE UNLOAD GUARD. Everything above and below is about Turbo replacing the
+// editor, which this module can hold until the queue has drained. Closing the
+// tab, reloading it or typing another address cannot be held: the document
+// is gone as soon as the handler returns, a debounce timer never fires and a
+// request on the wire may be cut. All there is, is the browser's own "Leave
+// site?" dialog, which `preventDefault()` on `beforeunload` asks for. So it
+// is asked for exactly when leaving would lose something -- when the screen
+// is not `settled()`:
+// - a write is queued or in flight, or a form holds an edit inside its
+//   debounce or is waiting to retry (`busy()`);
+// - or a form's last save did not land -- paused by a 409 "Changed
+//   elsewhere", refused, invalid, given up on after the retries, signed out
+//   (`clean()` false). The typed text is then in the page and nowhere else;
+//   the 409 bar says in so many words that it is still there to be copied.
+// Never on a clean screen, and never once a save has been answered with a
+// success: asked every time, the dialog would be dismissed unread the one
+// time it mattered. Nothing is sent from here -- a request started while the
+// page unloads is not reliably delivered, and the prompt is what gives the
+// debounce and the queue the time to finish when the editor chooses to stay.
+//
+// A Turbo visit fires no `beforeunload`, so the Reload link of the 409 bar
+// (how that text is given up on purpose) and every link inside CS Studio
+// stay under "THE RULE" alone.
+function guardUnload(event) {
+  if (!settled()) event.preventDefault()
+}
 
 // True while any write is queued, in flight, or still held by a form.
 export function busy() { return !idle() }
