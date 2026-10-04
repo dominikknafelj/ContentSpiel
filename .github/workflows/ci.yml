@@ -105,6 +105,9 @@ jobs:
       - name: Run tests
         env:
           RAILS_ENV: test
+          # Tests print everything in CI (migration statements, seed output);
+          # a local run is quiet unless VERBOSE=1 is set (test/test_helper.rb).
+          VERBOSE: "1"
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
           # REDIS_URL: redis://localhost:6379/0
@@ -147,6 +150,7 @@ jobs:
       - name: Run System Tests
         env:
           RAILS_ENV: test
+          VERBOSE: "1"
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
           BROWSER_PATH: /usr/bin/google-chrome
           # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}

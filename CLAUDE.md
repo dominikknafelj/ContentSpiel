@@ -21,6 +21,8 @@ bin/rails server               # or `bin/dev`, which runs server + `tailwindcss:
 
 **Tests:** `bin/rails test` (full suite, minitest). Single file: `bin/rails test test/models/page_test.rb`. Single test: `bin/rails test test/models/page_test.rb -n test_method_name` or `bin/rails test test/models/page_test.rb:42` (line number). System tests (Capybara on Cuprite, headless Chrome) are separate: `bin/rails test:system`; run `bin/rails tailwindcss:build` first, and on a laptop cap the workers (`PARALLEL_WORKERS=6 bin/rails test:system` — twelve flakes under load). On macOS prefix every test command with `PGGSSENCMODE=disable`: a parallel run can otherwise crash a forked worker in the pg gem and hang forever. `test/application_system_test_case.rb` prepends `StaleNodeAtOnce` to Cuprite's nodes so a poll whose element died in a Turbo visit fails at once instead of spending half a second per element — that is what made toasts that had come and gone look "missing".
 
+A local run is quiet: what tests themselves print (the statements a migration test runs, the seed file's "Seeded dev accounts" lines) is swallowed, and shown only for a block that fails. `VERBOSE=1 bin/rails test` prints all of it, and CI always sets `VERBOSE` (`TestOutput` in `test/test_helper.rb`; a test that prints wraps the call in `TestOutput.quietly { ... }`).
+
 **Lint/scan** (all run in CI, see `.github/workflows/ci.yml`):
 ```sh
 bin/rubocop            # style (rubocop-rails-omakase, config in .rubocop.yml)

@@ -8,6 +8,34 @@ require_relative "support/content_helper"
 require_relative "support/component_test_helper"
 require_relative "support/test_types"
 
+# What tests themselves print -- the statements a migration test runs
+# ("-- execute(...)"), the seed file's "Seeded dev accounts" lines -- is noise
+# between the dots that makes a real failure harder to spot, so a local run
+# keeps it quiet. `VERBOSE=1 bin/rails test` shows it all, and CI always runs
+# that way (`.github/workflows/ci.yml`), so a log there is complete.
+module TestOutput
+  def self.verbose? = ENV["VERBOSE"].present? && ENV["VERBOSE"] != "0"
+
+  # Runs the block with standard output swallowed, unless verbose. The stream
+  # is restored even if the block raises, and what a failing block printed is
+  # shown after all: it is usually the explanation.
+  def self.quietly
+    return yield if verbose?
+
+    original = $stdout
+    captured = StringIO.new
+    $stdout = captured
+    yield
+  rescue Exception # rubocop:disable Lint/RescueException -- re-raised below; only here to show the captured output first
+    original&.print(captured&.string)
+    raise
+  ensure
+    $stdout = original if original
+  end
+end
+
+ActiveRecord::Migration.verbose = TestOutput.verbose?
+
 module ActiveSupport
   class TestCase
     # Run tests in parallel with specified workers
