@@ -18,8 +18,8 @@ class FiltersSystemTest < ApplicationSystemTestCase
     assert_text "Beach holiday"
     assert_no_button "Filter"
 
-    find_field("Title").click
-    find_field("Title").send_keys("alp")
+    find_field("Search titles").click
+    find_field("Search titles").send_keys("alp")
     assert_no_text "Beach holiday", wait: 5
     assert_text "Alpine notes"
     assert_equal "q", page.evaluate_script("document.activeElement.id"), "the search box keeps focus"
@@ -28,9 +28,11 @@ class FiltersSystemTest < ApplicationSystemTestCase
     click_on "Clear"
     assert_text "Beach holiday", wait: 5
     assert_text "Alpine notes"
-    assert_equal "", find_field("Title").value
+    assert_equal "", find_field("Search titles").value
 
-    select "Draft", from: "Status"
+    # The All / Live / Drafts / Scheduled control is a radio group whose
+    # labels are the visible segments.
+    find("label[for=posts-scope-drafts]").click
     assert_no_text "Alpine notes", wait: 5
     assert_text "Beach holiday"
   end
@@ -41,7 +43,7 @@ class FiltersSystemTest < ApplicationSystemTestCase
   # other control without a caret (a number or date field).
   test "a select filter keeps focus after it applies" do
     site_settings(:default).update!(setup_completed_at: Time.current)
-    create_post(title: "Alpine notes")
+    create_post(title: "Alpine notes", tags: [ "alps" ])
     create_post(title: "Beach holiday", published: false)
     sign_in_via_form(users(:one))
 
@@ -49,13 +51,13 @@ class FiltersSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     assert_text "Alpine notes"
 
-    status = find_field("Status")
+    status = find_field("Tag")
     status_id = status[:id]
     assert status_id.present?
     page.execute_script("document.getElementById(arguments[0]).focus()", status_id)
-    select "Draft", from: "Status"
-    assert_no_text "Alpine notes", wait: 5
-    assert_text "Beach holiday"
+    select "alps", from: "Tag"
+    assert_no_text "Beach holiday", wait: 5
+    assert_text "Alpine notes"
     assert_equal status_id, page.evaluate_script("document.activeElement.id"), "the select keeps focus"
   end
 end
