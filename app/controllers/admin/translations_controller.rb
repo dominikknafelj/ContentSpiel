@@ -27,6 +27,11 @@ module Admin
   # per request. That's acceptable at CMS scale (hundreds to a few
   # thousand records) and tracked in the roadmap: a stored per-locale
   # state, kept current by the save services, is the way out if it isn't.
+  #
+  # Paging is by page number (`Pagination`, design pass spec §4): the total
+  # is `needing_work.size`, which walks the whole set -- the same cost a
+  # late page already paid. Round 2 replaces this with a query once the
+  # state is stored.
   class TranslationsController < BaseController
     include TranslatableRecordLoading
 
@@ -61,11 +66,10 @@ module Admin
       @target_locales = Translations.target_locales
       @types = TYPES.keys.select { |type| can?(TYPES.dig(type, :permission)) }
       @type = params[:type].presence_in(@types)
-      @offset = offset
 
-      items = needing_work.drop(@offset).first(PER_PAGE + 1)
-      @has_next = items.size > PER_PAGE
-      @items = items.first(PER_PAGE)
+      all_items = needing_work.to_a
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: all_items.size)
+      @items = all_items.drop(@pagination.offset).first(PER_PAGE)
     end
 
     # AI suggestions for some of one record's fields (translation helpers
@@ -168,11 +172,6 @@ module Admin
       when "post" then admin_scope(Post.all)
       when "media" then Media::Asset.kept
       end
-    end
-
-    def offset
-      raw = params[:offset].to_i
-      raw.positive? ? raw : 0
     end
   end
 end

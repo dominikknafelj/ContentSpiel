@@ -159,15 +159,27 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "section#translations-posts li[id^='translation-item-post-']", count: Admin::TranslationsController::PER_PAGE
     assert_select "a", text: "Previous", count: 0
-    assert_select "a[href*='offset=50']", text: "Next"
+    assert_select "a[href*='page=2']", text: "Next"
 
-    get "/cs-studio/translations", params: { locale: "de", type: "post", offset: 50 }
+    get "/cs-studio/translations", params: { locale: "de", type: "post", page: 2 }
 
     assert_response :success
     assert_select "section#translations-posts li[id^='translation-item-post-']", count: 1
     assert_select "##{row_id("post", posts.last)}"
     assert_select "a", text: "Next", count: 0
     assert_select "a", text: "Previous"
+  end
+
+  test "junk and out-of-range page numbers never error" do
+    create_post(title: "One post")
+
+    %w[0 abc -1].each do |junk|
+      get "/cs-studio/translations", params: { locale: "de", page: junk }
+      assert_response :success
+    end
+    get "/cs-studio/translations", params: { locale: "de", page: 9999 }
+    assert_response :success
+    assert_select "a", text: "Back to page 1"
   end
 
   test "an unknown, default or absent locale redirects to the first target language" do

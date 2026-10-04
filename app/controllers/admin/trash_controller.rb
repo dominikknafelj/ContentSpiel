@@ -1,6 +1,8 @@
 module Admin
   # The Trash screen (trash spec §7): everything the viewer could restore,
-  # newest first, 50 per page with the Media module's `limit(N+1)` paging.
+  # newest first, 50 per page, paged by page number (`Pagination`, design
+  # pass spec §4) with the total counted over the same scoped relations the
+  # rows are loaded from.
   # Items are loaded only through `AccessControl.scope(..., trashed: true)`
   # (pages and posts, keyed on their *delete* right, so a scoped
   # `pages.delete` narrows the list to its branch) or `Media::Asset.trashed`
@@ -29,10 +31,8 @@ module Admin
 
     def index
       @type = params[:type].presence_in(MODELS.keys)
-      @offset = offset
-      items = listed_items
-      @has_next = items.size > PER_PAGE
-      @items = items.first(PER_PAGE)
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
+      @items = listed_items
       @retention_days = Current.site.trash_retention_days
     end
 
@@ -109,21 +109,37 @@ module Admin
       scope.none
     end
 
+    def types = @type ? [ @type ] : MODELS.keys
+
+    # What the rows are loaded from, before any eager loading: the sum of
+    # one scoped count per model. Each goes through `visible`
+    # (`AccessControl.scope` / the image rule) and, for pages, the
+    # branch-root filter -- so the total can never count a row the list
+    # wouldn't show.
+    def total_count = types.sum { |type| roots(type).count }
+
     # Merged in Ruby across the three tables: each source contributes at
-    # most `offset + PER_PAGE + 1` of its newest rows -- enough that the
-    # merged, re-sorted slice below is exactly what one query over a union
-    # would return -- and the one extra row is how `@has_next` is known
-    # without a `COUNT(*)`.
+    # most `offset + PER_PAGE` of its newest rows -- enough that the merged,
+    # re-sorted slice below is exactly what one query over a union would
+    # return -- and the merge then drops the earlier pages' rows. (The
+    # window grows with the page number, as the old offset paging's did;
+    # the page is capped at `Pagination::MAX_PAGE` only to keep the integer
+    # sane, and a page past the end simply merges to nothing.)
     def listed_items
-      window = @offset + PER_PAGE + 1
-      sources = (@type ? [ @type ] : MODELS.keys).map { |type| listed(type).order(trashed_at: :desc, id: :desc).limit(window).to_a }
-      sources.flatten.sort_by { |item| [ -item.trashed_at.to_r, -item.id ] }.drop(@offset).first(PER_PAGE + 1)
+      window = @pagination.offset + PER_PAGE
+      sources = types.map { |type| listed(type).order(trashed_at: :desc, id: :desc).limit(window).to_a }
+      sources.flatten.sort_by { |item| [ -item.trashed_at.to_r, -item.id ] }.drop(@pagination.offset).first(PER_PAGE)
+    end
+
+    def roots(type)
+      relation = visible(type)
+      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
     end
 
     def listed(type)
-      relation = visible(type).includes(:trashed_by)
+      relation = roots(type).includes(:trashed_by)
       case type
-      when "page" then relation.where("pages.trash_root_id = pages.id").includes(:parent)
+      when "page" then relation.includes(:parent)
       when "media" then relation.with_variants
       else relation
       end
@@ -166,10 +182,5 @@ module Admin
     end
 
     def title_of(item) = item.title.presence || "Untitled"
-
-    def offset
-      raw = params[:offset].to_i
-      raw.positive? ? raw : 0
-    end
   end
 end

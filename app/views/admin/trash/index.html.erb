@@ -19,17 +19,11 @@
   <% end %>
 </nav>
 
-<%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, url_options: admin_url_options) %>
-
-<% if @has_next || @offset.positive? %>
-  <div class="mt-4 flex items-center gap-3">
-    <% if @offset.positive? %>
-      <%= link_to "Previous", admin_trash_path(request.query_parameters.merge("offset" => [ @offset - Admin::TrashController::PER_PAGE, 0 ].max)),
-            class: setup_secondary_link_class %>
-    <% end %>
-    <% if @has_next %>
-      <%= link_to "Next", admin_trash_path(request.query_parameters.merge("offset" => @offset + Admin::TrashController::PER_PAGE)),
-            class: setup_secondary_link_class %>
-    <% end %>
-  </div>
+<% page_url = ->(page) { admin_trash_path(request.query_parameters.merge("page" => page)) } %>
+<% if @pagination.out_of_range? %>
+  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+<% else %>
+  <%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, url_options: admin_url_options) do |list| %>
+    <% list.with_footer { render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
+  <% end %>
 <% end %>

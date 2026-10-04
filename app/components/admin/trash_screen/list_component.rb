@@ -17,6 +17,9 @@ module Admin
     # - the restore form's parent choices (`#parent_choices`), only when a
     #   row actually needs a parent.
     class ListComponent < Admin::AdminComponent
+      # The page-number footer (`Admin::PaginationComponent`), inside the card.
+      renders_one :footer
+
       EMPTY_DIALOG_ID = "empty-trash-dialog".freeze
 
       def initialize(items:, retention_days:, url_options: {})

@@ -83,7 +83,20 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media", params: { picker: 1 }
     assert_select "button[data-action='admin--media-picker#pick']", count: 48
-    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='offset=48']", text: "Next"
+    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='page=2']", text: "Next"
+  end
+
+  test "junk and out-of-range page numbers never error" do
+    sign_in_as(users(:one))
+    build_asset(filename: "one.png")
+
+    %w[0 abc -1].each do |junk|
+      get "/cs-studio/media", params: { page: junk }
+      assert_response :success
+    end
+    get "/cs-studio/media", params: { page: 9999 }
+    assert_response :success
+    assert_select "a", text: "Back to page 1"
   end
 
   test "picker mode needs media.upload" do

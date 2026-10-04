@@ -39,17 +39,14 @@
   <%= link_to "Clear", admin_media_path(**admin_url_options), class: setup_secondary_link_class %>
 <% end %>
 
-<%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
-
-<% if @has_next || @offset.positive? %>
-  <div class="mt-4 flex items-center gap-3">
-    <% if @offset.positive? %>
-      <%= link_to "Previous", admin_media_path(request.query_parameters.merge("offset" => [ @offset - Admin::MediaController::PER_PAGE, 0 ].max)),
-            class: setup_secondary_link_class %>
-    <% end %>
-    <% if @has_next %>
-      <%= link_to "Next", admin_media_path(request.query_parameters.merge("offset" => @offset + Admin::MediaController::PER_PAGE)),
-            class: setup_secondary_link_class %>
-    <% end %>
-  </div>
+<% page_url = ->(page) { admin_media_path(request.query_parameters.merge("page" => page)) } %>
+<% if @pagination.out_of_range? %>
+  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+<% else %>
+  <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
+  <% if @pagination.total_pages > 1 %>
+    <div class="mt-4 rounded-cs border border-line bg-surface">
+      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+    </div>
+  <% end %>
 <% end %>

@@ -45,11 +45,23 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
 
     get admin_trash_path
     assert_select "tbody tr", count: 50
-    assert_select "a", text: "Next"
+    assert_select "nav[aria-label='Pagination'] a[rel=next]", text: "Next"
+    assert_select "nav[aria-label='Pagination']", text: /1–50 OF 54/
 
-    get admin_trash_path(offset: 50)
+    get admin_trash_path(page: 2)
     assert_select "tbody tr", count: 4
     assert_select "tr", text: /Section/
+  end
+
+  test "junk and out-of-range page numbers never error" do
+    sign_in_as users(:one)
+    %w[0 abc -1].each do |junk|
+      get admin_trash_path(page: junk)
+      assert_response :success
+    end
+    get admin_trash_path(page: 9999)
+    assert_response :success
+    assert_select "a", text: "Back to page 1"
   end
 
   test "restore brings an item back and says where" do

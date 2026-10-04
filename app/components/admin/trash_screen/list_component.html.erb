@@ -13,6 +13,7 @@
   <% end %>
 <% end %>
 
+<div class="rounded-cs border border-line bg-surface">
 <% if items.empty? %>
   <%= render Admin::EmptyStateComponent.new(title: "The trash is empty", description: "Deleted pages, posts and images show up here until they're deleted permanently.") %>
 <% else %>
@@ -32,3 +33,5 @@
     </tbody>
   </table>
 <% end %>
+  <%= footer %>
+</div>
