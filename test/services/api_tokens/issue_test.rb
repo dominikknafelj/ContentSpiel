@@ -29,7 +29,7 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
 
       refused = ApiTokens::Issue.call(users(:author), group: access_control_groups(:admin))
       assert refused.denied?
-      assert_equal [ "You don't have permission to give a token the Admin group" ], refused.errors
+      assert_equal [ "You don't have permission to give a token that group" ], refused.errors
     end
     assert_equal 2, users(:author).api_tokens.count
   end
@@ -52,7 +52,7 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
     as(users(:editor_branch)) do
       refused = ApiTokens::Issue.call(users(:two), group: access_control_groups(:admin))
       assert refused.denied?
-      assert_equal [ "You don't have permission to give a token the Admin group" ], refused.errors
+      assert_equal [ "You don't have permission to give a token that group" ], refused.errors
 
       assert ApiTokens::Issue.call(users(:two), group: access_control_groups(:read_only)).ok?
     end
@@ -122,5 +122,35 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
     end
   ensure
     ApiToken.define_singleton_method(:generate!, original)
+  end
+
+  # Final fix wave (Task 2): the rescue is for ONE thing, the name race. Any
+  # other failure of the insert must not be reported as "that name is taken".
+  test "a failed insert that isn't the name race is not reported as a name clash" do
+    group = access_control_groups(:read_only)
+
+    with_singleton_override(ApiToken, :generate!, ->(user, **) { ApiToken.new(user:, name: "Claude").tap(&:save!) }) do
+      result = ApiTokens::Issue.call(users(:one), group:, name: "Claude")
+
+      assert_not result.ok?
+      assert_no_match(/already the name/, result.errors.to_sentence)
+      assert_match(/Group must exist/, result.errors.to_sentence)
+    end
+
+    with_singleton_override(ApiToken, :generate!, ->(*, **) { raise ActiveRecord::RecordNotUnique, 'duplicate key value violates unique constraint "some_other_index"' }) do
+      assert_raises(ActiveRecord::RecordNotUnique) { ApiTokens::Issue.call(users(:one), group:, name: "Claude") }
+    end
+  end
+
+  # Final fix wave (S-M6): the create endpoint is open to every signed-in user
+  # and looks the group up by a raw id, so a refusal that named the group let
+  # anyone read every group's name by counting ids upwards.
+  test "the refusal for a group the user can't assign doesn't name it" do
+    as(users(:author)) do
+      refused = ApiTokens::Issue.call(users(:author), group: access_control_groups(:admin), name: "forged")
+
+      assert refused.denied?
+      assert_no_match(/Admin/, refused.errors.to_sentence)
+    end
   end
 end

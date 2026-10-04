@@ -111,6 +111,25 @@ class ApiTokenTest < ActiveSupport::TestCase
     assert_equal 2, ApiToken.where(user: @user, name: "Claude").count
   end
 
+  # Final fix wave (Task 2): only the race the retry exists for is retried --
+  # a clash on the generated NAME. Anything else wrong with the row would fail
+  # the same way five times over, and hide behind the retries.
+  test "a generated name is not retried for a failure that isn't about the name" do
+    calls = 0
+    original = ApiToken.method(:next_default_name)
+    ApiToken.define_singleton_method(:next_default_name) do |user|
+      calls += 1
+      original.call(user)
+    end
+
+    error = assert_raises(ActiveRecord::RecordInvalid) { ApiToken.generate!(@user, group: nil) }
+    assert_empty error.record.errors[:name]
+    assert_equal 1, calls
+  ensure
+    ApiToken.singleton_class.send(:remove_method, :next_default_name)
+    ApiToken.define_singleton_method(:next_default_name, original)
+  end
+
   test "a generated name retries with the next number when it loses the race" do
     calls = 0
     original = ApiToken.method(:next_default_name)

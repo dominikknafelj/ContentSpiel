@@ -42,15 +42,35 @@ class ApiToken < ApplicationRecord
       token = transaction(requires_new: true) do
         create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, token: raw_token)
       end
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-      # Only a generated name is retried: a concurrent create took "Token N"
-      # between our look and our insert, so look again. A name the caller
-      # chose is theirs to fix.
-      raise unless name.nil? && (attempts += 1) < 5
+    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => error
+      # Only a generated name is retried, and only when the NAME is what
+      # clashed (`.name_taken?`): a concurrent create took "Token N" between
+      # our look and our insert, so look again. A name the caller chose is
+      # theirs to fix, and any other failure (a missing group, another unique
+      # index) would fail the same way every time -- it is raised at once
+      # rather than five times over.
+      raise unless name.nil? && name_taken?(error) && (attempts += 1) < 5
 
       retry
     end
     [ token, raw_token ]
+  end
+
+  # The partial unique index behind `name_unique_among_active_tokens`
+  # (`db/schema.rb`): the backstop for two creates racing past the validation.
+  NAME_INDEX = "index_api_tokens_on_user_and_lower_name_active".freeze
+  NAME_TAKEN = "is already the name of one of this user's active tokens".freeze
+
+  # Whether `error` (from saving a token) says the name is already an active
+  # token's: the unique index named in the database's message, or a validation
+  # failure on `name`. `ApiTokens::Issue` and `.generate!` both ask, so "the
+  # name was taken" is never read into a failure that is about something else.
+  def self.name_taken?(error)
+    case error
+    when ActiveRecord::RecordNotUnique then error.message.include?(NAME_INDEX)
+    when ActiveRecord::RecordInvalid then error.record.is_a?(ApiToken) && error.record.errors.added?(:name, NAME_TAKEN)
+    else false
+    end
   end
 
   # "Token N" with N one past the user's token count (the backfill's own
@@ -86,6 +106,6 @@ class ApiToken < ApplicationRecord
     return if name.blank? || revoked_at
 
     taken = ApiToken.active.where(user_id: user_id).where.not(id: id).exists?([ "LOWER(name) = LOWER(?)", name ])
-    errors.add(:name, "is already the name of one of this user's active tokens") if taken
+    errors.add(:name, NAME_TAKEN) if taken
   end
 end

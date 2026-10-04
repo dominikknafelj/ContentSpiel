@@ -159,6 +159,14 @@ class SetupController < ApplicationController
 
       if result&.ok?
         start_new_session_for(result.record)
+        # A sign-in like any other, so audited like one (`Admin::
+        # SessionsController#create`): `session.created`, the user as actor
+        # and subject, on this request's `:setup` channel. Without it the
+        # founding owner -- signed in here, never through the sign-in form --
+        # has no sign-in on record, and the Users list (`Users::LastSignIn`
+        # reads these events) says "Never" on a fresh install.
+        Current.actor = result.record
+        Audit.record("session.created", subject: result.record)
         session.delete(:setup_token_verified)
         redirect_to setup_step_path("site")
       elsif result.nil?

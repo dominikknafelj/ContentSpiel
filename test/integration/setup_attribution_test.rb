@@ -21,6 +21,29 @@ class SetupAttributionTest < ActionDispatch::IntegrationTest
     assert_not_includes event.snapshot.keys, "password_digest"
   end
 
+  # Final fix wave (Task 12): the wizard signs the founding owner in without
+  # the sign-in form, so nothing recorded it and a fresh install's Users list
+  # read "Never" for the one person who was certainly there.
+  test "the wizard's sign-in of the founding owner is recorded as their session.created" do
+    create_setup_admin
+    owner = User.find_by!(email_address: "owner@example.com")
+
+    event = Audit::Event.find_by!(action: "session.created")
+    assert_equal owner.id, event.user_id
+    assert_equal owner, event.subject
+    assert_equal "setup", event.channel
+    assert_in_delta Time.current, Users::LastSignIn.for([ owner ])[owner.id], 5.seconds
+    # After the account's own event, so the log reads in order.
+    assert_operator event.id, :>, Audit::Event.find_by!(action: "user.created", subject: owner).id
+  end
+
+  test "an admin step that is refused signs nobody in and records no session" do
+    patch setup_step_path("admin"), params: { user: { email_address: "owner@example.com", password: "short", password_confirmation: "short" } }
+
+    assert_response :unprocessable_entity
+    assert_not Audit::Event.exists?(action: "session.created")
+  end
+
   test "every step after the admin account is attributed to the owner" do
     create_setup_admin
     owner = User.find_by!(email_address: "owner@example.com")

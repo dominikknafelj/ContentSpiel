@@ -90,6 +90,26 @@ class Users::OwnerProtectionCharacterisationTest < ActiveSupport::TestCase
     as(user_manager) { assert rename(mixed).denied? }
   end
 
+  # Final fix wave (Task 12): `rename` above is `Users::Save`. The other two
+  # services ask the same question on their own lines; pinned here too.
+  test "an outranked target can't be deleted or given a new password either, and nothing is written" do
+    digest = users(:two).password_digest
+    as(user_manager) do
+      deleted = Users::Destroy.call(users(:two))
+      assert deleted.denied?
+      assert_equal [ "You don't have permission to manage users" ], deleted.errors
+
+      reset = Users::UpdatePassword.call(users(:two), password: "taken-over-1", password_confirmation: "taken-over-1")
+      assert reset.denied?
+      assert_equal [ "You don't have permission to manage users" ], reset.errors
+
+      assert Users::UpdatePassword.call(users(:reader), password: "reset-pass-1", password_confirmation: "reset-pass-1").ok?
+      assert Users::Destroy.call(users(:reader)).ok?
+    end
+    assert_equal digest, users(:two).reload.password_digest
+    assert_not User.exists?(users(:reader).id)
+  end
+
   test "an owner and a trusted actor are never outranked" do
     as_owner { assert rename(users(:two)).ok? }
     as(nil, channel: :console) { assert rename(users(:two)).ok? }
@@ -132,6 +152,34 @@ class Users::OwnerProtectionCharacterisationTest < ActiveSupport::TestCase
       assert rename(users(:two)).denied?, "the token's group can't manage Admin even though its user is an owner"
       assert rename(users(:reader)).ok?
     end
+  end
+
+  # Final fix wave (Task 12): a token on `Users::UpdatePassword`. "Own
+  # password" is a signed-in User only, so a token always takes the
+  # `users.manage` path -- for its own user as for anyone -- and is judged on
+  # its group and its user together.
+  test "a token changing a password is judged like any users.manage actor: owner targets and outranking groups refused" do
+    token, = ApiToken.generate!(users(:one), group: user_manager_group)
+    change = ->(user) { Users::UpdatePassword.call(user, password: "by-a-token-1", password_confirmation: "by-a-token-1") }
+
+    as(token, channel: :mcp) do
+      owner = change.call(users(:one))
+      assert owner.denied?
+      assert_equal [ OWNER_ONLY ], owner.errors, "even its own user, who is an owner"
+
+      assert change.call(users(:two)).denied?, "the token's group can't manage Admin"
+      assert change.call(users(:reader)).ok?
+    end
+    assert users(:reader).reload.authenticate("by-a-token-1")
+    assert_not users(:two).reload.authenticate("by-a-token-1")
+    assert_not users(:one).reload.authenticate("by-a-token-1")
+
+    # Without users.manage in its group, not even its own user's.
+    reader_token, = ApiToken.generate!(user_manager, group: access_control_groups(:read_only))
+    as(reader_token, channel: :mcp) { assert change.call(user_manager).denied? }
+    # With it, its own (non-owner) user's password is within its rights.
+    own_token, = ApiToken.generate!(user_manager, group: user_manager_group)
+    as(own_token, channel: :mcp) { assert change.call(user_manager).ok? }
   end
 
   test "a token acting on its own user is never outranked" do

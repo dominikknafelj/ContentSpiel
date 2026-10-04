@@ -270,7 +270,20 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :forbidden
-    assert_includes response.body, "You don&#39;t have permission to give a token the Admin group"
+    assert_select "main", text: /You don't have permission to give a token that group/
+  end
+
+  # Final fix wave (S-M6): every signed-in user reaches this endpoint, and the
+  # id is theirs to choose -- the refusal must not hand back the group's name.
+  test "a refused group id doesn't disclose the group's name" do
+    secret = AccessControl::Group.create!(name: "Project Nightjar")
+    AccessControl::Grant.create!(group: secret, permission: "users.manage", scope: {})
+    sign_in_as(users(:author))
+
+    post "/cs-studio/api_tokens", params: { name: "probe", group_id: secret.id }
+
+    assert_response :forbidden
+    assert_not response.body.include?("Nightjar"), "the refusal names the group"
   end
 
   test "a missing group is an error under Group, not a token" do

@@ -387,6 +387,17 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_equal [ { "content_types" => [ "blog" ] } ], group.grants.reload.map(&:scope)
   end
 
+  test "the delete dialog escapes a hostile token name" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Hostile bots")
+    ApiToken.generate!(users(:reader), group:, name: "<script>x</script>")
+
+    get "/cs-studio/groups/#{group.id}/edit"
+
+    assert_select "dialog#delete-group-#{group.id} li script", count: 0
+    assert_select "dialog#delete-group-#{group.id} li", text: /<script>x<\/script> — /
+  end
+
   private
 
   # The group of the Review Focus 3 tests, and the pages it points at. `editor_branch`
@@ -447,14 +458,4 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
 
   def dom_id(record) = ActionView::RecordIdentifier.dom_id(record)
 
-  test "the delete dialog escapes a hostile token name" do
-    sign_in_as(users(:one))
-    group = AccessControl::Group.create!(name: "Hostile bots")
-    ApiToken.generate!(users(:reader), group:, name: "<script>x</script>")
-
-    get "/cs-studio/groups/#{group.id}/edit"
-
-    assert_select "dialog#delete-group-#{group.id} li script", count: 0
-    assert_select "dialog#delete-group-#{group.id} li", text: /<script>x<\/script> — /
-  end
 end

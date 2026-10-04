@@ -74,6 +74,34 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "dialog[id^=delete-user]", count: 0
   end
 
+  # Final fix wave (Task 12): end to end. Every other test here writes the
+  # event by hand; this one signs in through the real form and reads what the
+  # list reads.
+  test "signing in through the sign-in form is what the list's last sign-in shows" do
+    user = users(:reader)
+    user.update!(password: "password12345", password_confirmation: "password12345")
+    assert_nil Users::LastSignIn.for([ user ])[user.id]
+
+    freeze_time do
+      sign_out
+      post "/cs-studio/sign-in", params: { email_address: user.email_address, password: "password12345" }
+      assert_response :redirect
+
+      assert_equal Time.current, Users::LastSignIn.for([ user ])[user.id]
+    end
+
+    # A failed attempt is no sign-in.
+    travel 1.hour do
+      delete "/cs-studio/sign-out"
+      post "/cs-studio/sign-in", params: { email_address: user.email_address, password: "wrong" }
+      assert_operator Users::LastSignIn.for([ user ])[user.id], :<, 30.minutes.ago
+    end
+
+    sign_in_as(users(:one))
+    get "/cs-studio/users"
+    assert_select "#{row(user)} [data-column=last-sign-in] time"
+  end
+
   test "the last sign-in is the newest session.created event of the user, and nothing else counts" do
     travel_to Time.zone.local(2026, 10, 4, 12) do
       as(users(:reader)) do
@@ -358,7 +386,14 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_difference -> { denied_events_for(users(:two)).count }, 1 do
       delete "/cs-studio/users/#{users(:two).id}"
     end
+    # A forged owner PATCH too (final fix wave, Task 12): refused, and nobody
+    # becomes an owner. Which rule answers (outranked, or owner-only) is the
+    # service's; here it must be a refusal that writes nothing.
+    assert_difference -> { denied_events_for(users(:two)).count }, 1 do
+      patch "/cs-studio/users/#{users(:two).id}/owner", params: { owner: "1" }
+    end
     assert_equal "two@example.com", users(:two).reload.email_address
+    assert_not users(:two).owner?
     assert_equal [ access_control_groups(:admin).id ], users(:two).group_ids
   end
 
