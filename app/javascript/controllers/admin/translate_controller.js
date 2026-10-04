@@ -409,8 +409,10 @@ function startJob(fields, { url, locale, signal, focus }) {
         const node = pending.get(box)?.node
         if (!node?.isConnected) return
         node.querySelector("[data-pending-running]").hidden = true
-        node.querySelector("[data-pending-timeout-message]").textContent = node.dataset.pendingTimeoutText
+        // Un-hide first, then write: a live region's text is announced only
+        // when it changes while the region is rendered.
         node.querySelector("[data-pending-timeout]").hidden = false
+        node.querySelector("[data-pending-timeout-message]").textContent = node.dataset.pendingTimeoutText
       })
     }, timeoutSeconds(template) * 1000)
     job.timers.push(() => clearInterval(interval), () => clearTimeout(timeout))

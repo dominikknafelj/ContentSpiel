@@ -12,6 +12,21 @@ class Tags::RenameTest < ActiveSupport::TestCase
     assert_nil post.reload.full_path("en")
   end
 
+  # A rename to the very same name changes nothing and records no event, so
+  # it must not make every open form of the carrying posts stale either.
+  test "a rename to the same name leaves the carrying posts' updated_at alone; a real rename moves it" do
+    tag = Tag.create!(name: "rails")
+    post = create_post(title: "Hi", tags: [ "rails" ])
+    post.update_columns(updated_at: 1.day.ago)
+    before = post.reload.updated_at
+
+    assert Tags::Rename.call(tag, name: " Rails ").ok?
+    assert_equal before, post.reload.updated_at
+
+    assert Tags::Rename.call(tag.reload, name: "ruby").ok?
+    assert_operator post.reload.updated_at, :>, before
+  end
+
   test "renaming to a taken name fails" do
     Tag.create!(name: "a"); b = Tag.create!(name: "b")
     assert_not Tags::Rename.call(b, name: " A ").ok?

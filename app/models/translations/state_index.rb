@@ -159,7 +159,9 @@ module Translations
       "|\\d{4}-(0[469]|11)-(0[1-9]|[12]\\d|30)" \
       "|\\d{4}-02-(0[1-9]|1\\d|2[0-8])" \
       "|(\\d\\d(0[48]|[2468][048]|[13579][26])|([02468][048]|[13579][26])00)-02-29)".freeze
-    ISO_TIMESTAMP = "^#{ISO_DATE}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$".freeze
+    # The UTC offset is capped at +-15:59: Postgres refuses a displacement of
+    # 16:00 or more ("time zone displacement out of range").
+    ISO_TIMESTAMP = "^#{ISO_DATE}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-](0\\d|1[0-5]):[0-5]\\d)$".freeze
 
     # SQL for when this record's original text last changed, "the most
     # recently changed original" the translations matrix sorts by: the

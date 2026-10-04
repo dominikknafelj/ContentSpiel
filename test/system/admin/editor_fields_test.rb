@@ -35,7 +35,7 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     announcement = "[data-admin--char-count-target=announcement]"
     assert_no_selector "[data-admin--char-count-target=output][aria-live]", visible: :all
     fill_in "Meta title", with: "x" * 59
-    assert_selector announcement, text: "", visible: :all
+    assert_selector announcement, exact_text: "", visible: :all
     fill_in "Meta title", with: "x" * 61
     assert_selector announcement, text: "Over the recommended length: 61 of 60.", visible: :all
     fill_in "Meta title", with: "x" * 62

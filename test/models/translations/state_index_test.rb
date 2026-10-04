@@ -125,7 +125,7 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     guard = Translations::StateIndex::ISO_TIMESTAMP
     ok = %w[2026-02-28T10:00:00Z 2024-02-29T10:00:00+02:00 2000-02-29T00:00:00Z 2026-04-30T23:59:59.123456Z 2026-12-31T10:00:00-05:30]
     bad = %w[2026-02-31T10:00:00Z 2026-02-29T10:00:00Z 1900-02-29T10:00:00Z 2026-04-31T10:00:00Z 2026-06-31T10:00:00Z 2026-11-31T10:00:00Z
-      0000-01-01T00:00:00Z 2026-13-01T10:00:00Z 2026-01-01T24:00:00Z not-a-date]
+      0000-01-01T00:00:00Z 2026-01-01T10:00:00+16:00 2026-01-01T10:00:00-23:59 2026-13-01T10:00:00Z 2026-01-01T24:00:00Z not-a-date]
     connection = ActiveRecord::Base.connection
     (ok + bad).each do |value|
       matches = connection.select_value("SELECT #{connection.quote(value)} ~ #{connection.quote(guard)}")
