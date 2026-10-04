@@ -357,6 +357,93 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # --- Final fix wave (S-M8): four readers added in round 3 --------------------
+
+  # The Settings screen's "(N items)" in the default-language dialog
+  # (`Translations::StateIndex.translated_record_count`): a trashed record's
+  # stored translations are kept for a restore, but it is not an item the
+  # change would re-mark today.
+  test "the default-language dialog's item count leaves out trashed pages, posts and images" do
+    with_locales(%w[en de], default: "en") do
+      as_owner do
+        pages = [ create_page(title: "Kept translated"), create_page(title: "Gone translated") ]
+        posts = [ create_post(title: "Kept translated post"), create_post(title: "Gone translated post") ]
+        assets = [ create_media_asset, create_media_asset ]
+        pages.each { |page| assert Pages::Save.call(page, translations: { "de" => { title: "Seite" } }).ok? }
+        posts.each { |post| assert Posts::Save.call(post, translations: { "de" => { title: "Beitrag" } }).ok? }
+        assets.each { |asset| assert Media::Save.call(asset, translations: { "en" => { alt: "A desk" }, "de" => { alt: "Ein Tisch" } }).ok? }
+        before = Translations::StateIndex.translated_record_count
+        assert_operator before, :>=, 6
+
+        [ pages.last, posts.last, assets.last ].each { |record| record.update!(trashed_at: Time.current) }
+
+        assert_equal before - 3, Translations::StateIndex.translated_record_count
+      end
+
+      sign_in_as users(:one)
+      get "/cs-studio/settings"
+      assert_select "dialog#language-default-dialog-de", text: /\(#{Translations::StateIndex.translated_record_count} items?\)/
+    end
+  end
+
+  # The audit log names every event's subject (its stored label), but LINKS
+  # only what the viewer can open -- and a trashed page or post can't be
+  # opened from anywhere but the Trash.
+  test "the audit log links a kept page's and post's events and leaves a trashed one's as plain text" do
+    rows = { @kept_page => true, @kept_post => true, @gone_page => false, @gone_post => false }.map do |record, linked|
+      event = Audit::Event.create!(action: "#{record.class.name.downcase}.updated", channel: "admin", user_id: users(:one).id,
+        subject_type: record.class.name, subject_id: record.id, subject_label: record.title, occurred_at: Time.current, last_occurred_at: Time.current)
+      [ event, record, linked ]
+    end
+    sign_in_as users(:one)
+
+    get "/cs-studio/audit_events"
+    rows.each do |event, record, linked|
+      row = "##{ActionView::RecordIdentifier.dom_id(event)}"
+      assert_select "#{row} p", text: /edited “#{record.title}”/
+      assert_select "#{row} p a", count: linked ? 1 : 0
+    end
+
+    event, = rows.last
+    get "/cs-studio/audit_events/#{event.id}"
+    assert_response :success
+    assert_select "h1", text: /Gone post/
+    assert_select "h1 a", count: 0
+  end
+
+  # The Media panel's "Used on" names kept places only; a trashed page that
+  # still uses the image is neither linked nor named there.
+  test "the media panel's Used on lists a kept page and never a trashed one" do
+    asset = create_media_asset
+    kept = create_page(title: "Uses it and stays")
+    gone = create_page(title: "Uses it and goes")
+    as_owner do
+      [ kept, gone ].each { |page| assert Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }).ok? }
+    end
+    gone.update!(trashed_at: Time.current)
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { selected: asset.id }
+
+    assert_select "#media-panel a[href='/cs-studio/pages/#{kept.id}']", text: /Uses it and stays/
+    assert_select "#media-panel a[href='/cs-studio/pages/#{gone.id}']", count: 0
+    assert_select "#media-panel", text: /Uses it and goes/, count: 0
+  end
+
+  # The group editor's page-scope tree (`Admin::GroupsScreen::BranchTree`): a
+  # branch can only be granted on a page that is there to be read.
+  test "the group editor's page tree offers kept pages and never a trashed one" do
+    sign_in_as users(:one)
+
+    get "/cs-studio/groups/new"
+
+    assert_response :success
+    assert_select "form#group-form input[type=checkbox][name$='[page_ids][]'][value='#{@kept_page.id}']", minimum: 1
+    assert_select "form#group-form input[name$='[page_ids][]'][value='#{@gone_page.id}']", count: 0
+    assert_select "form#group-form", text: /Kept page/
+    assert_select "form#group-form", text: /Gone page/, count: 0
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 

@@ -75,6 +75,38 @@ class TranslationStateParityTest < ActiveSupport::TestCase
     end
   end
 
+  # Final fix wave (S-M8): the one call that carries BOTH parts -- a site
+  # translation and the language order -- in one transaction. The site part
+  # refreshes the settings row's states before the language part saves the
+  # row again; neither may leave the stored rows behind.
+  test "one Settings::Save carrying a site translation and the language order keeps the index in step" do
+    as_owner do
+      page = create_page(title: "About", translations: { "de" => { title: "Über" } })
+      assert Settings::Save.call(translations: { "en" => { title: "Site" }, "de" => { title: "Seite" } }).ok?
+      assert_parity page, Current.site
+
+      # The original changes (German goes outdated) and the order moves, together.
+      result = Settings::Save.call(translations: { "en" => { title: "Site, renamed" } },
+        languages: [ { "code" => "en" }, { "code" => "es", "fallbacks" => [ "de" ] }, { "code" => "de" } ])
+      assert result.ok?, result.errors.to_sentence
+      assert_equal %w[en es de], Current.site.reload.locale_codes
+      assert_equal "outdated", Translations::State.find_by!(record_type: "SiteSetting", record_id: Current.site.id, locale: "de").state
+      assert_parity page, Current.site
+
+      # A translation written and the order moved back, together.
+      assert Settings::Save.call(translations: { "de" => { title: "Seite, umbenannt" }, "es" => { title: "Sitio" } },
+        languages: [ { "code" => "en" }, { "code" => "de" }, { "code" => "es" } ]).ok?
+      assert_parity page, Current.site
+
+      # A refused language part rolls the site part's states back with it.
+      before = Translations::State.where(record_type: "SiteSetting").order(:locale).pluck(:locale, :state)
+      refused = Settings::Save.call(translations: { "en" => { title: "Never stored" } }, languages: [ { "code" => "en" }, { "code" => "de" } ])
+      assert_not refused.ok?
+      assert_equal before, Translations::State.where(record_type: "SiteSetting").order(:locale).pluck(:locale, :state)
+      assert_parity page, Current.site
+    end
+  end
+
   test "purging a post removes its rows" do
     as_owner do
       post = create_post(title: "Hello")
