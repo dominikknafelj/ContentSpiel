@@ -75,10 +75,24 @@ module Admin
     # .create` on the parent's branch (design spec §3.3 "Create page"),
     # or on the homepage's when none was named, which is where `create`
     # puts it.
+    #
+    # With no `parent_id` the question is not "may they create under Home"
+    # (a branch editor may not, and is still offered the dialog) but "is there
+    # anywhere they may create": the form having a choice, as `posts#new` asks
+    # of the types. With no page at all it is the right to create the root.
+    # A parent that is readable but in the trash (a tree "+" clicked after the
+    # page was trashed elsewhere) is no preset rather than a 404 the dialog
+    # could never recover from; an unreadable or unknown one stays a 404.
     def new
-      parent = params[:parent_id].present? ? admin_scope(Page.all).find(params[:parent_id]) : nil
+      parent = requested_new_parent
       @page = Page.new(parent: parent)
-      return forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
+      @form = Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+        parent_id: parent&.id, title: params[:title])
+      allowed = if parent then can?("pages.create", Page.new(parent: parent))
+      elsif root_page then @form.choices.any?
+      else can?("pages.create", Page.new)
+      end
+      return forbidden! unless allowed
 
       # The New page dialog loading its form (`admin--new-record` sets the
       # frame's `src` to this URL): just the frame, no layout. A normal request
@@ -317,6 +331,21 @@ module Admin
       end
     end
 
+    def requested_new_parent
+      parent_id = params[:parent_id]
+      return nil if parent_id.blank?
+
+      admin_scope(Page.all).find(parent_id)
+    rescue ActiveRecord::RecordNotFound
+      raise unless trashed_readable_page?(parent_id)
+
+      nil
+    end
+
+    def trashed_readable_page?(id)
+      AccessControl.scope(Current.actor, "pages.read", Page.all, trashed: true).exists?(id: id)
+    end
+
     def render_new_page_failure(gone: false)
       @page ||= Page.new
       @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
@@ -330,7 +359,6 @@ module Admin
         format.html { render :new, status: :unprocessable_entity }
       end
     end
-
 
     # No `parent_id` at all (the empty state's "Add a page" names none) is
     # "use the homepage". A named one is looked up through the read scope
@@ -351,7 +379,7 @@ module Admin
 
       admin_scope(Page.all).find(parent_id)
     rescue ActiveRecord::RecordNotFound
-      raise unless AccessControl.scope(Current.actor, "pages.read", Page.all, trashed: true).exists?(id: parent_id)
+      raise unless trashed_readable_page?(parent_id)
 
       :gone
     end

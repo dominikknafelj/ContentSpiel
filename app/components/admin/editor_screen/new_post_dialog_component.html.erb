@@ -6,6 +6,8 @@
       <p class="text-danger-ink">The form couldn’t be loaded.</p>
       <div class="mt-3"><%= render Admin::ButtonComponent.new(label: "Try again", variant: :secondary, type: "button", data: { action: "admin--new-record#retry" }) %></div>
     </div>
+    <%# A SUBMIT that never reached the server (network error): the typed form stays, Create is enabled again. %>
+    <p data-admin--new-record-target="submitFailure" role="alert" class="mb-3 text-danger-ink" hidden>Couldn’t save. Check your connection and try again.</p>
     <turbo-frame id="<%= FRAME_ID %>"></turbo-frame>
   </div>
   <% dialog.with_footer do %>

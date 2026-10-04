@@ -39,7 +39,8 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     count.call
     small = count.call
     27.times { |index| create_page(title: "Filler #{index}", parent: @services) }
-    assert_equal small, count.call, "the admin layout's query count grew with the number of pages"
+    3.times { |index| ContentBlock.create!(owner: create_page(title: "List #{index}"), block_type: :post_list, position: 0, settings: { "content_type" => "blog" }) }
+    assert_equal small, count.call, "the admin layout's query count grew with the number of pages or listing pages"
   end
 
   test "the form endpoint answers a frame request without the layout, inside the frame" do
@@ -180,10 +181,18 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
   test "Inside offers only the pages the viewer may create under" do
     AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.create", scope: { "page_ids" => [ @branch.id ] })
     sign_in_as(users(:editor_branch))
-    get "/cs-studio/pages/new", params: { parent_id: @inside.id }, headers: { "Turbo-Frame" => "new-page-form-frame" }
+    # No parent_id (⌘K, the dashboard): the gate is "is there anywhere to create",
+    # not "may they create under Home", which a branch editor may not.
+    get "/cs-studio/pages/new", headers: { "Turbo-Frame" => "new-page-form-frame" }
 
+    assert_response :success
     values = css_select("#new-page-inside option").map { |option| option["value"].to_i }
     assert_equal [ @branch.id, @inside.id ], values
+
+    get "/cs-studio/pages/new"
+    assert_response :success
+    assert_select "form#new-page-form #new-page-inside option", count: 2
+    assert_select "dialog#new-page-dialog", count: 0
   end
 
   test "a trashed page is never offered as a parent" do
@@ -344,5 +353,42 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
 
     values = css_select("select[name=parent_id] option").map { |option| option["value"].to_i }
     assert_includes values, @branch.id
+  end
+
+  test "a tree plus for a page trashed in another tab loads the form with the default parent" do
+    gone = create_page(title: "Gone")
+    as_owner { Trash::Move.call(gone) }
+    sign_in_as(users(:one))
+
+    get "/cs-studio/pages/new", params: { parent_id: gone.id }, headers: { "Turbo-Frame" => "new-page-form-frame" }
+    assert_response :success
+    assert_select "#new-page-inside option[selected][value='#{root_page.id}']"
+
+    get "/cs-studio/pages/new", params: { parent_id: 0 }, headers: { "Turbo-Frame" => "new-page-form-frame" }
+    assert_response :not_found
+  end
+
+  test "the New post form instance is built once per request" do
+    sign_in_as(users(:one))
+    queries = []
+    callback = ->(*, payload) { queries << payload[:sql] if payload[:sql].include?("post_list") || payload[:sql].match?(/FROM "content_blocks"/) }
+    ActiveSupport::Notifications.subscribed(callback, "sql.active_record") do
+      get "/cs-studio/posts/new", headers: { "Turbo-Frame" => "new-post-form-frame" }
+    end
+    assert_equal 1, queries.count { |sql| sql.match?(/FROM "content_blocks"/) }
+  end
+
+  test "the database allows one root page, and a lost race fails like the validation" do
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      Page.new(page_type: :standard, title: "Second root", slug: "second-root").tap { |page| page.save(validate: false) }
+    end
+
+    PublicPath.delete_all # so nothing but the root rule can refuse the second root
+    racer = Page.new
+    racer.define_singleton_method(:only_one_root_page) { } # both creates passed the validation
+    result = as_owner { Pages::Save.call(racer, attributes: { published: false }, translations: { "en" => { title: "Racer" } }) }
+
+    assert_not result.ok?
+    assert_includes result.record.errors.full_messages, "a root page already exists"
   end
 end

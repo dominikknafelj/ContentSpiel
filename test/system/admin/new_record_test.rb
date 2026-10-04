@@ -143,4 +143,52 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog#command-palette[open]"
     assert_current_path admin_page_path(@about)
   end
+
+  test "a branch editor opens New page from the palette and creates a page in their branch" do
+    branch = create_page(title: "Branch")
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.create", scope: { "page_ids" => [ branch.id ] })
+    Capybara.reset_sessions!
+    sign_in_via_form(users(:editor_branch))
+    visit admin_page_path(branch)
+    await_admin_controllers
+
+    find("body").send_keys([ :control, "k" ])
+    find("dialog#command-palette input").set("New p")
+    find("#jump-results [role=option] a", text: "New page").click
+
+    assert_selector "dialog#new-page-dialog[open] form#new-page-form"
+    assert_equal branch.id.to_s, find("#new-page-inside").value
+    fill_in "new-page-title", with: "Inside the branch"
+    click_button "Create page"
+
+    assert_selector "header.admin-editor-header", wait: 10
+    assert_equal branch, Page.order(:id).last.parent
+  end
+
+  test "an expired session sends the user to sign-in instead of showing a load failure" do
+    visit admin_page_path(@about)
+    await_admin_controllers
+    Session.delete_all
+
+    click_link "+ New page"
+
+    assert_selector "h1, form", text: /Sign in/i, wait: 10
+    assert_current_path admin_sign_in_path
+  end
+
+  test "a submit that never reaches the server keeps the typed form and re-enables Create" do
+    visit admin_page_path(@about)
+    await_admin_controllers
+    click_link "+ New page"
+    assert_selector "dialog#new-page-dialog form#new-page-form"
+    page.execute_script("const real = window.fetch; window.fetch = (url, options) => (options && options.method && options.method.toUpperCase() === 'POST') ? Promise.reject(new TypeError('offline')) : real(url, options)")
+
+    fill_in "new-page-title", with: "Offline attempt"
+    click_button "Create page"
+
+    assert_selector "[data-admin--new-record-target=submitFailure]", text: "Couldn’t save.", visible: :visible
+    assert_equal "Offline attempt", find("#new-page-title").value
+    assert_button "Create page", disabled: false
+    assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+  end
 end

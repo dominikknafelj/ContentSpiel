@@ -166,7 +166,7 @@ module PublicSite
 
       posts.index_with do |post|
         best = candidates.select { |block| block.lists?(post) }.min_by do |block|
-          chain = chains[block.owner.id]
+          chain = chains.fetch(block.owner.id, [])
           settings = block.settings_object
           [
             chain.all?(&:live?) ? 0 : 1,
@@ -188,7 +188,7 @@ module PublicSite
       rows = Page.hierarchy_class.where(descendant_id: pages.map(&:id)).pluck(:descendant_id, :ancestor_id, :generations)
       by_id = Page.where(id: rows.map { |_, ancestor_id, _| ancestor_id }.uniq).index_by(&:id)
       rows.group_by(&:first).transform_values do |list|
-        list.sort_by { |_, _, generations| -generations }.map { |_, ancestor_id, _| by_id.fetch(ancestor_id) }
+        list.sort_by { |_, _, generations| -generations }.filter_map { |_, ancestor_id, _| by_id[ancestor_id] }
       end
     end
 

@@ -97,7 +97,7 @@ module Admin
       def path_label(page, kept)
         chain = []
         while page
-          chain.unshift(page.title.presence || "Untitled")
+          chain.unshift(page.title.presence || "(untitled)")
           page = kept[page.parent_id]
         end
         chain.join(" / ")

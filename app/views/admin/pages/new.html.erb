@@ -9,8 +9,9 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<% form = Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
-      parent_id: @page.parent_id, title: params.dig(:page, :title) || params[:title], page_type: params.dig(:page, :page_type), errors: @page.errors) %>
+<%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>
+<% form = @form || Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+      parent_id: @page.parent_id, title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors) %>
 <div class="mx-auto max-w-md">
   <h1 class="mb-4 text-base font-semibold">New page</h1>
 

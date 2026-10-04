@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_04_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -191,6 +191,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_120000) do
     t.bigint "trash_root_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
     t.index ["trash_root_id"], name: "index_pages_on_trash_root_id"

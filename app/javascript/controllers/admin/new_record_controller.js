@@ -35,7 +35,7 @@ import { slugify } from "controllers/admin/slug_preview_controller"
 // 5. A load that fails (a network error, an error status, or a response with no
 //    frame) shows a message with "Try again" instead of an empty dialog.
 export default class extends Controller {
-  static targets = [ "title", "inside", "pageType", "type", "url", "note", "loading", "failure" ]
+  static targets = [ "title", "inside", "pageType", "type", "url", "note", "loading", "failure", "submitFailure" ]
   static values = { kind: String, url: String }
 
   connect() {
@@ -73,6 +73,7 @@ export default class extends Controller {
     Object.entries(preset).forEach(([name, value]) => { if (value) url.searchParams.set(name, value) })
 
     this.failureTarget.hidden = true
+    this.submitFailureTarget.hidden = true
     this.loadingTarget.hidden = false
     if (this.footerButton) this.footerButton.disabled = true
     this.frame.removeAttribute("src")
@@ -91,6 +92,23 @@ export default class extends Controller {
   }
 
   failed(event) {
+    // A fetch error that is not the frame's own is a failed SUBMIT: keep the
+    // typed form, say so, and let Create be pressed again (`submitted` has
+    // already re-enabled it).
+    if (event.type === "turbo:fetch-request-error" && event.target !== this.frame) {
+      this.submitFailureTarget.hidden = false
+      return
+    }
+
+    // A session that expired between opening and loading answers the frame
+    // with the sign-in page (after a redirect): go there, as any visit would.
+    const response = event.detail?.response
+    if (response?.redirected && /\/sign-in\/?$/.test(new URL(response.url).pathname)) {
+      event.preventDefault()
+      window.Turbo.visit(response.url)
+      return
+    }
+
     event.preventDefault()
     this.frame.replaceChildren()
     this.loadingTarget.hidden = true
@@ -126,7 +144,10 @@ export default class extends Controller {
     }
   }
 
-  submitting() { if (this.button) this.button.disabled = true }
+  submitting() {
+    this.submitFailureTarget.hidden = true
+    if (this.button) this.button.disabled = true
+  }
 
   submitted(event) {
     if (!event.detail?.success && this.button) this.button.disabled = false
