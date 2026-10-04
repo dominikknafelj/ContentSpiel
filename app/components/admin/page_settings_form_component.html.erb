@@ -7,7 +7,7 @@
       need a Stimulus target here to reach it. Only on an editable page
       (`form_data`); the `contents` fieldset disables every field of a
       view-only one without touching the layout. %>
-  <%= form_with url: form_url, method: :patch, class: "mt-4 flex flex-col gap-4", data: form_data do %>
+  <%= form_with url: form_url, method: :patch, class: "admin-translation-form mt-4 flex flex-col gap-4", data: form_data do %>
   <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
 
     <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
@@ -32,12 +32,20 @@
       <% end %>
     </div>
 
-    <div class="admin-column mb-4" data-field-name="page_type">
-      <%= label_tag field_id("page_type"), "Page type", class: setup_label_class %>
-      <%= select_tag field_html_name("page_type"), options_for_select(page_type_options, page.page_type),
-            id: field_id("page_type"), class: setup_select_class %>
-      <div id="<%= errors_id("page_type") %>" class="mt-1 text-sm text-danger-ink"></div>
-    </div>
+    <% if translation_tab? %>
+      <%# The page type is the same in every language: a read-only line here, not a `<select>`,
+          so this tab's autosave never sends it. %>
+      <p class="admin-column mb-4 text-sm text-meta" data-field-name="page_type">
+        Page type: <span class="text-ink"><%= page.page_type.humanize %></span> — Shared by all languages.
+      </p>
+    <% else %>
+      <div class="admin-column mb-4" data-field-name="page_type">
+        <%= label_tag field_id("page_type"), "Page type", class: setup_label_class %>
+        <%= select_tag field_html_name("page_type"), options_for_select(page_type_options, page.page_type),
+              id: field_id("page_type"), class: setup_select_class %>
+        <div id="<%= errors_id("page_type") %>" class="mt-1 text-sm text-danger-ink"></div>
+      </div>
+    <% end %>
 
     <%= render Admin::Columns::PlainColumnComponent.new(
           name: "subtitle", id: field_id("subtitle"), html_name: field_html_name("subtitle"),

@@ -205,8 +205,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "input[name='site_setting[tagline]']" do |inputs|
       assert_nil inputs.first["value"].presence
     end
-    assert_select "[data-original-for='title']", text: "Dana's Notes"
-    assert_select "[data-original-for='tagline']", text: "Things I learned"
+    assert_select "[data-original-for='title'] p", text: "Dana's Notes"
+    assert_select "[data-original-for='tagline'] p", text: "Things I learned"
     assert_select "[data-translate-slot='title']"
     # The language switcher, keeping the editing language in the form's URL.
     assert_select "nav.admin-language-tabs a[href='/cs-studio/settings']", text: "English"

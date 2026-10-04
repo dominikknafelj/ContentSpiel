@@ -94,6 +94,8 @@ module Admin
     # otherwise show "//slug" in front of its children (design pass bug 1).
     def slug_base_url = (PublicSite::Urls.new.path_for(page.parent, locale) || "").sub(%r{/+\z}, "")
 
+    def translation_tab? = locale.to_s != ::Locales.default
+
     def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
 
     def landing? = page.landing?

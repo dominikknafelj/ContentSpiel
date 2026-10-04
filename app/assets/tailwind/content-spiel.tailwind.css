@@ -193,6 +193,31 @@
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
 
+/* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
+   translation tab is a `.admin-translation-pair`: the field on one side, the
+   primary-language original (`.admin-reference-card`) on the other. The
+   breakpoint is the width of the FORM (`container-type: inline-size` on
+   `.admin-translation-form`: the page-settings form, the post form and each
+   block card's form), not the viewport -- the page editor sits beside the tree,
+   so a 1400px window can still leave a 700px column. From 880px of form width
+   the two sit side by side; below it they stack with the original FIRST (it is
+   what you read before you type) and foldable (`<details open>`), and the
+   rich-text toolbar -- now alone in its row -- has the full width, so it fits
+   on one line again (round 1's `flex-wrap` stays as the fallback only). Side
+   by side the card's summary is inert: with room for both there is nothing to
+   fold away. The error slot is NOT inside the pair (see the invalid-border
+   notes above: it must stay a direct child of `.admin-column`/`.admin-field`). */
+.admin-translation-form { container-type: inline-size; }
+.admin-translation-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@container (min-width: 880px) {
+  .admin-translation-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; list-style: none; }
+  .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
+}
+@container (max-width: 879.98px) {
+  .admin-translation-pair > .admin-reference-card { order: -1; }
+}
+
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
    state). The ghost is the placeholder left where the row would land: a dashed

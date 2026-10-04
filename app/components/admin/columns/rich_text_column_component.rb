@@ -153,6 +153,10 @@ module Admin
 
       def show_original? = !original_document.blank?
 
+      def card_original = original_document
+
+      def card_kind = :rich
+
       def editor_id = "#{id}-editor"
 
       def label_id = "#{id}-label"

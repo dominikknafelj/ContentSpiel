@@ -423,6 +423,78 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_match "Restored “Gone post”", response.body
   end
 
+  # -- side-by-side translation (design pass round 2, Task 7) --
+
+  def with_mixed_type
+    with_test_types do
+      ContentTypes.register "test/mixed" do |t|
+        t.label "Mixed"
+        t.color "#f59e0b"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :blurb, :string, translated: true
+        t.field :venue, :string
+        t.field :capacity, :integer
+      end
+      yield
+    end
+  end
+
+  test "on a translation tab a translated field is a pair and the untranslated ones live only in Shared fields" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+      assert post_record.persisted?
+
+      get admin_post_path(post_record, locale: "de")
+
+      assert_select "form.admin-translation-form"
+      assert_select "[data-field-name='blurb'] .admin-translation-pair [data-original-for='blurb']"
+      assert_select "[data-field-name='title'] .admin-translation-pair [data-original-for='title']"
+      assert_select "details.admin-shared-fields > summary", text: "Shared fields (2)"
+      assert_select "details.admin-shared-fields:not([open])"
+      assert_select "details.admin-shared-fields", text: /Main Hall/
+      assert_select "details.admin-shared-fields", text: /120/
+      assert_select "[data-field-name='venue'], [data-field-name='capacity']", count: 0
+      assert_select "form input[name='post[fields][venue]'], form input[name='post[fields][capacity]']", count: 0
+      assert_select "form input[name='post[fields][blurb]']", count: 1
+    end
+  end
+
+  test "on the default tab every field of the type is an ordinary input and there are no shared fields" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+
+      get admin_post_path(post_record, locale: Locales.default)
+
+      assert_select "input[name='post[fields][blurb]']"
+      assert_select "input[name='post[fields][venue]']"
+      assert_select "input[name='post[fields][capacity]']"
+      assert_select ".admin-translation-pair", count: 0
+      assert_select "details.admin-shared-fields", count: 0
+    end
+  end
+
+  test "saving a translation tab leaves the shared values untouched" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+
+      patch admin_post_path(post_record), params: {
+        locale: "de", base_updated_at: post_record.updated_at.iso8601(6),
+        post: { title: "Start", fields: { blurb: "Hallo" } }
+      }, as: :turbo_stream
+
+      assert_response :success
+      post_record.reload
+      assert_equal "Start", post_record.title(locale: :de)
+      assert_equal "Hallo", post_record.fields(locale: :de).blurb
+      assert_equal "Main Hall", post_record.fields(locale: Locales.default).venue
+      assert_equal 120, post_record.fields(locale: Locales.default).capacity
+    end
+  end
+
   private
 
   # Every SQL statement the block issues, cached or not (see

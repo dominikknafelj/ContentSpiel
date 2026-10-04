@@ -31,7 +31,7 @@ module Admin
       # `translation_state:` is this field's `Translations::Tracker
       # #translation_state` in the locale being edited, and
       # `translation_confirm:` what its "Mark as up to date" button posts
-      # (nil for a viewer who can't) -- see `#outdated_note`. Both are the
+      # (nil for a viewer who can't) -- see `#reference_card`. Both are the
       # caller's to work out: only it knows the record behind the value.
       #
       # `**html` is the same "anything else passes through" escape hatch
@@ -55,17 +55,19 @@ module Admin
 
       def show_original? = original.present?
 
-      def default_locale_name = Locales.name(Locales.default, native: true)
-
       def errors_id = "#{id}-errors"
 
-      # The "Original changed" note (translation helpers spec §4), shown in
-      # the original's box only for an `:outdated` field -- `:unknown` (a
-      # translation older than tracking) and `:current` show nothing.
-      def outdated_note
-        return unless translation_state == :outdated
-
-        Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+      # The card showing the primary-language original beside (or, in a
+      # narrow column, above) the field (`Admin::EditorScreen
+      # ::ReferenceCardComponent`). An `:outdated` card carries the "Original
+      # changed" note (translation helpers spec §4) and its "Mark as up to
+      # date" button; `:unknown` (a translation older than tracking) and
+      # `:current` show nothing extra.
+      def reference_card
+        Admin::EditorScreen::ReferenceCardComponent.new(
+          field: name, locale: locale, original: card_original, kind: card_kind,
+          state: translation_state, confirm: translation_confirm
+        )
       end
 
       # The AI **Translate** button in the original's box (translation
@@ -81,6 +83,10 @@ module Admin
       end
 
       private
+
+      def card_original = original
+
+      def card_kind = :plain
 
       # The input's own invalid state (design pass spec §4). The danger BORDER
       # is not a server-rendered class: an autosave Turbo Stream replaces the

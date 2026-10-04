@@ -437,4 +437,24 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     Pages::Save.call(attributes: { parent: root_page, page_type: :landing, published: true, hero_media_asset_id: create_media_asset.id },
       translations: { Locales.default => { title: "Landing" } }).record
   end
+
+  test "the page type is a select on the default tab and a read-only shared line on a translation tab" do
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "form select[name='page[page_type]']"
+
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_select "form.admin-translation-form"
+    assert_select "form select[name='page[page_type]']", count: 0
+    assert_select "[data-field-name='page_type']", text: /Page type:\s*Standard\s*— Shared by all languages\./
+  end
+
+  test "a translation-tab save without the page type leaves it untouched" do
+    @page.update!(page_type: "landing")
+
+    patch "/cs-studio/pages/#{@page.id}", params: { locale: "de", page: { title: "Über uns" }, base_updated_at: @page.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "landing", @page.reload.page_type
+    assert_equal "Über uns", @page.title(locale: :de)
+  end
 end

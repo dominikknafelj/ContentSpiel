@@ -116,7 +116,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media/#{asset.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "[data-original-for='alt']", text: "Sand dunes"
+    assert_select "[data-original-for='alt'] p", text: "Sand dunes"
     assert_select "##{note_id("media-asset", asset, "alt")} button", text: "Mark as up to date"
     assert_select "#language-switcher-outdated-de"
     # Ruling: alt present in English, blank in Spanish -- missing there.

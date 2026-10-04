@@ -42,7 +42,7 @@
     <div data-block-body class="flex flex-col gap-3 p-3">
       <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
 
-      <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4", data: form_data do %>
+      <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4", data: form_data do %>
       <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
@@ -53,6 +53,9 @@
                 errors: field_errors(field), id_prefix: error_prefix, **translation(field.name)
               ) %>
         <% end %>
+
+        <%# Same-in-every-language fields: read-only on a translation tab (see `#schema_fields`). %>
+        <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
 
         <% uses_columns.each do |column| %>
           <% case column

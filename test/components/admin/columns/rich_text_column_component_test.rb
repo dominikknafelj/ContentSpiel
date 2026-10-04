@@ -189,7 +189,7 @@ class Admin::Columns::RichTextColumnComponentTranslationTest < ViewComponent::Te
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: doc("Hallo"), original: doc("Hello again"), locale: "de",
       translation_state: :outdated, translation_confirm: { record_type: "Post", record_id: 2, field: "body", locale: "de" })
 
-    assert_selector "[data-original-for='body'] ~ #translation-note-post-2-body button", text: "Mark as up to date"
+    assert_selector "[data-original-for='body'] #translation-note-post-2-body button", text: "Mark as up to date"
   end
 
   test "a current translation shows no note" do

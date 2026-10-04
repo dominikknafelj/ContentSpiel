@@ -15,7 +15,7 @@
     it) -- and only on an editable post (`form_data`). The `<fieldset>`
     (`contents`, so it doesn't affect the form's layout) disables every
     field at once for a view-only one. %>
-<%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data do %>
+<%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4 rounded-cs border border-line bg-surface p-4", data: form_data do %>
 <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
 
   <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
@@ -58,6 +58,11 @@
           errors: field_errors_for(field), id_prefix: ID_PREFIX, **translation(field.name)
         ) %>
   <% end %>
+
+  <%# On a translation tab the fields that are the same in every language are not inputs but
+      one collapsed, read-only list (`schema_fields` above already left them out), so this
+      tab's autosave can never send -- and never change -- a shared value. %>
+  <%= render Admin::EditorScreen::SharedFieldsComponent.new(fields: shared_fields) %>
 
   <%= render Admin::Columns::RichTextColumnComponent.new(
         name: "body", id: field_id("body"), html_name: field_html_name("body"),

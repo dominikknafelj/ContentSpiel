@@ -97,7 +97,27 @@ module Admin
       page ? (urls.path_for(page, locale) || "").sub(%r{/+\z}, "") : ""
     end
 
-    def schema_fields = definition&.fields || []
+    # The typed fields rendered as inputs. On a translation tab only the
+    # translated ones: an untranslated field is the same in every language, so
+    # it is shown read-only in `#shared_fields` instead of being a form input
+    # (see `Admin::EditorScreen::SharedFieldsComponent`).
+    def schema_fields
+      fields = definition&.fields || []
+      translation_tab? ? fields.select(&:translated?) : fields
+    end
+
+    def translation_tab? = locale.to_s != ::Locales.default
+
+    # `[label, value]` for every untranslated field, read from the original
+    # language (an untranslated field's one value lives there). Empty off a
+    # translation tab, where those fields are ordinary inputs.
+    def shared_fields
+      return [] unless translation_tab?
+
+      (definition&.fields || []).reject(&:translated?).map do |field|
+        [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_fields_object&.public_send(field.name)) ]
+      end
+    end
 
     # This post's own typed-field value, in whichever locale is being
     # edited -- `fields(locale:)` reads the *literal* locale (no fallback

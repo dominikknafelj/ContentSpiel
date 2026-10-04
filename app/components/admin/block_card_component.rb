@@ -89,7 +89,25 @@ module Admin
 
     def field_html_name(name) = "block[#{name}]"
 
-    def schema_fields = definition.fields
+    # The schema fields rendered as inputs: on a translation tab only the
+    # translated ones -- an untranslated field is the same in every language,
+    # so it is listed read-only by `#shared_fields` instead of being an input
+    # a translation tab's autosave could send (and change) by accident.
+    def schema_fields
+      translation_tab? ? definition.fields.select(&:translated?) : definition.fields
+    end
+
+    def translation_tab? = locale.to_s != ::Locales.default
+
+    # `[label, value]` for each untranslated schema field, read from the
+    # primary language (where its one value lives); empty off a translation tab.
+    def shared_fields
+      return [] unless translation_tab?
+
+      definition.fields.reject(&:translated?).map do |field|
+        [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_settings_object&.public_send(field.name)) ]
+      end
+    end
 
     # This block's own value for a schema field, in whichever locale is
     # being edited -- `settings_object(locale:)` reads the *literal* locale

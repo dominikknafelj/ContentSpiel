@@ -94,13 +94,12 @@ module Admin
     # rather than leaving it looking like an oversight.
     def show_untranslated_hint? = !field.translated? && !show_original? && locale.to_s != Locales.default
 
-    def default_locale_name = Locales.name(Locales.default, native: true)
-
-    # See `Admin::Columns::Base#outdated_note`.
-    def outdated_note
-      return unless translation_state == :outdated
-
-      Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+    # The card showing the primary-language original beside (or above) the
+    # input -- see `Admin::Columns::Base#reference_card`.
+    def reference_card
+      Admin::EditorScreen::ReferenceCardComponent.new(
+        field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm
+      )
     end
 
     # Text types only get the AI **Translate** button (translation helpers

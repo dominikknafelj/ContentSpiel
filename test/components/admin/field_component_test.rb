@@ -85,7 +85,7 @@ class Admin::FieldComponentTranslationTest < ViewComponent::TestCase
     render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de",
       translation_state: :outdated, translation_confirm: { record_type: "Post", record_id: 4, field: "headline", locale: "de" })
 
-    assert_selector "[data-original-for='headline'] ~ #translation-note-post-4-headline button", text: "Mark as up to date"
+    assert_selector "[data-original-for='headline'] #translation-note-post-4-headline button", text: "Mark as up to date"
   end
 
   test "a view-only outdated field shows the note without a button" do
