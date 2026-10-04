@@ -22,8 +22,7 @@ module Admin
   # page.
   class ApiTokensController < BaseController
     def index
-      @api_tokens = visible_tokens.includes(:user, :group).order(created_at: :desc)
-      @assignable_groups = AccessControl.permitted_groups_for(Current.user)
+      load_screen
     end
 
     # The one-time reveal. *Rendered*, never redirected, the same rule the
@@ -44,21 +43,33 @@ module Admin
     # reveal itself can only re-POST (the browser asks first), which mints
     # a *new* token; it never shows this one again.
     #
-    # A failed issue (fix round 1, m1) never reaches the reveal: there's no
-    # raw token worth showing, so it's an ordinary redirect back to the list
-    # with the service's own errors -- nothing secret to keep out of the flash.
+    # A failed issue never reaches the reveal: there's no raw token worth
+    # showing, so the page comes back at 422 -- the same page, with the
+    # service's own message under the field it is about (Name, or Group) and
+    # the typed name kept. Nothing secret exists to keep out of the response.
+    #
+    # `name:` is always passed as a String (`params[:name].to_s`): to
+    # `ApiTokens::Issue` a nil name means "pick Token N", and here the name is
+    # required, so a missing or blank field must be the "Name can't be blank"
+    # failure rather than a quiet default.
     def create
       group = AccessControl::Group.find_by(id: params[:group_id]) if params[:group_id].present?
-      result = ApiTokens::Issue.call(Current.user, group: group)
+      name = params[:name].to_s
+      result = ApiTokens::Issue.call(Current.user, group: group, name: name)
 
       unless result.ok?
         forbidden_or(result) do
-          redirect_to admin_api_tokens_path(**admin_url_options), status: :see_other,
-            alert: result.errors.to_sentence.presence || "The token couldn't be created"
+          load_screen
+          @name = name
+          @selected_group_id = group&.id
+          messages = result.errors.presence || [ "The token couldn't be created" ]
+          @name_errors, @group_errors = messages.partition { |message| message.start_with?("Name ") }
+          render :index, status: :unprocessable_entity
         end
         return
       end
 
+      load_screen
       @api_token, @raw_token = result.record
 
       response.set_header("Cache-Control", "no-store")
@@ -87,6 +98,18 @@ module Admin
     end
 
     private
+
+    # What both `index` and the refused/successful `create` render: the
+    # tokens the viewer may see (a just-issued one included, so the reveal
+    # lists it) and the groups they may give a token.
+    def load_screen
+      @api_tokens = visible_tokens.includes(:user, :group).order(created_at: :desc, id: :desc)
+      @assignable_groups = AccessControl.permitted_groups_for(Current.user)
+      @selected_group_id = default_group&.id
+      @name = ""
+      @name_errors = []
+      @group_errors = []
+    end
 
     def visible_tokens
       can?("tokens.manage") ? ApiToken.all : ApiToken.where(user: Current.user)

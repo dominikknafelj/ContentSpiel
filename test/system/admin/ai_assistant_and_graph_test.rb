@@ -13,11 +13,21 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   test "creating a token reveals it once, and back/reload don't show it again" do
     visit admin_api_tokens_path
     await_admin_controllers
+
+    # The group's description sits under the select and follows it.
+    assert_selector "#token-group-description", text: access_control_groups(:read_only).description.to_s
+    fill_in "Name", with: "claude-desktop"
+    select "Admin", from: "Group"
+    assert_selector "#token-group-description", text: access_control_groups(:admin).description
+
     press "Create token"
 
     assert_selector "#api-token-value", text: /\A\h{64}\z/
     raw = find("#api-token-value").text
     assert_current_path admin_api_tokens_path
+    assert_text "Copy this token now. It won't be shown again."
+    assert_selector "#api-token-config", text: raw
+    assert_selector "table", text: "claude-desktop"
 
     # No Clipboard API (e.g. plain http off localhost): the text is
     # selected instead, and the status line says so -- no dialog.
@@ -26,14 +36,17 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     assert_text "the text is selected"
     assert_equal raw, page.evaluate_script("window.getSelection().toString()").strip
 
-    press "Done"
+    # Leaving and coming Back refetches the list: the token is gone, its name stays.
+    visit admin_root_path
     assert_no_selector "#api-token-value"
     page.go_back
     assert_selector "h1", text: "Connect an AI assistant"
     assert_no_text raw
+    assert_selector "table", text: "claude-desktop"
 
-    visit current_url
+    visit admin_api_tokens_path
     assert_no_text raw
+    assert_selector "table", text: "claude-desktop"
   end
 
   test "the related-posts picker adds and removes through autosave" do

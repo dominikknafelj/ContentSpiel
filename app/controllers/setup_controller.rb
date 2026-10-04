@@ -11,7 +11,7 @@ class SetupController < ApplicationController
   OPTIONAL_STEPS = %w[system_check mcp_token starter_content].freeze
   LABELS = {
     "token" => "Setup token", "system_check" => "System check", "admin" => "Admin account",
-    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "MCP token",
+    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "AI agent",
     "starter_content" => "Starter content", "review" => "Review"
   }.freeze
 
@@ -58,6 +58,7 @@ class SetupController < ApplicationController
     when "review"
       @site_setting = Current.site
       @starter_added = StarterContent.added?(locale: @site_setting.default_locale)
+      @mcp_token_name = session[:setup_token_name]
     end
 
     render @step
@@ -227,11 +228,26 @@ class SetupController < ApplicationController
     # must never pass through the session or flash. no-store keeps it out of
     # the back/forward cache too, so navigating away doesn't leave the still-
     # valid raw token one "back" button press away from resurfacing.
+    #
+    # The token's *name* is required (round 3 decision D2): `name:` is always a
+    # String, so a missing or blank field is "Name can't be blank" (422, back on
+    # the form with what was typed) and not a default "Token 1". The name --
+    # never the token -- is kept in the session for the review step's row.
     def update_mcp_token
       # The first account is an owner, so its token gets the Admin group
       # (it can be narrowed to another group in CS Studio later).
       admin = AccessControl::Group.find_by!(name: AccessControl::Seeds::ADMIN_NAME)
-      _token, @raw_token = ApiTokens::Issue.call(Current.user, group: admin).record
+      name = params[:token_name].to_s
+      result = ApiTokens::Issue.call(Current.user, group: admin, name: name)
+
+      unless result.ok?
+        @token_name = name
+        @token_error = result.errors.to_sentence
+        return render :mcp_token, status: :unprocessable_entity
+      end
+
+      token, @raw_token = result.record
+      session[:setup_token_name] = token.name
       response.set_header("Cache-Control", "no-store")
       render :mcp_token_created
     end

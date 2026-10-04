@@ -61,6 +61,7 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
 
     assert_difference -> { ApiToken.count }, 1 do
       post "/cs-studio/api_tokens", params: {
+        name: "forged-params",
         api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" },
         group_id: access_control_groups(:admin).id
       }

@@ -30,7 +30,7 @@ class SetupAttributionTest < ActionDispatch::IntegrationTest
     assert_redirected_to setup_step_path("languages")
     patch setup_step_path("languages"), params: { site_setting: { default_locale: "en", extra_locales: [ "de" ] } }
     assert_redirected_to setup_step_path("mcp_token")
-    patch setup_step_path("mcp_token")
+    patch setup_step_path("mcp_token"), params: { token_name: "claude-desktop" }
     assert_response :success
     patch setup_step_path("starter_content")
     assert_redirected_to setup_step_path("review")

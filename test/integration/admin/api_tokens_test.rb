@@ -19,27 +19,48 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   # a token's owner is asserted against its own list row.
   test "the list shows active and revoked tokens with the owner's email, last used and IP" do
     sign_in_as(users(:one))
-    active, = ApiToken.generate!(users(:one))
+    active, = ApiToken.generate!(users(:one), name: "claude-desktop")
     active.record_usage!("203.0.113.5")
-    revoked, = ApiToken.generate!(users(:two))
+    revoked, = ApiToken.generate!(users(:two), name: "old-agent")
     revoked.revoke!
 
     get "/cs-studio/api_tokens"
 
     assert_response :success
     assert_select "#" + ActionView::RecordIdentifier.dom_id(active) do
-      assert_select "*", text: /#{Regexp.escape(users(:one).email_address)}/
+      assert_select "*", text: /claude-desktop/
+      assert_select "*", text: /#{Regexp.escape(users(:one).display_name)}/
       assert_select "*", text: /203\.0\.113\.5/
       assert_select "*", text: /Active/
       assert_select "*", text: /Admin/ # the token's group
-      assert_select "button", text: "Revoke"
+      assert_select "button", text: "Revoke…"
     end
     assert_select "#" + ActionView::RecordIdentifier.dom_id(revoked) do
-      assert_select "*", text: /#{Regexp.escape(users(:two).email_address)}/
+      assert_select "*", text: /old-agent/
+      assert_select "*", text: /#{Regexp.escape(users(:two).display_name)}/
       assert_select "*", text: /Revoked/
-      assert_select "button", text: "Revoke", count: 0
+      assert_select "button", text: "Revoke…", count: 0
+      assert_select "[class~='opacity-60']" # dimmed, still listed
     end
     assert_not_includes response.body, active.token_digest
+  end
+
+  test "the page is a numbered flow: create a token, add it to your assistant, the tokens table" do
+    sign_in_as(users(:one))
+    ApiToken.generate!(users(:one), name: "claude-desktop")
+    get "/cs-studio/api_tokens"
+
+    assert_select "h1", text: "Connect an AI assistant"
+    assert_select "h2", text: "1 · Create a token"
+    assert_select "h2", text: "2 · Add it to your assistant"
+    assert_select "h2", text: "Tokens"
+    assert_select "input[name=name][required][placeholder='claude-desktop']"
+    assert_select "select[name=group_id] option[data-description]"
+    assert_select "button", text: "Create token"
+    assert_select "button", text: "Copy", minimum: 2 # the URL and the configuration
+    headers = css_select("table th").map { |header| header.text.strip }
+    assert_equal %w[Name Acts\ as Group Created Last\ used Status], headers.first(6)
+    assert_no_match(/masked|••••/, response.body)
   end
 
   # Fix round 1: the create form is a plain POST, so the reveal arrives as
@@ -62,7 +83,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
   test "creating a token reveals it once, no-store, in the response itself" do
     sign_in_as(users(:one))
     assert_difference -> { ApiToken.count }, 1 do
-      post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
+      post "/cs-studio/api_tokens", params: { name: "claude-desktop", group_id: access_control_groups(:read_only).id }
     end
 
     assert_response :success
@@ -73,8 +94,13 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     token = ApiToken.order(:id).last
     assert_equal users(:one), token.user
     assert_equal access_control_groups(:read_only), token.group
+    assert_equal "claude-desktop", token.name
     assert token.authenticate_token(raw)
+    assert_select "[role=status]", text: /Copy this token now\. It won't be shown again\./
+    assert_select "button", text: "Copy token"
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
+    assert_select "pre#api-token-config", text: /Bearer #{raw}/
+    assert_select "table", text: /claude-desktop/
     assert_includes response.body, "#{PublicSite::Urls.default_host}/mcp"
 
     assert_nil flash[:notice]
@@ -92,7 +118,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     Rails.logger = ActiveSupport::Logger.new(io)
     ActionController::Base.logger = Rails.logger
 
-    post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
+    post "/cs-studio/api_tokens", params: { name: "logged", group_id: access_control_groups(:read_only).id }
     raw = raw_token_from(response.body)
 
     assert_not_includes io.string, raw
@@ -142,23 +168,69 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     host! admin_host
   end
 
-  # Fix round 1 (m1): a failed issue never renders the reveal.
-  test "a failed issue redirects to the list with an alert and no token" do
+  # A failed issue never renders the reveal: no token exists, so the page
+  # comes back at 422 with the service's own message under the field it is
+  # about and the typed name kept (it used to redirect with a flash).
+  test "a blank name re-renders the page at 422 with the error under Name and no token" do
     sign_in_as(users(:one))
-    failing = ->(*, **) { ApplicationService::Result.failure(ApiToken.new, [ "Tokens are switched off" ]) }
-    ApiTokens::Issue.singleton_class.define_method(:call, &failing)
-    begin
-      assert_no_difference -> { ApiToken.count } do
-        post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
-      end
-    ensure
-      ApiTokens::Issue.singleton_class.remove_method(:call)
+
+    assert_no_difference [ -> { ApiToken.count }, -> { Audit::Event.count } ] do
+      post "/cs-studio/api_tokens", params: { name: "   ", group_id: access_control_groups(:read_only).id }
     end
 
-    assert_redirected_to "/cs-studio/api_tokens"
-    follow_redirect!
-    assert_select "[role=alert]", text: "Tokens are switched off"
+    assert_response :unprocessable_entity
+    assert_select "#token-name-error", text: /Name can't be blank/
     assert_select "#api-token-value", count: 0
+    assert_select "[role=status]", text: /Copy this token now/, count: 0
+    assert_select "select[name=group_id] option[selected][value=?]", access_control_groups(:read_only).id.to_s
+  end
+
+  test "a missing name field is the blank-name error too" do
+    sign_in_as(users(:one))
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:read_only).id }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#token-name-error", text: /Name can't be blank/
+  end
+
+  test "a duplicate active name is refused at 422 with the typed name kept" do
+    sign_in_as(users(:one))
+    ApiToken.generate!(users(:one), name: "claude-desktop")
+
+    assert_no_difference -> { ApiToken.count } do
+      post "/cs-studio/api_tokens", params: { name: "Claude-Desktop", group_id: access_control_groups(:read_only).id }
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#token-name-error", text: /already the name of one of this user's active tokens/
+    assert_select "input[name=name][value='Claude-Desktop']"
+    assert_select "#api-token-value", count: 0
+  end
+
+  test "the reveal never survives a reload of the list" do
+    sign_in_as(users(:one))
+    post "/cs-studio/api_tokens", params: { name: "once", group_id: access_control_groups(:read_only).id }
+    raw = raw_token_from(response.body)
+
+    get "/cs-studio/api_tokens"
+    assert_not_includes response.body, raw
+    assert_select "#api-token-value", count: 0
+    assert_select "table", text: /once/
+  end
+
+  test "the revoke dialog names the token and the user" do
+    sign_in_as(users(:one))
+    token, = ApiToken.generate!(users(:one), name: "claude-desktop")
+
+    get "/cs-studio/api_tokens"
+
+    dialog = "dialog#revoke-api-token-#{token.id}"
+    assert_select dialog, text: /Revoke “claude-desktop”\?/
+    assert_select dialog, text: /The assistant acting as #{Regexp.escape(users(:one).display_name)} through this token loses access at once\. The token stays listed as revoked, and its past changes stay in the audit log\./
+    assert_select "#{dialog} button", text: "Revoke token"
   end
 
   # Fix round 1 (m4): a stale tab's Revoke keeps the original revoked_at.
@@ -194,23 +266,22 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:author))
 
     assert_no_difference -> { ApiToken.count } do
-      post "/cs-studio/api_tokens", params: { group_id: access_control_groups(:admin).id }
+      post "/cs-studio/api_tokens", params: { name: "forged", group_id: access_control_groups(:admin).id }
     end
 
     assert_response :forbidden
     assert_includes response.body, "You don&#39;t have permission to give a token the Admin group"
   end
 
-  test "a missing group is an alert, not a token" do
+  test "a missing group is an error under Group, not a token" do
     sign_in_as(users(:author))
 
     assert_no_difference -> { ApiToken.count } do
-      post "/cs-studio/api_tokens"
+      post "/cs-studio/api_tokens", params: { name: "no-group" }
     end
 
-    assert_redirected_to "/cs-studio/api_tokens"
-    follow_redirect!
-    assert_select "[role=alert]", text: "Choose a group for the token"
+    assert_response :unprocessable_entity
+    assert_select "[role=alert], #token-group-error", text: /Choose a group for the token/
   end
 
   test "users see only their own tokens unless they have tokens.manage" do
