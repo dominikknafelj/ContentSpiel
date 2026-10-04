@@ -53,4 +53,34 @@ class Admin::AuditScreen::SentenceComponentTest < ViewComponent::TestCase
     assert_text "<script>1</script>"
     assert_text "via <i>x</i>"
   end
+
+  # Final fix wave (M3): the one place a sentence's route NAME becomes a call.
+  # `Audit::Sentence` only ever builds six; the component checks the name
+  # against its own frozen list all the same, so a name from anywhere else is
+  # never `public_send` to the helpers -- the subject is then plain text.
+  test "each of the six routes a sentence can carry is linked" do
+    {
+      Audit::Sentence::Route.new(:admin_page_path, [ 7 ], {}) => "/cs-studio/pages/7",
+      Audit::Sentence::Route.new(:admin_post_path, [ 7 ], {}) => "/cs-studio/posts/7",
+      Audit::Sentence::Route.new(:admin_media_path, [], { selected: 7 }) => "/cs-studio/media?selected=7",
+      Audit::Sentence::Route.new(:edit_admin_user_path, [ 7 ], {}) => "/cs-studio/users/7/edit",
+      Audit::Sentence::Route.new(:edit_admin_group_path, [ 7 ], {}) => "/cs-studio/groups/7/edit",
+      Audit::Sentence::Route.new(:admin_settings_path, [], {}) => "/cs-studio/settings"
+    }.each do |route, href|
+      render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("post.published", route:))
+
+      assert_selector "a[href='#{href}']", text: "Hello"
+    end
+    assert_equal 6, Admin::AuditScreen::SentenceComponent::ROUTES.size
+    assert Admin::AuditScreen::SentenceComponent::ROUTES.frozen?
+  end
+
+  test "a route name outside the list is never called: the subject is plain text" do
+    [ :admin_sign_out_path, :admin_posts_path, :instance_eval, :root_path, "admin_post_path" ].each do |name|
+      render_inline Admin::AuditScreen::SentenceComponent.new(sentence: sentence("post.published", route: Audit::Sentence::Route.new(name, [ 7 ], {})))
+
+      assert_no_selector "a"
+      assert_text "You published “Hello”"
+    end
+  end
 end

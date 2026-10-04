@@ -40,6 +40,9 @@ module Admin
     # Actions the log holds that no sentence knows (a plugin's), for the Action
     # drop-down's "Other" group.
     MAX_OTHER_ACTIONS = 100
+    # `offset` is typed by the visitor: past this it is this (an empty page),
+    # never a number Postgres refuses as out of range for a bigint.
+    MAX_OFFSET = 1_000_000
 
     before_action -> { require_permission("audit.view") }
     before_action :load_filter
@@ -51,13 +54,23 @@ module Admin
       @offset = offset
       @entries = events.zip(Audit::Sentence.for_events(events, viewer: Current.actor, channel: Current.channel))
       @users = users_for_filter
-      @other_actions = Audit::Event.where.not(action: Audit::Sentence::ACTIONS).distinct.limit(MAX_OTHER_ACTIONS).pluck(:action)
+      @other_actions = other_actions
     end
 
-    # An event outside the current filters is not found (the list the visitor
-    # came from wouldn't show it), exactly as a missing id is.
+    # The event is found whatever the filters say; only an id that names no
+    # event is the 404. One that exists but falls OUTSIDE the filters in the URL
+    # -- a link kept from yesterday with `range=today`, a pasted link whose
+    # filter the event doesn't match -- is answered with the event's own
+    # filter-free address rather than "not found": the event page under filters
+    # promises Older/Newer within that list, which this event isn't in, so it
+    # is shown where Older/Newer walk the whole log. (Looked up inside the
+    # filter scope, as it once was, an event's link expired with its preset.)
     def show
-      @event = @filter.scope.includes(:user).find(params[:id])
+      @event = Audit::Event.includes(:user).find(params[:id])
+      if @filter.active? && !@filter.scope.exists?(id: @event.id)
+        return redirect_to(admin_audit_event_path(@event, **admin_url_options), status: :see_other)
+      end
+
       @sentence = Audit::Sentence.for(@event, viewer: Current.actor, channel: Current.channel)
       @older_id = neighbour(@event, :older)
       @newer_id = neighbour(@event, :newer)
@@ -67,9 +80,20 @@ module Admin
 
     def load_filter = @filter = Audit::Filter.new(params)
 
-    def offset
-      raw = params[:offset].to_i
-      raw.positive? ? raw : 0
+    def offset = params[:offset].to_i.clamp(0, MAX_OFFSET)
+
+    # The actions in the log that no sentence knows, for the drop-down's
+    # "Other" group, in alphabetical order. Finding them is a scan of the
+    # whole log (`DISTINCT action` over every row that isn't a known action),
+    # far too much for every render of the list -- so it is cached, keyed on
+    # the newest event's id: the log is append-only, so the set can only
+    # change when a row is added, which moves that id (one primary-key lookup
+    # per render). A coalesced event changes no action. In development and
+    # test the cache is the environment's own (memory, or none).
+    def other_actions
+      Rails.cache.fetch([ "audit", "other-actions", Audit::Event.maximum(:id).to_i, Audit::Sentence::ACTIONS.size ]) do
+        Audit::Event.where.not(action: Audit::Sentence::ACTIONS).distinct.order(:action).limit(MAX_OTHER_ACTIONS).pluck(:action)
+      end
     end
 
     # The adjacent event in the list's own order (`last_occurred_at, id`,

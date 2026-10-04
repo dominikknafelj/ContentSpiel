@@ -9,7 +9,10 @@ module Admin
     module TimeSpan
       module_function
 
-      def span?(event) = clock(event.occurred_at) != clock(event.last_occurred_at)
+      # Whether the two ends are different minutes -- the unit the log shows.
+      # Compared as TIMES cut to the minute, not as the "HH:MM" each prints:
+      # two ends a whole day apart print the same clock and are still a span.
+      def span?(event) = event.occurred_at.change(sec: 0) != event.last_occurred_at.change(sec: 0)
 
       # "16:05" or "16:05–16:31" (the list's time column).
       def short(event)
@@ -20,7 +23,10 @@ module Admin
         first.to_date == last.to_date ? "#{clock(first)}–#{clock(last)}" : "#{first.strftime("%a %H:%M")}–#{clock(last)}"
       end
 
-      # "Fri 2 Oct 2026, 16:05–16:31 · 12 saves" (the event page's WHEN).
+      # "Fri 2 Oct 2026, 16:05–16:31 · 12 saves" (the event page's WHEN). The
+      # count is what the row stands for: SAVES for a coalesced `*.updated`
+      # (an autosave session), TIMES for anything else that coalesces
+      # (`access.denied`: twelve refusals are not twelve saves).
       def long(event)
         first = event.occurred_at.in_time_zone
         last = event.last_occurred_at.in_time_zone
@@ -29,7 +35,7 @@ module Admin
           elsif first.to_date == last.to_date then "#{day(first)}, #{clock(first)}–#{clock(last)}"
           else "#{day(first)}, #{clock(first)} – #{day(last)}, #{clock(last)}"
           end
-        event.occurrences.to_i > 1 ? "#{text} · #{event.occurrences} saves" : text
+        event.occurrences.to_i > 1 ? "#{text} · #{event.occurrences} #{event.action.to_s.end_with?(".updated") ? "saves" : "times"}" : text
       end
 
       def clock(time) = time.in_time_zone.strftime("%H:%M")

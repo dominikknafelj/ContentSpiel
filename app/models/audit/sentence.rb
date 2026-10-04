@@ -209,10 +209,29 @@ module Audit
         before, after = CONTENT_VERBS.fetch(verb)
         if verb == "scheduled" && (date = scheduled_date)
           after = "#{after} for #{date}"
+        elsif verb == "unpublished" && schedule_removed?
+          before = "removed the schedule from "
         elsif verb == "updated" && @action == "media.updated" && alt_only?
           before = "updated the alt text of "
         end
         subject_parts(before, after)
+      end
+
+      # A page's or post's `*.unpublished` (what the services record whenever
+      # `published_at` becomes nil) that took away a date still in the FUTURE
+      # when it happened: the record was scheduled, never on the site, so
+      # nothing was unpublished -- a schedule was removed. Judged from the
+      # event's own change, `[old, nil]` against its own time; anything else
+      # (no change stored, junk, a past date) stays "unpublished".
+      def schedule_removed?
+        changes = event.field_changes
+        return false unless changes.is_a?(Hash)
+
+        was, now = Array(changes["published_at"])
+        return false unless now.nil? && was.present?
+
+        time = self.class.parse_time(was)
+        time.present? && time > event.occurred_at
       end
 
       def alt_only?
@@ -275,7 +294,14 @@ module Audit
 
       def denied_parts
         label = AccessControl::Permissions.find(event.metadata.is_a?(Hash) ? event.metadata["permission"] : nil)&.label
-        label ? [ text("#{were} refused permission to "), strong(label.downcase) ] : [ text("#{were} refused access") ]
+        parts = label ? [ text("#{were} refused permission to "), strong(label.downcase) ] : [ text("#{were} refused access") ]
+        # What it was refused ON, when the event names a subject (a page, a
+        # post, a user...): the event page's Object line has always shown it;
+        # the sentence says it too, linked like any other subject when the
+        # viewer may open it. An area refusal (settings, the audit log) has no
+        # subject and stays as it was.
+        subject = subject_label
+        subject ? parts + [ text(" on "), Part.new(:subject, subject) ] : parts
       end
 
       # "You were", "Ada was".

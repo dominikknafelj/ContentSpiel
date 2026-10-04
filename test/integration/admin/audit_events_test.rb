@@ -175,7 +175,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
   # captured onto the row at write time (`Audit::Snapshot.label_for`), not
   # re-derived from today's model name -- so it reads back exactly as
   # recorded, same as a deleted subject's event above.
-  test "a legacy MediaAsset-typed event still shows its label, without a link, and doesn't raise" do
+  test "a legacy MediaAsset-typed event still shows its label, linked to the image for a media.upload holder, and doesn't raise" do
     sign_in_as(users(:one))
     asset = create_media_asset
     event = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
@@ -187,6 +187,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     # Linked now (the viewer holds `media.upload` and the image exists), as the
     # dashboard's feed does; the stored label is what reads either way.
     assert_select "##{dom_id(event)}", text: /Media asset ##{asset.id}/
+    assert_select "##{dom_id(event)} p a[href='/cs-studio/media?selected=#{asset.id}']", text: "Media asset ##{asset.id}"
 
     get "/cs-studio/audit_events/#{event.id}"
 

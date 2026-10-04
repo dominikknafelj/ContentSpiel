@@ -369,16 +369,127 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='/audit_events?'][href*='channel=admin']", text: "Audit log"
   end
 
-  test "an event outside the filters, or one that doesn't exist, is a 404 in the shell" do
+  # Final fix wave (I3): an event's link used to die with its filter -- a URL
+  # carrying `range=today` was a 404 the next morning, and a link pasted with
+  # a filter the event doesn't match was "not found" for an event that exists.
+  # The event is found whatever the filter says; outside it, the answer is
+  # the event's own filter-free address (where Older/Newer walk the whole log).
+  test "an event outside the filters redirects to its filter-free permalink; only a missing id is a 404" do
     one = event(Time.current)
 
     get "/cs-studio/audit_events/#{one.id}", params: { channel: "mcp" }
+    assert_redirected_to "/cs-studio/audit_events/#{one.id}"
+    follow_redirect!
+    assert_response :success
+    assert_select "a[href='/cs-studio/audit_events']", text: "Audit log"
+
+    travel_to 2.days.from_now do
+      get "/cs-studio/audit_events/#{one.id}", params: { range: "today", locale: "de" }
+      assert_redirected_to "/cs-studio/audit_events/#{one.id}?locale=de"
+    end
+
+    # Inside its filters it renders, filters kept.
+    get "/cs-studio/audit_events/#{one.id}", params: { channel: "admin" }
+    assert_response :success
+
+    get "/cs-studio/audit_events/0", params: { channel: "mcp" }
     assert_response :not_found
     assert_select "nav[aria-label='Modules']"
-
     get "/cs-studio/audit_events/0"
     assert_response :not_found
-    assert_select "nav[aria-label='Modules']"
+  end
+
+  # Final fix wave (M5b): `offset` is the visitor's to type.
+  test "an absurd offset is clamped, never a database error" do
+    event(Time.current)
+
+    get "/cs-studio/audit_events", params: { offset: "9" * 40 }
+    assert_response :success
+    assert_select "section[aria-labelledby^=audit-day]", count: 0
+
+    get "/cs-studio/audit_events", params: { offset: "-5" }
+    assert_response :success
+    assert_select "section[aria-labelledby^=audit-day]", minimum: 1
+  end
+
+  # Final fix wave (M12): a filter on a user who has since been deleted (the
+  # link from one of their events) showed "Anyone" in the drop-down while the
+  # list was filtered.
+  test "a user filter naming a deleted user is shown as chosen" do
+    gone = User.maximum(:id) + 500
+    event(Time.current, user_id: gone)
+
+    get "/cs-studio/audit_events", params: { user_id: gone }
+
+    assert_select "select#user_id option[selected][value='#{gone}']", text: "A deleted user"
+  end
+
+  # Final fix wave (M2): a refusal said what was refused but not on what,
+  # though the event page's Object line already names it.
+  test "a refusal names what it was refused on, linked for a viewer who can open it" do
+    post = as(@me) { create_post(title: "Guarded post", published: false) }
+    denied = event(Time.current, action: "access.denied", user_id: users(:author).id, subject_type: "Post", subject_id: post.id,
+      subject_label: "Guarded post", metadata: { "permission" => "posts.edit" })
+    bare = event(Time.current, action: "access.denied", user_id: users(:author).id, subject_label: nil, metadata: { "permission" => "settings.manage" })
+
+    get "/cs-studio/audit_events"
+
+    assert_select "##{dom_id(denied)} p", text: "#{users(:author).display_name} was refused permission to edit posts on “Guarded post”"
+    assert_select "##{dom_id(denied)} p a[href='/cs-studio/posts/#{post.id}']", text: "Guarded post"
+    assert_select "##{dom_id(bare)} p", text: "#{users(:author).display_name} was refused permission to manage settings"
+  end
+
+  # Final fix wave (M10): an image's event links to its panel only for a
+  # viewer who can open the library, and never for a trashed image.
+  test "an image's row links to its panel for a media.upload holder, and is plain text without it or once the image is trashed" do
+    asset = as(@me) { create_media_asset }
+    row = event(Time.current, action: "media.updated", subject_type: "Media::Asset", subject_id: asset.id, subject_label: "Sunset")
+
+    get "/cs-studio/audit_events"
+    assert_select "##{dom_id(row)} p a[href='/cs-studio/media?selected=#{asset.id}']", text: "Sunset"
+
+    group = AccessControl::Group.create!(name: "Audit only #{SecureRandom.hex(4)}")
+    group.grants.create!(permission: "audit.view")
+    viewer = User.create!(email_address: "audit-only-m@example.com", password: "password12345")
+    AccessControl::Membership.create!(user: viewer, group:)
+    sign_in_as(viewer)
+    get "/cs-studio/audit_events"
+    assert_select "##{dom_id(row)} p", text: /edited “Sunset”/
+    assert_select "##{dom_id(row)} p a", count: 0
+
+    as(@me) { assert Trash::Move.call(asset).ok? }
+    sign_in_as(@me)
+    get "/cs-studio/audit_events"
+    assert_select "##{dom_id(row)} p", text: /edited “Sunset”/
+    assert_select "##{dom_id(row)} p a", count: 0
+  end
+
+  # Final fix wave: the list and the event page must render whatever a row
+  # holds -- no subject at all, and JSON columns that aren't the hashes the
+  # components expect (a hand-written or a legacy row).
+  test "a row with no subject type, a list for its field changes and a list for its metadata renders in the list and on its own page" do
+    junk = event(Time.current, action: "page.updated", subject_type: nil, subject_id: nil, subject_label: nil, field_changes: [ 1 ], metadata: [], snapshot: nil)
+    odd = event(Time.current, action: "access.denied", subject_type: nil, subject_label: "", field_changes: [ 1 ], metadata: [])
+
+    get "/cs-studio/audit_events"
+    assert_response :success
+    assert_select "##{dom_id(junk)} p", text: /You edited/
+    assert_select "##{dom_id(odd)} p", text: "You were refused access"
+
+    [ junk, odd ].each do |row|
+      get "/cs-studio/audit_events/#{row.id}"
+      assert_response :success
+      assert_select "h1"
+    end
+  end
+
+  test "a coalesced event that is not an edit counts times, not saves" do
+    refused = event(Time.utc(2026, 10, 2, 14, 5), last: Time.utc(2026, 10, 2, 14, 9), occurrences: 12, action: "access.denied", metadata: { "permission" => "posts.edit" })
+
+    get "/cs-studio/audit_events/#{refused.id}"
+
+    assert_select "dl", text: /Fri 2 Oct 2026, 16:05–16:09 · 12 times/
+    assert_select "dl", text: /saves/, count: 0
   end
 
   test "an event page for a record the viewer can't read links nothing but still names it" do

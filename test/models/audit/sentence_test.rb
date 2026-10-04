@@ -240,12 +240,40 @@ class Audit::SentenceTest < ActiveSupport::TestCase
 
       assert_match(/\AYou scheduled “Sched #{kind}” for \d{1,2} \w{3}\z/, read(sentence_for(save_at(record, later))), "schedule #{kind}")
       assert_match(/\AYou scheduled “Sched #{kind}” for /, read(sentence_for(save_at(record, later + 2.days))), "reschedule #{kind}")
-      assert_equal "You unpublished “Sched #{kind}”", read(sentence_for(save_at(record, nil))), "remove schedule #{kind}"
+      # Taking a FUTURE date away never took anything off the site: it removes a schedule.
+      assert_equal "You removed the schedule from “Sched #{kind}”", read(sentence_for(save_at(record, nil))), "remove schedule #{kind}"
       save_at(record, later)
       assert_equal "You published “Sched #{kind}”", read(sentence_for(save_at(record, Time.current - 1.minute))), "publish now #{kind}"
       assert_equal "You unpublished “Sched #{kind}”", read(sentence_for(save_at(record, nil))), "unpublish #{kind}"
       assert_no_match(/\bdid\b/, read(sentence_for(latest_event(record))))
     end
+  end
+
+  # A date in the past is a publication, however far back: backdating a draft
+  # publishes it, moving a live record's date leaves it published, and taking
+  # a past date away unpublishes it (never "removed the schedule").
+  test "backdating reads as publishing, and removing a past date as unpublishing" do
+    each_kind.each do |kind, make|
+      record = make.call("Back #{kind}")
+
+      assert_equal "You published “Back #{kind}”", read(sentence_for(save_at(record, 2.years.ago.change(usec: 0)))), "backdate #{kind}"
+      assert_no_match(/schedule/, read(sentence_for(save_at(record, 3.years.ago.change(usec: 0)))), "move the date further back #{kind}")
+      assert_equal "You unpublished “Back #{kind}”", read(sentence_for(save_at(record, nil))), "unpublish #{kind}"
+    end
+  end
+
+  test "an unpublished event with junk for its changes still reads as unpublished" do
+    [ [ 1 ], {}, { "published_at" => "not a time" }, { "published_at" => [ "junk", nil ] }, { "published_at" => [ nil, nil ] } ].each do |changes|
+      row = event("post.unpublished", subject_label: "Thing", field_changes: changes)
+      assert_equal "You unpublished “Thing”", read(sentence_for(row)), changes.inspect
+    end
+  end
+
+  test "a refusal names its subject when the event has one" do
+    denied = event("access.denied", user_id: users(:author).id, subject_label: "Guarded", metadata: { "permission" => "posts.edit" })
+
+    assert_equal "#{users(:author).display_name} was refused permission to edit posts on “Guarded”", read(sentence_for(denied))
+    assert_equal "You were refused access on “Guarded”", read(sentence_for(event("access.denied", subject_label: "Guarded", metadata: {})))
   end
 
   test "a block verb nothing knows reads as the generic sentence, with or without a readable owner" do

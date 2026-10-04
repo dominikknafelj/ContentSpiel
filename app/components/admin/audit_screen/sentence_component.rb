@@ -11,6 +11,14 @@ module Admin
     # resolved here with this request's URL options), every stored value
     # escaped as the text it is.
     class SentenceComponent < Admin::AdminComponent
+      # Every route a sentence may name (`Audit::Sentence.route_for`,
+      # `Audit::Sentence::Targets#for`). The name reaches `public_send` below,
+      # so it is checked against this list rather than trusted for coming from
+      # the model: a name that isn't here -- a new target added there and not
+      # here, or anything else -- draws the subject as plain text and calls
+      # nothing. Symbols only: `"admin_post_path"` is not on the list.
+      ROUTES = %i[admin_page_path admin_post_path admin_media_path edit_admin_user_path edit_admin_group_path admin_settings_path].freeze
+
       def initialize(sentence:)
         @sentence = sentence
       end
@@ -45,7 +53,7 @@ module Admin
 
       def subject_html(label)
         route = sentence.subject_route
-        inner = if route
+        inner = if route && ROUTES.include?(route.name)
           link_to(label, helpers.public_send(route.name, *route.args, **route.params, **url_options),
             class: "relative z-10 font-semibold hover:underline", data: { turbo_frame: "_top" })
         else
