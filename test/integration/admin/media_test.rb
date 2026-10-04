@@ -158,7 +158,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "a", text: "Next"
     assert_select "a", text: "Previous", count: 0
 
-    get "/cs-studio/media", params: { offset: 48 }
+    get "/cs-studio/media", params: { page: 2 }
     assert_response :success
     assert_select "li[id^='media-asset-']", 2
     assert_select "a", text: "Previous"
