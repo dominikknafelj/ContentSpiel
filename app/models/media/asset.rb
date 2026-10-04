@@ -359,7 +359,7 @@ class Media::Asset < ApplicationRecord
   # `ContentBlock`-owned usage -- fine for the "and 2 more" case `#in_use_
   # message` truncates to, but a real N+1 once an asset (or a delete
   # attempt's own full count) is used on a page full of image blocks
-  # (Admin::MediaLibrary::DetailComponent's own "Used on" list, unlike
+  # (Admin::MediaLibrary::PanelComponent's own "Used on" list, unlike
   # `#in_use_message`, never truncates at all).
   #
   # A public class method, not a private instance one: `#in_use_message`

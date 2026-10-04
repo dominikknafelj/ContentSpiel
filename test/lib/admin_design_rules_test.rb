@@ -95,11 +95,23 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
       status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb
       record_header_component.rb tag_input_component.rb translation_screen/list_component.rb
       translation_screen/outdated_note_component.rb dashboard_screen/column_component.rb audit_changes_component.rb
-      audit_changes_component.html.erb
+      audit_changes_component.html.erb settings_form_component.rb settings_form_component.html.erb
+      media_library/detail_component.rb media_library/detail_component.html.erb
+      columns/image_column_component.rb columns/image_column_component.html.erb
     ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
+    # Round 3: Languages is a card of the Settings screen, an image's detail a
+    # panel beside the Media grid, and the audit log words its rows through
+    # `Audit::Sentence` -- the screens and helper they replaced stay deleted.
+    %w[
+      app/views/admin/languages/index.html.erb app/views/admin/media/show.html.erb
+      app/views/admin/shared/_image_upload_field.html.erb app/views/admin/api_tokens/_connection.html.erb
+      app/views/admin/users/_access_fields.html.erb app/helpers/admin/audit_events_helper.rb
+    ].each do |file|
+      assert_not Rails.root.join(file).exist?, file
+    end
     # The translation states live in `translation_states` (`Translations::StateIndex`) now.
     assert_not Rails.root.join("app/models/translations/cached_status.rb").exist?
   end

@@ -1,11 +1,10 @@
 # A registered content type (spec §3.1 example: `blog`, `resume_entry`,
-# `now_update`): adds the mind-graph colour, the two ViewComponents a `Post`
+# `now_update`): adds the colour slot (`colour_index`), the two ViewComponents a `Post`
 # of this type renders through (a whole listing and its own detail page,
 # this sub-project's Task 4) and its starter content (what `db/seeds.rb` /
 # `StarterContent` creates for a fresh install).
 module ContentModel
   class ContentTypeDefinition < Definition
-    dsl_attribute :color
     dsl_attribute :list_component
     dsl_attribute :detail_component
 

@@ -72,7 +72,7 @@ class Audit::EventTest < ActiveSupport::TestCase
     assert_equal asset, legacy_event.subject
   end
 
-  test "scopes: for_subject, by_user and recent" do
+  test "scopes: for_subject and by_user" do
     other_post = create_post(title: "Other")
     travel 1.minute do
       Current.actor = users(:two)
@@ -84,7 +84,6 @@ class Audit::EventTest < ActiveSupport::TestCase
     ours = Audit::Event.where(id: [ @event.id, @newer.id ])
     assert_equal [ @event ], ours.for_subject(@event.subject).to_a
     assert_equal [ @newer ], Audit::Event.by_user(users(:two)).to_a
-    assert_equal [ @newer, @event ], ours.recent.to_a
   end
 
   test "occurrences may be updated by the model and by raw SQL, like the coalescing columns" do

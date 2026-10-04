@@ -260,13 +260,12 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='subject_type=User'][href*='subject_id=#{users(:two).id}']", text: "Activity"
   end
 
-  # Fix round 1 review: `Admin::AuditEventsHelper#audit_subject_path` asks
-  # `can?("pages.read", event.subject)` per row for a Page subject -- for
-  # a viewer whose `pages.read` grant is scoped by branch (`page_ids`),
-  # that used to cost its own closure-table query every time
-  # (`Checker#branch_ids`). `Admin::AuditEventsController#preload_page_
-  # branches` batches that into one `AccessControl.preload_branches` call
-  # per index request, so the query count for the same viewer's page
+  # Whether a Page subject links is "may this viewer read it", and for a
+  # viewer whose `pages.read` grant is scoped by branch (`page_ids`) a
+  # per-row check would cost its own closure-table query every time
+  # (`Checker#branch_ids`). `Audit::Sentence::Targets` resolves every
+  # subject on the page through one read-scoped query per kind instead,
+  # so the query count for the same viewer's page
   # doesn't grow with the number of Page-subject rows on the page --
   # asserted here by comparing two otherwise-identical requests, one with
   # 3 rows and one with 30, isolated from each other by date range so

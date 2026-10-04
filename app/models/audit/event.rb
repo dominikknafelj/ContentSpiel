@@ -26,7 +26,6 @@ module Audit
 
     scope :for_subject, ->(record) { where(subject: record) }
     scope :by_user, ->(user) { where(user_id: user.id) }
-    scope :recent, -> { order(occurred_at: :desc, id: :desc) }
 
     before_update :only_coalescing_columns_changed
     before_destroy { throw :abort }
