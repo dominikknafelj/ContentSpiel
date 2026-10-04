@@ -143,6 +143,9 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     fill_in "Title", with: "Landing v2"
     assert_eventually { @landing.reload.title(locale: :en) == "Landing v2" }
     assert_equal stored.id, @landing.hero_media_asset_id
+    # ...and that successful save did not erase the refusal message: it stays
+    # until the editor acts on the hero field again.
+    assert_selector "#page-hero-image-section", text: "Hero image doesn't exist"
   end
 
   test "Escape closes the picker and returns focus to the button that opened it" do

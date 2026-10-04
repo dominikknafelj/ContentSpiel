@@ -130,6 +130,7 @@ module Admin
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
+      stored_hero_id = @page.hero_media_asset_id
       result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 
       streams = autosave_stream(
@@ -137,7 +138,7 @@ module Admin
         result: result,
         status_id: "page-save-status",
         error_prefix: "page",
-        fields: page_error_fields
+        fields: without_untouched_media_slot(page_error_fields, :hero_image, sent: page_params[:hero_media_asset_id], stored_before: stored_hero_id)
       )
 
       # A refused hero choice puts the field back to the stored hero (and

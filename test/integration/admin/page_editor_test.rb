@@ -108,6 +108,22 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "#editor-notice:empty"
   end
 
+  test "a later save that did not touch the hero leaves its refusal message in place; acting on the hero clears it" do
+    landing = create_page(title: "Landing 2")
+    assert Pages::Save.call(landing, attributes: { page_type: "landing" }).ok?
+    chosen = create_media_asset
+
+    patch admin_page_path(landing), params: { page: { subtitle: "Other field", hero_media_asset_id: "" }, base_updated_at: landing.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-hero_image-errors']"),
+      "a save that sent the stored hero unchanged must not rewrite the hero's error slot"
+
+    patch admin_page_path(landing), params: { page: { hero_media_asset_id: chosen.id.to_s }, base_updated_at: landing.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-hero_image-errors']"),
+      "changing the hero is acting on the field: its slot is rewritten"
+  end
+
   test "the refusal also clears a lingering failed-save toast for the form" do
     page = create_page(title: "About 4")
     stale = page.updated_at.iso8601(6)

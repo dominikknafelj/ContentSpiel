@@ -76,6 +76,7 @@ module Admin
         reload_url: admin_page_path(@page, **admin_url_options))
 
       attributes, translations = split_block_params(block)
+      stored_asset_id = block.media_asset_id
       result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
       streams = autosave_stream(
@@ -83,7 +84,7 @@ module Admin
         result: result,
         status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
         error_prefix: Admin::BlockCardComponent.error_prefix(block),
-        fields: block_error_fields(block)
+        fields: without_untouched_media_slot(block_error_fields(block), "image", sent: attributes[:media_asset_id], stored_before: stored_asset_id)
       )
 
       # A refused image choice puts the field back to the stored image (and
