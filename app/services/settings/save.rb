@@ -23,8 +23,8 @@ module Settings
   # The AI settings (`ai_provider`, `ai_model`, `ai_api_key`, translation
   # helpers spec §6.2) are plain `attributes` too, one value for the whole
   # site; what a blank key or "Remove key" means is the Settings screen's
-  # to decide (`Admin::SettingsController#assign_ai_key`) -- here, nil
-  # clears the key like any other attribute.
+  # to decide (`Admin::AiKeysController`, the key's own Save key / Remove
+  # key forms) -- here, nil clears the key like any other attribute.
   #
   # `languages:` (decision D5) is CS Studio's path for the language order and
   # each language's fallback: the complete ordered `[{ "code", "fallbacks" }]`
@@ -84,11 +84,15 @@ module Settings
 
       language_errors = []
       saved = SiteSetting.transaction do
-        # A languages-only call never touches the site fields: saving the row
-        # first would run its validations (a row invalid for an unrelated
-        # reason would block a reorder with errors this actor can't fix),
-        # normalise columns and record a `settings.updated` for an actor who
-        # may not hold `settings.manage`.
+        # A languages-only call never ASSIGNS a site field: saving the row
+        # here first would normalise columns and record a `settings.updated`
+        # for an actor who may not hold `settings.manage`. The row is still
+        # saved once, by `Locales::Configure#apply` below (for its `locales`),
+        # and that save validates the whole row: a stored value that is
+        # validated only when it changes (the time zone, the AI provider, the
+        # social links) can't block a reorder, one that is always validated
+        # (a negative retention period written around the model) still does,
+        # with its own message.
         if site_part?
           @site.save || raise(ActiveRecord::Rollback)
           ai_key_change = write_ai_key if @ai_key_given
@@ -119,7 +123,23 @@ module Settings
         end
         true
       end
-      return failure(@site, language_errors) if language_errors.any?
+      if language_errors.any?
+        # The site part (if any) was saved and then rolled back with the
+        # refused language part, and `Configure#apply` left its entries
+        # assigned -- yet `@site` is `Current.site`, the one object everything
+        # rendered after this reads (the 422 re-render, the layout), and it
+        # would go on reporting the rolled-back values as stored: not dirty,
+        # so not even a later save would notice. Reload it, as
+        # `Locales::MakeDefault` does (`restore_attributes` doesn't reach
+        # Mobility's jsonb values, and a reload also drops a pending logo
+        # attachment). The errors survive a reload; what was typed comes back
+        # to the form from the request (`Admin::SettingsScreen::Values`).
+        # A plain validation failure of the site part is NOT reloaded: nothing
+        # was written, so the record is honestly dirty, and its own `errors`
+        # belong to the values still assigned.
+        @site.reload
+        return failure(@site, language_errors)
+      end
       return failure(@site) unless saved
 
       success(@site)

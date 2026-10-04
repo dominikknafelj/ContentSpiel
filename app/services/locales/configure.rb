@@ -12,8 +12,9 @@ module Locales
   #
   # `entries` is the *complete*, ordered replacement for `site.locales` --
   # an ordered Array of `{ "code", "fallbacks" }` (fallbacks optional) --
-  # not a partial patch; the caller (the languages screen's own form) always
-  # submits every enabled language's row together, the same way a content
+  # not a partial patch; the caller (the Settings form's Languages card,
+  # through `Settings::Save`'s `languages:`) always submits every enabled
+  # language's row together, the same way a content
   # block's own `ContentBlocks::Reorder` is handed the complete new order
   # rather than a delta.
   class Configure < ApplicationService

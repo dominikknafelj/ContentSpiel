@@ -27,14 +27,14 @@ module Admin
     # tiers: the default language, then every other enabled one.
     def create
       code = params[:code].to_s
-      redirect_after(Locales::Enable.call(code), "#{Locales.name(code, native: true)} added")
+      redirect_after("#{Locales.name(code, native: true)} added") { Locales::Enable.call(code) }
     end
 
     # Turn off. The service refuses the default (and is the one place that rule
     # lives); the card just never shows the button for it.
     def destroy
       code = params[:id].to_s
-      redirect_after(Locales::Disable.call(code), "#{Locales.name(code, native: true)} turned off")
+      redirect_after("#{Locales.name(code, native: true)} turned off") { Locales::Disable.call(code) }
     end
 
     # Make the language the default. A code that isn't an enabled language is a
@@ -44,18 +44,28 @@ module Admin
       code = params[:id].to_s
       return head(:unprocessable_entity) unless Locales.enabled?(code)
 
-      redirect_after(Locales::MakeDefault.call(code), "#{Locales.name(code, native: true)} is now the default language")
+      redirect_after("#{Locales.name(code, native: true)} is now the default language") { Locales::MakeDefault.call(code) }
     end
 
     private
 
-    def redirect_after(result, notice)
+    # Runs the service (the block) and answers. The services treat a request
+    # for what is already true -- adding an enabled language, turning off one
+    # that isn't on, "making" the default the default -- as a no-op success;
+    # the card never sends one, so it is a forged or a second-tab request, and
+    # it gets the plain redirect: a toast saying "Deutsch added" would report a
+    # change nobody made (and nothing was audited).
+    def redirect_after(notice)
+      before = language_state
+      result = yield
       if result.ok?
-        redirect_to card_path, status: :see_other, notice: notice
+        redirect_to card_path, status: :see_other, notice: (notice unless language_state == before)
       else
         forbidden_or(result) { redirect_to card_path, status: :see_other, alert: result.errors.to_sentence }
       end
     end
+
+    def language_state = [ Current.site.default_locale.to_s, Current.site.locale_codes ]
 
     def card_path = admin_settings_path(**admin_url_options, anchor: "languages")
   end

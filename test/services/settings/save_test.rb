@@ -185,6 +185,11 @@ class Settings::SaveTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert_equal [ "must list exactly the enabled languages" ], result.errors
+    # The object itself, before any reload (final fix wave, S-M2): it is
+    # `Current.site`, read by everything rendered after the refusal.
+    assert_nil Current.site.tagline(locale: "en")
+    assert_equal %w[en de es], Current.site.locale_codes
+    assert_not Current.site.changed?
     assert_nil Current.site.reload.tagline(locale: "en")
     assert_not Audit::Event.exists?(action: "settings.updated")
     assert_not Audit::Event.exists?(action: "language.configured")
@@ -249,14 +254,34 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert_not rebuilt
   end
 
-  test "a languages-only call leaves the site row alone: an unrelated invalid value neither blocks it nor is saved over" do
+  # What "leaves the site fields alone" means, exactly (final fix wave, Task 4):
+  # a languages-only call assigns no site field, normalises none and records no
+  # `settings.updated`. The ROW is still saved -- by `Locales::Configure#apply`,
+  # for its `locales` -- and so still validated as a whole.
+  test "a languages-only call assigns and audits no site field: a stored value only checked when it changes is neither a blocker nor rewritten" do
     grant_to_branch_editors("languages.manage")
+    # `time_zone` is validated (and normalised) only when it changes.
     Current.site.update_columns(time_zone: "Nowhere/Land")
 
     result = as(users(:editor_branch)) { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }
 
     assert result.ok?, result.errors.inspect
+    assert_equal %w[de en es], Current.site.reload.locale_codes
+    assert_equal "Nowhere/Land", Current.site.time_zone
     assert_not Audit::Event.exists?(action: "settings.updated")
+    assert_equal 1, Audit::Event.where(action: "language.configured").count
+  end
+
+  test "a languages-only call is still refused by a stored value that is always validated, and names it" do
+    grant_to_branch_editors("languages.manage")
+    Current.site.update_columns(trash_retention_days: -1)
+
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }
+
+    assert_not result.ok?
+    assert_match(/Trash retention days/, result.errors.to_sentence)
+    assert_equal %w[en de es], Current.site.reload.locale_codes
+    assert_not Audit::Event.exists?(action: %w[settings.updated language.configured])
   end
 
   test "changing the default language through attributes needs languages.manage" do

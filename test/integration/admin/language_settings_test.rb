@@ -102,12 +102,55 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     assert_select "dialog#language-default-dialog-de button[type=submit]", text: "Change default language"
   end
 
+  # Final fix wave (S-M4): the "(N items)" count is a scan of every page, post
+  # and image, so it runs only for a render that shows it -- a `languages.manage`
+  # holder's, with a language to make the default -- and once, however many
+  # dialogs there are. (Not cached: the only key that moves with every stored
+  # translation is `PublicSite.content_version`, which is fifteen aggregate
+  # scans of its own, more than the one query it would save.)
+  test "the item count is queried once when a default dialog renders, and not at all otherwise" do
+    counts = lambda do |&request|
+      seen = 0
+      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+        seen += 1 if payload[:sql].include?("jsonb_path_exists") && payload[:name] != "SCHEMA"
+      end
+      ActiveRecord::Base.uncached(&request)
+      seen
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" }, { "code" => "es" } ])
+    assert_equal 1, counts.call { get "/cs-studio/settings" }
+    assert_select "dialog[id^='language-default-dialog-']", 2
+
+    @site.update!(locales: [ { "code" => "en" } ])
+    assert_equal 0, counts.call { get "/cs-studio/settings" }
+
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+    sign_in_as(user_holding("settings.manage"))
+    assert_equal 0, counts.call { get "/cs-studio/settings" }
+    assert_response :success
+  end
+
   test "the old Languages screen redirects permanently to the card, keeping the query" do
     get "/cs-studio/settings/languages"
     assert_response :moved_permanently
     assert_redirected_to "/cs-studio/settings#languages"
 
     get "/cs-studio/settings/languages?locale=de"
+    assert_redirected_to "/cs-studio/settings?locale=de#languages"
+  end
+
+  # Final fix wave (Task 6 M1): `delete_suffix("/languages")` left a trailing
+  # slash or a format in place, so the 301 pointed at the URL it came from.
+  test "the old Languages screen's redirect also strips a trailing slash or a format, so it can't loop" do
+    get "/cs-studio/settings/languages/"
+    assert_response :moved_permanently
+    assert_redirected_to "/cs-studio/settings#languages"
+
+    get "/cs-studio/settings/languages.html?locale=de"
+    assert_response :moved_permanently
     assert_redirected_to "/cs-studio/settings?locale=de#languages"
   end
 
@@ -153,6 +196,57 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     save_languages([ { code: "en" }, { code: "de", fallback: "en" }, { code: "es" } ])
 
     assert_equal [ "en" ], @site.reload.locale_entry("de")["fallbacks"]
+  end
+
+  # D7, case (b): moving rows changes nothing about a row whose select wasn't
+  # touched -- the posted value is still the stored FIRST entry.
+  test "an order-only change keeps a multi-fallback row's whole list (D7)" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de", "fallbacks" => %w[es en] }, { "code" => "es" } ])
+
+    save_languages([ { code: "es", fallback: "" }, { code: "de", fallback: "es" }, { code: "en" } ])
+
+    assert_response :see_other
+    @site.reload
+    assert_equal %w[es de en], @site.locale_codes
+    assert_equal %w[es en], @site.locale_entry("de")["fallbacks"]
+  end
+
+  test "a forged order with an omitted, duplicate or unknown code is a 422 with the message, and nothing is written" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" }, { "code" => "es" } ])
+    before = @site.reload.locales
+
+    [
+      [ { code: "de" }, { code: "en" } ],
+      [ { code: "de" }, { code: "en" }, { code: "es" }, { code: "de" } ],
+      [ { code: "de" }, { code: "en" }, { code: "es" }, { code: "fr" } ],
+      [ { code: "de" }, { code: "en" }, { code: "xx" } ]
+    ].each do |rows|
+      assert_no_difference -> { Audit::Event.where(action: %w[language.configured settings.updated]).count } do
+        save_languages(rows, trash_retention_days: 3)
+      end
+
+      assert_response :unprocessable_entity, rows.inspect
+      assert_select ".admin-error-summary[role=alert]", text: /must list exactly the enabled languages/
+      assert_equal before, @site.reload.locales
+      assert_equal 30, @site.trash_retention_days
+    end
+  end
+
+  # Final fix wave (S-M2): the site part is saved first and the language part
+  # then refuses, so the transaction rolls back -- but `Current.site`, the one
+  # object the re-render reads, still held the rolled-back values as if they
+  # were stored. What was typed comes back from the params; everything read
+  # from the record must be the stored row.
+  test "a save whose language part is refused re-renders the stored site: the original beside the German fields is not the rolled-back title" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+    Mobility.with_locale(:en) { @site.update!(title: "Stored title") }
+
+    save_languages([ { code: "de" }, { code: "en", fallback: "fr" } ], translations: { "en" => { title: "Typed title" } })
+
+    assert_response :unprocessable_entity
+    assert_select "#settings-en-title[value='Typed title']"
+    assert_select "[data-language-panel='de'] [data-original-for='title'] p", text: "Stored title"
+    assert_equal "Stored title", @site.reload.title(locale: "en")
   end
 
   test "the default's row posts no fallback and keeps whatever it had" do
@@ -300,6 +394,31 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     @site.reload
     assert_equal "de", @site.default_locale.to_s
     assert_equal "Dana's Notes", @site.title(locale: "de")
+  end
+
+  # Final fix wave (Task 6 M6): the services answer a request for what is
+  # already true as a no-op success. The toast must not then claim a change.
+  test "a forged add, turn off or default that changes nothing toasts nothing" do
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de" } ])
+
+    post "/cs-studio/settings/languages", params: { code: "de" }
+    assert_redirected_to "/cs-studio/settings#languages"
+    follow_redirect!
+    assert_not response.body.include?("Deutsch added"), "a toast claims a change"
+    assert_select "#toasts [role=status], #toasts [role=alert]", count: 0
+
+    delete "/cs-studio/settings/languages/fr"
+    assert_redirected_to "/cs-studio/settings#languages"
+    follow_redirect!
+    assert_not response.body.include?("turned off"), "a toast claims a change"
+    assert_select "#toasts [role=status], #toasts [role=alert]", count: 0
+
+    patch "/cs-studio/settings/languages/en/default"
+    assert_redirected_to "/cs-studio/settings#languages"
+    follow_redirect!
+    assert_not response.body.include?("is now the default language"), "a toast claims a change"
+    assert_select "#toasts [role=status], #toasts [role=alert]", count: 0
+    assert_equal %w[en de], @site.reload.locale_codes
   end
 
   test "make default for a language that isn't enabled is 422 and changes nothing" do

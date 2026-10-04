@@ -201,7 +201,7 @@ Rails.application.routes.draw do
     scope "settings", as: "settings" do
       get "languages", to: redirect(status: 301) { |_params, request|
         query = request.query_string.presence
-        "#{request.path.delete_suffix("/languages")}#{"?#{query}" if query}#languages"
+        "#{request.path.sub(%r{/languages(?:/|\.[^/]*)?\z}, "")}#{"?#{query}" if query}#languages"
       }, as: :languages_screen
       resources :languages, only: %i[create destroy]
       patch "languages/:id/default", to: "languages#make_default", as: :default_language
