@@ -135,6 +135,27 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_nil @site.read_attribute(:title)["de"]
   end
 
+  test "a refused English title opened on the German tab shows the English panel, and the form keeps that tab" do
+    with_locales(%w[en de], default: "en")
+
+    save translations(en: { title: "" }, de: { title: "Danas Notizen" }), locale: "de"
+
+    assert_response :unprocessable_entity
+    assert_select "[data-language-panel='en']:not([hidden]) input#settings-en-title"
+    assert_select "[data-language-panel='de'][hidden]"
+    assert_select "button[role=tab][aria-selected='true']", text: "English"
+    assert_select "input[type=hidden][name=locale][value='en']"
+  end
+
+  test "a refusal elsewhere keeps the tab the editor was on" do
+    with_locales(%w[en de], default: "en")
+
+    save({ trash_retention_days: -1 }, locale: "de")
+
+    assert_response :unprocessable_entity
+    assert_select "[data-language-panel='de']:not([hidden])"
+  end
+
   test "a blank German title is fine: only the default language's title is required" do
     with_locales(%w[en de], default: "en")
     translate_site(title: "Danas Notizen")
@@ -213,6 +234,24 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "#settings-social-links [data-admin--repeat-rows-target=list] input[name$='[name]']", 2
     assert_select "#settings-social-links input[value='GitHub']"
     assert_select "#settings-social-links input[value='https://example.org/blog']"
+  end
+
+  test "a single blank row, what removing the last link leaves, clears the stored links" do
+    @site.update!(social_links: { "GitHub" => "https://github.com/dana" })
+
+    save social_links: { "0" => { name: "", url: "" } }
+
+    assert_response :see_other
+    assert_equal({}, @site.reload.social_links.to_h)
+  end
+
+  test "a forged social_links shape is ignored, never a 500" do
+    @site.update!(social_links: { "GitHub" => "https://github.com/dana" })
+
+    patch "/cs-studio/settings", params: { site_setting: { social_links: { name: "x", url: "y" } }, base_updated_at: base }
+
+    assert_includes [ 303, 422 ], response.status
+    assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links.to_h)
   end
 
   test "with no social links the form shows one empty row" do
@@ -310,6 +349,42 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "input[name=base_updated_at][value=?]", stale
     assert_equal "First", @site.reload.title
     assert_equal 30, @site.trash_retention_days
+  end
+
+  # -- the key's instant action and the form's base (I2) ------------------------
+
+  def save_key(carried_base, key = "sk-ant-new-key")
+    patch "/cs-studio/settings/ai_key", params: { site_setting: { ai_api_key: key }, main_base_updated_at: carried_base }, as: :turbo_stream
+  end
+
+  test "a key save on a current base moves the base on, and the next Save succeeds" do
+    carried = base
+    save_key(carried)
+
+    assert_response :success
+    assert_select "turbo-stream[target='settings-base-updated-at']"
+    moved = @site.reload.updated_at.iso8601(6)
+    patch "/cs-studio/settings", params: { site_setting: translations(en: { title: "After key" }), base_updated_at: moved }
+    assert_response :see_other
+  end
+
+  test "a key save from a stale form leaves the base alone, so the next Save is still a 409" do
+    stale = base
+    save translations(en: { title: "Other tab" })
+    save_key(stale)
+
+    assert_response :success
+    assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
+    patch "/cs-studio/settings", params: { site_setting: translations(en: { title: "Mine" }), base_updated_at: stale }
+    assert_response :conflict
+  end
+
+  test "pressing Save key with an empty field moves nothing" do
+    carried = base
+    save_key(carried, "")
+
+    assert_response :success
+    assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
   end
 
   test "a blank or unparseable base is not stale" do

@@ -55,7 +55,7 @@ module Admin
           if submitted&.key?(:social_links)
             raw = submitted[:social_links]
             raw = raw.to_h.sort_by { |index, _| index.to_i }.map(&:last) unless raw.is_a?(Array)
-            raw.map { |row| [ row[:name].to_s, row[:url].to_s ] }
+            raw.select { |row| row.respond_to?(:key?) }.map { |row| [ row[:name].to_s, row[:url].to_s ] }
           else
             site.social_links.to_a
           end

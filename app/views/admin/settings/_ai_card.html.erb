@@ -1,4 +1,4 @@
-<%# locals: site_setting, values, errors -- the AI translation card (translation
+<%# locals: site_setting, values, provider_errors, model_errors -- the AI translation card (translation
     helpers spec §6.2; round 3's Task 7 rebuilds it). Provider and model are
     pending fields of the Settings form like any other. The API key and Test
     connection are instant actions of their own, associated with the forms in
@@ -21,13 +21,13 @@
         <%= label_tag "settings-ai_provider", "Provider", class: setup_label_class %>
         <%= select_tag "site_setting[ai_provider]", options_for_select(provider_names, values.ai_provider),
               include_blank: "None (AI translation off)", id: "settings-ai_provider", class: setup_select_class %>
-        <%= render "admin/shared/field_errors", id: "settings-ai_provider-errors", messages: errors.grep(/provider/i) %>
+        <%= render "admin/shared/field_errors", id: "settings-ai_provider-errors", messages: provider_errors %>
       </div>
       <div class="admin-column" data-field-name="ai_model">
         <%= label_tag "settings-ai_model", "Model", class: setup_label_class %>
         <%= text_field_tag "site_setting[ai_model]", values.ai_model, placeholder: ::AI::DEFAULT_MODEL, id: "settings-ai_model",
               autocomplete: "off", spellcheck: false, class: setup_input_class %>
-        <%= render "admin/shared/field_errors", id: "settings-ai_model-errors", messages: errors.grep(/model/i) %>
+        <%= render "admin/shared/field_errors", id: "settings-ai_model-errors", messages: model_errors %>
       </div>
     </div>
 

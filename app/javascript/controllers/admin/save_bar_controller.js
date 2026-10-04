@@ -474,6 +474,10 @@ export default class extends Controller {
 
   get changes() {
     const now = this.snapshot()
-    return Object.keys({ ...this.initial, ...now }).filter((key) => this.initial[key] !== now[key]).length
+    // An absent key and an empty string are the same value: a blank row added
+    // to a list (`name#1` appears, empty) is nothing the editor changed yet.
+    // For a checkbox the absent key is "unticked" and any present one "on", so
+    // the two still differ.
+    return Object.keys({ ...this.initial, ...now }).filter((key) => (this.initial[key] ?? "") !== (now[key] ?? "")).length
   }
 }

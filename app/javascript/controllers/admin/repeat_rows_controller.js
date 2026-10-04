@@ -27,6 +27,15 @@ export default class extends Controller {
   remove(event) {
     const row = event.currentTarget.closest("[data-admin--repeat-rows-target='row']")
     if (!row) return
+    // The last row is cleared, not removed: one empty row is the "none" state,
+    // and without it the form would post no rows at all, which the server
+    // reads as "not touched" -- the removed link would stay stored.
+    if (this.rowTargets.length === 1) {
+      row.querySelectorAll("input").forEach((input) => { input.value = "" })
+      row.querySelector("input")?.focus()
+      this.changed()
+      return
+    }
     const following = row.nextElementSibling || row.previousElementSibling
     row.remove()
     ;(following?.querySelector("input") || this.element.querySelector("[data-action~='admin--repeat-rows#add']"))?.focus()

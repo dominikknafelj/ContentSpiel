@@ -13,6 +13,7 @@
     (409): `@submitted` holds what was typed, so every field shows that and
     nothing is lost (`Admin::SettingsScreen::Values`). %>
 <% content_for :title, "Settings" %>
+<% tab = @tab_locale || admin_locale %>
 <% manage_settings = can?("settings.manage") %>
 <% manage_languages = can?("languages.manage") %>
 <% values = Admin::SettingsScreen::Values.new(site: @site_setting, submitted: @submitted) %>
@@ -44,21 +45,21 @@
       <%= form_with url: admin_settings_path, method: :patch, id: "settings-form", multipart: true, class: "flex flex-col gap-5",
             data: save_bar_form_data(dirty: @stale || @errors.present?) do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "settings-base-updated-at", value: base } %>
-        <%= hidden_field_tag :locale, admin_locale, id: nil if admin_locale != Locales.default %>
 
-        <%= render Admin::SettingsScreen::SiteCardComponent.new(site_setting: @site_setting, values: values, locale: admin_locale,
+        <%= render Admin::SettingsScreen::SiteCardComponent.new(site_setting: @site_setting, values: values, locale: tab,
               errors: (@errors if @errors.respond_to?(:full_messages_for))) %>
         <% if manage_languages %><%= render "admin/settings/languages_card" %><% end %>
         <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
               errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
+        <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
         <%= render "admin/settings/ai_card", site_setting: @site_setting, values: values,
-              errors: (@errors.full_messages_for(:ai_provider) + @errors.full_messages_for(:ai_model) if @errors.respond_to?(:full_messages_for)).to_a %>
+              provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model) %>
 
         <%= render Admin::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
       <% end %>
 
       <%# Forms of their own, outside the one above (see the comment at the top). %>
-      <div id="settings-ai-key-forms"><%= render "admin/settings/ai_key_forms", site_setting: @site_setting %></div>
+      <div id="settings-ai-key-forms"><%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %></div>
     <% elsif manage_languages %>
       <%= render "admin/settings/languages_card" %>
     <% end %>

@@ -19,7 +19,7 @@ import { Controller } from "@hotwired/stimulus"
 // the empty fields of the language that is visible, and which one that is
 // just changed.
 export default class extends Controller {
-  static targets = [ "tab", "panel" ]
+  static targets = [ "tab", "panel", "locale" ]
   static values = { current: String }
 
   connect() {
@@ -28,6 +28,18 @@ export default class extends Controller {
 
   select(event) {
     this.show(event.currentTarget.dataset.code)
+  }
+
+  // A link to a field on this screen (the error summary's) may name one inside
+  // a hidden panel, which can't take focus: show its panel first. This listens
+  // on `document`'s click, which runs before Turbo turns the click into the
+  // `turbo:click` the save footer answers with its own focus jump.
+  reveal(event) {
+    const link = event.target instanceof Element && event.target.closest("a[href^='#']")
+    if (!link || link.getAttribute("href").length < 2) return
+    const target = document.getElementById(decodeURIComponent(link.getAttribute("href").slice(1)))
+    const panel = target?.closest("[data-language-panel][hidden]")
+    if (panel && this.element.contains(panel)) this.show(panel.dataset.languagePanel)
   }
 
   keydown(event) {
@@ -42,6 +54,9 @@ export default class extends Controller {
 
   show(code, { announce = true } = {}) {
     this.currentValue = code
+    // The form's `locale` (a hidden field, not counted by the footer) follows
+    // the tab, so a Save or a refused one comes back on the tab being looked at.
+    if (this.hasLocaleTarget) this.localeTarget.value = code
     this.tabTargets.forEach((tab) => {
       const selected = tab.dataset.code === code
       tab.setAttribute("aria-selected", String(selected))

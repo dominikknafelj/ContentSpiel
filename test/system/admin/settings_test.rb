@@ -46,7 +46,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     # A social link row added is counted, and removed it is not.
     click_on "+ Add link"
-    assert_selector footer, text: /[2-9] unsaved changes/i
+    assert_selector footer, text: /\b1 unsaved change/i # a blank row is nothing yet
     page.all("[data-admin--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
     assert_selector footer, text: /\b1 unsaved change/i
     assert_equal 1, page.all("[data-admin--repeat-rows-target=list] input[name$='[name]']").size
@@ -111,5 +111,48 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_equal entries, page.evaluate_script("history.length")
     assert_equal "Typed, then jump", find_field("settings-en-title").value
     assert_equal "ai", page.evaluate_script("document.activeElement.id")
+  end
+
+  test "a blank social row counts nothing, a typed label counts one" do
+    visit admin_settings_path
+    await_admin_controllers
+
+    click_on "+ Add link"
+    assert_selector footer, text: /No unsaved changes/i
+    page.all("[data-admin--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
+    assert_selector footer, text: /\b1 unsaved change/i
+  end
+
+  test "removing the only social link, then Save, deletes it" do
+    site_settings(:default).update!(social_links: { "GitHub" => "https://github.com/dana" })
+    visit admin_settings_path
+    await_admin_controllers
+
+    find("button[aria-label='Remove link']").click
+    assert_selector footer, text: /unsaved change/i
+    assert_field "settings-social-0-name", with: ""
+    click_on "Save"
+    assert_selector "#toasts .admin-toast", text: "Settings saved"
+    assert_equal({}, site_settings(:default).reload.social_links.to_h)
+    visit admin_settings_path
+    assert_field "settings-social-0-name", with: ""
+  end
+
+  test "the error summary's link reveals the hidden panel and focuses the field" do
+    visit "#{admin_settings_path}?locale=de"
+    await_admin_controllers
+    fill_in "settings-de-title", with: "Danas Notizen"
+    click_on "English"
+    fill_in "settings-en-title", with: ""
+    click_on "Deutsch"
+    click_on "Save"
+
+    assert_selector ".admin-error-summary a[href='#settings-en-title']"
+    assert_selector "#settings-en-title"
+    click_on "Deutsch"
+    assert_no_selector "#settings-en-title"
+    find(".admin-error-summary a[href='#settings-en-title']").click
+    assert_selector "#settings-en-title"
+    assert_equal "settings-en-title", page.evaluate_script("document.activeElement.id")
   end
 end

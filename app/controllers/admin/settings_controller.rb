@@ -60,6 +60,7 @@ module Admin
         @site_setting = site
         @submitted = permitted
         @stale = true
+        @tab_locale = admin_locale
         return render(:show, status: :conflict)
       end
 
@@ -73,6 +74,7 @@ module Admin
           @site_setting = site
           @submitted = permitted
           @errors = site.errors.any? ? site.errors : result.errors
+          @tab_locale = tab_for_errors(site.errors)
           render :show, status: :unprocessable_entity
         end
       end
@@ -99,18 +101,28 @@ module Admin
     # the next Save look stale. Round 3's Task 7 rebuilds this card.
     def ai_key
       site = Current.site
+      before = site.updated_at
+      carried = params[:main_base_updated_at]
       attributes = {}
       key = params.dig(:site_setting, :ai_api_key).to_s
       attributes["ai_api_key"] = key if key.present?
       attributes["ai_api_key"] = nil if ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_ai_key)) && key.blank?
 
       result = attributes.any? ? Settings::Save.call(site, attributes: attributes) : nil
+      site.reload
+      # The main form's base moves on only when this request wrote something AND
+      # the base the form carried was still current before the write -- the rule
+      # the editors use for a block's answer. A key save from a stale tab must
+      # neither unlock its Save nor cancel a 409 it was already shown, and a
+      # press that wrote nothing (an empty field) moves nothing.
+      move_base = site.updated_at != before && !base_older_than?(before, carried)
+      main_base = move_base ? site.updated_at.iso8601(6) : (carried.presence || before.iso8601(6))
       streams = [
         turbo_stream.replace("#{ID_PREFIX}-ai-key-section", partial: "admin/settings/ai_key_field", locals: { site_setting: site }),
-        turbo_stream.replace("#{ID_PREFIX}-ai-key-forms", partial: "admin/settings/ai_key_forms", locals: { site_setting: site }),
-        turbo_stream.replace("#{ID_PREFIX}-base-updated-at", partial: "admin/shared/base_updated_at_field",
-          locals: { id: "#{ID_PREFIX}-base-updated-at", value: site.reload.updated_at.iso8601(6), name: "base_updated_at", form: "#{ID_PREFIX}-form" })
+        turbo_stream.replace("#{ID_PREFIX}-ai-key-forms", partial: "admin/settings/ai_key_forms", locals: { site_setting: site, main_base: main_base })
       ]
+      streams << turbo_stream.replace("#{ID_PREFIX}-base-updated-at", partial: "admin/shared/base_updated_at_field",
+        locals: { id: "#{ID_PREFIX}-base-updated-at", value: main_base }) if move_base
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: result.errors.to_sentence, kind: :error)) if result && !result.ok?
 
       render turbo_stream: streams, status: (result && !result.ok? ? (result.denied? ? :forbidden : :unprocessable_entity) : :ok)
@@ -122,10 +134,12 @@ module Admin
     # (`AutosaveResponses#stale_base?`, which is private to autosave): the
     # row as just loaded is newer than the base the form carried. Blank or
     # unparseable is not stale -- non-JS and scripted clients never send one.
-    def stale?(site, base)
+    def stale?(site, base) = base_older_than?(site.updated_at, base)
+
+    def base_older_than?(updated_at, base)
       return false if base.blank?
 
-      Time.iso8601(base) < site.updated_at
+      Time.iso8601(base) < updated_at
     rescue ArgumentError
       false
     end
@@ -138,7 +152,7 @@ module Admin
       attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model).to_h
       attributes = drop_blank_file_params(attributes, fields: %w[logo])
       attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(permitted[:remove_logo])
-      attributes["social_link_rows"] = social_link_rows(permitted[:social_links]) if permitted.key?(:social_links)
+      attributes["social_link_rows"] = social_link_rows(permitted[:social_links]) if rows_posted?(permitted[:social_links])
 
       translated = (permitted[:translations]&.to_h || {}).transform_values { |fields| fields.slice(*Settings::Save::TRANSLATED.map(&:to_s)) }.reject { |_, fields| fields.empty? }
       [ attributes, translated ]
@@ -146,9 +160,24 @@ module Admin
 
     # `social_links[0][name]`-style rows arrive as a hash keyed by row number
     # (or, from a scripted client, a plain array); either way, row order.
+    # Rows are an array, or a hash keyed by row number; any other shape (a forged
+    # `social_links[name]=x`) is not rows at all, and leaves the stored links be.
+    def rows_posted?(rows)
+      rows.is_a?(Array) || (rows.respond_to?(:keys) && rows.keys.any? && rows.keys.all? { |key| key.to_s.match?(/\A\d+\z/) })
+    end
+
     def social_link_rows(rows)
       rows = rows.respond_to?(:values) && !rows.is_a?(Array) ? rows.to_h.sort_by { |index, _| index.to_i }.map(&:last) : Array(rows)
-      rows.map { |row| row.to_h.symbolize_keys }
+      # Only rows that are hashes: a forged `social_links[name]=x` is a hash of
+      # strings, not of rows.
+      rows.grep(Hash).map { |row| row.to_h.symbolize_keys }
+    end
+
+    # The tab to show after a refusal: the language of the first error that
+    # belongs to a translated field (the title rule is the default language's),
+    # else the tab the editor was on (`locale`, kept current by `admin--settings-tabs`).
+    def tab_for_errors(errors)
+      errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
     end
 
     def ai_test_result_stream(message:, ok:)

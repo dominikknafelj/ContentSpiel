@@ -1,10 +1,12 @@
-<%# locals: site_setting -- the forms of the AI card's instant actions, kept
+<%# locals: site_setting, main_base -- the forms of the AI card's instant actions, kept
     OUTSIDE the Settings form (forms can't nest; a dialog's form can't be
     inside one either). The card's controls reach them by `form=`. Replaced as
     one element by a key save (`Admin::SettingsController#ai_key`). %>
 <%= form_with method: :post, id: "settings-ai-test-form", html: { class: "hidden" },
       data: { controller: "admin--busy" }, url: test_ai_connection_admin_settings_path do end %>
-<%= form_with url: ai_key_admin_settings_path, method: :patch, id: "settings-ai-key-form", html: { class: "hidden" } do end %>
+<%= form_with url: ai_key_admin_settings_path, method: :patch, id: "settings-ai-key-form", html: { class: "hidden" } do %>
+  <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
+<% end %>
 
 <% if site_setting.ai_api_key_set? %>
   <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: "settings-ai-remove-key-dialog", title: "Remove the API key?",
@@ -12,6 +14,7 @@
     <% dialog.with_confirm_action do %>
       <%= form_with url: ai_key_admin_settings_path, method: :patch do %>
         <%= hidden_field_tag "site_setting[remove_ai_key]", "1", id: nil %>
+        <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
         <%= render Admin::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
       <% end %>
     <% end %>
