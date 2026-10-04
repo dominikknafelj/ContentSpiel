@@ -375,22 +375,32 @@ class Admin::AuditLogScreenTest < ActionDispatch::IntegrationTest
   # The event is found whatever the filter says; outside it, the answer is
   # the event's own filter-free address (where Older/Newer walk the whole log).
   test "an event outside the filters redirects to its filter-free permalink; only a missing id is a 404" do
-    one = event(Time.current)
+    older = event(2.minutes.ago)
+    one = event(1.minute.ago)
+    newer = event(Time.current)
 
     get "/cs-studio/audit_events/#{one.id}", params: { channel: "mcp" }
     assert_redirected_to "/cs-studio/audit_events/#{one.id}"
     follow_redirect!
     assert_response :success
+    # The permalink carries no filter, and neither does any link on it.
     assert_select "a[href='/cs-studio/audit_events']", text: "Audit log"
+    assert_select "a[href='/cs-studio/audit_events/#{older.id}']", text: /Older event/
+    assert_select "a[href='/cs-studio/audit_events/#{newer.id}']", text: /Newer event/
+    assert_select "a[href*='channel=']", count: 0
 
     travel_to 2.days.from_now do
       get "/cs-studio/audit_events/#{one.id}", params: { range: "today", locale: "de" }
       assert_redirected_to "/cs-studio/audit_events/#{one.id}?locale=de"
     end
 
-    # Inside its filters it renders, filters kept.
-    get "/cs-studio/audit_events/#{one.id}", params: { channel: "admin" }
+    # Inside its filters it renders where it was asked for, and every link on
+    # the page keeps them: back to the list, Older and Newer.
+    get "/cs-studio/audit_events/#{one.id}", params: { channel: "admin", event_action: "test.screen" }
     assert_response :success
+    assert_select "a[href^='/cs-studio/audit_events?'][href*='channel=admin'][href*='event_action=test.screen']", text: "Audit log"
+    assert_select "a[href^='/cs-studio/audit_events/#{older.id}?'][href*='channel=admin'][href*='event_action=test.screen']", text: /Older event/
+    assert_select "a[href^='/cs-studio/audit_events/#{newer.id}?'][href*='channel=admin'][href*='event_action=test.screen']", text: /Newer event/
 
     get "/cs-studio/audit_events/0", params: { channel: "mcp" }
     assert_response :not_found
