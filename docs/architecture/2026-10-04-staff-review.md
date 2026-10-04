@@ -317,7 +317,15 @@ What exists: one application cache (the rich-text body render, `app/models/rich_
 - **Deploy-time, not a setting:** the asset host and where Active Storage serves images from (C2). Those are infrastructure choices made with the deploy, like the encryption keys.
 - Later, if a CDN supports it: `Cache-Tag` / `Surrogate-Key` headers per page, so a purge can be narrower than the whole site.
 
-Order: S7's version row and S8, then C1 with C6, then C7's lifetime setting, C2, C3, and C4 as C7's CDN provider.
+### C8. A longer cache lifetime for individual pages — requested by the user
+- Some pages are effectively static (imprint, privacy, an about page) and can be held by shared caches far longer than the site default.
+- Shape: a per-page "Cache lifetime" in the page settings, offered as presets rather than raw seconds: *Site default* (C7's value), *1 hour*, *1 day*, *1 week*, *Never cache*. Stored as a nullable `pages.cache_lifetime` (nil = site default). It is the same in every language, so on a translation tab it sits in "Shared fields". A post uses its listing page's value.
+- **Only the shared lifetime (`s-maxage`) is raised; the browser keeps revalidating (`max-age=0`).** A proxy or CDN can be purged by C6 and C7; a visitor's browser cache cannot, so a long browser lifetime could never be taken back.
+- The Rails-side page cache (C1) is unaffected: it is keyed on the site version and is always exact. This setting only governs what leaves the server.
+- What the editor is opting into, and the screen should say so: until the lifetime expires or the cache is cleared, a shared cache may show the page as it was, including its navigation (a renamed page elsewhere) and anything scheduled.
+- Guard rails worth having: warn, or cap at the site default, when the page has a post-list block or a scheduled go-live below it, since those change without the page being edited. With a CDN provider configured (C7), a publish purges and the long lifetime is safe; without one, only Clear cache or expiry refreshes it, and the hint should differ accordingly.
+
+Order: S7's version row and S8, then C1 with C6, then C7's lifetime setting with C8, C2, C3, and C4 as C7's CDN provider.
 
 ## 10. Checked and found sound
 
