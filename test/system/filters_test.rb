@@ -34,4 +34,28 @@ class FiltersSystemTest < ApplicationSystemTestCase
     assert_no_text "Alpine notes", wait: 5
     assert_text "Beach holiday"
   end
+
+  # A keyboard user stepping through a select's options submits on every
+  # change; the reload must hand focus back to the select, or each arrow
+  # press would throw them to the top of the page. The same holds for any
+  # other control without a caret (a number or date field).
+  test "a select filter keeps focus after it applies" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    create_post(title: "Alpine notes")
+    create_post(title: "Beach holiday", published: false)
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/posts"
+    await_admin_controllers
+    assert_text "Alpine notes"
+
+    status = find_field("Status")
+    status_id = status[:id]
+    assert status_id.present?
+    page.execute_script("document.getElementById(arguments[0]).focus()", status_id)
+    select "Draft", from: "Status"
+    assert_no_text "Alpine notes", wait: 5
+    assert_text "Beach holiday"
+    assert_equal status_id, page.evaluate_script("document.activeElement.id"), "the select keeps focus"
+  end
 end
