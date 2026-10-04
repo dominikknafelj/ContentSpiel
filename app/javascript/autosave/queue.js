@@ -32,7 +32,9 @@
 // starts until the queue is empty. Three kinds of thing replace an editor:
 // - a Turbo visit (a sidebar link, a locale switch, Reload);
 // - the editor header's actions (Publish, Unpublish, Schedule, Move to trash,
-//   which redirect);
+//   which redirect), and any other Turbo form submission made while something
+//   is outstanding (the Undo toast's button, New page / New post, sign out):
+//   see "TURBO FORM SUBMISSIONS" at the end of this file;
 // - a Turbo FRAME navigation inside `#content` (the page tree's links, the
 //   header's breadcrumb, its menu's Activity link). Turbo fetches and RENDERS
 //   the frame first and only then proposes the promoted visit, so by
@@ -112,9 +114,6 @@ let tail = Promise.resolve()
 let frameRenders = 0
 const retired = new WeakSet()
 let queued = 0
-// Set while an editor header action's own submission is on its way (see
-// `beginAction`).
-let actionInFlight = false
 const forms = new Set()
 
 // The page a controller was rendered on: read in `connect()`, handed back to
@@ -306,29 +305,26 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
 // Two visits are never held, because holding one means issuing it again with
 // `Turbo.visit(url)`, and each of them arrives WITH the answer Turbo already
 // fetched -- a second fetch of a page that is, or is about to be, on screen:
-// - the redirect that answers an editor header action (`actionInFlight`). The
-//   flash -- the "Moved to trash · Undo" toast -- was spent on the first
-//   fetch. (An edit that lands between that submission and its answer is the
-//   price: its save belongs to the page being replaced.) The flag is spent on
-//   the first visit it lets through, so it never excuses a second one;
+// - the redirect that answers a Turbo form submission (`answeredVisit`, see
+//   "TURBO FORM SUBMISSIONS" below). The flash -- the "Moved to trash · Undo"
+//   toast, "Restored …" -- was spent on the first fetch;
 // - the visit a `#content` frame navigation is promoted to (`promotedVisit`,
 //   the frame's own URL, set as the frame is let render below). It replaces
 //   nothing: the frame has rendered. Held, the page a tree link had just
 //   loaded was loaded a second time, and the old page's answer drawn into it
 //   in between (review B, M1). Normally nothing is outstanding by then anyway
-//   -- the frame's render waited for the drain. Spent on the next visit,
-//   whichever it is.
+//   -- the frame's render waited for the drain.
+// Both are the URL that visit will have, and both are spent on the next
+// `turbo:before-visit`, whichever visit it is: neither can excuse a later one.
 let reentry = false
 let promotedVisit = null
+let answeredVisit = null
 const absolute = (url) => { try { return new URL(url, document.baseURI).href } catch { return null } }
 document.addEventListener("turbo:before-visit", (event) => {
-  const promoted = promotedVisit
+  const expected = [ promotedVisit, answeredVisit ]
   promotedVisit = null
-  if (promoted && promoted === absolute(event.detail.url)) return
-  if (actionInFlight) {
-    actionInFlight = false
-    return
-  }
+  answeredVisit = null
+  if (expected.includes(absolute(event.detail.url))) return
   if (reentry || event.defaultPrevented || !busy()) return
 
   event.preventDefault()
@@ -374,20 +370,50 @@ document.addEventListener("turbo:before-frame-render", (event) => {
   })
 })
 
-// `admin--queue-hold` brackets a header action's real submission with these:
-// `beginAction()` as it lets the submit through, `endAction()` when the
-// submission ends without a redirect to follow (aborted, failed, refused).
-// After a redirect the flag has to outlive `turbo:submit-end`, which Turbo
-// dispatches BEFORE it proposes the redirect's visit
-// (`Navigator#formSubmissionSucceededWithResponse` awaits the body first), so
-// it is dropped by that visit's own `turbo:before-visit` above, and at the
-// latest by the next render -- any render: it cannot stick past the page.
-export function beginAction() { actionInFlight = true }
-export function endAction() { actionInFlight = false }
+// TURBO FORM SUBMISSIONS (final fix wave 1, ledger q1). A Turbo form
+// submission made from a screen with autosave forms may replace the editor
+// (most answer with a redirect), so the rule applies to every one of them, in
+// two halves -- generally, not form by form:
+//
+// 1. It is not SENT while anything is outstanding. `turbo:before-fetch-request`
+//    for a non-GET request is held until `drained()`, then resumed whatever
+//    the outcome, after `DRAIN_LIMIT_MS` at the latest. On `window`, so it
+//    runs after every listener on an element or on `document`: a request
+//    `holdTurboRequest` already took (block add/duplicate/delete, the reorder
+//    and tree Undo toasts -- which also need the page base) is
+//    `defaultPrevented` by then and left to it. The editor header's five
+//    actions drain earlier still, at `submit` (`admin--queue-hold`), because
+//    they also refuse to run after an unclean drain; this half only catches
+//    what lands between their drain and their request.
+//
+// 2. The visit its redirect ends in is not HELD. Turbo proposes that visit
+//    with the answer it already has (`Navigator
+//    #formSubmissionSucceededWithResponse`); held by the handler above it
+//    would be issued again and fetched a second time, the flash spent on the
+//    first. `turbo:submit-end` is dispatched BEFORE the visit is proposed
+//    (the navigator awaits the body first), so the redirect's final URL is
+//    noted there (`answeredVisit`) and that one visit let through. An edit
+//    that lands between the submission and its answer is the price: its save
+//    belongs to the page being replaced (sent if it was already on its way,
+//    dropped if it was still inside its debounce).
+//    The note cannot stick: it is replaced by every submission's end, spent
+//    by the next `turbo:before-visit`, and dropped by the next render.
+window.addEventListener("turbo:before-fetch-request", (event) => {
+  if (event.defaultPrevented || !busy()) return
+  if (String(event.detail.fetchOptions?.method || "GET").toUpperCase() === "GET") return
+
+  event.preventDefault()
+  drained().then(() => event.detail.resume())
+})
+
+document.addEventListener("turbo:submit-end", (event) => {
+  const { success, fetchResponse } = event.detail
+  answeredVisit = success && fetchResponse?.redirected ? absolute(fetchResponse.location) : null
+})
 
 // See "WHAT A GENERATION IS": the body Turbo is about to replace is retired
 // now, a moment before the swap.
 document.addEventListener("turbo:before-render", () => {
   if (Turbo.navigator?.currentVisit?.willRender === true) retired.add(document.body)
-  actionInFlight = false
+  answeredVisit = null
 })

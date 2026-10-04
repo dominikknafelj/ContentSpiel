@@ -473,6 +473,47 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_no_selector "#toasts .admin-toast"
   end
 
+  # The same holds for ANY Turbo form submission that answers with a redirect
+  # (final fix wave 1, ledger q1), not only for the header's own actions: here
+  # the "Moved to the trash" toast's Undo, pressed on Home's editor while an
+  # autosave of Home is still on the wire. Its redirect arrives with the
+  # answer Turbo already fetched; the queue used to hold that visit and issue
+  # it again, so the restored page was fetched twice and the "Restored" toast
+  # -- spent on the first -- never showed. And the edit that was outstanding
+  # is saved before the submission goes at all.
+  test "the Undo toast pressed while an autosave is outstanding keeps its answer's toast, and the edit" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    open_editor_menu
+    press "Move to trash"
+    within("dialog#delete-page-#{@page.id}[open]") { press "Move to trash" }
+    assert_current_path(admin_page_path(root_page), wait: 10)
+    assert_selector "#toasts button", text: "Undo"
+    await_admin_controllers
+
+    page.execute_script(SLOW_PATCHES)
+    page.execute_script(<<~JS)
+      const countedFetch = window.fetch
+      window.__gets = []
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "GET") window.__gets.push(new URL(String(url.url || url), location.href).pathname)
+        return countedFetch(url, options)
+      }
+    JS
+    fill_in "Subtitle", with: "first"
+    page.execute_script("document.activeElement.blur()") # the (slow) save of Home is in flight
+    fill_in "Subtitle", with: "second, typed while that save is in flight"
+    within("#toasts") { press "Undo" }
+
+    assert_current_path(admin_page_path(@page), wait: 15)
+    assert_selector "#toasts .admin-toast", text: "Restored “About”", wait: 10
+    assert_not @page.reload.trashed?
+    assert_equal "second, typed while that save is in flight", root_page.reload.subtitle
+    # The restored page comes with the submission's own (redirected) answer:
+    # no GET of its own at all.
+    assert_equal 0, page.evaluate_script("window.__gets").count("/cs-studio/pages/#{@page.id}"), "the restored page was fetched a second time"
+  end
+
   private
 
   # Two saves in a row from the page settings form: the first has to draw its

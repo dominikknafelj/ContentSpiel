@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { beginAction, drained, endAction, settled } from "autosave/queue"
+import { drained, settled } from "autosave/queue"
 
 // On a form in an editor's header whose submission REPLACES THE PAGE (Publish,
 // Unpublish, Schedule, Remove schedule, Move to trash: each redirects).
@@ -21,53 +21,35 @@ import { beginAction, drained, endAction, settled } from "autosave/queue"
 // themselves while the queue drained (Escape, Cancel, the backdrop), they
 // took the action back: it does not run.
 //
-// The submission that is let through is announced to the queue
-// (`beginAction`), so the visit its redirect ends in is not held and fetched
-// a second time by the queue's own `turbo:before-visit` handler, should an
-// edit have landed in the meantime -- see there. `end` takes the announcement
-// back when the submission ends with no redirect to follow (aborted, a network
-// error, an answer Turbo renders in place or not at all).
+// The visit the action's redirect ends in is not held by the queue's own
+// `turbo:before-visit` handler, should an edit have landed in the meantime:
+// that holds for every Turbo form submission and is the queue's business
+// (`autosave/queue.js`, "TURBO FORM SUBMISSIONS"), which also holds the
+// request itself once more if something became outstanding between this
+// controller's drain and the request going out.
 //
 // With nothing outstanding and every form clean the submit is not touched at
-// all (only announced). Only the five header forms carry this controller, so nothing outside an
-// editor (sign out, the palette, other screens) is ever held. A double click
-// while waiting is ignored.
+// all. Only the five header forms carry this controller; other forms get the
+// queue's general treatment, without the refusal. A double click while
+// waiting is ignored.
 export default class extends Controller {
   static MESSAGE = "Your last change wasn't saved, so this didn't run. Fix it or reload, then try again."
 
   connect() {
     this.waiting = false
     this.passing = false
-    this.acting = false
-    // On `document`: Turbo dispatches an event to the document element instead
-    // when its form is no longer connected.
-    this.end = (event) => {
-      if (!this.acting || event.detail.formSubmission?.formElement !== this.element) return
-      this.acting = false
-      const { success, fetchResponse } = event.detail
-      if (!success || !fetchResponse?.redirected) endAction()
-    }
-    document.addEventListener("turbo:submit-end", this.end)
-  }
-
-  disconnect() {
-    document.removeEventListener("turbo:submit-end", this.end)
   }
 
   async submit(event) {
     if (this.passing) {
       this.passing = false
-      this.announce()
       return
     }
     if (this.waiting) {
       event.preventDefault()
       return
     }
-    if (settled()) {
-      this.announce()
-      return
-    }
+    if (settled()) return
 
     event.preventDefault()
     const submitter = event.submitter || undefined
@@ -91,13 +73,6 @@ export default class extends Controller {
 
     this.passing = true
     this.element.requestSubmit(submitter)
-  }
-
-  // The submission goes through now, untouched: tell the queue (see the class
-  // comment), until `end` hears how it ended.
-  announce() {
-    this.acting = true
-    beginAction()
   }
 
   // The same busy look `admin--busy` gives a submitting button: disabled, the
