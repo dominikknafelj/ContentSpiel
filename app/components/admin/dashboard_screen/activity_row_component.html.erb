@@ -1,0 +1,8 @@
+<span class="flex size-7 shrink-0 items-center justify-center text-xs font-semibold <%= avatar_class %>" aria-hidden="true"><%= initial %></span>
+<p class="min-w-0 flex-1 text-sm text-ink">
+  <span class="font-semibold"><%= name %></span><%= " via an API token" if via_token? %> <%= before %> “<%= link_to title, path, class: "font-semibold hover:underline", data: { turbo_frame: "_top" } %>”<%= after %>
+</p>
+<% if status? %>
+  <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
+<% end %>
+<%= tag.span(class: "shrink-0 text-sm text-meta", title: span_title) { render Admin::TimeAgoComponent.new(time: shown_at) } %>

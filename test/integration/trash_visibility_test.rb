@@ -196,6 +196,38 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
   # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
   # child count and no translation marker; the starter offer counts kept pages.
+  test "the dashboard's cards and activity feed list kept pages and posts and never trashed ones" do
+    with_locales(%w[en de], default: "en")
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(published_at: 3.days.from_now) }
+    sign_in_as users(:one)
+    # The newest events about each record exist (created through the services);
+    # the trashed ones' events must not surface, not even anonymised.
+    get admin_root_path
+    assert_response :ok
+
+    %w[dashboard-drafts dashboard-going-live-next dashboard-activity].each do |section|
+      assert_select "section[aria-labelledby=#{section}]" do
+        assert_select "a", text: "Gone post", count: 0
+        assert_select "a", text: "Gone page", count: 0
+      end
+    end
+    assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
+    assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
+    assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept post"
+    assert_no_match "Gone post", response.body
+    assert_no_match "Gone page", response.body
+
+    # And the activity feed itself: no row whose record is trashed.
+    rows = Dashboard::Activity.new(actor: users(:one), channel: :admin).rows
+    assert_not_includes rows.map(&:record), @gone_post
+    assert_not_includes rows.map(&:record), @gone_page
+    assert_includes rows.map(&:record), @kept_post
+
+    # The needs-translation card counts kept records only (image included).
+    de = Dashboard::TranslationNeeds.new(actor: users(:one), channel: :admin).entries.find { |entry| entry.locale == "de" }
+    assert_equal Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total], de.total
+  end
+
   test "the page tree's child count and translation markers ignore a trashed page" do
     sign_in_as users(:one)
     with_locales(%w[en de], default: "en") do

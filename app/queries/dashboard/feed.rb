@@ -1,36 +1,35 @@
 module Dashboard
-  # Every list on the CS Studio dashboard (dashboard spec §4), read-scoped
-  # through `AccessControl.scope` -- which already hides trashed records --
-  # and built in a constant number of queries, whatever the data size: one
-  # limited query per model per list (pages, posts and, for a `media.upload`
-  # holder, images -- merged and cut to the list's limit in Ruby), then ONE
-  # batched "newest audit event per record" query for every row any list
-  # returned (`#last_change`), plus one actor preload per actor type and
-  # one preload of those events' users.
+  # The two *personal* lists on the CS Studio dashboard -- "Your drafts" and
+  # "Going live next" (design pass round 2, Task 16) -- read-scoped through
+  # `AccessControl.scope` (which already hides trashed records) and built in
+  # a constant number of queries, whatever the data size: one limited query
+  # per model per list (pages and posts), merged and cut to the list's limit
+  # in Ruby. (The "Recent activity" feed is `Dashboard::Activity`; the
+  # "Needs translation" numbers come from `Translations::StateIndex`.)
   #
-  # "Mine" (spec §4.2): a post I authored, or any page/post/image whose
-  # *newest* audit event is mine. Pages have no author, so for a page only
-  # the last change counts -- someone editing it after me takes it off my
-  # lists (but not off the site's "Recently updated"). "Me" is the human:
-  # an event's `user_id`, which `Audit.record` fills for a user and for any
-  # of their API tokens alike, so a change made through MCP is still mine.
+  # "Mine" (spec §4.2): a post I authored, or any page/post whose *newest*
+  # audit event is mine. Pages have no author, so for a page only the last
+  # change counts -- someone editing it after me takes it off my drafts.
+  # "Me" is the human: an event's `user_id`, which `Audit.record` fills for
+  # a user and for any of their API tokens alike, so a change made through
+  # MCP is still mine.
   #
   # The newest event is decided in SQL, per row, through a LATERAL subquery
   # (`#with_newest_event`) rather than by loading candidates and checking
   # them in Ruby: a filter applied before the LIMIT can't under-fill a list
   # the way "load 3x the limit, then drop what isn't mine" can, and it keeps
   # each list to exactly one query per model however many records exist.
-  # "Recently edited by you" is the same join, ordered by that event's time.
+  # "Going live next" is site-wide, but joins the same subquery so it can
+  # say "by you" without a query per row (`#mine?`).
   class Feed
-    LIMITS = { drafts: 10, scheduled: 10, recently_edited: 10, going_live_next: 10, recently_updated: 15 }.freeze
+    LIMITS = { drafts: 5, going_live_next: 5 }.freeze
 
     # Events that never count as "the newest change" (final fix wave, I1):
     # `ApplicationService#denied` records `access.denied` with the refused
     # record as its subject -- and it coalesces -- so without this a user
-    # merely *refused* on someone else's page would take it over as "mine"
-    # and become its "by". Both places that decide the newest event (the
-    # LATERAL join and `#load_last_changes`) exclude exactly this list, so
-    # a row's "mine" and its "by" can never disagree.
+    # merely *refused* on someone else's page would take it over as "mine".
+    # The LATERAL join excludes exactly this list. (`Dashboard::Activity`
+    # never lists the action either: it only lists content events.)
     NOT_A_CHANGE = %w[access.denied].freeze
 
     # `channel:` is captured here rather than read from `Current` each time
@@ -47,56 +46,23 @@ module Dashboard
         .then { |records| newest_first(records, :updated_at, LIMITS[:drafts]) }
     end
 
-    def scheduled
-      @scheduled ||= mine(page_and_post_relations { |r| scheduled_soonest_first(r) }, limit: LIMITS[:scheduled])
-        .then { |records| soonest_first(records, :published_at, LIMITS[:scheduled]) }
-    end
-
     def going_live_next
       @going_live_next ||= page_and_post_relations { |r| scheduled_soonest_first(r) }
-        .flat_map { |r| r.limit(LIMITS[:going_live_next]).to_a }
+        .flat_map do |relation|
+          table = relation.quoted_table_name
+          with_newest_event(relation, join: "LEFT JOIN")
+            .select("#{table}.*, newest.newest_user_id AS dashboard_newest_user_id")
+            .limit(LIMITS[:going_live_next]).to_a
+        end
         .then { |records| soonest_first(records, :published_at, LIMITS[:going_live_next]) }
     end
 
-    def recently_updated
-      @recently_updated ||= all_relations
-        .flat_map { |r| r.reorder(updated_at: :desc, id: :desc).limit(LIMITS[:recently_updated]).to_a }
-        .then { |records| newest_first(records, :updated_at, LIMITS[:recently_updated]) }
-    end
+    # Whether a record `#going_live_next` returned is mine (a post I wrote,
+    # or one whose newest change is mine) -- the card's "by you".
+    def mine?(record)
+      return false unless @user
 
-    # The pages, posts and images whose newest audit event is mine, by that
-    # event's time (`last_occurred_at`, so a coalesced autosave session
-    # counts from its latest save), newest first.
-    def recently_edited
-      @recently_edited ||= begin
-        limit = LIMITS[:recently_edited]
-        all_relations.flat_map do |relation|
-          next [] unless @user
-
-          table = relation.quoted_table_name
-          with_newest_event(relation)
-            .where("newest.newest_user_id = ?", @user.id)
-            .select("#{table}.*, newest.newest_at AS dashboard_edited_at")
-            .reorder("newest.newest_at DESC, #{table}.id DESC")
-            .limit(limit).to_a
-        end.then { |records| newest_first(records, :dashboard_edited_at, limit) }
-      end
-    end
-
-    # `{ actor:, user:, user_id:, at: }` from `record`'s newest audit event
-    # (or nil when `record` has no event at all). `actor` is nil for a
-    # change made by the system (a nil actor on a trusted channel) or by an
-    # actor since deleted; `user` is the human behind it (the actor itself
-    # for a user, the token's owner for an API token -- `Audit.record` fills
-    # `user_id` for both), so a change made through MCP can be shown as its
-    # user's without a query per row. `user_id` outlives the user (no
-    # foreign key), which is what tells "a deleted user" apart from the
-    # system (`Admin::DashboardScreen::RowComponent#changed_by`).
-    # The first call loads every listed record's newest event in one query
-    # (so it forces every list); a record no list returned answers nil.
-    def last_change(record)
-      @last_changes ||= load_last_changes
-      @last_changes[[ record.class.base_class.name, record.id ]]
+      record.try(:dashboard_newest_user_id) == @user.id || (record.is_a?(Post) && record.author_id == @user.id)
     end
 
     private
@@ -108,18 +74,6 @@ module Dashboard
         AccessControl.scope(@actor, "pages.read", Page.all, channel: @channel),
         AccessControl.scope(@actor, "posts.read", Post.all, channel: @channel)
       ].map(&narrow)
-    end
-
-    # Pages, posts and -- only for a `media.upload` holder (spec §4.4: the
-    # library isn't read-scoped, so holding the right is the whole check) --
-    # kept images, loaded `with_variants` so each row's thumbnail
-    # (`Media::Asset#thumbnail_url`, which reads the attachment, its blob
-    # and the blob's variant records) costs a constant three preload
-    # queries per list instead of three per image.
-    def all_relations
-      relations = page_and_post_relations(&:itself)
-      relations << Media::Asset.kept.with_variants if AccessControl.holds?(@actor, "media.upload", channel: @channel)
-      relations
     end
 
     # Scheduled (spec §10.4 of the CMS spec: a future `published_at`),
@@ -155,7 +109,7 @@ module Dashboard
     # (final fix wave, I3 -- a block event's subject is the block, but
     # editing a block is editing its page, so it counts towards "mine" and
     # "by" exactly like a title edit). Each half is its own `LIMIT 1`, so
-    # both stay index lookups; `#load_last_changes` applies the same rule.
+    # both stay index lookups.
     # An event about a block deleted since can't be traced back to its owner
     # any more (the block row is gone) -- its edit still shows through the
     # owner's `updated_at`, which `ContentBlocks::Destroy` bumps.
@@ -210,43 +164,5 @@ module Dashboard
     def newest_first(records, attribute, limit) = records.max_by(limit) { |r| [ r.public_send(attribute), r.id ] }
 
     def soonest_first(records, attribute, limit) = records.min_by(limit) { |r| [ r.public_send(attribute), r.id ] }
-
-    # One DISTINCT ON query over every listed record (spec §4.5), bounded by
-    # the lists' own limits, then one actor preload per actor type and one
-    # of their users. Its candidates are each record's own events plus, for
-    # a page or post, its current blocks' events (the same rule as
-    # `#with_newest_event`), every one tagged with the record it counts for
-    # (`dashboard_owner_type`/`_id`) -- the model's current name, so a
-    # legacy subject type ("MediaAsset") lands on the same record too.
-    def load_last_changes
-      records = [ drafts, scheduled, recently_edited, going_live_next, recently_updated ].flatten.uniq
-      return {} if records.empty?
-
-      events_table = Audit::Event.arel_table
-      candidates = records.group_by { |r| r.class.base_class }.flat_map do |model, rs|
-        owner_type = Arel::Nodes.build_quoted(model.name).as("dashboard_owner_type")
-        ids = rs.map(&:id)
-        own = Audit::Event.where(subject_type: subject_type_names(model), subject_id: ids)
-          .select(events_table[Arel.star], owner_type, events_table[:subject_id].as("dashboard_owner_id"))
-        next [ own ] unless block_owner?(model)
-
-        via_blocks = Audit::Event.joins("JOIN content_blocks ON content_blocks.id = audit_events.subject_id")
-          .where(subject_type: subject_type_names(ContentBlock), content_blocks: { owner_type: model.name, owner_id: ids })
-          .select(events_table[Arel.star], owner_type, ContentBlock.arel_table[:owner_id].as("dashboard_owner_id"))
-        [ own, via_blocks ]
-      end
-      union = candidates.map { |relation| relation.where.not(action: NOT_A_CHANGE).arel.ast }
-        .reduce { |left, right| Arel::Nodes::UnionAll.new(left, right) }
-
-      events = Audit::Event.from(Arel::Nodes::TableAlias.new(Arel::Nodes::Grouping.new(union), "audit_events"))
-        .select("DISTINCT ON (dashboard_owner_type, dashboard_owner_id) audit_events.*")
-        .order(:dashboard_owner_type, :dashboard_owner_id, last_occurred_at: :desc, id: :desc)
-        .to_a
-      ActiveRecord::Associations::Preloader.new(records: events, associations: %i[actor user]).call
-
-      events.to_h do |e|
-        [ [ e.dashboard_owner_type, e.dashboard_owner_id ], { actor: e.actor, user: e.user, user_id: e.user_id, at: e.last_occurred_at } ]
-      end
-    end
   end
 end
