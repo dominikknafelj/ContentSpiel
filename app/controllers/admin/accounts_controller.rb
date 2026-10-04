@@ -30,6 +30,10 @@ module Admin
         redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Password changed. Your other sessions were signed out."
       else
         @errors = result.errors
+        # By field too, so the current-password message can sit under its own
+        # input as well as in the summary. A denied result carries no record
+        # errors, only its sentence.
+        @field_errors = result.record.errors.to_hash(true)
         render :edit, status: :unprocessable_entity
       end
     end

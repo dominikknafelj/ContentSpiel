@@ -544,7 +544,9 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     fill_in "Your name", with: "Saved Name"
     press "Save name"
     assert_no_selector "dialog#leave-dialog[open]"
-    assert_text "Saved Name", wait: 10
+    # (The old subtitle, "Signed in as <name>.", used to show the saved name;
+    # the new one doesn't, so the toast is the visible proof.)
+    assert_text "Name saved.", wait: 10
     assert_equal "Saved Name", @owner.reload.name
   end
 end

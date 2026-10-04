@@ -70,7 +70,7 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     fill_in "Email address", with: "owner@example.com"
     fill_in "Password", with: "12345678"
-    assert_text "Use at least 12 characters."
+    assert_text "Too short. Use 12 or more characters."
     assert_selector "button[data-password-submit][disabled]", text: "Continue"
 
     fill_in "Password", with: "12345678901234"

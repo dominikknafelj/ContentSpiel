@@ -30,7 +30,8 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
     result = as(users(:reader)) { change(users(:reader), actor: users(:reader), current_password: "wrong") }
 
     assert_not result.ok?
-    assert_includes result.record.errors[:current_password], "is incorrect"
+    assert_includes result.record.errors[:current_password], "That's not your current password."
+    assert_equal [ "That's not your current password." ], result.errors
     assert users(:reader).reload.authenticate("password")
 
     result = as(users(:reader)) { change(users(:reader), actor: users(:reader), current_password: "password") }
