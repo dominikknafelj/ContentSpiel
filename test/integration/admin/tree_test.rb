@@ -20,12 +20,25 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   end
 
   test "the pages index shows the tree with status and child counts" do
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@b.id}"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
       # The tree hides Live: only a draft or scheduled page gets a chip.
       assert_select "[data-status='live']", count: 0
       assert_select "[data-child-count]", text: "1"
     end
+  end
+
+  # Handoff §10 C34.
+  test "/pages opens Home's editor for someone who can open it" do
+    get "/cs-studio/pages"
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}"
+    assert_response :see_other
+  end
+
+  test "/pages keeps the editing language when it redirects" do
+    with_locales(%w[en de], default: "en")
+    get "/cs-studio/pages", params: { locale: "de" }
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}?locale=de"
   end
 
   test "moving a page reparents it and re-renders the tree" do
@@ -105,37 +118,42 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_equal @a, @child.reload.parent
   end
 
-  # Translation helpers spec §4 (Task 4): one marker on a page that isn't
-  # complete in some target language, its tooltip naming them.
-  test "the tree marks a page incomplete in some language, naming the languages" do
+  # Handoff §10 B24: "↻N" for outdated and "○N" for missing fields, summed
+  # over the target languages, the tooltip naming them; nothing at zero.
+  test "the tree counts missing translations, naming the languages" do
     with_locales(%w[en de es], default: "en")
     assert Pages::Save.call(@a, translations: { "es" => { title: "Alfa" } }).ok?
     assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" }, "es" => { title: "Beta" } }).ok?
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@b.id}"
 
-    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]" do |markers|
-      assert_equal 1, markers.size
-      assert_equal "Incomplete in Deutsch (missing)", markers.first["title"]
-      assert_equal "Incomplete in Deutsch (missing)", markers.first["aria-label"]
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]", count: 1 do |markers|
+      assert_equal "○1", markers.first.text
+      assert_equal "Deutsch: 1 missing", markers.first["title"]
+      assert_equal "1 missing translation", markers.first["aria-label"]
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker]", count: 0
   end
 
-  test "the tree marker lists outdated languages too" do
+  test "the tree counts outdated fields too" do
     with_locales(%w[en de es], default: "en")
     assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" } }).ok?
     assert Pages::Save.call(@b, translations: { "en" => { title: "Beta!" } }).ok?
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@a.id}"
 
-    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker][title='Incomplete in Deutsch (outdated), Español (missing)']"
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker=outdated]", text: "↻1" do |markers|
+      assert_equal "Deutsch: 1 outdated", markers.first["title"]
+    end
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker=missing]", text: "○1" do |markers|
+      assert_equal "Español: 1 missing", markers.first["title"]
+    end
   end
 
   test "the tree shows no marker with one language enabled" do
     with_locales(%w[en], default: "en")
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@a.id}"
 
     assert_select "turbo-frame#tree [data-translation-marker]", count: 0
   end

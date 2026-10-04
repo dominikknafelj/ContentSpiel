@@ -194,10 +194,30 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
+  # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
+  # child count and no translation marker; the starter offer counts kept pages.
+  test "the page tree's child count and translation markers ignore a trashed page" do
+    sign_in_as users(:one)
+    with_locales(%w[en de], default: "en") do
+      kept_child = create_page(title: "Kept child", parent: @kept_page)
+      gone_child = create_page(title: "Gone child", parent: @kept_page)
+      assert Pages::Save.call(kept_child, translations: { "de" => { title: "Kind" } }).ok?
+      assert Pages::Save.call(kept_child, translations: { "en" => { title: "Kept child!" } }).ok?
+      assert Pages::Save.call(gone_child, translations: { "en" => { title: "Gone child!" } }).ok?
+      gone_child.update!(trashed_at: Time.current)
+
+      get "/cs-studio/pages/#{@kept_page.id}"
+
+      assert_select "turbo-frame#tree li[data-page-id='#{@kept_page.id}'] > div [data-child-count]", text: "1"
+      assert_select "turbo-frame#tree li[data-page-id='#{gone_child.id}']", count: 0
+      assert_select "turbo-frame#tree [data-translation-marker=outdated]", text: "↻1", count: 1
+    end
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@kept_page.id}"
     assert_select "turbo-frame#tree li[data-page-id='#{@kept_page.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@gone_page.id}']", count: 0
 

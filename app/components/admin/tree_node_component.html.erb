@@ -3,7 +3,7 @@
     <%# Shown only as the path to a readable page below it (access-control
         design spec §3.3): greyed out, not a link, no status or actions. %>
     <div class="flex items-center gap-1.5 rounded-cs px-1.5 py-1">
-      <span class="flex-1 truncate text-meta" title="You can't open this page"><%= title %></span>
+      <span class="flex-1 truncate text-meta" title="You can’t open this page"><%= title %></span>
     </div>
   <% else %>
     <div class="group/node flex items-center gap-1.5 rounded-cs px-1.5 py-1 hover:bg-sunken">
@@ -29,13 +29,19 @@
       <%# The chip carries `data-status` itself and renders nothing for Live. %>
       <%= render Admin::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
 
-      <% if incomplete_locales.any? %>
-        <%# One marker for every language at once (translation helpers spec
-            §4), its tooltip naming them; `role="img"` + `aria-label` so a
-            screen reader hears the same list the tooltip shows. %>
-        <%= tag.span "!", data: { translation_marker: true }, role: "img", title: translation_marker_label,
-              aria: { label: translation_marker_label },
-              class: "shrink-0 rounded-cs border border-warn bg-warn-tint px-1 font-cs-mono text-label text-warn-ink" %>
+      <%# Outdated and missing translated fields (handoff §10 B24), summed over
+          the target languages: plain text in a warn / meta ink, nothing at
+          zero. `role="img"` + `aria-label` so a screen reader hears what the
+          tooltip says; the glyph itself is decoration. %>
+      <% if translation_total(:outdated).positive? %>
+        <%= tag.span "↻#{translation_total(:outdated)}", data: { translation_marker: "outdated" }, role: "img",
+              title: translation_tooltip(:outdated), aria: { label: translation_label(:outdated) },
+              class: "shrink-0 font-cs-mono text-label text-warn-ink" %>
+      <% end %>
+      <% if translation_total(:missing).positive? %>
+        <%= tag.span "○#{translation_total(:missing)}", data: { translation_marker: "missing" }, role: "img",
+              title: translation_tooltip(:missing), aria: { label: translation_label(:missing) },
+              class: "shrink-0 font-cs-mono text-label text-meta" %>
       <% end %>
 
       <% if child_count.positive? %>
@@ -56,7 +62,7 @@
       a context-only page (see the component's comment). %>
   <ul <%= tag.attributes("data-admin--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
     <% children.each do |child| %>
-      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_states: translation_states, selected: selected, locale: locale, url_options: url_options) %>
+      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>
   </ul>
 </li>

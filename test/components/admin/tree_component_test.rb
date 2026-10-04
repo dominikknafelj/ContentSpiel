@@ -30,19 +30,64 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
     count
   end
 
-  test "the tree with translation markers costs the same queries for 3 pages as for 15" do
+  test "the tree with translation markers costs the same queries for 3 pages as for 30" do
     with_locales(%w[en de es], default: "en") do
       add_pages(3, "Small")
       render_tree # warm up whatever a first render loads once
       small = count_queries { render_tree }
 
-      add_pages(12, "Large")
+      add_pages(27, "Large")
       large = count_queries { render_tree }
 
-      assert_selector "li.admin-tree-node", minimum: 16
+      assert_selector "li.admin-tree-node", minimum: 31
       assert_equal small, large, "the tree ran a query per page"
     end
   end
+
+  # Handoff §10 B24: "↻N" outdated and "○N" missing, summed over the target
+  # languages, no box, no "!", the tooltip naming the languages.
+  test "a row shows outdated and missing counts summed over the languages, with labels and a tooltip" do
+    with_locales(%w[en de es], default: "en") do
+      row = create_page(title: "Counted", translations: { "en" => { title: "Counted", subtitle: "Sub" }, "de" => { title: "Gezählt", subtitle: "Unter" } })
+      assert Pages::Save.call(row, translations: { "en" => { title: "Counted again", subtitle: "Sub!" } }).ok?
+      render_tree
+
+      assert_selector "li[data-page-id='#{row.id}'] > div [data-translation-marker=outdated][role=img]", text: "↻2",
+        count: 1
+      marker = page_node(row).find("[data-translation-marker=outdated]")
+      assert_equal "2 outdated translations", marker["aria-label"]
+      assert_equal "Deutsch: 2 outdated", marker["title"]
+      missing = page_node(row).find("[data-translation-marker=missing]")
+      assert_equal "○1", missing.text
+      assert_equal "1 missing translation", missing["aria-label"]
+      assert_equal "Español: 1 missing", missing["title"]
+      assert_no_selector "[data-translation-marker]", text: "!"
+    end
+  end
+
+  test "a complete page shows neither count" do
+    with_locales(%w[en de], default: "en") do
+      done = create_page(title: "Done", translations: { "de" => { title: "Fertig" } })
+      render_tree
+      assert_no_selector "li[data-page-id='#{done.id}'] > div [data-translation-marker]"
+    end
+  end
+
+  test "the header names the tree and offers New page" do
+    render_tree
+    assert_selector "h2", text: "Pages"
+    assert_selector "a[href='/cs-studio/pages/new']", text: "+ New page"
+  end
+
+  test "the starter offer sits in the header menu only while Home is the only kept page" do
+    render_tree
+    assert_selector "[role=menu] button", text: "Create starter pages", visible: :all
+    create_page(title: "About")
+    render_tree
+    assert_no_selector "[role=menu] button", text: "Create starter pages", visible: :all
+  end
+
+  def page_node(record) = page.find("li[data-page-id='#{record.id}'] > div")
 
   test "a re-render after one page's save shows that page's new marker and leaves the others alone" do
     with_locales(%w[en de], default: "en") do
@@ -52,8 +97,8 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
       assert Pages::Save.call(pages.first, translations: { "en" => { title: "Page 0, revised" } }).ok?
       render_tree
 
-      assert_selector "li[data-page-id='#{pages.first.id}'] > div [data-translation-marker][title*='Deutsch (outdated)']"
-      assert_no_selector "li[data-page-id='#{pages.second.id}'] [data-translation-marker][title*='Deutsch (outdated)']"
+      assert_selector "li[data-page-id='#{pages.first.id}'] > div [data-translation-marker=outdated][title*='Deutsch']"
+      assert_no_selector "li[data-page-id='#{pages.second.id}'] [data-translation-marker=outdated][title*='Deutsch']"
     end
   end
 

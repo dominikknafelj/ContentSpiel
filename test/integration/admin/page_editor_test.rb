@@ -309,6 +309,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_response :see_other
     assert parent.reload.trashed?
     assert child.reload.trashed?
+    follow_redirect! # the pages index opens Home, keeping the flash
     follow_redirect!
     assert_response :success
     assert_match "Moved “Section” and 1 subpage to the trash", response.body
@@ -330,6 +331,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   test "deleting a leaf page moves just that page to the trash" do
     delete "/cs-studio/pages/#{@page.id}"
     assert_response :see_other
+    follow_redirect!
     follow_redirect!
     assert_match "Moved “About” to the trash", response.body
     assert_no_match(/and \d+ subpage/, response.body)

@@ -12,23 +12,23 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
   end
 
   test "the Pages index offers the action while the starter pages are missing" do
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{root_page.id}"
 
     assert_select "form[action='/cs-studio/starter_contents'][data-turbo-frame='_top']", minimum: 1
     assert_select "button", text: "Create starter pages"
   end
 
   test "starter pages are offered only while Home is the only kept page" do
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{root_page.id}"
     assert_select "button", text: "Create starter pages"
 
     page = create_page(title: "About")
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{root_page.id}"
     assert_select "button", text: "Create starter pages", count: 0
 
     # A trashed page isn't a page the site has built: the offer is back.
     page.update!(trashed_at: Time.current)
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{root_page.id}"
     assert_select "button", text: "Create starter pages"
   end
 
@@ -41,6 +41,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     end
 
     assert_redirected_to "/cs-studio/pages"
+    follow_redirect! # /pages opens Home, keeping the flash
     follow_redirect!
     assert_select "#tree", text: /Blog/
     assert_select "[role=status]", text: "Starter pages created"
@@ -54,6 +55,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       post "/cs-studio/starter_contents"
     end
 
+    follow_redirect!
     follow_redirect!
     assert_select "[role=status]", text: "Starter pages already exist"
   end
@@ -75,11 +77,12 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "/cs-studio/pages"
     follow_redirect!
+    follow_redirect!
     assert_select "[role=alert]", text: /couldn.t be added/
   end
 
   test "a request from a stale tab re-checks and finds the sections another tab created" do
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{root_page.id}"
     assert_select "button", text: "Create starter pages" # this tab still offers it
 
     StarterContent.create_pages_and_posts!(locale: "en") # another tab finished first
@@ -87,6 +90,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     assert_no_difference [ "Page.count", "Post.count" ] do
       post "/cs-studio/starter_contents"
     end
+    follow_redirect!
     follow_redirect!
     assert_select "[role=status]", text: "Starter pages already exist"
   end

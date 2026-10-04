@@ -176,10 +176,23 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       assert_nil row.at_css("a"), "a context-only node has no link or actions"
       assert_nil row.at_css(".admin-tree-node__handle")
       assert_includes row.text, "Home"
+      assert_select nodes.first, "> div span.text-meta[title='You can’t open this page']"
+      assert_nil row.at_css("[data-translation-marker]"), "a context-only row shows no counts"
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@branch.id}']:not([data-context-only]) a[href='/cs-studio/pages/#{@branch.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@inside.id}'] a[href='/cs-studio/pages/#{@inside.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@outside.id}']", count: 0
+  end
+
+  test "/pages for a viewer who reads only a deep branch is the empty state, not a 404 or a redirect" do
+    grant_branch("pages.edit")
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/pages"
+
+    assert_response :success
+    assert_select "h2, p, div", text: "Choose a page from the tree"
+    assert_select "turbo-frame#tree li[data-page-id='#{@inside.id}']"
   end
 
   test "rendering the tree as a branch editor costs the same queries however many pages it shows" do
@@ -187,12 +200,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     3.times { |index| create_page(title: "Small #{index}", parent: @inside) }
 
-    get "/cs-studio/pages" # warm up whatever a first request loads once
-    small = count_queries { get "/cs-studio/pages" }
+    get "/cs-studio/pages/#{@inside.id}" # warm up whatever a first request loads once
+    small = count_queries { get "/cs-studio/pages/#{@inside.id}" }
     assert_response :success
 
     12.times { |index| create_page(title: "Large #{index}", parent: @inside) }
-    large = count_queries { get "/cs-studio/pages" }
+    large = count_queries { get "/cs-studio/pages/#{@inside.id}" }
 
     assert_select "turbo-frame#tree li.admin-tree-node", count: 18
     assert_equal small, large, "the tree ran a query per page"

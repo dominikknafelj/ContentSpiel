@@ -140,8 +140,8 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_selector "#{dialog}[open] [role=alert]", wait: 10
     within("#{dialog}[open]") { press "Cancel" }
 
-    visit admin_pages_path
-    assert_current_path admin_pages_path
+    visit admin_root_path
+    assert_current_path admin_root_path
     page.go_back
     assert_selector "header.admin-editor-header", wait: 10
     assert_no_selector "#{dialog}[open]"

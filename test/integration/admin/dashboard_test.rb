@@ -14,7 +14,10 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
 
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
     sign_in_as users(:one)
+    root_page
     get admin_pages_path
+    assert_response :see_other # opens Home's editor
+    follow_redirect!
     assert_response :ok
     assert_select "nav[aria-label='Modules'] a", text: "Pages"
     assert_equal "Dashboard", css_select("nav[aria-label='Modules'] a").first.text.strip

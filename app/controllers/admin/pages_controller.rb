@@ -36,13 +36,29 @@ module Admin
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule]
 
-    # The Pages module's own index. Someone who can't read any page (a
-    # group with only tags or settings, say) is sent on to the first
-    # module they *can* open rather than shown a 403 -- in practice always
-    # the dashboard now (`BaseController::MODULES`'s first entry, open to
-    # everyone), same as if they'd signed in fresh.
+    # The Pages module's own index (handoff §10 C34): Home's editor when the
+    # viewer can open it (303, with the editing language kept), otherwise the
+    # empty state "Choose a page from the tree" beside the tree -- a viewer
+    # whose grants reach only a deep branch has a tree to choose from but no
+    # Home to land on, and must see neither a 404 nor a hint of what Home
+    # holds. "Can open" is the read scope, the same rule `set_page` applies
+    # to `show`, so this never redirects into a 404. Someone who can't read
+    # any page (a group with only tags or settings, say) is sent on to the
+    # first module they *can* open rather than shown a 403 -- in practice
+    # always the dashboard now (`BaseController::MODULES`'s first entry,
+    # open to everyone), same as if they'd signed in fresh.
+    #
+    # The flash is kept across the redirect: "Starter pages created" is set
+    # by `StarterContentsController` for a redirect to this very URL, and
+    # would otherwise be spent on this hop.
     def index
       return redirect_to(first_admin_module_path) unless can?("pages.read")
+
+      home = root_page
+      if home && admin_scope(Page.where(id: home.id)).exists?
+        flash.keep
+        return redirect_to(admin_page_path(home, **admin_url_options), status: :see_other)
+      end
 
       @page = nil
     end
