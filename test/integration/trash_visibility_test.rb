@@ -482,6 +482,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{@gone_asset.id}", count: 0
   end
 
+  # Round 3 Task 9: the picker's frame answers a query and a segment too, and
+  # an upload's answer counts only what is kept.
+  test "the picker's searched and segmented frame hides trashed images, and an upload's counts skip them" do
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { picker: 1, q: "tiny", filter: "unused" }
+    assert_select "#media-picker-asset-#{@kept_asset.id}"
+    assert_select "#media-picker-asset-#{@gone_asset.id}", count: 0
+
+    post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
+    assert_equal Media::Asset.kept.count, response.parsed_body["counts"]["all"]
+  end
+
   # --- Choosing and embedding images -------------------------------------------
 
   test "choosing or embedding a trashed image reads as missing" do

@@ -1,7 +1,7 @@
 module Media
   # Stores one uploaded image as a library `Media::Asset` (media library
   # design spec §5.1) -- every way an image enters the library goes through
-  # here: the picker's Upload tab (`Media::PickerComponent`, through
+  # here: the picker's header Upload (`Media::PickerComponent`, through
   # `Admin::MediaAssetsController` -- the one upload for a page's hero, an
   # image block and the Tiptap editor, which then set their reference to
   # the new asset's id like any library pick) and the Media module's own

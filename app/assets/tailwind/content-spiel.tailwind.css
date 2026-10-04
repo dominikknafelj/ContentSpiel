@@ -126,6 +126,14 @@
    when centred, so a full one looks as before and a shorter one only grows
    downwards. `test/system/admin/media_picker_test.rb` pins it. */
 .admin-media-picker { margin-top: 7.5vh; }
+/* The same fixed top edge for the New page and New post dialogs
+   (`Admin::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
+   with a loading line and the form loads into it, so a centred one grew in both
+   directions and moved its own header (and the Create button at the foot) under
+   the pointer. 7.5vh as above, where the top of a full-height dialog sits when
+   centred; a shorter one only grows downwards. `test/system/admin/dialogs_
+   hang_test.rb` pins it. */
+.admin-dialog[data-dialog-hang] { margin-top: 7.5vh; }
 
 /* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }

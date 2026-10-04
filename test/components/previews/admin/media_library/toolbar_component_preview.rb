@@ -12,6 +12,11 @@ module Admin
       def segment_chosen_with_a_search
         render Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "missing_alt", q: "studio")
       end
+
+      # Inside the media picker's own frame (round 3, Task 9): no Untranslated.
+      def in_the_picker
+        render Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: nil, picker: true)
+      end
     end
   end
 end

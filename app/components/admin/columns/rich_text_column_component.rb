@@ -50,7 +50,7 @@ module Admin
     # the picked asset is inserted as `image{asset_id}` -- the picker's
     # `media-picker:picked` event bubbles from the button to this
     # controller's element. There's no upload of the editor's own any more;
-    # the picker's Upload tab covers it.
+    # the picker's header Upload covers it.
     #
     # `editable: false` (a view-only editor, handoff §10 B20) renders no
     # toolbar at all -- a row of dead, disabled buttons would only suggest

@@ -21,6 +21,9 @@ class Admin::EditorScreen::NewPageDialogComponentTest < ViewComponent::TestCase
   test "the shell is a 560 wide dialog with a loading line, an empty frame and a disabled Create button" do
     render_shell
     assert_selector "dialog#new-page-dialog[data-dialog-width=form]", visible: :all
+    # Its height changes when the form loads into the shell, so it hangs from a fixed
+    # top edge like the media picker (`.admin-dialog[data-dialog-hang]`).
+    assert_selector "dialog#new-page-dialog[data-dialog-hang]", visible: :all
     assert_selector "#new-page-dialog-title", text: "New page", visible: :all
     assert_selector "[data-controller=admin--new-record][data-admin--new-record-kind-value=page][data-admin--new-record-url-value='/cs-studio/pages/new']", visible: :all
     assert_selector "[data-admin--new-record-target=loading]", text: "Loading…", visible: :all

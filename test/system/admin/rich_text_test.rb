@@ -61,9 +61,12 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     editor.click
     type_text "Intro"
     press_insert "Image"
+    # The upload shows as a tile, which is selected once it has finished; the
+    # editor confirms with Use image (select-then-use, round 3 Task 9).
     within("dialog[open]") do
-      click_on "Upload"
       attach_file "Image file", file_fixture("tiny.png").to_s
+      assert_text "1 selected", wait: 10
+      click_on "Use image"
     end
     assert_selector "dialog#rich-text-image-dialog[open]"
     refute_selector ".ProseMirror img"
@@ -106,7 +109,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     visit_post
     editor.click
     press_insert "Image"
-    within("dialog[open]") { click_on "Lake" }
+    within("dialog[open]") { click_on "Lake"; click_on "Use image" }
     within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
     refute_selector "dialog[open]"
     saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" } }
@@ -128,7 +131,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     editor.click
     press_insert "Image"
-    within("dialog[open]") { click_on "Lake" }
+    within("dialog[open]") { click_on "Lake"; click_on "Use image" }
     within("dialog#rich-text-image-dialog[open]") do
       assert_field "Alt text", with: "", placeholder: "A calm lake"
       assert_field "Caption", with: "", placeholder: "Lake at dawn"
@@ -139,7 +142,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_selector ".ProseMirror:focus"
 
     press_insert "Image"
-    within("dialog[open]") { click_on "Lake" }
+    within("dialog[open]") { click_on "Lake"; click_on "Use image" }
     within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
 
     document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" } }
@@ -153,9 +156,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     editor.click
     press_insert "Image"
     within("dialog[open]") do
-      click_on "Upload"
       attach_file "Image file", file_fixture("fake.png").to_s
-      assert_selector "[role=alert]", text: /File/
+      # The refused file keeps its tile, with the server's reason and Dismiss.
+      assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/, wait: 10
+      assert_button "Dismiss"
+      assert_button "Use image", disabled: true
     end
 
     refute_selector ".ProseMirror img"
@@ -462,7 +467,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     editor.click
     press_insert "Image"
-    within("dialog[open]") { click_on Media::Asset.last.title }
+    within("dialog[open]") { click_on Media::Asset.last.title; click_on "Use image" }
     within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
     refute_selector "dialog[open]"
     assert_selector ".ProseMirror figure.is-selected"

@@ -16,15 +16,24 @@ module Admin
     # (`Admin::MediaController#update`) rewrites them after an alt text is
     # typed in the panel. The chosen image rides along as a hidden `selected`,
     # so searching or choosing a segment keeps the panel open.
+    #
+    # `picker: true` is the same toolbar inside `Media::PickerComponent`'s own
+    # frame (`media-picker-grid`, round 3 Task 9): the form targets that frame
+    # (no history, the dialog is not a page), carries `picker=1` so every later
+    # request is the picker's again, offers every segment but Untranslated
+    # (translating is not what picking an image is about), and its ids are the
+    # picker's own -- the dialog is in the layout of the Media screen too, and
+    # the grid's search box and count spans already own the plain ones.
     class ToolbarComponent < Admin::AdminComponent
       SEGMENTS = [ [ "", :all, "All" ], [ "unused", :unused, "Unused" ], [ "missing_alt", :missing_alt, "Missing alt" ],
                    [ "untranslated", :untranslated, "Untranslated" ], [ "mine", :mine, "Mine" ] ].freeze
 
       SEGMENT_CLASS = Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS
 
-      def self.count_id(key) = "media-count-#{key}"
+      def self.count_id(key, picker: false) = "media-#{"picker-" if picker}count-#{key}"
 
-      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {})
+      def initialize(counts:, filter:, q:, selected_id: nil, url_options: {}, picker: false)
+        @picker = picker
         @counts = counts
         @filter = filter.to_s
         @q = q
@@ -34,10 +43,21 @@ module Admin
 
       def path = helpers.admin_media_path(**url_options)
 
-      def form_options = helpers.filter_form_options(path)
+      def clear_path = helpers.admin_media_path(**url_options, **(picker? ? { picker: 1 } : {}))
 
-      # "Untranslated" needs a language to be untranslated in.
-      def segments = SEGMENTS.reject { |value, _key, _label| value == "untranslated" && ::Translations.target_locales.empty? }
+      def picker? = @picker
+
+      def form_options = helpers.filter_form_options(path, frame: (picker? ? "media-picker-grid" : "content"))
+
+      def search_id = picker? ? "media-picker-q" : "q"
+
+      def filter_id(key) = "media-#{"picker-" if picker?}filter-#{key}"
+
+      def count_dom_id(key) = self.class.count_id(key, picker: picker?)
+
+      # "Untranslated" needs a language to be untranslated in, and the picker
+      # has no use for it.
+      def segments = SEGMENTS.reject { |value, _key, _label| value == "untranslated" && (picker? || ::Translations.target_locales.empty?) }
 
       # `filter` is `Media::Search#filter`: already normalised, `all` or a segment's name.
       def checked?(value) = filter == (value.presence || "all")

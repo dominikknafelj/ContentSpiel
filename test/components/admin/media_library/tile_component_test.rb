@@ -57,4 +57,30 @@ class Admin::MediaLibrary::TileComponentTest < ViewComponent::TestCase
 
     assert_selector "a[data-turbo-frame='content'][data-turbo-action='advance']"
   end
+
+  # Round 3 Task 9: the picker's tile is a button that selects, not a link.
+  test "a pick tile is a button with the picker's id, the select actions and the payload" do
+    asset = create_media_asset
+    Mobility.with_locale(:en) { asset.update!(alt: "A dune", caption: "At dusk") }
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset.reload, unused: true, pick: true, locale: "en")
+
+    assert_no_selector "a"
+    assert_selector "li#media-picker-asset-#{asset.id} button[type=button][aria-pressed=false][data-asset-id='#{asset.id}']"
+    button = page.find("button")
+    assert_includes button["data-action"], "click->admin--media-select#select"
+    assert_includes button["data-action"], "dblclick->admin--media-select#choose"
+    assert_includes button["data-action"], "keydown->admin--media-select#key"
+    assert_equal({ "id" => asset.id, "url" => asset.thumbnail_url, "title" => asset.title, "alt" => "A dune", "caption" => "At dusk" },
+      JSON.parse(button["data-admin--media-select-asset-param"]))
+    assert_text "UNUSED"
+  end
+
+  test "a pick tile draws its selection from aria-pressed, with the same ring the panel's tile has" do
+    asset = create_media_asset
+
+    render_inline Admin::MediaLibrary::TileComponent.new(asset: asset, unused: false, pick: true)
+
+    assert_selector "button.aria-pressed\\:ring-accent-tint.aria-pressed\\:border-accent"
+  end
 end

@@ -50,4 +50,22 @@ class Admin::MediaLibrary::ToolbarComponentTest < ViewComponent::TestCase
 
     assert_no_selector "a", text: "Clear"
   end
+
+  # Round 3 Task 9: the same toolbar inside the picker's own frame.
+  test "the picker's toolbar targets its frame, keeps picker=1, has its own ids and no Untranslated" do
+    with_locales(%w[en de], default: "en")
+
+    render_inline Admin::MediaLibrary::ToolbarComponent.new(counts: COUNTS, filter: "all", q: "dune", picker: true)
+
+    assert_selector "form[data-turbo-frame='media-picker-grid'][data-controller='admin--auto-submit']"
+    assert_no_selector "form[data-turbo-action]"
+    assert_selector "input[type=hidden][name=picker][value='1']", visible: :all
+    assert_selector "input#media-picker-q[type=search][value=dune]"
+    assert_selector "label[for=media-picker-q]", text: "Search images", visible: :all
+    assert_selector "input[type=radio][name=filter]", count: 4, visible: :all
+    assert_no_selector "input[value=untranslated]", visible: :all
+    assert_selector "input#media-picker-filter-unused", visible: :all
+    assert_selector "#media-picker-count-unused", text: "5"
+    assert_no_selector "#media-count-unused"
+  end
 end

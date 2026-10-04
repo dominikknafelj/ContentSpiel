@@ -1,8 +1,10 @@
 import { Controller } from "@hotwired/stimulus"
+import { UploadTiles, updateCounts } from "media/upload_tiles"
 
-// The one media picker (media library design spec §6, Task 8), on
-// `Media::PickerComponent`'s `<dialog>` -- rendered once per CS Studio page
-// by the admin layout. See that component's comment for where it's used.
+// The one media picker (media library design spec §6, Task 8; round 3, Task 9),
+// on `Media::PickerComponent`'s `<dialog>` -- rendered once per CS Studio page by
+// the admin layout. See that component's comment for where it's used and how it
+// is built; `admin--media-select` (the same element) owns choosing a tile.
 //
 // The contract with a field or editor that wants an image:
 // - open it by dispatching `media-picker:open` on `window` with
@@ -12,34 +14,44 @@ import { Controller } from "@hotwired/stimulus"
 //   `detail: { id, url, title, alt, caption }` -- `id` is what gets saved,
 //   `url` a thumbnail to show, `alt`/`caption` the asset's own defaults in
 //   the editing language (for the per-use fields' placeholders).
-// Nothing is dispatched on Cancel or Escape: the opener simply gets focus
+// Nothing is dispatched on Cancel, × or Escape: the opener simply gets focus
 // back.
 //
 // `picked` is dispatched from the dialog's `close` handler, not straight
-// from `#pick`: closing a modal dialog restores focus asynchronously, so
+// from `#choose`: closing a modal dialog restores focus asynchronously, so
 // dispatching first would let that restore land *after* whatever focus the
 // opener's own handler moved (the rich-text editor opens its alt-text
 // popover and focuses it) and steal it back.
 //
-// No browser dialogs: an upload's errors go into the Upload tab's own
-// `role=alert` line.
+// Escape: the first one, while the search box holds text, clears the search (the
+// grid answers at once) and keeps the dialog open; the next one -- or the first,
+// with nothing typed -- closes it. Chrome fires the native `cancel` for the key
+// whether or not `keydown` was prevented, so both listeners cooperate through one
+// flag rather than trusting either to be the only one that runs.
+//
+// Upload (the header button, then the file input) puts a progress tile per file at
+// the start of the grid (`media/upload_tiles.js`, one at a time); the first to
+// finish is selected, so Use image is one click away. A refused file keeps its
+// tile with the server's reason. No browser dialogs anywhere.
 export default class extends Controller {
-  static targets = [ "tab", "panel", "frame", "file", "status", "error" ]
-  static values = { libraryUrl: String, uploadUrl: String }
-
-  static texts = {
-    uploading: "Uploading…",
-    uploadFailed: "Upload failed — check your connection",
-    uploadRejected: "Upload failed"
-  }
+  static targets = [ "frame", "file", "status" ]
+  static values = { gridUrl: String, uploadUrl: String }
 
   connect() {
     this.opener = null
     this.pending = null
+    this.escapeCleared = false
+    this.uploads = new UploadTiles({
+      url: this.uploadUrlValue,
+      grid: () => this.frameTarget.querySelector("ul.admin-media-grid"),
+      fields: () => this.searchValue ? { q: this.searchValue } : {},
+      onUploaded: (done) => this.uploaded(done),
+      announce: (text) => { this.statusTarget.textContent = text }
+    })
   }
 
   disconnect() {
-    this.aborter?.abort()
+    this.uploads?.abort()
   }
 
   open(event) {
@@ -48,17 +60,19 @@ export default class extends Controller {
 
     this.opener = opener
     this.pending = null
-    this.clearUpload()
-    this.showTab("library")
-    this.loadLibrary()
+    this.selectNextUpload = false
+    this.uploads.abort()
+    this.statusTarget.textContent = ""
+    this.dispatch("reset")
+    this.focusSearchOnLoad = true
+    this.loadGrid()
     if (!this.element.open) this.element.showModal()
-    this.tabTargets[0]?.focus()
   }
 
   // A fresh load on every open: setting `src` to the URL it already has
   // wouldn't refetch, so a repeated open reloads the frame instead.
-  loadLibrary() {
-    const url = new URL(this.libraryUrlValue, window.location.href).toString()
+  loadGrid() {
+    const url = new URL(this.gridUrlValue, window.location.href).toString()
     if (this.frameTarget.src === url) {
       this.frameTarget.reload()
     } else {
@@ -66,10 +80,33 @@ export default class extends Controller {
     }
   }
 
-  // A Library card's button (`Admin::MediaLibrary::GridComponent`, pick
-  // mode): its whole payload arrives as one JSON action param.
-  pick(event) {
-    this.choose(event.params.asset)
+  // The grid arrived or navigated (search, segment, page): live upload tiles go
+  // back at the start of it, and the first time, the search box takes focus --
+  // unless the editor has already moved on to something else in the dialog.
+  gridLoaded(event) {
+    if (event.target !== this.frameTarget) return
+
+    this.uploads.reattach()
+    if (!this.focusSearchOnLoad) return
+
+    this.focusSearchOnLoad = false
+    const active = document.activeElement
+    if (active === this.element || active === document.body || active?.dataset?.action?.includes("admin--media-picker#browse")) {
+      this.search?.focus()
+    }
+  }
+
+  get search() {
+    return this.frameTarget.querySelector("input[type=search]")
+  }
+
+  get searchValue() {
+    return this.search?.value || ""
+  }
+
+  // The select controller's `chosen`: its detail is the payload.
+  chosen(event) {
+    this.choose(event.detail)
   }
 
   choose(detail) {
@@ -79,7 +116,12 @@ export default class extends Controller {
     this.element.close()
   }
 
-  // The dialog's own `close` event -- after a pick, Cancel, or Escape (the
+  // × and Cancel.
+  dismiss() {
+    this.element.close()
+  }
+
+  // The dialog's own `close` event -- after a pick, Cancel, ×, or Escape (the
   // native `cancel` closes it too). Hands focus back to the opener, then
   // tells it what was picked, if anything.
   closed() {
@@ -89,7 +131,7 @@ export default class extends Controller {
     // away). Nothing references it, so it shows up under the Media
     // module's "Unused" filter, where it can be deleted (cleanup is manual
     // only, global constraints).
-    this.aborter?.abort()
+    this.uploads.abort()
     const opener = this.opener
     const detail = this.pending
     this.opener = null
@@ -100,90 +142,59 @@ export default class extends Controller {
     if (detail) this.dispatch("picked", { target: opener, prefix: "media-picker", detail })
   }
 
-  // --- Tabs ----------------------------------------------------------------
+  // --- Escape ----------------------------------------------------------------
 
-  selectTab(event) {
-    this.showTab(event.currentTarget.dataset.tab)
-  }
-
-  // Left/Right move between the two tabs (WAI-ARIA tabs pattern), with the
-  // inactive one out of the tab order.
-  tabKey(event) {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+  keydown(event) {
+    if (event.key !== "Escape" || !this.clearSearch(event.target)) return
 
     event.preventDefault()
-    const index = this.tabTargets.indexOf(event.currentTarget)
-    const next = this.tabTargets[(index + (event.key === "ArrowRight" ? 1 : -1) + this.tabTargets.length) % this.tabTargets.length]
-    this.showTab(next.dataset.tab)
-    next.focus()
+    // The native `cancel` that follows this same key press must not close it.
+    this.escapeCleared = true
+    setTimeout(() => { this.escapeCleared = false }, 0)
   }
 
-  showTab(name) {
-    this.tabTargets.forEach((tab) => {
-      const selected = tab.dataset.tab === name
-      tab.setAttribute("aria-selected", selected ? "true" : "false")
-      tab.tabIndex = selected ? 0 : -1
-    })
-    this.panelTargets.forEach((panel) => { panel.hidden = panel.dataset.tab !== name })
+  cancel(event) {
+    if (this.escapeCleared || this.clearSearch(event.target === this.element ? this.search : event.target)) event.preventDefault()
+  }
+
+  // True when the search box held text and was emptied. `change` (not `input`)
+  // so `admin--auto-submit` answers at once instead of after its typing delay.
+  clearSearch(field) {
+    const search = this.search
+    if (!search || (field !== search && field !== this.element) || search.value === "") return false
+
+    search.value = ""
+    search.dispatchEvent(new Event("change", { bubbles: true }))
+    return true
   }
 
   // --- Upload ----------------------------------------------------------------
-  //
-  // One file to `Admin::MediaAssetsController#create` (`Media::Upload`),
-  // multipart `file` plus the layout's CSRF token. A 201 is picked straight
-  // away -- a new upload has no default alt or caption yet; anything else
-  // shows the response's `errors` inline and leaves the picker open.
-  async upload() {
-    const file = this.fileTarget.files[0]
+
+  // The header's Upload button opens the (visually hidden, labelled) file input.
+  browse() {
+    this.fileTarget.click()
+  }
+
+  upload() {
+    const files = Array.from(this.fileTarget.files)
     // Cleared at once, so choosing the same file again still fires `change`.
     this.fileTarget.value = ""
-    if (!file) return
+    if (files.length === 0) return
 
-    this.aborter?.abort()
-    this.aborter = new AbortController()
-    this.errorTarget.textContent = ""
-    this.statusTarget.textContent = this.constructor.texts.uploading
-
-    const body = new FormData()
-    body.append("file", file)
-
-    let response
-    try {
-      response = await fetch(this.uploadUrlValue, {
-        method: "POST",
-        body,
-        signal: this.aborter.signal,
-        headers: { Accept: "application/json", "X-CSRF-Token": this.csrfToken() }
-      })
-    } catch (error) {
-      if (error.name !== "AbortError") this.showUploadError([ this.constructor.texts.uploadFailed ])
-      return
-    }
-
-    const json = await response.json().catch(() => ({}))
-
-    if (response.status !== 201 || !Number.isInteger(json.id)) {
-      this.showUploadError(Array.isArray(json.errors) && json.errors.length ? json.errors : [ this.constructor.texts.uploadRejected ])
-      return
-    }
-
-    this.statusTarget.textContent = ""
-    this.choose({ id: json.id, url: json.url, title: json.title || file.name, alt: "", caption: "" })
+    this.selectNextUpload = true
+    this.uploads.add(files)
   }
 
-  showUploadError(errors) {
-    this.statusTarget.textContent = ""
-    this.errorTarget.textContent = errors.join(". ")
-  }
+  // A finished upload: the counts follow it, and the first of the batch is the
+  // selection (handoff C36b) -- selected, not chosen: the editor confirms.
+  uploaded({ json, tile }) {
+    updateCounts(json.counts, { picker: true })
+    if (!this.selectNextUpload || !tile) return
 
-  clearUpload() {
-    this.aborter?.abort()
-    this.fileTarget.value = ""
-    this.statusTarget.textContent = ""
-    this.errorTarget.textContent = ""
-  }
+    const raw = tile.querySelector("[data-admin--media-select-asset-param]")?.getAttribute("data-admin--media-select-asset-param")
+    if (!raw) return
 
-  csrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.content || ""
+    this.selectNextUpload = false
+    this.dispatch("uploaded", { detail: { payload: JSON.parse(raw) } })
   }
 }

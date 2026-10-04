@@ -18,6 +18,7 @@ module Admin
   # write.
   class MediaController < BaseController
     include AutosaveResponses
+    include MediaUploadResponses
 
     # "About 48 per page" (design spec §6), by page number (`Pagination`,
     # design pass spec §4): `@pagination.total` is a `COUNT(*)` over the same
@@ -47,23 +48,23 @@ module Admin
     # and a trashed image only ever opens from the Trash); it is NOT "the grid
     # without a panel", which would hide that a link has gone stale.
     #
-    # `picker=1` (Task 8) is the same listing for `Media::PickerComponent`'s
-    # Library tab: the grid, search and pagination, rendered on their own
-    # inside the picker's `<turbo-frame>` (`admin/media/picker`, no layout)
-    # with pick buttons instead of detail links. Deliberately this endpoint
-    # rather than a second one: one search, one set of filters, one
-    # constant-query load (`Media::Search`), and the same `media.upload`
-    # gate -- the picker's only permission is "may browse and choose". It has
-    # no segment counts and no panel.
+    # `picker=1` is the same listing for `Media::PickerComponent` (round 3,
+    # Task 9): the toolbar, the grid and the pagination, rendered on their own
+    # inside the picker's `<turbo-frame id="media-picker-grid">`
+    # (`admin/media/picker`, no layout) with select buttons instead of panel
+    # links. Deliberately this endpoint rather than a second one: one search,
+    # one set of segments and counts, one constant-query load (`Media::Search`,
+    # kept images only), and the same `media.upload` gate -- the picker's only
+    # permission is "may browse and choose". It has no panel.
     def index
       @search = Media::Search.new(q: params[:q], filter: params[:filter], actor: Current.actor)
       scope = @search.results
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: scope.count)
       @assets = scope.order(id: :desc).limit(PER_PAGE).offset(@pagination.offset).to_a
 
+      @counts = @search.counts
       return render :picker, layout: false if params[:picker].present?
 
-      @counts = @search.counts
       @selected = selected_asset
       @link_params = list_query
     end
@@ -78,19 +79,19 @@ module Admin
 
     # The grid's own multi-file upload (design spec §6, global
     # constraints): one request per file -- `admin--media-upload` calls
-    # this once per selected/dropped file, never a batch -- so a refused
-    # or oversized file never blocks its siblings and gets its own inline
-    # error rather than one dialog for a whole batch. JSON either way,
-    # same shape `Admin::MediaAssetsController#create` already answers
-    # with (that controller's own JSON contract is the Tiptap editor's,
-    # this one the grid's own JS controller's -- two different callers,
-    # deliberately not merged into one endpoint, per that resource's own
-    # routing comment).
+    # this once per selected/dropped file, one at a time, never a batch -- so a
+    # refused or oversized file never blocks its siblings and keeps its own
+    # progress tile with the reason rather than one dialog for a whole batch.
+    # JSON either way: the finished tile and the new counts on success
+    # (`Admin::MediaUploadResponses`), `{ errors }` otherwise. Same shape as
+    # `Admin::MediaAssetsController#create`, which answers the picker with pick
+    # tiles (two different callers, deliberately not merged into one endpoint,
+    # per that resource's own routing comment).
     def create
       result = Media::Upload.call(file: params[:file])
 
       if result.ok?
-        render json: { id: result.record.id, title: result.record.title }, status: :created
+        render json: upload_json(result.record, picker: false), status: :created
       else
         render json: { errors: result.errors }, status: result.denied? ? :forbidden : :unprocessable_entity
       end

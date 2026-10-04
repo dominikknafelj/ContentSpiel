@@ -1,5 +1,11 @@
+<ul class="admin-media-grid <%= grid_class %>">
+  <% assets.each do |asset| %>
+    <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: (show_path(asset) unless pick?), unused: !used_ids.include?(asset.id),
+          selected: selected?(asset), pick: pick?, locale: locale) %>
+  <% end %>
+</ul>
 <% if assets.empty? %>
-  <div class="rounded-cs border border-line bg-surface">
+  <div class="rounded-cs border border-line bg-surface" data-media-empty>
     <% if filtered? %>
       <%= render Admin::EmptyStateComponent.new(title: "No matches", description: "No images match the current search or filter.") do |empty_state| %>
         <% empty_state.with_action do %>
@@ -7,26 +13,7 @@
         <% end %>
       <% end %>
     <% else %>
-      <%= render Admin::EmptyStateComponent.new(title: "No images", description: pick? ? "Upload one in the Upload tab." : "Upload one above.") %>
+      <%= render Admin::EmptyStateComponent.new(title: "No images", description: pick? ? "Use Upload above to add one." : "Upload one above.") %>
     <% end %>
   </div>
-<% else %>
-  <ul class="admin-media-grid <%= grid_class %>">
-    <% assets.each do |asset| %>
-      <% if pick? %>
-        <li id="media-picker-asset-<%= asset.id %>">
-          <% card_class = "group block w-full rounded-cs border border-line bg-surface p-2 text-left hover:border-line-strong focus:outline-2 focus:outline-accent" %>
-          <%= tag.button type: "button", class: card_class,
-                data: { action: "admin--media-picker#pick", "admin--media-picker-asset-param": pick_payload(asset) } do %>
-            <span class="block aspect-square overflow-hidden rounded-cs bg-sunken">
-              <%= image_tag thumbnail_url(asset), alt: "", loading: "lazy", class: "h-full w-full object-cover" %>
-            </span>
-            <span class="mt-2 block truncate text-sm text-ink"><%= asset.title %></span>
-          <% end %>
-        </li>
-      <% else %>
-        <%= render Admin::MediaLibrary::TileComponent.new(asset: asset, url: show_path(asset), unused: !used_ids.include?(asset.id), selected: selected?(asset)) %>
-      <% end %>
-    <% end %>
-  </ul>
 <% end %>

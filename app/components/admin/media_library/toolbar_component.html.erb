@@ -2,13 +2,16 @@
   <% if hidden_locale? %>
     <%= hidden_field_tag :locale, url_options[:locale], id: nil %>
   <% end %>
+  <% if picker? %>
+    <%= hidden_field_tag :picker, "1", id: nil %>
+  <% end %>
   <% if selected_id %>
     <%= hidden_field_tag :selected, selected_id, id: nil %>
   <% end %>
 
   <div>
-    <%= label_tag :q, "Search images", class: "sr-only" %>
-    <%= search_field_tag :q, q.is_a?(String) ? q : nil, placeholder: "Search title, alt text or filename", autocomplete: "off",
+    <%= label_tag search_id, "Search images", class: "sr-only" %>
+    <%= search_field_tag :q, q.is_a?(String) ? q : nil, id: search_id, placeholder: "Search title, alt text or filename", autocomplete: "off",
           class: "block w-72 max-w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
   </div>
 
@@ -16,10 +19,10 @@
     <legend class="sr-only">Show</legend>
     <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-line-strong bg-surface">
       <% segments.each do |value, key, label| %>
-        <label for="media-filter-<%= key %>" class="<%= SEGMENT_CLASS %>">
-          <%= radio_button_tag :filter, value, checked?(value), id: "media-filter-#{key}", class: "sr-only" %>
+        <label for="<%= filter_id(key) %>" class="<%= SEGMENT_CLASS %>">
+          <%= radio_button_tag :filter, value, checked?(value), id: filter_id(key), class: "sr-only" %>
           <span><%= label %></span>
-          <span id="<%= self.class.count_id(key) %>" class="font-cs-mono text-[10px] opacity-70"><%= count_for(key) %></span>
+          <span id="<%= count_dom_id(key) %>" class="font-cs-mono text-[10px] opacity-70"><%= count_for(key) %></span>
         </label>
       <% end %>
     </div>
@@ -27,6 +30,7 @@
 
   <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
   <% if active? %>
-    <%= link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+    <%= link_to "Clear", clear_path, class: setup_secondary_link_class,
+          data: (picker? ? { turbo_frame: "media-picker-grid" } : { turbo_frame: "content", turbo_action: "replace" }) %>
   <% end %>
 <% end %>

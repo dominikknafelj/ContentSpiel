@@ -1,11 +1,14 @@
 require "application_system_test_case"
 
-# The one media picker (media library design spec §6, Task 8):
-# `Media::PickerComponent`, a modal with a Library tab (search and pick) and
-# an Upload tab, opened from the page hero field, an image block's image
-# field and the rich-text editor's Image button -- each of which receives
+# The one media picker (media library design spec §6, Task 8; round 3 Task 9):
+# `Media::PickerComponent`, a modal that is the Media grid in miniature -- instant
+# search, segments, selectable tiles, a header Upload and a footer "N selected ·
+# Cancel · Use image" -- opened from the page hero field, an image block's image
+# field and the rich-text editor's Image button, each of which receives
 # the picked asset's id and stores it (a hidden `hero_media_asset_id` /
-# `media_asset_id` input autosave sends, or an `image{asset_id}` node).
+# `media_asset_id` input autosave sends, or an `image{asset_id}` node). Choosing
+# is select-then-use (D14): a click selects, Use image confirms, a double click
+# does both.
 #
 # Native clicks throughout (Cuprite's own `click`), not
 # `ApplicationSystemTestCase#press`'s scripted one: opening a modal
@@ -61,7 +64,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     press_insert "Image"
     # Picking opens the image dialog (Task 13), so not `pick_from_library`,
     # which waits for every dialog to close.
-    within("dialog[open]") { click_on @asset.title }
+    within("dialog[open]") { click_on @asset.title; click_on "Use image" }
     assert_selector "dialog#rich-text-image-dialog[open]"
     # The per-use fields show the image's own defaults as placeholders
     # (fix round 1, I1).
@@ -92,25 +95,177 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert Media::Asset.exists?(@asset.id)
   end
 
-  test "an upload through the picker's Upload tab shows errors inline, then lands in an image block" do
+  test "an upload through the picker's header Upload: a refused file keeps its tile and reason, a good one is selected, Use image lands it in an image block" do
     block = @landing.content_blocks.create!(block_type: "image", position: 0)
     visit_editor
 
     within("##{Admin::BlockCardComponent.error_prefix(block)}-image-section") { click_on "Choose image" }
     within("dialog[open]") do
-      click_on "Upload"
+      assert_button @asset.title
       attach_file "Image file", file_fixture("fake.png").to_s
-      assert_selector "[role=alert]", text: /PNG, JPEG, GIF, or WEBP/
+      assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/, wait: 10
+      assert_button "Dismiss"
+      assert_text "No image selected"
     end
     assert_equal 1, Media::Asset.count
 
-    within("dialog[open]") { attach_file "Image file", file_fixture("tiny.png").to_s }
+    within("dialog[open]") do
+      attach_file "Image file", file_fixture("tiny.png").to_s
+      assert_text "1 selected", wait: 10
+      # The refused file's tile is still there beside the new one.
+      assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/
+      click_on "Use image"
+    end
     refute_selector "dialog[open]"
 
     within("##{Admin::BlockCardComponent.error_prefix(block)}-image-section") { assert_button "Change image" }
     uploaded = Media::Asset.where.not(id: @asset.id).sole
     assert_equal "tiny", uploaded.title
     assert_eventually { block.reload.media_asset_id == uploaded.id }
+  end
+
+  # The carried requirement: one good and one refused file in a single batch.
+  test "a batch of one good and one refused file in the picker: the good one becomes a tile and is selected, the refused one keeps its reason and Dismiss" do
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      assert_button @asset.title
+      attach_file "Image file", [ file_fixture("fake.png").to_s, file_fixture("tiny.png").to_s ]
+      assert_text "1 selected", wait: 10
+      assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/
+      assert_button "tiny"
+      assert_text "UNUSED", minimum: 2
+      find("[data-upload-tile] button", text: "Dismiss").click
+      assert_no_selector "[data-upload-tile]"
+    end
+    assert_equal 2, Media::Asset.count
+  end
+
+  test "choosing: a click only selects, Use image fills the field, a double click picks at once" do
+    other = create_media_asset(filename: "tiny.png")
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      assert_text "No image selected"
+      assert_button "Use image", disabled: true
+      click_on @asset.title
+      assert_text "1 selected"
+      assert_selector "button[aria-pressed=true]", count: 1
+      assert_button "Use image", disabled: false
+      # Selecting another moves the selection.
+      click_on other.title
+      assert_selector "button[aria-pressed=true]", text: other.title, count: 1
+    end
+    assert_selector "dialog[open]"
+    assert_nil @landing.reload.hero_media_asset_id
+
+    within("dialog[open]") { click_on "Use image" }
+    refute_selector "dialog[open]"
+    within("#page-hero-image-section") { assert_button "Change image" }
+    assert_eventually { @landing.reload.hero_media_asset_id == other.id }
+
+    within("#page-hero-image-section") { click_on "Change image" }
+    within("dialog[open]") { find("button", text: @asset.title).double_click }
+    refute_selector "dialog[open]"
+    assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
+  end
+
+  test "the keyboard selects a tile with Enter or Space and a second Enter on the selected tile confirms" do
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    tile = nil
+    within("dialog[open]") { tile = find("button", text: @asset.title) }
+    tile.send_keys(:space)
+    assert_selector "dialog[open] [role=status]", text: "1 selected"
+    assert_selector "dialog[open] button[aria-pressed=true]", text: @asset.title
+    assert_selector "dialog[open]"
+
+    tile.send_keys(:enter)
+    refute_selector "dialog[open]"
+    assert_eventually { @landing.reload.hero_media_asset_id == @asset.id }
+  end
+
+  test "the search is instant with no button, segments filter inside the dialog, and the selection survives" do
+    other = create_media_asset(filename: "tiny.png")
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      assert_no_button "Search"
+      assert_button other.title
+      click_on @asset.title
+      assert_text "1 selected"
+
+      fill_in "Search images", with: "tiny"
+      assert_no_button @asset.title
+      assert_button other.title
+      # The choice outlives a grid that no longer lists it.
+      assert_text "1 selected"
+      assert_button "Use image", disabled: false
+
+      fill_in "Search images", with: ""
+      assert_selector "button[aria-pressed=true]", text: @asset.title
+
+      find("label", text: /Missing alt/).click
+      assert_button @asset.title
+    end
+    assert_selector "dialog[open]"
+    assert_current_path "/cs-studio/pages/#{@landing.id}"
+  end
+
+  test "Escape clears the search first, a second Escape closes the dialog and focus goes back to the opener" do
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      assert_button @asset.title
+      fill_in "Search images", with: "zzz-nothing"
+      assert_text "No matches"
+      find_field("Search images").send_keys(:escape)
+      assert_field "Search images", with: ""
+      assert_button @asset.title
+    end
+    assert_selector "dialog[open]"
+
+    find("dialog[open]").send_keys(:escape)
+    refute_selector "dialog[open]"
+    assert_selector "#page-hero-image-section button:focus", text: "Choose image"
+  end
+
+  test "the × and Cancel close without choosing, and a press that begins inside and ends on the backdrop leaves it open" do
+    visit_editor
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      assert_button @asset.title
+      click_on @asset.title
+    end
+
+    box = page.evaluate_script("(() => { const r = document.querySelector('dialog[open]').getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom] })()")
+    left, top, right, _bottom = box
+    mouse = page.driver.browser.mouse
+    mouse.move(x: (left + right) / 2, y: top + 30)
+    mouse.down
+    mouse.move(x: 5, y: 5)
+    mouse.up
+    sleep 0.3
+    assert_selector "dialog[open]"
+
+    within("dialog[open]") { find("button[aria-label=Close]").click }
+    refute_selector "dialog[open]"
+    assert_nil @landing.reload.hero_media_asset_id
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    within("dialog[open]") do
+      # Reopened afresh: nothing is selected.
+      assert_text "No image selected"
+      click_on "Cancel"
+    end
+    refute_selector "dialog[open]"
+    assert_nil @landing.reload.hero_media_asset_id
   end
 
   # Fix round 1 (I2), with a realistic trigger: the image is deleted
@@ -164,56 +319,43 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_nil @landing.reload.hero_media_asset_id
   end
 
-  test "the Library tab searches the library" do
+  # The picker's height changes while it is open -- the grid is empty until its
+  # request answers, a search narrows it, progress tiles join it -- and a centred
+  # dialog moved its header with every change (112px up when the library arrived),
+  # so a click aimed at something just after opening landed on what had slid
+  # under the pointer: CI's one-run-in-ten failure of the rich-text upload test.
+  # The picker hangs from a fixed top edge (`.admin-media-picker`), so its top and
+  # its header stay put. The grid's answer is held back here until the first
+  # measurement is taken, so the test sees both states every time instead of
+  # whichever the timing gives it.
+  test "the picker's top edge stays where it is when the grid arrives and when a search narrows it" do
     other = create_media_asset(filename: "tiny.png")
-    visit_editor
-
-    within("#page-hero-image-section") { click_on "Choose image" }
-    within("dialog[open]") do
-      assert_button other.title
-      fill_in "Search images", with: "wid"
-      click_on "Search"
-      assert_no_button other.title
-      assert_button @asset.title
-    end
-  end
-
-  # The picker's height changes while it is open -- the Library frame is empty
-  # until its request answers, and the Upload panel is shorter than a loaded
-  # library -- and a centred dialog moved its tab row with every change (112px
-  # up when the library arrived). A click aimed at "Upload" just after opening
-  # then landed on the library that had slid under the pointer and the tab
-  # never switched: CI's "Unable to find visible file field "Image file"", one
-  # run in ten. The picker hangs from a fixed top edge now (`.admin-media-picker`),
-  # so the tabs stay put. The library's answer is held back here until the
-  # first measurement is taken, so the test sees both states every time
-  # instead of whichever the timing gives it.
-  test "the picker's tabs stay where they are when the library arrives and when the tab changes" do
     visit_editor
     page.execute_script(<<~JS)
       const original = window.fetch
-      window.__libraryHeld = new Promise((release) => { window.__releaseLibrary = release })
+      window.__gridHeld = new Promise((release) => { window.__releaseGrid = release })
       window.fetch = (url, options) => {
         if (!String(url?.url || url).includes("picker=1")) return original(url, options)
-        return window.__libraryHeld.then(() => original(url, options))
+        return window.__gridHeld.then(() => original(url, options))
       }
     JS
-    tab_top = -> { page.evaluate_script("document.getElementById('media-picker-upload-tab').getBoundingClientRect().top") }
+    top = -> { page.evaluate_script("document.getElementById('media-picker').getBoundingClientRect().top") }
 
     within("#page-hero-image-section") { click_on "Choose image" }
     assert_selector "dialog#media-picker[open]"
-    assert_no_selector "#media-picker-library *", visible: :all, wait: 0.5
-    before_library = tab_top.call
+    assert_no_selector "#media-picker-grid *", visible: :all, wait: 0.5
+    before_grid = top.call
 
-    page.execute_script("window.__releaseLibrary()")
+    page.execute_script("window.__releaseGrid()")
     within("dialog[open]") { assert_button @asset.title }
-    assert_equal before_library, tab_top.call, "the tab row moved when the library loaded"
+    assert_equal before_grid, top.call, "the dialog moved when the grid loaded"
 
     within("dialog[open]") do
-      click_on "Upload"
-      assert_field "Image file"
+      fill_in "Search images", with: "tiny"
+      assert_no_button @asset.title
+      assert_button other.title
     end
-    assert_equal before_library, tab_top.call, "the tab row moved when the tab changed"
+    assert_equal before_grid, top.call, "the dialog moved when a search narrowed the grid"
   end
 
   private
@@ -261,8 +403,12 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
   end
 
+  # Select-then-use (D14): a click selects the tile, Use image confirms.
   def pick_from_library(asset)
-    within("dialog[open]") { click_on asset.title }
+    within("dialog[open]") do
+      click_on asset.title
+      click_on "Use image"
+    end
     refute_selector "dialog[open]"
   end
 

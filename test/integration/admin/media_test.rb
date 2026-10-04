@@ -49,7 +49,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#media-asset-#{unrelated.id}", count: 0
   end
 
-  # Media library Task 8: `Media::PickerComponent`'s Library tab is this
+  # Media library Task 8: `Media::PickerComponent`'s grid is this
   # same listing with `picker=1` -- no layout, just the picker's frame,
   # each card a pick button carrying the asset's id, thumbnail, title and
   # its own alt/caption defaults in the editing language.
@@ -63,13 +63,13 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not_includes response.body, "<html"
     assert_select "nav[aria-label='Modules']", count: 0
-    assert_select "turbo-frame#media-picker-library" do
+    assert_select "turbo-frame#media-picker-grid" do
       assert_select "form input[type=hidden][name=picker][value='1']"
       assert_select "form input[type=hidden][name=locale][value='de']"
-      assert_select "button[data-action='admin--media-picker#pick']", count: 1
+      assert_select PICK, count: 1
       assert_select "a[href*='selected=#{asset.id}']", count: 0
     end
-    payload = JSON.parse(css_select("button[data-action='admin--media-picker#pick']").first["data-admin--media-picker-asset-param"])
+    payload = JSON.parse(css_select(PICK).first["data-admin--media-select-asset-param"])
     assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
   end
 
@@ -79,11 +79,41 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     upload_asset(filename: "needle.png")
 
     get "/cs-studio/media", params: { picker: 1, q: "needle" }
-    assert_select "button[data-action='admin--media-picker#pick']", count: 1
+    assert_select PICK, count: 1
 
     get "/cs-studio/media", params: { picker: 1 }
-    assert_select "button[data-action='admin--media-picker#pick']", count: 48
-    assert_select "turbo-frame#media-picker-library a[href*='picker=1'][href*='page=2']", text: "Next"
+    assert_select PICK, count: 48
+    assert_select "turbo-frame#media-picker-grid a[href*='picker=1'][href*='page=2']", text: "Next"
+  end
+
+  # Round 3 Task 9: the picker reuses the grid's toolbar -- an instant search
+  # and the segments (the translation one is not a picking concern) -- inside
+  # its own frame, so typing or choosing a segment never leaves the dialog.
+  test "picker mode draws the toolbar in its own frame and filters by query and segment" do
+    sign_in_as(users(:one))
+    bare = upload_asset(filename: "bare.png")
+    described = upload_asset(filename: "described.png")
+    assert Media::Save.call(described, translations: { Locales.default => { alt: "A view" } }).ok?
+
+    get "/cs-studio/media", params: { picker: 1 }
+
+    assert_select "turbo-frame#media-picker-grid form[data-turbo-frame='media-picker-grid']" do
+      assert_select "form[data-controller='admin--auto-submit']"
+      assert_select "input[type=search][name=q]"
+      assert_select "input[type=radio][name=filter]", count: 4
+      assert_select "input[type=radio][value=untranslated]", count: 0
+      assert_select "[id^='media-picker-count-']", count: 4
+    end
+    # A frame navigation that stays in the dialog: no history promotion.
+    assert_select "turbo-frame#media-picker-grid form[data-turbo-action]", count: 0
+
+    get "/cs-studio/media", params: { picker: 1, filter: "missing_alt" }
+    assert_select "#media-picker-asset-#{bare.id}"
+    assert_select "#media-picker-asset-#{described.id}", count: 0
+
+    get "/cs-studio/media", params: { picker: 1, q: "described", filter: "unused" }
+    assert_select "#media-picker-asset-#{described.id}"
+    assert_select "#media-picker-asset-#{bare.id}", count: 0
   end
 
   test "junk and out-of-range page numbers never error" do
@@ -119,7 +149,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     60.times { |i| build_asset(filename: "many-#{i}.png") }
     many_count = ActiveRecord::Base.uncached { count_queries { get "/cs-studio/media", params: { picker: 1 } } }
 
-    assert_select "button[data-action='admin--media-picker#pick']", 48
+    assert_select PICK, 48
     assert_equal few_count, many_count, "10 assets: #{few_count} queries, 60 assets: #{many_count}"
   end
 
@@ -208,7 +238,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/media"
 
-    assert_select "ul[data-admin--media-upload-target='list'][aria-live='polite']"
+    assert_select "[data-admin--media-upload-target='status'][aria-live='polite']"
   end
 
   # Final fix wave (M8): a forged non-String `q` (`?q[]=x`, `?q[a]=x`)
@@ -656,6 +686,37 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # Round 3 Task 9: what the drop zone needs to turn a progress tile into the
+  # real one without a reload -- the tile's own markup (a link into the panel,
+  # NO ALT and UNUSED while they hold) and the segment counts.
+  test "an upload answers with the finished tile and the new counts" do
+    sign_in_as(users(:one))
+    upload_asset(filename: "older.png")
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png"), q: "" }
+
+    assert_response :created
+    body = response.parsed_body
+    asset = Media::Asset.order(:id).last
+    assert_equal asset.id, body["id"]
+    assert_equal "tiny", body["title"]
+    assert_equal 2, body["counts"]["all"]
+    assert_equal 2, body["counts"]["unused"]
+    tile = Nokogiri::HTML.fragment(body["tile"])
+    assert_equal "media-asset-#{asset.id}", tile.at_css("li")["id"]
+    assert_includes tile.at_css("a")["href"], "selected=#{asset.id}"
+    assert_includes tile.text, "NO ALT"
+  end
+
+  test "an upload's counts respect the search that was showing" do
+    sign_in_as(users(:one))
+    upload_asset(filename: "older.png")
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png"), q: "older" }
+
+    assert_equal 1, response.parsed_body["counts"]["all"]
+  end
+
   test "an SVG upload is rejected with an inline error, not a 500" do
     sign_in_as(users(:one))
 
@@ -676,6 +737,8 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  PICK = "button[data-action*='admin--media-select#select']".freeze
 
   # A real, saved `Media::Asset` through the actual write path
   # (`Media::Upload`), with a custom logical filename independent of the

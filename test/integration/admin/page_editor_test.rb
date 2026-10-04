@@ -372,9 +372,9 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     end
     assert_select "input[name='page[hero_alt]'][placeholder='A dog on a beach']"
     # No upload field of its own any more; the one file input is the
-    # picker's Upload tab, rendered once by the layout.
+    # picker's header Upload, rendered once by the layout.
     assert_select "form[data-controller~='admin--autosave'] input[type=file]", count: 0
-    assert_select "dialog#media-picker[data-controller='admin--media-picker']", count: 1
+    assert_select "dialog#media-picker[data-controller~='admin--media-picker']", count: 1
   end
 
   # `new FormData(form)` (`admin--autosave`) resends *every* field on

@@ -14,12 +14,13 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     # A real, single multi-file selection on the visible file input --
-    # `admin--media-upload#filesSelected` fires one POST per file (global
-    # constraints' own upload ruling) and reloads the page once both have
-    # settled.
+    # `admin--media-upload#filesSelected` fires one POST per file, one at a time
+    # (global constraints' own upload ruling), and nothing reloads.
     attach_file("media-upload-input", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
 
-    assert_selector ".admin-media-grid li", count: 2, wait: 10
+    # One at a time, and no reload: each file's tile becomes the real one in turn.
+    assert_selector ".admin-media-grid li[id^=media-asset-]", count: 2, wait: 10
+    assert_no_selector "[data-upload-tile]"
     assert_equal 2, Media::Asset.count
 
     asset = Media::Asset.find_by!(title: "wide")
@@ -99,7 +100,153 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"
   end
 
+  # Round 3 Task 9: drop images anywhere on the screen. A real OS drag cannot be
+  # driven from here, so the page itself builds the `DataTransfer` and fires the
+  # same events a drag would (`dragenter`, then `drop`).
+  test "dropping files anywhere shows the overlay, then a progress tile for each and the real tile after it, with no reload" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    page.execute_script("window.__noReload = 'still here'")
+    hold_uploads
+
+    dispatch_file_drag("dragenter", "tiny.png")
+    assert_selector "[data-admin--media-drop-target=overlay]", text: "Drop images to upload", visible: :visible
+    dispatch_file_drop("tiny.png")
+
+    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_selector "[data-upload-tile]", text: "tiny.png"
+    assert_selector "[data-upload-tile]", text: "Uploading…"
+    assert_equal 0, Media::Asset.count
+
+    release_uploads
+    assert_selector ".admin-media-grid li[id^=media-asset-] a", text: "tiny", wait: 10
+    assert_no_selector "[data-upload-tile]"
+    assert_selector "#media-count-all", text: "1"
+    assert_equal 1, Media::Asset.count
+    assert_equal "still here", page.evaluate_script("window.__noReload")
+  end
+
+  test "a drop of one good and one refused file: the good one becomes a tile, the refused one keeps its reason and Dismiss, nothing reloads" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    page.execute_script("window.__noReload = 'still here'")
+
+    dispatch_file_drop("fake.png", "tiny.png")
+
+    assert_selector ".admin-media-grid li[id^=media-asset-] a", text: "tiny", wait: 10
+    assert_selector "[data-upload-tile]", text: /fake\.png.*PNG, JPEG, GIF, or WEBP/m, wait: 10
+    assert_equal 1, Media::Asset.count
+    assert_equal "still here", page.evaluate_script("window.__noReload")
+
+    find("[data-upload-tile] button", text: "Dismiss").click
+    assert_no_selector "[data-upload-tile]"
+    assert_selector ".admin-media-grid li", count: 1
+  end
+
+  test "a drag that carries text, and one that Escape ends, never shows the overlay for long" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const data = new DataTransfer()
+      data.setData("text/plain", "just some words")
+      document.dispatchEvent(new DragEvent("dragenter", { dataTransfer: data, bubbles: true, cancelable: true }))
+    JS
+    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+
+    dispatch_file_drag("dragenter", "tiny.png")
+    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    # Entering and leaving a child (the counted enter/leave) does not flicker it...
+    dispatch_file_drag("dragenter", "tiny.png")
+    dispatch_file_drag("dragleave", "tiny.png", related: true)
+    assert_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    # ...and Escape ends the drag.
+    page.driver.browser.keyboard.type(:escape)
+    assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
+    assert_equal 0, Media::Asset.count
+  end
+
+  test "an upload that finishes while the editor types in the panel leaves the panel and the text alone, and the counts follow" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    click_tile(existing)
+    assert_selector "#media-count-all", text: "1"
+    hold_uploads
+
+    fill_in "Alt", with: "Typing while uploading"
+    page.execute_script("document.getElementById('media-panel').dataset.same = 'yes'")
+    dispatch_file_drop("tiny.png")
+    assert_selector "[data-upload-tile]", text: "Uploading…"
+    release_uploads
+
+    assert_selector ".admin-media-grid li[id^=media-asset-] a", text: "tiny", wait: 10
+    assert_selector "#media-count-all", text: "2"
+    assert_selector "#media-count-missing_alt", text: "2"
+    assert_selector "#media-panel[data-same=yes]"
+    assert_field "Alt", with: "Typing while uploading"
+    assert_alt_eventually(existing, :en, "Typing while uploading")
+  end
+
+  test "a file still going up when another tile is chosen keeps its progress tile in the new grid, and becomes real when it finishes" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    hold_uploads
+
+    dispatch_file_drop("tiny.png")
+    assert_selector "[data-upload-tile]", text: "Uploading…"
+    click_tile(existing)
+    assert_selector "[data-upload-tile]", text: "tiny.png"
+
+    release_uploads
+    assert_selector ".admin-media-grid li[id^=media-asset-] a", text: "tiny", wait: 10
+    assert_no_selector "[data-upload-tile]"
+    assert_selector "#media-panel"
+  end
+
   private
+
+  # Holds every upload's request in the page until `release_uploads`, so a test
+  # sees the progress tiles instead of whatever the timing gives it.
+  def hold_uploads
+    page.execute_script(<<~JS)
+      const send = XMLHttpRequest.prototype.send
+      window.__uploadsHeld = new Promise((release) => { window.__releaseUploads = release })
+      XMLHttpRequest.prototype.send = function (body) { window.__uploadsHeld.then(() => send.call(this, body)) }
+    JS
+  end
+
+  def release_uploads
+    page.execute_script("window.__releaseUploads()")
+  end
+
+  # A `DataTransfer` carrying real `File`s built from fixture bytes, in the page.
+  def files_script(*names)
+    builders = names.map do |name|
+      bytes = Base64.strict_encode64(file_fixture(name).binread)
+      %(data.items.add(new File([Uint8Array.from(atob("#{bytes}"), (c) => c.charCodeAt(0))], "#{name}", { type: "image/png" })))
+    end
+    "const data = new DataTransfer(); #{builders.join("; ")};"
+  end
+
+  def dispatch_file_drag(type, name, related: false)
+    page.execute_script("#{files_script(name)} document.body.dispatchEvent(new DragEvent('#{type}', { dataTransfer: data, bubbles: true, cancelable: true, relatedTarget: #{related ? "document.body" : "null"} }))")
+  end
+
+  def dispatch_file_drop(*names)
+    page.execute_script("#{files_script(*names)} document.querySelector('h1').dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))")
+  end
 
   # Clicks a tile and waits until the panel is open AND Turbo has finished with
   # the click. A tile is a link into the `content` frame with `data-turbo-action

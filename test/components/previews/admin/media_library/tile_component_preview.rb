@@ -7,6 +7,11 @@ module Admin
         render Admin::MediaLibrary::TileComponent.new(asset: PreviewFixtures.media_asset.tap(&:reload), url: "#", unused: true)
       end
 
+      # The picker's tile (round 3, Task 9): a button; `aria-pressed` draws the ring.
+      def in_the_picker
+        render Admin::MediaLibrary::TileComponent.new(asset: PreviewFixtures.media_asset.tap(&:reload), unused: true, pick: true)
+      end
+
       def selected
         render Admin::MediaLibrary::TileComponent.new(asset: PreviewFixtures.media_asset.tap(&:reload), url: "#", unused: false, selected: true)
       end

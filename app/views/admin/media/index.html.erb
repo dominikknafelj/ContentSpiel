@@ -6,14 +6,17 @@
     frame that keeps the search, the segment, the page and the language, so Back
     returns to the previous choice. No tree column (a library image has no tree
     position of its own, the same reason Tags/Posts render plain content frames). %>
-<%# The wrapper keeps `admin--media-upload`'s own dragover/drop (a drop anywhere
-    on it uploads); the FileDropComponent inside is the visible zone and the
-    labelled file input, and stops its own drops from reaching that handler
-    twice (file_drop_controller.js). The header's button opens the same input. %>
+<%# Uploading (round 3, Task 9): the wrapper carries `admin--media-drop` (a file drag
+    anywhere on the screen shows the overlay below and a drop hands its files to
+    `admin--media-upload`) and `admin--media-upload` itself (the queue: a progress
+    tile per file at the start of the grid, one at a time, nothing reloads). The
+    FileDropComponent inside is the visible zone and the labelled file input; it
+    stops its own drops from reaching the document-level handler twice
+    (file_drop_controller.js). The header's button opens the same input. %>
 <div class="mb-4 flex flex-col gap-4"
-     data-controller="admin--media-upload"
+     data-controller="admin--media-drop admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
-     data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
+     data-action="admin--media-drop:dropped->admin--media-upload#dropped">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h1 class="text-h1 text-ink">Media</h1>
     <%= render Admin::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
@@ -22,7 +25,14 @@
     <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
           hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
           data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
-    <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
+    <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
+    <p class="sr-only" role="status" aria-live="polite" data-admin--media-upload-target="status"></p>
+  </div>
+  <%# Centred by flex over the whole window, and never in the way of the drop
+      itself (`pointer-events-none`: the drag keeps its real target). %>
+  <div hidden data-admin--media-drop-target="overlay" aria-hidden="true"
+       class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint">
+    <p class="rounded-cs bg-surface px-6 py-4 text-h2 text-ink shadow-menu">Drop images to upload</p>
   </div>
 </div>
 

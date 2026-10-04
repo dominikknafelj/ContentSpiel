@@ -1,5 +1,5 @@
 module Admin
-  # `Media::PickerComponent`'s Upload tab (media library Task 8 -- the one
+  # `Media::PickerComponent`'s header Upload (media library Task 8, round 3 Task 9 -- the one
   # way to upload from a hero field, an image block or the Tiptap editor's
   # Image button, which used to POST here directly) POSTs a multipart
   # `file` straight here -- there's no page or post this belongs to yet at
@@ -13,6 +13,8 @@ module Admin
   # that happen to share the same underlying `Media::Upload`, not one
   # feature split across two endpoints.
   class MediaAssetsController < BaseController
+    include MediaUploadResponses
+
     # `params[:file]` missing entirely (no multipart part at all -- not the
     # same as an empty one, which `ActionDispatch::Http::UploadedFile`
     # would still answer to) is the one shape this can't hand straight to
@@ -27,7 +29,7 @@ module Admin
       result = Media::Upload.call(file: upload)
 
       if result.ok?
-        render json: { id: result.record.id, url: result.record.url, title: result.record.title }, status: :created
+        render json: upload_json(result.record, picker: true), status: :created
       else
         render_errors(result.errors, status: result.denied? ? :forbidden : :unprocessable_entity)
       end
