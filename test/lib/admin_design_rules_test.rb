@@ -107,4 +107,15 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     offenders = Dir[Rails.root.join("app/**/*")].select { |f| File.file?(f) && File.read(f).include?("danger_outline") }
     assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
   end
+
+  # Inside the shell a form starts at the left edge of the content area, next
+  # to the sidebar and under the page heading; only a screen that IS the form
+  # (sign-in, setup, a dialog) is centred. The 403 and 404 messages are the
+  # two centred things inside the shell, and they are messages, not forms.
+  test "nothing inside CS Studio is centred except the 403 and 404 messages" do
+    centred = Dir[Rails.root.join("app/views/admin/**/*.erb"), Rails.root.join("app/components/admin/**/*.erb")]
+      .select { |f| File.read(f).match?(/\bmx-auto\b/) }
+      .map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
+    assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort
+  end
 end

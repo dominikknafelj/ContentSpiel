@@ -5,7 +5,7 @@
 
 <% form = @form || Admin::EditorScreen::NewPostFormComponent.new(url_options: admin_url_options, locale: admin_locale,
       content_type: @post.content_type.presence || new_post_params[:content_type], title: new_post_params[:title], errors: @post.errors) %>
-<div class="mx-auto max-w-md">
+<div class="max-w-md">
   <h1 class="mb-4 text-base font-semibold">New post</h1>
 
   <%= render form %>
