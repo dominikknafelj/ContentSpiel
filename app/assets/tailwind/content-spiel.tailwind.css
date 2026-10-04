@@ -126,17 +126,39 @@
    spec §4). Autosave streams replace a field's error slot but never its input,
    so the border can't be a class set at render time: it would stay red after
    a fix, or never turn red after a failed autosave. The slot's presence of a
-   message (<p>) is the single source of truth. Wrappers that render a slot:
+   message (<p>) is the single source of truth.
+
+   Wrappers that render a slot (always as their own direct child):
    `.admin-column` (Columns::*, the settings fields, tag and related-post
    inputs, the AI key form, a tag row's form) and `.admin-field` (the schema
-   fields of Admin::FieldComponent). Surfaces: native controls, the prefix
-   input's wrapper, and the rich-text editor's toolbar and body (the whole
-   editor border). The media column has no text input, so it has nothing to
-   colour. Explicit-save forms render their class server-side instead. */
-:is(.admin-column, .admin-field):has([id$="-errors"] > p) :is(input:not([type="file"]), textarea, select, .admin-prefix-input, .admin-rich-text-editor, [role="toolbar"]) { border-color: var(--cs-danger); }
-/* The prefix input's own wrapper carries `border-danger` when it is rendered
-   invalid; once a stream empties the slot the border must go again. */
-:is(.admin-column, .admin-field):not(:has([id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
+   fields of Admin::FieldComponent). Wrappers NEST: a group field's sub-fields
+   and a repeater's rows are FieldComponents inside a FieldComponent, so one
+   sub-field's error must colour only that sub-field's own controls, never its
+   siblings' (a descendant `:has` would, since the outer wrapper contains every
+   inner slot). So the colour travels as an inherited custom property that
+   EVERY wrapper first resets (`initial` = guaranteed-invalid, so `var()` falls
+   back) and only a wrapper whose own slot holds a message sets: a control
+   sees the value of its nearest wrapper. An outer wrapper's own error is
+   therefore a message only -- nothing inside its nested sub-fields turns red.
+   The rich-text popovers (link/image/YouTube, built by JS inside the editor's
+   column) reset it too: an invalid body must not redden their inputs.
+
+   Surfaces: native controls, the prefix input's wrapper, and the rich-text
+   editor's toolbar and body (the whole editor border). The media column has no
+   text input, so it has nothing to colour. Explicit-save forms render their
+   class server-side instead. */
+.admin-column, .admin-field, .admin-rich-text-popover { --cs-field-invalid-border: initial; }
+.admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
+:is(.admin-column, .admin-field, .admin-rich-text-popover) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
+  border-color: var(--cs-field-invalid-border, var(--cs-line-strong));
+}
+/* The prefix input's wrapper is the one surface with its own focus border
+   (`focus-within:border-accent`), which an invalid field must still override,
+   so it is spelled out with the wrapper-level `:has` instead of the variable
+   (slug columns never nest) and, once the slot is empty, reset to the normal
+   border only while unfocused. */
+.admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
+.admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
 
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
