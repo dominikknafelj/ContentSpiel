@@ -123,12 +123,15 @@ module Admin
     end
 
     def suggestion_streams(fields, translation, result)
+      # The model is configuration, shown in the box's heading; nothing about
+      # the key is ever read here.
+      named = { provider: Current.site.ai_provider, model: AI.model }
       requested_inputs(fields).map do |field, input_id|
         box = Admin::TranslationScreen::SuggestionComponent
         component =
           if !result.ok? then box.new(input_id: input_id, locale: params[:locale], error: result.errors.to_sentence)
           elsif translation.suggestions.key?(field)
-            box.new(input_id: input_id, locale: params[:locale], suggestion: translation.suggestions[field], warnings: translation.warnings[field])
+            box.new(input_id: input_id, locale: params[:locale], suggestion: translation.suggestions[field], warnings: translation.warnings[field], **named)
           else box.new(input_id: input_id, locale: params[:locale], error: NOTHING_TO_TRANSLATE)
           end
         turbo_stream.update(box.dom_id(input_id), component)

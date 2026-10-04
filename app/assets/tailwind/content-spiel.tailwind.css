@@ -143,15 +143,17 @@
    sees the value of its nearest wrapper. An outer wrapper's own error is
    therefore a message only -- nothing inside its nested sub-fields turns red.
    The rich-text popovers (link/image/YouTube, built by JS inside the editor's
-   column) reset it too: an invalid body must not redden their inputs.
+   column) reset it too: an invalid body must not redden their inputs. So does an
+   AI suggestion box (`.admin-translation-suggestion`), whose editable textarea
+   sits under the field's input inside the same wrapper.
 
    Surfaces: native controls, the prefix input's wrapper, and the rich-text
    editor's toolbar and body (the whole editor border). The media column has no
    text input, so it has nothing to colour. Explicit-save forms render their
    class server-side instead. */
-.admin-column, .admin-field, .admin-rich-text-popover { --cs-field-invalid-border: initial; }
+.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion { --cs-field-invalid-border: initial; }
 .admin-column:has(> [id$="-errors"] > p), .admin-field:has(> [id$="-errors"] > p) { --cs-field-invalid-border: var(--cs-danger); }
-:is(.admin-column, .admin-field, .admin-rich-text-popover) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
+:is(.admin-column, .admin-field, .admin-rich-text-popover, .admin-translation-suggestion) :is(input:not([type="file"], [type="hidden"], [type="checkbox"], [type="radio"]), textarea, select, .admin-rich-text-editor, [role="toolbar"]) {
   border-color: var(--cs-field-invalid-border, var(--cs-line-strong));
 }
 /* The prefix input's wrapper is the one surface with its own focus border

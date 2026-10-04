@@ -14,18 +14,46 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     assert_equal "translation-suggestion-post-title", Admin::TranslationScreen::SuggestionComponent.dom_id("post-title")
   end
 
-  test "a plain suggestion: escaped text, Use carrying the text and its input, Discard" do
-    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "post-title", locale: "de", suggestion: %(Hallo <script>alert("x")</script>))
+  test "a plain suggestion is editable and names the model that wrote it" do
+    render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo Welt",
+      provider: "anthropic", model: "claude-sonnet-5"))
+    assert_selector "[data-translation-suggestion].bg-accent-tint"
+    assert_selector "textarea[data-translate-suggestion-text][aria-label='Suggested translation']", text: "Hallo Welt"
+    assert_no_selector "textarea[name]", visible: :all
+    assert_text(/suggested by claude-sonnet-5/i)
+    assert_selector "button", text: "Use"
+    assert_selector "button", text: "Discard"
+  end
 
-    assert_text %(Hallo <script>alert("x")</script>)
-    refute_selector "script", visible: :all
+  test "Use names its input and no longer carries the text (the textarea's current value is applied)" do
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "post-title", locale: "de", suggestion: "Hallo")
+
     use = page.find("button[type='button'][data-translate-use]", text: "Use")
     assert_equal "plain", use["data-translate-kind"]
     assert_equal "post-title", use["data-translate-input-id"]
-    assert_equal %(Hallo <script>alert("x")</script>), use["data-translate-text"]
+    assert_nil use["data-translate-text"]
     assert_equal "admin--translate#use", use["data-action"]
     assert_selector "button[type='button'][data-action='admin--translate#discard']", text: "Discard"
     refute_selector "[role='alert']"
+  end
+
+  test "the box keeps its edits from the form's autosave" do
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "post-title", locale: "de", suggestion: "Hallo")
+
+    actions = page.find("[data-translation-suggestion]")["data-action"]
+    %w[input change focusout].each { |event| assert_includes actions, "#{event}->admin--translate#contain" }
+  end
+
+  test "without a model name it just says Suggested translation" do
+    render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo"))
+    assert_text(/suggested translation/i)
+    assert_no_text(/suggested by/i)
+  end
+
+  test "the suggestion text is escaped inside the textarea" do
+    render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "</textarea><script>x</script>"))
+    assert_no_selector "script", visible: :all
+    assert_selector "textarea", text: "</textarea><script>x</script>"
   end
 
   test "a rich-text suggestion: the scrubbed preview, the document to load, and its warnings" do

@@ -4,8 +4,11 @@ module Admin
     # (translation helpers spec §6.4), rendered into its
     # `data-translate-slot` by the three "original" renderers
     # (`Admin::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
-    # `RichTextColumnComponent`), plus the empty box a suggestion streams
-    # into (`SuggestionComponent.dom_id(input_id)`).
+    # `RichTextColumnComponent`). The empty box a suggestion streams into
+    # (`SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
+    # component: the renderers put it under the field's own input
+    # (`admin/shared/_translation_box`), so a suggestion appears inside the
+    # field rather than in the original's panel beside it.
     #
     # `confirm:` is the same `{ record_type:, record_id:, field:, locale: }`
     # the "Mark as up to date" note gets (`OutdatedNoteComponent

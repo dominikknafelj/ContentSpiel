@@ -77,7 +77,10 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     assert_equal "button", use["type"], "never a submit -- these sit inside autosave forms"
     assert_equal "plain", use["data-translate-kind"]
     assert_equal "post-title", use["data-translate-input-id"]
-    assert_equal "[de] Hello", use["data-translate-text"]
+    assert_nil use["data-translate-text"]
+    assert_equal "[de] Hello", box.at_css("textarea[data-translate-suggestion-text]").text.strip
+    assert_includes box.text, "Suggested by #{AI.model}", "the model is configuration (the default when unset), shown in the heading"
+    refute_includes stream("translation-suggestion-post-title").to_s, "sk-test", "never anything about the key"
     assert box.at_css("button[type='button']", text: "Discard")
     assert_includes stream_fragment("translation-suggestion-post-excerpt").text, "[de] A summary"
 
@@ -249,7 +252,8 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
       assert_equal "de", wrapper["data-admin--translate-locale-value"]
     end
     assert_select "[data-translate-slot='title'] button[type='button']", text: "Translate"
-    assert_select "[data-translate-slot='title'] #translation-suggestion-post-title"
+    assert_select "[data-translate-slot='title'] #translation-suggestion-post-title", count: 0
+    assert_select "[data-field-name='title'] > div > div > #translation-suggestion-post-title[data-translation-box]"
     assert_select "[data-translate-slot='body'] [data-translate-input-id='post-body-json'][data-translate-kind='rich']"
     assert_select "button[type='button'][data-action~='admin--translate#translateEmpty']", text: "Translate empty fields"
     assert_select "[data-admin--translate-max-fields-value='#{AI::Translate::MAX_FIELDS}'][data-admin--translate-max-characters-value='#{AI::Translate::MAX_CHARACTERS}']"

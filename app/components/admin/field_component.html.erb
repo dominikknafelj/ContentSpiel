@@ -1,14 +1,18 @@
+<% translate = show_original? ? translate_button : nil %>
 <div class="admin-field mb-4" data-field-name="<%= field.name %>">
   <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
 
   <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
-    <div><%= render input_component %></div>
+    <div>
+      <%= render input_component %>
+      <%= render "admin/shared/translation_box", button: translate %>
+    </div>
 
     <% if show_original? %>
       <div class="rounded-cs border border-line bg-sunken px-3 py-2">
         <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
         <p data-original-for="<%= field.name %>" class="text-ink"><%= original %></p>
-        <div data-translate-slot="<%= field.name %>"><% if (button = translate_button) %><%= render button %><% end %></div>
+        <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
         <% if (note = outdated_note) %><%= render note %><% end %>
       </div>
     <% end %>
