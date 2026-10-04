@@ -150,6 +150,37 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_equal "[de] About", page_record.title(locale: "de", fallback: false)
       assert_equal "[de] Who we are", page_record.subtitle(locale: "de", fallback: false)
       assert_equal "[de] To be", block.reload.translated_settings.dig("de", "text")
+
+      # "Use all" fires the page form's and the block's saves on the same tick.
+      # Sent together they would carry the same page base, and the second
+      # would leave the page form holding a base nobody else made stale: its
+      # next save would be refused ("changed elsewhere") with no one else
+      # involved. The page-level queue (`autosave/queue.js`) prevents that.
+      fill_in id: "page-subtitle", with: "[de] Typed after Use all"
+      assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "[de] Typed after Use all" }
+      assert_no_text "CHANGED ELSEWHERE"
+    end
+  end
+
+  test "Use all across two blocks leaves the page settings form able to save" do
+    with_test_types do
+      page_record = create_page(title: "About")
+      blocks = 2.times.map do |i|
+        ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "test/quote" },
+          translations: { "en" => { settings: { "text" => "Line #{i}" } } }).record
+      end
+
+      visit "/cs-studio/pages/#{page_record.id}?locale=de"
+      await_admin_controllers
+
+      press "Translate empty fields"
+      assert_text "Suggestions are ready"
+      press "Use all"
+      blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5 }
+
+      fill_in id: "page-subtitle", with: "Typed after Use all"
+      assert_eventually { page_record.reload.subtitle(locale: "de", fallback: false) == "Typed after Use all" }
+      assert_no_text "CHANGED ELSEWHERE"
     end
   end
 

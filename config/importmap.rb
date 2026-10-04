@@ -26,6 +26,8 @@ pin_all_from "app/javascript/controllers/admin", under: "controllers/admin", pre
 # The Tiptap editor's own extensions/schema (tiptap spec §4.1), imported by
 # `controllers/admin/rich_text_controller.js` as `rich_text/...`.
 pin_all_from "app/javascript/rich_text", under: "rich_text", preload: "admin"
+# The one-at-a-time write queue every autosaving form and block action shares.
+pin_all_from "app/javascript/autosave", under: "autosave", preload: "admin"
 
 pin "sortablejs", preload: "admin" # @1.15.7
 pin "d3-force", preload: "admin" # @3.0.0

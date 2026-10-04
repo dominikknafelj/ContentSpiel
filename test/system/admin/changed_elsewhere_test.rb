@@ -16,7 +16,10 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    # Someone else saves the page behind this browser's back.
+    # Someone else saves the page behind this browser's back. (The bar only
+    # names changes more than a second past the base: an event is written a
+    # few milliseconds after the save whose `updated_at` became the base.)
+    sleep 1.2
     as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     fill_in "Subtitle", with: "My text"
@@ -38,5 +41,52 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_field "Subtitle", with: "The other editor's text"
     assert_no_selector "#changed-elsewhere"
     assert_no_selector "#page-save-status", text: "CHANGED ELSEWHERE"
+  end
+
+  # The editor's own forms must never make each other stale (autosave queue,
+  # `autosave/queue.js`): fill the page settings form and two block forms
+  # inside one debounce window so all three save on the same tick, then edit
+  # the page settings again. Deterministic, no AI. A `fetch` wrapper counts
+  # the writes in flight at once: it must never exceed one.
+  test "page and block forms saving on the same tick never make the page form stale, and never overlap" do
+    blocks = 2.times.map { |i| @page.content_blocks.create!(block_type: :image, position: i) }
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__inFlight = 0
+      window.__maxInFlight = 0
+      window.fetch = async (url, options = {}) => {
+        const write = (options.method || "GET").toUpperCase() !== "GET"
+        if (write) { window.__inFlight += 1; window.__maxInFlight = Math.max(window.__maxInFlight, window.__inFlight) }
+        try { return await originalFetch(url, options) } finally { if (write) window.__inFlight -= 1 }
+      }
+    JS
+
+    fill_in "Subtitle", with: "First"
+    blocks.each_with_index { |block, i| fill_in id: "block-#{block.id}-caption", with: "Caption #{i}" }
+
+    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8 }
+
+    fill_in "Subtitle", with: "Second"
+    assert_eventually { @page.reload.subtitle == "Second" }
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_equal 1, page.evaluate_script("window.__maxInFlight"), "two writes were on the wire at once"
+  end
+
+  # Add and Delete block are plain Turbo form submissions that also touch the
+  # page: they take their turn in the same queue and write the page base back.
+  test "adding and deleting blocks leaves the page settings form able to save" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    press "Rich text"
+    assert_selector ".admin-block-card", count: 1, wait: 5
+
+    fill_in "Subtitle", with: "After add"
+    assert_eventually { @page.reload.subtitle == "After add" }
+    assert_no_text "CHANGED ELSEWHERE"
   end
 end

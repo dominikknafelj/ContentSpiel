@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
+import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
@@ -40,9 +41,22 @@ export default class extends Controller {
   static pageBaseId = "page-base-updated-at"
 
   connect() {
+    // A write (never a GET) waits its turn in the page-level queue
+    // (`autosave/queue.js`) and reads the page base when it is actually sent;
+    // the queue slot is kept until the answer's bases are in the hidden
+    // fields, so the next request sees them. Add, duplicate and delete are
+    // plain Turbo form submissions, and answer with streams that move the
+    // page form's base, so they depend on it exactly as an autosave does.
     this.addPageBase = (event) => {
-      const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
-      if (pageBase) event.detail.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+      if (String(event.detail.fetchOptions.method).toUpperCase() === "GET") return
+
+      holdTurboRequest(event, {
+        baseIds: [ this.constructor.pageBaseId ],
+        before: (request) => {
+          const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
+          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+        }
+      })
     }
     this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
     // The Undo toast after a reorder lives in `#toasts`, outside this
@@ -133,21 +147,31 @@ export default class extends Controller {
     this.reorder()
   }
 
+  // Queued with every other write on the screen (`autosave/queue.js`): the
+  // order is read when the request is sent (a Move up/down made while an
+  // autosave was in flight still sends the final order), and the page base
+  // it carries is the freshest one. The answer's page base is written into
+  // the hidden field before the next request goes.
   async reorder() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    const response = await fetch(this.reorderUrlValue, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken,
-        "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
-      },
-      body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) })
-    })
+    await enqueue(async () => {
+      const response = await fetch(this.reorderUrlValue, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/vnd.turbo-stream.html",
+          "X-CSRF-Token": csrfToken,
+          "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
+        },
+        body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) }),
+        signal: AbortSignal.timeout(30000)
+      })
 
-    Turbo.renderStreamMessage(await response.text())
+      const text = await response.text()
+      syncBases(text, [ this.constructor.pageBaseId ])
+      Turbo.renderStreamMessage(text)
+    }).catch(() => {})
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------

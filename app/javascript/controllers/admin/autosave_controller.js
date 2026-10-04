@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { enqueue, syncBases } from "autosave/queue"
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -33,6 +34,16 @@ import { Turbo } from "@hotwired/turbo-rails"
 // other's fields on screen with a stale response, and never a queue of
 // more than one -- a second, third, fourth edit while busy all collapse
 // into the same single follow-up.
+//
+// Across forms: that rule is per form. Every request this controller sends
+// also goes through the page-level queue (`autosave/queue.js`), shared with
+// every other autosaving form on the screen and with block add/duplicate/
+// delete/reorder: one request is on the wire at a time, and each reads its
+// body and bases when it is SENT, after the previous answer's bases were
+// written into the hidden fields. Without it, forms that debounce on the same
+// tick ("Use all") send the same page base together, one write makes the
+// other's base stale, and the page settings form is left holding a base
+// nobody else made stale -- now a final 409. See the queue's own comment.
 export default class extends Controller {
   static values = {
     statusId: String,
@@ -109,20 +120,73 @@ export default class extends Controller {
     this.attempt()
   }
 
+  // One save attempt. The request itself is SENT from inside the page-level
+  // queue (`autosave/queue.js` -- read its comment for why every write on a
+  // screen goes one at a time): the "saving" line shows from the moment the
+  // attempt is queued, and the body, headers and bases are read when the
+  // request is actually sent, not now. `send()` answers with what happened;
+  // everything that needs the controller's own state is done here, after.
   async attempt() {
     const status = document.getElementById(this.statusIdValue)
     this.setStatus(status && status.hasAttribute("data-live") ? this.constructor.texts.savingLive : this.constructor.texts.saving)
 
+    const outcome = await enqueue(() => this.send())
+
+    switch (outcome) {
+      case "retry":
+        this.scheduleRetry()
+        return
+      case "signedOut":
+        this.retryCount = 0
+        this.busy = false
+        this.setStatus(this.constructor.texts.signedOut)
+        return
+      case "conflict":
+        // 409: the server refused this save because the record changed since
+        // the form loaded (`Admin::AutosaveResponses#refuse_stale_autosave`).
+        // It is FINAL, unlike every other failure here: no retry (the same
+        // request would be refused again), and no further saves from this
+        // form at all (`paused`), because the editor's text on screen is the
+        // only copy of what they typed and any later save would be refused
+        // too -- or, were the base ever advanced, would overwrite the other
+        // editor's work. The stream (rendered in `send`) puts the "Changed
+        // elsewhere" status and bar up; the fields are left exactly as they
+        // are so the text can be copied, and Reload (a full page visit)
+        // discards it. No base is read out of the answer, there being none
+        // -- a refusal never vouches for a newer one. A paused form drops out
+        // of the queue by simply never queueing again; other forms go on.
+        this.paused = true
+        this.pending = false
+        this.retryCount = 0
+        this.busy = false
+        if (this.timer) clearTimeout(this.timer)
+        this.timer = null
+        return
+      default:
+        this.retryCount = 0
+        this.busy = false
+        // A newer edit made while this save was queued or in flight: its own
+        // save follows, and (queued behind this one) reads the bases this
+        // answer just wrote.
+        if (this.pending) this.trigger()
+    }
+  }
+
+  // The request, run alone by the queue. Returns "done" (a real answer was
+  // received and rendered), "conflict" (a 409, rendered), "signedOut" or
+  // "retry". It never throws.
+  async send() {
     let response
     try {
       response = await fetch(this.element.action, {
         method: "PATCH",
         body: new FormData(this.element),
-        headers: this.requestHeaders()
+        headers: this.requestHeaders(),
+        // A fetch that never answers must not hold the whole screen's queue.
+        signal: AbortSignal.timeout(30000)
       })
     } catch (error) {
-      this.scheduleRetry()
-      return
+      return "retry"
     }
 
     // Fix (final-fixes round, finding 4): a network error throws (caught
@@ -141,106 +205,53 @@ export default class extends Controller {
     // SaveStatusComponent`'s own `:signed_out`) rather than the retry path
     // below: retrying a PATCH against an expired session can never
     // succeed on its own, only signing back in does.
-    if (response.redirected) {
-      this.retryCount = 0
-      this.busy = false
-      this.setStatus(this.constructor.texts.signedOut)
-      return
-    }
+    if (response.redirected) return "signedOut"
 
     // Anything else has to actually be the Turbo Stream response this
-    // controller's own endpoints answer with -- global constraints' own
-    // "Couldn't save"/"Changed elsewhere" status texts only ever reach the
-    // page through one of *those* streams (`Admin::AutosaveResponses
+    // controller's own endpoints answer with -- the status texts only ever
+    // reach the page through one of *those* streams (`Admin::AutosaveResponses
     // #autosave_stream`), so a response with some other content type, or a
-    // status outside this endpoint's own documented range (2xx a save;
-    // 409 a refused stale save; 410 "this block was deleted"; 422 a failed
-    // save's own per-field errors) was never actually processed by the endpoint at all -- a 500,
-    // a proxy's own error page, ... -- and takes the same retry path a
-    // network error does, rather than being handed to
+    // status outside this endpoint's own documented range (2xx a save; 409 a
+    // refused stale save; 410 "this block was deleted"; 422 a failed save's
+    // own per-field errors) was never actually processed by the endpoint at
+    // all -- a 500, a proxy's own error page, ... -- and takes the same retry
+    // path a network error does, rather than being handed to
     // `Turbo.renderStreamMessage` as if it were one.
-    if (!this.isTurboStreamAnswer(response)) {
-      this.scheduleRetry()
-      return
-    }
+    if (!this.isTurboStreamAnswer(response)) return "retry"
 
-    // 409: the server refused this save because the record changed since the
-    // form loaded (`Admin::AutosaveResponses#refuse_stale_autosave`). It is
-    // FINAL, unlike every other failure here: no retry (the same request
-    // would be refused again), and no further saves from this form at all
-    // (`paused`), because the editor's text on screen is the only copy of
-    // what they typed and any later save would be refused too -- or, were
-    // the base ever advanced, would overwrite the other editor's work. The
-    // stream puts the "Changed elsewhere" status and bar up; the fields are
-    // left exactly as they are so the text can be copied, and Reload (a full
-    // page visit) discards it. No base is read out of the answer, there
-    // being none -- a refusal never vouches for a newer one.
+    const text = await response.text()
+
     if (response.status === 409) {
-      Turbo.renderStreamMessage(await response.text())
-      this.paused = true
-      this.pending = false
-      this.retryCount = 0
-      this.busy = false
-      if (this.timer) clearTimeout(this.timer)
-      this.timer = null
-      return
+      Turbo.renderStreamMessage(text)
+      return "conflict"
     }
 
     // A 422 with a body is still a real answer at this point -- the
     // server-rendered stream already turns that into the "Couldn't save"
     // status and the per-field errors, so it counts as success from *this*
     // controller's own point of view (nothing left to retry).
-    const text = await response.text()
-
-    // Fix (discovered by this task's own autosave-queue system test):
-    // `Turbo.renderStreamMessage` doesn't patch the DOM synchronously --
-    // confirmed empirically, its `<turbo-stream>` elements apply on the
-    // *next animation frame*, not on this line, not even after a
-    // microtask/macrotask -- so a `pending` retrigger just below used to
-    // build its own `FormData` from the *stale* `base_updated_at` hidden
-    // field this very response is about to refresh, making a client's own
-    // very next save spuriously report "Changed elsewhere — reload to see
-    // the latest" against nothing but itself (spec §6.1's staleness check
-    // is meant to catch an edit from *elsewhere*, not this). Reading the
-    // field's fresh value straight out of the response text and writing it
-    // onto the form ourselves, synchronously, right now, is what keeps that
-    // race from ever mattering -- Turbo's own (later) replace of the same
-    // element just re-applies the identical value once it catches up.
-    // `template.content` (not a plain `querySelector` on the parsed
-    // document) is what a `<turbo-stream>`'s own hidden field actually
-    // lives in -- a `<template>`'s content is its own document fragment,
-    // invisible to a query against the document around it.
     //
-    // Matched by id, not just by name: a block card's response may also
-    // carry the page settings form's own base (the block write touched the
-    // page -- `Admin::ContentBlocksController#page_base_streams`), and
-    // taking the first `base_updated_at` in the response would hand this
-    // card the page's value instead of its own.
+    // `Turbo.renderStreamMessage` doesn't patch the DOM synchronously -- its
+    // `<turbo-stream>` elements apply on the *next animation frame* -- so the
+    // next request (queued behind this one, or this form's own `pending`
+    // retrigger) would otherwise build its `FormData` from the *stale*
+    // `base_updated_at` hidden field this very response is about to refresh,
+    // and be refused as "changed elsewhere" against nothing but itself.
+    // `syncBases` reads the fresh values straight out of the response text and
+    // writes them onto the live fields synchronously, right now; Turbo's own
+    // (later) replace of the same element re-applies the identical value.
     //
-    // That page base is applied synchronously too, for the same reason
-    // (fix round 3): a queued retrigger sends it as `X-Page-Base-Updated-At`
-    // (`#requestHeaders`), and read before Turbo's deferred replace it would
-    // be the *old* value -- the server then (rightly) won't move it, this
-    // write touches the page again, and the page form's next save reads
-    // "Changed elsewhere" with nobody else involved.
-    const templates = Array.from(new DOMParser().parseFromString(text, "text/html").querySelectorAll("template"))
-    const freshValue = (id) => templates
-      .map((template) => template.content.querySelector(`[name="base_updated_at"][id="${id}"]`))
-      .find((field) => field)?.value
-
+    // Matched by id, not just by name: a block card's response may also carry
+    // the page settings form's own base (the block write touched the page --
+    // `Admin::ContentBlocksController#page_base_streams`), and taking the
+    // first `base_updated_at` in the response would hand this card the page's
+    // value instead of its own. The page base is applied too because the next
+    // request sends it as `X-Page-Base-Updated-At` (`#requestHeaders`).
     const ownBase = this.element.querySelector('[name="base_updated_at"]')
-    const ownFresh = ownBase && freshValue(ownBase.id)
-    if (ownFresh) ownBase.value = ownFresh
-
-    const pageBase = this.hasPageBaseIdValue && document.getElementById(this.pageBaseIdValue)
-    const pageFresh = pageBase && freshValue(this.pageBaseIdValue)
-    if (pageFresh) pageBase.value = pageFresh
+    syncBases(text, [ ownBase?.id, this.hasPageBaseIdValue && this.pageBaseIdValue ].filter(Boolean))
 
     Turbo.renderStreamMessage(text)
-    this.retryCount = 0
-    this.busy = false
-
-    if (this.pending) this.trigger()
+    return "done"
   }
 
   requestHeaders() {

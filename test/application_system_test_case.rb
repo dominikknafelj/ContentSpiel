@@ -91,6 +91,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
+  # Polls a condition on the database (a save the browser sends on its own
+  # timer) until it holds, `wait` seconds at most.
+  def assert_eventually(wait: 8, message: "condition never became true")
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+    until yield
+      flunk message if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.1
+    end
+    assert true
+  end
+
   def await_admin_controllers
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
