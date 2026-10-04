@@ -519,4 +519,41 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert stream, "expected the page form's base in:\n#{response.body}"
     stream.inner_html[/value="([^"]+)"/, 1]
   end
+
+  # Task 7: a translation tab's block form no longer renders the untranslated
+  # settings as inputs (they are read-only under "Shared fields"), so its
+  # autosave sends exactly the keys below -- and the shared values must be
+  # exactly what they were.
+  test "a translation-tab save of a block leaves its shared settings untouched" do
+    with_test_types do
+      block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "test/quote", settings: { cite: "https://example.com/a" } },
+        translations: { "en" => { settings: { text: "To be" } } }).record
+      assert block.persisted?
+
+      get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+      assert_select "form.admin-translation-form input[name='block[settings][text]']"
+      assert_select "form.admin-translation-form input[name='block[settings][cite]']", count: 0
+
+      patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+        params: { locale: "de", block: { settings: { text: "Sein" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+      assert_response :success
+      block.reload
+      assert_equal "https://example.com/a", block.settings["cite"]
+      assert_equal "Sein", block.settings_object(locale: :de).text
+      assert_equal "To be", block.settings_object(locale: Locales.default).text
+    end
+  end
+
+  test "a translation-tab save of a post_list block (a form with no inputs but the base) leaves its settings untouched" do
+    block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "post_list", settings: { content_type: "blog", limit: 3 } }).record
+
+    patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+      params: { locale: "de", base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+    block.reload
+    assert_equal 3, block.settings["limit"]
+    assert_equal "blog", block.settings["content_type"]
+    assert_not block.translated_settings.key?("de")
+  end
 end

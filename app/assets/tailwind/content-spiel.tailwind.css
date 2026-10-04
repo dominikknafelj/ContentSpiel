@@ -204,14 +204,20 @@
    what you read before you type) and foldable (`<details open>`), and the
    rich-text toolbar -- now alone in its row -- has the full width, so it fits
    on one line again (round 1's `flex-wrap` stays as the fallback only). Side
-   by side the card's summary is inert: with room for both there is nothing to
-   fold away. The error slot is NOT inside the pair (see the invalid-border
+   by side there is nothing to fold away: `::details-content` is forced visible
+   whatever the `open` state (a card folded while stacked must not stay hidden
+   once the column widens -- no JS, CSS only; Chrome 131+/Safari 18.4+/Firefox
+   143+, older browsers just keep the user's last state), and the summary takes
+   no pointer events (and `interactivity: inert` where supported, which also
+   drops it from the tab order; Enter/Space on it elsewhere is then a visual
+   no-op). The error slot is NOT inside the pair (see the invalid-border
    notes above: it must stay a direct child of `.admin-column`/`.admin-field`). */
 .admin-translation-form { container-type: inline-size; }
 .admin-translation-pair { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
 @container (min-width: 880px) {
   .admin-translation-pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; list-style: none; }
+  .admin-translation-pair > .admin-reference-card > details::details-content { content-visibility: visible; display: block; }
+  .admin-translation-pair > .admin-reference-card > details > summary { pointer-events: none; interactivity: inert; list-style: none; }
   .admin-translation-pair > .admin-reference-card > details > summary::-webkit-details-marker { display: none; }
 }
 @container (max-width: 879.98px) {

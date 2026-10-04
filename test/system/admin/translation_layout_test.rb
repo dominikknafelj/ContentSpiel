@@ -64,6 +64,29 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
+  # A card folded while stacked must not stay folded (and unreachable, its
+  # summary inert) once the column is wide enough for the pair.
+  test "a card folded while stacked shows its original again when the window widens" do
+    page.driver.resize(1100, 1000)
+    page_record = create_page(title: "About")
+    visit "/cs-studio/pages/#{page_record.id}?locale=de"
+    await_admin_controllers
+
+    find("[data-original-for='title'] summary").execute_script("this.click()")
+    assert_no_selector "[data-original-for='title'] details[open]"
+    assert_no_selector "[data-original-for='title'] p", text: "About"
+
+    page.driver.resize(1700, 1000)
+    # Geometry, not Capybara visibility: Cuprite treats anything inside a
+    # closed `<details>` as hidden, which is the state under test.
+    height = page.evaluate_script("document.querySelector(\"[data-original-for='title'] p\").getBoundingClientRect().height")
+    assert_operator height, :>, 0, "the original should show again once the pair is side by side, whatever the open state"
+    tops = tops_of("[data-field-name='title'] .admin-translation-pair > div:first-child", "[data-original-for='title']")
+    assert_in_delta tops[0], tops[1], 4
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   private
 
   def tops_of(*selectors)

@@ -1,9 +1,10 @@
 module Admin
   # Renders one `ContentModel::Definition::Field` as a labelled input, plus
   # everything around it every field type shares (spec §4.3/§6.2): the
-  # read-only original-language value and its translate slot for a
-  # translated field in a non-default locale, the "Same in all languages"
-  # hint for an untranslated one, and a per-field error slot a Turbo Stream
+  # reference card with the original-language value (beside the field, or
+  # above it when narrow) and its translate slot for a translated field in a
+  # non-default locale (an untranslated field isn't rendered there at all: the
+  # forms list it read-only under "Shared fields"), and a per-field error slot a Turbo Stream
   # can replace wholesale. The actual `<input>`/`<select>`/... is delegated
   # to one `Admin::Fields::*` class per `field.type` -- this component only
   # owns the chrome around it, so every field type gets that chrome for
@@ -88,11 +89,6 @@ module Admin
     # see the class comment for why that's the caller's call, not this
     # component re-deriving "non-default locale and translated" itself.
     def show_original? = original.present?
-
-    # An untranslated field renders once regardless of locale, so a non-
-    # default locale needs to say *why* there's no per-language input here
-    # rather than leaving it looking like an oversight.
-    def show_untranslated_hint? = !field.translated? && !show_original? && locale.to_s != Locales.default
 
     # The card showing the primary-language original beside (or above) the
     # input -- see `Admin::Columns::Base#reference_card`.

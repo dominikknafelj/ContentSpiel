@@ -18,9 +18,5 @@
     <%= field_side %>
   <% end %>
 
-  <% if show_untranslated_hint? %>
-    <p class="mt-1 text-sm text-meta">Same in all languages</p>
-  <% end %>
-
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

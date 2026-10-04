@@ -1,14 +1,14 @@
 module Admin
   module TranslationScreen
-    # The **Translate** button in a translated field's original box
-    # (translation helpers spec §6.4), rendered into its
-    # `data-translate-slot` by the three "original" renderers
+    # The **Translate** button under a translated field's own input, on the
+    # field's side of the translation pair (translation helpers spec §6.4),
+    # rendered into its `data-translate-slot` by the three field renderers
     # (`Admin::FieldComponent`, `Admin::Columns::PlainColumnComponent`/
     # `RichTextColumnComponent`). The empty box a suggestion streams into
     # (`SuggestionComponent.dom_id(input_id)`, `box_id`) is NOT part of this
-    # component: the renderers put it under the field's own input
-    # (`admin/shared/_translation_box`), so a suggestion appears inside the
-    # field rather than in the original's panel beside it.
+    # component: the renderers put it right beside the button, under the
+    # field's own input (`admin/shared/_translation_box`), so a suggestion
+    # appears inside the field rather than in the reference card beside it.
     #
     # `confirm:` is the same `{ record_type:, record_id:, field:, locale: }`
     # the "Mark as up to date" note gets (`OutdatedNoteComponent

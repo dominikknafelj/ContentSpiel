@@ -128,10 +128,9 @@ module Admin
     # `field.translated?` gates this first -- same fix, same reasoning,
     # `Admin::BlockCardComponent#original_for`'s own comment gives: an
     # untranslated typed field (e.g. `test/event`'s own `venue`) has one
-    # value across every locale, so it must fall through to `FieldComponent
-    # #show_untranslated_hint?`'s "Same in all languages" line, not a
-    # read-only original that would otherwise show up here regardless of
-    # `translated?`.
+    # value across every locale, so it be listed read-only under
+    # "Shared fields" (`#shared_fields`), not shown as an original that would
+    # otherwise show up here regardless of `translated?`.
     def field_original(field)
       return nil if !field.translated? || locale.to_s == ::Locales.default
 

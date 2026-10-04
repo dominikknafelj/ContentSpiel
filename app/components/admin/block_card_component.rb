@@ -127,9 +127,8 @@ module Admin
     # translate from" -- returning it here regardless of `translated?` (the
     # bug this guard fixes) would make `FieldComponent#show_original?` show
     # a read-only original/translate-slot pair for a field that should
-    # instead render its "Same in all languages" hint
-    # (`FieldComponent#show_untranslated_hint?`, which itself only fires
-    # once this method hands back nil).
+    # instead be listed read-only under "Shared fields" on a translation tab
+    # (`#shared_fields`).
     def original_for(field)
       return nil if !field.translated? || locale.to_s == ::Locales.default
 

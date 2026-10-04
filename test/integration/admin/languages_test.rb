@@ -85,8 +85,8 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
   # post's own typed `fields` -- `test/event#venue` (`t.field :venue,
   # :string`, no `translated: true`) is `Post#fields_are_valid`'s
   # equivalent of a block's untranslated settings field, so it has to show
-  # the same "Same in all languages" hint with no read-only original in a
-  # non-default locale. `test/event#title` (a plain Mobility column, always
+  # the same Shared-fields listing, with no input and no read-only original in
+  # a non-default locale. `test/event#title` (a plain Mobility column, always
   # translated) is the control: it must still show its original the way
   # every other translated field already does, proving this isn't just
   # "post-level fields never show an original."

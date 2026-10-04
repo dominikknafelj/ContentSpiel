@@ -40,22 +40,9 @@ class Admin::FieldComponentTest < ViewComponent::TestCase
     assert_equal "post_fields_speakers_0", Admin::FieldComponent.dom_id_prefix("post[fields][speakers][0]")
   end
 
-  test "an untranslated field in a non-default locale shows the same-in-all-languages hint" do
-    field = Field.new(name: "cite", type: :url, options: {})
-    render_inline Admin::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "de")
-    assert_text "Same in all languages"
-  end
-
-  test "no hint for an untranslated field in the default locale" do
-    field = Field.new(name: "cite", type: :url, options: {})
-    render_inline Admin::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en")
-    refute_text "Same in all languages"
-  end
-
-  test "no hint or original for a translated field with no original given" do
+  test "no original for a translated field with no original given" do
     field = Field.new(name: "headline", type: :string, options: { translated: true })
     render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hello", locale: "en")
-    refute_text "Same in all languages"
     refute_selector "[data-original-for]"
   end
 

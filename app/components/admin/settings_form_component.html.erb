@@ -13,7 +13,7 @@
     rebuilt with real sections in round 3; until then each id sits on the
     first element of what it names. %>
 <div id="settings-section-site" class="admin-settings-form rounded-cs border border-line bg-surface p-4">
-  <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
+  <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4",
         data: {
           controller: "admin--autosave",
           action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
