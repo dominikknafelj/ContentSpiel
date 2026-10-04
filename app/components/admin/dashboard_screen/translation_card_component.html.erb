@@ -1,15 +1,13 @@
-<section aria-labelledby="dashboard-needs-translation" class="flex flex-col rounded-cs border border-line bg-surface">
-  <header class="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-    <h2 id="dashboard-needs-translation" class="font-cs-mono text-label uppercase tracking-mono text-meta">Needs translation</h2>
-    <% if link %>
-      <%= link_to "→", link.first, class: "text-sm text-ink hover:underline", aria: { label: link.last }, data: { turbo_frame: "_top" } %>
-    <% end %>
-  </header>
-  <ul class="px-4">
-    <% entries.each do |entry| %>
-      <li class="flex flex-col gap-1.5 border-b border-line py-3 last:border-b-0" data-locale="<%= entry.locale %>">
+<%= render Admin::DashboardScreen::CardComponent.new(title: "Needs translation", id: "dashboard-needs-translation", empty: "Nothing to translate.", link: link) do |card| %>
+  <% entries.each do |entry| %>
+    <% card.with_row do %>
+      <div class="flex min-w-0 flex-1 flex-col gap-1.5" data-locale="<%= entry.locale %>">
         <div class="flex items-baseline justify-between gap-3">
-          <%= link_to entry.name, helpers.admin_translations_path(locale: entry.locale), class: "font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
+          <% if link %>
+            <%= link_to entry.name, helpers.admin_translations_path(locale: entry.locale), class: "font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
+          <% else %>
+            <span class="font-semibold text-ink"><%= entry.name %></span>
+          <% end %>
           <span class="text-sm <%= entry.outdated.positive? ? "text-warn-ink" : "text-meta" %>"><%= counts(entry) %></span>
         </div>
         <div class="h-1 overflow-hidden rounded-full bg-line" role="progressbar" aria-label="<%= entry.name %> translated"
@@ -19,7 +17,7 @@
         <% if entry.item %>
           <p class="truncate text-sm text-meta">Outdated: <%= link_to item_title(entry), item_path(entry), class: "text-ink hover:underline", data: { turbo_frame: "_top" } %></p>
         <% end %>
-      </li>
+      </div>
     <% end %>
-  </ul>
-</section>
+  <% end %>
+<% end %>

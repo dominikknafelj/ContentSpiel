@@ -20,9 +20,9 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
 
     entry = entries.find { |e| e.locale == "de" }
     assert_equal summary.slice(:total, :complete, :missing, :outdated), entry.to_h.slice(:total, :complete, :missing, :outdated)
-    assert_selector "li[data-locale=de]", text: /Deutsch.*#{summary[:missing]} missing/m
-    assert_selector "li[data-locale=es]", text: /Español/
-    assert_selector "li[data-locale=de] [role=progressbar][aria-valuenow='#{(summary[:complete] * 100.0 / summary[:total]).round}']"
+    assert_selector "[data-locale=de]", text: /Deutsch.*#{summary[:missing]} missing/m
+    assert_selector "[data-locale=es]", text: /Español/
+    assert_selector "[data-locale=de] [role=progressbar][aria-valuenow='#{(summary[:complete] * 100.0 / summary[:total]).round}']"
   end
 
   test "an outdated item is offered as a link to its editor in that language" do
@@ -31,7 +31,7 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
 
     render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries:)
 
-    assert_selector "li[data-locale=de] a[href='/cs-studio/posts/#{post.id}?locale=de']", text: "Changing"
+    assert_selector "[data-locale=de] a[href='/cs-studio/posts/#{post.id}?locale=de']", text: "Changing"
     assert_text "1 outdated"
   end
 
@@ -42,5 +42,17 @@ class Admin::DashboardScreen::TranslationCardComponentTest < ViewComponent::Test
 
     with_locales(%w[en de], default: "en")
     assert_empty Dashboard::TranslationNeeds.new(actor: users(:editor_branch)).entries
+  end
+
+  test "the language name is plain text when the viewer can't open the overview" do
+    group = AccessControl::Group.create!(name: "Uploaders")
+    group.grants.create!(permission: "media.upload", scope: {})
+    user = User.create!(email_address: "uploader@example.com", password: "password12345")
+    AccessControl::Membership.create!(user:, group:)
+    Current.actor = user
+    render_inline Admin::DashboardScreen::TranslationCardComponent.new(entries: Dashboard::TranslationNeeds.new(actor: user).entries)
+
+    assert_selector "[data-locale=de]", text: "Deutsch"
+    assert_no_selector "a"
   end
 end

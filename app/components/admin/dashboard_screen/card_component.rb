@@ -7,7 +7,8 @@ module Admin
     # heading, so a screen reader names every list.
     #
     # The rows are slots (`with_row`), whatever the caller renders for them;
-    # the card only caps them (`LIMIT`, or `limit:` for the activity feed), so a list that returns more can't
+    # the card only caps them (`LIMIT`, `limit:` for another cap, `limit: nil` for
+    # none -- the activity feed, whose own query already limits it), so a list that returns more can't
     # grow the card. `hint:` is one muted line under the rows ("Schedule a
     # draft to see it here."), for a list that is short; `link:` is the
     # `[path, label]` of the "→" (nil when the viewer has no fuller list to
@@ -26,7 +27,7 @@ module Admin
         @hint = hint
       end
 
-      def visible_rows = rows.first(limit)
+      def visible_rows = limit ? rows.first(limit) : rows.to_a
 
       private
 

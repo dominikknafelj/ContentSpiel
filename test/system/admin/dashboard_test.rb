@@ -39,6 +39,17 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     assert_current_path(%r{/cs-studio/posts/\d+})
   end
 
+  test "pressing Enter twice in quick create makes one draft" do
+    sign_in_via_form(users(:one))
+    await_admin_controllers
+    field = find_field("Title")
+    field.fill_in with: "Only once"
+    field.send_keys(:enter, :enter)
+
+    assert_text "Draft created"
+    assert_equal 1, Post.kept.i18n.where(title: "Only once").count
+  end
+
   test "choosing Page in quick create opens the New page dialog with the typed title" do
     root_page # the dialog needs a Home to put the page inside
     sign_in_via_form(users(:one))

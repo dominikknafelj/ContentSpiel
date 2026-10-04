@@ -14,14 +14,17 @@ module Admin
   # future time (a scheduled publish) is an absolute "5 Oct, 09:30".
   # Rendered once per request: lists reload on navigation, so no ticking.
   class TimeAgoComponent < AdminComponent
-    def initialize(time:)
+    # `title:` replaces the tooltip (the dashboard's coalesced edit burst
+    # shows its whole span there).
+    def initialize(time:, title: nil)
       @time = time&.in_time_zone
+      @title = title
     end
 
     def render? = !time.nil?
 
     def call
-      tag.time(phrase, datetime: time.iso8601, title: time.strftime("%-d %b %Y, %H:%M"))
+      tag.time(phrase, datetime: time.iso8601, title: @title || time.strftime("%-d %b %Y, %H:%M"))
     end
 
     private

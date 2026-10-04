@@ -12,11 +12,19 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = [ "title", "type", "pageTrigger" ]
 
+  // A second submit while the first is in flight (Enter twice, a double
+  // click) would create a second draft: ignore it until Turbo reports the
+  // first one done (`turbo:submit-end`, wired in the template).
   submit(event) {
+    if (this.submitting) return event.preventDefault()
     if (this.typeTarget.value !== "page" || !this.hasPageTriggerTarget) return
 
     event.preventDefault()
     this.pageTriggerTarget.dataset.newPageTitleParam = this.titleTarget.value
     this.pageTriggerTarget.click()
   }
+
+  submitStart() { this.submitting = true }
+
+  submitEnd() { this.submitting = false }
 }

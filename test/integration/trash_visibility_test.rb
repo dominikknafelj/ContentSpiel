@@ -194,40 +194,46 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
-  # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
-  # child count and no translation marker; the starter offer counts kept pages.
-  test "the dashboard's cards and activity feed list kept pages and posts and never trashed ones" do
+  test "the dashboard's drafts, going-live, needs-translation and activity lists show kept records and never trashed ones" do
     with_locales(%w[en de], default: "en")
+    # Drafts are "mine" by their newest audit event, so create them as the viewer.
+    kept_draft, gone_draft = as(users(:one)) { [ create_post(title: "Kept draft", published: false), create_post(title: "Gone draft", published: false) ] }
     [ @kept_post, @gone_post ].each { |post| post.update_columns(published_at: 3.days.from_now) }
+    gone_draft.update!(trashed_at: Time.current)
+    # The trashed post is the NEWEST outdated item, so a leak would show it.
+    Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de")
+      .update_all(state: "outdated", outdated_count: 1, missing_count: 0)
+    @gone_post.update_columns(updated_at: 1.minute.from_now)
+    [ @kept_asset, @gone_asset ].each { |asset| as(users(:one)) { Audit.record("media.uploaded", subject: asset) } }
     sign_in_as users(:one)
-    # The newest events about each record exist (created through the services);
-    # the trashed ones' events must not surface, not even anonymised.
+
     get admin_root_path
     assert_response :ok
 
-    %w[dashboard-drafts dashboard-going-live-next dashboard-activity].each do |section|
-      assert_select "section[aria-labelledby=#{section}]" do
-        assert_select "a", text: "Gone post", count: 0
-        assert_select "a", text: "Gone page", count: 0
-      end
-    end
+    assert_select "section[aria-labelledby=dashboard-drafts] a[href=?]", "/cs-studio/posts/#{kept_draft.id}"
+    assert_select "section[aria-labelledby=dashboard-drafts] a", text: "Gone draft", count: 0
     assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Gone post", count: 0
+    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
+    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
-    assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept post"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
     assert_no_match "Gone post", response.body
     assert_no_match "Gone page", response.body
+    assert_no_match "Gone draft", response.body
 
-    # And the activity feed itself: no row whose record is trashed.
     rows = Dashboard::Activity.new(actor: users(:one), channel: :admin).rows
     assert_not_includes rows.map(&:record), @gone_post
     assert_not_includes rows.map(&:record), @gone_page
     assert_includes rows.map(&:record), @kept_post
 
-    # The needs-translation card counts kept records only (image included).
     de = Dashboard::TranslationNeeds.new(actor: users(:one), channel: :admin).entries.find { |entry| entry.locale == "de" }
     assert_equal Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total], de.total
   end
 
+  # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
+  # child count and no translation marker; the starter offer counts kept pages.
   test "the page tree's child count and translation markers ignore a trashed page" do
     sign_in_as users(:one)
     with_locales(%w[en de], default: "en") do

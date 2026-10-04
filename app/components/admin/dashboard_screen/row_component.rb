@@ -35,8 +35,9 @@ module Admin
 
       def day = record.published_at.in_time_zone.day
 
-      # "today", "tomorrow", "in 5 days" by the site's calendar (`Time.zone`);
-      # earlier today it is "in 3h" -- an exact moment is the tooltip.
+      # By the site's calendar (`Time.zone`), not by 24-hour spans: "in 5 days",
+      # "tomorrow" for the next calendar day, and for later today "in 3h" (or
+      # "soon" within the hour). An exact moment is the tooltip.
       def going_live_phrase
         at = record.published_at.in_time_zone
         days = (at.to_date - Time.zone.today).to_i

@@ -1,8 +1,8 @@
 require "test_helper"
 
-# `Admin::DashboardScreen::QuickCreateComponent` (dashboard spec §4.1): the
-# draft form (only with a creatable type to offer), New page and Upload
-# image, each shown only to someone who could use it.
+# `Admin::DashboardScreen::QuickCreateComponent` (round 2, Task 16): one row
+# -- title, a type select (the creatable post types, then Page for someone who
+# may create pages) and Create draft -- hidden when nothing is creatable.
 class Admin::DashboardScreen::QuickCreateComponentTest < ViewComponent::TestCase
   teardown { Current.reset }
 

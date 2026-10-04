@@ -5,4 +5,4 @@
 <% if status? %>
   <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
 <% end %>
-<%= tag.span(class: "shrink-0 text-sm text-meta", title: span_title) { render Admin::TimeAgoComponent.new(time: shown_at) } %>
+<span class="shrink-0 text-sm text-meta"><%= render Admin::TimeAgoComponent.new(time: shown_at, title: span_title) %></span>

@@ -47,4 +47,14 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     assert_no_text "Draft"
     assert_no_text "Live"
   end
+
+  test "a coalesced burst shows its span as the time's tooltip" do
+    post = Current.set(actor: users(:one), channel: :admin) { create_post(title: "Typing", published: false) }
+    event = Audit::Event.find_by!(subject_type: "Post", subject_id: post.id)
+    row = Dashboard::Activity::Row.new(event:, record: post, sentence_parts: [ "edited", post, "" ], actor_name: "Ada", via_token: false,
+      at: Time.zone.local(2030, 1, 10, 9, 0), span_end: Time.zone.local(2030, 1, 10, 9, 40))
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
+
+    assert_selector "time[title='10 Jan 2030, 09:00 – 09:40']"
+  end
 end

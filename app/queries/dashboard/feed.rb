@@ -49,10 +49,13 @@ module Dashboard
     def going_live_next
       @going_live_next ||= page_and_post_relations { |r| scheduled_soonest_first(r) }
         .flat_map do |relation|
-          table = relation.quoted_table_name
-          with_newest_event(relation, join: "LEFT JOIN")
-            .select("#{table}.*, newest.newest_user_id AS dashboard_newest_user_id")
-            .limit(LIMITS[:going_live_next]).to_a
+          # The limit is taken on the ids first, so the LATERAL "newest
+          # event" lookup runs for at most LIMIT rows, not for every
+          # scheduled record before the cut.
+          soonest = relation.select("#{relation.quoted_table_name}.id").limit(LIMITS[:going_live_next])
+          outer = relation.klass.where(id: soonest).reorder(published_at: :asc, id: :asc)
+          with_newest_event(outer, join: "LEFT JOIN")
+            .select("#{outer.quoted_table_name}.*, newest.newest_user_id AS dashboard_newest_user_id").to_a
         end
         .then { |records| soonest_first(records, :published_at, LIMITS[:going_live_next]) }
     end

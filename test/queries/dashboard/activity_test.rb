@@ -124,4 +124,80 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     end
     assert_equal counts.first, counts.last
   end
+
+  # --- fix round 1: the read scope is applied in SQL, so the list fills -----
+
+  def blog_reader
+    group = AccessControl::Group.create!(name: "Blog readers #{SecureRandom.hex(3)}")
+    group.grants.create!(permission: "posts.read", scope: { "content_types" => [ "blog" ] })
+    User.create!(email_address: "blog-reader-#{SecureRandom.hex(3)}@example.com", password: "password12345").tap do |user|
+      AccessControl::Membership.create!(user:, group:)
+    end
+  end
+
+  test "an older readable event is listed after 60 newer events on records the viewer can't read" do
+    readable = as(@me) { create_post(title: "Readable", published: false) }
+    60.times { |i| as(@me) { create_post(title: "Secret #{i}", content_type: "resume_entry", published: false) } }
+
+    assert_equal [ readable ], activity(blog_reader).rows.map(&:record)
+  end
+
+  test "an older readable event is listed after 60 uploads for a viewer without media.upload" do
+    readable = as(@me) { create_post(title: "Readable", published: false) }
+    60.times { as(@me) { Audit.record("media.uploaded", subject: create_media_asset) } }
+
+    assert_equal [ readable ], activity(blog_reader).rows.map(&:record)
+    assert_equal 15, activity(@me).rows.size
+  end
+
+  test "a block event whose owner the viewer can't read is absent, one on a readable owner is listed" do
+    branch = as(@me) { create_page(title: "Branch", published: false) }
+    outside = as(@me) { create_page(title: "Outside", published: false) }
+    as(@me) { ContentBlocks::Save.call(ContentBlock.new(owner: outside, block_type: "rich_text")) }
+    as(@me) { ContentBlocks::Save.call(ContentBlock.new(owner: branch, block_type: "rich_text")) }
+    access_control_groups(:branch_editors).grants.create!(permission: "pages.read", scope: { "page_ids" => [ branch.id ] })
+
+    rows = activity(users(:editor_branch)).rows
+    assert_equal [ branch ], rows.map(&:record).uniq
+    assert rows.any? { |r| r.event.action.start_with?("block.") }
+  end
+
+  test "a page outside a branch grant is absent" do
+    branch = as(@me) { create_page(title: "Branch", published: false) }
+    inside = as(@me) { create_page(title: "Inside", parent: branch, published: false) }
+    as(@me) { create_page(title: "Outside", published: false) }
+    access_control_groups(:branch_editors).grants.create!(permission: "pages.read", scope: { "page_ids" => [ branch.id ] })
+
+    assert_equal [ branch, inside ].sort_by(&:id), activity(users(:editor_branch)).rows.map(&:record).sort_by(&:id)
+  end
+
+  test "a trashed image is absent for a media.upload holder, a kept one listed, and a legacy MediaAsset subject type still counts" do
+    kept = create_media_asset
+    gone = create_media_asset
+    legacy = create_media_asset
+    as(@me) { Audit.record("media.uploaded", subject: kept) }
+    as(@me) { Audit.record("media.uploaded", subject: gone) }
+    Audit::Event.create!(action: "media.uploaded", actor: @me, user_id: @me.id, subject_type: "MediaAsset", subject_id: legacy.id,
+      subject_label: "legacy", occurred_at: Time.current, last_occurred_at: Time.current)
+    gone.update!(trashed_at: Time.current)
+
+    assert_equal [ kept, legacy ].sort_by(&:id), activity.rows.map(&:record).sort_by(&:id)
+  end
+
+  test "an update that only set a future published_at reads as scheduled for that date" do
+    post = as(@me) { create_post(title: "Later", published: false) }
+    as(@me) { Audit.record("post.updated", subject: post, field_changes: { "published_at" => [ nil, Time.zone.local(2031, 10, 6, 9).iso8601 ] }) }
+    row = activity.rows.find { |r| r.event.action == "post.updated" }
+
+    assert_equal [ "scheduled", post, " for 6 Oct" ], row.sentence_parts
+  end
+
+  test "a malformed stored published_at neither raises nor leaves a dangling for" do
+    post = as(@me) { create_post(title: "Odd", published: false) }
+    as(@me) { Audit.record("post.scheduled", subject: post, field_changes: { "published_at" => [ nil, "not a time" ] }) }
+    row = activity.rows.find { |r| r.event.action == "post.scheduled" }
+
+    assert_equal "scheduled", row.sentence_parts[0]
+    assert_no_match(/ for\s*\z/, row.sentence_parts[2])
+  end
 end

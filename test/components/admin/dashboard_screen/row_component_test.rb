@@ -28,25 +28,38 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
   end
 
   test "a going-live row has the date tile, a relative phrase and by you only when mine" do
-    post = create_post(title: "Coming soon", published: false)
-    post.update_columns(published_at: 5.days.from_now + 1.hour)
+    travel_to Time.zone.local(2030, 1, 10, 12) do
+      post = create_post(title: "Coming soon", published: false)
+      post.update_columns(published_at: Time.zone.local(2030, 1, 15, 13))
 
-    render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live, mine: true)
-    assert_selector "span.text-warn-ink", text: post.published_at.strftime("%b")
-    assert_selector "span.text-\\[18px\\]", text: post.published_at.day.to_s
-    assert_text "in 5 days"
-    assert_text "by you"
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live, mine: true)
+      assert_selector "span.text-warn-ink", text: "Jan"
+      assert_selector "span.text-\\[18px\\]", text: "15"
+      assert_text "in 5 days"
+      assert_text "by you"
 
-    render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live, mine: false)
-    assert_no_text "by you"
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live, mine: false)
+      assert_no_text "by you"
+    end
   end
 
-  test "tomorrow and an unknown variant" do
-    post = create_post(title: "Tomorrow", published: false)
-    post.update_columns(published_at: 1.day.from_now + 2.hours)
-    render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live)
-    assert_text "tomorrow"
+  test "the phrase counts calendar days: an hour past midnight is tomorrow, later today is in hours" do
+    travel_to Time.zone.local(2030, 1, 10, 23, 30) do
+      post = create_post(title: "Just after midnight", published: false)
+      post.update_columns(published_at: Time.zone.local(2030, 1, 11, 0, 30))
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live)
+      assert_text "tomorrow"
+    end
 
-    assert_raises(ArgumentError) { Admin::DashboardScreen::RowComponent.new(record: post, variant: :other) }
+    travel_to Time.zone.local(2030, 1, 10, 9) do
+      post = create_post(title: "This afternoon", published: false)
+      post.update_columns(published_at: Time.zone.local(2030, 1, 10, 13, 30))
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live)
+      assert_text "in 4h"
+    end
+  end
+
+  test "an unknown variant is refused" do
+    assert_raises(ArgumentError) { Admin::DashboardScreen::RowComponent.new(record: create_post(title: "x"), variant: :other) }
   end
 end

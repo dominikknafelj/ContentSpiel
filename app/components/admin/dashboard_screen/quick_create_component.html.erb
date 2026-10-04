@@ -3,7 +3,7 @@
     <p class="text-danger-ink" role="alert"><%= errors.to_sentence %></p>
   <% end %>
   <%= form_with url: helpers.admin_dashboard_draft_path(**url_options), method: :post, class: "flex flex-wrap items-end gap-3",
-        data: { controller: "admin--quick-create", action: "submit->admin--quick-create#submit" } do %>
+        data: { controller: "admin--quick-create", action: "submit->admin--quick-create#submit turbo:submit-start->admin--quick-create#submitStart turbo:submit-end->admin--quick-create#submitEnd" } do %>
     <div class="min-w-48 flex-1">
       <%= label_tag "dashboard_draft_title", "Title", class: setup_label_class %>
       <%= text_field_tag :title, title, id: "dashboard_draft_title", placeholder: "A new idea…", class: setup_input_class,

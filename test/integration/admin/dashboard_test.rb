@@ -58,13 +58,25 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
   end
 
   test "going live next shows the date tile, a relative phrase and by you" do
-    post = Current.set(actor: users(:one)) { create_post(title: "Soon", published: false) }
-    post.update_columns(published_at: 5.days.from_now + 1.hour)
-    sign_in_as users(:one)
-    get admin_root_path
+    # Pinned to midday: a phrase counts calendar days, so a run late in the
+    # evening must not change the answer.
+    travel_to Time.zone.local(2030, 1, 10, 12) do
+      post = Current.set(actor: users(:one)) { create_post(title: "Soon", published: false) }
+      post.update_columns(published_at: Time.zone.local(2030, 1, 15, 13))
+      sign_in_as users(:one)
+      get admin_root_path
 
-    assert_select "section[aria-labelledby=dashboard-going-live-next] li", text: /Soon.*in 5 days.*by you/m
-    assert_select "section[aria-labelledby=dashboard-going-live-next]", text: /Schedule a draft to see it here\./
+      assert_select "section[aria-labelledby=dashboard-going-live-next] li", text: /Soon.*in 5 days.*by you/m
+      assert_select "section[aria-labelledby=dashboard-going-live-next]", text: /Schedule a draft to see it here\./
+    end
+  end
+
+  test "empty-state copy doesn't point at a quick-create row the viewer doesn't have" do
+    sign_in_as users(:reader)
+    get admin_root_path
+    assert_match "No drafts.", response.body
+    assert_no_match "start one above", response.body
+    assert_no_match "Schedule a draft to see it here", response.body
   end
 
   test "the needs-translation card shows each target language's numbers with several languages" do
@@ -73,7 +85,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     sign_in_as users(:one)
     get admin_root_path
 
-    assert_select "section[aria-labelledby=dashboard-needs-translation] li[data-locale=de]", text: /Deutsch.*1 missing/m
+    assert_select "section[aria-labelledby=dashboard-needs-translation] [data-locale=de]", text: /Deutsch.*1 missing/m
     assert_select "section[aria-labelledby=dashboard-needs-translation] [role=progressbar]"
   end
 
@@ -90,7 +102,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
   test "empty lists say so" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_match "No drafts — start one above.", response.body
+    assert_match "No drafts.", response.body
     assert_match "Nothing scheduled on the site.", response.body
     assert_match "No activity yet.", response.body
   end
@@ -183,9 +195,9 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_redirected_to new_admin_page_path
   end
 
-  # Spec §4.5, at the view level: everything a row renders -- status
-  # badges, editor paths, "by" names (a token's user included), image
-  # thumbnails -- comes from the feed's constant set of queries. Signed in
+  # Spec §4.5, at the view level: everything a row renders -- editor paths,
+  # type labels, the activity sentences (a token's user included) and the
+  # translation card -- comes from a constant set of queries. Signed in
   # as users(:two), a non-owner Admin-group member, so every `can?` and
   # every read scope goes through the grant path rather than the owner
   # shortcut.
