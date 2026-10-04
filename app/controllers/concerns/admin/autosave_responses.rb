@@ -50,8 +50,18 @@ module Admin
       # line and the per-field slots can be scrolled out of sight, and an
       # error toast stays until dismissed. It only restates that the save
       # didn't happen -- the reasons stay in the field slots, never here.
+      #
+      # Precisely because it never auto-hides, it is one toast per form, not
+      # one per failed attempt: it carries a stable id, a failure removes the
+      # previous one before appending its own (three failed autosaves in a
+      # row used to stack three identical toasts), and the next successful
+      # save removes it (it used to sit there, claiming a failure that had
+      # already been fixed). Removing an id that isn't on the page is a no-op.
+      toast_id = "toast-#{error_prefix}"
+      streams << turbo_stream.remove(toast_id)
       unless result.ok?
-        streams << toast_stream(result.denied? ? "You don't have permission to make this change." : "Couldn't save your changes.", kind: :error)
+        message = result.denied? ? "You don't have permission to make this change." : "Couldn't save your changes."
+        streams << toast_stream(message, kind: :error, id: toast_id)
       end
 
       streams
@@ -60,9 +70,10 @@ module Admin
     # One toast appended to the layout's `#toasts` region
     # (`Admin::ToastRegionComponent`) from a Turbo Stream answer -- for a
     # response that has no redirect and so no flash to carry the message.
-    # `action` is `{ label:, url:, method: }`, as for `Admin::ToastComponent`.
-    def toast_stream(message, kind: :success, action: nil)
-      turbo_stream.append("toasts", Admin::ToastComponent.new(message: message, kind: kind, action: action))
+    # `action` is `{ label:, url:, method: }` and `id` the optional DOM id,
+    # both as for `Admin::ToastComponent`.
+    def toast_stream(message, kind: :success, action: nil, id: nil)
+      turbo_stream.append("toasts", Admin::ToastComponent.new(message: message, kind: kind, action: action, id: id))
     end
 
     # The HTTP status an autosave answers with: 200, 403 for a permission

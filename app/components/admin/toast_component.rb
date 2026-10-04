@@ -19,23 +19,34 @@ module Admin
   # may be strings: `flash[:undo]` comes back from the session JSON-encoded.
   # The message is a plain String and stays auto-escaped; a toast that needs
   # a link carries it as `action`, never as `html_safe` markup in the message.
+  #
+  # `id` is optional and only for a toast that has to be found again: the
+  # autosave error toast (`Admin::AutosaveResponses`) never auto-hides, so the
+  # form it belongs to gives it a stable id, replaces it on the next failure
+  # and removes it on the next successful save. Without one, no `id` attribute
+  # is rendered at all.
+  #
+  # Every toast is `data-turbo-temporary`: Turbo drops it from the page-cache
+  # snapshot, so coming Back to a screen never shows a stale Undo (whose
+  # target may be long gone) or an error that has since been fixed.
   class ToastComponent < AdminComponent
     KINDS = %i[success undo warning error].freeze
     TIMEOUTS = { success: 4000, undo: 8000, warning: 0, error: 0 }.freeze
 
-    def initialize(message:, kind: :success, action: nil)
+    def initialize(message:, kind: :success, action: nil, id: nil)
       raise ArgumentError, "unknown toast kind #{kind.inspect}" unless KINDS.include?(kind.to_sym)
 
       @message = message
       @kind = kind.to_sym
       @action = action&.to_h&.with_indifferent_access
+      @id = id.presence
     end
 
     def render? = message.present?
 
     private
 
-    attr_reader :message, :kind, :action
+    attr_reader :message, :kind, :action, :id
 
     def role = %i[warning error].include?(kind) ? "alert" : "status"
 
