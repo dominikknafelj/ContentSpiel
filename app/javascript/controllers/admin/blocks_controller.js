@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
 import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "autosave/queue"
+import { orderErrorToast, sendOrder } from "autosave/order_request"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
@@ -119,8 +120,13 @@ export default class extends Controller {
       fallbackOnBody: true,
       fallbackClass: "admin-drag-fallback",
       fallbackTolerance: 3,
-      onStart: () => this.makeCloneInert(),
-      onEnd: () => this.reorder()
+      // The order before the drag (`reorder` puts it back if the request
+      // fails), read after the clone lost its `card` target.
+      onStart: () => {
+        this.makeCloneInert()
+        this.orderBeforeDrag = this.cardTargets.slice()
+      },
+      onEnd: () => this.reorder(this.orderBeforeDrag)
     })
   }
 
@@ -198,21 +204,23 @@ export default class extends Controller {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
     if (index <= 0) return
+    const before = this.cardTargets.slice()
     this.listTarget.insertBefore(card, this.cardTargets[index - 1])
-    this.moved(card)
+    this.moved(card, before)
   }
 
   moveDown(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
     if (index < 0 || index >= this.cardTargets.length - 1) return
+    const before = this.cardTargets.slice()
     this.listTarget.insertBefore(this.cardTargets[index + 1], card)
-    this.moved(card)
+    this.moved(card, before)
   }
 
-  moved(card) {
+  moved(card, before) {
     this.focusHandle(card)
-    this.reorder()
+    this.reorder(before)
   }
 
   // Queued with every other write on the screen (`autosave/queue.js`): the
@@ -220,34 +228,90 @@ export default class extends Controller {
   // autosave was in flight still sends the final order), and the page base
   // it carries is the freshest one. The answer's page base is written into
   // the hidden field before the next request goes.
-  async reorder() {
+  //
+  // AN ORDER THAT WAS NOT SAVED IS NOT LEFT ON SCREEN. The cards are moved in
+  // the DOM before the request goes (the drop, the menu, the keyboard), and
+  // the endpoint's answer does not redraw the list -- so when the request
+  // fails, the order on screen would be one the server never took, looking
+  // exactly like one it did. What came back is judged by `sendOrder`
+  // (`autosave/order_request.js`, which also says what this used to do with
+  // an expired session's sign-in page):
+  // - a Turbo Stream is rendered, whatever its status. A refusal (403, 422:
+  //   the status line and the reason) is the endpoint's own answer -- and
+  //   also means the order was not saved, so the cards go back;
+  // - anything else -- the redirect to sign-in, an error page, no answer at
+  //   all -- renders nothing: the cards go back and an error toast says why.
+  //
+  // `before` is the cards in the order they had before this move (every
+  // caller that moves a card takes it first; left out, as by a caller that
+  // moved nothing, there is nothing to put back). The order to go back to is
+  // `restoreTo`: the order the server last took, as far as this screen knows.
+  // It is `before` of the FIRST move since then, not of each -- two quick
+  // moves queue two requests, and when the first fails the second's `before`
+  // is itself an order that was never saved. A request that succeeds while
+  // another waits behind it makes the order it sent the one to go back to.
+  // After a failure the requests still queued read the order as it is then
+  // (put back), and so save nothing new: the screen and the server agree.
+  async reorder(before = null) {
     this.refreshMoveState()
+    if (before && !this.restoreTo) this.restoreTo = before
+    this.reordersQueued = (this.reordersQueued || 0) + 1
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
     await enqueue(async (isCurrent) => {
-      const response = await fetch(this.reorderUrlValue, {
-        method: "PATCH",
+      const sent = this.cardTargets.slice()
+      const answer = await sendOrder(this.reorderUrlValue, {
         headers: {
           "Content-Type": "application/json",
           Accept: "text/vnd.turbo-stream.html",
           "X-CSRF-Token": csrfToken,
           "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
         },
-        body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) }),
-        signal: AbortSignal.timeout(30000)
+        body: JSON.stringify({ ids: sent.map((card) => card.dataset.blockId) })
       })
-
-      const text = await response.text()
+      this.reordersQueued -= 1
+      // The page was replaced while the request was on its way: its cards,
+      // its base field and its toast region are gone.
       if (!isCurrent()) return
-      syncBases(text, [ this.constructor.pageBaseId ])
-      Turbo.renderStreamMessage(text)
+
+      if (answer.outcome === "answered") {
+        syncBases(answer.text, [ this.constructor.pageBaseId ])
+        Turbo.renderStreamMessage(answer.text)
+        if (answer.ok) {
+          this.restoreTo = this.reordersQueued > 0 ? sent : null
+          return
+        }
+      }
+
+      this.putBack()
+      if (answer.outcome !== "answered") orderErrorToast(answer.outcome, "toast-order-error")
     }, { generation: this.generation }).catch(() => {})
+  }
+
+  // Puts the cards back in the order of `restoreTo` (see `reorder`). Only
+  // cards still in the list take part, each put into a place one of them
+  // holds now: a card streamed in since (an Add queued in between) stays
+  // where it is, one removed since is skipped, and a list an Undo re-rendered
+  // -- new elements throughout -- is left exactly as the server drew it. A
+  // card picked up by keyboard in the meantime is let go first: it goes back
+  // with the rest, and its remembered place would no longer be true.
+  putBack() {
+    const order = (this.restoreTo || []).filter((card) => card.parentElement === this.listTarget)
+    this.restoreTo = null
+    if (this.picked) this.clearPicked(this.picked)
+
+    order.forEach((card, index) => {
+      const holder = this.cardTargets.filter((candidate) => order.includes(candidate))[index]
+      if (holder !== card) this.listTarget.insertBefore(card, holder)
+    })
+    this.refreshMoveState()
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------
   //
   // Space on a card's handle picks it up; ArrowUp/ArrowDown move it among the
-  // cards; Space drops it (`reorder`, the request a drag's `onEnd` makes) and
+  // cards; Space drops it (`reorder`, the request a drag's `onEnd` makes, with
+  // the order as it was when the card was picked up, in case it fails) and
   // Escape puts it back without saving.
   key(event) {
     const card = this.cardFor(event)
@@ -273,6 +337,7 @@ export default class extends Controller {
     if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
     this.picked = card
     this.originNext = card.nextElementSibling
+    this.orderBeforePick = this.cardTargets.slice()
     card.dataset.picked = "true"
     card.classList.add("admin-drag-chosen")
     this.announce(`Picked up ${this.titleOf(card)}. ${this.positionOf(card)}`)
@@ -294,7 +359,7 @@ export default class extends Controller {
   drop(card) {
     this.clearPicked(card)
     this.announce(`Dropped ${this.titleOf(card)}. ${this.positionOf(card)}`)
-    return this.reorder()
+    return this.reorder(this.orderBeforePick)
   }
 
   // Focus leaving the handle puts a picked card back: the DOM move has saved
