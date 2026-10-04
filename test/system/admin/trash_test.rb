@@ -123,10 +123,10 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
 
     assert_selector "nav[aria-label='Filter by type']", text: /All\s+3/
     assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+2/
-    within("nav[aria-label='Filter by type']") { click_link "Posts" }
+    click_tab "Posts"
     assert_selector "#trash-post-#{Post.trashed.first.id}"
     assert_no_selector "tr[id^=trash-page-]"
-    within("nav[aria-label='Filter by type']") { click_link "Pages" }
+    click_tab "Pages"
     assert_selector "tr[id^=trash-page-]", count: 2
 
     within("#trash-page-#{@child.id}") do
@@ -137,5 +137,20 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     assert_equal elsewhere, @child.reload.parent
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages"
     assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+1/
+  end
+
+  private
+
+  # A tab is a link into the `content` frame that Turbo promotes to a page
+  # visit once the frame has loaded -- a few dozen ms after the rows appear.
+  # A form pressed in that gap is sent (the server restores the page) but its
+  # answer is dropped when the promoted visit starts, so the redirect and the
+  # toast never arrive: a gap no person lives in, but a scripted browser does
+  # (the media library's `click_tile` waits for the same reason).
+  def click_tab(label)
+    page.execute_script("window.__tabVisitDone = false; document.addEventListener('turbo:load', () => { window.__tabVisitDone = true }, { once: true })")
+    within("nav[aria-label='Filter by type']") { click_link label }
+    assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: label
+    assert_eventually(message: "the tab's promoted visit never finished") { page.evaluate_script("window.__tabVisitDone") }
   end
 end

@@ -65,6 +65,10 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     assert_operator right, :<=, page.evaluate_script("document.documentElement.clientWidth")
     click_link "Exit preview"
     # The pages landing redirects to Home's editor for this viewer.
-    assert_match %r{\A/cs-studio/pages}, URI(current_url).path
+    assert_current_path %r{\A/cs-studio/pages}
+  ensure
+    # The window outlives the test: every later test in this worker would
+    # otherwise run at phone width.
+    page.driver.resize(1400, 1400)
   end
 end
