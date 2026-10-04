@@ -23,7 +23,7 @@ class Admin::TranslationStatusSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
 
-    card = Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title")
+    card = Admin::EditorScreen::ReferenceCardComponent.dom_id(post, "title", "de")
     assert_selector "##{card}[data-translation-state='outdated'] del", text: "spare"
     assert_selector "##{card} ins", text: "small"
     assert_selector "##{card} time"
