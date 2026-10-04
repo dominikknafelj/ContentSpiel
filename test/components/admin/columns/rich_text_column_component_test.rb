@@ -40,7 +40,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
 
     labels = page.all("[role=toolbar] button", visible: :all).map { |button| button["aria-label"] }
     assert_equal [ "Heading 2", "Heading 3", "Heading 4", "Bold", "Italic", "Strikethrough", "Inline code", "Bullet list",
-      "Numbered list", "Quote", "Code block", "Link", nil, "Internal link", "Image", "YouTube", "Horizontal rule" ], labels
+      "Numbered list", "Quote", "Code block", "Link", nil, "Page link", "Image", "YouTube", "Divider" ], labels
     assert page.all("[role=toolbar] button", visible: :all).all? { |button| button["type"] == "button" }
   end
 

@@ -15,7 +15,8 @@ module Admin
     #   a separate data value -- so an editor remounted after a drag
     #   reorder (Stimulus disconnects and reconnects the moved element)
     #   comes back with the edits made so far, not the page-load state.
-    # - the toolbar (`TOOLBAR`, spec §4.1's exact list), as real
+    # - the toolbar (`TOOLBAR_GROUPS` plus the "Insert" menu's `INSERT_MENU`,
+    #   together spec §4.1's exact list), as real
     #   server-rendered `<button type="button">`s: accessible names come
     #   from here, not from JS, and a system test can `press` them;
     # - the editor mount (empty; Tiptap fills it) and a message slot for
@@ -64,7 +65,14 @@ module Admin
       # paragraph/heading select, the levels stay buttons) · marks · blocks ·
       # Link -- and everything that *inserts* something moves into the
       # "Insert" menu (`INSERT_MENU`). Spec §4.1's set is unchanged, only its
-      # layout; every button keeps its action and accessible name.
+      # layout; every button keeps its action.
+      #
+      # The accessible name must contain the visible text (WCAG 2.5.3, "label
+      # in name"): someone using voice control says what they see. A glyph
+      # button ("B", "•") has no words to say, so its name is free; a button
+      # that shows words is named by those words -- which is why the two menu
+      # items shown as "Page link" and "Divider" are named exactly that, not
+      # by their node types ("Internal link", "Horizontal rule").
       TOOLBAR_GROUPS = [
         [
           [ "heading2", "Heading 2", "H2", true ],
@@ -90,10 +98,10 @@ module Admin
 
       # The "Insert ▾" menu's items, same shape as `TOOLBAR_GROUPS`'.
       INSERT_MENU = [
-        [ "internalLink", "Internal link", "Page link", false ],
+        [ "internalLink", "Page link", "Page link", false ],
         [ "image", "Image", "Image", false ],
         [ "youtube", "YouTube", "YouTube", false ],
-        [ "horizontalRule", "Horizontal rule", "Divider", false ]
+        [ "horizontalRule", "Divider", "Divider", false ]
       ].freeze
 
       # Which of these open a popover or dialog (`aria-haspopup="dialog"`).

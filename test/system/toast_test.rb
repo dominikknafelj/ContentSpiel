@@ -19,11 +19,9 @@ class ToastSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast", text: /trash/i, wait: 10
     assert @post.reload.trashed?
 
-    # The delete answered inside the content frame, whose `advance` then
-    # promotes the frame's URL to a Turbo visit of its own. A click that
-    # lands while that visit is still in flight is swallowed by it, so wait
-    # it out (a person never clicks that fast; Capybara does).
-    sleep 1
+    # The delete form targets `_top`: one whole-page visit, the toast in
+    # `#toasts` from the start (and the sidebar's Trash badge with it).
+    assert_selector "nav[aria-label='Modules'] a", text: /Trash\s*1/
     within("#toasts") { press "Undo" }
     assert_selector "#toasts .admin-toast", text: "Restored", wait: 10
     assert_not @post.reload.trashed?

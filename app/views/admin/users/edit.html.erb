@@ -7,9 +7,13 @@
     <%# The Activity link (design spec §5 "Audit log module", Task 9):
         opens the audit log filtered to this user -- visible only with
         `audit.view`, the same permission `Admin::AuditEventsController`
-        itself requires (access-control design spec §5 "Everywhere"). %>
+        itself requires (access-control design spec §5 "Everywhere").
+        `_top`, not the content frame it sits in: the leave guard
+        (`admin--save-bar`) listens for Turbo Drive visits, and a frame
+        navigation fires none -- in the frame this link would throw away
+        typed changes without asking. %>
     <% if can?("audit.view") %>
-      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), class: setup_secondary_link_class %>
+      <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), data: { turbo_frame: "_top" }, class: setup_secondary_link_class %>
     <% end %>
   </div>
 

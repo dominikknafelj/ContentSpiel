@@ -23,11 +23,14 @@ export default class extends Controller {
 
   connect() { this.measure() }
 
+  // The button's own text says what pressing it does ("Show" / "Hide"), and
+  // that text is its whole state. It deliberately carries no `aria-pressed`:
+  // a label that changes *and* a pressed state that flips reads as "Hide,
+  // pressed" -- two signals that contradict each other.
   toggle() {
     const showing = this.inputTarget.type === "text"
     this.inputTarget.type = showing ? "password" : "text"
     this.toggleTarget.textContent = showing ? "Show" : "Hide"
-    this.toggleTarget.setAttribute("aria-pressed", String(!showing))
   }
 
   measure() {

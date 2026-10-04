@@ -82,7 +82,11 @@
 
       <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this post to the trash?", body: "You can restore it from the trash.") do |dialog| %>
         <% dialog.with_confirm_action do %>
-          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete do %>
+          <%# `_top`, as the page's own delete: the redirect is a whole-page
+              visit, so the sidebar's Trash badge is re-rendered with it and
+              the Undo toast lands in `#toasts` directly instead of being
+              relayed out of the content frame. %>
+          <%= form_with url: helpers.admin_post_path(post, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
             <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
           <% end %>
         <% end %>

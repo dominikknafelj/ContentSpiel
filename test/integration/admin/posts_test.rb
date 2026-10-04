@@ -92,6 +92,12 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal rich_doc("Kept"), post_record.reload.body_document(locale: "en").to_h
   end
 
+  test "Move to trash answers the whole page, so the sidebar's Trash badge updates" do
+    post_record = create_post(title: "Engineer")
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_select "dialog form[action^='/cs-studio/posts/#{post_record.id}'][data-turbo-frame='_top'] input[name='_method'][value='delete']"
+  end
+
   # The error toast never auto-hides, so it must not pile up or outlive the
   # error: each form owns one toast with a stable id (`toast-<error prefix>`).
   # A failed autosave takes the previous one away before appending its own,

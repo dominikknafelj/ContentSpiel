@@ -1,12 +1,18 @@
 <dialog id="<%= ID %>" aria-label="Jump to…" data-dialog-width="form"
         class="admin-dialog admin-palette rounded-cs border border-line-strong bg-surface p-0 text-ink shadow-menu">
   <div class="border-b border-line px-4 py-3">
-    <input type="search" role="combobox" aria-controls="jump-results" aria-expanded="true" aria-autocomplete="list"
+    <%# A combobox over one listbox (`#jump-listbox`, rendered by
+        `admin/jump/show` -- and by the placeholder below until the first
+        answer arrives, so `aria-controls` always names an element that
+        exists and is a listbox). Focus stays in this input; which row is
+        selected is reported through `aria-activedescendant`, which
+        `admin--command-palette#select` keeps in step with `aria-selected`. %>
+    <input type="search" role="combobox" aria-controls="jump-listbox" aria-expanded="true" aria-autocomplete="list"
            aria-label="Jump to…" placeholder="Jump to…" autocomplete="off" spellcheck="false" maxlength="100"
            data-action="input->admin--command-palette#search keydown->admin--command-palette#move"
            class="w-full bg-transparent text-base text-ink placeholder:text-meta focus:outline-none">
   </div>
   <div class="admin-dialog__body min-h-0 overflow-y-auto pb-2">
-    <turbo-frame id="jump-results" data-action="turbo:frame-load->admin--command-palette#loaded"></turbo-frame>
+    <turbo-frame id="jump-results" data-action="turbo:frame-load->admin--command-palette#loaded"><div id="jump-listbox" role="listbox" aria-label="Results"></div></turbo-frame>
   </div>
 </dialog>

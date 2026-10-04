@@ -5,7 +5,10 @@ class Admin::PasswordFieldComponentTest < ViewComponent::TestCase
     render_inline(Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password"))
     assert_selector "label[for=password]", text: "New password"
     assert_selector "input#password[type=password][name=password][autocomplete='new-password'][data-password-field-target=input]"
-    assert_selector "button[type=button][aria-controls=password][aria-pressed=false]", text: "Show"
+    assert_selector "button[type=button][aria-controls=password]", text: "Show"
+    # Its changing text ("Show" / "Hide") is the state; a pressed state on top
+    # would read as "Hide, pressed".
+    assert_no_selector "button[aria-pressed]"
     assert_no_selector "[data-password-field-target=bar]"
   end
 

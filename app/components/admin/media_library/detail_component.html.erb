@@ -77,7 +77,9 @@
                   data: dialog_trigger(delete_dialog_id)) %>
             <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
               <% dialog.with_confirm_action do %>
-                <%= form_with url: destroy_path, method: :delete do %>
+                <%# `_top`: a whole-page visit, so the sidebar's Trash badge
+                    updates and the Undo toast isn't relayed out of the frame. %>
+                <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
                   <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
                 <% end %>
               <% end %>

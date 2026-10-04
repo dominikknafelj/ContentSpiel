@@ -180,7 +180,8 @@ export default class extends Controller {
   }
 
   // Toolbar commands. `data-action="admin--rich-text#<name>"` on each
-  // button (`RichTextColumnComponent::TOOLBAR`).
+  // button (`RichTextColumnComponent::TOOLBAR_GROUPS` and, for the Insert menu's
+  // items, `INSERT_MENU`).
   bold() { this.run((chain) => chain.toggleBold()) }
   italic() { this.run((chain) => chain.toggleItalic()) }
   strike() { this.run((chain) => chain.toggleStrike()) }

@@ -14,6 +14,36 @@ class CommandPaletteTest < ApplicationSystemTestCase
     assert_no_selector "dialog#command-palette[open]"
   end
 
+  # The input keeps focus throughout, so the selected row reaches a screen
+  # reader only through `aria-activedescendant` -- which must always name
+  # the option that is selected, inside the listbox `aria-controls` names.
+  test "the arrow keys move aria-activedescendant along with the selection" do
+    create_post(title: "Palette first")
+    create_post(title: "Palette second")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    assert_selector "##{input["aria-controls"]}[role=listbox]", visible: :all
+
+    input.set("Palette")
+    assert_selector "#jump-results [role=option]", minimum: 2
+    assert_selector "#jump-results [role=option][aria-selected=true]", count: 1
+    first = find("#jump-results [role=option][aria-selected=true]")[:id]
+    assert first.present?
+    assert_equal first, input["aria-activedescendant"]
+    assert_selector "##{input["aria-controls"]}[role=listbox] [role=group][aria-labelledby] ##{first}"
+
+    input.send_keys(:down)
+    second = find("#jump-results [role=option][aria-selected=true]")[:id]
+    assert_not_equal first, second
+    assert_equal second, input["aria-activedescendant"]
+
+    input.set("zzzqqq")
+    assert_text "No results for “zzzqqq”."
+    assert_nil input["aria-activedescendant"]
+  end
+
   test "the sidebar button opens it too, and nonsense shows the no-results line" do
     sign_in_via_form users(:one)
     await_admin_controllers

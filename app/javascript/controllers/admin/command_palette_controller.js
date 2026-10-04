@@ -4,8 +4,8 @@ import { Controller } from "@hotwired/stimulus"
 // results frame are rendered once in the layout
 // (Admin::Shell::CommandPaletteComponent); this controller sits on <body>.
 // Typing reloads the frame (debounced), the arrow keys move the selection
-// (`aria-selected` on the <li role=option>), Enter follows the selected
-// link. Following a link is a `_top` Turbo visit, whose page replacement
+// (`aria-selected` on the <li role=option>, mirrored for the focused input
+// as `aria-activedescendant`), Enter follows the selected link. Following a link is a `_top` Turbo visit, whose page replacement
 // closes the dialog (it is not part of the new body).
 export default class extends Controller {
   static values = { url: String }
@@ -93,12 +93,22 @@ export default class extends Controller {
     this.select((this.index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length)
   }
 
+  // Focus never leaves the input, so the selected row is announced through
+  // the input's `aria-activedescendant`. It names the selected option's id,
+  // and is removed whenever no row is selected (stale results, an empty
+  // answer) -- an id that no longer exists must not be left behind.
   select(index) {
     this.index = index
+    let selectedId = null
     this.options.forEach((option, i) => {
       option.parentElement.setAttribute("aria-selected", String(i === index))
       option.classList.toggle("bg-sunken", i === index)
-      if (i === index) option.scrollIntoView({ block: "nearest" })
+      if (i === index) {
+        option.scrollIntoView({ block: "nearest" })
+        selectedId = option.parentElement.id
+      }
     })
+    if (selectedId) this.input.setAttribute("aria-activedescendant", selectedId)
+    else this.input.removeAttribute("aria-activedescendant")
   }
 }

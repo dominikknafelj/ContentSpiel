@@ -59,6 +59,8 @@ class Admin::MediaLibrary::DetailComponentTest < ViewComponent::TestCase
 
     assert_selector "button", text: "Move to trash"
     assert_no_selector "button[disabled]", text: "Move to trash"
+    # A whole-page answer, so the sidebar's Trash badge updates with it.
+    assert_selector "dialog form[data-turbo-frame='_top'] input[name='_method'][value='delete']", visible: :all
   end
 
   test "Move to trash is disabled, with the in-use reason, while a kept owner uses the image" do

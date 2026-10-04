@@ -64,6 +64,15 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "has already been taken"
   end
 
+  # The edit form is an explicit-save form with a leave guard that only sees
+  # Turbo Drive visits: a link inside the content frame would discard typed
+  # changes without asking, so the one there breaks out of the frame.
+  test "the Activity link on the edit screen leaves the content frame" do
+    get "/cs-studio/users/#{users(:two).id}/edit"
+    assert_select "a[data-turbo-frame='_top']", text: "Activity"
+    assert_select "#user-form noscript", count: 1
+  end
+
   test "editing a user's email without touching the password" do
     user = users(:two)
     digest_before = user.password_digest

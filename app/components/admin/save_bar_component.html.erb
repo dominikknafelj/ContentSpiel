@@ -5,3 +5,8 @@
   <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
   <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data) %>
 </div>
+<%# The bar above starts `hidden` and only `admin--save-bar` ever shows it, so
+    without JavaScript the form would have no submit button at all. This one
+    exists only then (a browser with scripting on never parses it into the
+    page), the way the filter forms keep their "Filter" button. %>
+<noscript><%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id) %></noscript>

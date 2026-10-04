@@ -56,8 +56,36 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
   test "an empty query lists modules and actions" do
     sign_in_as users(:one)
     get admin_jump_path
-    assert_select "h3", text: "Settings"
-    assert_select "h3", text: "Actions"
+    assert_select "[role=group] > [role=presentation]", text: "Settings"
+    assert_select "[role=group] > [role=presentation]", text: "Actions"
+  end
+
+  # One listbox (what the palette's combobox input controls), holding groups
+  # each named by its own heading row, holding options that each have an id
+  # (for `aria-activedescendant`).
+  test "the results are one listbox of labelled groups whose options have unique ids" do
+    sign_in_as users(:one)
+    get admin_jump_path
+    assert_select "#jump-listbox[role=listbox]", count: 1
+    assert_select "[role=listbox]", count: 1
+
+    groups = css_select("#jump-listbox > [role=group]")
+    assert_operator groups.size, :>=, 2
+    groups.each do |group|
+      assert_select group, "> [role=presentation]##{group["aria-labelledby"]}", count: 1
+      assert_select group, "> [role=option]", minimum: 1
+    end
+
+    ids = css_select("#jump-listbox [role=option]").map { |option| option["id"] }
+    assert ids.all?(&:present?)
+    assert_equal ids.uniq, ids
+  end
+
+  test "no results still renders the (empty) listbox the input controls" do
+    sign_in_as users(:one)
+    get admin_jump_path(q: "zzzqqq")
+    assert_select "#jump-listbox[role=listbox]", count: 1
+    assert_select "#jump-listbox [role=option]", count: 0
   end
 
   test "a user with no grants sees only what they can read" do
