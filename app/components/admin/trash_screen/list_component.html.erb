@@ -17,7 +17,7 @@
 <% if items.empty? %>
   <%= render Admin::EmptyStateComponent.new(title: "The trash is empty", description: "Deleted pages, posts and images show up here until they're deleted permanently.") %>
 <% else %>
-  <table class="admin-trash-table w-full border-collapse text-sm">
+  <table class="admin-trash-table admin-card-table w-full border-collapse text-sm">
     <thead>
       <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
         <th class="py-2 pr-4">Item</th>

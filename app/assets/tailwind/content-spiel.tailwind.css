@@ -295,3 +295,17 @@
   .admin-block-settings-row > .admin-field:last-child > * { direction: ltr; }
   .admin-block-settings-row > .admin-field:last-child > [id$="-errors"] { width: max-content; max-width: 20rem; }
 }
+
+/* A table that sits directly inside a bordered card (audit log, API tokens,
+   tags, trash): its cells carry only the gap between columns, so without
+   this the first column's text touches the card's left border and the last
+   column's its right one. 14px matches the posts table's own `pl-3.5`. */
+.admin-card-table th:first-child,
+.admin-card-table td:first-child {
+  padding-left: 14px;
+}
+
+.admin-card-table th:last-child,
+.admin-card-table td:last-child {
+  padding-right: 14px;
+}
