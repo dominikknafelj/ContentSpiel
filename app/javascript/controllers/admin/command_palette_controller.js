@@ -77,26 +77,31 @@ export default class extends Controller {
     if (this.stale) return
     this.select(0)
     if (this.pendingEnter) {
+      const newTab = this.pendingEnter === "newTab"
       this.pendingEnter = false
-      this.options[0]?.click()
+      if (newTab) this.openInNewTab(this.options[0])
+      else this.options[0]?.click()
     }
+  }
+
+  openInNewTab(link) {
+    if (link?.href) window.open(link.href, "_blank", "noopener")
   }
 
   move(event) {
     if (!["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) return
     event.preventDefault()
     // Enter while the results are stale waits for the matching response
-    // and then follows its first row (or does nothing if it has none).
-    if (event.key === "Enter" && this.stale) { this.pendingEnter = true; return }
+    // and then follows its first row (or does nothing if it has none). A
+    // ⌘/Ctrl+Enter waits the same way, remembered as "newTab", and opens that
+    // first row in a new tab instead of following it in this one.
+    if (event.key === "Enter" && this.stale) { this.pendingEnter = (event.metaKey || event.ctrlKey) ? "newTab" : true; return }
     const options = this.options
     if (options.length === 0) return
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      // Stale results: the selected row may be for a query the viewer has
-      // since changed, so do nothing rather than open the wrong thing (the
-      // plain Enter above waits for the response; a new-tab open doesn't).
-      if (this.stale) return
-      const href = options[this.index]?.href
-      if (href) window.open(href, "_blank", "noopener")
+      // Not stale here (the guard above caught that case): the selected row
+      // answers the current query.
+      this.openInNewTab(options[this.index])
       return
     }
     if (event.key === "Enter") return options[this.index]?.click()

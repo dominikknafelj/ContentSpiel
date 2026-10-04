@@ -67,6 +67,27 @@ class CommandPaletteTest < ApplicationSystemTestCase
     assert_selector "h1", text: beta.title
   end
 
+  test "typing a new query and pressing Cmd/Ctrl+Enter at once opens the new query's result in a new tab, not this one" do
+    create_post(title: "Alpha stale target")
+    beta = create_post(title: "Beta fresh target")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    page.execute_script("window.__opened = []; window.open = (...args) => { window.__opened.push(args); return null }")
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("Alpha")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: "Alpha stale target"
+    input.set("Beta")
+    input.send_keys([ :control, :enter ])
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: beta.title
+    opened = nil
+    Timeout.timeout(5) { sleep 0.05 until (opened = page.evaluate_script("window.__opened")).any? }
+    assert_equal 1, opened.size
+    assert_match(%r{/cs-studio/posts/#{beta.id}\b}, opened.first[0])
+    assert_equal [ "_blank", "noopener" ], opened.first[1..]
+    assert_current_path admin_root_path
+  end
+
   test "an empty result offers New post" do
     sign_in_via_form users(:one)
     await_admin_controllers

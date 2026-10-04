@@ -15,7 +15,7 @@ module Admin
       primary: "bg-accent text-on-accent hover:bg-accent-hover",
       secondary: "border border-line-strong bg-surface text-ink hover:bg-sunken",
       # The trigger for a destructive action (round 1's red-outline
-      # `:danger_text` is gone, spec §7): a secondary button -- same border,
+      # `:danger_outline` variant is gone, spec §7): a secondary button -- same border,
       # fill and hover -- whose label alone is red, so the one solid red on
       # screen is the confirm button inside the dialog it opens.
       danger_text: "border border-line-strong bg-surface text-danger-ink hover:bg-sunken",
