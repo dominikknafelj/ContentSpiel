@@ -7,7 +7,11 @@ module AccessControl
   # A grant goes stale when the world it points at changes under it -- its
   # branch root page is deleted, its content type is no longer registered,
   # or its permission key itself is gone (a removed plugin). None of that is
-  # an error: the stale value simply matches nothing (`Scoping::Condition`).
+  # an error: the stale value simply matches nothing (`Scoping::Condition`,
+  # which reads a grant's content types through the same registry reader as
+  # this class, `Permissions.content_type_choices` -- so a name filed under
+  # `gone_types` here grants nothing there, even on posts that still carry
+  # that type, until a type of that name is registered again).
   # Here each grant is split into the part that still means something and
   # the part that doesn't:
   #

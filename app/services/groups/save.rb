@@ -103,8 +103,11 @@ module Groups
     # a group they only meant to rename.
     #
     # Why it is this narrow (fix round 2). A removed name is dormant, not
-    # meaningless: the day a plugin registers a type of that name again the
-    # grant matches it. So a grant that carries one may only pass unchecked when
+    # meaningless. While it is unregistered it grants nothing at all -- not even
+    # on leftover posts that still carry that type (`Scoping::Condition`
+    # intersects a grant's types with the registered ones) -- but the day a
+    # plugin registers a type of that name again the grant matches it, with no
+    # save in between. So a grant that carries one may only pass unchecked when
     # NOTHING ELSE about it changed. A posted grant is read as a stored one only
     # when all of this holds:
     #

@@ -315,6 +315,36 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert_not allowed?(@brancher, "posts.edit", create_post(title: "Blog"))
   end
 
+  # Final fix wave (S-I1): the test above only proves that a gone name doesn't
+  # match a *blog* post. The case that matters is a post that still CARRIES the
+  # gone type (a removed plugin's leftovers): the grant's name and the post's
+  # type are the same string, so a plain `include?` matched. A name that isn't
+  # registered grants nothing -- alone or beside a live one.
+  test "a grant naming an unregistered content type doesn't match a post that still carries that type" do
+    blog = create_post(title: "Blog")
+    leftover = create_post(title: "Leftover")
+    leftover.update_columns(content_type: "gone")
+    unscoped_group = AccessControl::Group.create!(name: "Unscoped editors")
+    grant!("posts.edit", group: unscoped_group)
+    @reader.groups << unscoped_group
+
+    [ [ "gone" ], [ "blog", "gone" ] ].each do |types|
+      @branch_group.grants.destroy_all
+      %w[posts.read posts.edit posts.delete].each { |key| grant!(key).update_columns(scope: { "content_types" => types }) }
+      AccessControl::ActorGrants.reset!
+
+      %w[posts.read posts.edit posts.delete].each do |key|
+        assert_not allowed?(@brancher, key, leftover), "#{types.inspect} let #{key} through on a post of the gone type"
+        assert_equal types.include?("blog"), allowed?(@brancher, key, blog), "#{types.inspect}: #{key} on a blog post"
+      end
+    end
+
+    # No `content_types` key at all is still "every type", gone ones included,
+    # and an owner is never asked.
+    assert allowed?(@reader, "posts.edit", leftover)
+    assert allowed?(@owner, "posts.edit", leftover)
+  end
+
   test "a grant for an unregistered permission is ignored" do
     grant = grant!("posts.edit")
     grant.update_columns(permission: "gone/thing.edit")

@@ -25,6 +25,25 @@ module AccessControl
     # (Review Focus 3): a scope key this subject can't be matched on, an
     # unknown key, an empty list, a stale page id or an unregistered
     # content type all match nothing, and never raise.
+    #
+    # "An unregistered content type matches nothing" is enforced HERE, not
+    # left to the data (final fix wave, S-I1). A grant's `content_types` is
+    # read through `#registered_types` -- the stored names that are
+    # registered today, by the same reader `LiveGrants` splits a grant with
+    # (`Permissions.content_type_choices`), so the editor's "no longer
+    # exists" and what the grant actually reaches can't drift. Comparing the
+    # raw names was not enough: a post can outlive its type (a removed
+    # plugin's posts keep their `content_type`), and its type then equals
+    # the gone name on the grant, so `{content_types: ["retired"]}` -- or
+    # `["blog", "retired"]` -- still reached every leftover `retired` post.
+    # That mattered because everything that decides who may hand a grant out
+    # (`can_assign_group?`, `can_manage_group?`, `Groups::Save`) judges a
+    # group by its LIVE entries: a `{blog}` holder could put a user or a
+    # token into a group holding a gone name. Now the name is dormant in
+    # fact: it grants nothing until a type of that name is registered again
+    # (and then at once, with its old meaning). A scope that NAMED types of
+    # which none is registered is still a scope -- it matches nothing; only
+    # a scope with no `content_types` key at all means "every type".
     class Condition
       def initialize(grant, user_id, permission)
         @grant = grant
@@ -40,7 +59,7 @@ module AccessControl
       def matches?(record, branch_ids)
         @grant.scope.all? do |scope_key, value|
           case scope_key
-          when "content_types" then record.is_a?(Post) && Array(value).include?(record.content_type)
+          when "content_types" then record.is_a?(Post) && registered_types(value).include?(record.content_type)
           when "page_ids" then record.is_a?(Page) && Array(value).map(&:to_i).intersect?(branch_ids.call)
           when "own" then !@grant.scope_own? || own?(record)
           else false
@@ -56,7 +75,8 @@ module AccessControl
       # as `1=0`. Every value goes in as a bind parameter.
       #
       # The mirror image of each `matches?` branch:
-      # - `content_types` -> `content_type IN (...)`;
+      # - `content_types` -> `content_type IN (<the registered ones>)`, and
+      #   nothing at all when none of the named types is registered;
       # - `page_ids` -> the page (for `pages.create`: its parent, which is
       #   what the checker's `branch_ids` uses) is a descendant-or-self of
       #   a listed root, via the closure table. A root page has no parent,
@@ -69,8 +89,9 @@ module AccessControl
         @grant.scope.reduce(base) do |relation, (scope_key, value)|
           case scope_key
           when "content_types"
-            return nothing(base) unless base.model == Post
-            relation.where(content_type: Array(value))
+            types = registered_types(value)
+            return nothing(base) unless base.model == Post && types.any?
+            relation.where(content_type: types)
           when "page_ids"
             return nothing(base) unless base.model == Page
             column = @permission.key == "pages.create" ? :parent_id : :id
@@ -102,6 +123,10 @@ module AccessControl
       end
 
       def nothing(base) = base.where(id: [])
+
+      # The grant's content types that are registered today (see the class
+      # comment). Never the raw list: both forms of the predicate read this.
+      def registered_types(value) = Array(value).map(&:to_s) & Permissions.content_type_choices
     end
 
     def initialize(actor, key, channel, trashed: false)
