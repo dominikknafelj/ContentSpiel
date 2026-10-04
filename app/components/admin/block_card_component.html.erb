@@ -1,8 +1,12 @@
 <div id="<%= dom_id %>" data-block-id="<%= block.id %>" data-admin--blocks-target="card"
      class="admin-block-card rounded-cs border border-line bg-surface">
-  <div class="flex items-center gap-2 border-b border-line p-3">
+  <div class="flex items-center gap-2 border-b border-line p-3 hover:bg-sunken">
     <% if editable? %>
-      <span class="admin-block-card__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+      <%# A real button for the keyboard path (`admin--blocks#key`); the mouse
+          drag starts from it too (SortableJS `handle:`). %>
+      <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              aria-label="Move <%= label %>" aria-describedby="block-drag-help"
+              data-action="keydown->admin--blocks#key">⠿</button>
     <% end %>
 
     <% if unavailable? %>

@@ -13,7 +13,12 @@
           `handle:` option), so the title link below stays a plain, clickable
           link. %>
       <% if movable? %>
-        <span class="admin-tree-node__handle shrink-0 cursor-grab select-none text-meta" aria-hidden="true">⠿</span>
+        <%# A real button, so the keyboard reaches it: Space picks the row up,
+            the arrows move it, Space drops it (`admin--tree#key`). The mouse
+            drag still starts from it (SortableJS `handle:`). %>
+        <button type="button" class="admin-tree-node__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="Move <%= title %>" aria-describedby="tree-drag-help"
+                data-action="keydown->admin--tree#key">⠿</button>
       <% end %>
 
       <%= link_to title, path, data: { turbo_frame: "content" },

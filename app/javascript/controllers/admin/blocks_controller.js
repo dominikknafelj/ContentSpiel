@@ -3,13 +3,16 @@ import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
-// dragging a card, or its "⋯" menu's Move up/down. `card` targets are
+// dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
+// handle (Space, arrows, Space). `card` targets are
 // `Admin::BlockCardComponent`'s own top-level wrapper -- one per block, in
 // document order -- and every between-cards "+ add block" picker lives
 // *nested inside* the card it follows (that component's own comment
-// explains why), so it's never itself a direct child of this element and
-// Sortable never has to be told to skip it: `this.element`'s direct
-// children are exactly the cards, nothing else.
+// explains why), so it's never itself a direct child of the `list` target
+// and Sortable never has to be told to skip it: the list's direct children
+// are exactly the cards, nothing else. (The list is its own target, not
+// `this.element`: the controller's element is the whole Blocks section,
+// whose direct children are the header, the list and the picker.)
 //
 // Duplicate and Delete need no controller action of their own -- both are
 // plain `button_to`/`form_with` submissions, and Turbo Drive already
@@ -24,7 +27,7 @@ import Sortable from "sortablejs"
 // "fetch bypasses Turbo Drive, so nothing else applies this for us"
 // pattern `admin--tree`'s own drag handler already uses.
 export default class extends Controller {
-  static targets = ["card"]
+  static targets = ["card", "list", "announcer"]
   static values = { reorderUrl: String }
 
   // Every block request also carries the page settings form's current base
@@ -42,15 +45,30 @@ export default class extends Controller {
       if (pageBase) event.detail.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
     }
     this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
-    this.sortable = Sortable.create(this.element, {
+    // The Undo toast after a reorder lives in `#toasts`, outside this
+    // section, so its `button_to` request wouldn't pass through the listener
+    // above -- and without the base the server wouldn't move the page form's
+    // base forward after the Undo's own page touch (a spurious "Changed
+    // elsewhere" on the next page save). It's recognised by its URL.
+    this.addPageBaseToUndo = (event) => {
+      if (this.element.contains(event.target)) return
+      if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
+    }
+    document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.sortable = Sortable.create(this.listTarget, {
       handle: ".admin-block-card__handle",
       animation: 150,
+      // The drag look (handoff §9 A9): a dashed placeholder where the card
+      // would land, and the lifted card itself with a shadow.
+      ghostClass: "admin-drag-ghost",
+      chosenClass: "admin-drag-chosen",
       onEnd: () => this.reorder()
     })
   }
 
   disconnect() {
     this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
+    document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
     this.sortable?.destroy()
   }
 
@@ -70,7 +88,7 @@ export default class extends Controller {
   moveUp(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
-    if (index > 0) this.element.insertBefore(card, this.cardTargets[index - 1])
+    if (index > 0) this.listTarget.insertBefore(card, this.cardTargets[index - 1])
     this.reorder()
   }
 
@@ -78,7 +96,7 @@ export default class extends Controller {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
     if (index >= 0 && index < this.cardTargets.length - 1) {
-      this.element.insertBefore(this.cardTargets[index + 1], card)
+      this.listTarget.insertBefore(this.cardTargets[index + 1], card)
     }
     this.reorder()
   }
@@ -98,6 +116,87 @@ export default class extends Controller {
     })
 
     Turbo.renderStreamMessage(await response.text())
+  }
+
+  // ---- Keyboard path (handoff §9 A9) -------------------------------------
+  //
+  // Space on a card's handle picks it up; ArrowUp/ArrowDown move it among the
+  // cards; Space drops it (`reorder`, the request a drag's `onEnd` makes) and
+  // Escape puts it back without saving.
+  key(event) {
+    const card = this.cardFor(event)
+    if (!card) return
+
+    if (event.key === " ") {
+      event.preventDefault()
+      this.picked === card ? this.drop(card) : this.pickUp(card)
+      return
+    }
+    if (this.picked !== card) return
+
+    if (event.key === "Escape") {
+      event.preventDefault()
+      this.cancel(card)
+    } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault()
+      this.step(card, event.key === "ArrowUp" ? -1 : 1)
+    }
+  }
+
+  pickUp(card) {
+    this.picked = card
+    this.originNext = card.nextElementSibling
+    card.dataset.picked = "true"
+    card.classList.add("admin-drag-chosen")
+    this.announce(`Picked up ${this.titleOf(card)}. ${this.positionOf(card)}`)
+  }
+
+  // Swaps with the neighbouring card in `cardTargets`' own order, as Move
+  // up/down does (never raw DOM siblings -- see `moveUp`).
+  step(card, direction) {
+    const index = this.cardTargets.indexOf(card)
+    const neighbour = this.cardTargets[index + direction]
+    if (!neighbour) return
+    this.listTarget.insertBefore(card, direction < 0 ? neighbour : neighbour.nextElementSibling)
+    // A DOM move blurs the focused handle; put focus back so the next key
+    // press still reaches this card.
+    this.focusHandle(card)
+    this.announce(this.positionOf(card))
+  }
+
+  drop(card) {
+    this.clearPicked(card)
+    this.announce(`Dropped ${this.titleOf(card)}. ${this.positionOf(card)}`)
+    return this.reorder()
+  }
+
+  cancel(card) {
+    this.listTarget.insertBefore(card, this.originNext)
+    this.clearPicked(card)
+    this.focusHandle(card)
+    this.announce(`Cancelled. ${this.titleOf(card)} is back where it was.`)
+  }
+
+  clearPicked(card) {
+    delete card.dataset.picked
+    card.classList.remove("admin-drag-chosen")
+    this.picked = null
+  }
+
+  focusHandle(card) {
+    card.querySelector(".admin-block-card__handle")?.focus()
+  }
+
+  titleOf(card) {
+    return card.querySelector("[data-action$='admin--blocks#toggle']")?.textContent.trim() || "block"
+  }
+
+  positionOf(card) {
+    return `Position ${this.cardTargets.indexOf(card) + 1} of ${this.cardTargets.length}.`
+  }
+
+  announce(message) {
+    if (this.hasAnnouncerTarget) this.announcerTarget.textContent = message
   }
 
   cardFor(event) {
