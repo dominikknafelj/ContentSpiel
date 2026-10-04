@@ -415,7 +415,7 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
       assert_select "a[href*='tag=shared']", text: "1 post"
       assert_select "a", text: "2 posts", count: 0
-      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts. The posts themselves stay."
+      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
     end
 
     get "/cs-studio/posts", params: { tag: "shared" }

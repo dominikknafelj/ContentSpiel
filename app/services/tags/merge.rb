@@ -41,7 +41,9 @@ module Tags
     # first so a caller without the right learns nothing about the arguments.
     def call
       return denied("tags.manage", @source) unless authorize!("tags.manage", @source)
-      return failure(@source, [ MISSING_TAG ]) if @into.nil?
+      # Not a tag at all -- nil from a name that matched nothing, or whatever a
+      # caller outside CS Studio handed over -- is "none chosen", a plain failure.
+      return failure(@source, [ MISSING_TAG ]) unless @into.is_a?(Tag)
       return failure(@source, [ SAME_TAG ]) if @into.id == @source.id
 
       problem = nil
@@ -72,7 +74,7 @@ module Tags
 
         give_target_to_carriers(into, carrier_ids)
         touch_carrying_posts(source)
-        repoint_blocks(blocks, into)
+        repoint_blocks(blocks, source, into)
         PostTag.where(tag_id: source.id).delete_all
         source.destroy!
 
@@ -111,12 +113,23 @@ module Tags
     # open resends the OLD tag name on its next autosave, and a moved
     # `updated_at` makes that save a 409 ("Changed elsewhere") instead of
     # quietly undoing the merge.
-    def repoint_blocks(blocks, into)
+    #
+    # `blocks` were read at the start of the merge, to know which listings it
+    # affects. Their settings are NOT written back from that read: the rows are
+    # loaded again here under a row lock (in id order, like the tags), and the
+    # tag is merged into the settings as they are stored now -- so a limit or a
+    # content type another editor saved in between survives, and a block that
+    # has been pointed at some other tag meanwhile is left alone (the same
+    # match as `Listings#listing_blocks_naming`, asked again of the fresh row).
+    # The lock holds until the commit, so a block save arriving after it sees
+    # the new tag and the moved `updated_at`.
+    def repoint_blocks(blocks, source, into)
       return if blocks.empty?
 
       now = Time.current
-      blocks.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
-      Page.where(id: blocks.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all
+      fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
+      fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
+      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all
     end
   end
 end

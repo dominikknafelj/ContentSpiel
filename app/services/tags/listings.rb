@@ -19,12 +19,16 @@ module Tags
     # included on purpose: they come back with the page, so they must already
     # name the right tag then.
     def listing_blocks_naming(*names)
-      names = names.map { |name| name.to_s.strip.downcase }.reject(&:blank?)
+      ContentBlock.listing.select { |block| block_names_tag?(block, names) }
+    end
 
-      ContentBlock.listing.select do |block|
-        tag = block.settings_object&.tag.to_s.strip
-        tag.present? && names.include?(tag.downcase)
-      end
+    # The match itself, for one block as loaded -- also asked of a block
+    # re-read under a lock (`Tags::Merge#repoint_blocks`), so "names this tag"
+    # has one definition whenever it is asked.
+    def block_names_tag?(block, names)
+      names = Array(names).map { |name| name.to_s.strip.downcase }.reject(&:blank?)
+      tag = block.settings_object&.tag.to_s.strip
+      tag.present? && names.include?(tag.downcase)
     end
 
     # The content types a `PublicSite::Paths.sync_posts` has to re-derive after

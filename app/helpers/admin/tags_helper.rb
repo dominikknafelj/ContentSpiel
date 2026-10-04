@@ -11,25 +11,46 @@ module Admin
   # viewer who may read posts at all. For anyone else it is nil and the copy
   # stays general, so a tag manager without `posts.read` learns no figure about
   # posts they can't see (the list's own count column is hidden for them too).
+  #
+  # `readable` is the list's own "Posts" number for that tag: the kept posts
+  # the viewer may read. When the action reaches MORE than that, the dialog's
+  # number would contradict the column beside it ("1 post" in the row, "2
+  # posts" in the dialog), so the sentence says where the others are -- in the
+  # trash, or out of the viewer's reach. It says no more than that: which of
+  # the two, and how many of each, would tell a scoped viewer how many posts
+  # they can't see carry the tag. When the two agree, the plain sentence stays.
   module TagsHelper
+    HIDDEN_MANY = "including ones in the trash or that you can't open".freeze
+    HIDDEN_ONE = "which is in the trash or one you can't open".freeze
+
     def tag_merge_title(tag) = "Merge “#{tag.name}” into…"
 
     def tag_delete_title(tag) = "Delete “#{tag.name}”?"
 
-    def tag_merge_text(tag, count)
+    def tag_merge_text(tag, count, readable = count)
       lead = if count.nil? then "Its posts get"
       elsif count.zero? then return "No posts use it, so nothing moves. “#{tag.name}” is deleted. This can't be undone."
-      elsif count == 1 then "Its 1 post gets"
-      else "Its #{count} posts get"
+      else
+        hidden = tag_hidden_posts_clause(count, readable)
+        "Its #{pluralize(count, 'post')}#{", #{hidden}," if hidden} #{count == 1 ? 'gets' : 'get'}"
       end
       "#{lead} the chosen tag and “#{tag.name}” is deleted. This can't be undone."
     end
 
-    def tag_delete_text(count)
+    def tag_delete_text(count, readable = count)
       return "It is removed from every post that uses it. The posts themselves stay." if count.nil?
       return "No posts use it." if count.zero?
 
-      "It is removed from #{pluralize(count, 'post')}. The posts themselves stay."
+      hidden = tag_hidden_posts_clause(count, readable)
+      "It is removed from #{pluralize(count, 'post')}#{", #{hidden}" if hidden}. The posts themselves stay."
+    end
+
+    # The clause explaining a dialog number larger than the column's, or nil
+    # when they agree.
+    def tag_hidden_posts_clause(count, readable)
+      return nil unless count > readable.to_i
+
+      count == 1 ? HIDDEN_ONE : HIDDEN_MANY
     end
 
     # "3 posts", "1 post".

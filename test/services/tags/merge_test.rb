@@ -87,9 +87,114 @@ class Tags::MergeTest < ActiveSupport::TestCase
     assert_equal "b", already.reload.settings["tag"]
     assert_nil untagged.reload.settings["tag"]
     assert_equal [ only_a, only_b ].sort_by(&:id), exact.listed_posts.sort_by(&:id)
+    # The block that named the source with other case and spaces around it, and
+    # no content type, lists them too -- by what it now stores, not by luck.
+    assert_equal [ only_a, only_b ].sort_by(&:id), cased.listed_posts.sort_by(&:id)
     # Two blocks on one page now list the same posts twice; that is correct, they are not deduplicated.
     assert_equal 2, listing.content_blocks.reload.count
     assert_equal exact.settings["tag"], cased.settings["tag"]
+  end
+
+  # --- Final fix wave (Task 13 I2): what a merge does to public URLs ----------
+  #
+  # A merge changes which listing blocks list a post, and a post's URL is its
+  # canonical listing page's path plus its slug (`PublicSite::Paths.canonical_
+  # page`: among equally specific blocks, the page that comes first in tree
+  # order). These pin the effects through the real services -- nothing here
+  # writes a `public_paths` row by hand.
+
+  def resolve(path) = PublicSite::Resolver.new(scope: :published).call(locale: "en", path: path)
+
+  def assert_one_current_row_per_url
+    doubled = PublicPath.where(current: true).group(:locale, :path).having("COUNT(*) > 1").count
+    assert_empty doubled, "a (locale, path) has two current rows"
+  end
+
+  test "a merge moves the source's posts to the listing earlier in the tree, and their old URL redirects" do
+    for_b = create_page(title: "B posts") # created first: earlier among its siblings
+    for_a = create_page(title: "A posts")
+    listing_block(for_b, tag: "b")
+    listing_block(for_a, tag: "a")
+    only_a = create_post(title: "Only A", tags: [ "a" ])
+    only_b = create_post(title: "Only B", tags: [ "b" ])
+    assert_operator for_b.position, :<, for_a.position
+    assert_equal "/a-posts/only-a", only_a.full_path("en")
+    assert_equal :found, resolve("/a-posts/only-a").status
+
+    assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
+
+    # Both blocks list both posts now; the earlier page wins for both.
+    assert_equal "/b-posts/only-a", only_a.reload.full_path("en")
+    assert_equal "/b-posts/only-b", only_b.reload.full_path("en")
+    old = PublicPath.find_by!(record: only_a, locale: "en", path: "/a-posts/only-a")
+    assert_not old.current
+    assert_equal [ "/b-posts/only-a" ], PublicPath.where(record: only_a, locale: "en", current: true).pluck(:path)
+    result = resolve("/a-posts/only-a")
+    assert_equal [ :redirect, "/b-posts/only-a", 301 ], [ result.status, result.location, result.http_status ]
+    assert_equal :found, resolve("/b-posts/only-a").status
+    assert_one_current_row_per_url
+  end
+
+  test "a post carrying only the target moves to a former-source listing that is earlier in the tree" do
+    for_a = create_page(title: "A posts") # earlier
+    for_b = create_page(title: "B posts")
+    listing_block(for_a, tag: "a")
+    listing_block(for_b, tag: "b")
+    create_post(title: "Only A", tags: [ "a" ])
+    only_b = create_post(title: "Only B", tags: [ "b" ])
+    assert_equal "/b-posts/only-b", only_b.full_path("en")
+
+    assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
+
+    assert_equal "/a-posts/only-b", only_b.reload.full_path("en"), "the block that named the source now lists it, and its page comes first"
+    result = resolve("/b-posts/only-b")
+    assert_equal [ :redirect, "/a-posts/only-b", 301 ], [ result.status, result.location, result.http_status ]
+    assert_not PublicPath.find_by!(record: only_b, locale: "en", path: "/b-posts/only-b").current
+    assert_one_current_row_per_url
+  end
+
+  test "a post carrying only the target gains a URL when the only listing named the source" do
+    for_a = create_page(title: "A posts")
+    listing_block(for_a, tag: "a")
+    create_post(title: "Only A", tags: [ "a" ])
+    only_b = create_post(title: "Only B", tags: [ "b" ])
+    assert_nil only_b.full_path("en")
+    assert_equal :not_found, resolve("/a-posts/only-b").status
+
+    assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
+
+    assert_equal "/a-posts/only-b", only_b.reload.full_path("en")
+    assert_equal :found, resolve("/a-posts/only-b").status
+    assert_one_current_row_per_url
+  end
+
+  # Final fix wave (m8): the blocks are read early in the merge (to know which
+  # listings are affected) and repointed later. The write must be made on the
+  # row as it is THEN, changing the tag alone -- not put back the settings as
+  # they were read, over whatever another editor saved in between.
+  test "repointing a block changes its tag alone, on the row as stored at that moment" do
+    listing = create_page(title: "Listing")
+    block = ContentBlocks::Save.call(listing.content_blocks.build,
+      attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "a", limit: 3 } }).record
+    elsewhere = ContentBlocks::Save.call(listing.content_blocks.build,
+      attributes: { block_type: "post_list", settings: { content_type: "blog", tag: "a", limit: 4 } }).record
+    create_post(title: "Only A", tags: [ "a" ])
+    Tag.create!(name: "b")
+    insert_all = PostTag.method(:insert_all)
+
+    # Between the read of the blocks and their repointing (the join rows are
+    # written in between), another request changes one block's limit and
+    # points the other at a different tag altogether.
+    with_singleton_override(PostTag, :insert_all, lambda { |*args, **options|
+      block.update_columns(settings: block.settings.merge("limit" => 9))
+      elsewhere.update_columns(settings: elsewhere.settings.merge("tag" => "zzz"))
+      insert_all.call(*args, **options)
+    }) do
+      assert Tags::Merge.call(tag("a"), into: tag("b")).ok?
+    end
+
+    assert_equal({ "content_type" => "blog", "tag" => "b", "limit" => 9 }, block.reload.settings)
+    assert_equal "zzz", elsewhere.reload.settings["tag"], "a block that no longer names the source is left alone"
   end
 
   test "block rows keep their other settings" do
@@ -192,6 +297,21 @@ class Tags::MergeTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert Tag.exists?(source.id)
+  end
+
+  # Final fix wave (m9): `into:` is whatever a caller hands over (MCP, the
+  # console). Anything that isn't a tag is "no tag chosen", not a NoMethodError.
+  test "a target that isn't a tag is the same plain failure, never an exception" do
+    source = Tag.create!(name: "a")
+
+    [ "b", 42, Object.new, Post.new ].each do |junk|
+      result = as_owner { Tags::Merge.call(source, into: junk) }
+
+      assert_not result.ok?
+      assert_equal [ Tags::Merge::MISSING_TAG ], result.errors
+    end
+    assert Tag.exists?(source.id)
+    assert_not Audit::Event.exists?(action: "tag.merged")
   end
 
   test "a target deleted since it was loaded is a plain failure that leaves the source alone" do

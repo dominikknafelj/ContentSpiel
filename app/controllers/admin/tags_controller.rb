@@ -99,7 +99,11 @@ module Admin
     def merge
       source = Tag.find(params[:id])
       name = params[:into].to_s.strip.downcase
-      into = Tag.find_by(name: name) if name.present?
+      # By `LOWER(name)`, the comparison every other match on a tag name makes
+      # (`index`'s ordering, `BlockTypes::PostList`): names are stored
+      # lowercase today, but one stored with a capital (an old row, a write
+      # around the model) must still be found by the name the picker shows.
+      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?
 
       result = Tags::Merge.call(source, into: into)
       return forbidden!(result.errors.first) if result.denied?

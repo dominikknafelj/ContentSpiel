@@ -30,6 +30,7 @@
       <tbody>
         <% @tags.each do |row| %>
           <% carriers = @counts_visible ? @carrier_counts.fetch(row.id, 0) : nil %>
+          <% readable = @counts_visible ? @readable_counts.fetch(row.id, 0) : nil %>
           <tr id="<%= dom_id(row) %>" class="border-b border-line last:border-b-0 align-middle">
             <td class="py-1.5 pr-4">
               <%# `data-controller="admin--autosave"` sits directly on this
@@ -70,7 +71,7 @@
                 <% menu.with_item do %>
                   <%= content_tag(:button, "Merge into…", type: "button",
                         data: dialog_trigger("merge-tag-dialog").merge(
-                          tag_id: row.id, tag_merge_title: tag_merge_title(row), tag_merge_text: tag_merge_text(row, carriers),
+                          tag_id: row.id, tag_merge_title: tag_merge_title(row), tag_merge_text: tag_merge_text(row, carriers, readable),
                           tag_name: row.name)) %>
                 <% end %>
                 <% menu.with_item { content_tag(:div, "", class: "my-1 border-t border-line", role: "separator") } %>
@@ -79,7 +80,7 @@
                       red is the dialog's own confirm button. %>
                   <%= content_tag(:button, "Delete tag…", type: "button",
                         data: dialog_trigger("delete-tag-dialog").merge(
-                          tag_id: row.id, tag_delete_title: tag_delete_title(row), tag_delete_text: tag_delete_text(carriers))) %>
+                          tag_id: row.id, tag_delete_title: tag_delete_title(row), tag_delete_text: tag_delete_text(carriers, readable))) %>
                 <% end %>
               <% end %>
             </td>

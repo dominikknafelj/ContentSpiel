@@ -71,7 +71,25 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
       assert_select "a[href*='tag=rails']", text: "1 post"
+      # Two numbers for one tag need a reason (final fix wave, Task 13 I1).
+      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
+      assert_select "button[data-tag-merge-text=?]", "Its 2 posts, including ones in the trash or that you can't open, get the chosen tag and “rails” is deleted. This can't be undone."
+    end
+  end
+
+  test "when the column and the dialog agree, the dialogs keep the plain sentences; a single hidden post is named in the singular" do
+    create_post(title: "One", tags: [ "rails" ])
+    create_post(title: "Two", tags: [ "rails" ])
+    create_post(title: "Only hidden", tags: [ "gone" ]).update_columns(trashed_at: Time.current)
+
+    get "/cs-studio/tags"
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(Tag.find_by!(name: "rails"))}" do
       assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts. The posts themselves stay."
+      assert_select "button[data-tag-merge-text=?]", "Its 2 posts get the chosen tag and “rails” is deleted. This can't be undone."
+    end
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(Tag.find_by!(name: "gone"))}" do
+      assert_select "button[data-tag-delete-text=?]", "It is removed from 1 post, which is in the trash or one you can't open. The posts themselves stay."
+      assert_select "button[data-tag-merge-text=?]", "Its 1 post, which is in the trash or one you can't open, gets the chosen tag and “gone” is deleted. This can't be undone."
     end
   end
 
@@ -143,9 +161,9 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
       assert_select "button[data-tag-delete-title=?][data-tag-delete-text=?]",
-        "Delete “rails”?", "It is removed from 3 posts. The posts themselves stay."
+        "Delete “rails”?", "It is removed from 3 posts, including ones in the trash or that you can't open. The posts themselves stay."
       assert_select "button[data-tag-merge-title=?][data-tag-merge-text=?]",
-        "Merge “rails” into…", "Its 3 posts get the chosen tag and “rails” is deleted. This can't be undone."
+        "Merge “rails” into…", "Its 3 posts, including ones in the trash or that you can't open, get the chosen tag and “rails” is deleted. This can't be undone."
     end
   end
 
@@ -317,6 +335,35 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
     patch "/cs-studio/pages/#{page.id}/content_blocks/#{block.id}", params: { base_updated_at: block_base, block: { settings: { tag: "ruby" } } }, as: :turbo_stream
     assert_response :conflict
     assert_equal "rails", block.reload.settings["tag"]
+  end
+
+  # Final fix wave (m3): the picker sends a name and the controller looked the
+  # target up by the exact lowercased string, so a tag stored with a capital
+  # (written before names were lowercased, or around the model) was "gone".
+  test "the merge target is found whatever the case it is stored in" do
+    create_post(title: "One", tags: [ "news" ])
+    source = Tag.find_by!(name: "news")
+    target = Tag.create!(name: "studio")
+    target.update_columns(name: "Studio")
+
+    post "/cs-studio/tags/#{source.id}/merge", params: { into: " STUDIO " }
+
+    assert_redirected_to "/cs-studio/tags"
+    assert_not Tag.exists?(source.id)
+    assert_equal [ target.id ], Post.joins(:post_tags).where(post_tags: { tag_id: target.id }).map { |p| p.tags.map(&:id) }.flatten.uniq
+    assert_equal "Merged “news” into “Studio”", flash[:notice]
+  end
+
+  # A tag name is whatever an editor typed; the delete toast repeats it.
+  test "the delete toast escapes a tag name that contains markup" do
+    tag = Tag.create!(name: "safe")
+    tag.update_columns(name: "<img src=x onerror=alert(1)>")
+
+    delete "/cs-studio/tags/#{tag.id}", as: :turbo_stream
+
+    assert_response :success
+    assert_not response.body.include?("<img src=x"), "the name reached the toast as markup"
+    assert_includes response.body, "&lt;img src=x onerror=alert(1)&gt;"
   end
 
   test "the dialog's count and the event's count agree" do
