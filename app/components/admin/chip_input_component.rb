@@ -45,10 +45,19 @@ module Admin
   # only cue), where the server would refuse the
   # whole save (`Tag`'s length limit) and name it in the error slot.
   #
+  # `track: true` is for a field inside an explicit-save form (the group
+  # editor's members): the form's footer counts what the form would submit and
+  # skips a hidden input unless it carries `data-save-bar-track`
+  # (`admin--save-bar#snapshot`), so the sentinel and every chip's input are
+  # marked -- adding a chip is then "1 unsaved change", removing it likewise,
+  # and the sentinel's bubbling `change` makes the footer look. Typing in the
+  # search box still counts as nothing: its text input has no name and its
+  # events are swallowed.
+  #
   # In a view-only editor the surrounding `<fieldset disabled>` disables the
   # input and every remove button, so the whole component is inert.
   class ChipInputComponent < AdminComponent
-    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil)
+    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false, exclude: [], lowercase: false, max_length: nil, track: false)
       @name = name
       @id = id
       @label = label
@@ -64,6 +73,7 @@ module Admin
       @exclude = Array(exclude).map(&:to_s)
       @lowercase = lowercase
       @max_length = max_length
+      @track = track
     end
 
     def listbox_id = "#{id}-listbox"
@@ -75,6 +85,9 @@ module Admin
     def status_id = "#{id}-status"
 
     def remove_label(chip) = "Remove #{chip[:label]}"
+
+    # The `data:` a hidden input carries so the explicit-save footer counts it.
+    def track_data = track ? { save_bar_track: true } : {}
 
     def chip_class(chip)
       [ "admin-chip inline-flex max-w-full items-center gap-1.5 rounded-full py-0.5 pl-2.5 pr-1 text-sm",
@@ -88,6 +101,6 @@ module Admin
 
     private
 
-    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help, :single, :exclude, :lowercase, :max_length
+    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help, :single, :exclude, :lowercase, :max_length, :track
   end
 end

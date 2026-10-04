@@ -212,6 +212,11 @@ Rails.application.routes.draw do
     # ends your own session, since only the controller knows which request
     # this is). Invites stay on the roadmap (spec §6.1) -- there is no
     # separate "invite" action here.
+    # The group editor's member chip input asks this for suggestions
+    # (`Admin::UserSuggestionsController`, needs `groups.manage`); declared before
+    # `resources :users` so `suggest` is never read as a user id.
+    get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
+
     resources :users, only: %i[index new create edit update destroy]
 
     # The Groups module (access-control design spec §5): the list, the
