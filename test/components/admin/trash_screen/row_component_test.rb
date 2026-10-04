@@ -8,7 +8,11 @@ require "test_helper"
 class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
   include ContentHelper
 
-  setup { Current.actor = users(:one) }
+  setup do
+    # Midday, so "IN 30 DAYS" can't become 29 on a run that crosses midnight.
+    travel_to Time.current.change(hour: 12)
+    Current.actor = users(:one)
+  end
   teardown { Current.reset }
 
   test "shows who and when, then the retention tag" do
@@ -88,6 +92,13 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
 
     assert_selector "select[disabled]"
     assert_selector "button[disabled]", text: "Restore"
+    # The reason, as visible text tied to the controls (final fix wave, m5).
+    assert_selector "p#trash-page-#{child.id}-no-parent", text: "No page you can restore it under."
+    assert_selector "select[disabled][aria-describedby='trash-page-#{child.id}-no-parent']"
+    assert_selector "button[disabled][aria-describedby='trash-page-#{child.id}-no-parent']", text: "Restore"
+
+    render_inline row(child.reload, parent_choices: [ [ "Home", root_page.id ] ])
+    assert_no_text "No page you can restore it under."
   end
 
   test "a branch root under a kept parent restores in one click" do

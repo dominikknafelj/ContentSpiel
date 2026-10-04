@@ -35,7 +35,7 @@ class Admin::TrashScreen::RetentionTagComponentTest < ViewComponent::TestCase
       travel_to Time.utc(2026, 10, 31, 12, 0) do # 1 Nov 01:00 in Auckland: past 2 Oct + 30 d = 1 Nov? due 1 Nov => today
         render_inline Admin::TrashScreen::RetentionTagComponent.new(trashed_at: trashed, retention_days: 30)
         assert_selector "[data-retention]", text: "TODAY"
-        assert_selector "[data-retention][title='Deleted for good on 1 Nov 2026']"
+        assert_selector "[data-retention][title='Deleted for good on or after 1 Nov 2026']"
       end
     end
   end
@@ -46,7 +46,7 @@ class Admin::TrashScreen::RetentionTagComponentTest < ViewComponent::TestCase
     assert_selector "[data-retention][title='Kept until someone deletes it for good']"
 
     render_inline tag(30)
-    assert_selector "[data-retention] .sr-only", text: "Deleted for good on 31 Oct 2026", visible: :all
+    assert_selector "[data-retention] .sr-only", text: "Deleted for good on or after 31 Oct 2026", visible: :all
     assert_no_selector "[data-retention][class*=danger]"
     assert_selector "[data-retention].font-cs-mono"
   end

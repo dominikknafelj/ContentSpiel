@@ -6,12 +6,22 @@ require "test_helper"
 # list itself, restore, purge and visibility stay in `trash_test.rb`.
 class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
   setup do
+    # Midday (final fix wave): the retention tag counts calendar days, so a
+    # run that crossed midnight between this setup and a request read "IN 29
+    # DAYS". Without a block, so each test may move on with `travel_to` again.
+    @now = Time.current.change(hour: 12)
+    travel_to @now
     Current.actor = users(:one)
     @section = create_page(title: "Section")
     @child = create_page(title: "Child", parent: @section)
     @post = create_post(title: "Gone post")
     @asset = create_media_asset
-    [ @section, @post, @asset ].each { |r| Trash::Move.call(r) }
+    # One second apart: the clock is stopped, and the list is newest first.
+    [ @section, @post, @asset ].each_with_index do |record, index|
+      travel_to @now + index.seconds
+      Trash::Move.call(record)
+    end
+    travel_to @now + 3.seconds
     Current.reset
   end
 
@@ -66,6 +76,42 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Filter by type'] a:not([href*='page='])", count: 4
   end
 
+  # Final fix wave (I2): the list, the tabs and the badge are the page roots
+  # `Trash.roots` -- and so `Trash::Empty` and the retention job -- work on.
+  # A page left with no `trash_root_id` (its root's row deleted around the
+  # services; the FK nullifies) is not one of them: it was a row here that
+  # Empty trash and the sweep would never take.
+  test "a trashed page with no trash root is not a row, a count or part of the badge: the screen lists what Trash.roots holds" do
+    @child.reload.update_columns(trash_root_id: nil)
+    sign_in_as users(:one)
+
+    get admin_trash_path
+    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1" ], tab_texts
+    assert_select "#trash-page-#{@child.id}", count: 0
+    assert_equal Trash.roots[:pages].pluck(:id), Admin::TrashController.roots("page", users(:one)).order(:trashed_at, :id).pluck(:id)
+    assert_equal 3, Admin::TrashController.badge_count(users(:one))
+  end
+
+  # Final fix wave (m2): the tabs' three counts ARE the sidebar badge's; the
+  # Trash page used to run them twice.
+  test "the Trash page counts each type once: the badge reuses the tabs' counts" do
+    group = access_control_groups(:branch_editors)
+    %w[pages.delete posts.delete media.manage].each { |key| AccessControl::Grant.create!(group:, permission: key, scope: {}) }
+    sign_in_as users(:editor_branch)
+    get admin_trash_path
+
+    counts = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      counts << payload[:sql] if payload[:sql].match?(/\ASELECT COUNT\(\*\) FROM "(pages|posts|media_assets)"/) && payload[:sql].include?("trashed_at")
+    end
+    ActiveRecord::Base.uncached { get admin_trash_path }
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+
+    assert_equal 3, counts.size, counts.join("\n")
+    assert_equal [ "All 3", "Pages 1", "Posts 1", "Images 1" ], tab_texts
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}']", text: /3/
+  end
+
   test "each tab has its own empty state" do
     Current.set(actor: users(:one)) { Trash::Empty.call }
     sign_in_as users(:one)
@@ -117,6 +163,49 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "#trash-post-#{gone.id}", text: /a deleted user · /
   end
 
+  # Final fix wave (m4). A token's trash sets `trashed_by` to the token's
+  # USER, so the row named the user alone -- "via <token>" showed only once
+  # that user was gone and the event was read instead.
+  test "who: an item an API token trashed names its user and the token, for that user and for anyone else" do
+    token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name: "Deploy bot")
+    by_token = Current.set(actor: users(:one)) { create_post(title: "Trashed by a token") }
+    Current.set(actor: token, channel: :mcp) { assert Trash::Move.call(by_token).ok? }
+    assert_equal users(:two).id, by_token.reload.trashed_by_id
+
+    sign_in_as users(:one)
+    get admin_trash_path
+    assert_select "#trash-post-#{by_token.id}", text: /two@example\.com via Deploy bot · /
+    assert_select "#trash-post-#{@post.id}", text: /You · /
+    assert_select "#trash-post-#{@post.id}", text: /via/, count: 0
+
+    sign_in_as users(:two)
+    get admin_trash_path
+    assert_select "#trash-post-#{by_token.id}", text: /You via Deploy bot · /
+
+    # The token row is deleted: the name written on the event still says
+    # which token it was.
+    ApiToken.where(id: token.id).delete_all
+    sign_in_as users(:one)
+    get admin_trash_path
+    assert_select "#trash-post-#{by_token.id}", text: /two@example\.com via Deploy bot · /
+  end
+
+  # Final fix wave (m4): the event that names the trasher must be the event of
+  # THIS trashing. An item trashed, restored and then trashed again by a path
+  # that records no event of its own (a branch member going with its root)
+  # would otherwise show whoever trashed it the first time.
+  test "who: an older trashing's event doesn't name who trashed it this time" do
+    Current.set(actor: users(:two)) { assert Trash::Restore.call(@post.reload).ok? }
+    later = @now + 2.hours
+    @post.reload.update_columns(trashed_at: later, trashed_by_id: nil)
+    travel_to later + 1.minute
+
+    sign_in_as users(:two)
+    get admin_trash_path
+    assert_select "#trash-post-#{@post.id}", text: /System · /
+    assert_select "#trash-post-#{@post.id}", text: /one@example\.com/, count: 0
+  end
+
   test "the audit events of the listed rows are read in one query, however many rows" do
     sign_in_as users(:one)
     2.times { |n| make_orphan("Orphan #{n}") }
@@ -135,26 +224,27 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     get admin_trash_path
     assert_select "#trash-post-#{@post.id} [data-retention]", text: /IN 30 DAYS/
 
-    travel 29.days do
-      get admin_trash_path
-      assert_select "#trash-post-#{@post.id} [data-retention]", text: /IN 1 DAY\b/
-    end
-    travel 30.days do
-      get admin_trash_path
-      assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
-    end
-    travel 45.days do # the sweep hasn't run yet
-      get admin_trash_path
-      assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
-      assert_select "#trash-post-#{@post.id} [data-retention]", text: /-/, count: 0
-    end
+    travel_to @now + 29.days
+    get admin_trash_path
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /IN 1 DAY\b/
+
+    travel_to @now + 30.days
+    get admin_trash_path
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
+
+    travel_to @now + 45.days # the sweep hasn't run yet
+    get admin_trash_path
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /TODAY/
+    assert_select "#trash-post-#{@post.id} [data-retention]", text: /-/, count: 0
   end
 
   test "the exact date is a tooltip and also text for a screen reader; never danger" do
     sign_in_as users(:one)
     get admin_trash_path
     due = (@post.reload.trashed_at.in_time_zone + 30.days).strftime("%-d %b %Y")
-    assert_select "#trash-post-#{@post.id} [data-retention][title='Deleted for good on #{due}']"
+    # "on or after": the sweep runs once a day, so the date is the first day
+    # it can go, not a promise that it goes then.
+    assert_select "#trash-post-#{@post.id} [data-retention][title='Deleted for good on or after #{due}']"
     assert_select "#trash-post-#{@post.id} [data-retention] .sr-only", text: /#{due}/
     assert_select "#trash-post-#{@post.id} [data-retention][class*=danger]", count: 0
   end
@@ -202,11 +292,11 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_no_match(/Fourth/, row)
   end
 
-  # Reading is implied by the delete right that lists the row at all (a read
-  # key also looks at the subject's write keys), so a member of a branch the
-  # viewer may delete is one they may read: the readable filter is a guard
-  # for a scope that ever narrows reads below deletes, not something a
-  # fixture can trigger today.
+  # The sentence names only members the viewer may READ. A viewer who may
+  # delete a branch may read it too (a read check also accepts the subject's
+  # write keys), so with today's permissions every member of a listed branch
+  # is named; the filter only matters if reads are ever scoped more narrowly
+  # than deletes, which no grant can express yet.
   test "a viewer who may delete only the branch still sees its subpages named" do
     group = access_control_groups(:branch_editors)
     AccessControl::Grant.create!(group:, permission: "pages.delete", scope: { "page_ids" => [ @section.id ] })
@@ -251,7 +341,46 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     assert_select "[role=alert]"
   end
 
+  # A forged `parent_id` that names the page itself or one of its own
+  # descendants: the service's refusal, shown as the alert -- never a 500, and
+  # never a page restored under itself.
+  test "restoring under itself or under its own descendant is refused with the message" do
+    sign_in_as users(:one)
+
+    [ @section.id, @child.id ].each do |parent_id|
+      post admin_restore_trash_item_path("page", @section), params: { parent_id: }
+      assert_redirected_to admin_trash_path
+      assert flash[:alert].present?, "parent_id #{parent_id} gave no alert"
+      assert @section.reload.trashed?
+      assert_equal root_page.id, @section.parent_id
+    end
+
+    # One of its descendants that is KEPT again is still its descendant.
+    Current.set(actor: users(:one)) { assert Trash::Restore.call(@child.reload, parent: root_page).ok? }
+    grandchild = Current.set(actor: users(:one)) { create_page(title: "Kept elsewhere", parent: @child.reload) }
+    post admin_restore_trash_item_path("page", @child), params: { parent_id: grandchild.id }
+    assert_response :not_found # `@child` is kept now: not in the trash at all
+  end
+
   # ---- delete now ----------------------------------------------------
+
+  # One page using the image twice -- as its hero and in a block -- is one
+  # item: the block counts as the page it sits on.
+  test "the in-use count collapses a block onto its page: a hero and a block of one page are 1 item" do
+    Current.set(actor: users(:one)) do
+      Trash::Restore.call(@asset.reload)
+      Trash::Restore.call(@section.reload)
+      assert Pages::Save.call(@section.reload, attributes: { hero_media_asset_id: @asset.id }).ok?
+      assert ContentBlocks::Save.call(@section.content_blocks.build, attributes: { block_type: "image", media_asset_id: @asset.id }).ok?
+      assert_equal 2, Media::Usage.where(media_asset_id: @asset.id).count
+      Trash::Move.call(@section.reload)
+      Trash::Move.call(@asset.reload)
+    end
+    sign_in_as users(:one)
+    get admin_trash_path
+
+    assert_select "#trash-media-#{@asset.id} p", text: "Still used by 1 item in the trash"
+  end
 
   test "Delete now… is disabled with its reason as visible text" do
     Current.set(actor: users(:one)) do
@@ -295,6 +424,51 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
     get admin_trash_path
     assert_equal [ "All 0", "Pages 0", "Posts 0", "Images 0" ], tab_texts
     assert_select "dialog#empty-trash-dialog", text: /1 page \(with 1 subpage\), 1 post and 1 image/
+  end
+
+  # Final fix wave (m3): "The trash is empty" beside "Empty trash… deletes 1
+  # page" was a contradiction on one screen.
+  test "a trash.empty-only viewer's empty list says there is nothing they can restore, not that the trash is empty" do
+    group = access_control_groups(:branch_editors)
+    AccessControl::Grant.create!(group:, permission: "trash.empty", scope: {})
+    sign_in_as users(:editor_branch)
+
+    get admin_trash_path
+    assert_select "tbody tr", count: 0
+    assert_select "*", text: /Nothing here you can restore\./
+    assert_select "*", text: /The trash is empty/, count: 0
+    get admin_trash_path(type: "posts")
+    assert_select "*", text: /Nothing here you can restore\./
+    assert_select "*", text: /No posts in the trash/, count: 0
+
+    # A tab whose kind really is absent keeps its own empty state...
+    Current.set(actor: users(:one)) { assert Trash::Purge.call(@post.reload).ok? }
+    get admin_trash_path(type: "posts")
+    assert_select "*", text: /No posts in the trash/
+    # ...and so does the whole screen once the trash is empty.
+    Current.set(actor: users(:one)) { Trash::Empty.call }
+    get admin_trash_path
+    assert_select "*", text: /The trash is empty/
+    assert_select "*", text: /Nothing here you can restore/, count: 0
+  end
+
+  # The service would let `trash.empty` purge any one item; the screen loads an
+  # item only through the viewer's own delete right, so by id it is "not found"
+  # for them -- and never restorable, which `trash.empty` doesn't cover at all.
+  test "a trash.empty-only viewer can't purge or restore one item by id: not found" do
+    group = access_control_groups(:branch_editors)
+    AccessControl::Grant.create!(group:, permission: "trash.empty", scope: {})
+    sign_in_as users(:editor_branch)
+
+    delete admin_trash_item_path("post", @post)
+    assert_response :not_found
+    post admin_restore_trash_item_path("post", @post)
+    assert_response :not_found
+    delete admin_trash_item_path("page", @section)
+    assert_response :not_found
+    assert @post.reload.trashed?
+    assert @section.reload.trashed?
+    assert_not Audit::Event.exists?(action: %w[post.purged post.restored page.purged])
   end
 
   test "only the kinds present are named" do

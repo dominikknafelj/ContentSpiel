@@ -11,7 +11,15 @@ module Admin
     # item the sweep hasn't reached yet (overdue) reads "TODAY" too, never a
     # negative number. The exact date is the tooltip AND screen-reader text
     # (a visually hidden span), so it isn't hover-only; it names the day,
-    # not a time, because the sweep runs on a schedule.
+    # not a time, because the sweep runs on a schedule -- and it says "on or
+    # after": the date is the first day the item CAN go (`Trash::
+    # PurgeExpiredJob` takes what was trashed more than the retention period
+    # ago, so never before this date in the site's zone), not the day it
+    # will. A daily sweep that runs before the due moment that day takes it
+    # the day after. The wording is deliberately not tied to the sweep's hour
+    # (`config/recurring.yml`), which can change without this component.
+    # `test/jobs/trash/purge_expired_job_test.rb` runs the job around the
+    # boundary against this component's own date.
     class RetentionTagComponent < Admin::AdminComponent
       TAG_CLASS = "font-cs-mono text-label uppercase tracking-mono text-meta".freeze
 
@@ -33,7 +41,7 @@ module Admin
       end
 
       def explanation
-        never? ? "Kept until someone deletes it for good" : "Deleted for good on #{due_on.strftime("%-d %b %Y")}"
+        never? ? "Kept until someone deletes it for good" : "Deleted for good on or after #{due_on.strftime("%-d %b %Y")}"
       end
 
       def call

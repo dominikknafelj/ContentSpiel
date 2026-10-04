@@ -7,12 +7,20 @@ require "test_helper"
 # for an id that isn't in the trash or isn't of the addressed type.
 class Admin::TrashTest < ActionDispatch::IntegrationTest
   setup do
+    # Midday, so "IN 30 DAYS" can't become 29 on a run that crosses midnight.
+    midday = Time.current.change(hour: 12)
+    travel_to midday
     Current.actor = users(:one)
     @section = create_page(title: "Section")
     @child = create_page(title: "Child", parent: @section)
     @post = create_post(title: "Gone post")
     @asset = create_media_asset
-    [ @section, @post, @asset ].each { |r| Trash::Move.call(r) }
+    # One second apart: the clock is stopped, and the list is newest first.
+    [ @section, @post, @asset ].each_with_index do |record, index|
+      travel_to midday + index.seconds
+      Trash::Move.call(record)
+    end
+    travel_to midday + 3.seconds
     Current.reset
   end
 

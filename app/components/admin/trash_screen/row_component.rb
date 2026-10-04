@@ -27,7 +27,9 @@ module Admin
       # A page restores in place only when it's the root of its own trash
       # branch and its parent is a kept page; a member of another page's
       # branch, or a page whose parent is trashed or gone, needs a new
-      # parent (`Trash::Restore#page_problem` refuses the rest). Expects
+      # parent (`Trash::Restore#page_problem` refuses the rest). (The list
+      # holds branch roots only, so the first case never reaches a row today;
+      # it is here because this is the rule, whatever is listed.) Expects
       # `parent` preloaded when called over a whole list.
       def self.needs_parent?(item)
         return false unless item.is_a?(Page)
@@ -91,6 +93,16 @@ module Admin
       def purge_path = helpers.admin_trash_item_path(type_key, item, **url_options)
 
       def parent_select_id = "#{row_id}-parent"
+
+      # A page that needs a new parent while there is none this viewer may
+      # create under: the select and Restore are disabled, and this says why
+      # as visible text (their `aria-describedby`), like the disabled "Delete
+      # now…" does.
+      NO_PARENT = "No page you can restore it under.".freeze
+
+      def no_parent? = needs_parent? && parent_choices.blank?
+
+      def no_parent_id = "#{row_id}-no-parent"
 
       private
 

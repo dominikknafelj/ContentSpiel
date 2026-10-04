@@ -136,6 +136,7 @@ module Admin
     def trash_badge_count
       return 0 unless admin_modules.any? { |entry| entry[:path] == :admin_trash_path }
 
+      # (`Admin::TrashController#index` presets it from its tabs' counts.)
       @trash_badge_count ||= Admin::TrashController.badge_count(Current.actor)
     end
 

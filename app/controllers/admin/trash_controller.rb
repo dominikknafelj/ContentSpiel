@@ -60,13 +60,20 @@ module Admin
 
     # What the screen lists and counts: `visible`, narrowed for pages to
     # branch roots (`trash_root_id = id`) -- a branch member shows as "Includes
-    # N subpages" under its root, never as a row (or a count) of its own. A
-    # member whose root is gone from the trash (`trash_root_id` nullified with
-    # it) is a row of its own: it is shown on its own, with "Restore under",
-    # and counts.
+    # N subpages" under its root, never as a row (or a count) of its own.
+    #
+    # Exactly `Trash.roots`' own condition, so the list, the tabs and the badge
+    # are the pages `Trash::Empty` and the retention job work on. A trashed
+    # page with NO `trash_root_id` is therefore not listed: no service leaves
+    # one (a branch is trashed, restored and purged with its root); it takes a
+    # root's row being deleted around them, which nullifies its members' FK.
+    # Listing those here, as this once did, showed rows that Empty trash and
+    # the sweep would never take -- the opposite of "one code path". Such a
+    # page is still reachable by id (`set_item` loads through `visible`), and
+    # the orphan state itself is a roadmap row.
     def self.roots(type, actor)
       relation = visible(type, actor)
-      type == "page" ? relation.where("(pages.trash_root_id = pages.id OR pages.trash_root_id IS NULL)") : relation
+      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
     end
 
     # One COUNT per type over `roots`: the numbers on the screen's tabs.
@@ -86,12 +93,17 @@ module Admin
       @type = tab_type(params[:type])
       @tab = TABS.key(@type)
       @counts = self.class.counts(Current.actor)
+      # The sidebar's badge is the sum of these same three counts
+      # (`BaseController#trash_badge_count`, memoised in this ivar): hand it
+      # over rather than let the layout count each type a second time.
+      @trash_badge_count = @counts.values.sum
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
       # A page past the end shows the "back to page 1" notice and no rows:
       # don't load `offset + 50` records per type just to drop them all.
       @items = @pagination.out_of_range? ? [] : listed_items
       @retention_days = Current.site.trash_retention_days
       @everything = everything_counts if can?("trash.empty")
+      @hidden_items = @items.empty? && !@pagination.out_of_range? && hidden_items?
     end
 
     # `params[:from] == "undo"` is the flash's own Undo link (Task 10, added
@@ -210,6 +222,17 @@ module Admin
       pages = roots[:pages].count
       members = Page.trashed.where("pages.trash_root_id IS NOT NULL AND pages.trash_root_id <> pages.id").count
       { pages:, subpages: members, posts: roots[:posts].count, images: roots[:assets].count }
+    end
+
+    # Whether the tab's kind is in the trash at all while this viewer's list
+    # of it is empty (`Admin::TrashScreen::ListComponent::HIDDEN_ITEMS`). Known
+    # only for a `trash.empty` holder -- `@everything` is computed for nobody
+    # else, so no other viewer learns that the trash holds what they can't see.
+    def hidden_items?
+      return false unless @everything
+
+      kinds = { "page" => :pages, "post" => :posts, "media" => :images }
+      types.any? { |type| @everything.fetch(kinds.fetch(type)).positive? }
     end
 
     # Merged in Ruby across the three tables: each source contributes at

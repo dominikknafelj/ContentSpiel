@@ -13,9 +13,9 @@ module Admin
     # - each page root's branch members (`#subpages_by_root`), which of them
     #   the viewer may read (`#readable_member_ids`) and how many pages its
     #   purge would take (`#descendant_counts`);
-    # - who trashed each item (`#who_label`): the user the row names, else
-    #   the newest `*.trashed` audit event of every row that names none
-    #   (`#recorded_trashers`, one query);
+    # - who trashed each item (`#who_label`): the user the row names, and the
+    #   newest `*.trashed` audit event of every row (`#recorded_trashings`,
+    #   one query) for a token's name and for a user who is gone;
     # - which images something in the trash still uses, and by how many items
     #   (`#used_by_counts`);
     # - the restore form's parent choices (`#parent_choices`), only when a
@@ -27,8 +27,7 @@ module Admin
       # How many names the "Includes N subpages: …" line gives before "and N more".
       NAMED_SUBPAGES = 3
 
-      # What a trash row's `trashed_by` is looked up by when it names nobody
-      # any more: the audit action each kind records.
+      # The audit action each kind's trashing records (`#recorded_trashings`).
       TRASHED_ACTIONS = { "Page" => "page.trashed", "Post" => "post.trashed", "Media::Asset" => "media.trashed" }.freeze
 
       EMPTY_STATES = {
@@ -38,12 +37,23 @@ module Admin
         "images" => [ "No images in the trash", "Deleted images show up here until they're deleted for good." ]
       }.freeze
 
+      # The empty state of a list that is empty only FOR THIS VIEWER: the
+      # trash (or this tab's kind) holds items, none of which they may restore
+      # or delete one by one. Only a `trash.empty` holder is ever told so --
+      # they are the one viewer who is shown what the whole trash holds (the
+      # Empty trash dialog's sentence), and "The trash is empty" beside "Empty
+      # trash… deletes 1 page" was a contradiction on one screen.
+      HIDDEN_ITEMS = [ "Nothing here you can restore.", "The trash holds items you can't restore or delete one by one. Empty trash deletes them too." ].freeze
+
       # `tab` is the active tab's key ("pages", ... or nil for All): the empty
       # state's wording, and the tab a restore or delete comes back to.
-      def initialize(items:, retention_days:, tab: nil, url_options: {})
+      # `hidden_items` says the list's kind is in the trash but out of this
+      # viewer's reach (see `HIDDEN_ITEMS`).
+      def initialize(items:, retention_days:, tab: nil, hidden_items: false, url_options: {})
         @items = items
         @retention_days = retention_days
         @tab = tab
+        @hidden_items = hidden_items
         @url_options = url_options
       end
 
@@ -61,13 +71,15 @@ module Admin
         )
       end
 
-      def empty_title = EMPTY_STATES.fetch(tab).first
+      def empty_title = empty_state.first
 
-      def empty_description = EMPTY_STATES.fetch(tab).last
+      def empty_description = empty_state.last
 
       private
 
       attr_reader :items, :retention_days, :tab, :url_options
+
+      def empty_state = @hidden_items ? HIDDEN_ITEMS : EMPTY_STATES.fetch(tab)
 
       def pages = items.grep(Page)
 
@@ -100,41 +112,70 @@ module Admin
         end
       end
 
-      # "You", the user's name, the name from the item's newest `*.trashed`
-      # audit event when `trashed_by` is gone (a deleted user, or a record the
-      # FK nullified), else "System". A branch member trashed with its root
-      # has no event of its own and a `trashed_by` set by the move, so only a
-      # standalone member whose user is gone falls through to "System".
+      # Who trashed the item: "You", the user's name, "a deleted user" or
+      # "System" -- then " via <token name>" when an API token did it.
+      #
+      # Two sources. `trashed_by` is the row's own answer (the acting user, or
+      # the token's user). The item's `*.trashed` audit event (`#trashing_
+      # event`) is read for EVERY listed row, because only it knows two things
+      # the row doesn't: that a token did it, and under which name (`Audit::
+      # Event#via_label`, the name written when the event was recorded, so it
+      # outlives the token) -- and who it was once `trashed_by` is gone (the FK
+      # nullifies it when the user is deleted).
+      #
+      # - a row that names its user: that user;
+      # - else the event's user (`user_id` may name a user who no longer
+      #   exists: "a deleted user");
+      # - else, for a token's event with no user at all, "a deleted user" too
+      #   (a token always acts for a user; the log reads the same,
+      #   `Audit::Sentence`). The token's id is never passed off as a user id;
+      # - else "System": a trusted nil actor (the retention job never trashes,
+      #   but a console or system move does), or no event of this trashing --
+      #   a branch member trashed with its root has none of its own.
       def who_label(item)
-        return label_for(item.trashed_by, item.trashed_by_id) if item.trashed_by
-
-        event = recorded_trashers[[ item.class.name, item.id ]]
-        return "System" unless event&.user_id || event&.actor_type == "ApiToken"
-
-        label = label_for(event.user, event.user_id || event.actor_id)
-        event.via_label ? "#{label} via #{event.via_label}" : label
+        event = trashing_event(item)
+        label =
+          if item.trashed_by then label_for(item.trashed_by)
+          elsif event&.user_id then label_for(event.user)
+          elsif event&.via_label then Admin::UserNameComponent::DELETED_USER
+          else return Admin::UserNameComponent::NOBODY
+          end
+        event&.via_label ? "#{label} via #{event.via_label}" : label
       end
 
-      def label_for(user, user_id)
+      # A user who was there: "You", their name, or -- gone since -- "a deleted
+      # user" (`Admin::UserNameComponent`, the one place a user is named).
+      def label_for(user)
         return "You" if user && Current.actor.is_a?(User) && Current.actor.id == user.id
 
-        Admin::UserNameComponent.new(user:, user_id:).label
+        user ? Admin::UserNameComponent.new(user:).label : Admin::UserNameComponent::DELETED_USER
       end
 
-      # The newest `*.trashed` event of every listed item that names no
-      # trasher, in ONE query (DISTINCT ON per subject), however many rows.
-      def recorded_trashers
-        @recorded_trashers ||= begin
-          unnamed = items.select { |item| item.trashed_by.nil? }.group_by { |item| item.class.name }
-          if unnamed.empty?
+      # The `*.trashed` event of THIS trashing, or nil. `recorded_trashings`
+      # holds each item's newest one; an event from before the item's current
+      # `trashed_at` belongs to an earlier trip to the trash (trashed, restored,
+      # trashed again by a path that recorded nothing for this item) and would
+      # name the wrong person. `Trash::Move` stamps `trashed_at` and records
+      # its event in one transaction, the event after the stamp; the second of
+      # slack only absorbs clock rounding between the two columns.
+      def trashing_event(item)
+        event = recorded_trashings[[ item.class.name, item.id ]]
+        event if event && event.occurred_at >= item.trashed_at - 1.second
+      end
+
+      # The newest `*.trashed` event of every listed item, in ONE query
+      # (DISTINCT ON per subject), however many rows.
+      def recorded_trashings
+        @recorded_trashings ||=
+          if items.empty?
             {}
           else
-            events = unnamed.map { |type, list| Audit::Event.where(subject_type: type, subject_id: list.map(&:id), action: TRASHED_ACTIONS.fetch(type)) }.reduce(:or)
+            events = items.group_by { |item| item.class.name }
+              .map { |type, list| Audit::Event.where(subject_type: type, subject_id: list.map(&:id), action: TRASHED_ACTIONS.fetch(type)) }.reduce(:or)
             events.includes(:user).select("DISTINCT ON (audit_events.subject_type, audit_events.subject_id) audit_events.*")
               .order(Arel.sql("audit_events.subject_type, audit_events.subject_id, audit_events.occurred_at DESC, audit_events.id DESC"))
               .index_by { |event| [ event.subject_type, event.subject_id ] }
           end
-        end
       end
 
       # A branch member shares its root's `trash_root_id`; a separately

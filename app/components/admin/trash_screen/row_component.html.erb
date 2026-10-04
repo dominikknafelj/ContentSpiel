@@ -26,8 +26,9 @@
             <%= hidden_field_tag :tab, tab, id: nil %>
             <%= label_tag parent_select_id, "Restore under", class: "text-sm text-meta" %>
             <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: "#{setup_select_class} !w-auto max-w-56",
-                  disabled: parent_choices.blank? %>
-            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: parent_choices.blank?) %>
+                  disabled: no_parent?, aria: { describedby: (no_parent_id if no_parent?) } %>
+            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: no_parent?,
+                  aria: { describedby: (no_parent_id if no_parent?) }) %>
           <% end %>
         <% else %>
           <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top" } do %>
@@ -44,6 +45,9 @@
                 data: dialog_trigger(purge_dialog_id)) %>
         <% end %>
       </div>
+      <% if no_parent? %>
+        <p id="<%= no_parent_id %>" class="text-sm text-meta"><%= Admin::TrashScreen::RowComponent::NO_PARENT %></p>
+      <% end %>
       <% if in_use? %>
         <p id="<%= reason_id %>" class="text-sm text-meta"><%= in_use_reason %></p>
       <% else %>

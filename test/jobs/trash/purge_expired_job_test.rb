@@ -21,6 +21,39 @@ class Trash::PurgeExpiredJobTest < ActiveJob::TestCase
     assert_equal "system", event.channel
   end
 
+  # Final fix wave (Task 14 I1): the Trash screen's retention tag promises a
+  # date -- "Deleted for good on or after <date>", the date of `trashed_at +
+  # retention` in the site's time zone. Whenever the sweep runs, nothing may
+  # go BEFORE that date; from the due moment on it goes at the next run.
+  test "nothing is purged before the date the retention tag shows, whenever the sweep runs" do
+    site_settings(:default).update!(time_zone: "Pacific/Auckland")
+    trashed_at = Time.utc(2026, 10, 1, 23, 30) # 2 Oct 12:30 in Auckland
+    @old.update_columns(trashed_at:)
+    @fresh.update_columns(trashed_at:)
+    zone = site_settings(:default).reload.effective_time_zone
+
+    shown = Time.use_zone(zone) { Admin::TrashScreen::RetentionTagComponent.new(trashed_at:, retention_days: 30).due_on }
+    assert_equal Date.new(2026, 11, 1), shown
+
+    # The last moment of the day before the date shown, in the site's zone.
+    travel_to zone.local(2026, 10, 31, 23, 59, 59) do
+      Trash::PurgeExpiredJob.perform_now
+      assert Post.exists?(@old.id), "purged on #{Time.current.in_time_zone(zone).to_date}, before the #{shown} the tag shows"
+    end
+    # On the date shown but before the due moment (a 03:00 sweep): still there.
+    travel_to zone.local(2026, 11, 1, 3, 0) do
+      Trash::PurgeExpiredJob.perform_now
+      assert Post.exists?(@old.id)
+      assert_operator Time.current.in_time_zone(zone).to_date, :>=, shown
+    end
+    # The first sweep after the due moment takes it -- on or after the date.
+    travel_to zone.local(2026, 11, 2, 3, 0) do
+      Trash::PurgeExpiredJob.perform_now
+      assert_not Post.exists?(@old.id)
+      assert_not Post.exists?(@fresh.id)
+    end
+  end
+
   test "0 days turns it off" do
     site_settings(:default).update!(trash_retention_days: 0)
     @old.update_columns(trashed_at: 400.days.ago)
