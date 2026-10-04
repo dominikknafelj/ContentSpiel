@@ -130,7 +130,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]", count: 1 do |markers|
       assert_equal "○1", markers.first.text
       assert_equal "Deutsch: 1 missing", markers.first["title"]
-      assert_equal "1 missing translation", markers.first["aria-label"]
+      assert_equal "1 missing translation: Deutsch", markers.first["aria-label"]
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker]", count: 0
   end

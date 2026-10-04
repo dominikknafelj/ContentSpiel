@@ -199,11 +199,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   test "the page tree's child count and translation markers ignore a trashed page" do
     sign_in_as users(:one)
     with_locales(%w[en de], default: "en") do
-      kept_child = create_page(title: "Kept child", parent: @kept_page)
-      gone_child = create_page(title: "Gone child", parent: @kept_page)
-      assert Pages::Save.call(kept_child, translations: { "de" => { title: "Kind" } }).ok?
-      assert Pages::Save.call(kept_child, translations: { "en" => { title: "Kept child!" } }).ok?
-      assert Pages::Save.call(gone_child, translations: { "en" => { title: "Gone child!" } }).ok?
+      # Both children are outdated in German (translated, then the original
+      # edited), so each carries "↻1" while kept: only the trashed one's must
+      # not show. The marker count is 1 with the trash honoured and 2 (and
+      # the child count 2) if the index counted a trashed page.
+      kept_child, gone_child = [ "Kept child", "Gone child" ].map do |title|
+        child = create_page(title: title, parent: @kept_page, translations: { "en" => { title: title }, "de" => { title: "#{title} de" } })
+        assert Pages::Save.call(child, translations: { "en" => { title: "#{title}!" } }).ok?
+        child
+      end
+      get "/cs-studio/pages/#{@kept_page.id}"
+      assert_select "turbo-frame#tree [data-translation-marker=outdated]", text: "↻1", count: 2
       gone_child.update!(trashed_at: Time.current)
 
       get "/cs-studio/pages/#{@kept_page.id}"

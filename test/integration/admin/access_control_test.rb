@@ -165,6 +165,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   end
 
   test "the tree greys out context ancestors, unlinked and without actions, and hides the rest" do
+    with_locales(%w[en de], default: "en")
+    # The context-only Home has an outdated German field: its count must stay
+    # hidden (a number would hint at a page the viewer can't open).
+    assert Pages::Save.call(@root, translations: { "de" => { title: "Start" } }).ok?
+    assert Pages::Save.call(@root, translations: { "en" => { title: "Home!" } }).ok?
     grant_branch("pages.edit", "pages.create")
     sign_in_as(users(:editor_branch))
 
@@ -176,6 +181,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       assert_nil row.at_css("a"), "a context-only node has no link or actions"
       assert_nil row.at_css(".admin-tree-node__handle")
       assert_includes row.text, "Home"
+      assert_equal 1, Translations::StateIndex.counts_for([ @root.reload ]).values.first["de"][:outdated]
       assert_select nodes.first, "> div span.text-meta[title='You can’t open this page']"
       assert_nil row.at_css("[data-translation-marker]"), "a context-only row shows no counts"
     end

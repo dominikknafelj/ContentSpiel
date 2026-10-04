@@ -154,9 +154,12 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     # pass bug 4), so this starts from a site with nothing but Home.
     root_page
 
-    visit admin_pages_path
+    visit admin_pages_path # opens Home's editor
     await_admin_controllers
-    within(".admin-empty-state") { press "Create starter pages" }
+    within("#tree") do
+      find("button[aria-label='More page actions']").click
+      press "Create starter pages"
+    end
 
     assert_text "Starter pages created"
     within("#tree") { assert_text "Blog" }

@@ -55,11 +55,14 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     open_editor_menu
     press "Move to trash"
     within("dialog#delete-page-#{@child.id}[open]") { press "Move to trash" }
-    assert_selector "[role=status]", text: "Moved “Child” to the trash", wait: 10
+    # The redirect goes through /pages to Home's editor; wait for that landing
+    # (not just any status text) before reaching for the toast's button.
+    assert_current_path(admin_page_path(root_page), wait: 10)
+    assert_selector "#toasts .admin-toast", text: "Moved “Child” to the trash", wait: 10
     assert @child.reload.trashed?
 
-    press "Undo"
-    assert_selector "[role=status]", text: "Restored “Child”"
+    within("#toasts") { press "Undo" }
+    assert_selector "[role=status]", text: "Restored “Child”", wait: 10
     assert_not @child.reload.trashed?
   end
 

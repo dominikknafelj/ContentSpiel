@@ -204,7 +204,7 @@ module Admin
       if result.ok?
         notice = count.zero? ? "Moved “#{@page.title}” to the trash" : "Moved “#{@page.title}” and #{helpers.pluralize(count, "subpage")} to the trash"
         flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("page", @page, from: "undo", **admin_url_options) }
-        redirect_to admin_pages_path(**admin_url_options), notice:, status: :see_other
+        redirect_to pages_landing_path, notice:, status: :see_other
       else
         forbidden_or(result) do
           @page = result.record

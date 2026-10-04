@@ -83,19 +83,25 @@ module Admin
 
     # "outdated" / "missing" -> the number of such fields over every target
     # language; always 0 for a context-only row (it shows nothing but its title).
-    def translation_total(kind) = translation_breakdown(kind).values.sum
+    def translation_total(kind) = (@translation_totals ||= {})[kind] ||= translation_breakdown(kind).values.sum
 
     # `{ locale => n }`, only the languages with something to report.
     def translation_breakdown(kind)
-      return {} if context_only?
-
-      translation_counts.fetch(page.id, {}).transform_values { |counts| counts.fetch(kind, 0) }.select { |_code, n| n.positive? }
+      (@translation_breakdowns ||= {})[kind] ||=
+        if context_only?
+          {}
+        else
+          translation_counts.fetch(page.id, {}).transform_values { |counts| counts.fetch(kind, 0) }.select { |_code, n| n.positive? }
+        end
     end
 
-    # "3 outdated translations" / "1 missing translation"
+    # "3 outdated translations: Deutsch, Español" / "1 missing translation: Español"
+    # -- the languages are in the label too, so a screen reader gets the same
+    # detail the tooltip gives a mouse.
     def translation_label(kind)
       total = translation_total(kind)
-      "#{total} #{kind} #{"translation".pluralize(total)}"
+      languages = translation_breakdown(kind).keys.map { |code| ::Locales.name(code, native: true) }.join(", ")
+      "#{total} #{kind} #{"translation".pluralize(total)}: #{languages}"
     end
 
     # "Deutsch: 2 outdated · Español: 1 outdated"

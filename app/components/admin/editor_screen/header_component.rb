@@ -162,7 +162,9 @@ module Admin
       # its content type's filtered list.
       def breadcrumb
         if page?
-          pages_crumb = [ "Pages", can?("pages.read") ? helpers.admin_pages_path(**url_options) : nil ]
+          # On Home itself "Pages" would link to the page you are on (`/pages`
+          # opens Home), so it is plain text there.
+          pages_crumb = [ "Pages", can?("pages.read") && !record.root? ? helpers.admin_pages_path(**url_options) : nil ]
           ancestors = record.ancestors.to_a.reverse.map do |ancestor|
             [ ::Locales.read(ancestor, :title, locale: locale), can?("pages.read", ancestor) ? helpers.admin_page_path(ancestor, **url_options) : nil ]
           end

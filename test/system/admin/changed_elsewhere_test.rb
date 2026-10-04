@@ -351,8 +351,14 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
       field.dispatchEvent(new Event("input", { bubbles: true }))
     JS
 
-    assert_current_path(/cs-studio\/pages\z/, wait: 10)
+    # /pages answers with a second redirect, to Home's editor; the flash is
+    # kept across that hop, so the Undo toast is still there.
+    assert_current_path(admin_page_path(root_page), wait: 10)
     assert_selector "#toasts button", text: "Undo"
     assert @page.reload.trashed?
+
+    # ...and spent exactly once: the next navigation shows no toast.
+    visit admin_root_path
+    assert_no_selector "#toasts .admin-toast"
   end
 end

@@ -83,7 +83,7 @@ module Admin
     # always UTC until now.
     around_action :use_site_time_zone
 
-    helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules, :trash_badge_count
+    helper_method :admin_locale, :admin_url_options, :root_page, :pages_landing_path, :admin_modules, :trash_badge_count
 
     # A record outside the viewer's scope and a record that doesn't exist
     # answer identically (access-control design spec §3.3) -- now inside the
@@ -208,6 +208,19 @@ module Admin
     # `admin_locale`/`admin_url_options` already are.
     def root_page
       Page.find_by(parent_id: nil)
+    end
+
+    # Where "back to the pages" means: Home's editor when the actor can open
+    # it (what `/pages` would redirect to anyway -- going there directly
+    # saves a hop, which matters for a redirect carrying a flash or an Undo
+    # toast), else the Pages index and its "Choose a page from the tree".
+    def pages_landing_path
+      home = root_page
+      if home && admin_scope(Page.where(id: home.id)).exists?
+        admin_page_path(home, **admin_url_options)
+      else
+        admin_pages_path(**admin_url_options)
+      end
     end
 
     # The language being edited: ?locale= when it's enabled, else the site's

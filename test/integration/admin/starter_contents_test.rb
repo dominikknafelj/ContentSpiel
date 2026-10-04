@@ -40,8 +40,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       post "/cs-studio/starter_contents"
     end
 
-    assert_redirected_to "/cs-studio/pages"
-    follow_redirect! # /pages opens Home, keeping the flash
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}"
     follow_redirect!
     assert_select "#tree", text: /Blog/
     assert_select "[role=status]", text: "Starter pages created"
@@ -55,7 +54,6 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       post "/cs-studio/starter_contents"
     end
 
-    follow_redirect!
     follow_redirect!
     assert_select "[role=status]", text: "Starter pages already exist"
   end
@@ -75,8 +73,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
       end
     end
 
-    assert_redirected_to "/cs-studio/pages"
-    follow_redirect!
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}"
     follow_redirect!
     assert_select "[role=alert]", text: /couldn.t be added/
   end
@@ -90,7 +87,6 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     assert_no_difference [ "Page.count", "Post.count" ] do
       post "/cs-studio/starter_contents"
     end
-    follow_redirect!
     follow_redirect!
     assert_select "[role=status]", text: "Starter pages already exist"
   end

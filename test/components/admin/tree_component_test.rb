@@ -55,11 +55,11 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
       assert_selector "li[data-page-id='#{row.id}'] > div [data-translation-marker=outdated][role=img]", text: "↻2",
         count: 1
       marker = page_node(row).find("[data-translation-marker=outdated]")
-      assert_equal "2 outdated translations", marker["aria-label"]
+      assert_equal "2 outdated translations: Deutsch", marker["aria-label"]
       assert_equal "Deutsch: 2 outdated", marker["title"]
       missing = page_node(row).find("[data-translation-marker=missing]")
       assert_equal "○1", missing.text
-      assert_equal "1 missing translation", missing["aria-label"]
+      assert_equal "1 missing translation: Español", missing["aria-label"]
       assert_equal "Español: 1 missing", missing["title"]
       assert_no_selector "[data-translation-marker]", text: "!"
     end

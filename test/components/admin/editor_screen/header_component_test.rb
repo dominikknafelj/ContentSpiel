@@ -25,6 +25,14 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "[role=menu] button", text: "Unpublish", visible: :all
   end
 
+  test "the Pages crumb links on a subpage but is plain text on Home, which /pages would reopen" do
+    render_header(create_page(title: "About"))
+    assert_selector "nav[aria-label='Breadcrumb'] a", text: "Pages"
+    render_header(root_page)
+    assert_no_selector "nav[aria-label='Breadcrumb'] a", text: "Pages"
+    assert_selector "nav[aria-label='Breadcrumb']", text: "Pages"
+  end
+
   test "a live record: no primary button, the live hint, Unpublish in the menu, View on site" do
     page = create_page(title: "About", published: true)
     render_header(page)
