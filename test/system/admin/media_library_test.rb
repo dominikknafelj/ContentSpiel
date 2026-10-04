@@ -16,7 +16,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     # `admin--media-upload#filesSelected` fires one POST per file (global
     # constraints' own upload ruling) and reloads the page once both have
     # settled.
-    attach_file("Upload images", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
+    attach_file("Choose file", [ file_fixture("tiny.png").to_s, file_fixture("wide.png").to_s ])
 
     assert_selector ".admin-media-grid li", count: 2, wait: 10
     assert_equal 2, Media::Asset.count

@@ -7,15 +7,17 @@
     ::DetailComponent`'s own). %>
 <h1 class="mb-4 text-h1 text-ink">Media</h1>
 
-<div class="mb-6 rounded-cs border border-dashed border-line-strong p-4"
+<%# The wrapper keeps `admin--media-upload`'s own dragover/drop (a drop anywhere
+    on it uploads); the FileDropComponent inside is the visible zone and the
+    labelled file input, and stops its own drops from reaching that handler
+    twice (file_drop_controller.js). %>
+<div class="mb-6"
      data-controller="admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
      data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
-  <%= label_tag "media-upload-input", "Upload images", class: setup_label_class %>
-  <%= file_field_tag "media-upload-input", multiple: true, accept: Media::Asset::ALLOWED_CONTENT_TYPES.join(","),
-        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" },
-        class: "mt-1 block text-sm text-ink" %>
-  <p class="mt-1 text-sm text-meta">Or drag and drop images here.</p>
+  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true,
+        hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
+        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
   <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
 </div>
 

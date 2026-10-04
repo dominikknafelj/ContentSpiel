@@ -14,7 +14,11 @@
   </div>
   <div>
     <%= form.label :logo, class: setup_label_class %>
-    <%= form.file_field :logo, accept: "image/*", class: "mt-1 block text-dim" %>
+    <%# Setup loads only the `application` JS entry, so the drop zone's Stimulus
+        controller (controllers/admin/) isn't there: this degrades to a plain
+        labelled file input (the label opens the dialog; the chosen name just
+        isn't echoed). `form.label :logo` above points at this id. %>
+    <%= render Admin::FileDropComponent.new(name: "site_setting[logo]", id: "site_setting_logo", accept: "image/*") %>
   </div>
 
   <fieldset>
