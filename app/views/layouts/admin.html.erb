@@ -13,65 +13,48 @@
     <%= yield :head %>
   </head>
 
-  <%# CS Studio's shell (cs-studio spec §4.2): a grid of up to three columns --
-      modules, an optional page tree, and the main content frame.
-      `data-admin-locale` carries the editing language onto <body> (rather
-      than one data attribute per component) so any Stimulus controller can
-      read it via `closest` without a server round trip. The grid quietly
+  <%# CS Studio's shell (cs-studio spec §4.2, design pass spec §4): a grid of
+      up to three columns -- modules, an optional page tree, and the main
+      content frame -- plus, below 1280px, a top bar. The grid quietly
       collapses to two columns on any screen with no tree column of its own
       (every one but Pages -- `content_for :tree` is never set outside it).
 
-      The modules column itself collapses to icons below `md` (spec §4.2):
-      the grid's own first track narrows from a fixed 16rem to `auto`, and
-      `nav_link_classes` below centers each row's icon once its text label
-      (kept in the DOM as `sr-only`, so the link's accessible name is
-      unchanged -- just not painted) has nowhere to go. %>
-  <body data-controller="admin--dialog" data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop" data-admin-locale="<%= admin_locale %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
-    <% nav_link_classes = "flex items-center justify-center gap-3 rounded-cs px-2 py-1.5 hover:bg-sunken md:justify-start" %>
-    <div class="grid min-h-screen grid-cols-[auto_1fr] md:grid-cols-[16rem_1fr]<%= " lg:grid-cols-[16rem_18rem_1fr]" if content_for?(:tree) %>">
-      <nav aria-label="Modules" class="flex flex-col gap-6 border-r border-line bg-surface p-4">
-        <ul class="flex flex-col gap-2">
-          <%# `Admin::BaseController::MODULES`, narrowed to what this user can
-              open (`admin_modules`, access-control design spec §5: sidebar
-              modules are shown only when `can?`) -- a module they lack is
-              simply absent, not greyed out; opening its URL anyway gets the
-              403 page. `admin_url_options` on every one (final-fixes round,
-              finding 5): without it, following a modules link while
-              editing a non-default language silently dropped back to
-              `Locales.default` -- these are the one navigation in the
-              shell that doesn't already run through a component
-              (`Admin::TreeNodeComponent#path`,
-              `Admin::LanguageTabsComponent`, ...) that threads it
-              through for its own links. %>
-          <% admin_modules.each do |entry| %>
-            <li>
-              <%= link_to public_send(entry[:path], **admin_url_options), class: nav_link_classes do %>
-                <%= render "admin/shared/icon", name: entry[:icon] %><span class="sr-only md:not-sr-only"><%= entry[:label] %></span>
-              <% end %>
-            </li>
-          <% end %>
-        </ul>
+      The sidebar and tree columns are *drawers* below 1280px / 1024px
+      (`.admin-shell` in content-spiel.tailwind.css, handoff §9 A7): the same
+      elements, slid off-screen until the top bar's buttons set `data-open`
+      (`admin--drawer`, which also owns the scrim and Escape). That is real
+      CSS rather than utilities because the open state is an attribute
+      selector. `admin--drawer` joins `admin--dialog` on <body> -- both
+      listen at the document level, and the existing dialog actions stay.
 
-        <div class="mt-auto flex flex-col gap-2">
-          <%= render Admin::ThemeSwitchComponent.new %>
-          <%# The account menu: your own password (open to every user,
-              access-control design spec §5), then sign out. %>
-          <%= link_to admin_account_password_path(**admin_url_options), class: nav_link_classes do %>
-            <%= render "admin/shared/icon", name: :key %><span class="sr-only md:not-sr-only">Change password</span>
-          <% end %>
-          <%= button_to admin_sign_out_path, method: :delete, class: nav_link_classes do %>
-            <%= render "admin/shared/icon", name: :external %><span class="sr-only md:not-sr-only">Sign out</span>
-          <% end %>
-        </div>
-      </nav>
+      `data-admin-locale` carries the editing language onto <body> (rather
+      than one data attribute per component) so any Stimulus controller can
+      read it via `closest` without a server round trip. %>
+  <body data-controller="admin--dialog admin--drawer"
+        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded"
+        data-admin-locale="<%= admin_locale %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+    <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
+    <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">
+      <%# `Admin::BaseController::MODULES`, narrowed to what this user can
+          open (`admin_modules`, access-control design spec §5: sidebar
+          modules are shown only when `can?`) -- a module they lack is
+          simply absent, not greyed out; opening its URL anyway gets the
+          403 page. `admin_url_options` is threaded through by the component
+          (see its comment). %>
+      <div id="sidebar" class="admin-shell__sidebar" data-admin--drawer-target="panel" data-drawer="sidebar" tabindex="-1">
+        <%= render Admin::Shell::SidebarComponent.new(modules: admin_modules, user: Current.user, current_path: request.path,
+              url_options: admin_url_options, trash_count: trash_badge_count) %>
+      </div>
 
       <% if content_for?(:tree) %>
-        <aside id="tree-column" class="border-r border-line bg-surface p-4">
+        <aside id="tree-column" class="admin-shell__tree" data-admin--drawer-target="panel" data-drawer="tree" tabindex="-1">
           <%= yield :tree %>
         </aside>
       <% end %>
 
-      <main class="p-6">
+      <%# `p-6` stays on <main>: the save bar (`sticky bottom-0 -mx-6`) is
+          sized against it. %>
+      <main class="min-w-0 p-6">
         <turbo-frame id="content" data-turbo-action="advance">
           <%# A frame request's response keeps only this frame, so the flash
               it carries is rendered here (as bare toasts that `admin--toast`
@@ -82,6 +65,8 @@
         </turbo-frame>
       </main>
     </div>
+
+    <div class="admin-shell__scrim" data-action="click->admin--drawer#closeAll" data-admin--drawer-target="scrim" hidden></div>
 
     <%# The one toast region (handoff §10): outside `#content` so a frame
         navigation never wipes it, and a Turbo Stream's `toast_stream` has a

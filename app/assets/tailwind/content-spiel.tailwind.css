@@ -61,6 +61,34 @@
   color: var(--cs-ink);
 }
 
+/* The shell (design pass spec §4, handoff §9 A7). Real CSS rather than
+   utilities because the drawers' open state is the `data-open` attribute
+   `admin--drawer` toggles. Desktop: sidebar | [tree] | content in a grid.
+   Below 1280px the sidebar leaves the grid and becomes a fixed drawer behind
+   the top bar; below 1024px the tree does too. A closed drawer is also
+   `visibility: hidden` (after the slide), so its links leave the tab order. */
+.admin-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; }
+.admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
+.admin-shell__sidebar { position: sticky; top: 0; height: 100vh; }
+.admin-shell__tree { border-right: 1px solid var(--cs-line); background: var(--cs-chrome); padding: 1rem; }
+.admin-top-bar { display: none; }
+.admin-shell__scrim { position: fixed; inset: 0; z-index: 30; background: color-mix(in oklab, var(--cs-ink) 38%, transparent); }
+
+@media (max-width: 1279px) {
+  .admin-top-bar { display: flex; }
+  .admin-shell { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell--tree { grid-template-columns: 17rem minmax(0, 1fr); }
+  .admin-shell__sidebar { position: fixed; z-index: 40; top: 0; left: 0; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__sidebar[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+}
+@media (max-width: 1023px) {
+  .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+}
+@media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
+@media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
+
 /* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }
