@@ -25,6 +25,15 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", admin_post_path(@post), count: 0
     assert_select "p", text: /No results for/
+    assert_select "a[href=?]", new_admin_post_path, text: "New post"
+  end
+
+  test "the fragment echoes the trimmed, capped query it answered" do
+    sign_in_as users(:one)
+    get admin_jump_path(q: "  jumpmatch  ")
+    assert_select "#jump-results [data-query=?]", "jumpmatch"
+    get admin_jump_path(q: "a" * 500)
+    assert_select "#jump-results [data-query=?]", "a" * 100
   end
 
   test "an overlong or non-string query is a short search, not an error" do

@@ -2,7 +2,14 @@
     a bare fragment, no layout. Rows are links that leave the frame
     (`_top`), so following one is an ordinary Turbo visit and the page
     replacement closes the dialog. %>
+<%# `data-query` echoes the (trimmed, capped) query this fragment answers:
+    Turbo copies a response's children, not its attributes, into the
+    palette's frame, so the marker is an inner element. `admin--command-palette`
+    compares it with the input to ignore a response that arrives after the
+    viewer typed something else. %>
+<% query = @query.strip.first(Jump::Search::MAX_QUERY) %>
 <turbo-frame id="jump-results">
+<div data-query="<%= query %>">
   <% @groups.each do |group| %>
     <section class="py-1">
       <h3 class="px-4 pb-1 pt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group[:label] %></h3>
@@ -19,12 +26,13 @@
       </ul>
     </section>
   <% end %>
-  <% if @groups.empty? && @query.strip.present? %>
+  <% if @groups.empty? && query.present? %>
     <div class="px-4 py-4 text-sm text-dim">
-      <p>No results for “<%= @query.strip.first(Jump::Search::MAX_QUERY) %>”.</p>
+      <p>No results for “<%= query %>”.</p>
       <% if can?("posts.create") %>
-        <p class="pt-2"><%= link_to "New blog post “#{@query.strip.first(Jump::Search::MAX_QUERY)}”", new_admin_post_path(title: @query.strip.first(Jump::Search::MAX_QUERY), **admin_url_options), data: { turbo_frame: "_top" }, class: "underline" %></p>
+        <p class="pt-2"><%= link_to "New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "_top" }, class: "underline" %></p>
       <% end %>
     </div>
   <% end %>
+</div>
 </turbo-frame>

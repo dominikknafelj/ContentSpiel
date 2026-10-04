@@ -82,4 +82,24 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_not_includes rows, "Users"
     assert_not_includes rows, "New page"
   end
+
+  test "a short query matches titles, not locale keys: an older real match still appears behind newer non-matches" do
+    older = create_post(title: "Garden notes")
+    older.update_columns(title: { "en" => "Garden notes", "de" => "Gartenbuch" }, updated_at: 1.day.ago)
+    25.times { |i| create_post(title: "Filler #{i}") }
+    # "de" is a locale key of every record's title, and a substring of the
+    # older record's German title only.
+    assert_equal [ "Garden notes" ], rows_of(content_groups(search("de"))).map { |row| row[:title] }
+  end
+
+  test "a title containing a double quote is found by a query containing one" do
+    create_post(title: 'The "quoted" one')
+    assert_equal [ 'The "quoted" one' ], rows_of(content_groups(search('"quoted"'))).map { |row| row[:title] }
+  end
+
+  test "a backslash query matches a title containing a backslash" do
+    create_post(title: 'C:\\temp')
+    assert_nothing_raised { search("\\") }
+    assert_equal [ 'C:\\temp' ], rows_of(content_groups(search("\\"))).map { |row| row[:title] }
+  end
 end

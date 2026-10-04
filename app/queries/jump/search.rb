@@ -48,14 +48,14 @@ module Jump
     def routes = Rails.application.routes.url_helpers
     def matches?(text) = text.to_s.downcase.include?(query.downcase)
 
-    # `title` is a jsonb of { locale => text }: `title::text ILIKE` matches
-    # any language's title in one predicate. It can also match a locale
-    # *key* (or JSON punctuation) for a short query like "de"; the Ruby-side
-    # filter drops those, and the over-fetch keeps the group full anyway.
+    # `title` is a jsonb of { locale => text }. `jsonb_each_text` unnests it
+    # so ILIKE tests only the VALUES: `title::text ILIKE` would also match a
+    # locale key ("de", "en") or JSON punctuation, filling the LIMIT with
+    # non-matches, and would miss a title containing `"` or `\` (jsonb's
+    # text form escapes both).
     def titled(relation)
-      relation.where("#{relation.table_name}.title::text ILIKE ?", pattern).order(updated_at: :desc).limit(LIMIT * 4)
-        .select { |record| record.read_attribute(:title).to_h.values.any? { |value| matches?(value) } }
-        .first(LIMIT)
+      relation.where("EXISTS (SELECT 1 FROM jsonb_each_text(#{relation.table_name}.title) AS t(locale, value) WHERE t.value ILIKE ?)", pattern)
+        .order(updated_at: :desc).limit(LIMIT).to_a
     end
 
     def page_rows
