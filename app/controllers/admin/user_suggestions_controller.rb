@@ -33,6 +33,17 @@ module Admin
 
     def query = params[:q].to_s.strip.first(MAX_QUERY_LENGTH)
 
+    # The ids the members field already holds as chips, a JSON array in
+    # `exclude`: left out before the limit, so the field still gets eight to
+    # show (with eight matching members already chosen it was offered nobody).
+    MAX_EXCLUDED = 100
+    def excluded
+      list = JSON.parse(params[:exclude].to_s)
+      list.is_a?(Array) ? list.first(MAX_EXCLUDED).filter_map { |id| Integer(id, exception: false) } : []
+    rescue JSON::ParserError
+      []
+    end
+
     def rows
       return [] if query.length < MIN_QUERY_LENGTH
 
@@ -40,7 +51,7 @@ module Admin
       prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([
         "(COALESCE(LOWER(users.name), '') LIKE :prefix OR LOWER(users.email_address) LIKE :prefix) DESC", { prefix: "#{pattern}%" }
       ]))
-      User.where(owner: false)
+      User.where(owner: false).where.not(id: excluded)
         .where("LOWER(users.name) LIKE :any OR LOWER(users.email_address) LIKE :any", any: "%#{pattern}%")
         .order(prefix_first, Arel.sql("LOWER(users.email_address) ASC"))
         .limit(LIMIT)

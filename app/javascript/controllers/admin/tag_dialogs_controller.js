@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { Turbo } from "@hotwired/turbo-rails"
 
 // The Tags list's two dialogs, Merge and Delete (`app/views/admin/tags/index.html.erb`).
 // There is ONE of each in the page, not one per row: a row's menu item opens
@@ -20,7 +21,21 @@ import { Controller } from "@hotwired/stimulus"
 //
 // Delete: sets the title and the sentence and points its form at
 // `DELETE /tags/:id`. The answer is a Turbo Stream that removes the row, which
-// leaves the dialog open, so a successful submission closes it (`submitted`).
+// leaves the dialog open, so a submission's end closes it (`submitted`):
+// - a success moves the focus to the next row's name (the previous one's for
+//   the last row, the heading when none is left) -- the row that had it is
+//   gone, and focus on <body> sends a keyboard user back to the top; and when
+//   the last tag went, the screen is fetched again for its empty state;
+// - a refusal (a 403, a tag someone else deleted) has no body to render: the
+//   dialog would stay open over a button that does nothing, so it closes and
+//   an error toast says the tag wasn't deleted.
+//
+// THE NAME IS READ LIVE. The row's `data-tag-*` were written when the list was
+// rendered; a name renamed in place since (the row's own autosave) is not in
+// them, and the dialog asked to delete "old" beside a row that says "new". So
+// the name comes from the row's input as it stands, and the title, the
+// sentence and the picker's exclusion are re-worded with it (the name appears
+// in them in “curly quotes”, as `Admin::TagsHelper` wrote it).
 //
 // Everything reaches the DOM through `textContent` and attributes: a tag name
 // is whatever an editor typed, never markup.
@@ -37,23 +52,37 @@ export default class extends Controller {
   }
 
   openMerge(dialog, data) {
-    dialog.querySelector("[id$='-title']").textContent = data.tagMergeTitle
-    this.mergeTextTarget.textContent = data.tagMergeText
+    const name = this.liveName(data)
+    dialog.querySelector("[id$='-title']").textContent = this.reword(data.tagMergeTitle, data, name)
+    this.mergeTextTarget.textContent = this.reword(data.tagMergeText, data, name)
     this.mergeFormTarget.action = this.mergeUrlValue.replace("__ID__", encodeURIComponent(data.tagId))
 
     const picker = this.mergeFormTarget.querySelector("[data-controller~='admin--chip-input']")
-    picker.setAttribute("data-admin--chip-input-exclude-value", JSON.stringify([data.tagName]))
-    picker.querySelector("[data-admin--chip-input-target='list']").replaceChildren()
-    const input = picker.querySelector("[data-admin--chip-input-target='input']")
-    input.value = ""
-    picker.querySelector("[data-admin--chip-input-target='listbox']").hidden = true
+    picker.setAttribute("data-admin--chip-input-exclude-value", JSON.stringify([name]))
+    // Through the picker's own controller, so an answer still on its way from
+    // the last opening is dropped and `aria-expanded` follows the list.
+    this.application.getControllerForElementAndIdentifier(picker, "admin--chip-input")?.reset()
     this.mergeButtonTarget.disabled = true
   }
 
   openDelete(dialog, data) {
-    dialog.querySelector("[id$='-title']").textContent = data.tagDeleteTitle
-    this.deleteTextTarget.textContent = data.tagDeleteText
+    const name = this.liveName(data)
+    dialog.querySelector("[id$='-title']").textContent = this.reword(data.tagDeleteTitle, data, name)
+    this.deleteTextTarget.textContent = this.reword(data.tagDeleteText, data, name)
     this.deleteFormTarget.action = this.deleteUrlValue.replace("__ID__", encodeURIComponent(data.tagId))
+    this.deleting = data.tagId
+  }
+
+  // See "THE NAME IS READ LIVE". An emptied or refused input is not a name:
+  // the row's own stays.
+  liveName(data) {
+    const input = document.getElementById(`tag-${data.tagId}-name`)
+    const typed = input && input.getAttribute("aria-invalid") !== "true" ? input.value.trim() : ""
+    return typed || data.tagName
+  }
+
+  reword(text, data, name) {
+    return name === data.tagName ? text : text.split(`“${data.tagName}”`).join(`“${name}”`)
   }
 
   // Enabled once the picker holds a tag: its chips' hidden inputs carry the
@@ -65,7 +94,38 @@ export default class extends Controller {
   }
 
   submitted(event) {
-    if (event.target !== this.deleteFormTarget || !event.detail?.success) return
+    if (event.target !== this.deleteFormTarget) return
+    const row = document.getElementById(`tag_${this.deleting}`)
     this.deleteFormTarget.closest("dialog")?.close()
+
+    if (!event.detail?.success) return this.failed()
+
+    // Chosen before the stream takes the row.
+    const neighbour = row?.nextElementSibling || row?.previousElementSibling
+    const next = neighbour?.querySelector("input[type=text]") || document.querySelector("#content h1")
+    if (next && next.tabIndex < 0 && !next.hasAttribute("tabindex")) next.setAttribute("tabindex", "-1")
+    // Once the stream has taken the row (Turbo reads the answer and applies
+    // it a frame later; a timer, since a background tab runs no frames).
+    const started = Date.now()
+    const settle = () => {
+      if (row?.isConnected && Date.now() - started < 2000) return setTimeout(settle, 30)
+      next?.focus()
+      // The last tag: the table is a header over nothing. The screen itself
+      // knows its empty state.
+      if (!document.querySelector(".admin-tags-table tbody tr")) Turbo.visit(location.href, { action: "replace" })
+    }
+    settle()
+  }
+
+  // The server's own error toast markup (`#toast-error-template` in the
+  // layout), one per cause.
+  failed() {
+    const toast = document.getElementById("toast-error-template")?.content.firstElementChild?.cloneNode(true)
+    const region = document.getElementById("toasts")
+    if (!toast || !region) return
+    toast.id = "toast-tag-delete"
+    toast.querySelector("span").textContent = "The tag wasn't deleted. Reload the list and try again."
+    document.getElementById(toast.id)?.remove()
+    region.append(toast)
   }
 }

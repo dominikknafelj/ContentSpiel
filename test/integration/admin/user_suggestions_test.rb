@@ -38,6 +38,21 @@ class Admin::UserSuggestionsTest < ActionDispatch::IntegrationTest
     assert_equal 8, suggest("member").size
   end
 
+  test "excluded ids are left out before the limit; a junk exclude excludes nothing" do
+    users = 10.times.map { |i| User.create!(email_address: "member#{i}@example.org", password: "a-long-enough-password") }
+    first_eight = suggest("member").map { |row| row["value"] }
+
+    get "/cs-studio/users/suggest", params: { q: "member", exclude: first_eight.map(&:to_s).to_json }
+    rest = response.parsed_body.map { |row| row["value"] }
+    assert_equal (users.map(&:id) - first_eight).sort, rest.sort
+
+    [ "not json", { a: 1 }.to_json, [ "x; DROP TABLE users", nil, [ 1 ] ].to_json ].each do |junk|
+      get "/cs-studio/users/suggest", params: { q: "member", exclude: junk }
+      assert_response :ok
+      assert_equal 8, response.parsed_body.size
+    end
+  end
+
   test "a blank or one-letter query lists nobody: it is not a user directory" do
     assert_equal [], suggest("")
     assert_equal [], suggest("a")

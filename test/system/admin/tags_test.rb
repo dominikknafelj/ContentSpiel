@@ -107,4 +107,55 @@ class Admin::TagsSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
     assert_not Tag.exists?(@gear.id)
   end
+
+  # Final wave B (ledger C-M7): the row's data was written when the list was
+  # rendered; the dialogs name the tag as it is called now.
+  test "after an inline rename the dialogs name the tag by its new name, and the picker excludes it" do
+    find("#tag-#{@gear.id}-name").set("kit")
+    assert_selector "#tag-#{@gear.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
+
+    open_row_menu(@gear, "Delete tag…")
+    within("dialog#delete-tag-dialog[open]") do
+      assert_selector "h2", text: "Delete “kit”?"
+      click_button "Cancel"
+    end
+
+    open_row_menu(@gear, "Merge into…")
+    within("dialog#merge-tag-dialog[open]") do
+      assert_selector "h2", text: "Merge “kit” into…"
+      find("#merge-tag-into").send_keys("k")
+      assert_no_selector "#merge-tag-into-listbox [role=option]", text: "kit", wait: 1
+    end
+  end
+
+  # Task 13 m4: a refusal has no body to render; the dialog stayed open over a
+  # button that did nothing.
+  test "a delete the server refuses closes the dialog and says so" do
+    open_row_menu(@gear, "Delete tag…")
+    assert_selector "dialog#delete-tag-dialog[open]"
+    @gear.destroy!
+    within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
+
+    assert_no_selector "dialog[open]"
+    assert_selector "#toasts [role=alert]", text: "The tag wasn't deleted. Reload the list and try again."
+  end
+
+  # Task 13 m6 and m7.
+  test "after a delete the focus is on a neighbouring row, and deleting the last tag shows the empty state" do
+    rows = page.all("table.admin-tags-table tbody tr").map { |tr| tr[:id] }
+    first = Tag.find(rows.first.delete_prefix("tag_"))
+    open_row_menu(first, "Delete tag…")
+    within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
+    assert_no_selector row(first)
+    assert_eventually(message: "focus fell to the body") { page.evaluate_script("document.activeElement.id") == "tag-#{rows.second.delete_prefix('tag_')}-name" }
+
+    rows.drop(1).each do |id|
+      tag = Tag.find(id.delete_prefix("tag_"))
+      open_row_menu(tag, "Delete tag…")
+      within("dialog#delete-tag-dialog[open]") { click_button "Delete tag" }
+      assert_no_selector row(tag)
+    end
+    assert_text "No tags yet"
+    assert_no_selector "table.admin-tags-table"
+  end
 end

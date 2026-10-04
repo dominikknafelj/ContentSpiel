@@ -48,7 +48,9 @@
                     } do %>
                 <%= render partial: "admin/shared/base_updated_at_field",
                       locals: { id: "tag-#{row.id}-base-updated-at", value: row.updated_at.iso8601(6) } %>
-                <%= label_tag "tag-#{row.id}-name", "Name", class: "sr-only" %>
+                <%# Named per row: fifty inputs all called "Name" tell a screen
+                    reader's list of fields nothing. %>
+                <%= label_tag "tag-#{row.id}-name", "Name of #{row.name}", class: "sr-only" %>
                 <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
                       class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-line-strong focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
                 <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
@@ -80,7 +82,8 @@
                       red is the dialog's own confirm button. %>
                   <%= content_tag(:button, "Delete tag…", type: "button",
                         data: dialog_trigger("delete-tag-dialog").merge(
-                          tag_id: row.id, tag_delete_title: tag_delete_title(row), tag_delete_text: tag_delete_text(carriers, readable))) %>
+                          tag_id: row.id, tag_delete_title: tag_delete_title(row), tag_delete_text: tag_delete_text(carriers, readable),
+                          tag_name: row.name)) %>
                 <% end %>
               <% end %>
             </td>
@@ -101,7 +104,7 @@
 
     <%= render Admin::DialogComponent.new(id: "merge-tag-dialog", title: "Merge tag", width: :form_narrow) do |dialog| %>
       <%# `data-turbo-frame="_top"`: the answer is a redirect with a toast, shown by a full visit. %>
-      <%= form_with url: "#", method: :post, id: "merge-tag-form", data: { turbo_frame: "_top", "admin--tag-dialogs-target": "mergeForm" } do %>
+      <%= form_with url: "#", method: :post, id: "merge-tag-form", data: { turbo_frame: "_top", "admin--tag-dialogs-target": "mergeForm", controller: "admin--busy" } do %>
         <%# The picker: one value, no "create new" path, the merged tag itself never offered
             (`admin--tag-dialogs` sets `exclude` per opening; `Tags::Merge` refuses it again
             on the server). Its controls live in this dialog's own form, so they feed no
@@ -116,7 +119,7 @@
         <% end %>
         <%# Disabled until a target is chosen (`admin--tag-dialogs#targetChanged`). %>
         <%= render Admin::ButtonComponent.new(label: "Merge tags", variant: :primary, type: "submit", form: "merge-tag-form", disabled: true,
-              data: { "admin--tag-dialogs-target": "mergeButton" }) %>
+              data: { "admin--tag-dialogs-target": "mergeButton", busy_label: "Merging…" }) %>
       <% end %>
     <% end %>
 

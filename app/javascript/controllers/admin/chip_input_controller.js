@@ -47,6 +47,13 @@ export default class extends Controller {
     // (shared with the rich-text link search); this controller renders.
     this.suggestions = createSuggestions({
       url: () => this.searchUrlValue,
+      // What the field already holds is left out by the SERVER, before its
+      // limit, so there are still eight to show (`showSuggestions` filters
+      // again: an endpoint that ignores the parameter is no worse than before).
+      params: () => {
+        const held = [ ...this.chipValues, ...this.excludeValue ].map(String)
+        return held.length > 0 ? { exclude: JSON.stringify(held.slice(0, 100)) } : {}
+      },
       getQuery: () => this.query,
       onRows: (query, rows) => this.showSuggestions(query, rows.map((row) => this.normalize(row))),
       // A field that takes free text (`create`) just offers no suggestions --
@@ -345,6 +352,21 @@ export default class extends Controller {
   remove(event) {
     if (this.inputTarget.disabled) return
     this.removeChip(event.currentTarget.closest("li"))
+  }
+
+  get chipValues() {
+    return Array.from(this.listTarget.querySelectorAll("li[data-chip-value]"), (chip) => chip.dataset.chipValue)
+  }
+
+  // Back to empty, for a field in a dialog that is filled anew each time it
+  // opens (the Tags list's Merge picker): no chips, nothing typed, the list
+  // closed with its `aria-expanded`, and an answer still on its way dropped
+  // (`close` cancels it) so it can't open the list of the previous opening.
+  reset() {
+    this.listTarget.replaceChildren()
+    this.inputTarget.value = ""
+    this.close()
+    this.changed()
   }
 
   // `focus: "input"` keeps the caret where it is (Backspace in the field);
