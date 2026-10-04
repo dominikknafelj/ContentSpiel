@@ -22,6 +22,12 @@ module Tags
       saved = Tag.transaction do
         @tag.name = @name
         @tag.save || raise(ActiveRecord::Rollback)
+        # An open post form resends the tag's *old* name on its next autosave,
+        # which `Posts::Save` would create anew and attach, leaving both names
+        # on the post. Touching the carrying posts moves their `updated_at`,
+        # so that form's save is refused as "Changed elsewhere" instead
+        # (`touch_all`: callbacks and validations skipped, only the base moves).
+        Post.where(id: @tag.post_tags.select(:post_id)).touch_all
 
         changes = Audit::Snapshot.field_changes_for(@tag)
         record_event("tag.renamed", subject: @tag, field_changes: changes) if changes.any?

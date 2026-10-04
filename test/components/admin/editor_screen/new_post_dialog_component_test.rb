@@ -64,6 +64,24 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
     assert_selector "input[value=blog][data-path='/journal']", visible: :all
   end
 
+  test "a listing page the viewer can't read keeps its path to itself unless it is live" do
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.create", scope: { "content_types" => [ "blog" ] })
+    journal = create_page(title: "Journal", published: false)
+    ContentBlock.create!(owner: journal, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+
+    render_form(users(:one))
+    assert_selector "input[value=blog][data-path='/journal']", visible: :all
+
+    render_form(users(:editor_branch))
+    assert_selector "input[value=blog]", visible: :all
+    assert_no_selector "input[value=blog][data-path]", visible: :all
+    assert_selector "[data-admin--new-record-target=url]", text: "Not listed on any page yet"
+
+    journal.update_columns(published_at: 1.day.ago)
+    render_form(users(:editor_branch))
+    assert_selector "input[value=blog][data-path='/journal']", visible: :all
+  end
+
   test "the form builds in a constant number of queries however many listing pages there are" do
     count = lambda do
       queries = 0

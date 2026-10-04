@@ -391,4 +391,28 @@ class Admin::NewRecordDialogsTest < ActionDispatch::IntegrationTest
     assert_not result.ok?
     assert_includes result.record.errors.full_messages, "a root page already exists"
   end
+
+  # Final review A, M3: a hand-made parameter shape is the ordinary refusal,
+  # never a 500 (`page=x` has no `dig`; a hash title reached the slug fill; an
+  # array parent id reached `find`).
+  test "forged parameter shapes are a 422 or the default parent, never a 500" do
+    sign_in_as(users(:one))
+    [ { page: "x" }, { page: { title: { a: "b" } } } ].each do |forged|
+      post "/cs-studio/pages", params: forged
+      assert_response :unprocessable_entity, forged.inspect
+    end
+    assert_difference -> { Page.count }, 2 do
+      post "/cs-studio/pages", params: { page: { title: "Forged type", page_type: { a: "b" } } }
+      assert_response :see_other
+      post "/cs-studio/pages", params: { page: { title: "Forged parent", parent_id: [ @inside.id, @branch.id ] } }
+    end
+    assert_response :see_other
+
+    [ { post: "x" }, { post: { title: { a: "b" } } }, { post: { title: "T", content_type: [ "blog" ] } } ].each do |forged|
+      assert_no_difference -> { Post.count } do
+        post "/cs-studio/posts", params: forged
+      end
+      assert_response :unprocessable_entity, forged.inspect
+    end
+  end
 end

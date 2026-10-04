@@ -117,4 +117,21 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     counts = Translations::Status.counts([ page ])[page]
     assert_equal Translations::Status.for([ page ])[page], counts.transform_values { |c| c[:state] }
   end
+
+  # Final fix wave 2 (Task 18 t1): the guard in front of the `::timestamptz`
+  # cast must accept only what the cast accepts. A shape-only check let
+  # 2026-02-31 through and the cast then raised, 500ing the matrix.
+  test "the stamp guard accepts exactly the timestamps Postgres can cast" do
+    guard = Translations::StateIndex::ISO_TIMESTAMP
+    ok = %w[2026-02-28T10:00:00Z 2024-02-29T10:00:00+02:00 2000-02-29T00:00:00Z 2026-04-30T23:59:59.123456Z 2026-12-31T10:00:00-05:30]
+    bad = %w[2026-02-31T10:00:00Z 2026-02-29T10:00:00Z 1900-02-29T10:00:00Z 2026-04-31T10:00:00Z 2026-06-31T10:00:00Z 2026-11-31T10:00:00Z
+      0000-01-01T00:00:00Z 2026-13-01T10:00:00Z 2026-01-01T24:00:00Z not-a-date]
+    connection = ActiveRecord::Base.connection
+    (ok + bad).each do |value|
+      matches = connection.select_value("SELECT #{connection.quote(value)} ~ #{connection.quote(guard)}")
+      assert_equal ok.include?(value), matches, "#{value} should #{"not " unless ok.include?(value)}pass the guard"
+      # Everything the guard passes must cast without raising.
+      connection.select_value("SELECT #{connection.quote(value)}::timestamptz") if matches
+    end
+  end
 end

@@ -54,7 +54,12 @@ module Admin
           stored = PublicPath.current.where(record_type: "Page", record_id: pages.values.compact.map(&:id), locale: locale).pluck(:record_id, :path).to_h
           types.map do |type|
             page = pages.fetch(posts.fetch(type))
-            path = page && stored[page.id] ? "#{prefix}#{stored[page.id]}".sub(%r{/+\z}, "") : nil
+            # A draft or private listing page's path is only for someone who may
+            # read that page: a posts-only author reads "Not listed on any
+            # page yet" instead of learning the slug path of a page they can't
+            # open (final review A, M4).
+            visible = page && (page.live? || can?("pages.read", page))
+            path = visible && stored[page.id] ? "#{prefix}#{stored[page.id]}".sub(%r{/+\z}, "") : nil
             Choice.new(name: type.name, label: type.label, path: path)
           end
         end

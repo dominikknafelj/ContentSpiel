@@ -25,6 +25,7 @@ module Tags
 
       content_types = affected_content_types
       destroyed = Tag.transaction do
+        touch_carrying_posts
         record_event("tag.deleted", subject: @tag)
         @tag.destroy || raise(ActiveRecord::Rollback)
       end
@@ -35,6 +36,19 @@ module Tags
     end
 
     private
+
+    # An open post form resends every tag chip on every autosave, so a post
+    # that carried this tag and is being edited right now would put the tag
+    # straight back (`Posts::Save#build_tag` creates a name it can't find).
+    # Touching the carrying posts moves their `updated_at`, so that form's
+    # next save is refused as "Changed elsewhere" (`refuse_stale_autosave`)
+    # -- the same protection `Posts::Save` gives another editor's tag-only
+    # change. `touch_all` skips callbacks and validations on purpose: only
+    # the stale-save base moves. Must run before the destroy, which removes
+    # the `post_tags` this reads.
+    def touch_carrying_posts
+      Post.where(id: @tag.post_tags.select(:post_id)).touch_all
+    end
 
     # Computed *before* the destroy: once `@tag` (and its `post_tags`) are
     # gone, there is nothing left to look this up from, and a listing

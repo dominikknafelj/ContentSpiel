@@ -120,8 +120,8 @@ module Admin
     # replaces just the dialog's form (typed values kept, error summary on top)
     # and, without JS, re-renders the standalone page.
     def create
-      result = Posts::Save.call(Post.new, attributes: { content_type: params.dig(:post, :content_type), published: false },
-        translations: { admin_locale => { title: params.dig(:post, :title) } })
+      result = Posts::Save.call(Post.new, attributes: { content_type: new_post_params[:content_type], published: false },
+        translations: { admin_locale => { title: new_post_params[:title] } })
 
       if result.ok?
         redirect_to admin_post_path(result.record, **admin_url_options), status: :see_other
@@ -245,6 +245,16 @@ module Admin
 
     private
 
+    helper_method :new_post_params
+
+    # The New post dialog's two fields, read as scalars only (`params.dig`
+    # raises on `post=x`, and a hash for the title reached the slug fill and
+    # 500ed); anything else reads as blank -- the ordinary 422 (final review
+    # A, M3).
+    def new_post_params
+      @new_post_params ||= (params[:post].respond_to?(:permit) ? params[:post] : ActionController::Parameters.new).permit(:title, :content_type)
+    end
+
     # Through the read scope (design spec §3.3): someone else's post an
     # author may not read is a 404 -- for show, autosave, publish and delete
     # alike -- not a 403 that would confirm it exists (Review Focus 2).
@@ -254,8 +264,8 @@ module Admin
 
     def render_new_post_failure
       form = Admin::EditorScreen::NewPostFormComponent.new(
-        url_options: admin_url_options, locale: admin_locale, content_type: params.dig(:post, :content_type),
-        title: params.dig(:post, :title), errors: @post.errors
+        url_options: admin_url_options, locale: admin_locale, content_type: new_post_params[:content_type],
+        title: new_post_params[:title], errors: @post.errors
       )
 
       respond_to do |format|

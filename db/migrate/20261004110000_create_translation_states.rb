@@ -10,7 +10,7 @@
 # record's rows itself.
 #
 # `up` fills the table from what exists by calling application code
-# (`StateIndex.rebuild_all`). On a database built by `db:schema:load` the
+# (`StateIndex.rebuild_all`), tolerating a failure there. On a database built by `db:schema:load` the
 # table starts empty and is filled by saves instead; `bin/rails
 # translations:reindex` is the repair tool for that, and for any time the
 # table is suspected stale.
@@ -28,8 +28,22 @@ class CreateTranslationStates < ActiveRecord::Migration[8.1]
     add_index :translation_states, %i[record_type record_id locale], unique: true, name: "index_translation_states_on_record_and_locale"
     add_index :translation_states, %i[locale state]
 
-    Translations::State.reset_column_information
-    Translations::StateIndex.rebuild_all
+    # The fill is a convenience, not part of the schema change: it runs
+    # application code as it is at whatever commit this migration is later
+    # run from, so a future change to a model it reads could fail a
+    # from-scratch `db:migrate` -- or a deploy -- over a table that may simply
+    # start empty (a record with no row reads complete). A failure is logged
+    # and left to `bin/rails translations:reindex`.
+    begin
+      # A savepoint: a failed statement would otherwise abort the migration's
+      # own transaction and take the rest of it down with the rescued error.
+      ActiveRecord::Base.transaction(requires_new: true) do
+        Translations::State.reset_column_information
+        Translations::StateIndex.rebuild_all
+      end
+    rescue StandardError => e
+      say "translation_states left empty: #{e.class}: #{e.message}. Run `bin/rails translations:reindex`."
+    end
   end
 
   def down

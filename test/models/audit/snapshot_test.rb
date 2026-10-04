@@ -136,7 +136,10 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
       changes = Audit::Snapshot.field_changes_for(post)
       assert_equal [ nil, "Hallo" ], changes["de title"]
       assert_not changes.key?("translation_sources")
-      assert Audit::Snapshot.for(post.reload)["translation_sources"].dig("title", "de").present?
+      entry = Audit::Snapshot.for(post.reload)["translation_sources"].dig("title", "de")
+      assert entry.present?
+      assert entry.key?("digest")
+      assert_not entry.key?("text"), "the original's text stays out of the append-only log"
     end
   end
 

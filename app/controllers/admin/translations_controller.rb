@@ -30,8 +30,12 @@ module Admin
   # page is cut out of the types the way the trash list does it: every type
   # contributes its own ordered window of `offset + per_page` rows, they are
   # merged in Ruby by the same sort key and sliced. Cost is proportional to
-  # the page (and to how deep it is), not the site, and one `states_for`
-  # query supplies every cell. A record with no row reads complete and isn't
+  # the rows that need work (and to how deep the page is): the ordering
+  # expression (`original_changed_at_sql`, a correlated aggregate per row)
+  # runs over every row of a type that is missing or outdated in a target
+  # language before the window is cut, not just over the page's rows -- and
+  # never over the rows that are complete. One `states_for` query supplies
+  # every cell. A record with no row reads complete and isn't
   # listed (`StateIndex`).
   #
   # Order (§4.4): rows with an outdated language first -- they are already

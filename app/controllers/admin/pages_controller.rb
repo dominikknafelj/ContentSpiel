@@ -114,14 +114,14 @@ module Admin
     # refusal is the 403 page, and a parent outside the read scope is a 404
     # (`requested_parent`), as for any forged id.
     def create
-      page_type = params.dig(:page, :page_type).presence
+      page_type = new_page_params[:page_type].presence
       parent = requested_parent
       return render_new_page_failure(gone: true) if parent == :gone
 
       # An unknown `page_type` is `Page`'s own validation failure (`enum ...
       # validate: true`), reported on the field like any other.
       result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, page_type: page_type }.compact,
-        translations: { admin_locale => { title: params.dig(:page, :title) } })
+        translations: { admin_locale => { title: new_page_params[:title] } })
 
       if result.ok?
         redirect_to admin_page_path(result.record, **admin_url_options), status: :see_other
@@ -282,6 +282,8 @@ module Admin
 
     private
 
+    helper_method :new_page_params
+
     # Through the read scope (design spec §3.3): a page the actor can't
     # read is a 404 here -- show, autosave, publish and delete alike --
     # never a 403 that would confirm it exists.
@@ -350,8 +352,8 @@ module Admin
       @page ||= Page.new
       @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
       form = Admin::EditorScreen::NewPageFormComponent.new(
-        url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || params.dig(:page, :parent_id) unless gone),
-        title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors
+        url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || new_page_params[:parent_id] unless gone),
+        title: new_page_params[:title], page_type: new_page_params[:page_type], errors: @page.errors
       )
 
       respond_to do |format|
@@ -373,8 +375,17 @@ module Admin
     # is not "an id forged outside my scope" -- the editor just lost the race --
     # so it comes back as `:gone`, answered with the form and "Choose a page
     # that still exists." on Inside rather than a bare 404 in an empty dialog.
+    # The dialog's three fields, read as scalars only. `params.dig(:page, ...)`
+    # raises on `page=x` (a String has no `dig`), and a hash or array where a
+    # scalar belongs reached `parameterize` / `find` and 500ed; `permit`
+    # drops anything non-scalar, so a forged shape is the ordinary blank-title
+    # 422 or the default parent (final review A, M3).
+    def new_page_params
+      @new_page_params ||= (params[:page].respond_to?(:permit) ? params[:page] : ActionController::Parameters.new).permit(:title, :parent_id, :page_type)
+    end
+
     def requested_parent
-      parent_id = params.dig(:page, :parent_id)
+      parent_id = new_page_params[:parent_id]
       return root_page if parent_id.blank?
 
       admin_scope(Page.all).find(parent_id)

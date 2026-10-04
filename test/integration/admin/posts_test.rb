@@ -108,6 +108,35 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
   end
 
+  # Final review A, I2: the Tags module changes a post's tags without going
+  # through `Posts::Save`, so an editor's already-open form (which resends
+  # every chip on every autosave) would recreate a deleted tag or put a
+  # renamed one back. Both services touch the carrying posts, so the open
+  # form's next save is the same 409 as for another editor's tag change.
+  test "deleting a tag in the Tags module makes an open post form's save a 409 and does not recreate the tag" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { assert Tags::Destroy.call(Tag.find_by!(name: "ruby")).ok? }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { title: "Engineer 2", tag_names: [ "", "ruby" ] } }, as: :turbo_stream
+    assert_response :conflict
+    assert_not Tag.exists?(name: "ruby")
+    assert_empty post_record.reload.tags
+  end
+
+  test "renaming a tag in the Tags module makes an open post form's save a 409 and keeps the new name" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { assert Tags::Rename.call(Tag.find_by!(name: "ruby"), name: "rails").ok? }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { title: "Engineer 2", tag_names: [ "", "ruby" ] } }, as: :turbo_stream
+    assert_response :conflict
+    assert_not Tag.exists?(name: "ruby")
+    assert_equal %w[rails], post_record.reload.tags.map(&:name)
+  end
+
   test "a view-only post editor says so" do
     post_record = create_post(title: "Engineer", published: false)
     sign_in_as(users(:reader))

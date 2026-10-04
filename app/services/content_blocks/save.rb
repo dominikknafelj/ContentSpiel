@@ -42,9 +42,6 @@ module ContentBlocks
         assign
         @block.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@block)
-        # A block's fields roll up into its owner's stored translation state
-        # (`translation_states`), so this refreshes the page or post.
-        Translations::StateIndex.refresh(@block)
         # Editing a block is editing its owner (final fix wave, I3): bump
         # the owner's `updated_at` so the dashboard's "Recently updated"
         # (ordered by it) sees the edit. `touch` runs no validations and no
@@ -52,6 +49,15 @@ module ContentBlocks
         # hierarchy rebuild, which a block edit can't affect -- only
         # `after_touch`/commit callbacks, of which `Page`/`Post` have none.
         @block.owner.touch
+        # The touch comes BEFORE the state refresh: it takes the owner's row
+        # lock, so a second editor's block save on the same page waits here
+        # and its refresh then reads this transaction's committed rows,
+        # instead of both computing the owner's state from their own snapshot
+        # and the later upsert winning with a value that ignores the other's
+        # change (final review A, M2). `ContentBlocks::Destroy` does the same.
+        # A block's fields roll up into its owner's stored translation state
+        # (`translation_states`), so this refreshes the page or post.
+        Translations::StateIndex.refresh(@block)
 
         created = @block.previously_new_record?
         changes = Audit::Snapshot.field_changes_for(@block)

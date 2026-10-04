@@ -87,11 +87,19 @@ module Translations
 
     # `relation` (pages, posts or images) narrowed to the records whose state
     # in `locale` is one of `states` (Strings; `complete` includes a record
-    # with no row). A LEFT JOIN, so it composes with the caller's own
+    # with no row). A join, so it composes with the caller's own
     # `where`, `order`, `limit` and `count`.
+    #
+    # When `states` leaves out `complete` no record without a row can match,
+    # so the join is an INNER JOIN on the filter: `COALESCE(...)` is not
+    # strict, so Postgres can't turn the LEFT JOIN into an inner one itself,
+    # and a "newest outdated item" lookup in a language where nothing is
+    # outdated would read every readable record before returning nothing.
     def joins(relation, locale:, states:)
-      relation.joins(join_sql(relation.klass, locale))
-        .where("COALESCE(translation_states.state, 'complete') IN (?)", Array(states).map(&:to_s))
+      states = Array(states).map(&:to_s)
+      return relation.joins(join_sql(relation.klass, locale)).where("COALESCE(translation_states.state, 'complete') IN (?)", states) if states.include?("complete")
+
+      relation.joins(join_sql(relation.klass, locale, inner: true)).where("translation_states.state IN (?)", states)
     end
 
     # `{ total:, complete:, missing:, outdated: }` over the given (already
@@ -141,8 +149,17 @@ module Translations
     # (`Translations::Tracker#record_original_changes`), with or without a
     # zone offset (the site time zone applies while an editor saves), and
     # nothing else: only a value like this is cast, so one malformed stored
-    # value can never raise a cast error and 500 the screen.
-    ISO_TIMESTAMP = "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$".freeze
+    # value can never raise a cast error and 500 the screen. "Like this"
+    # includes being a REAL date: a day that doesn't exist in its month
+    # (2026-02-31, 2026-02-29, 2026-04-31) passes a shape-only check and then
+    # fails the `::timestamptz` cast ("date/time field value out of range"),
+    # so the month lengths and the leap-year rule are spelled out, and year
+    # 0000 (which Postgres has no such date for) is refused.
+    ISO_DATE = "(?!0000)(\\d{4}-(0[13578]|1[02])-(0[1-9]|[12]\\d|3[01])" \
+      "|\\d{4}-(0[469]|11)-(0[1-9]|[12]\\d|30)" \
+      "|\\d{4}-02-(0[1-9]|1\\d|2[0-8])" \
+      "|(\\d\\d(0[48]|[2468][048]|[13579][26])|([02468][048]|[13579][26])00)-02-29)".freeze
+    ISO_TIMESTAMP = "^#{ISO_DATE}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$".freeze
 
     # SQL for when this record's original text last changed, "the most
     # recently changed original" the translations matrix sorts by: the
@@ -167,9 +184,9 @@ module Translations
       "FROM #{from}jsonb_each_text(CASE WHEN jsonb_typeof(#{column}) = 'object' THEN #{column} ELSE '{}'::jsonb END) stamp #{where})"
     end
 
-    def join_sql(model, locale)
+    def join_sql(model, locale, inner: false)
       ActiveRecord::Base.sanitize_sql_array([
-        "LEFT JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{model.quoted_table_name}.id " \
+        "#{inner ? "INNER" : "LEFT"} JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{model.quoted_table_name}.id " \
         "AND translation_states.locale = ?", model.polymorphic_name, locale.to_s
       ])
     end

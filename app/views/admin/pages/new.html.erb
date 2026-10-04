@@ -11,7 +11,7 @@
 
 <%# `@form` is built (and gated on) by `#new`; a refused create re-renders from what was typed. %>
 <% form = @form || Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
-      parent_id: @page.parent_id, title: params.dig(:page, :title), page_type: params.dig(:page, :page_type), errors: @page.errors) %>
+      parent_id: @page.parent_id, title: new_page_params[:title], page_type: new_page_params[:page_type], errors: @page.errors) %>
 <div class="mx-auto max-w-md">
   <h1 class="mb-4 text-base font-semibold">New page</h1>
 
