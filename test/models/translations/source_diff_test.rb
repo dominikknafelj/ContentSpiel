@@ -48,4 +48,46 @@ class Translations::SourceDiffTest < ActiveSupport::TestCase
     elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     assert_operator elapsed, :<, 1.0
   end
+
+  def elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC).then { |t0| yield; Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0 }
+
+  test "a changed middle paragraph of three, exactly" do
+    assert_equal [ [ :equal, "One." ], [ :equal, "\n" ], [ :equal, "Two " ], [ :delete, "old" ], [ :insert, "new" ], [ :equal, " words." ],
+                   [ :equal, "\n" ], [ :equal, "Three." ] ],
+      segments([ "One.", "Two old words.", "Three." ], [ "One.", "Two new words.", "Three." ])
+  end
+
+  test "20,000 one-word paragraphs with one changed answers quickly" do
+    from = Array.new(20_000) { |i| "p#{i}" }
+    to = from.dup
+    to[10_000] = "changed"
+    result = nil
+    assert_operator elapsed { result = Translations::SourceDiff.call(from: from, to: to) }, :<, 1.0
+    assert result.too_long? || result.changed?
+  end
+
+  test "20,000 entirely different one-word paragraphs are refused, quickly" do
+    from = Array.new(20_000) { |i| "a#{i}" }
+    to = Array.new(20_000) { |i| "b#{i}" }
+    result = nil
+    assert_operator elapsed { result = Translations::SourceDiff.call(from: from, to: to) }, :<, 1.0
+    assert result.too_long?
+    assert_empty result.segments
+  end
+
+  test "ten rewritten 2,000-word paragraphs are refused, quickly" do
+    from = Array.new(10) { |n| Array.new(2000) { |i| "a#{n}x#{i}" }.join(" ") }
+    to = Array.new(10) { |n| Array.new(2000) { |i| "b#{n}x#{i}" }.join(" ") }
+    result = nil
+    assert_operator elapsed { result = Translations::SourceDiff.call(from: from, to: to) }, :<, 1.0
+    assert result.too_long?
+  end
+
+  test "a text over the cell budget but under the word cap is too long" do
+    from = Array.new(1500) { |i| "a#{i}" }.join(" ")
+    to = Array.new(1500) { |i| "b#{i}" }.join(" ")
+    result = Translations::SourceDiff.call(from: from, to: to)
+    assert result.too_long?
+    assert_empty result.segments
+  end
 end

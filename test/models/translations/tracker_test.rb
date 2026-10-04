@@ -436,4 +436,60 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       assert_not_includes changed, "translation_original_changed_at"
     end
   end
+
+  test "an entry records the language its text was in; it stops being comparable when the default changes" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      source = page.reload.translation_source(:title, "de")
+      assert_equal "en", source.from
+      assert source.comparable?
+
+      with_locales(%w[en de], default: "de") do
+        assert_not page.translation_source(:title, "de").comparable?
+      end
+    end
+  end
+
+  test "an old digest-only entry is never comparable" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      page.update_columns(translation_sources: { "title" => { "de" => Translations.digest("About us") } })
+      assert_not page.reload.translation_source(:title, "de").comparable?
+    end
+  end
+
+  test "confirming writes the language too" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      assert Pages::Save.call(page, translations: { "en" => { title: "About the studio" } }).ok?
+      as_owner { Translations::Confirm.call(page.reload, field: :title, locale: "de") }
+      assert page.reload.translation_source(:title, "de").comparable?
+    end
+  end
+
+  test "the original-changed time is stamped for a rich-text body" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Notes")
+      # Blank -> filled counts as a change too (documented in the tracker).
+      save_post(post, "en", { body: paragraph("First.") })
+      travel_to(Time.zone.local(2026, 10, 4, 12, 0)) { save_post(post, "en", { body: paragraph("Second.") }) }
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), post.reload.translation_original_changed_at_for(:body)
+    end
+  end
+
+  test "the original-changed time is stamped for a translated schema field" do
+    ContentTypes.register("test/interview") do |t|
+      t.label "Interview"
+      t.field :quote, :string, translated: true
+    end
+    with_locales(%w[en de], default: "en") do
+      post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "To be" } },
+        translations: { "en" => { title: "Quote" } }).record
+      assert_nil post.translation_original_changed_at_for(:quote)
+      travel_to(Time.zone.local(2026, 10, 4, 12, 0)) { save_post(post, "en", { fields: { quote: "Or not" } }) }
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), post.reload.translation_original_changed_at_for(:quote)
+    end
+  ensure
+    ContentTypes.reset!
+  end
 end

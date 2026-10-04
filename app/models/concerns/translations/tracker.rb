@@ -5,8 +5,8 @@ module Translations
   # `translation_sources` (jsonb, on every tracked table) holds
   # `{ "field" => { "locale" => entry } }`, where an entry is either the bare
   # digest of the original (the shape before the design pass; still valid,
-  # see `Translations::Source`) or `{ "digest", "text", "saved_at" }` -- the
-  # original's text as it was then, and when, so the translations screen can
+  # see `Translations::Source`) or `{ "digest", "text", "saved_at", "from" }` -- the
+  # original's text as it was then, when, and in which language (`from`), so the translations screen can
   # diff it against the original as it is now.
   #
   # Storage cost: the text is kept once per target language a field was
@@ -17,7 +17,9 @@ module Translations
   # `translation_original_changed_at` (jsonb, `{ "field" => ISO-8601 }`) is
   # the other half: when each field's *primary-language* value last changed
   # (by digest, so a whitespace-only edit isn't one). It is written by this
-  # concern's before_save and by nothing else.
+  # concern's before_save and by nothing else. A field whose original goes
+  # from blank to filled (or filled to blank) counts as changed and is
+  # stamped; only a create sets nothing.
   #
   # Only a target-locale value that *changed in this save* gets a fresh
   # digest; a change to the primary value itself never touches the record's
@@ -307,7 +309,8 @@ module Translations
       (sources[field] ||= {})[locale] = {
         "digest" => digest,
         "text" => Translations.source_text(translation_value(field, translation_primary_locale)),
-        "saved_at" => Time.current.iso8601
+        "saved_at" => Time.current.iso8601,
+        "from" => translation_primary_locale
       }
       self.translation_sources = sources
     end

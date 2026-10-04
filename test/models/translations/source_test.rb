@@ -25,4 +25,12 @@ class Translations::SourceTest < ActiveSupport::TestCase
     end
     assert_nil Translations::Source.wrap("text" => "no digest")
   end
+
+  test "comparable needs stored text in the current primary language" do
+    entry = { "digest" => "d", "text" => "Hi", "from" => Translations.primary_locale }
+    assert Translations::Source.wrap(entry).comparable?
+    assert_not Translations::Source.wrap(entry.merge("from" => "xx")).comparable?
+    assert_not Translations::Source.wrap(entry.except("from")).comparable?
+    assert_not Translations::Source.wrap(entry.except("text")).comparable?
+  end
 end

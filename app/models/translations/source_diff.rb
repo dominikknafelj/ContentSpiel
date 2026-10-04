@@ -11,22 +11,24 @@ module Translations
   # means there is nothing to compare (no stored text: an old entry), and
   # yields no segments and no change.
   #
-  # Cost. Words and the whitespace between them are separate tokens, so a
-  # compared pair of N and M words is a table of about (2N)x(2M) cells.
-  # Three bounds keep that safe on a web request:
-  #   * MAX_WORDS (4000) per side and per compared text: past it the diff is
-  #     refused (`too_long?`), checked *before* anything is trimmed;
-  #   * a common prefix and suffix is trimmed first, so the usual case -- a
-  #     small edit in a long text -- costs almost nothing;
-  #   * the table over what is left may not exceed MAX_CELLS (16 million, a
-  #     ~2,000-word text rewritten end to end); beyond that it is `too_long?`
-  #     too, rather than building a table that large.
+  # Cost. Words and the whitespace between them are separate tokens, and a
+  # longest-common-subsequence table is (tokens x tokens) cells. One call has
+  # ONE budget for the whole thing, so no input can make it expensive:
+  #   * MAX_CELLS (4 million) table cells in total, paragraph-level and
+  #     word-level tables combined -- every table is charged before it is
+  #     built; once the budget is spent the result is `too_long?` with no
+  #     segments;
+  #   * MAX_WORDS (4000) per compared text, checked before anything is built;
+  #   * a common prefix and suffix is trimmed first, at paragraph level and
+  #     again at word level, so the usual case -- a small edit in a long
+  #     text -- costs almost nothing and 20,000 one-word paragraphs with one
+  #     changed cost a 1x1 table.
   # Arrays are matched paragraph-by-paragraph first (an inserted paragraph
   # must not shift every later one), so a 20,000-word body only word-diffs
   # the few paragraphs that actually changed.
   class SourceDiff
     MAX_WORDS = 4000
-    MAX_CELLS = 16_000_000
+    MAX_CELLS = 4_000_000
 
     Result = Data.define(:segments, :compared, :too_long) do
       def changed? = segments.any? { |kind, _| kind != :equal }
@@ -43,6 +45,7 @@ module Translations
       @from = from
       @to = to
       @too_long = false
+      @cells = 0
     end
 
     def call
@@ -57,31 +60,39 @@ module Translations
     def result(segments, compared:) = Result.new(segments, compared, @too_long)
 
     def paragraph_segments(from, to)
+      prefix = common_prefix(from, to)
+      suffix = common_suffix(from, to, prefix)
+      from_middle = from[prefix...(from.size - suffix)]
+      to_middle = to[prefix...(to.size - suffix)]
+
       segments = []
-      anchors = lcs_pairs(from, to)
+      add = ->(parts) { segments << [ :equal, "\n" ] if segments.any?; segments.concat(parts) }
+      from[0, prefix].each { |paragraph| add.([ [ :equal, paragraph ] ]) }
+
+      anchors = lcs_pairs(from_middle, to_middle)
+      return [] if @too_long
+
       from_at = to_at = 0
-      (anchors + [ [ from.size, to.size ] ]).each do |from_anchor, to_anchor|
-        gap_from = from[from_at...from_anchor]
-        gap_to = to[to_at...to_anchor]
+      (anchors + [ [ from_middle.size, to_middle.size ] ]).each do |from_anchor, to_anchor|
+        gap_from = from_middle[from_at...from_anchor]
+        gap_to = to_middle[to_at...to_anchor]
         [ gap_from.size, gap_to.size ].max.times do |index|
           old_paragraph = gap_from[index]
           new_paragraph = gap_to[index]
-          segments << [ :equal, "\n" ] if segments.any?
           if old_paragraph && new_paragraph
-            segments.concat(word_segments(old_paragraph, new_paragraph))
+            add.(word_segments(old_paragraph, new_paragraph))
+            return [] if @too_long
           elsif old_paragraph
-            segments << [ :delete, old_paragraph ]
+            add.([ [ :delete, old_paragraph ] ])
           else
-            segments << [ :insert, new_paragraph ]
+            add.([ [ :insert, new_paragraph ] ])
           end
         end
-        if from_anchor < from.size
-          segments << [ :equal, "\n" ] if segments.any?
-          segments << [ :equal, from[from_anchor] ]
-        end
+        add.([ [ :equal, from_middle[from_anchor] ] ]) if from_anchor < from_middle.size
         from_at = from_anchor + 1
         to_at = to_anchor + 1
       end
+      from[from.size - suffix, suffix].each { |paragraph| add.([ [ :equal, paragraph ] ]) }
       segments
     end
 
@@ -97,14 +108,11 @@ module Translations
       suffix = common_suffix(old_tokens, new_tokens, prefix)
       old_middle = old_tokens[prefix...(old_tokens.size - suffix)]
       new_middle = new_tokens[prefix...(new_tokens.size - suffix)]
-      if old_middle.size.to_i * new_middle.size > MAX_CELLS
-        @too_long = true
-        return []
-      end
-
       segments = []
       segments << [ :equal, old_tokens[0, prefix].join ] if prefix > 0
       segments.concat(diff_middle(old_middle, new_middle))
+      return [] if @too_long
+
       segments << [ :equal, old_tokens[old_tokens.size - suffix, suffix].join ] if suffix > 0
       merge(segments)
     end
@@ -144,6 +152,10 @@ module Translations
     # Index pairs [i, j] of one longest common subsequence, in order.
     def lcs_pairs(a, b)
       return [] if a.empty? || b.empty?
+
+      @cells += a.size * b.size
+      @too_long = true if @cells > MAX_CELLS
+      return [] if @too_long
 
       rows = Array.new(a.size + 1) { Array.new(b.size + 1, 0) }
       (a.size - 1).downto(0) do |i|
