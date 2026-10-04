@@ -174,6 +174,36 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
   private
 
+  # Round 1 second review: Design's screenshot showed the picker at the bottom
+  # of the page, cut off, with the page behind shifted and a black band on top.
+  # This opens it in a real browser (1400x900) with the page scrolled down 600px
+  # and checks the dialog lies inside the viewport and nothing behind it moved.
+  test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
+    page.driver.resize(1400, 900)
+    visit_editor
+    # Make sure there is 600px to scroll whatever the editor's own height is.
+    page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 600)")
+    assert_equal 600, page.evaluate_script("Math.round(window.scrollY)")
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+
+    box = page.evaluate_script(<<~JS)
+      (() => {
+        const r = document.getElementById("media-picker").getBoundingClientRect()
+        return { top: r.top, left: r.left, bottom: r.bottom, right: r.right,
+                 width: window.innerWidth, height: window.innerHeight, scrollY: Math.round(window.scrollY) }
+      })()
+    JS
+    assert_operator box["top"], :>=, 0
+    assert_operator box["left"], :>=, 0
+    assert_operator box["bottom"], :<=, box["height"]
+    assert_operator box["right"], :<=, box["width"]
+    assert_equal 600, box["scrollY"]
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   def visit_editor
     visit "/cs-studio/pages/#{@landing.id}"
     await_admin_controllers
