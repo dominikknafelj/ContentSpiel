@@ -26,5 +26,11 @@ module Admin
     end
 
     def filters_active?(keys) = keys.any? { |key| params[key].present? }
+
+    # "type blog, status draft, title “zzz”" -- the active filters named for a
+    # "No matches" empty state, from `{ label => param key }`.
+    def filter_summary(labels)
+      labels.filter_map { |label, key| "#{label} #{params[key]}" if params[key].present? }.to_sentence
+    end
   end
 end

@@ -47,13 +47,23 @@
 <% end %>
 
 <% if @posts.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: (may_create ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
-    <% if may_create %>
-      <% empty_state.with_action do %>
-        <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <div class="rounded-cs border border-line bg-surface">
+    <% if filters_active?(filter_keys) %>
+      <%= render Admin::EmptyStateComponent.new(title: "No matches", description: "No posts match the current filters (#{filter_summary("type" => :type, "status" => :status, "tag" => :tag, "title" => :q)}).") do |empty_state| %>
+        <% empty_state.with_action do %>
+          <%= link_to "Clear filters", admin_posts_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: (may_create ? "Choose a content type to create your first post." : nil)) do |empty_state| %>
+        <% if may_create %>
+          <% empty_state.with_action do %>
+            <%= link_to "+ New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+          <% end %>
+        <% end %>
       <% end %>
     <% end %>
-  <% end %>
+  </div>
 <% else %>
   <table class="admin-posts-table w-full border-collapse text-sm">
     <thead>

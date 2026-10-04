@@ -30,6 +30,7 @@
   </div>
 <% end %>
 
+<div class="rounded-cs border border-line bg-surface">
 <%= render Admin::EmptyStateComponent.new(title: "Pages", description: (offer_new_page ? "Choose a page in the tree, or add one." : "Choose a page in the tree.")) do |empty_state| %>
   <% empty_state.with_action do %>
     <div class="flex flex-wrap items-center justify-center gap-2">
@@ -44,3 +45,4 @@
     </div>
   <% end %>
 <% end %>
+</div>

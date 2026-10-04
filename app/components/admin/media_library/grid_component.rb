@@ -39,6 +39,18 @@ module Admin
 
       def pick? = @pick
 
+      # A search or filter is active (`Admin::MediaController#filtered_assets`'s
+      # own params), so an empty grid means "nothing matches", not "nothing
+      # uploaded yet".
+      def filtered? = helpers.params[:q].present? || helpers.params[:filter].present?
+
+      # The unfiltered grid, staying in picker mode inside the picker's own
+      # frame (a link inside a `<turbo-frame>` is scoped to it already), or
+      # replacing the `content` frame's history entry on the full page.
+      def clear_filters_path = helpers.admin_media_path(**url_options, **(pick? ? { picker: 1 } : {}))
+
+      def clear_filters_data = pick? ? {} : { turbo_frame: "content", turbo_action: "replace" }
+
       # The thumbnail ruling (design spec §6): `Media::Asset#thumbnail_url`.
       def thumbnail_url(asset) = asset.thumbnail_url
 

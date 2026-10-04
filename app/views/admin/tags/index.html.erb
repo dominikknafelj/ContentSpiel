@@ -7,7 +7,9 @@
 <h1 class="mb-4 text-h1 text-ink">Tags</h1>
 
 <% if @tags.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+  </div>
 <% else %>
   <table class="admin-tags-table w-full border-collapse text-sm">
     <thead>

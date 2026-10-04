@@ -32,7 +32,14 @@ export default class extends Controller {
     try { field.setSelectionRange(start, end) } catch { /* not a text-like input */ }
   }
 
-  submit() {
+  // `event` is absent when `submitLater`'s timer calls this. A text field
+  // that is removed while focused (the frame render replacing this form)
+  // fires a last `change` from a detached element; that is the page
+  // reloading, not the visitor choosing something, and acting on it would
+  // submit a second time and wipe the focus just remembered.
+  submit(event) {
+    if (event?.target && !event.target.isConnected) return
+
     clearTimeout(this.timer)
     this.rememberFocus()
     this.element.requestSubmit()
@@ -48,8 +55,8 @@ export default class extends Controller {
   rememberFocus() {
     const field = document.activeElement
     const isText = field instanceof HTMLInputElement && typeof field.selectionStart === "number"
-    pendingFocus = this.element.contains(field) && field.id && isText
-      ? { id: field.id, start: field.selectionStart, end: field.selectionEnd }
-      : null
+    if (this.element.contains(field) && field.id && isText) {
+      pendingFocus = { id: field.id, start: field.selectionStart, end: field.selectionEnd }
+    }
   }
 }

@@ -106,7 +106,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "section#translations-pages", count: 0
     assert_select "section#translations-posts", count: 0
     assert_select "section#translations-media", count: 0
-    assert_select "p", text: /Everything is translated into Deutsch/
+    assert_select "h3", text: /Everything is translated into Deutsch/
   end
 
   test "filters by type" do

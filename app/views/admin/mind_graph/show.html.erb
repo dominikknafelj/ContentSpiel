@@ -13,7 +13,9 @@
 </div>
 
 <% if @graph[:nodes].empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Posts and the relations between them appear here.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "No posts yet", description: "Posts and the relations between them appear here.") %>
+  </div>
 <% else %>
   <div data-controller="admin--mind-graph" class="rounded-cs border border-line bg-surface">
     <script type="application/json" id="mind-graph-data" data-admin--mind-graph-target="data"><%= json_escape(@graph.to_json).html_safe %></script>

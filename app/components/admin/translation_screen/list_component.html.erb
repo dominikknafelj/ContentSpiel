@@ -1,5 +1,7 @@
 <% if items.empty? %>
-  <p class="rounded-cs border border-dashed border-line-strong px-6 py-10 text-center text-ink">Everything is translated into <%= language_name %>.</p>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "Everything is translated into #{language_name}.") %>
+  </div>
 <% else %>
   <div class="flex flex-col gap-6">
     <% groups.each do |type, label, group_items| %>

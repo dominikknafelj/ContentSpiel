@@ -28,7 +28,9 @@
 
 
 <% if @api_tokens.empty? %>
-  <%= render Admin::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>
+  <div class="rounded-cs border border-line bg-surface">
+    <%= render Admin::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>
+  </div>
 <% else %>
   <table class="admin-api-tokens-table w-full border-collapse text-sm">
     <thead>
