@@ -343,4 +343,155 @@ class Translations::TrackerTest < ActiveSupport::TestCase
       assert_equal :outdated, post.reload.translation_state("excerpt", "de")
     end
   end
+
+  # Design pass round 2, task 1: the stored source text and the "original
+  # changed" time.
+  test "saving a translation stores the original's digest, its text and the time" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us")
+      freeze_time do
+        assert Pages::Save.call(page, translations: { "de" => { title: "Über uns" } }).ok?
+        entry = page.reload.translation_sources.dig("title", "de")
+        assert_equal Translations.digest("About us"), entry["digest"]
+        assert_equal "About us", entry["text"]
+        assert_equal Time.current.iso8601, entry["saved_at"]
+      end
+      assert_equal :current, page.translation_state(:title, "de")
+    end
+  end
+
+  test "an old digest-only entry still reads as current, then outdated, and has no stored text" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      page.update_columns(translation_sources: { "title" => { "de" => Translations.digest("About us") } })
+      assert_equal :current, page.reload.translation_state(:title, "de")
+      assert_not page.translation_source(:title, "de").stored_text?
+
+      assert Pages::Save.call(page, translations: { "en" => { title: "About the studio" } }).ok?
+      assert_equal :outdated, page.reload.translation_state(:title, "de")
+    end
+  end
+
+  test "a record with both shapes side by side never raises" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "en" => { title: "About us", subtitle: "Who we are" }, "de" => { title: "Über uns", subtitle: "Wer wir sind" } })
+      sources = page.translation_sources
+      sources["title"]["de"] = sources["title"]["de"]["digest"] # downgrade one entry to the old shape
+      page.update_columns(translation_sources: sources)
+      page.reload
+      assert_nothing_raised { page.class.translation_tracked_fields(page).each { |f| page.translation_state(f, "de") } }
+      assert_equal :current, page.translation_state(:subtitle, "de")
+    end
+  end
+
+  test "changing the original records when, per field; changing a translation does not" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      assert_nil page.translation_original_changed_at_for(:title)
+      travel_to Time.zone.local(2026, 10, 4, 12, 0) do
+        assert Pages::Save.call(page, translations: { "en" => { title: "About the studio" } }).ok?
+      end
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), page.reload.translation_original_changed_at_for(:title)
+      assert_nil page.translation_original_changed_at_for(:subtitle)
+
+      travel_to Time.zone.local(2026, 10, 5, 12, 0) do
+        assert Pages::Save.call(page, translations: { "de" => { title: "Über das Studio" } }).ok?
+      end
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), page.reload.translation_original_changed_at_for(:title)
+    end
+  end
+
+  test "a whitespace-only change to the original is not a change" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      assert Pages::Save.call(page, translations: { "en" => { title: "About us  " } }).ok?
+      assert_nil page.reload.translation_original_changed_at_for(:title)
+      assert_equal :current, page.translation_state(:title, "de")
+    end
+  end
+
+  test "rich text stores one plain string per paragraph" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Notes")
+      save_post(post, "en", { body: paragraph("First paragraph.") })
+      doc = { "type" => "doc", "content" => [
+        { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "First paragraph." } ] },
+        { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "Second paragraph." } ] }
+      ] }
+      save_post(post, "en", { body: doc })
+      save_post(post, "de", { body: paragraph("Erster Absatz.") })
+      assert_equal [ "First paragraph.", "Second paragraph." ], post.reload.translation_source(:body, "de").text
+    end
+  end
+
+  test "confirming refreshes the stored text and time; the audit event's field changes stay free of bookkeeping" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      assert Pages::Save.call(page, translations: { "en" => { title: "About the studio" } }).ok?
+      as_owner { Translations::Confirm.call(page.reload, field: :title, locale: "de") }
+      assert_equal "About the studio", page.reload.translation_source(:title, "de").text
+      assert_equal :current, page.translation_state(:title, "de")
+      changed = Audit::Event.where(action: "page.updated").order(:id).last.field_changes.keys
+      assert_not_includes changed, "translation_sources"
+      assert_not_includes changed, "translation_original_changed_at"
+    end
+  end
+
+  test "an entry records the language its text was in; it stops being comparable when the default changes" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      source = page.reload.translation_source(:title, "de")
+      assert_equal "en", source.from
+      assert source.comparable?
+
+      with_locales(%w[en de], default: "de") do
+        assert_not page.translation_source(:title, "de").comparable?
+      end
+    end
+  end
+
+  test "an old digest-only entry is never comparable" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      page.update_columns(translation_sources: { "title" => { "de" => Translations.digest("About us") } })
+      assert_not page.reload.translation_source(:title, "de").comparable?
+    end
+  end
+
+  test "confirming writes the language too" do
+    with_locales(%w[en de], default: "en") do
+      page = create_page(title: "About us", translations: { "de" => { title: "Über uns" } })
+      assert Pages::Save.call(page, translations: { "en" => { title: "About the studio" } }).ok?
+      as_owner { Translations::Confirm.call(page.reload, field: :title, locale: "de") }
+      assert page.reload.translation_source(:title, "de").comparable?
+    end
+  end
+
+  test "the original-changed time is stamped for a rich-text body" do
+    with_locales(%w[en de], default: "en") do
+      post = create_post(title: "Notes")
+      # Blank -> filled counts as a change too (documented in the tracker).
+      save_post(post, "en", { body: paragraph("First.") })
+      travel_to(Time.zone.local(2026, 10, 4, 12, 0)) { save_post(post, "en", { body: paragraph("Second.") }) }
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), post.reload.translation_original_changed_at_for(:body)
+    end
+  end
+
+  test "the original-changed time is stamped for a translated schema field" do
+    saved = ContentTypes.all.dup
+    ContentTypes.register("test/interview") do |t|
+      t.label "Interview"
+      t.field :quote, :string, translated: true
+    end
+    with_locales(%w[en de], default: "en") do
+      post = Posts::Save.call(Post.new, attributes: { content_type: "test/interview", fields: { quote: "To be" } },
+        translations: { "en" => { title: "Quote" } }).record
+      assert_nil post.translation_original_changed_at_for(:quote)
+      travel_to(Time.zone.local(2026, 10, 4, 12, 0)) { save_post(post, "en", { fields: { quote: "Or not" } }) }
+      assert_equal Time.zone.local(2026, 10, 4, 12, 0), post.reload.translation_original_changed_at_for(:quote)
+    end
+  ensure
+    ContentTypes.reset!
+    saved.each { |definition| ContentTypes.registry_put(definition) }
+  end
 end

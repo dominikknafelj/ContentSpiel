@@ -34,6 +34,25 @@ module Admin
     # `sent` is the raw param (nil when the request didn't carry it);
     # `build` yields the stored asset and the field's errors and returns
     # the component to render.
+    # The error-slot map for `autosave_stream`, minus the media field's own
+    # slot unless this request acted on that field. Every autosave resends the
+    # whole form and `autosave_stream` replaces each listed slot with the
+    # record's current errors -- empty, for a successful save -- so a LATER
+    # save of some other field (a stray second autosave a second after the
+    # refusal, the next keystroke in the title) used to wipe a just-shown
+    # "Hero image doesn't exist" before the editor had read it. The refused
+    # choice's message must stay until the editor acts on that field, i.e.
+    # sends a different image id (or clears it) than the one stored.
+    #
+    # `sent` is the raw param (nil when the form did not carry the field),
+    # `stored_before` the record's id as loaded, before the service ran;
+    # `slot` the key of the media field in `fields`.
+    def without_untouched_media_slot(fields, slot, sent:, stored_before:)
+      return fields if !sent.nil? && sent.to_s != stored_before.to_s
+
+      fields.except(slot)
+    end
+
     def refused_media_field_stream(result, attribute:, error_attribute:, sent:)
       return if result.ok? || sent.nil?
 

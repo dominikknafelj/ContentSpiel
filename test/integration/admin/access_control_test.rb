@@ -165,6 +165,11 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   end
 
   test "the tree greys out context ancestors, unlinked and without actions, and hides the rest" do
+    with_locales(%w[en de], default: "en")
+    # The context-only Home has an outdated German field: its count must stay
+    # hidden (a number would hint at a page the viewer can't open).
+    assert Pages::Save.call(@root, translations: { "de" => { title: "Start" } }).ok?
+    assert Pages::Save.call(@root, translations: { "en" => { title: "Home!" } }).ok?
     grant_branch("pages.edit", "pages.create")
     sign_in_as(users(:editor_branch))
 
@@ -176,10 +181,24 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       assert_nil row.at_css("a"), "a context-only node has no link or actions"
       assert_nil row.at_css(".admin-tree-node__handle")
       assert_includes row.text, "Home"
+      assert_equal 1, Translations::StateIndex.counts_for([ @root.reload ]).values.first["de"][:outdated]
+      assert_select nodes.first, "> div span.text-meta[title='You can’t open this page']"
+      assert_nil row.at_css("[data-translation-marker]"), "a context-only row shows no counts"
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@branch.id}']:not([data-context-only]) a[href='/cs-studio/pages/#{@branch.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@inside.id}'] a[href='/cs-studio/pages/#{@inside.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@outside.id}']", count: 0
+  end
+
+  test "/pages for a viewer who reads only a deep branch is the empty state, not a 404 or a redirect" do
+    grant_branch("pages.edit")
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/pages"
+
+    assert_response :success
+    assert_select "h2, p, div", text: "Choose a page from the tree"
+    assert_select "turbo-frame#tree li[data-page-id='#{@inside.id}']"
   end
 
   test "rendering the tree as a branch editor costs the same queries however many pages it shows" do
@@ -187,12 +206,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:editor_branch))
     3.times { |index| create_page(title: "Small #{index}", parent: @inside) }
 
-    get "/cs-studio/pages" # warm up whatever a first request loads once
-    small = count_queries { get "/cs-studio/pages" }
+    get "/cs-studio/pages/#{@inside.id}" # warm up whatever a first request loads once
+    small = count_queries { get "/cs-studio/pages/#{@inside.id}" }
     assert_response :success
 
     12.times { |index| create_page(title: "Large #{index}", parent: @inside) }
-    large = count_queries { get "/cs-studio/pages" }
+    large = count_queries { get "/cs-studio/pages/#{@inside.id}" }
 
     assert_select "turbo-frame#tree li.admin-tree-node", count: 18
     assert_equal small, large, "the tree ran a query per page"
@@ -261,12 +280,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-field-name='related_post_ids']" do
-      assert_select "li[data-post-id='#{@other_post.id}']", count: 0
+      assert_select "li[data-chip-value='#{@other_post.id}']", count: 0
       assert_select "input[type=hidden][value='#{@other_post.id}']", count: 0
       assert_select "a[href='/cs-studio/posts/#{@other_post.id}']", count: 0
-      assert_select "p", text: "+1 related post you can't open"
+      assert_select "p", text: "+1 related post you can’t open (kept)"
     end
-    assert_no_match(/data-post-id="#{@other_post.id}"/, response.body)
+    assert_no_match(/data-chip-value="#{@other_post.id}"/, response.body)
     assert_not_includes response.body, "Other post"
     assert_not_includes response.body, "Pointing here" # "Also related from"
   end
@@ -395,8 +414,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{@outside.id}"
 
     assert_response :success
-    assert_select "button, input[type=submit]", text: /Publish now|Unpublish|Move to trash/, count: 0
-    assert_select "details.admin-record-header__schedule", count: 0
+    assert_select "button, input[type=submit]", text: /Publish|Unpublish|Move to trash/, count: 0
+    assert_select "dialog[id^=schedule-]", count: 0
     assert_select "#block-picker-end", count: 0
 
     sign_in_as(users(:two))
@@ -414,7 +433,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "form[data-controller~='admin--autosave']"
-    assert_select "button, input[type=submit]", text: /Publish now|Move to trash/, count: 0
+    assert_select "button, input[type=submit]", text: /Publish|Move to trash/, count: 0
   end
 
   test "new posts offer only the content types the author may create" do
@@ -424,8 +443,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/new"
 
     assert_response :success
-    assert_select "select[name='post[content_type]'] option:not([value=''])", count: 1
-    assert_select "select[name='post[content_type]'] option[value='blog']"
+    assert_select "input[type=radio][name='post[content_type]']", count: 1
+    assert_select "input[type=radio][name='post[content_type]'][value='blog']"
   end
 
   # --- View only ---------------------------------------------------------------
@@ -499,7 +518,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/posts/#{@other_post.id}"
     assert_select "[data-view-only]", text: "View only"
-    assert_select "button", text: "Publish now"
+    assert_select "button", text: "Publish"
     post "/cs-studio/posts/#{@other_post.id}/publish"
     assert_redirected_to "/cs-studio/posts/#{@other_post.id}"
     assert @other_post.reload.live?
@@ -509,7 +528,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_nil @other_post.reload.published_at
 
     get "/cs-studio/pages/#{@outside.id}"
-    assert_select "button", text: "Publish now"
+    assert_select "button", text: "Publish"
     post "/cs-studio/pages/#{@outside.id}/publish"
     assert @outside.reload.live?
     post "/cs-studio/pages/#{@outside.id}/unpublish"

@@ -2,49 +2,21 @@
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%# "Create starter pages" (design spec §6.1, Task 9) is offered -- in the
-    empty state and in the "More" menu -- only while the site is still empty:
-    Home and nothing else, counting kept pages (design pass bug 4: it used to
-    show whenever the starter sections were missing, i.e. on every site that
-    had built its own pages instead). `StarterContents::Add` still refuses on
-    its own when it isn't permitted or the content exists. Its form posts to `_top`:
-    the new pages land in the tree, outside the `content` frame, so the
-    redirect back here has to replace the whole shell to show them. %>
-<%# Both offers are shown only when the actor could act on them (access-
-    control design spec §5): starter pages when `StarterContents::Add` would
-    get past its own permission checks, "Add a page" when `pages.create`
-    allows a page under the homepage -- where `Admin::PagesController
+<%# Reached only by a viewer who can't open Home (`PagesController#index`
+    redirects everyone else to Home's editor), so the panel is a plain
+    prompt (handoff §10 C34). "Create starter pages" lives in the tree's
+    "⋯" menu (`Admin::TreeComponent`), which is where it is offered while
+    Home is the only kept page. "Add a page" is offered only where `pages
+    .create` allows a page under the homepage -- where `Admin::PagesController
     #create` puts a page with no parent named. %>
-<% offer_starter_pages = Page.kept.count == 1 && !StarterContent.added?(locale: Locales.default) && StarterContents::Add.new.permitted? %>
 <% offer_new_page = can?("pages.create", Page.new(parent: root_page)) %>
 
-<% if offer_starter_pages %>
-  <div class="mb-4 flex justify-end">
-    <details class="admin-pages-menu relative">
-      <summary class="cursor-pointer <%= setup_secondary_link_class %>">More</summary>
-      <div class="absolute right-0 z-10 mt-2 w-72 rounded-cs border border-line-strong bg-surface p-3 shadow-menu">
-        <p class="mb-2 text-sm text-meta">Adds a page listing each type of post, plus one sample post each, in the default language.</p>
-        <%= form_with url: admin_starter_contents_path(**admin_url_options), method: :post, data: { turbo_frame: "_top" } do %>
-          <%= render Admin::ButtonComponent.new(label: "Create starter pages", variant: :secondary, type: "submit") %>
-        <% end %>
-      </div>
-    </details>
-  </div>
-<% end %>
-
 <div class="rounded-cs border border-line bg-surface">
-<%= render Admin::EmptyStateComponent.new(title: "Pages", description: (offer_new_page ? "Choose a page in the tree, or add one." : "Choose a page in the tree.")) do |empty_state| %>
-  <% empty_state.with_action do %>
-    <div class="flex flex-wrap items-center justify-center gap-2">
-      <% if offer_new_page %>
-        <%= link_to "+ Add a page", new_admin_page_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
-      <% end %>
-      <% if offer_starter_pages %>
-        <%= form_with url: admin_starter_contents_path(**admin_url_options), method: :post, data: { turbo_frame: "_top" } do %>
-          <%= render Admin::ButtonComponent.new(label: "Create starter pages", variant: :secondary, type: "submit") %>
-        <% end %>
-      <% end %>
-    </div>
+<%= render Admin::EmptyStateComponent.new(title: "Choose a page from the tree", description: (offer_new_page ? "Or add a new one." : nil)) do |empty_state| %>
+  <% if offer_new_page %>
+    <% empty_state.with_action do %>
+      <%= link_to "+ New page", new_admin_page_path(**admin_url_options), data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: setup_primary_button_class %>
+    <% end %>
   <% end %>
 <% end %>
 </div>

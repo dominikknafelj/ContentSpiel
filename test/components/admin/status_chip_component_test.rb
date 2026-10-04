@@ -18,7 +18,7 @@ class Admin::StatusChipComponentTest < ViewComponent::TestCase
 
   test "a scheduled chip's tooltip is the scheduled time" do
     render_inline(Admin::StatusChipComponent.new(status: "scheduled", at: Time.zone.local(2026, 10, 5, 9, 30)))
-    assert_selector ".admin-status-chip[title='Oct 5, 2026 09:30']"
+    assert_selector ".admin-status-chip[title='5 Oct 2026, 09:30']"
   end
 
   test "an unknown status is a programming error" do

@@ -28,7 +28,17 @@ module Admin
     # error once the value that caused it is fixed, since each autosave
     # PATCH resends the whole form and this always reflects the record's
     # complete, current validity rather than only what changed.
-    def autosave_stream(record:, result:, status_id:, error_prefix:, base_updated_at:, fields: {})
+    #
+    # Which forms refuse a stale save and which do not. The page settings
+    # form, a block card and the post form refuse (`#refuse_stale_autosave`):
+    # they have the `#editor-notice` area for the explanation bar and a
+    # Reload. Settings, the media detail panel and the tag rows still save on
+    # a stale base and pass `base_updated_at:` here for the after-the-fact
+    # warning; those screens have no notice area, and Settings moves to an
+    # explicit save bar in a later round. That warning is its own state
+    # (`:saved_over`, "SAVED · ALSO CHANGED ELSEWHERE -- RELOAD ..."), so the
+    # refusal's "● CHANGED ELSEWHERE" always, everywhere, means "not saved".
+    def autosave_stream(record:, result:, status_id:, error_prefix:, base_updated_at: nil, fields: {})
       streams = [ turbo_stream.replace(status_id, save_status_component(record: record, result: result, status_id: status_id, base_updated_at: base_updated_at)) ]
 
       fields.each do |field, attributes|
@@ -76,6 +86,63 @@ module Admin
       turbo_stream.append("toasts", Admin::ToastComponent.new(message: message, kind: kind, action: action, id: id))
     end
 
+    # Optimistic locking for the three record editors (the page settings
+    # form, a block card, the post form). Each form carries the record's
+    # `updated_at` as it loaded it (`base_updated_at`, iso8601 with
+    # microseconds); a save sent with a base OLDER than the record as just
+    # loaded for this request is refused: 409, the service never called, the
+    # record untouched, and the answer is the "● CHANGED ELSEWHERE" status
+    # plus the explanation bar in `#editor-notice`
+    # (`Admin::EditorScreen::ChangedElsewhereComponent`).
+    #
+    # This used to be last-write-wins with a warning: the save went through
+    # and the status line merely said "Changed elsewhere -- reload". The
+    # handoff's rule (§10 B19) is different and only makes sense if the stale
+    # write did NOT happen: the editor's text stays on screen so they can
+    # copy it, and Reload discards it for the newer version. A warning after
+    # an overwrite would offer to throw away text that had already replaced
+    # the other editor's.
+    #
+    # What is NOT done, deliberately: the answer carries no
+    # `base_updated_at` replacement (the form keeps its old base, so every
+    # later save is refused too -- advancing it would turn the next keystroke
+    # into the very overwrite just refused), and no audit event (nothing was
+    # attempted through a service, and this is a lost race, not a permission
+    # denial -- `access.denied` is for the latter). A blank or unparseable
+    # base is not stale: non-JS and scripted clients (and MCP, which does not
+    # use this endpoint at all) never send one, and keep saving as before.
+    #
+    # Accepted race: the check and the save are not atomic (the record is
+    # loaded, compared, then written some milliseconds later, with no lock or
+    # `WHERE updated_at = base`). Two saves on the same base arriving within
+    # the same few milliseconds can both pass and the later one wins. The
+    # window is the length of one request, against the human-scale one this
+    # guards (another editor's save minutes ago); closing it would need
+    # row locking in every service for no case a person can produce.
+    #
+    # The refusal also removes a lingering failed-save error toast for the
+    # form (`toast-<error_prefix>`), as a successful save does: the failure
+    # it reports has been superseded by this answer.
+    #
+    # Returns true after rendering the refusal, so a caller is
+    # `return if refuse_stale_autosave(...)` before it calls its service.
+    # `record` must be the record as loaded for this request, before any write.
+    def refuse_stale_autosave(record, status_id:, error_prefix:, reload_url:)
+      return false unless stale_base?(record, params[:base_updated_at])
+
+      render turbo_stream: stale_streams(record, status_id: status_id, error_prefix: error_prefix, reload_url: reload_url, since: Time.iso8601(params[:base_updated_at])), status: :conflict
+      true
+    end
+
+    def stale_streams(record, status_id:, error_prefix:, reload_url:, since:)
+      live = live_record?(record)
+      [
+        turbo_stream.replace(status_id, Admin::SaveStatusComponent.new(id: status_id, state: :stale, live: live)),
+        turbo_stream.update("editor-notice", Admin::EditorScreen::ChangedElsewhereComponent.new(record: record, reload_url: reload_url, since: since)),
+        turbo_stream.remove("toast-#{error_prefix}")
+      ]
+    end
+
     # The HTTP status an autosave answers with: 200, 403 for a permission
     # refusal (access-control design spec §3.4 -- a forged or stale-tab
     # PATCH to a record the user may only read), 422 for anything else.
@@ -90,29 +157,52 @@ module Admin
 
     private
 
-    def save_status_component(record:, result:, status_id:, base_updated_at:)
-      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden) if result.denied?
-      return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size) unless result.ok?
-
-      return Admin::SaveStatusComponent.new(id: status_id, state: :stale) if stale_base?(record, base_updated_at)
-
-      Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at)
+    # Whether an edit to `record` goes straight to the site: a live page or
+    # post, and a content block whose owner page/post is live (a block is
+    # published with its owner, so its save line reads "SAVED TO SITE" like
+    # the page's own).
+    def live_record?(record)
+      record = record.owner if record.is_a?(ContentBlock)
+      record.respond_to?(:live?) && record.live?
     end
 
-    # "Previous" (spec §6.1: "each form carries the record's updated_at as
-    # loaded") means the value the row had *before this save*, which is
-    # exactly `updated_at_before_last_save` right after a successful
-    # `save` -- not `record.updated_at` itself, which by this point is the
-    # fresh timestamp this very save just wrote. Reading the wrong one
-    # would make almost every save look stale, since a base loaded even a
-    # moment ago is reliably "older than right now".
-    def stale_base?(record, base_updated_at)
+    # `live:` (a page or post that is live -- its edits go straight to the
+    # site) rides on every state, not just "saved": the status line is
+    # replaced wholesale, and `autosave_controller.js` reads `data-live`
+    # off whatever element is there when it writes its own "saving" line.
+    def save_status_component(record:, result:, status_id:, base_updated_at:)
+      live = live_record?(record)
+      return Admin::SaveStatusComponent.new(id: status_id, state: :forbidden, live: live) if result.denied?
+      return Admin::SaveStatusComponent.new(id: status_id, state: :error, count: result.errors.size, live: live) unless result.ok?
+
+      return Admin::SaveStatusComponent.new(id: status_id, state: :saved_over, live: live) if legacy_stale_after_save?(record, base_updated_at)
+
+      Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: record.updated_at, live: live)
+    end
+
+    # The after-the-fact check for the callers that still warn rather than
+    # refuse: compared against the value the row had *before this save*
+    # (`updated_at_before_last_save`), not `record.updated_at`, which this
+    # very save just rewrote and which would make almost every save look
+    # stale.
+    def legacy_stale_after_save?(record, base_updated_at)
       return false if base_updated_at.blank?
 
       previous = record.updated_at_before_last_save
       return false if previous.nil?
 
       Time.iso8601(base_updated_at) < previous
+    rescue ArgumentError
+      false
+    end
+
+    # The record's `updated_at` as loaded for this request is newer than the
+    # base the form sent: someone saved it since the form loaded. Blank or
+    # unparseable base: not stale (see `#refuse_stale_autosave`).
+    def stale_base?(record, base_updated_at)
+      return false if base_updated_at.blank?
+
+      Time.iso8601(base_updated_at) < record.updated_at
     rescue ArgumentError
       false
     end

@@ -1,7 +1,7 @@
 require "test_helper"
 
 # Final fix wave I3: editing a block is editing its owner, so every block
-# write bumps the owner's `updated_at` (the dashboard's "Recently updated"
+# write bumps the owner's `updated_at` (the dashboard's "edited 2h ago" line
 # orders by it) -- through `touch`, which runs no save callbacks, so the
 # page's own path/hierarchy rebuild (`Page#sync_public_paths`, closure_tree's
 # `after_save`) never runs for a block edit.

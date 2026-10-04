@@ -1,15 +1,19 @@
 <div id="<%= DOM_ID %>">
 <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
   <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
-  <%# Translate empty fields / Use all -- see `Admin::RecordHeaderComponent`.
+  <%# Suggest translations for N empty fields / Use all -- see `Admin::EditorScreen::HeaderComponent`.
       Anyone on this screen holds `settings.manage`, the settings' edit
       right. %>
-  <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: true) %>
+  <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: locale, editable: true) %>
   <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
 </div>
 
-<div class="admin-settings-form rounded-cs border border-line bg-surface p-4">
-  <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4",
+<%# The `settings-section-*` ids are what the ⌘K palette's "Settings › X"
+    rows link to (`Jump::Search::SETTINGS_DESTINATIONS`). This screen is
+    rebuilt with real sections in round 3; until then each id sits on the
+    first element of what it names. %>
+<div id="settings-section-site" class="admin-settings-form rounded-cs border border-line bg-surface p-4">
+  <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col gap-4",
         data: {
           controller: "admin--autosave",
           action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
@@ -52,7 +56,7 @@
       <div id="<%= errors_id("time_zone") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 
-    <div class="admin-column mb-4" data-field-name="trash_retention_days">
+    <div id="settings-section-publishing" class="admin-column mb-4" data-field-name="trash_retention_days">
       <%= label_tag field_id("trash_retention_days"), "Empty trash automatically after", class: setup_label_class %>
       <div class="flex items-center gap-2">
         <%= number_field_tag field_html_name("trash_retention_days"), site_setting.trash_retention_days,
@@ -85,7 +89,7 @@
     <%# AI translation (translation helpers spec §6.2): provider and model
         autosave with everything else, one value for the whole site. The
         key is deliberately *not* in this form -- see below. %>
-    <section class="border-t border-line pt-4" aria-labelledby="<%= field_id("ai-heading") %>">
+    <section id="settings-section-ai" class="border-t border-line pt-4" aria-labelledby="<%= field_id("ai-heading") %>">
       <h2 id="<%= field_id("ai-heading") %>" class="mb-1 text-h2 text-ink">AI translation</h2>
       <p class="mb-4 text-sm text-meta">Lets editors ask for a suggested translation of a field. Nothing is saved until they use it.</p>
 

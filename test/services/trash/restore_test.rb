@@ -155,6 +155,11 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     parent = create_page(title: "Section")
     child = create_page(title: "Child", parent: parent)
     Trash::Move.call(child)                  # child is its own root
+    # A second NULL-parent row is exactly what `index_pages_on_single_root`
+    # forbids (and what the foreign key keeps a real purge from producing), so
+    # the index is dropped for this simulation; the test's transaction takes
+    # the DDL back with it.
+    ActiveRecord::Base.connection.remove_index :pages, name: "index_pages_on_single_root"
     child.update_columns(parent_id: nil)     # simulate: parent row gone (purge of parent tested in Task 7)
     refused = Trash::Restore.call(child.reload)
     assert_not refused.ok?

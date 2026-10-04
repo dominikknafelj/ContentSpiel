@@ -5,7 +5,9 @@ require "test_helper"
 # or to record an event is a hole in both the permissions and the audit
 # log. This walks every subclass and reads its `#call` source: each must
 # call `authorize!(` and `record_event(`, or say why not with an explicit
-# `# audit: none (reason)` comment. That list is empty today -- keep it so.
+# `# audit: none (reason)` comment. Each exemption names its reason (`Posts::Bulk` and `Posts::BulkRestore`
+# write nothing themselves: the single-record services they run do);
+# keep the list to such orchestrators.
 #
 # A source check, not a behavioural one (the matrix test and each
 # service's own tests cover behaviour): it catches the new service that

@@ -7,8 +7,6 @@ require "test_helper"
 class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
   include TestTypes
 
-  NOTE = "Original changed since this was translated".freeze
-
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de es], default: "en")
@@ -24,7 +22,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     record.reload
   end
 
-  def note_id(type, record, field) = "translation-note-#{type}-#{record.id}-#{field}"
+  def note_id(type, record, field) = "reference-card-#{type}-#{record.id}-#{field}"
 
   def confirm_params(record, field, locale = "de")
     { record_type: record.class.name, record_id: record.id, field: field, locale: locale }
@@ -36,12 +34,15 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "##{note_id("post", record, "title")}", text: /#{NOTE}/
+    assert_select "##{note_id("post", record, "title")}[data-translation-state='outdated']"
+    # The title was translated after sources kept their text, so the card diffs.
+    assert_select "##{note_id("post", record, "title")} ins", text: "Added: Hello!"
+    assert_select "##{note_id("post", record, "title")} del", text: "Removed: Hello"
     # The button belongs to the layout's one confirm form (outside every
     # autosave form -- forms can't nest), and names its record in the
     # `formaction`.
     assert_select "form#translation-confirm-form[action='/cs-studio/translations/confirm'][method='post']"
-    assert_select "##{note_id("post", record, "title")} button[form='translation-confirm-form']", text: "Mark as up to date" do |buttons|
+    assert_select "##{note_id("post", record, "title")} button[form='translation-confirm-form']", text: "Still correct — mark up to date" do |buttons|
       action = buttons.first["formaction"]
       assert_equal "/cs-studio/translations/confirm", URI(action).path
       assert_equal confirm_params(record, "title").transform_keys(&:to_s).transform_values(&:to_s), Rack::Utils.parse_query(URI(action).query)
@@ -58,7 +59,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/posts/#{record.id}"
 
     assert_response :success
-    assert_not_includes response.body, NOTE
+    assert_select "[data-translation-state='outdated']", count: 0
   end
 
   test "posting the confirm form clears the note and the marker" do
@@ -70,7 +71,8 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     assert_redirected_to "http://www.example.com/cs-studio/posts/#{record.id}?locale=de"
     assert_equal :current, record.reload.translation_state("title", "de")
     follow_redirect!
-    assert_select "##{note_id("post", record, "title")}", count: 0
+    assert_select "##{note_id("post", record, "title")}[data-translation-state='current']"
+    assert_select "##{note_id("post", record, "title")} del", count: 0
     assert_select "#language-switcher-outdated-de", count: 0
     assert_includes response.body, "Marked as up to date"
   end
@@ -85,12 +87,63 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     post "/cs-studio/translations/confirm", params: confirm_params(record, "title"), as: :turbo_stream
 
     assert_response :success
-    assert_includes response.body, %(<turbo-stream action="remove" target="#{note_id("post", record, "title")}">)
+    assert_includes response.body, %(<turbo-stream action="replace" target="#{note_id("post", record, "title")}">)
+    assert_includes response.body, %(data-translation-state="current")
+    assert_not_includes response.body, "<del"
     assert_not_includes response.body, "language-switcher-outdated-de"
 
     post "/cs-studio/translations/confirm", params: confirm_params(record, "excerpt"), as: :turbo_stream
 
     assert_includes response.body, %(<turbo-stream action="remove" target="language-switcher-outdated-de">)
+  end
+
+  test "confirming a schema group field replaces its card (never removes it) and the card still shows the original" do
+    FieldGroups.register("test/link") { |c| c.field :label, :string; c.field :url, :string }
+    BlockTypes.register("test/cta") do |t|
+      t.label "Call to action"
+      t.field :link, :group, of: "test/link", translated: true
+      t.component TestQuoteComponent
+    end
+    page = create_page(title: "Links")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test/cta" },
+      translations: { "en" => { settings: { "link" => { "label" => "Read more", "url" => "/en" } } },
+                      "de" => { settings: { "link" => { "label" => "Mehr lesen", "url" => "/de" } } } }).record
+    assert ContentBlocks::Save.call(block, translations: { "en" => { settings: { "link" => { "label" => "Read on", "url" => "/en" } } } }).ok?
+    assert_equal :outdated, block.reload.translation_state("link", "de")
+
+    post "/cs-studio/translations/confirm", params: confirm_params(block, "link"), as: :turbo_stream
+
+    assert_response :success
+    target = note_id("content-block", block, "link")
+    assert_includes response.body, %(<turbo-stream action="replace" target="#{target}">)
+    assert_not_includes response.body, %(<turbo-stream action="remove" target="#{target}">)
+    assert_includes response.body, "Read on"
+    assert_includes response.body, %(data-translation-state="current")
+  ensure
+    Rails.application.reloader.prepare!
+  end
+
+  test "confirming one block's field replaces that block's own card among several blocks" do
+    with_test_types do
+      page = create_page(title: "About")
+      blocks = [ "To be", "Or not" ].map do |text|
+        block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "test/quote" },
+          translations: { "en" => { settings: { "text" => text } }, "de" => { settings: { "text" => "#{text} (de)" } } }).record
+        assert ContentBlocks::Save.call(block, translations: { "en" => { settings: { "text" => "#{text}!" } } }).ok?
+        block
+      end
+      get "/cs-studio/pages/#{page.id}", params: { locale: "de" }
+      ids = blocks.map { |block| note_id("content-block", block, "text") }
+      assert_equal 2, ids.uniq.size
+      ids.each { |id| assert_select "##{id}", count: 1 }
+
+      post "/cs-studio/translations/confirm", params: confirm_params(blocks.first, "text"), as: :turbo_stream
+
+      assert_response :success
+      assert_includes response.body, %(<turbo-stream action="replace" target="#{ids.first}">)
+      assert_not_includes response.body, ids.last
+      assert_includes response.body, "To be!"
+    end
   end
 
   test "the page form, its block cards and the media detail show the note too" do
@@ -104,8 +157,8 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
       get "/cs-studio/pages/#{page.id}", params: { locale: "de" }
 
       assert_response :success
-      assert_select "##{note_id("page", page, "title")} button", text: "Mark as up to date"
-      assert_select "##{note_id("content-block", block, "text")} button", text: "Mark as up to date"
+      assert_select "##{note_id("page", page, "title")} button", text: "Still correct — mark up to date"
+      assert_select "##{note_id("content-block", block, "text")} button", text: "Still correct — mark up to date"
       assert_select "#language-switcher-outdated-de"
     end
 
@@ -116,8 +169,8 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media/#{asset.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_select "[data-original-for='alt']", text: "Sand dunes"
-    assert_select "##{note_id("media-asset", asset, "alt")} button", text: "Mark as up to date"
+    assert_select "[data-original-for='alt'] p", text: /Sand.*dunes/
+    assert_select "##{note_id("media-asset", asset, "alt")} button", text: "Still correct — mark up to date"
     assert_select "#language-switcher-outdated-de"
     # Ruling: alt present in English, blank in Spanish -- missing there.
     assert_select "nav[aria-label='Languages'] [title='Missing required fields']", count: 1
@@ -138,15 +191,15 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "a view-only reader sees the note but no button" do
+  test "a view-only reader sees the diff but no button" do
     record = outdated_post
     sign_in_as(users(:reader))
 
     get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
 
     assert_response :success
-    assert_includes response.body, NOTE
-    assert_select "button", text: "Mark as up to date", count: 0
+    assert_select "##{note_id("post", record, "title")} ins", text: "Added: Hello!"
+    assert_select "button", text: "Still correct — mark up to date", count: 0
   end
 
   test "a record outside the read scope is a 404, and so is a trashed one or an unknown type" do

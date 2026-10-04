@@ -48,6 +48,11 @@ module Locales
         root = Page.find_by(parent_id: nil)
         PublicSite::Paths.sync_subtree(root) if root
         PublicSite::Paths.sync_posts(nil)
+        # Which languages are targets changed, so every stored translation
+        # state (`translation_states`) is recomputed. Synchronous and
+        # proportional to the site's size; fine while sites are small, and
+        # the natural thing to move into a job later.
+        Translations::StateIndex.rebuild_all
 
         record_event("language.enabled", subject: site, field_changes: changes, metadata: { "code" => @code })
       end

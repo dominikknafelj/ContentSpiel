@@ -51,6 +51,32 @@ module Translations
       end
     end
 
+    # `.for`'s roll-up plus how many fields stand behind it, for the stored
+    # state (`Translations::StateIndex`) and the lists that say "2 fields to
+    # review": `{ record => { locale => { state:, missing:, outdated: } } }`.
+    # `missing` counts the required fields that are blank in that language
+    # (exactly the rule that makes the state `:missing` -- a title, a
+    # required schema field, an image's alt -- blocks included; an optional
+    # field left blank is a choice and counts nowhere), `outdated` every
+    # tracked field, blocks included, reading `:outdated`. `state` is
+    # derived from the two counts with `.for`'s precedence, so the two
+    # cannot disagree (`test/services/translation_state_parity_test.rb`).
+    def counts(records, locales: Translations.target_locales)
+      records = Array(records)
+      locales = locales.map(&:to_s)
+      blocks = blocks_by_owner(records)
+
+      records.index_with do |record|
+        owned = blocks.fetch([ record.class.polymorphic_name, record.id ], [])
+        locales.index_with do |code|
+          missing = missing_count(record, owned, code)
+          outdated = ([ record ] + owned).sum { |item| outdated_count(item, code) }
+          state = missing.positive? ? :missing : (outdated.positive? ? :outdated : :complete)
+          { state:, missing:, outdated: }
+        end
+      end
+    end
+
     # What `Admin::LanguageTabsComponent` marks, for one record (and,
     # for a page or post, its blocks), with one blocks query:
     # `{ missing: [codes], outdated: [codes] }`. Unlike the single record
@@ -101,28 +127,30 @@ module Translations
       Translations.target_locales.select { |code| items.any? { |item| outdated?(item, code) } }
     end
 
-    def missing?(record, blocks, code)
+    def missing?(record, blocks, code) = missing_count(record, blocks, code).positive?
+
+    def outdated?(record, code) = outdated_count(record, code).positive?
+
+    # How many required fields are blank in `code`: the one rule behind both
+    # `:missing` and the stored `missing_count`.
+    def missing_count(record, blocks, code)
       case record
-      when Page then page_missing?(record, blocks, code)
-      when Post then post_missing?(record, blocks, code)
-      when Media::Asset then image_missing?(record, code)
-      when SiteSetting then title_blank?(record, code)
-      else false
+      when Page then title_blank_count(record, code) + block_missing_count(blocks, code)
+      when Post
+        title_blank_count(record, code) + required_blank_count(record.definition, record.fields(locale: code)) +
+          block_missing_count(blocks, code)
+      when Media::Asset then image_missing?(record, code) ? 1 : 0
+      when SiteSetting then title_blank_count(record, code)
+      else 0
       end
     end
 
-    def outdated?(record, code)
-      record.class.translation_tracked_fields(record).any? { |field| record.translation_state(field, code) == :outdated }
+    def block_missing_count(blocks, code)
+      blocks.sum { |block| required_blank_count(block.definition, block.settings_object(locale: code)) }
     end
 
-    def page_missing?(page, blocks, code)
-      title_blank?(page, code) ||
-        blocks.any? { |block| required_fields_blank?(block.definition, block.settings_object(locale: code)) }
-    end
-
-    def post_missing?(post, blocks, code)
-      title_blank?(post, code) || required_fields_blank?(post.definition, post.fields(locale: code)) ||
-        blocks.any? { |block| required_fields_blank?(block.definition, block.settings_object(locale: code)) }
+    def outdated_count(record, code)
+      record.class.translation_tracked_fields(record).count { |field| record.translation_state(field, code) == :outdated }
     end
 
     def image_missing?(asset, code)
@@ -130,7 +158,7 @@ module Translations
       alt[Translations.primary_locale].present? && alt[code.to_s].blank?
     end
 
-    def title_blank?(record, code) = record.read_attribute(:title).to_h[code.to_s].blank?
+    def title_blank_count(record, code) = record.read_attribute(:title).to_h[code.to_s].blank? ? 1 : 0
 
     # `definition`/`object` are handed in already resolved (a block's own
     # `.definition`, `settings_object(locale:)`/`fields(locale:)`) rather than
@@ -139,13 +167,13 @@ module Translations
     # unregistered `block_type`/`content_type`, spec §8), which has nothing
     # here to call "missing": there's no schema left to name a required
     # translated field against.
-    def required_fields_blank?(definition, object)
-      return false if definition.nil? || object.nil?
+    def required_blank_count(definition, object)
+      return 0 if definition.nil? || object.nil?
 
-      definition.fields.any? { |field| field.required? && field.translated? && object.public_send(field.name).blank? }
+      definition.fields.count { |field| field.required? && field.translated? && object.public_send(field.name).blank? }
     end
 
     private_class_method :record_state, :blocks_by_owner, :owned_blocks, :missing_codes, :outdated_codes, :missing?, :outdated?,
-      :page_missing?, :post_missing?, :image_missing?, :title_blank?, :required_fields_blank?
+      :missing_count, :block_missing_count, :outdated_count, :image_missing?, :title_blank_count, :required_blank_count
   end
 end

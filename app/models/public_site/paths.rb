@@ -146,7 +146,14 @@ module PublicSite
     # Every post_list block is checked, not just the ones on already-synced
     # pages: this is also what a block's own save/destroy calls (via
     # `sync_posts`), where nothing about the page tree changed at all.
-    def canonical_page(post)
+    def canonical_page(post) = canonical_pages([ post ]).fetch(post)
+
+    # `canonical_page` for several posts in ONE pass: `{ post => page or nil }`.
+    # The listing blocks, their owners and every candidate's ancestry are loaded
+    # once (a constant number of queries however many posts, blocks or pages
+    # there are), then each post is ranked among the blocks that list it. The
+    # New post dialog asks for every creatable type's listing page at once.
+    def canonical_pages(posts)
       # `ContentBlock.listing` is every block whose type has the
       # `lists_posts` capability -- only a `Page` owner is a candidate at
       # all (open-types spec §4.1 lets other records own blocks too, but
@@ -154,22 +161,35 @@ module PublicSite
       # A block on a trashed page isn't a candidate either (trash spec §5.2):
       # its posts move to the next-best listing, or lose their URL, and
       # come back here when the page is restored.
-      blocks = ContentBlock.listing.includes(:owner).select do |block|
-        block.owner.is_a?(Page) && !block.owner.trashed? && block.lists?(post)
-      end
-      chains = blocks.map(&:owner).uniq.index_with { |page| page.self_and_ancestors.to_a.reverse }
+      candidates = ContentBlock.listing.includes(:owner).select { |block| block.owner.is_a?(Page) && !block.owner.trashed? }
+      chains = ancestry_chains(candidates.map(&:owner).uniq)
 
-      best = blocks.min_by do |block|
-        chain = chains[block.owner]
-        settings = block.settings_object
-        [
-          chain.all?(&:live?) ? 0 : 1,
-          settings.content_type.present? ? 0 : 1,
-          settings.tag.to_s.strip.present? ? 0 : 1,
-          chain.map { |page| page.position.to_i }
-        ]
+      posts.index_with do |post|
+        best = candidates.select { |block| block.lists?(post) }.min_by do |block|
+          chain = chains.fetch(block.owner.id, [])
+          settings = block.settings_object
+          [
+            chain.all?(&:live?) ? 0 : 1,
+            settings.content_type.present? ? 0 : 1,
+            settings.tag.to_s.strip.present? ? 0 : 1,
+            chain.map { |page| page.position.to_i }
+          ]
+        end
+        best&.owner
       end
-      best&.owner
+    end
+
+    # `{ page id => [root, ..., page] }` for every page given -- what
+    # `page.self_and_ancestors.to_a.reverse` is, for all of them from two
+    # queries (the closure rows, then the pages on them).
+    def ancestry_chains(pages)
+      return {} if pages.empty?
+
+      rows = Page.hierarchy_class.where(descendant_id: pages.map(&:id)).pluck(:descendant_id, :ancestor_id, :generations)
+      by_id = Page.where(id: rows.map { |_, ancestor_id, _| ancestor_id }.uniq).index_by(&:id)
+      rows.group_by(&:first).transform_values do |list|
+        list.sort_by { |_, _, generations| -generations }.filter_map { |_, ancestor_id, _| by_id[ancestor_id] }
+      end
     end
 
     # A post's path is its canonical listing page's current path, then `/`,

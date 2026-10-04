@@ -70,16 +70,52 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  test "translation chips and language tabs never use the danger colour" do
-    %w[app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb].each do |path|
+  # Every place a translation STATE is drawn: red is for destruction and
+  # failure, never for "missing" or "outdated" (final review C, M13).
+  test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
+    %w[
+      app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb
+      app/components/admin/tree_node_component.html.erb app/components/admin/tree_node_component.rb
+      app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
+      app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
+      app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb
+    ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
   end
 
+  # One placeholder for a record with no title, everywhere: "(untitled)".
+  test "a blank title reads (untitled), never Untitled" do
+    offenders = Dir[Rails.root.join("app/**/*.{rb,erb,js}")].select { |f| File.read(f).match?(/["']Untitled["']/) }
+    assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
+  end
+
   test "the replaced components are gone" do
-    %w[status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb].each do |file|
+    %w[
+      status_badge_component.rb language_switcher_component.rb flash_component.rb translation_screen/state_badge_component.rb
+      record_header_component.rb tag_input_component.rb translation_screen/list_component.rb
+      translation_screen/outdated_note_component.rb dashboard_screen/column_component.rb
+    ].each do |file|
       assert_not Rails.root.join("app/components/admin", file).exist?, file
     end
     assert_not Rails.root.join("app/views/shared/_theme_toggle.html.erb").exist?
+    # The translation states live in `translation_states` (`Translations::StateIndex`) now.
+    assert_not Rails.root.join("app/models/translations/cached_status.rb").exist?
+  end
+
+  test "the outlined danger button variant is gone" do
+    offenders = Dir[Rails.root.join("app/**/*")].select { |f| File.file?(f) && File.read(f).include?("danger_outline") }
+    assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
+  end
+
+  # Inside the shell a form starts at the left edge of the content area, next
+  # to the sidebar and under the page heading; only a screen that IS the form
+  # (sign-in, setup, a dialog) is centred. The 403 and 404 messages are the
+  # two centred things inside the shell, and they are messages, not forms.
+  test "nothing inside CS Studio is centred except the 403 and 404 messages" do
+    centred = Dir[Rails.root.join("app/views/admin/**/*.erb"), Rails.root.join("app/components/admin/**/*.erb")]
+      .select { |f| File.read(f).match?(/\bmx-auto\b/) }
+      .map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
+    assert_equal %w[app/views/admin/errors/forbidden.html.erb app/views/admin/errors/not_found.html.erb], centred.sort
   end
 end

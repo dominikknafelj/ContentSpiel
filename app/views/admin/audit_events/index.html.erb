@@ -63,7 +63,7 @@
       <%= render Admin::EmptyStateComponent.new(title: "No events", description: "Nothing has been recorded yet.") %>
     <% end %>
   <% else %>
-  <table class="admin-audit-events-table w-full border-collapse text-sm">
+  <table class="admin-audit-events-table admin-card-table w-full border-collapse text-sm">
     <thead>
       <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
         <th class="py-2 pr-4">Time</th>

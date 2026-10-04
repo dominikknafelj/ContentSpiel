@@ -30,8 +30,8 @@ module Admin
       #
       # `translation_state:` is this field's `Translations::Tracker
       # #translation_state` in the locale being edited, and
-      # `translation_confirm:` what its "Mark as up to date" button posts
-      # (nil for a viewer who can't) -- see `#outdated_note`. Both are the
+      # `translation_confirm:` what its "Still correct — mark up to date" button posts
+      # (nil for a viewer who can't) -- see `#reference_card`. Both are the
       # caller's to work out: only it knows the record behind the value.
       #
       # `**html` is the same "anything else passes through" escape hatch
@@ -40,7 +40,7 @@ module Admin
       # slug-preview controller, Task 4) without this component knowing
       # anything about that controller.
       def initialize(name:, value:, original: nil, errors: [], locale: nil, id: nil, html_name: nil,
-        translation_state: nil, translation_confirm: nil, **html)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, **html)
         @name = name
         @value = value
         @original = original
@@ -50,22 +50,25 @@ module Admin
         @html_name = html_name || name
         @html = html
         @translation_state = translation_state
+        @translation_record = translation_record
         @translation_confirm = translation_confirm
       end
 
       def show_original? = original.present?
 
-      def default_locale_name = Locales.name(Locales.default, native: true)
-
       def errors_id = "#{id}-errors"
 
-      # The "Original changed" note (translation helpers spec §4), shown in
-      # the original's box only for an `:outdated` field -- `:unknown` (a
-      # translation older than tracking) and `:current` show nothing.
-      def outdated_note
-        return unless translation_state == :outdated
-
-        Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+      # The card showing the primary-language original beside (or, in a
+      # narrow column, above) the field (`Admin::EditorScreen
+      # ::ReferenceCardComponent`). An `:outdated` card carries the "Original
+      # changed" note (translation helpers spec §4) and its "Mark as up to
+      # date" button; `:unknown` (a translation older than tracking) and
+      # `:current` show nothing extra.
+      def reference_card
+        Admin::EditorScreen::ReferenceCardComponent.new(
+          field: name, locale: locale, original: card_original, kind: card_kind,
+          state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
+        )
       end
 
       # The AI **Translate** button in the original's box (translation
@@ -74,13 +77,35 @@ module Admin
       # set up and `ai.translate`; see `Admin::TranslationScreen
       # ::TranslateButtonComponent`. Nil when there's no confirm at all (the
       # primary language, an untracked column, a view-only viewer).
+      #
+      # Only on an **empty** field (design pass round 2, handoff §4.1): a field
+      # that already has a translation is not asked to be translated again --
+      # when its original moved on, the outdated card's **Suggest update**
+      # (`suggest_update_button`) is the way in.
       def translate_button
-        return unless translation_confirm
+        return unless translation_confirm && translation_field_empty?
 
         Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
       end
 
+      # **Suggest update** in an outdated card (same wrapper as Translate,
+      # `mode: :update`); the card draws it only when it is outdated, and the
+      # button itself only with AI set up and `ai.translate`.
+      def suggest_update_button
+        return unless translation_state == :outdated && translation_confirm
+
+        Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
+      end
+
+      # What the field holds as it was rendered; the rich-text column reads its
+      # document instead.
+      def translation_field_empty? = value.blank?
+
       private
+
+      def card_original = original
+
+      def card_kind = :plain
 
       # The input's own invalid state (design pass spec §4). The danger BORDER
       # is not a server-rendered class: an autosave Turbo Stream replaces the
@@ -98,7 +123,7 @@ module Admin
       # its own input, measured as the text it is.
       def translate_target = { input_id: id, kind: :plain, characters: original.to_s.length }
 
-      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm
+      attr_reader :name, :value, :original, :errors, :locale, :id, :html_name, :html, :translation_state, :translation_confirm, :translation_record
     end
   end
 end

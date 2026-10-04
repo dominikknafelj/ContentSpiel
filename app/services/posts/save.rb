@@ -69,11 +69,14 @@ module Posts
         refused = refusal_after_assign
         raise ActiveRecord::Rollback if refused
 
-        (@post.save && assign_related_posts) || raise(ActiveRecord::Rollback)
+        (@post.save && tags_valid? && assign_related_posts) || raise(ActiveRecord::Rollback)
+        touch_for_join_rows(related_before)
         # The body's `image` nodes, every locale (media library design spec
         # §5.1) -- recomputed from the saved post, so an image removed from
         # one locale's body loses exactly that locale's row.
         Media::UsageIndex.refresh(@post)
+        # The post's stored translation state (`translation_states`).
+        Translations::StateIndex.refresh(@post)
         record_events(related_before)
         true
       end
@@ -90,6 +93,22 @@ module Posts
     end
 
     private
+
+    # Tags and related posts are join rows: changing only those saves no
+    # column of the post, so its `updated_at` would not move -- and
+    # `updated_at` is the base every editor's autosave form carries (a stale
+    # base is refused, `Admin::AutosaveResponses#refuse_stale_autosave`).
+    # Left alone, another editor's tag-only change would not make a stale
+    # form's next save a 409: it would silently revert the tags. Touched here,
+    # inside the same transaction, only when a join set really changed (a
+    # no-op resend of the same tags moves nothing) and only if the save did
+    # not already move it.
+    def touch_for_join_rows(related_before)
+      return if @post.saved_change_to_updated_at?
+      return if related_state == related_before
+
+      @post.touch
+    end
 
     # Publishing, unpublishing and scheduling need `posts.publish` (design
     # spec §3.3), not `posts.edit` as well (final fix wave, Important 1):
@@ -323,10 +342,49 @@ module Posts
     # `ActiveRecord::Rollback` undoes it along with everything else --
     # confirmed by the "invalid input... nothing saved" test, which would
     # otherwise leave an orphaned Tag/PostTag behind.
+    #
+    # An existing tag is matched on the exact submitted name first (stripped,
+    # case-insensitively), then on the squished one, and reused as it is,
+    # whatever its length or inner spacing: a post that already carries a
+    # legacy over-long tag must keep saving (the editor resubmits every chip,
+    # and MCP resends what it read). Only a name that would be CREATED is
+    # normalised the way the chip input shows it -- inner runs of whitespace
+    # collapse, case folds (a tag is stored lower-case) -- and only that name
+    # can be refused (too long): `tags_valid?` reports it after the save, as a
+    # failure on `tag_names`, which rolls the whole save back like a refused
+    # related post does. Two names for one tag are one tag.
     def assign_tags
-      @post.tags = Array(@attributes[:tag_names]).map(&:to_s).map(&:strip).compact_blank.uniq(&:downcase).map do |name|
-        Tag.where("LOWER(name) = ?", name.downcase).first || Tag.new(name: name.downcase)
+      @refused_tag_names = []
+      tags = Array(@attributes[:tag_names]).map { |name| name.to_s.strip }.compact_blank.filter_map do |name|
+        find_tag(name) || build_tag(name)
       end
+      tags = tags.uniq { |tag| tag.persisted? ? [ :id, tag.id ] : [ :name, tag.name ] }
+      return if @refused_tag_names.any?
+
+      @post.tags = tags
+    end
+
+    def find_tag(name)
+      Tag.where("LOWER(name) = ?", name.downcase).first || Tag.where("LOWER(name) = ?", name.squish.downcase).first
+    end
+
+    def build_tag(name)
+      squished = name.squish
+      if squished.length > Tag::MAX_NAME_LENGTH
+        @refused_tag_names << squished
+        return nil
+      end
+      Tag.new(name: squished.downcase)
+    end
+
+    # Runs after `@post.save` (which clears errors added before it): names
+    # `assign_tags` refused, each in words so the field's error slot says
+    # which one.
+    def tags_valid?
+      Array(@refused_tag_names).each do |name|
+        @post.errors.add(:tag_names, "include “#{name.truncate(24)}”, which is longer than #{Tag::MAX_NAME_LENGTH} characters")
+      end
+      Array(@refused_tag_names).empty?
     end
   end
 end

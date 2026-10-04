@@ -194,10 +194,113 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /No results for/
   end
 
+  test "the dashboard's drafts, going-live, needs-translation and activity lists show kept records and never trashed ones" do
+    with_locales(%w[en de], default: "en")
+    # Drafts are "mine" by their newest audit event, so create them as the viewer.
+    kept_draft, gone_draft = as(users(:one)) { [ create_post(title: "Kept draft", published: false), create_post(title: "Gone draft", published: false) ] }
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(published_at: 3.days.from_now) }
+    gone_draft.update!(trashed_at: Time.current)
+    # The trashed post is the NEWEST outdated item, so a leak would show it.
+    Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de")
+      .update_all(state: "outdated", outdated_count: 1, missing_count: 0)
+    @gone_post.update_columns(updated_at: 1.minute.from_now)
+    [ @kept_asset, @gone_asset ].each { |asset| as(users(:one)) { Audit.record("media.uploaded", subject: asset) } }
+    sign_in_as users(:one)
+
+    get admin_root_path
+    assert_response :ok
+
+    assert_select "section[aria-labelledby=dashboard-drafts] a[href=?]", "/cs-studio/posts/#{kept_draft.id}"
+    assert_select "section[aria-labelledby=dashboard-drafts] a", text: "Gone draft", count: 0
+    assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Kept post"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] a", text: "Gone post", count: 0
+    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
+    assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
+    assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_no_match "Gone post", response.body
+    assert_no_match "Gone page", response.body
+    assert_no_match "Gone draft", response.body
+
+    rows = Dashboard::Activity.new(actor: users(:one), channel: :admin).rows
+    assert_not_includes rows.map(&:record), @gone_post
+    assert_not_includes rows.map(&:record), @gone_page
+    assert_includes rows.map(&:record), @kept_post
+
+    de = Dashboard::TranslationNeeds.new(actor: users(:one), channel: :admin).entries.find { |entry| entry.locale == "de" }
+    assert_equal Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total], de.total
+  end
+
+  # The tree's own counts (handoff §10 B24/C34): a trashed page is no row, no
+  # child count and no translation marker; the starter offer counts kept pages.
+  test "the page tree's child count and translation markers ignore a trashed page" do
+    sign_in_as users(:one)
+    with_locales(%w[en de], default: "en") do
+      # Both children are outdated in German (translated, then the original
+      # edited), so each carries "↻1" while kept: only the trashed one's must
+      # not show. The marker count is 1 with the trash honoured and 2 (and
+      # the child count 2) if the index counted a trashed page.
+      kept_child, gone_child = [ "Kept child", "Gone child" ].map do |title|
+        child = create_page(title: title, parent: @kept_page, translations: { "en" => { title: title }, "de" => { title: "#{title} de" } })
+        assert Pages::Save.call(child, translations: { "en" => { title: "#{title}!" } }).ok?
+        child
+      end
+      get "/cs-studio/pages/#{@kept_page.id}"
+      assert_select "turbo-frame#tree [data-translation-marker=outdated]", text: "↻1", count: 2
+      gone_child.update!(trashed_at: Time.current)
+
+      get "/cs-studio/pages/#{@kept_page.id}"
+
+      assert_select "turbo-frame#tree li[data-page-id='#{@kept_page.id}'] > div [data-child-count]", text: "1"
+      assert_select "turbo-frame#tree li[data-page-id='#{gone_child.id}']", count: 0
+      assert_select "turbo-frame#tree [data-translation-marker=outdated]", text: "↻1", count: 1
+    end
+  end
+
+  # The translations matrix keeps a trashed record's `translation_states` rows
+  # (a restore needs no work), so only the readers' scopes hide it: not as a
+  # row, not in the type filter's counts, not in a language's percentage.
+  test "the translations matrix lists, counts and filters kept records only" do
+    with_locales(%w[en de], default: "en") do
+      # An image is only missing a translation once its original has an alt.
+      [ @kept_asset, @gone_asset ].each { |asset| asset.update_columns(alt: { "en" => "An image" }) }
+      Translations::StateIndex.rebuild_all
+      sign_in_as users(:one)
+
+      get admin_translations_path
+      assert_response :ok
+      assert_select "th[scope=row] a", text: "Kept post"
+      assert_select "th[scope=row] a", text: "Kept page"
+      assert_select "#translation-item-media-#{@kept_asset.id}"
+      assert_select "th[scope=row] a", text: "Gone post", count: 0
+      assert_select "th[scope=row] a", text: "Gone page", count: 0
+      assert_select "#translation-item-media-#{@gone_asset.id}", count: 0
+      assert_no_match "Gone post", response.body
+      assert_no_match "Gone page", response.body
+
+      get admin_translations_path(type: "post")
+      assert_select "tbody tr[id^='translation-item-post-']", count: 1
+      assert_select "label", text: /Posts\s*1\b/
+
+      # The rendered cards (what the viewer reads), not just the model: the
+      # trashed page, post and image are missing in German too, so a count
+      # taken over an unscoped relation would show a larger number.
+      kept = Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])
+      everything = Translations::StateIndex.summary("de", [ Page.all, Post.all, Media::Asset.all ])
+      assert_operator kept[:missing], :<, everything[:missing]
+      assert_select "[data-translation-summary] [data-locale=de]" do
+        assert_select "span", text: "#{kept[:missing]} missing"
+        assert_select "[role=progressbar][aria-valuenow=?]", (kept[:complete] * 100.0 / kept[:total]).round.to_s
+      end
+      assert_select "[data-translation-summary] [data-locale=de] span", text: "#{everything[:missing]} missing", count: 0
+    end
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@kept_page.id}"
     assert_select "turbo-frame#tree li[data-page-id='#{@kept_page.id}']"
     assert_select "turbo-frame#tree li[data-page-id='#{@gone_page.id}']", count: 0
 
@@ -217,6 +320,62 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
   end
 
+  # The posts list's own filters, search, scope counts and pagination, and the
+  # bulk endpoints (design pass round 2, Task 17): every one of them is kept
+  # posts only, a trashed id is "not found", and Undo restores only trashed ones.
+  test "the posts list's search, scope, type, tag and translation filters, counts and pager never include a trashed post" do
+    sign_in_as users(:one)
+    [ @kept_post, @gone_post ].each { |post| post.update_columns(content_type: "blog") }
+    tag = Tag.create!(name: "shared")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+    Translations::State.where(record_type: "Post", record_id: [ @kept_post.id, @gone_post.id ], locale: "de").delete_all
+    [ @kept_post, @gone_post ].each do |post|
+      Translations::State.create!(record_type: "Post", record_id: post.id, locale: "de", state: "outdated", outdated_count: 1)
+    end
+
+    [ {}, { q: "post" }, { scope: "live" }, { type: "blog" }, { tag: "shared" }, { translation: "outdated" }, { translation: "needs" } ].each do |params|
+      get "/cs-studio/posts", params: params
+      assert_response :ok
+      assert_select "tbody tr", text: /Kept post/
+      assert_select "tbody tr", text: /Gone post/, count: 0
+      assert_not_includes response.body, "Gone post", "filters #{params}"
+    end
+    get "/cs-studio/posts", params: { q: "gone" }
+    assert_select "h3", text: "No matches"
+    get "/cs-studio/posts", params: { scope: "drafts" }
+    assert_select "label[for=posts-scope-all] span", text: "1"
+    assert_select "label[for=posts-scope-live] span", text: "1"
+  end
+
+  test "bulk publish and trash name a trashed post as not found and leave it alone; restore_many ignores a kept post" do
+    sign_in_as users(:one)
+    @gone_post.update_columns(published_at: nil)
+    events_before = Audit::Event.count
+    post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ @gone_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_nil @gone_post.reload.published_at
+
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ @gone_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_equal events_before, Audit::Event.count, "not a single event: not even a denial"
+
+    post "/cs-studio/trash/restore_many", params: { type: "post", ids: [ @kept_post.id ] }
+    assert_equal "Nothing was changed. 1 post was not found.", flash[:alert]
+    assert_not @kept_post.reload.trashed?
+  end
+
+  test "tag suggestions never count a trashed post, and a tag only trashed posts use still appears with 0" do
+    sign_in_as users(:one)
+    create_post(title: "Kept tagged", tags: [ "shared-tag" ])
+    create_post(title: "Gone tagged", tags: [ "shared-tag", "only-trashed" ]).update_columns(trashed_at: Time.current)
+
+    get "/cs-studio/tags/suggest", params: { q: "shared" }
+    assert_equal [ "1 post" ], response.parsed_body.map { |row| row["hint"] }
+
+    get "/cs-studio/tags/suggest", params: { q: "only-" }
+    assert_equal [ "0 posts" ], response.parsed_body.map { |row| row["hint"] }
+  end
+
   test "the related-posts editor neither shows a trashed post nor counts it as one you can't open" do
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
     component = Admin::RelatedPostsComponent.new(post: @kept_post, locale: "en")
@@ -233,6 +392,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       assert_not result.ok?
     end
     assert_empty @kept_post.reload.related_posts
+  end
+
+  test "the New page dialog's Inside picker never offers a trashed page, and a trashed parent is answered on Inside" do
+    sign_in_as(users(:one))
+    get "/cs-studio/pages/new", headers: { "Turbo-Frame" => "new-page-form-frame" }
+
+    assert_select "#new-page-inside option[value='#{@kept_page.id}']"
+    assert_select "#new-page-inside option[value='#{@gone_page.id}']", count: 0
+    assert_no_difference "Page.count" do
+      post "/cs-studio/pages", params: { page: { title: "Under the trash", parent_id: @gone_page.id } }, as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+    assert_select "template .admin-error-summary", text: /Choose a page that still exists\./
   end
 
   test "the media library, picker and search hide trashed images" do

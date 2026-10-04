@@ -1,0 +1,20 @@
+<section aria-labelledby="<%= id %>" class="flex flex-col rounded-cs border border-line bg-surface">
+  <header class="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+    <h2 id="<%= id %>" class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= title %></h2>
+    <% if link %>
+      <%= link_to "→", link.first, class: "text-sm text-ink hover:underline", aria: { label: link.last }, data: { turbo_frame: "_top" } %>
+    <% end %>
+  </header>
+  <% if rows.empty? %>
+    <%= render Admin::EmptyStateComponent.new(title: empty) %>
+  <% else %>
+    <ul class="px-4">
+      <% visible_rows.each do |row| %>
+        <li class="flex items-center gap-3 border-b border-line py-2.5 last:border-b-0"><%= row %></li>
+      <% end %>
+    </ul>
+  <% end %>
+  <% if hint %>
+    <p class="px-4 pb-3 text-sm text-meta"><%= hint %></p>
+  <% end %>
+</section>

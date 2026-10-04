@@ -15,22 +15,28 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
 
   test "each state renders its exact text (Global Constraints)" do
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :saving)
-    assert_text "Saving…"
+    assert_text "SAVING…"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 14:05"))
-    assert_text "Saved 14:05"
+    assert_text "SAVED 14:05"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :error, count: 3)
     assert_text "Couldn't save — 3 problems"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :retrying)
-    assert_text "Not saved — retrying"
+    assert_text "NOT SAVED · RETRYING…"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :offline)
-    assert_text "Not saved — check your connection"
+    assert_text "NOT SAVED · Retry"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :stale)
-    assert_text "Changed elsewhere — reload to see the latest"
+    assert_text "● CHANGED ELSEWHERE"
+    assert_selector "p.text-warn-ink"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved_over)
+    assert_text "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
+    assert_no_text "● CHANGED ELSEWHERE"
+    assert_selector "p.text-warn-ink"
 
     # Fix (final-fixes round, finding 4): never rendered by a server
     # response (see this state's own class comment), but its exact text
@@ -45,6 +51,23 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
     assert_text "Not saved — you don't have permission to change this"
   end
 
+  test "a live record reads SAVED TO SITE in the ok colour, and SAVING TO SITE while saving" do
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 10:42"), live: true)
+    assert_selector "p#s[data-live].text-ok-ink", text: "● SAVED TO SITE 10:42"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saving, live: true)
+    assert_text "SAVING TO SITE…"
+
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved, at: Time.zone.parse("2026-09-27 10:42"))
+    assert_no_selector "p[data-live]"
+    assert_no_selector "p.text-ok-ink"
+  end
+
+  test "the offline state carries a Retry button that saves now" do
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :offline)
+    assert_selector "p#s button[data-action='admin--autosave#saveNow']", text: "Retry"
+  end
+
   test "rejects an unknown state" do
     assert_raises(ArgumentError) { Admin::SaveStatusComponent.new(id: "s", state: :bogus) }
   end
@@ -52,6 +75,6 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
   test "saved with no at renders 'Saved' with no trailing space" do
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :saved)
 
-    assert_equal "Saved", page.find("p").text
+    assert_equal "SAVED", page.find("p").text
   end
 end

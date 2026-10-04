@@ -1,8 +1,37 @@
+<%# Never restored from Turbo's page cache (final fix wave 1, ledger m1): a
+    snapshot of an editor holds its forms as they stood when it was left --
+    typed text whose save was only sent as the page was torn down (Back
+    drains nothing), next to the base from before that save. Restored, the
+    form took that text for what the server holds and sent the next edit on
+    the old base: refused as "Changed elsewhere" against one's own save. With
+    this, Back/Forward to an editor fetches it afresh. (A frame navigation's
+    answer carries the tag too, and the promoted visit merges it into the
+    head, so it also holds for an editor opened from the tree.)
+
+    And no link is prefetched from an editor (follow-up N1): Turbo fetches a
+    link on hover and reuses that answer for the click. From an editor the
+    click first waits for the save queue (`autosave/queue.js`), so a
+    prefetched answer for the same record -- its other language tab, its own
+    row in the tree -- shows it as it was BEFORE those saves, with the old
+    base: the saved text missing and the next edit refused. %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+  <meta name="turbo-prefetch" content="false">
+<% end %>
+
 <% content_for :tree do %>
   <%= render Admin::TreeComponent.new(root: root_page, selected: @page, locale: admin_locale, url_options: admin_url_options) %>
 <% end %>
 
-<%= render Admin::RecordHeaderComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+<%= render Admin::EditorScreen::HeaderComponent.new(record: @page, locale: admin_locale, url_options: admin_url_options) do |header| %>
+  <% header.with_suggest do %>
+    <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4): only
+        in a non-default language, for a viewer who may edit the page, with AI
+        set up and `ai.translate`. It asks for the page's own fields and its
+        blocks' alike -- whatever has a Translate button below. %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: @page, locale: admin_locale, editable: can_edit?(@page)) %>
+  <% end %>
+<% end %>
 
 <%= render Admin::PageSettingsFormComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
 
@@ -30,7 +59,7 @@
   <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
     <% blocks = @page.content_blocks.to_a %>
     <% blocks.each_with_index do |block, index| %>
-      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
     <% end %>
   </div>
 

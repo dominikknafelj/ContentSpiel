@@ -12,6 +12,36 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
   end
 
+  test "a post: scheduling in the past is refused with the dialog's own message, a future time schedules, Remove schedule goes back to draft" do
+    post_record = create_post(title: "Later", published: false)
+    travel_to Time.zone.local(2026, 10, 4, 12, 0) do
+      post schedule_admin_post_path(post_record), params: { published_at: "2026-10-04T12:00" }
+      follow_redirect!
+      assert_select "dialog#schedule-post-#{post_record.id}[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
+      assert_select "#toasts .admin-toast", count: 0
+      assert_nil post_record.reload.published_at
+
+      post schedule_admin_post_path(post_record), params: { published_at: "" }
+      follow_redirect!
+      assert_select "dialog#schedule-post-#{post_record.id} [role=alert]", text: "Choose a date and time"
+
+      post schedule_admin_post_path(post_record), params: { published_at: "2026-10-06T09:00" }
+      assert_equal "scheduled", post_record.reload.status
+      get admin_post_path(post_record)
+      assert_select "dialog#schedule-post-#{post_record.id} form input[name=remove][value='1'] ~ button", text: "Remove schedule"
+
+      post schedule_admin_post_path(post_record), params: { remove: "1" }
+      assert_nil post_record.reload.published_at
+    end
+  end
+
+  test "a post's Schedule dialog names the site time zone" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    post_record = create_post(title: "Later", published: false)
+    get admin_post_path(post_record)
+    assert_select "dialog#schedule-post-#{post_record.id}", text: /Berlin time \(GMT\+[12]\), the site’s time zone\./
+  end
+
   test "the list filters by type, status and tag" do
     create_post(title: "Blog one", tags: [ "rails" ])
     create_post(title: "Resume one", content_type: "resume_entry")
@@ -27,11 +57,23 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   # `eager_load` once both reference the same table -- so a post matching
   # the filter by having *one* of several tags showed only that one tag in
   # the list, not every tag it actually has.
-  test "filtering by tag still shows every tag on a matching row, not just the one it matched by" do
+  test "filtering by tag stays a subquery, never a join the listing query carries" do
     create_post(title: "Multi-tagged", tags: [ "rails", "ruby" ])
-    get "/cs-studio/posts", params: { tag: "rails" }
+    # The list no longer has a Tags column (handoff §4.3) and preloads no
+    # tags, so the bug can't show in a row; it is checked at the query
+    # instead: the tag filter must stay a subquery, never a join the listing
+    # query itself carries (and so never an `eager_load` should tags be
+    # preloaded here again).
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      get "/cs-studio/posts", params: { tag: "rails" }
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
     assert_select "tbody tr", 1
-    assert_select "tbody tr", /rails, ruby/
+    assert_select "tbody tr", /Multi-tagged/
+    assert_empty statements.grep(/LEFT OUTER JOIN "tags"/), "the tag filter must stay a subquery, not an eager_load of tags"
   end
 
   test "new asks for the type, then opens the editor" do
@@ -39,6 +81,220 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     created = Post.order(:id).last
     assert_redirected_to "/cs-studio/posts/#{created.id}"
     assert_equal "draft", created.status
+  end
+
+  test "a save made on a stale base is refused, names who changed it, and keeps the newer text" do
+    post_record = create_post(title: "Engineer")
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { Posts::Save.call(post_record, translations: { "en" => { excerpt: "Changed by someone else" } }) }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { excerpt: "My stale edit" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal "Changed by someone else", post_record.reload.excerpt
+    assert_select_in_stream "post-save-status", /CHANGED ELSEWHERE/
+    assert_select_in_stream "editor-notice", /Changed by .+Reload/m
+    assert_no_match(/post-base-updated-at/, response.body)
+  end
+
+  test "another editor's tag-only change makes a stale form's save a 409, and the tags stay theirs" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { Posts::Save.call(post_record, attributes: { tag_names: [ "ruby", "rails" ] }) }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { tag_names: "ruby" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
+  end
+
+  # Final review A, I2: the Tags module changes a post's tags without going
+  # through `Posts::Save`, so an editor's already-open form (which resends
+  # every chip on every autosave) would recreate a deleted tag or put a
+  # renamed one back. Both services touch the carrying posts, so the open
+  # form's next save is the same 409 as for another editor's tag change.
+  test "deleting a tag in the Tags module makes an open post form's save a 409 and does not recreate the tag" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { assert Tags::Destroy.call(Tag.find_by!(name: "ruby")).ok? }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { title: "Engineer 2", tag_names: [ "", "ruby" ] } }, as: :turbo_stream
+    assert_response :conflict
+    assert_not Tag.exists?(name: "ruby")
+    assert_empty post_record.reload.tags
+  end
+
+  test "renaming a tag in the Tags module makes an open post form's save a 409 and keeps the new name" do
+    post_record = create_post(title: "Engineer", tags: [ "ruby" ])
+    stale = post_record.updated_at.iso8601(6)
+    travel 2.seconds
+    as(users(:two), channel: :admin) { assert Tags::Rename.call(Tag.find_by!(name: "ruby"), name: "rails").ok? }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { title: "Engineer 2", tag_names: [ "", "ruby" ] } }, as: :turbo_stream
+    assert_response :conflict
+    assert_not Tag.exists?(name: "ruby")
+    assert_equal %w[rails], post_record.reload.tags.map(&:name)
+  end
+
+  test "a view-only post editor says so" do
+    post_record = create_post(title: "Engineer", published: false)
+    sign_in_as(users(:reader))
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_select "[data-view-only-hint]", "You can view this post but not change it."
+    assert_select ".admin-view-only"
+  end
+
+  test "a post save on a current base still saves" do
+    post_record = create_post(title: "Engineer")
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: post_record.updated_at.iso8601(6), post: { excerpt: "Fresh" } }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Fresh", post_record.reload.excerpt
+  end
+
+  test "the editor has an empty notice slot a stream can target" do
+    get "/cs-studio/posts/#{create_post(title: "Engineer").id}"
+    assert_select "#editor-notice:empty"
+  end
+
+  # Design pass round 2 (handoff §9 B23): the type's own fields are one group
+  # between Excerpt and Body, titled with the type's label.
+  test "the content type's fields sit in their own titled group between Excerpt and Body" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    get "/cs-studio/posts/#{post_record.id}"
+    assert_response :success
+    assert_select "[data-editor-fields-group] [data-fields-group-title]", text: "Resume entry fields"
+    assert_select "[data-editor-fields-group] input[name='post[fields][start_date]'][type=text][pattern][placeholder='yyyy-mm-dd']"
+    assert_select "[data-editor-fields-group] select.cs-select[name='post[fields][role_type]']"
+    body = response.body
+    assert body.index('data-field-name="excerpt"') < body.index("data-editor-fields-group")
+    assert body.index("data-editor-fields-group") < body.index('data-field-name="body"')
+  end
+
+  test "a date typed in the wrong form is a field error after the save, not a 500" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "2024-13-45" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select_in_stream "post-start_date-errors", /\A\s*!?\s*Start date must use the form yyyy-mm-dd\s*\z/
+    assert_nil post_record.reload.fields.start_date
+  end
+
+  test "a row error in the CS Studio slot reads as group, row and sub-field" do
+    with_test_types do
+      post_record = create_post(title: "Launch", content_type: "test/event")
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { fields: { speakers: [ { name: "" } ] } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select_in_stream "post_fields_speakers_0-name-errors", /\A\s*!?\s*Speakers, row 1: name can't be blank\s*\z/
+    end
+  end
+
+  test "a required scalar's error in the slot reads as its label and message" do
+    with_test_types do
+      ContentTypes.register "test/required_company" do |t|
+        t.label "Required company"
+        t.color "#f59e0b"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :company, :string, required: true
+      end
+      post_record = Post.create!(content_type: "test/required_company", title: "Role", metadata: { "company" => "Acme" })
+      patch "/cs-studio/posts/#{post_record.id}",
+        params: { post: { fields: { company: "" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select_in_stream "post-company-errors", /\A\s*!?\s*Company can't be blank\s*\z/
+    end
+  end
+
+  test "only a strict yyyy-mm-dd date is accepted" do
+    post_record = create_post(title: "Engineer", content_type: "resume_entry")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "20240101" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { fields: { start_date: "2024-01-31" } }, base_updated_at: post_record.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal Date.new(2024, 1, 31), post_record.reload.fields.start_date
+  end
+
+  # The chip input submits one `post[tag_names][]` per chip plus an empty
+  # sentinel (so an emptied list still arrives and clears the tags).
+  test "tag_names as an array is saved case-insensitively deduplicated, the sentinel ignored" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "Rails", "rails", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ "rails" ], post_record.reload.tags.map(&:name)
+  end
+
+  # Defence in depth: the chip input splits pasted text before it makes a
+  # chip, but a client that sends "ruby, rails" as one element means two tags.
+  test "an array element containing a comma is split like the legacy string" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "rails, ruby", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal %w[rails ruby], post_record.reload.tags.map(&:name).sort
+  end
+
+  test "a tag_names value that is neither a string nor an array of strings leaves the tags alone" do
+    post_record = create_post(title: "Chips", tags: [ "keep" ])
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: { "0" => "evil" } }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "non-string elements of the array are ignored" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "ok", { "a" => "b" } ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "ok" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "a tag name over 50 characters is refused in the tags' error slot and nothing is saved" do
+    post_record = create_post(title: "Chips", tags: [ "keep" ])
+    long = "x" * 51
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "fine", long ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "post-tag_names-errors"
+    assert_includes response.body, "longer than 50 characters"
+    assert_equal [ "keep" ], post_record.reload.tags.map(&:name)
+    assert_not Tag.exists?(name: "fine")
+  end
+
+  test "autosave resubmitting a legacy over-long tag still saves an unrelated edit" do
+    Tag.new(name: "l" * 60).save!(validate: false)
+    post_record = create_post(title: "Legacy")
+    post_record.tags << Tag.find_by!(name: "l" * 60)
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Renamed", tag_names: [ "l" * 60, "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Renamed", post_record.reload.title
+    assert_equal [ "l" * 60 ], post_record.tags.map(&:name)
+  end
+
+  test "inner whitespace in a tag name collapses" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "Two   words", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "two words" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "an array holding only the sentinel clears the tags" do
+    post_record = create_post(title: "Chips", tags: [ "ruby" ])
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_empty post_record.reload.tags
   end
 
   test "typed fields and tags autosave" do
@@ -228,7 +484,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/posts/#{post_record.id}"
 
-    assert_select "[data-controller~='admin--related-posts'][data-admin--related-posts-search-url-value='/cs-studio/link_targets?type=post']" do
+    assert_select "[data-controller~='admin--chip-input'][data-admin--chip-input-search-url-value='/cs-studio/link_targets?locale=en&type=post']" do
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='']", 1
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='#{related.id}']", 1
       assert_select "li", text: /Related one/
@@ -366,6 +622,78 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     assert_match "Restored “Gone post”", response.body
+  end
+
+  # -- side-by-side translation (design pass round 2, Task 7) --
+
+  def with_mixed_type
+    with_test_types do
+      ContentTypes.register "test/mixed" do |t|
+        t.label "Mixed"
+        t.color "#f59e0b"
+        t.list_component Posts::BlogListComponent
+        t.detail_component Posts::DetailComponent
+        t.field :blurb, :string, translated: true
+        t.field :venue, :string
+        t.field :capacity, :integer
+      end
+      yield
+    end
+  end
+
+  test "on a translation tab a translated field is a pair and the untranslated ones live only in Shared fields" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+      assert post_record.persisted?
+
+      get admin_post_path(post_record, locale: "de")
+
+      assert_select "form.admin-translation-form"
+      assert_select "[data-field-name='blurb'] .admin-translation-pair [data-original-for='blurb']"
+      assert_select "[data-field-name='title'] .admin-translation-pair [data-original-for='title']"
+      assert_select "details.admin-shared-fields > summary", text: "Shared fields (2)"
+      assert_select "details.admin-shared-fields:not([open])"
+      assert_select "details.admin-shared-fields", text: /Main Hall/
+      assert_select "details.admin-shared-fields", text: /120/
+      assert_select "[data-field-name='venue'], [data-field-name='capacity']", count: 0
+      assert_select "form input[name='post[fields][venue]'], form input[name='post[fields][capacity]']", count: 0
+      assert_select "form input[name='post[fields][blurb]']", count: 1
+    end
+  end
+
+  test "on the default tab every field of the type is an ordinary input and there are no shared fields" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+
+      get admin_post_path(post_record, locale: Locales.default)
+
+      assert_select "input[name='post[fields][blurb]']"
+      assert_select "input[name='post[fields][venue]']"
+      assert_select "input[name='post[fields][capacity]']"
+      assert_select ".admin-translation-pair", count: 0
+      assert_select "details.admin-shared-fields", count: 0
+    end
+  end
+
+  test "saving a translation tab leaves the shared values untouched" do
+    with_mixed_type do
+      post_record = Posts::Save.call(Post.new, attributes: { content_type: "test/mixed", fields: { venue: "Main Hall", capacity: 120 } },
+        translations: { Locales.default => { title: "Launch", fields: { blurb: "Hello" } } }).record
+
+      patch admin_post_path(post_record), params: {
+        locale: "de", base_updated_at: post_record.updated_at.iso8601(6),
+        post: { title: "Start", fields: { blurb: "Hallo" } }
+      }, as: :turbo_stream
+
+      assert_response :success
+      post_record.reload
+      assert_equal "Start", post_record.title(locale: :de)
+      assert_equal "Hallo", post_record.fields(locale: :de).blurb
+      assert_equal "Main Hall", post_record.fields(locale: Locales.default).venue
+      assert_equal 120, post_record.fields(locale: Locales.default).capacity
+    end
   end
 
   private

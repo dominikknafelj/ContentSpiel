@@ -1,7 +1,7 @@
 module Admin
-  # "Mark as up to date" (translation helpers spec §3.4/§4): the button an
+  # "Still correct — mark up to date" (translation helpers spec §3.4/§4): the button an
   # outdated translation shows beside its original
-  # (`Admin::TranslationScreen::OutdatedNoteComponent`) posts here with
+  # (`Admin::EditorScreen::ReferenceCardComponent`) posts here with
   # `record_type`, `record_id`, `field` and `locale`; `Translations::Confirm`
   # does the rest, including deciding whether the actor may.
   #
@@ -9,9 +9,10 @@ module Admin
   # type through its own module's read scope, so an unreadable one is a
   # 404); only a refused *write* is a 403.
   #
-  # Answers a Turbo request with streams removing the note and, once that
-  # language has nothing else outdated, the switcher's marker; anything
-  # else with a redirect back and a flash.
+  # Answers a Turbo request with streams replacing the card with its
+  # current-state variant and, once that language has nothing else outdated,
+  # removing the switcher's marker; anything else with a redirect back and a
+  # flash.
   class TranslationConfirmationsController < BaseController
     include TranslatableRecordLoading
 
@@ -35,11 +36,16 @@ module Admin
 
     private
 
-    # The note itself, and -- when the record (for a block: its page or
-    # post, whose switcher it rolls up into) has nothing left outdated in
-    # this language -- the switcher's marker.
+    # The reference card swapped for its `:current` variant (confirming
+    # writes only `translation_sources`, never `updated_at`, so the open form
+    # stays valid) and -- when the record (for a block: its page or post,
+    # whose switcher it rolls up into) has nothing left outdated in this
+    # language -- the switcher's marker.
     def confirmed_streams(record)
-      streams = [ turbo_stream.remove(Admin::TranslationScreen::OutdatedNoteComponent.dom_id(record.class.name, record.id, params[:field])) ]
+      field = params[:field].to_s
+      card_id = Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field)
+      card = Admin::EditorScreen::ReferenceCardComponent.current_for(record, field, locale: params[:locale].to_s)
+      streams = [ turbo_stream.replace(card_id, card) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record
       unless Translations::Status.outdated_locales(switcher_record).include?(params[:locale].to_s)
         streams << turbo_stream.remove(Admin::LanguageTabsComponent.outdated_marker_id(params[:locale]))

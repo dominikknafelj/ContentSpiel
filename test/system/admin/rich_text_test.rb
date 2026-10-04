@@ -51,10 +51,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal({ "id" => YOUTUBE_ID }, youtube["attrs"])
   end
 
-  # Media library Task 8: the Image button opens the media picker; an
-  # upload through its Upload tab is inserted after the text already typed
-  # (not over it), and the alt-text popover opens on the new image.
-  test "an image uploaded through the picker from the Image button is inserted and its alt text saved" do
+  # Media library Task 8 / design pass round 2 Task 13: the Image button opens
+  # the media picker; the picked asset then opens the 560 image dialog (alt
+  # text and caption), and "Insert image" there inserts it after the text
+  # already typed (not over it). Nothing is inserted before that.
+  test "an image uploaded through the picker from the Image button is inserted through the image dialog and its alt text saved" do
     visit_post
 
     editor.click
@@ -64,12 +65,15 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       click_on "Upload"
       attach_file "Image file", file_fixture("tiny.png").to_s
     end
-    refute_selector "dialog[open]"
+    assert_selector "dialog#rich-text-image-dialog[open]"
+    refute_selector ".ProseMirror img"
 
-    within(".admin-rich-text-popover") do
+    within("dialog#rich-text-image-dialog[open]") do
+      assert_text "Empty uses the text from Media", count: 2
       fill_in "Alt text", with: "A"
-      press "Done"
+      press "Insert image"
     end
+    refute_selector "dialog[open]"
 
     document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "alt") == "A" } }
     image = nodes(document).find { |node| node["type"] == "image" }
@@ -77,18 +81,70 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal({ "asset_id" => asset.id, "alt" => "A", "caption" => "" }, image["attrs"])
     assert_equal "Intro", doc_text(document).strip
     assert_selector ".ProseMirror img[src='#{asset.url}']"
+    # Focus is back in the editor.
+    assert_selector ".ProseMirror:focus"
 
-    # The image is still selected after Done: the Image button now edits it
-    # (the keyboard route to alt text) instead of opening the picker.
-    press_insert "Image"
-    refute_selector "dialog[open]"
-    within(".admin-rich-text-popover") do
+    # Clicking the image edits it: the same dialog, now titled for editing
+    # with "Save".
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    within("dialog#rich-text-image-dialog[open]") do
+      assert_selector "h2", text: "Edit image"
       assert_field "Alt text", with: "A"
       fill_in "Caption", with: "C"
-      press "Done"
+      press "Save"
     end
     saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "caption") == "C" } }
     assert_equal 1, Media::Asset.count
+  end
+
+  # Review C, M22: the toolbar route to editing a selected image. An inserted
+  # image is left node-selected, so Insert, Image then edits it instead of
+  # inserting another.
+  test "Insert, Image with an image selected edits that image through the toolbar" do
+    asset = create_media_asset
+    asset.update!(title: "Lake")
+    visit_post
+    editor.click
+    press_insert "Image"
+    within("dialog[open]") { click_on "Lake" }
+    within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
+    refute_selector "dialog[open]"
+    saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" } }
+
+    press_insert "Image"
+    within("dialog#rich-text-image-dialog[open]") do
+      assert_selector "h2", text: "Edit image"
+      fill_in "Caption", with: "Via the toolbar"
+      press "Save"
+    end
+    document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "caption") == "Via the toolbar" } }
+    assert_equal 1, nodes(document).count { |node| node["type"] == "image" }
+  end
+
+  test "the image dialog shows the library text as placeholders, an empty one leaves the node without overrides, and Cancel inserts nothing" do
+    asset = create_media_asset
+    asset.update!(title: "Lake", alt: "A calm lake", caption: "Lake at dawn")
+    visit_post
+
+    editor.click
+    press_insert "Image"
+    within("dialog[open]") { click_on "Lake" }
+    within("dialog#rich-text-image-dialog[open]") do
+      assert_field "Alt text", with: "", placeholder: "A calm lake"
+      assert_field "Caption", with: "", placeholder: "Lake at dawn"
+      press "Cancel"
+    end
+    refute_selector "dialog[open]"
+    refute_selector ".ProseMirror figure"
+    assert_selector ".ProseMirror:focus"
+
+    press_insert "Image"
+    within("dialog[open]") { click_on "Lake" }
+    within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
+
+    document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" } }
+    image = nodes(document).find { |node| node["type"] == "image" }
+    assert_equal({ "asset_id" => asset.id, "alt" => "", "caption" => "" }, image["attrs"])
   end
 
   test "a failed upload in the picker shows its errors inline and inserts nothing" do
@@ -106,21 +162,326 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal 0, Media::Asset.count
   end
 
-  test "the internal link picker inserts an internalLink mark to an existing page" do
+  test "Insert > Page link opens the page dialog and inserts an internalLink mark to the picked page" do
     target = create_page(title: "Contact")
     visit_post
 
     editor.click
     press_insert "Page link"
-    within(".admin-rich-text-popover") do
+    within("dialog#rich-text-page-dialog[open]") do
       fill_in "Search pages and posts", with: "Cont"
-      press "Contact"
+      assert_selector "[role=option]", text: "Contact"
+      find("[role=option]", text: "Contact").click
     end
+    refute_selector "dialog[open]"
 
     document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
     linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } }
     assert_equal "Contact", linked["text"]
     assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ], linked["marks"]
+    assert_selector ".ProseMirror:focus"
+  end
+
+  test "the Link popover searches pages and posts: picking a row makes an internalLink, typing a URL and Enter makes a link" do
+    target = create_page(title: "About")
+    visit_post
+
+    editor.click
+    type_text "see this"
+    select_editor_text
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "abo"
+      assert_selector "[role=option]", text: "About"
+      find("[role=option]", text: "About").click
+    end
+    refute_selector ".admin-rich-text-popover"
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } }
+    assert_equal "see this", linked["text"]
+    assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ], linked["marks"]
+
+    # An external one over the same text: the typed URL, Enter -- not the
+    # first search row.
+    select_editor_text
+    press "Link"
+    within(".admin-rich-text-popover") do
+      assert_button "Remove link"
+      fill_in "URL or search", with: "https://example.org"
+      find_field("URL or search").send_keys(:enter)
+    end
+    refute_selector ".admin-rich-text-popover"
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } } }
+    linked = text_nodes(document).find { |node| Array(node["marks"]).any? { |mark| mark["type"] == "link" } }
+    assert_equal [ "link" ], linked["marks"].map { |mark| mark["type"] }
+    assert_match %r{\Ahttps://example\.org/?\z}, linked["marks"].first.dig("attrs", "href")
+    assert_not text_nodes(document).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } }
+  end
+
+  # A Turbo Stream can replace the block card an open dialog belongs to; the
+  # dialog has nobody to answer then, so it closes instead of applying to a
+  # different editor.
+  test "a dialog whose editor is replaced while it is open closes without inserting anything" do
+    page_record = create_page(title: "About")
+    block = page_record.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("Body"))
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_editors(count: 1)
+    card_id = ActionView::RecordIdentifier.dom_id(block)
+
+    find("##{card_id} .ProseMirror").click
+    press_insert "YouTube"
+    assert_selector "dialog#rich-text-youtube-dialog[open]"
+    page.execute_script(<<~JS, card_id)
+      const id = arguments[0]
+      const card = document.getElementById(id)
+      window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${id}"><template>${card.outerHTML}</template></turbo-stream>`)
+    JS
+    refute_selector "dialog[open]"
+    assert_selector "##{card_id} .ProseMirror", count: 1
+    refute_selector ".ProseMirror [data-youtube-id]"
+  end
+
+  # --- Fix round 1 (Task 13) ------------------------------------------------
+
+  test "reopening the page dialog never piles up listeners: one pick applies exactly one link, to the picked page" do
+    target = create_page(title: "Contact")
+    create_page(title: "Contract")
+    visit_post
+
+    editor.click
+    2.times do
+      press_insert "Page link"
+      within("dialog#rich-text-page-dialog[open]") do
+        fill_in "Search pages and posts", with: "Cont"
+        assert_selector "[role=option]", minimum: 1
+        press "Cancel"
+      end
+      refute_selector "dialog[open]"
+      # A closed dialog's search is torn down: nothing of it is left in the
+      # persistent list.
+      assert_no_selector "#rich-text-page-dialog [role=option]", visible: :all
+    end
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Cont"
+      assert_selector "[role=option]", text: "Contact"
+      find("[role=option]", text: "Contact").click
+    end
+    refute_selector "dialog[open]"
+
+    document = saved_post_document { |doc| doc_text(doc).include?("Contact") }
+    assert_equal "Contact", doc_text(document)
+    marks = text_nodes(document).flat_map { |node| Array(node["marks"]) }
+    assert_equal [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ], marks
+  end
+
+  test "Escape closes the suggestion list first and only a second Escape closes the dialog" do
+    create_page(title: "Contact")
+    visit_post
+
+    editor.click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Cont"
+      assert_selector "[role=option]"
+      find_field("Search pages and posts").send_keys(:escape)
+      assert_no_selector "[role=option]"
+    end
+    assert_selector "dialog#rich-text-page-dialog[open]"
+    find_field("Search pages and posts").send_keys(:escape)
+    refute_selector "dialog[open]"
+
+    # The same in the Link popover.
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "Cont"
+      assert_selector "[role=option]"
+      find_field("URL or search").send_keys(:escape)
+      assert_no_selector "[role=option]"
+    end
+    assert_selector ".admin-rich-text-popover"
+    find_field("URL or search").send_keys(:escape)
+    refute_selector ".admin-rich-text-popover"
+  end
+
+  test "picking a page with the caret inside an external link converts that link instead of inserting text" do
+    target = create_page(title: "About")
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "link", "attrs" => { "href" => "https://example.org/" } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[href]").click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") do
+      fill_in "Search pages and posts", with: "Abo"
+      find("[role=option]", text: "About").click
+    end
+    refute_selector "dialog[open]"
+
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    assert_equal "linked", doc_text(document)
+    assert_equal [ [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] ], text_nodes(document).map { |node| node["marks"] }
+  end
+
+  test "Enter on a plain word applies nothing and says what to do; real URLs and paths are accepted" do
+    visit_post
+    editor.click
+    type_text "target"
+
+    [ "abo", "v1.2" ].each do |word|
+      select_editor_text
+      press "Link"
+      within(".admin-rich-text-popover") do
+        fill_in "URL or search", with: word
+        find_field("URL or search").send_keys(:enter)
+        assert_selector "[role=alert]", text: "Pick a page, or enter a URL"
+        find_field("URL or search").send_keys(:escape)
+      end
+      refute_selector ".admin-rich-text-popover"
+    end
+    sleep 0.6
+    assert_empty text_nodes(@post.reload.body_document(locale: :en)).flat_map { |node| Array(node["marks"]) }
+
+    { "example.com" => "example.com", "/about" => "/about", "#top" => "#top", "mailto:a@b.c" => "mailto:a@b.c" }.each do |typed, saved|
+      select_editor_text
+      press "Link"
+      within(".admin-rich-text-popover") do
+        fill_in "URL or search", with: typed
+        find_field("URL or search").send_keys(:enter)
+      end
+      refute_selector ".admin-rich-text-popover"
+      saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark.dig("attrs", "href").to_s.include?(saved) } } }
+    end
+  end
+
+  test "arrow keys move through the rows with aria-activedescendant and Enter picks the highlighted one" do
+    target = create_page(title: "Zeta")
+    create_page(title: "Zebra")
+    visit_post
+
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "Ze"
+      assert_selector "[role=option]", count: 2
+      field = find_field("URL or search")
+      assert_nil field["aria-activedescendant"]
+      field.send_keys(:down)
+      first = find("[role=option][aria-selected=true]")
+      assert_equal first[:id], field["aria-activedescendant"]
+      field.send_keys(:down)
+      second = find("[role=option][aria-selected=true]")
+      assert_not_equal first[:id], second[:id]
+      assert_equal second[:id], field["aria-activedescendant"]
+      chosen = second.text
+      field.send_keys(:enter)
+      @chosen = chosen
+    end
+    document = saved_post_document { |doc| text_nodes(doc).any? { |node| Array(node["marks"]).any? { |mark| mark["type"] == "internalLink" } } }
+    assert_includes @chosen, doc_text(document)
+    assert_equal target.id, text_nodes(document).first["marks"].first.dig("attrs", "id") if doc_text(document) == "Zeta"
+  end
+
+  test "a slow answer for an earlier query never replaces the rows for the current one" do
+    create_page(title: "Alpha")
+    create_page(title: "Beta")
+    visit_post
+
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (url, options) => {
+        if (String(url).includes("link_targets") && String(url).includes("q=alp")) return new Promise((resolve) => setTimeout(() => resolve(original(url, { ...options, signal: undefined })), 1200))
+        return original(url, options)
+      }
+    JS
+    editor.click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      fill_in "URL or search", with: "alp"
+      sleep 0.4
+      fill_in "URL or search", with: "bet"
+      assert_selector "[role=option]", text: "Beta"
+      sleep 1.6
+      assert_selector "[role=option]", text: "Beta"
+      assert_no_selector "[role=option]", text: "Alpha"
+    end
+  end
+
+  test "the Link popover is prefilled with an existing link's URL" do
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "link", "attrs" => { "href" => "https://example.org/docs" } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[href]").click
+    press "Link"
+    within(".admin-rich-text-popover") do
+      assert_field "URL or search", with: "https://example.org/docs"
+      assert_button "Remove link"
+    end
+  end
+
+  test "Remove image in the image dialog deletes the node, and an unchanged Save writes nothing" do
+    asset = create_media_asset
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "A", "caption" => "" } } ] }, locale: :en)
+    @post.save!
+    visit_post
+    updated_at = @post.reload.updated_at
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    within("dialog#rich-text-image-dialog[open]") { press "Save" }
+    refute_selector "dialog[open]"
+    sleep 1.5
+    assert_equal updated_at, @post.reload.updated_at
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    within("dialog#rich-text-image-dialog[open]") { press "Remove image" }
+    refute_selector "dialog[open]"
+    refute_selector ".ProseMirror figure"
+    saved_post_document { |doc| nodes(doc).none? { |node| node["type"] == "image" } }
+  end
+
+  test "Remove link in the page dialog removes an internal link" do
+    target = create_page(title: "About")
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[data-internal-link]").click
+    press_insert "Page link"
+    within("dialog#rich-text-page-dialog[open]") { press "Remove link" }
+    refute_selector "dialog[open]"
+    saved_post_document { |doc| text_nodes(doc).none? { |node| Array(node["marks"]).any? } }
+  end
+
+  test "an inserted image is selected, so Enter edits it" do
+    create_media_asset
+    visit_post
+
+    editor.click
+    press_insert "Image"
+    within("dialog[open]") { click_on Media::Asset.last.title }
+    within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror figure.is-selected"
+    page.driver.browser.keyboard.type(:enter)
+    assert_selector "dialog#rich-text-image-dialog[open] h2", text: "Edit image"
+  end
+
+  test "Remove link in the Link popover removes an internal link" do
+    target = create_page(title: "About")
+    @post.assign_body({ "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => "linked", "marks" => [ { "type" => "internalLink", "attrs" => { "type" => "page", "id" => target.id } } ] } ] } ] }, locale: :en)
+    @post.save!
+    visit_post
+
+    find(".ProseMirror a[data-internal-link]").click
+    press "Link"
+    within(".admin-rich-text-popover") { press "Remove link" }
+
+    document = saved_post_document { |doc| text_nodes(doc).none? { |node| Array(node["marks"]).any? } }
+    assert_equal "linked", doc_text(document)
   end
 
   test "an external link is checked client-side before it's applied" do
@@ -182,12 +543,13 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_no_text_in_editor "there"
   end
 
-  # The page editor sits beside the tree, so at 1100px a translation's editor
-  # gets a column too narrow for the toolbar's single row. There the toolbar
-  # wraps -- whole groups at a time -- but stays inside its own box: no tool
-  # pokes out sideways or runs into the original's panel next to it, and the
-  # Insert menu still opens.
-  test "in a narrow translation column (page editor beside the tree) the toolbar wraps inside its box and the Insert menu stays reachable" do
+  # The page editor sits beside the tree, so at 1100px a block card's form is
+  # under 880px wide: the original (reference card) stacks ABOVE the editor
+  # (design pass round 2, Task 7), which leaves the toolbar the whole column.
+  # It stays inside its own box -- no tool pokes out sideways, and the
+  # original is above it, not beside it -- and the Insert menu still opens.
+  # (Round 1's `flex-wrap` remains the fallback for a column narrower still.)
+  test "in a narrow translation column (page editor beside the tree) the original stacks above the toolbar, which stays inside its box, and the Insert menu stays reachable" do
     page.driver.resize(1100, 1000)
     page_record = create_page(title: "About")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
@@ -199,17 +561,17 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     spill = page.evaluate_script(<<~JS)
       (() => {
         const toolbar = document.querySelector("#block-#{block.id} [role=toolbar], [role=toolbar]")
-        const original = document.querySelector("[data-original-for='body']").parentElement
+        const original = document.querySelector("[data-original-for='body']")
         const t = toolbar.getBoundingClientRect(), o = original.getBoundingClientRect()
         const inside = Array.from(toolbar.querySelectorAll("button")).filter((b) => b.offsetParent).every((b) => {
           const r = b.getBoundingClientRect()
           return r.right <= t.right + 0.5 && r.left >= t.left - 0.5
         })
-        return { inside, clear: t.right <= o.left + 0.5 }
+        return { inside, clear: o.bottom <= t.top + 0.5 }
       })()
     JS
     assert spill["inside"], "a toolbar tool sits outside the toolbar's box"
-    assert spill["clear"], "the toolbar runs into the original's panel"
+    assert spill["clear"], "the original should stack above the toolbar, not overlap it"
     find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
     assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
   ensure
@@ -252,11 +614,96 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     page.find("[role=toolbar] [role=menu] button", text: "YouTube").click
 
     assert_no_selector "[role=toolbar] [role=menu]", visible: true
-    within(".admin-rich-text-popover") do
+    within("dialog#rich-text-youtube-dialog[open]") do
       fill_in "YouTube URL or video ID", with: "https://www.youtube.com/watch?v=#{YOUTUBE_ID}"
-      press "Insert"
+      press "Insert video"
     end
     assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+  end
+
+  test "the YouTube dialog rejects text that is not a video, shows the id live, and Enter inserts" do
+    visit_post
+
+    editor.click
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") do
+      fill_in "YouTube URL or video ID", with: "hello"
+      press "Insert video"
+      assert_text "That doesn’t look like a YouTube link."
+      assert_selector "#rich-text-youtube-url[aria-invalid=true]"
+      fill_in "YouTube URL or video ID", with: "https://www.youtube.com/watch?v=#{YOUTUBE_ID}"
+      assert_no_text "That doesn’t look like a YouTube link."
+      assert_text "Video id: #{YOUTUBE_ID}"
+      find_field("YouTube URL or video ID").send_keys(:enter)
+    end
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+    # Enter applied the dialog: it did not submit the editor's form.
+    assert_current_path "/cs-studio/posts/#{@post.id}"
+    saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
+  end
+
+  # Review B, M3: a refused Insert marks the field invalid; the next opening
+  # starts clean -- no message, and no invalid border without one.
+  test "the YouTube dialog reopens without the invalid mark a refused Insert left" do
+    visit_post
+
+    editor.click
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") do
+      fill_in "YouTube URL or video ID", with: "hello"
+      press "Insert video"
+      assert_selector "#rich-text-youtube-url[aria-invalid=true]"
+      press "Cancel"
+    end
+    refute_selector "dialog[open]"
+
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") do
+      assert_field "YouTube URL or video ID", with: ""
+      assert_no_selector "#rich-text-youtube-url[aria-invalid]"
+      assert_no_text "That doesn’t look like a YouTube link."
+    end
+  end
+
+  test "Escape and Cancel close a dialog, insert nothing and return focus to the editor" do
+    visit_post
+
+    editor.click
+    press_insert "YouTube"
+    find_field("YouTube URL or video ID").send_keys(:escape)
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror:focus"
+
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") { press "Cancel" }
+    refute_selector "dialog[open]"
+    assert_selector ".ProseMirror:focus"
+    refute_selector ".ProseMirror [data-youtube-id]"
+  end
+
+  # Dialogs live once in the layout, so which editor asked is the only thing
+  # that decides who gets the answer.
+  test "with two rich-text blocks on a page, a dialog opened from the second changes only the second" do
+    page_record = create_page(title: "About")
+    first = page_record.content_blocks.create!(block_type: "rich_text", position: 0, body: rich_doc("First"))
+    second = page_record.content_blocks.create!(block_type: "rich_text", position: 1, body: rich_doc("Second"))
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_editors(count: 2)
+
+    second_card = "##{ActionView::RecordIdentifier.dom_id(second)}"
+    find("#{second_card} .ProseMirror").click
+    within(second_card) { press_insert "YouTube" }
+    within("dialog#rich-text-youtube-dialog[open]") do
+      fill_in "YouTube URL or video ID", with: YOUTUBE_ID
+      press "Insert video"
+    end
+
+    assert_selector "#{second_card} .ProseMirror [data-youtube-id='#{YOUTUBE_ID}']"
+    saved_document(second) { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(first)} .ProseMirror", text: "First"
+    refute_selector "##{ActionView::RecordIdentifier.dom_id(first)} .ProseMirror [data-youtube-id]"
+    assert_equal rich_doc("First"), first.reload.body_document(locale: :en).to_h
   end
 
   # Turbo Stream replacement of a whole block card (task 7's lifecycle
@@ -465,6 +912,22 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   end
 
   def editor = find(".ProseMirror")
+
+  # Selects everything in the (first) editor, so a toolbar command applies to it.
+  def select_editor_text
+    page.execute_script(<<~JS)
+      const el = document.querySelector(".ProseMirror")
+      el.focus()
+      const range = document.createRange()
+      range.selectNodeContents(el)
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(range)
+    JS
+    # ProseMirror learns of a DOM selection from a `selectionchange` event,
+    # handled a frame or two later: wait that out before a command reads it.
+    page.evaluate_async_script("const done = arguments[0]; requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => done(true), 50)))")
+  end
 
   # Real key events (CDP `Input.dispatchKeyEvent`, through Ferrum's
   # keyboard) into whatever currently has focus (the ProseMirror element,

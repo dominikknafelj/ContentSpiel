@@ -1,0 +1,43 @@
+<%= form_with(**form_options) do %>
+  <% if hidden_locale? %>
+    <%= hidden_field_tag :locale, locale, id: nil %>
+  <% end %>
+
+  <div>
+    <%= label_tag :q, "Search titles", class: "sr-only" %>
+    <%= text_field_tag :q, filters[:q], placeholder: "Search titles", autocomplete: "off", class: "block w-56 rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+  </div>
+
+  <fieldset class="m-0 min-w-0 border-0 p-0">
+    <legend class="sr-only">Show</legend>
+    <div class="inline-flex overflow-hidden rounded-cs border border-line-strong bg-surface">
+      <% SCOPES.each do |name, label| %>
+        <label for="posts-scope-<%= name %>" class="<%= SEGMENT_CLASS %>">
+          <%= radio_button_tag :scope, name, scope == name, id: "posts-scope-#{name}", class: "sr-only" %>
+          <span><%= label %></span>
+          <span class="font-cs-mono text-[10px] opacity-70"><%= count_for(name) %></span>
+        </label>
+      <% end %>
+    </div>
+  </fieldset>
+
+  <div>
+    <%= label_tag :type, "Type", class: "sr-only" %>
+    <%= select_tag :type, options_for_select(type_options, filters[:type]), include_blank: "Type: All", class: setup_select_class %>
+  </div>
+
+  <div>
+    <%= label_tag :tag, "Tag", class: "sr-only" %>
+    <%= select_tag :tag, options_for_select(tags.map(&:name), filters[:tag]), include_blank: "Tag: Any", class: setup_select_class %>
+  </div>
+
+  <div>
+    <%= label_tag :translation, "Translation", class: "sr-only" %>
+    <%= select_tag :translation, options_for_select(TRANSLATIONS, filters[:translation]), include_blank: "Translation: Any", class: setup_select_class %>
+  </div>
+
+  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <% if active? %>
+    <%= link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+  <% end %>
+<% end %>

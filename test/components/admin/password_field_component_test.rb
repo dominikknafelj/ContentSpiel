@@ -12,6 +12,20 @@ class Admin::PasswordFieldComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-password-field-target=bar]"
   end
 
+  test "Show/Hide is 12px medium sans in the accent colour, not mono capitals" do
+    render_inline(Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password"))
+    assert_selector "button[data-password-field-target=toggle].text-xs.font-medium.text-accent", text: "Show"
+    assert_no_selector "button[data-password-field-target=toggle].font-cs-mono"
+    assert_no_selector "button[data-password-field-target=toggle].uppercase"
+  end
+
+  test "a label_aside sits on the label row, to the right" do
+    render_inline(Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "Password")) do |field|
+      field.with_label_aside { "<a href='/x'>Forgot?</a>".html_safe }
+    end
+    assert_selector ".admin-password-field > div.justify-between label[for=password] + a[href='/x']", text: "Forgot?"
+  end
+
   test "with a meter it renders four bars and a polite hint" do
     render_inline(Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true))
     assert_selector "[data-password-field-target=bar]", count: 4

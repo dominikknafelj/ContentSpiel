@@ -33,11 +33,22 @@ class Admin::ButtonComponentTest < ViewComponent::TestCase
     assert_selector "button.text-dim", text: "Cancel"
   end
 
-  test "danger_outline (opens a destructive confirm) differs from solid danger" do
-    render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger_outline)
-    assert_selector "button.bg-danger-tint", text: "Delete"
-
-    render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger)
+  test "danger_text is a secondary button with danger-coloured text; danger_outline is gone" do
+    render_inline(Admin::ButtonComponent.new(label: "Move to trash", variant: :danger_text))
+    assert_selector "button.border-line-strong.text-danger-ink", text: "Move to trash"
     assert_no_selector "button.bg-danger-tint"
+    assert_raises(ArgumentError) { Admin::ButtonComponent.new(label: "x", variant: :danger_outline) }
+  end
+
+  test "solid danger stays the dialog confirm" do
+    render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger)
+    assert_selector "button.bg-danger", text: "Delete"
+  end
+
+  test "small swaps the padding for a compact one and keeps the variant" do
+    render_inline Admin::ButtonComponent.new(label: "Use", size: :small)
+    assert_selector "button.bg-accent.px-2.py-0\\.5.text-sm", text: "Use"
+    assert_no_selector "button.px-4"
+    assert_raises(ArgumentError) { Admin::ButtonComponent.new(label: "x", size: :huge) }
   end
 end

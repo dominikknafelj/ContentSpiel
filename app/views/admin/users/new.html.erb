@@ -1,7 +1,7 @@
 <%# "New user" (cs-studio spec §6.1) -- email + password up front
     (`has_secure_password` requires a password on create). Mirrors
     `admin/posts/new.html.erb`'s own shape. %>
-<div class="mx-auto max-w-md">
+<div class="max-w-md">
   <h1 class="mb-4 font-cs-mono text-label uppercase tracking-mono text-meta">New user</h1>
 
   <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>

@@ -1,9 +1,9 @@
 module Admin
-  # The post editor (cs-studio spec §5.2): the same shell, autosave and
-  # publish-state behaviour as the page editor (`Admin::RecordHeaderComponent`
-  # + `Admin::PageSettingsFormComponent`), folded into one component the way
-  # `Admin::BlockCardComponent` already folds a block's own header and form
-  # together -- there is exactly one post form per screen (unlike a page,
+  # The post editor (cs-studio spec §5.2): the same header (`Admin::
+  # EditorScreen::HeaderComponent`, which it renders first), autosave and
+  # publish-state behaviour as the page editor (+ `Admin::
+  # PageSettingsFormComponent`), folded into one component -- there is
+  # exactly one post form per screen (unlike a page,
   # which shares the tree column with every other page, or a block, which
   # can have several cards on one page at once), so there's no multi-
   # instance-per-screen id collision to disambiguate against the way
@@ -19,12 +19,6 @@ module Admin
       @url_options = url_options
     end
 
-    def status = post.status
-
-    def live? = post.live?
-
-    def scheduled_at = post.published_at
-
     def save_status_id = "post-save-status"
 
     def base_updated_at_id = "#{ID_PREFIX}-base-updated-at"
@@ -35,34 +29,13 @@ module Admin
 
     def definition = post.definition
 
-    # The canonical address (spec §5.2): a `post_list` block somewhere lists
-    # this post, or it doesn't -- `nil` here means "nowhere yet", the same
-    # contract `PublicSite::Urls#path_for` already uses for a page with no
-    # path, told apart in the template by the "Not listed on any page yet"
-    # message the spec calls for verbatim.
-    def public_path = urls.path_for(post, locale)
-
-    def public_url = absolute_urls.url_for(post, locale)
-
-    def preview_path = preview_urls.path_for(post, locale)
-
-    # Access control (design spec §5 "Everywhere"): Publish now, Unpublish
-    # and Schedule… need `posts.publish` on this post, Delete `posts.delete`
-    # -- each absent, not disabled, without it. `editable?` is whether the
+    # Access control (design spec §5 "Everywhere"): `editable?` is whether the
     # form itself is live: without it the header says "View only", every
     # field is disabled (one `<fieldset disabled>` around the form's
     # contents, which also makes the rich-text editor read-only) and
     # `admin--autosave` isn't attached, so typing sends nothing at all
     # (Review Focus 4).
     def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(post))
-
-    def may_publish? = can?("posts.publish", post)
-
-    def can_publish? = !post.live? && may_publish?
-
-    def can_unpublish? = post.status != "draft" && may_publish?
-
-    def can_delete? = can?("posts.delete", post)
 
     # The form's `data-*`: the autosave wiring only when the post is
     # editable (see `editable?`).
@@ -76,32 +49,8 @@ module Admin
       }
     end
 
-    def delete_dialog_id = "delete-post-#{post.id}"
-
-    def scheduled_at_input_value
-      (post.status == "scheduled" ? post.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
-    end
-
-    # The dot-marked codes for `Admin::LanguageTabsComponent` (spec
-    # §6.2) -- same reasoning `Admin::RecordHeaderComponent#missing_locales`
-    # gives for its own page.
-    def missing_locales = switcher_locales[:missing]
-
-    # The switcher's "original changed" codes (translation helpers spec §4).
-    def outdated_locales = switcher_locales[:outdated]
-
-    # See `Admin::RecordHeaderComponent#switcher_locales`.
-    def switcher_locales = @switcher_locales ||= Translations::Status.switcher_locales(post)
-
     # See `Admin::PageSettingsFormComponent#translation`.
-    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(post, field, locale: locale, confirmable: editable?)
-
-    # Per-code URL for the switcher: same "omit `locale:` for the site's
-    # default language" rule `Admin::RecordHeaderComponent#language_url`
-    # applies to a page, rebuilt here against this post's own editor path.
-    def language_url
-      ->(code) { helpers.admin_post_path(post, **(code.to_s == ::Locales.default ? {} : { locale: code })) }
-    end
+    def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(post, field, locale: locale, confirmable: editable?)
 
     def field_id(name) = "#{ID_PREFIX}-#{name}"
 
@@ -148,7 +97,34 @@ module Admin
       page ? (urls.path_for(page, locale) || "").sub(%r{/+\z}, "") : ""
     end
 
-    def schema_fields = definition&.fields || []
+    # The typed fields rendered as inputs. On a translation tab only the
+    # translated ones: an untranslated field is the same in every language, so
+    # it is shown read-only in `#shared_fields` instead of being a form input
+    # (see `Admin::EditorScreen::SharedFieldsComponent`).
+    def schema_fields
+      fields = definition&.fields || []
+      translation_tab? ? fields.select(&:translated?) : fields
+    end
+
+    def translation_tab? = locale.to_s != ::Locales.default
+
+    # The type's own fields (and, on a translation tab, the read-only list of
+    # the ones shared by every language) are one titled group; a type with
+    # none draws no empty group.
+    def fields_group? = schema_fields.any? || shared_fields.any?
+
+    def fields_group_title = "#{definition&.label || post.content_type.to_s.humanize} fields"
+
+    # `[label, value]` for every untranslated field, read from the original
+    # language (an untranslated field's one value lives there). Empty off a
+    # translation tab, where those fields are ordinary inputs.
+    def shared_fields
+      return [] unless translation_tab?
+
+      (definition&.fields || []).reject(&:translated?).map do |field|
+        [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_fields_object&.public_send(field.name)) ]
+      end
+    end
 
     # This post's own typed-field value, in whichever locale is being
     # edited -- `fields(locale:)` reads the *literal* locale (no fallback
@@ -159,10 +135,9 @@ module Admin
     # `field.translated?` gates this first -- same fix, same reasoning,
     # `Admin::BlockCardComponent#original_for`'s own comment gives: an
     # untranslated typed field (e.g. `test/event`'s own `venue`) has one
-    # value across every locale, so it must fall through to `FieldComponent
-    # #show_untranslated_hint?`'s "Same in all languages" line, not a
-    # read-only original that would otherwise show up here regardless of
-    # `translated?`.
+    # value across every locale, so it be listed read-only under
+    # "Shared fields" (`#shared_fields`), not shown as an original that would
+    # otherwise show up here regardless of `translated?`.
     def field_original(field)
       return nil if !field.translated? || locale.to_s == ::Locales.default
 
@@ -171,23 +146,13 @@ module Admin
 
     def field_errors_for(field) = post.errors.full_messages_for("fields.#{field.name}")
 
-    def tag_names_value = post.tags.order(:name).map(&:name).join(", ")
+    def tag_chips = post.tags.order(:name).map { |tag| { value: tag.name, label: tag.name } }
 
     private
 
     attr_reader :post, :locale, :url_options
 
     def urls = PublicSite::Urls.new
-
-    # Absolute addresses (the "Copy" button) use the configured public
-    # origin, or -- with none configured, as on a local checkout -- the
-    # origin this very request came in on, which is where the site is
-    # actually being served. Its own instance, separate from `urls`:
-    # reading the request needs the view context, which the path readers
-    # above (also called outside a render, e.g. `slug_base_url`) must not.
-    def absolute_urls = PublicSite::Urls.new(host: PublicSite::Urls.configured_host || helpers.request.base_url)
-
-    def preview_urls = PublicSite::Urls.new(preview: true)
 
     def fields_object = post.fields(locale: locale)
 

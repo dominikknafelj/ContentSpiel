@@ -17,5 +17,7 @@ module Admin
     include AccessControlHelper
     # `dialog_trigger(id)`: the `data:` that opens a dialog (no inline JS).
     include Admin::DialogHelper
+
+    include Admin::SiteNameHelper
   end
 end

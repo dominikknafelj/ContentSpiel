@@ -7,6 +7,26 @@
       Admin::TreeController#update -- kept empty (not `sr-only`'d away
       entirely) on an ordinary page load, since there is nothing to report
       yet. %>
+  <%# Handoff §10 C34. "+ New page" opens the New page dialog (Inside = Home, the
+      default); the `href` is the no-JS page, and the trigger is a data attribute
+      on the link so it keeps working after this frame is replaced by a Turbo
+      Stream. %>
+  <div class="mb-2 flex items-center gap-2 px-1">
+    <h2 class="flex-1 text-sm font-semibold text-ink">Pages</h2>
+    <% if can_add_page? %>
+      <%= link_to "+ New page", new_page_path, data: dialog_trigger("new-page-dialog").merge(turbo_frame: "content"), class: "rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken" %>
+    <% end %>
+    <% if offer_starter_pages? %>
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "More page actions") do |menu| %>
+        <% menu.with_item do %>
+          <%# Posts to `_top`: the new pages land in the tree, outside the `content`
+              frame, so the redirect back has to replace the whole shell. %>
+          <%= helpers.button_to "Create starter pages", helpers.admin_starter_contents_path(**url_options), method: :post, form: { data: { turbo_frame: "_top" } } %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+
   <p id="tree-status" role="status" aria-live="polite" class="min-h-[1.25rem] px-1 text-sm"></p>
 
   <%# The keyboard path for a drag (handoff §9 A9): one instruction every
@@ -17,7 +37,7 @@
 
   <% if root %>
     <ul class="admin-tree flex flex-col gap-0.5">
-      <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_states: translation_states, selected: selected, locale: locale, url_options: url_options, root: true) %>
+      <%= render Admin::TreeNodeComponent.new(page: root, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, selected: selected, locale: locale, url_options: url_options, root: true) %>
     </ul>
   <% else %>
     <%= render Admin::EmptyStateComponent.new(title: "No pages yet") %>

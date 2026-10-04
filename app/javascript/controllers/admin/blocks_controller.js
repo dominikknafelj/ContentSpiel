@@ -1,18 +1,26 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
+import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
 // handle (Space, arrows, Space). `card` targets are
 // `Admin::BlockCardComponent`'s own top-level wrapper -- one per block, in
-// document order -- and every between-cards "+ add block" picker lives
-// *nested inside* the card it follows (that component's own comment
-// explains why), so it's never itself a direct child of the `list` target
-// and Sortable never has to be told to skip it: the list's direct children
-// are exactly the cards, nothing else. (The list is its own target, not
-// `this.element`: the controller's element is the whole Blocks section,
-// whose direct children are the header, the list and the picker.)
+// document order -- and the list's direct children are exactly the cards,
+// nothing else (the one "Add block" row sits after the list, not in it), so
+// Sortable never has to be told to skip anything. (The list is its own
+// target, not `this.element`: the controller's element is the whole Blocks
+// section, whose direct children are the header, the list and the picker.)
+//
+// Each card's "⋯" menu has Move up and Move down; the first card's Move up
+// and the last card's Move down are disabled. `refreshMoveState` keeps that
+// right in the browser: it runs on connect, after every reorder this
+// controller sends, and whenever the list's children change (a drop, a
+// keyboard step, a card streamed in by Add block or Duplicate, one removed by
+// Delete, the whole list replaced by an Undo) -- the server renders the
+// right state for the cards it sends, but a streamed insertion or removal
+// touches no neighbour, so it can only be corrected here.
 //
 // Duplicate and Delete need no controller action of their own -- both are
 // plain `button_to`/`form_with` submissions, and Turbo Drive already
@@ -40,9 +48,25 @@ export default class extends Controller {
   static pageBaseId = "page-base-updated-at"
 
   connect() {
+    // The page this list was rendered on: a reorder belongs to it whenever it
+    // is queued (`autosave/queue.js`, "PAGE GENERATIONS").
+    this.generation = currentGeneration()
+    // A write (never a GET) waits its turn in the page-level queue
+    // (`autosave/queue.js`) and reads the page base when it is actually sent;
+    // the queue slot is kept until the answer's bases are in the hidden
+    // fields, so the next request sees them. Add, duplicate and delete are
+    // plain Turbo form submissions, and answer with streams that move the
+    // page form's base, so they depend on it exactly as an autosave does.
     this.addPageBase = (event) => {
-      const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
-      if (pageBase) event.detail.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+      if (String(event.detail.fetchOptions.method).toUpperCase() === "GET") return
+
+      holdTurboRequest(event, {
+        baseIds: [ this.constructor.pageBaseId ],
+        before: (request) => {
+          const pageBase = document.getElementById(this.constructor.pageBaseId)?.value
+          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+        }
+      })
     }
     this.element.addEventListener("turbo:before-fetch-request", this.addPageBase)
     // The Undo toast after a reorder lives in `#toasts`, outside this
@@ -55,6 +79,28 @@ export default class extends Controller {
       if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    // Duplicate is picked from a card's "⋯" menu, which closes on the pick:
+    // the item that had focus is hidden, and focus fell to <body> -- a
+    // keyboard user was back at the top of the page with the copy somewhere
+    // below. So a Duplicate that succeeded is remembered (`turbo:submit-end`
+    // bubbles up from its form), and the card its answer's stream then adds
+    // to the list gets focus on its handle (`focusCopy`, from the list's
+    // observer): the copy, where Space and the arrows move it on. The note is
+    // dropped after a moment in case no card follows.
+    this.duplicated = (event) => {
+      const action = event.detail.formSubmission?.formElement?.getAttribute("action") || ""
+      if (!event.detail.success || !new URL(action, window.location.origin).pathname.endsWith("/duplicate")) return
+      this.awaitingCopy = true
+      clearTimeout(this.copyTimer)
+      this.copyTimer = setTimeout(() => { this.awaitingCopy = false }, 2000)
+    }
+    this.element.addEventListener("turbo:submit-end", this.duplicated)
+    this.moveStateObserver = new MutationObserver((mutations) => {
+      this.refreshMoveState()
+      this.focusCopy(mutations)
+    })
+    this.moveStateObserver.observe(this.listTarget, { childList: true })
+    this.refreshMoveState()
     this.sortable = Sortable.create(this.listTarget, {
       handle: ".admin-block-card__handle",
       animation: 150,
@@ -101,53 +147,101 @@ export default class extends Controller {
   disconnect() {
     this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
     document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.element.removeEventListener("turbo:submit-end", this.duplicated)
+    clearTimeout(this.copyTimer)
+    this.moveStateObserver?.disconnect()
     this.sortable?.destroy()
+  }
+
+  // See `duplicated` in `connect`: the first card added to the list after a
+  // Duplicate is the copy.
+  focusCopy(mutations) {
+    if (!this.awaitingCopy) return
+    const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
+      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--blocks-target="card"]'))
+    if (!copy) return
+
+    this.awaitingCopy = false
+    this.focusHandle(copy)
+  }
+
+  // Move up is disabled on the first card, Move down on the last. Only the
+  // attribute is touched, so it is idempotent and cheap to run on every
+  // child-list change.
+  refreshMoveState() {
+    const cards = this.cardTargets
+    cards.forEach((card, index) => {
+      const up = card.querySelector('[data-move="up"]')
+      const down = card.querySelector('[data-move="down"]')
+      if (up) up.disabled = index === 0
+      if (down) down.disabled = index === cards.length - 1
+    })
   }
 
   // Shows/hides one card's own field list -- purely client-side (spec §5.1
   // names no "remember this across a reload" requirement for it), so this
-  // never round-trips to the server the way a drag/move does.
+  // never round-trips to the server the way a drag/move does. The title
+  // button is the disclosure: `aria-expanded` follows.
   toggle(event) {
-    this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    const hidden = this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    if (hidden !== undefined) event.currentTarget.setAttribute("aria-expanded", String(!hidden))
   }
 
   // "Move up/down (client-side move, then the same reorder request)" (this
   // task's own brief): swaps this card with its immediate neighbour in
-  // `cardTargets`' own order -- not raw DOM siblings, since a card's
-  // *own* nested trailing picker would otherwise come along as if it were
-  // itself another list item -- then fires the exact same request a drag's
-  // `onEnd` does.
+  // `cardTargets`' own order, then fires the exact same request a drag's
+  // `onEnd` does. A disabled item (first card's Move up, last card's Move
+  // down) never gets here; the index guards are a belt for a programmatic
+  // call. The menu has closed by the time the card moves, so focus goes to
+  // the card's handle rather than being lost with the DOM move.
   moveUp(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
-    if (index > 0) this.listTarget.insertBefore(card, this.cardTargets[index - 1])
-    this.reorder()
+    if (index <= 0) return
+    this.listTarget.insertBefore(card, this.cardTargets[index - 1])
+    this.moved(card)
   }
 
   moveDown(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
-    if (index >= 0 && index < this.cardTargets.length - 1) {
-      this.listTarget.insertBefore(this.cardTargets[index + 1], card)
-    }
+    if (index < 0 || index >= this.cardTargets.length - 1) return
+    this.listTarget.insertBefore(this.cardTargets[index + 1], card)
+    this.moved(card)
+  }
+
+  moved(card) {
+    this.focusHandle(card)
     this.reorder()
   }
 
+  // Queued with every other write on the screen (`autosave/queue.js`): the
+  // order is read when the request is sent (a Move up/down made while an
+  // autosave was in flight still sends the final order), and the page base
+  // it carries is the freshest one. The answer's page base is written into
+  // the hidden field before the next request goes.
   async reorder() {
+    this.refreshMoveState()
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    const response = await fetch(this.reorderUrlValue, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "text/vnd.turbo-stream.html",
-        "X-CSRF-Token": csrfToken,
-        "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
-      },
-      body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) })
-    })
+    await enqueue(async (isCurrent) => {
+      const response = await fetch(this.reorderUrlValue, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/vnd.turbo-stream.html",
+          "X-CSRF-Token": csrfToken,
+          "X-Page-Base-Updated-At": document.getElementById(this.constructor.pageBaseId)?.value || ""
+        },
+        body: JSON.stringify({ ids: this.cardTargets.map((card) => card.dataset.blockId) }),
+        signal: AbortSignal.timeout(30000)
+      })
 
-    Turbo.renderStreamMessage(await response.text())
+      const text = await response.text()
+      if (!isCurrent()) return
+      syncBases(text, [ this.constructor.pageBaseId ])
+      Turbo.renderStreamMessage(text)
+    }, { generation: this.generation }).catch(() => {})
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------

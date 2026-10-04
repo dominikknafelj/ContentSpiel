@@ -59,13 +59,16 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     find(".ProseMirror").click
     press_insert "Image"
-    pick_from_library(@asset)
+    # Picking opens the image dialog (Task 13), so not `pick_from_library`,
+    # which waits for every dialog to close.
+    within("dialog[open]") { click_on @asset.title }
+    assert_selector "dialog#rich-text-image-dialog[open]"
     # The per-use fields show the image's own defaults as placeholders
     # (fix round 1, I1).
-    within(".admin-rich-text-popover") do
+    within("dialog#rich-text-image-dialog[open]") do
       assert_field "Alt text", with: "", placeholder: "A wide view"
       assert_field "Caption", with: "", placeholder: "Wide"
-      click_on "Done"
+      click_on "Insert image"
     end
     assert_eventually do
       post.reload.body_document(locale: :en).to_h.to_json.include?(%("asset_id":#{@asset.id}))
@@ -143,6 +146,9 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     fill_in "Title", with: "Landing v2"
     assert_eventually { @landing.reload.title(locale: :en) == "Landing v2" }
     assert_equal stored.id, @landing.hero_media_asset_id
+    # ...and that successful save did not erase the refusal message: it stays
+    # until the editor acts on the hero field again.
+    assert_selector "#page-hero-image-section", text: "Hero image doesn't exist"
   end
 
   test "Escape closes the picker and returns focus to the button that opened it" do
@@ -173,6 +179,44 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   end
 
   private
+
+  # Round 1 second review: Design's screenshot showed the picker at the bottom
+  # of the page, cut off, with the page behind shifted and a black band on top.
+  # This opens it in a real browser (1400x900) with the page scrolled down 600px
+  # and checks the dialog lies inside the viewport and nothing behind it moved.
+  # The page is scrolled to where the Choose image button sits 300px below the
+  # viewport top (about 600px down), not to a fixed 600: the editor header is
+  # sticky now, and at a fixed offset the button can sit under it, where the
+  # driver's click first scrolls the page to reach it -- a scroll of the test's
+  # own making, not the picker's.
+  test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
+    page.driver.resize(1400, 900)
+    visit_editor
+    # Make sure there is 600px to scroll whatever the editor's own height is.
+    page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 0)")
+    button_top = page.evaluate_script("Math.round(document.querySelector('#page-hero-image-section button').getBoundingClientRect().top)")
+    scrolled_to = [ button_top - 300, 1 ].max
+    page.execute_script("window.scrollTo(0, #{scrolled_to})")
+    assert_equal scrolled_to, page.evaluate_script("Math.round(window.scrollY)")
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+
+    box = page.evaluate_script(<<~JS)
+      (() => {
+        const r = document.getElementById("media-picker").getBoundingClientRect()
+        return { top: r.top, left: r.left, bottom: r.bottom, right: r.right,
+                 width: window.innerWidth, height: window.innerHeight, scrollY: Math.round(window.scrollY) }
+      })()
+    JS
+    assert_operator box["top"], :>=, 0
+    assert_operator box["left"], :>=, 0
+    assert_operator box["bottom"], :<=, box["height"]
+    assert_operator box["right"], :<=, box["width"]
+    assert_equal scrolled_to, box["scrollY"]
+  ensure
+    page.driver.resize(1400, 1400)
+  end
 
   def visit_editor
     visit "/cs-studio/pages/#{@landing.id}"

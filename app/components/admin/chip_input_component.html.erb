@@ -1,0 +1,76 @@
+<div class="admin-column mb-4" data-field-name="<%= name.delete_suffix("[]").split(/[\[\]]+/).last %>"
+     data-controller="admin--chip-input"
+     data-admin--chip-input-search-url-value="<%= search_url %>"
+     data-admin--chip-input-name-value="<%= name %>"
+     data-admin--chip-input-create-value="<%= create %>"
+     data-admin--chip-input-noun-value="<%= noun %>"
+     data-admin--chip-input-single-value="<%= single %>"
+     data-admin--chip-input-lowercase-value="<%= lowercase %>"
+     data-admin--chip-input-exclude-value="<%= exclude.to_json %>"
+     <% if max_length %>data-admin--chip-input-max-length-value="<%= max_length %>"<% end %>
+     data-action="input->admin--chip-input#swallow change->admin--chip-input#swallow">
+  <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= label %></label>
+
+  <%# The sentinel -- see this component's own class comment. It is also the control
+      `admin--chip-input` dispatches its bubbling `change` from. %>
+  <%= tag.input type: "hidden", name: name, value: "", autocomplete: "off", data: { "admin--chip-input-target": "sentinel" } %>
+
+  <%# One border around the chips and the text input; clicking the empty part focuses the input. %>
+  <div class="admin-chip-field relative flex flex-wrap items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-accent"
+       data-action="click->admin--chip-input#focusInput">
+    <ul class="flex flex-wrap gap-1.5" aria-label="<%= label %>" data-admin--chip-input-target="list">
+      <% chips.each do |chip| %>
+        <%= tag.li class: chip_class(chip), data: { "chip-value": chip[:value], invalid: (true if chip[:invalid]) } do %>
+          <% if chip[:dot].present? %><span class="admin-chip__dot h-[7px] w-[7px] shrink-0 rounded-full <%= chip[:dot] %>" aria-hidden="true"></span><% end %>
+          <span class="min-w-0 truncate" data-chip-label><%= chip[:label] %></span>
+          <% if chip[:invalid] %><span class="sr-only" data-chip-invalid-note> (invalid)</span><% end %>
+          <% if chip[:hint].present? %><span class="shrink-0 text-meta" data-chip-hint>· <%= chip[:hint] %></span><% end %>
+          <%= tag.input type: "hidden", name: name, value: chip[:value], autocomplete: "off" %>
+          <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label="<%= remove_label(chip) %>"
+                  data-action="click->admin--chip-input#remove keydown->admin--chip-input#chipKeydown"><span aria-hidden="true">×</span></button>
+        <% end %>
+      <% end %>
+    </ul>
+
+    <%= tag.input type: "text", id: id, placeholder: placeholder, autocomplete: "off", autocapitalize: "off", spellcheck: "false",
+          class: "min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-0.5 text-sm text-ink outline-none placeholder:text-meta",
+          role: "combobox", aria: { expanded: "false", controls: listbox_id, autocomplete: "list", describedby: described_by, invalid: (true if errors.any?) },
+          data: { "admin--chip-input-target": "input", action: "keydown->admin--chip-input#keydown input->admin--chip-input#search blur->admin--chip-input#leave" } %>
+
+    <ul id="<%= listbox_id %>" role="listbox" aria-label="<%= label %> suggestions" hidden
+        class="absolute left-0 right-0 top-full z-10 mt-1 max-h-64 overflow-y-auto rounded-cs border border-line-strong bg-surface py-1 shadow-menu"
+        data-admin--chip-input-target="listbox"
+        data-action="mousedown->admin--chip-input#holdFocus click->admin--chip-input#choose"></ul>
+  </div>
+
+  <%# Additions and removals, announced politely (the chips themselves aren't a live region). %>
+  <p id="<%= status_id %>" class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-admin--chip-input-target="status"></p>
+
+  <% if help.present? %><p id="<%= help_id %>" class="mt-1 text-sm text-meta"><%= help %></p><% end %>
+  <% if hidden_note.present? %><p class="mt-1 text-sm text-meta"><%= hidden_note %></p><% end %>
+  <%# Anything the caller adds beneath the field (the related-posts "Also related from" line). %>
+  <%= content %>
+
+  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
+
+  <%# What the controller clones for a chip or a suggestion row it adds. Server-rendered so every class
+      is a literal Tailwind sees, and so the markup can't drift from the chips rendered above. %>
+  <template data-admin--chip-input-target="chipTemplate">
+    <%= tag.li class: chip_class({}) do %>
+      <span class="admin-chip__dot h-[7px] w-[7px] shrink-0 rounded-full" aria-hidden="true" hidden></span>
+      <span class="min-w-0 truncate" data-chip-label></span>
+      <span class="shrink-0 text-meta" data-chip-hint hidden></span>
+      <input type="hidden" name="<%= name %>" autocomplete="off">
+      <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              data-action="click->admin--chip-input#remove keydown->admin--chip-input#chipKeydown"><span aria-hidden="true">×</span></button>
+    <% end %>
+  </template>
+  <template data-admin--chip-input-target="optionTemplate">
+    <li role="option" class="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-ink aria-selected:bg-sunken" aria-selected="false">
+      <span class="admin-chip__dot h-[7px] w-[7px] shrink-0 rounded-full" aria-hidden="true" hidden></span>
+      <span class="min-w-0 flex-1 truncate" data-option-label></span>
+      <span class="shrink-0 text-meta" data-option-hint hidden></span>
+    </li>
+  </template>
+</div>

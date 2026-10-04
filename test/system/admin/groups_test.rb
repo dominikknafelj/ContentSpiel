@@ -18,17 +18,17 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
 
       await_admin_controllers
 
-      # "Add Test/speaker" -- `Admin::Fields::GroupsField#add_label`, built
+      # "+ Add Test/speaker" -- `Admin::Fields::GroupsField#add_label`, built
       # off `test/speaker`'s own default (unlabeled) `humanize`d name --
       # purely client-side (`admin--groups#add`), no request of its own.
-      press "Add Test/speaker"
+      press "+ Add Test/speaker"
       # Row 0's `name` input id, by `Admin::FieldComponent`'s own formula
       # (`dom_id_prefix("post[fields][speakers][0]")`) -- see that
       # component's class comment, and `admin--groups#renumber`'s own for
       # why this id moves with a row across a later reorder/remove.
       fill_in "post_fields_speakers_0-name", with: "Ada"
 
-      press "Add Test/speaker"
+      press "+ Add Test/speaker"
       fill_in "post_fields_speakers_1-name", with: "Grace"
 
       assert_speakers_eventually(post_record, %w[Ada Grace])
@@ -53,10 +53,10 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       assert_speakers_eventually(post_record, %w[Grace Ada])
 
       # Remove the row now in first position (Grace, after the reorder
-      # above) -- scoped to that row alone since every row's own "Remove"
+      # above) -- scoped to that row alone since every row's own ×
       # button shares the same label.
       first_row = all('[data-admin--groups-target="row"]').first
-      first_row.find(:link_or_button, "Remove").execute_script("this.click()")
+      first_row.find("button[aria-label='Remove Test/speaker']").execute_script("this.click()")
 
       assert_speakers_eventually(post_record, %w[Ada])
     end

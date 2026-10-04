@@ -29,33 +29,65 @@ module Admin
     # `:forbidden` is a save a service refused for want of permission
     # (access-control design spec §3.4) -- an editor that's view only never
     # sends one, so it only shows for a stale tab whose rights changed.
-    STATES = %i[idle saving saved error stale offline retrying signed_out forbidden].freeze
+    STATES = %i[idle saving saved error stale saved_over offline retrying signed_out forbidden].freeze
 
-    def initialize(id:, state: :idle, at: nil, count: 0)
+    #
+    # Wording (design pass round 2, handoff §4.1): the saved/saving/offline
+    # lines are mono capitals ("SAVED 10:42"; a live record's edits go
+    # straight to the site, so "● SAVED TO SITE 10:42" in the ok colour). The
+    # capitals are literal text, not a CSS `uppercase`, so what a test or a
+    # screen reader reads is exactly what is shown. `live:` also rides on the
+    # element (`data-live`) so `autosave_controller.js`, which writes the
+    # "saving" line itself, picks the same wording. Every string here that
+    # the controller also writes (`static texts`) must be changed on both
+    # sides together.
+    def initialize(id:, state: :idle, at: nil, count: 0, live: false)
       raise ArgumentError, "unknown save status state #{state.inspect}" unless STATES.include?(state)
 
       @id = id
       @state = state
       @at = at
       @count = count
+      @live = live
     end
 
     def text
       case state
       when :idle then ""
-      when :saving then "Saving…"
-      when :saved then [ "Saved", at&.strftime("%H:%M") ].compact.join(" ")
+      when :saving then live ? "SAVING TO SITE…" : "SAVING…"
+      when :saved then [ live ? "● SAVED TO SITE" : "SAVED", at&.strftime("%H:%M") ].compact.join(" ")
       when :error then "Couldn't save — #{count} problems"
       when :forbidden then "Not saved — you don't have permission to change this"
-      when :retrying then "Not saved — retrying"
-      when :offline then "Not saved — check your connection"
-      when :stale then "Changed elsewhere — reload to see the latest"
+      when :retrying then "NOT SAVED · RETRYING…"
+      # The Retry button is rendered after this text (see the template).
+      when :offline then "NOT SAVED · "
+      # "Not saved": the three record editors refuse a stale save
+      # (`Admin::AutosaveResponses#refuse_stale_autosave`).
+      when :stale then "● CHANGED ELSEWHERE"
+      # The opposite meaning, for the forms that still save on a stale base
+      # (Settings, media detail, tag rows): the save WENT THROUGH and
+      # overwrote, so it must never read like the refusal above.
+      when :saved_over then "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
       when :signed_out then "Signed out — sign in again to keep saving"
       end
     end
 
+    # Only an `offline` line offers Retry (the other failures either retry by
+    # themselves or need the fields fixed first).
+    def retry_button? = state == :offline
+
+    # `text-ok-ink` marks a live record's saved line only; a failure or
+    # anything else keeps the neutral colour.
+    def css_class
+      colour = if state == :saved && live then "text-ok-ink"
+      elsif state == :stale || state == :saved_over then "text-warn-ink"
+      else "text-meta"
+      end
+      "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{colour}"
+    end
+
     private
 
-    attr_reader :id, :state, :at, :count
+    attr_reader :id, :state, :at, :count, :live
   end
 end

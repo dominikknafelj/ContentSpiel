@@ -15,6 +15,16 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:reader))
   end
 
+  # Task 19's visual difference 9: the chip input's frame is a div, so the
+  # sunken look of a disabled field missed it and it kept a white frame around
+  # a sunken inner field.
+  test "the tag chip input's frame is as sunken as the other disabled fields" do
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+    background = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).backgroundColor") }
+    assert_equal background.call("#post-title"), background.call(".admin-chip-field")
+  end
+
   test "a read-only user's post editor is view only and never autosaves" do
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
@@ -30,7 +40,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
 
     assert_selector "[data-view-only]", text: "View only"
     assert_no_selector "[data-controller~='admin--autosave']"
-    assert_no_button "Publish now"
+    assert_no_button "Publish"
+    assert_no_selector "button[aria-label='More actions']"
     assert_no_button "Delete"
 
     title = find_field("Title", disabled: true)
@@ -56,5 +67,33 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_no_text "typed"
     assert_text "Original body"
     assert_equal "Hands off", @post.reload.title
+  end
+
+  test "a read-only user clicking an image in the body opens no dialog" do
+    asset = create_media_asset
+    Posts::Save.call(@post, translations: { "en" => { body: { "type" => "doc", "content" => [ { "type" => "image", "attrs" => { "asset_id" => asset.id, "alt" => "", "caption" => "" } } ] } } })
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+
+    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    sleep 0.5
+    assert_no_selector "dialog[open]"
+  end
+
+  test "a read-only user's page editor says why, shows no tools, and cannot type" do
+    page_record = create_page(title: "Look only")
+    page_record.content_blocks.create!(block_type: :rich_text, position: 0)
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_admin_controllers
+
+    assert_selector "[data-view-only-hint]", text: "You can view this page but not change it."
+    assert_selector "#editor-notice"
+    assert_no_selector "[role=toolbar]"
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "button[aria-label='Block actions'], summary[aria-label='Block actions']"
+    assert_no_text "Add block"
+    assert_no_selector "[data-controller~='admin--autosave']"
+    assert_selector ".admin-view-only"
+    assert find_field("Title", disabled: true).disabled?
   end
 end

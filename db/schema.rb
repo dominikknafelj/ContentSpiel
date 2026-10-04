@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -101,6 +101,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.datetime "occurred_at", null: false
     t.datetime "last_occurred_at", null: false
     t.index ["action", "occurred_at"], name: "index_audit_events_on_action_and_occurred_at"
+    t.index ["last_occurred_at", "id"], name: "index_audit_events_on_recent", order: :desc
     t.index ["subject_type", "subject_id", "last_occurred_at"], name: "index_audit_events_on_subject_and_newest", order: { last_occurred_at: :desc }
     t.index ["subject_type", "subject_id", "occurred_at"], name: "idx_on_subject_type_subject_id_occurred_at_92d4f006a6"
     t.index ["user_id", "occurred_at"], name: "index_audit_events_on_user_id_and_occurred_at"
@@ -120,6 +121,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.jsonb "body", default: {}, null: false
     t.bigint "media_asset_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["media_asset_id"], name: "index_content_blocks_on_media_asset_id"
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
   end
@@ -138,6 +140,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.datetime "trashed_at"
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
@@ -187,6 +190,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.bigint "trashed_by_id"
     t.bigint "trash_root_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
     t.index ["trash_root_id"], name: "index_pages_on_trash_root_id"
@@ -229,6 +234,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.datetime "trashed_at"
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
     t.index ["trashed_at"], name: "index_posts_on_trashed_at"
@@ -272,6 +278,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.string "ai_provider"
     t.string "ai_model"
     t.text "ai_api_key"
+    t.jsonb "translation_original_changed_at", default: {}, null: false
   end
 
   create_table "tags", force: :cascade do |t|
@@ -279,6 +286,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_tags_on_name", unique: true
+  end
+
+  create_table "translation_states", force: :cascade do |t|
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.string "locale", null: false
+    t.string "state", null: false
+    t.integer "missing_count", default: 0, null: false
+    t.integer "outdated_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["locale", "state"], name: "index_translation_states_on_locale_and_state"
+    t.index ["record_type", "record_id", "locale"], name: "index_translation_states_on_record_and_locale", unique: true
   end
 
   create_table "users", force: :cascade do |t|

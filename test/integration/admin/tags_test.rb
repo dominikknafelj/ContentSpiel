@@ -51,9 +51,22 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: tag.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_match(/Saved \d\d:\d\d/, response.body)
+    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
     assert_equal "ruby", tag.reload.name
     assert_nil post.reload.full_path("en")
+  end
+
+  test "a rename on a stale base still saves, and says so without the refusal's wording" do
+    tag = Tag.create!(name: "rails")
+    stale = tag.updated_at.iso8601(6)
+    travel 1.minute
+    tag.update!(name: "rails2")
+
+    patch "/cs-studio/tags/#{tag.id}", params: { tag: { name: "ruby" }, base_updated_at: stale }, as: :turbo_stream
+    assert_response :success
+    assert_equal "ruby", tag.reload.name
+    assert_match(/SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST/, response.body)
+    assert_no_match(/● CHANGED ELSEWHERE/, response.body)
   end
 
   test "renaming to a name already taken comes back as a per-field error" do

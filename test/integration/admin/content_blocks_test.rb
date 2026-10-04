@@ -37,58 +37,67 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
-  # Fix (final-fixes round, finding 10): the end-of-list picker (rendered
-  # once, statically, below the whole list) and a card's own trailing
-  # between-picker (`last: false` only) used to both end up showing at the
-  # tail after an append -- the newly-appended card kept the default
-  # `last: false` regardless of actually being last now, so it rendered its
-  # own redundant trailing picker right above the page's already-present
-  # end-of-list one -- and the card that *was* last lost nothing (it never
-  # had one to lose), but was left permanently missing the between-picker
-  # it should have gained the moment something followed it.
-  test "adding a block at the end gives the new card no trailing picker, and gives the previous last card one" do
+  # One "Add block" row at the end of the list (design pass round 2): the
+  # between-cards pickers are gone, so an append only streams the new card in
+  # before that row -- nothing about the previously-last card changes (its
+  # Move down is re-enabled client-side, `admin--blocks#refreshMoveState`).
+  test "adding a block appends its card to the list and replaces nothing else" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     post blocks_path, params: { block: { block_type: "rich_text" } }, as: :turbo_stream
     assert_response :success
 
     new_block = @page.content_blocks.order(:position).last
-    assert_not_includes response.body, "block-picker-after-#{new_block.id}"
-    assert_includes response.body, "block-picker-after-#{first.id}"
-    assert_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+    assert_select "turbo-stream[action='append'][target='content-blocks-list']", count: 1
+    assert_includes response.body, ActionView::RecordIdentifier.dom_id(new_block)
+    assert_not_includes response.body, "block-picker-after-"
+    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
   end
 
-  test "adding a block between two existing cards touches neither one's own picker" do
+  test "the new last card renders its Move down disabled, and Move up enabled when it is not first" do
+    @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    post blocks_path, params: { block: { block_type: "rich_text" } }, as: :turbo_stream
+    assert_response :success
+
+    card = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action='append'] template")
+    assert card.at_css("button[data-move='down'][disabled]"), "the last card cannot move down"
+    assert_nil card.at_css("button[data-move='up'][disabled]")
+  end
+
+  test "after_id is still honoured by create: the card lands right after that block" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
 
     post blocks_path, params: { block: { block_type: "rich_text" }, after_id: first.id }, as: :turbo_stream
     assert_response :success
 
-    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+    added = (@page.content_blocks.reload.to_a - [ first, second ]).sole
+    assert_equal [ first, added, second ], @page.content_blocks.to_a
+    assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
     assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
   end
 
-  test "duplicating the last block gives the copy no trailing picker, and gives the source one" do
-    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
-
-    post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
-    assert_response :success
-
-    copy = @page.content_blocks.order(:position).last
-    assert_not_equal first.id, copy.id
-    assert_not_includes response.body, "block-picker-after-#{copy.id}"
-    assert_includes response.body, "block-picker-after-#{first.id}"
-  end
-
-  test "duplicating a block that isn't last doesn't touch the actual last card's picker" do
+  test "duplicating a block streams the copy in right after the source and replaces no other card" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
 
     post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
     assert_response :success
 
-    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
+    copy = (@page.content_blocks.reload.to_a - [ first, second ]).sole
+    assert_equal [ first, copy, second ], @page.content_blocks.to_a
+    assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
+    assert_not_includes response.body, %(<turbo-stream action="replace")
+  end
+
+  test "typed-setting errors name their field in words in the block's error slot" do
+    block = @page.content_blocks.create!(block_type: "post_list", position: 0)
+    prefix = Admin::BlockCardComponent.error_prefix(block)
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select_in_stream "#{prefix}-limit-errors", /\A\s*!?\s*Limit must be greater than or equal to 1\s*\z/
   end
 
   test "reorder, duplicate and delete" do
@@ -206,6 +215,22 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     block.update_column(:block_type, "gone/thing")
     get "/cs-studio/pages/#{@page.id}"
     assert_includes response.body, "Unavailable type — gone/thing"
+  end
+
+  # Task 12's b5: the one action an unavailable card has works end to end --
+  # the block is deleted although its type is no longer registered, and the
+  # page's other blocks stay.
+  test "an unavailable block can be deleted" do
+    keep = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    gone = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    gone.update_column(:block_type, "gone/thing")
+
+    assert_difference -> { @page.content_blocks.count }, -1 do
+      delete "#{blocks_path}/#{gone.id}", as: :turbo_stream
+    end
+    assert_response :success
+    assert_not ContentBlock.exists?(gone.id)
+    assert ContentBlock.exists?(keep.id)
   end
 
   # Media library Task 4: an image block's image is a library asset, so a
@@ -432,7 +457,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: fresh }, as: :turbo_stream
     assert_response :success
-    assert_no_match(/Changed elsewhere/, response.body)
+    assert_no_match(/CHANGED ELSEWHERE|changed-elsewhere/, response.body)
 
     travel 1.minute
     patch "#{blocks_path}/reorder", params: { ids: [ block.id ] }, headers: page_base_header(@page.reload.updated_at), as: :turbo_stream
@@ -440,6 +465,64 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     delete "#{blocks_path}/#{block.id}", headers: page_base_header(@page.reload.updated_at), as: :turbo_stream
     assert_response :success
     assert_equal @page.reload.updated_at.iso8601(6), streamed_page_base
+  end
+
+  test "a block save made on a stale base is refused, names who changed it, and keeps the newer text" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    stale = block.updated_at.iso8601(6)
+    travel 1.minute
+    as(users(:two), channel: :admin) { ContentBlocks::Save.call(block, translations: { "en" => { caption: "Changed by someone else" } }) }
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "My stale edit" }, base_updated_at: stale }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal "Changed by someone else", block.reload.caption
+    assert_select_in_stream "block-#{block.id}-save-status", /CHANGED ELSEWHERE/
+    assert_select_in_stream "editor-notice", /Changed by .+Reload/m
+    assert_no_match(/block-#{block.id}-base-updated-at/, response.body)
+    assert_no_match(/page-base-updated-at/, response.body, "a refused save vouches for nothing")
+  end
+
+  test "a block save on a current base still saves" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Fresh" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Fresh", block.reload.caption
+  end
+
+  # The same rule as the page hero's (`MediaFields#without_untouched_media_slot`),
+  # for an image block: a later save of the block that does not touch its image
+  # leaves the refusal message in place; choosing or clearing the image clears it.
+  test "a refused image choice's message survives a later save that leaves the image alone" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    slot = "block-#{block.id}-image-errors"
+    gone = Media::Asset.maximum(:id).to_i + 1000
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { media_asset_id: gone.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_match(/doesn.*t exist/, response.body)
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Later", media_asset_id: "" }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_nil Nokogiri::HTML5.fragment(response.body).css("turbo-stream[target='#{slot}']").find { |stream| stream.at_css("template").text.strip.present? },
+      "the refusal message must not be rewritten by a save that left the image alone"
+    assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{slot}']").nil?, "its slot is not even touched"
+
+    chosen = create_media_asset
+    patch "#{blocks_path}/#{block.id}", params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{slot}']"), "choosing an image is acting on the field: its slot is rewritten"
+  end
+
+  test "a block on a live page saves 'to site', like the page does; on a draft page it just saves" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    assert @page.live?
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Live" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_select_in_stream "block-#{block.id}-save-status", /● SAVED TO SITE \d\d:\d\d/
+
+    draft = create_page(title: "Draft page", published: false)
+    draft_block = draft.content_blocks.create!(block_type: :image, position: 0)
+    patch "/cs-studio/pages/#{draft.id}/content_blocks/#{draft_block.id}", params: { block: { caption: "Draft" }, base_updated_at: draft_block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_select_in_stream "block-#{draft_block.id}-save-status", /\ASAVED \d\d:\d\d/
   end
 
   # Fix round 2: the refresh above must never paper over a real conflict.
@@ -460,9 +543,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
 
     patch "/cs-studio/pages/#{@page.id}", params: { page: { subtitle: "A's subtitle" }, base_updated_at: a_base.iso8601(6) }, as: :turbo_stream
-    assert_response :success
-    assert_match(/Changed elsewhere/, response.body)
-    assert_equal "B's title", @page.reload.title
+    assert_response :conflict
+    assert_match(/CHANGED ELSEWHERE/, response.body)
+    assert_select_in_stream "editor-notice", /Changed by two@example\.com/
+    assert_nil @page.reload.subtitle
+    assert_equal "B's title", @page.title
   end
 
   # No page base sent (a client that doesn't send one): nothing to vouch
@@ -482,5 +567,42 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
     assert stream, "expected the page form's base in:\n#{response.body}"
     stream.inner_html[/value="([^"]+)"/, 1]
+  end
+
+  # Task 7: a translation tab's block form no longer renders the untranslated
+  # settings as inputs (they are read-only under "Shared fields"), so its
+  # autosave sends exactly the keys below -- and the shared values must be
+  # exactly what they were.
+  test "a translation-tab save of a block leaves its shared settings untouched" do
+    with_test_types do
+      block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "test/quote", settings: { cite: "https://example.com/a" } },
+        translations: { "en" => { settings: { text: "To be" } } }).record
+      assert block.persisted?
+
+      get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+      assert_select "form.admin-translation-form input[name='block[settings][text]']"
+      assert_select "form.admin-translation-form input[name='block[settings][cite]']", count: 0
+
+      patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+        params: { locale: "de", block: { settings: { text: "Sein" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+      assert_response :success
+      block.reload
+      assert_equal "https://example.com/a", block.settings["cite"]
+      assert_equal "Sein", block.settings_object(locale: :de).text
+      assert_equal "To be", block.settings_object(locale: Locales.default).text
+    end
+  end
+
+  test "a translation-tab save of a post_list block (a form with no inputs but the base) leaves its settings untouched" do
+    block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "post_list", settings: { content_type: "blog", limit: 3 } }).record
+
+    patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
+      params: { locale: "de", base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+
+    block.reload
+    assert_equal 3, block.settings["limit"]
+    assert_equal "blog", block.settings["content_type"]
+    assert_not block.translated_settings.key?("de")
   end
 end

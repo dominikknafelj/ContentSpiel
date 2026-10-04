@@ -28,6 +28,17 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", new_admin_post_path, text: "New post"
   end
 
+  test "the New page and New post actions are links that close the palette and open their dialogs" do
+    sign_in_as users(:one)
+    get admin_jump_path(q: "new p")
+
+    %w[page post].each do |kind|
+      assert_select "a[href=?][data-action='admin--command-palette#close admin--dialog#open'][data-admin--dialog-id-param=?]",
+        public_send("new_admin_#{kind}_path"), "new-#{kind}-dialog", text: /New #{kind}/
+    end
+    assert_select "a[data-admin--dialog-id-param]", count: 2
+  end
+
   test "the fragment echoes the trimmed, capped query it answered" do
     sign_in_as users(:one)
     get admin_jump_path(q: "  jumpmatch  ")
@@ -56,6 +67,7 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
   test "an empty query lists modules and actions" do
     sign_in_as users(:one)
     get admin_jump_path
+    assert_select "[role=group] > [role=presentation]", text: "Sections"
     assert_select "[role=group] > [role=presentation]", text: "Settings"
     assert_select "[role=group] > [role=presentation]", text: "Actions"
   end
@@ -94,5 +106,25 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     get admin_jump_path(q: "jumpmatch")
     assert_response :success
     assert_select "a[href=?]", admin_post_path(@post), count: 0
+  end
+
+  test "a draft post shows its status chip, a live one none, and every row carries the selected-row Enter hint" do
+    sign_in_as users(:one)
+    create_post(title: "Jumpdraft", published: false)
+    create_post(title: "Jumplive", published: true)
+    get admin_jump_path(q: "jump")
+    assert_select "[role=option]", text: /Jumpdraft/ do
+      assert_select ".admin-status-chip[data-status=draft]", count: 1
+    end
+    assert_select "[role=option]", text: /Jumplive/ do
+      assert_select ".admin-status-chip", count: 0
+    end
+    assert_select "[role=option] .admin-palette__enter", minimum: 2
+  end
+
+  test "Settings destinations anchor into the settings screen" do
+    sign_in_as users(:one)
+    get admin_jump_path(q: "publishing")
+    assert_select "[role=option] a[href$='/settings#settings-section-publishing']", text: /Settings › Publishing/
   end
 end

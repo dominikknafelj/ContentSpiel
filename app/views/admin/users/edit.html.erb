@@ -1,7 +1,7 @@
 <%# Edit a user (cs-studio spec §6.1) -- email and an optional password
     change (`Users::Save`'s own doc comment: a blank password/confirmation
     here means "leave it alone", never "clear it"). %>
-<div class="mx-auto max-w-md">
+<div class="max-w-md">
   <div class="mb-4 flex items-center justify-between gap-3">
     <h1 class="font-cs-mono text-label uppercase tracking-mono text-meta">Edit user</h1>
     <%# The Activity link (design spec §5 "Audit log module", Task 9):
@@ -50,6 +50,6 @@
 
     <%= render "admin/users/access_fields", user: @user %>
 
-    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save changes") %>
+    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save") %>
   <% end %>
 </div>

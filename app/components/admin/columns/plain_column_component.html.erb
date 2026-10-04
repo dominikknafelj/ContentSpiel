@@ -1,26 +1,43 @@
 <% translate = show_original? ? translate_button : nil %>
+<%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
+    its reference card): one id, `SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
+<% box_button = translate || (show_original? ? suggest_update_button : nil) %>
 <div class="admin-column mb-4" data-field-name="<%= name %>">
-  <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
+  <%# One side of the translation pair (or the whole field, with no original to show): label,
+      input, the per-field Translate button and the suggestion box under it. The error slot
+      stays a DIRECT child of `.admin-column` (below the pair) -- the invalid border follows it. %>
+  <% field_side = capture do %>
+    <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
 
-  <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
-    <div>
+    <%# With a soft counter, the controller wraps the input and its counter only (never the label or the
+        translation pieces below), so the translate slot and suggestion box keep their own wrappers. %>
+    <%= tag.div(data: (counter? ? { controller: "admin--char-count", "admin--char-count-limit-value": counter } : {})) do %>
       <% if multiline %>
-        <%= tag.textarea value, **html.merge(name: html_name, id: id, class: input_class, rows: 3, **invalid_attrs) %>
+        <%= tag.textarea value, **input_html.merge(name: html_name, id: id, class: input_class, rows: 3, **invalid_attrs) %>
       <% else %>
-        <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
+        <%= tag.input(**input_html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
       <% end %>
-      <%= render "admin/shared/translation_box", button: translate %>
-    </div>
-
-    <% if show_original? %>
-      <div class="rounded-cs border border-line bg-sunken px-3 py-2">
-        <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
-        <p data-original-for="<%= name %>" class="text-ink"><%= original %></p>
-        <div data-translate-slot="<%= name %>"><% if translate %><%= render translate %><% end %></div>
-        <% if (note = outdated_note) %><%= render note %><% end %>
-      </div>
+      <% if counter? %>
+        <p id="<%= counter_id %>" class="mt-1 text-right font-cs-mono text-xs <%= counter_long? ? "text-warn-ink" : "text-meta" %>" data-admin--char-count-target="output"><%= counter_text %></p>
+        <%# Only the crossing of the limit is announced, never each keystroke's count. %>
+        <p class="sr-only" role="status" data-admin--char-count-target="announcement"></p>
+      <% end %>
     <% end %>
-  </div>
+    <% if override? %>
+      <%= render "admin/shared/override_field", input_id: id, noun: override, overridden: overridden?, library: html[:placeholder] %>
+    <% end %>
+    <div data-translate-slot="<%= name %>"><% if translate %><%= render translate %><% end %></div>
+    <%= render "admin/shared/translation_box", button: box_button %>
+  <% end %>
+
+  <% if show_original? %>
+    <div class="admin-translation-pair">
+      <div class="min-w-0"><%= field_side %></div>
+      <%= render reference_card %>
+    </div>
+  <% else %>
+    <%= field_side %>
+  <% end %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
 </div>

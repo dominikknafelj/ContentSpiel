@@ -107,9 +107,44 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
     visit admin_page_path(@page)
     await_admin_controllers
 
-    find("#{card(@second)} summary[aria-label='Block actions']").click
+    find("#{card(@second)} button[aria-label='Block actions']").click
     within(card(@second)) { press "Move up" }
     assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
     assert_equal [ @second, @first, @third ], @page.content_blocks.reload.to_a
+    assert_equal [ @second.id, @first.id, @third.id ], order_on_screen
+  end
+
+  test "Move down in the card menu reorders and offers Undo, which restores the order" do
+    sign_in_via_form(users(:one))
+    visit admin_page_path(@page)
+    await_admin_controllers
+
+    find("#{card(@first)} button[aria-label='Block actions']").click
+    within(card(@first)) { press "Move down" }
+    assert_selector "#toasts .admin-toast[data-kind=undo]", text: /order changed/i, wait: 10
+    assert_equal [ @second, @first, @third ], @page.content_blocks.reload.to_a
+
+    within("#toasts") { press "Undo" }
+    assert_selector "#toasts .admin-toast", text: /Order restored/, wait: 10
+    assert_equal [ @first, @second, @third ], @page.content_blocks.reload.to_a
+    assert_equal [ @first.id, @second.id, @third.id ], order_on_screen
+  end
+
+  test "Move up is disabled on the first card and Move down on the last, and that follows a move" do
+    sign_in_via_form(users(:one))
+    visit admin_page_path(@page)
+    await_admin_controllers
+
+    assert_selector "#{card(@first)} button[data-move='up'][disabled]", visible: :all
+    assert_selector "#{card(@third)} button[data-move='down'][disabled]", visible: :all
+    assert_no_selector "#{card(@second)} button[data-move][disabled]", visible: :all
+
+    find("#{card(@third)} .admin-block-card__handle").send_keys(:space, :up, :space)
+    assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
+
+    # Order is now first, third, second.
+    assert_selector "#{card(@second)} button[data-move='down'][disabled]", visible: :all
+    assert_no_selector "#{card(@third)} button[data-move='down'][disabled]", visible: :all
+    assert_selector "#{card(@first)} button[data-move='up'][disabled]", visible: :all
   end
 end

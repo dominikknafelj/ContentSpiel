@@ -1,1 +1,22 @@
+<%# Never restored from Turbo's page cache (final fix wave 1, ledger m1): a
+    snapshot of an editor holds its forms as they stood when it was left --
+    typed text whose save was only sent as the page was torn down (Back
+    drains nothing), next to the base from before that save. Restored, the
+    form took that text for what the server holds and sent the next edit on
+    the old base: refused as "Changed elsewhere" against one's own save. With
+    this, Back/Forward to an editor fetches it afresh. (A frame navigation's
+    answer carries the tag too, and the promoted visit merges it into the
+    head, so it also holds for an editor opened from the tree.)
+
+    And no link is prefetched from an editor (follow-up N1): Turbo fetches a
+    link on hover and reuses that answer for the click. From an editor the
+    click first waits for the save queue (`autosave/queue.js`), so a
+    prefetched answer for the same record -- its other language tab, its own
+    row in the tree -- shows it as it was BEFORE those saves, with the old
+    base: the saved text missing and the next edit refused. %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+  <meta name="turbo-prefetch" content="false">
+<% end %>
+
 <%= render Admin::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options) %>

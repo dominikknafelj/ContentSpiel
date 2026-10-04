@@ -1,44 +1,12 @@
-<div class="admin-column mb-4" data-field-name="related_post_ids"
-     data-controller="admin--related-posts"
-     data-admin--related-posts-search-url-value="<%= search_url %>"
-     data-admin--related-posts-locale-value="<%= locale %>"
-     data-admin--related-posts-post-id-value="<%= post.id %>"
-     data-admin--related-posts-name-value="<%= html_name %>">
-  <label class="<%= setup_label_class %> mb-1" for="<%= search_id %>">Related posts</label>
-
-  <%# The sentinel -- see this component's own class comment. %>
-  <%= tag.input type: "hidden", name: html_name, value: "", autocomplete: "off" %>
-
-  <ul class="flex flex-col gap-1" data-admin--related-posts-target="list">
-    <% related.each do |related_post| %>
-      <li class="flex items-center justify-between gap-2 rounded-cs border border-line px-3 py-1.5" data-post-id="<%= related_post.id %>">
-        <span class="truncate text-ink"><%= title_for(related_post) %></span>
-        <%= tag.input type: "hidden", name: html_name, value: related_post.id, autocomplete: "off" %>
-        <button type="button" class="text-sm text-meta underline hover:text-ink" data-action="admin--related-posts#remove">Remove</button>
-      </li>
-    <% end %>
-  </ul>
-  <p class="text-sm text-meta" data-admin--related-posts-target="empty" <%= "hidden" if related.any? %>>No related posts yet.</p>
-  <% if (hidden = hidden_related_count).positive? %>
-    <p class="text-sm text-meta">+<%= pluralize(hidden, "related post") %> you can't open</p>
-  <% end %>
-
-  <div class="relative mt-2">
-    <%= tag.input type: "search", id: search_id, placeholder: "Search posts to add…", autocomplete: "off", class: setup_input_class,
-          role: "combobox", aria: { expanded: "false", controls: "#{search_id}-results", autocomplete: "list" },
-          data: { "admin--related-posts-target": "query",
-                  action: "input->admin--related-posts#search change->admin--related-posts#swallow keydown.enter->admin--related-posts#swallow" } %>
-    <ul id="<%= search_id %>-results" role="listbox" hidden
-        class="absolute z-10 mt-1 max-h-64 w-full overflow-y-auto rounded-cs border border-line-strong bg-surface shadow-menu"
-        data-admin--related-posts-target="results"></ul>
-  </div>
-
+<%= render Admin::ChipInputComponent.new(
+      name: html_name, id: search_id, label: "Related posts", chips: chips, search_url: search_url,
+      placeholder: "Search posts to link…", exclude: [ post.id ], errors: errors, hidden_note: hidden_note,
+      help: "Related posts show at the end of the article and in the Mind graph."
+    ) do %>
   <% if (from = related_from).any? %>
     <p class="mt-2 text-sm text-meta">
       Also related from: <%= safe_join(from.map { |other| link_to(title_for(other), editor_path(other), class: "underline hover:text-ink") }, ", ") %>
       (edit on that post)
     </p>
   <% end %>
-
-  <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>
-</div>
+<% end %>

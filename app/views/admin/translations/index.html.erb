@@ -1,33 +1,49 @@
-<%# The Translations overview (translation helpers spec §4): a tab per
-    target language, a type filter, then what's missing or outdated there
-    (`Admin::TranslationScreen::ListComponent`), 50 per page
-    (`Admin::TranslationsController`). %>
+<%# The Translations matrix (design pass round 2, Task 18, handoff §4.4):
+    one summary card per target language, a type filter, then a matrix of
+    the items that need work in any language (`Admin::TranslationScreen::
+    MatrixComponent`), 50 per page (`Admin::TranslationsController`). %>
 <h1 class="mb-2 text-h1 text-ink">Translations</h1>
-<p class="mb-4 text-meta">What's missing or out of date in each language. Open an item to translate it.</p>
+<p class="mb-4 text-meta">Everything that isn't translated yet, or changed in <%= Locales.name(Translations.primary_locale, native: true) %> after it was. Outdated items are listed first because they're already visible on the site.</p>
 
-<nav aria-label="Target languages" class="mb-3 flex flex-wrap gap-2">
-  <% @target_locales.each do |code| %>
-    <%= link_to Locales.name(code, native: true), admin_translations_path(locale: code, type: @type),
-          class: "rounded-cs px-3 py-1 #{@locale == code ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
-          aria: { current: (@locale == code ? "page" : nil) } %>
+<div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3" data-translation-summary>
+  <% @target_locales.each do |locale| %>
+    <%= render Admin::TranslationScreen::SummaryCardComponent.new(locale: locale, summary: @summaries.fetch(locale),
+          current: @language == locale,
+          url: admin_translations_path(list_params(:type, :language).except("language", "page").merge(@language == locale ? {} : { "language" => locale }))) %>
   <% end %>
-</nav>
+</div>
 
 <% if @types.size > 1 %>
-  <nav aria-label="Filter by type" class="mb-4 flex flex-wrap gap-2">
-    <% [ [ "All", nil ] ].concat(@types.map { |type| [ Admin::TranslationsController::TYPES.dig(type, :label), type ] }).each do |label, type| %>
-      <%= link_to label, admin_translations_path(locale: @locale, type:),
-            class: "rounded-cs px-3 py-1 #{@type == type ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
-            aria: { current: (@type == type ? "page" : nil) } %>
-    <% end %>
-  </nav>
+  <%= form_with(**filter_form_options(admin_translations_path)) do %>
+    <% if @language %><%= hidden_field_tag :language, @language, id: nil %><% end %>
+    <fieldset class="m-0 min-w-0 border-0 p-0">
+      <legend class="sr-only">Type</legend>
+      <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-line-strong bg-surface">
+        <% all_count = @counts.values.sum %>
+        <% [ [ "", "All", all_count ] ].concat(@types.map { |type| [ type, Admin::TranslationsController::TYPES.dig(type, :label), @counts.fetch(type) ] }).each do |value, label, count| %>
+          <label for="translations-type-<%= value.presence || "all" %>" class="<%= Admin::PostsScreen::ToolbarComponent::SEGMENT_CLASS %>">
+            <%= radio_button_tag :type, value, @type.to_s == value, id: "translations-type-#{value.presence || "all"}", class: "sr-only" %>
+            <span><%= label %></span>
+            <span class="font-cs-mono text-[10px] opacity-70"><%= count %></span>
+          </label>
+        <% end %>
+      </div>
+    </fieldset>
+    <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <% end %>
 <% end %>
 
-<% page_url = ->(page) { admin_translations_path(list_params(:type).merge("page" => page)) } %>
+<%# Spec §4: "Clear" only when a filter is active. The only other way back from
+    a language card was clicking the highlighted card again. %>
+<% if @language || @type.present? %>
+  <p class="mb-3 mt-2 text-sm"><%= link_to "Clear", admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %></p>
+<% end %>
+
+<% page_url = ->(page) { admin_translations_path(list_params(:type, :language).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>
-  <%= render Admin::TranslationScreen::ListComponent.new(items: @items, locale: @locale) %>
+  <%= render Admin::TranslationScreen::MatrixComponent.new(items: @items, locales: @target_locales) %>
   <% if @pagination.total_pages > 1 %>
     <div class="mt-4 rounded-cs border border-line bg-surface">
       <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>

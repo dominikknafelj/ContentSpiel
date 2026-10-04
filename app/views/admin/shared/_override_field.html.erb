@@ -1,0 +1,21 @@
+<%# What sits under a per-use override input -- a page hero's alt, an image block's alt and caption (design
+    pass round 2, handoff §10 A1). The input itself is the caller's: its placeholder is the library's text in
+    the tab's language, so an empty override visibly falls back to it. This adds the rest of the pattern:
+    the help line, and, once the field holds its own text, a **Reset** (empties the input and tells autosave,
+    so the cleared value is what is saved -- no server route) and the library's text shown beneath.
+
+    Locals: `input_id` (the override input's id), `noun` ("alt text", "caption"), `overridden` (the input
+    held text when rendered). The library text shown is the input's own placeholder, read live by
+    `admin--override-field`, so it follows a newly chosen image without a request of its own. `library` is
+    that text as rendered, for the first paint. Reused by the image block's alt and caption (Task 12). %>
+<% library = local_assigns[:library].to_s %>
+<div class="mt-1 flex flex-col gap-1" data-controller="admin--override-field" data-admin--override-field-input-id-value="<%= input_id %>">
+  <p class="text-xs text-meta">Empty uses the <%= noun %> from Media</p>
+  <p class="flex flex-wrap items-center gap-2 text-xs text-meta" data-admin--override-field-target="library" <%= "hidden" unless overridden && library.present? %>>
+    <span>Media:</span><span class="text-ink" data-admin--override-field-target="text"><%= library %></span>
+  </p>
+  <div>
+    <%= render Admin::ButtonComponent.new(label: "Reset", variant: :ghost, size: :small, type: "button", hidden: !overridden,
+          data: { "admin--override-field-target": "reset", action: "admin--override-field#reset" }) %>
+  </div>
+</div>

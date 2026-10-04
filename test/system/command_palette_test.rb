@@ -67,11 +67,86 @@ class CommandPaletteTest < ApplicationSystemTestCase
     assert_selector "h1", text: beta.title
   end
 
+  test "typing a new query and pressing Cmd/Ctrl+Enter at once opens the new query's result in a new tab, not this one" do
+    create_post(title: "Alpha stale target")
+    beta = create_post(title: "Beta fresh target")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    page.execute_script("window.__opened = []; window.open = (...args) => { window.__opened.push(args); return null }")
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("Alpha")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: "Alpha stale target"
+    input.set("Beta")
+    input.send_keys([ :control, :enter ])
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: beta.title
+    opened = nil
+    Timeout.timeout(5) { sleep 0.05 until (opened = page.evaluate_script("window.__opened")).any? }
+    assert_equal 1, opened.size
+    assert_match(%r{/cs-studio/posts/#{beta.id}\b}, opened.first[0])
+    assert_equal [ "_blank", "noopener" ], opened.first[1..]
+    assert_current_path admin_root_path
+  end
+
   test "an empty result offers New post" do
     sign_in_via_form users(:one)
     await_admin_controllers
     press "Jump to…"
     find("dialog#command-palette input").set("zzzqqq")
     assert_link "New post"
+  end
+
+  test "Cmd+Enter opens the selected row in a new tab and leaves the palette where it is" do
+    post = create_post(title: "Newtab destination")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    page.execute_script("window.__opened = []; window.open = (...args) => { window.__opened.push(args); return null }")
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("Newtab dest")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: post.title
+    assert_selector "#jump-results [role=option][aria-selected=true] .admin-palette__enter", text: "↵"
+
+    input.send_keys([ :control, :enter ])
+    opened = page.evaluate_script("window.__opened")
+    assert_equal 1, opened.size
+    assert_match(%r{/cs-studio/posts/#{post.id}\b}, opened.first[0])
+    assert_equal [ "_blank", "noopener" ], opened.first[1..]
+    assert_selector "dialog#command-palette[open]"
+    assert_current_path admin_root_path
+  end
+
+  test "the palette shows the hint row, the Esc chip and a Settings group that holds no sections" do
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    find("body").send_keys([ :control, "k" ])
+    assert_selector "dialog#command-palette .admin-palette__hints", text: "NEW TAB"
+    assert_selector "dialog#command-palette kbd", text: /esc/i
+    assert_selector "#jump-results [role=group] [role=presentation]", text: /sections/i
+    within(find("#jump-results [role=group][aria-labelledby]", text: "Settings › Languages")) do
+      assert_no_text "Dashboard"
+    end
+  end
+
+  # Review B, M5: the shortcut is heard on `window`, so also while another
+  # modal dialog is up. The palette used to stack on top of it, and following
+  # a row left that dialog's typed input behind without a word.
+  test "Ctrl+K does nothing while another dialog is open" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form users(:one)
+    visit "/cs-studio/pages/#{root_page.id}"
+    await_admin_controllers
+
+    find("#tree a", text: "+ New page").click
+    assert_selector "dialog#new-page-dialog[open]"
+    find("dialog#new-page-dialog").send_keys([ :control, "k" ])
+    sleep 0.3
+    assert_no_selector "dialog#command-palette[open]"
+    assert_selector "dialog#new-page-dialog[open]"
+
+    find("dialog#new-page-dialog").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    find("body").send_keys([ :control, "k" ])
+    assert_selector "dialog#command-palette[open]"
   end
 end

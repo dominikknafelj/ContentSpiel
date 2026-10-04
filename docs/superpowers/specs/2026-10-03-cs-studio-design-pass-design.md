@@ -189,6 +189,25 @@ One PR.
 - **Posts list:** split button, toolbar, columns, pagination, selection and the bulk bar (§5.6).
 - **Translations:** the matrix, summary cards, sort order and row links (handoff §4.4, §10 B18), including a Site settings row.
 - **Data:** §5.2 and §5.3.
+- **Carried over from round 1** (Claude Design's review of the built round 1, 2026-10-04; it checked six screens — sign-in, password reset, dashboard, page tree, page editor in German, posts list — and not yet ⌘K, dialogs, toasts, the save bar, drawers or the light theme):
+  - **Wordmark:** uppercase "CONTENT·SPIEL" (12px, 700, 0.18em tracking) with the site name beneath in dim 13px.
+  - **Account block:** when the name falls back to the email, show the email once; the role sits inline as "Owner" (or up to two group names), not on its own mono line (handoff §10 B15).
+  - **Sidebar height:** the sidebar background is full height and sticky on long pages (it stops at the viewport height today).
+  - **Language tab dots:** 7px and vertically centred on the label.
+  - **Rich-text toolbar:** one row in the side-by-side view too. Round 1 made it wrap inside a narrow column instead of spilling; the stacked translation layout in this round is what gives it the width.
+  - **Sign-in and reset:** the form sits directly on the page, 360px wide, with no card; the site name above the heading; heading 28px/600; the reset heading reads "Reset password"; "Show"/"Hide" in 12px/500 sans in the accent colour (as on setup and change password); "Forgot your password?" right-aligned on the Password label row, 12px; links not underlined.
+  - The page tree's boxed "!" markers were already this round's work (↻N and ○N, no box, hidden at zero).
+- **Carried over from round 1, second review** (Claude Design, 2026-10-04, on 18 more screens: media picker, 404, ⌘K, a confirm dialog, the save bar, the Insert menu, three at 1100px, nine in light theme):
+  - **Overlay colour:** the dialog backdrop and the drawer scrim read as about 50% grey; they must be ink at 38%.
+  - **Media picker:** verify first — in the screenshot the picker sat at the bottom, cut off, with the page behind shifted down and a black band on top, as if the overlay were inside a scrolled container rather than fixed to the viewport (this may be an artefact of the headless full-height capture; check in a real browser). Then to the handoff: × instead of Cancel at the top, a footer with "N selected · Cancel · Use image", search and filters that apply as you type (no Search button). The picker's redesign itself is round 3; the positioning, if real, is a bug to fix here.
+  - **⌘K palette:** a footer hint row ("↑↓ MOVE · ↵ OPEN · ⌘↵ NEW TAB") and an ESC chip; rows show a non-Live status on the right and the selected row a "↵" hint; the group headed "Settings" must not list app sections (Dashboard, Pages, …) — give sections their own group or leave them out, and let "Settings" mean things like "Settings › Languages".
+  - **Save bar:** sticky to the bottom of the content area at full content width with a top border (not a block inside the form column); the count in sans 13px dim, not mono capitals; the button reads "Save".
+  - **Checkboxes:** a shared, token-styled checkbox (accent fill, 2px radius) instead of native ones (user and group forms).
+  - **Destructive trigger buttons:** no red-outline button style — destructive is solid danger inside dialogs and danger-coloured text on a secondary button elsewhere. This replaces round 1's `danger_outline` variant.
+  - **Logo field in Settings:** still the native "Choose File" control; it should be the styled file drop (round 1's shared control).
+  - **Translation stacking:** at 1100px the main column is about 780px, so side-by-side translation should already stack (under 880px) — this round's stacking rule; it also resolves the toolbar wrap.
+  - **Sidebar height:** the same full-height bug shows in light theme.
+  - Confirmed as matching: the 404 page, the confirm dialog's width, title and button order, the drawer and top bar, the palette's placement and group order, the retention field.
 
 ## 8. Round 3: settings, media, people, system
 

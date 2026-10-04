@@ -51,7 +51,20 @@ module Admin
     # `media-picker:picked` event bubbles from the button to this
     # controller's element. There's no upload of the editor's own any more;
     # the picker's Upload tab covers it.
+    #
+    # `editable: false` (a view-only editor, handoff §10 B20) renders no
+    # toolbar at all -- a row of dead, disabled buttons would only suggest
+    # something could be done. `admin--rich-text` already mounts the editor
+    # read-only inside a `fieldset[disabled]` and guards every popover and
+    # command on that, so the missing toolbar costs it nothing.
     class RichTextColumnComponent < Base
+      def initialize(editable: true, **options)
+        super(**options)
+        @editable = editable
+      end
+
+      def editable? = @editable
+
       # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text` method the button runs (`data-action` below) and
       # the key the controller reports active state under. Toggle buttons
@@ -140,6 +153,10 @@ module Admin
 
       def show_original? = !original_document.blank?
 
+      def card_original = original_document
+
+      def card_kind = :rich
+
       def editor_id = "#{id}-editor"
 
       def label_id = "#{id}-label"
@@ -212,6 +229,9 @@ module Admin
       # `admin--rich-text#applySuggestion`), and the original counts as the
       # Markdown `AI::Translate` actually sends.
       def translate_target = { input_id: "#{id}-json", kind: :rich, characters: original_document.to_markdown.length }
+
+      # Empty means no text and no embed in the document as rendered.
+      def translation_field_empty? = self.class.to_document(value).blank?
 
       def self.to_document(value)
         case value

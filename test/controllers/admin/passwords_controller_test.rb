@@ -10,11 +10,27 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   test "new is the request state: email field, send button, and the no-mail hint" do
     get new_admin_password_path
-    assert_select "h1", text: "Reset your password"
+    assert_select "h1", text: "Reset password"
     assert_select "label[for=email_address]", text: "Email"
     assert_select "button.bg-accent", text: "Send reset link"
     assert_select "main", text: /No outgoing mail on this site\? Ask an owner to set a new password for you\./
     assert_select "a", text: /Back to sign in/
+  end
+
+  # Handoff "Studio Password Reset": the form on the page itself (no card), the
+  # site name above the heading, and a back link that underlines on hover only.
+  test "every state sits directly on the page, with the site name above the heading and an ununderlined back link" do
+    [ new_admin_password_path, new_admin_password_path(sent: "1"), new_admin_password_path(expired: "1"),
+      admin_edit_password_path(token: users(:one).password_reset_token) ].each do |path|
+      get path
+      assert_select "main div.bg-surface.border", count: 0, message: "no card on #{path}"
+      assert_select ".admin-site-name + h1"
+      assert_select ".admin-site-name", text: site_settings(:default).title
+      assert_select "main a.underline", count: 0, message: "no always-underlined link on #{path}"
+    end
+    get new_admin_password_path
+    assert_select "a.hover\\:underline", text: "← Back to sign in"
+    assert_select "h1.text-\\[28px\\].font-semibold"
   end
 
   test "create" do

@@ -1,9 +1,10 @@
 module Admin
   # Renders one `ContentModel::Definition::Field` as a labelled input, plus
   # everything around it every field type shares (spec §4.3/§6.2): the
-  # read-only original-language value and its translate slot for a
-  # translated field in a non-default locale, the "Same in all languages"
-  # hint for an untranslated one, and a per-field error slot a Turbo Stream
+  # reference card with the original-language value (beside the field, or
+  # above it when narrow) and its translate slot for a translated field in a
+  # non-default locale (an untranslated field isn't rendered there at all: the
+  # forms list it read-only under "Shared fields"), and a per-field error slot a Turbo Stream
   # can replace wholesale. The actual `<input>`/`<select>`/... is delegated
   # to one `Admin::Fields::*` class per `field.type` -- this component only
   # owns the chrome around it, so every field type gets that chrome for
@@ -54,7 +55,7 @@ module Admin
     # changed" note beside the original -- the same contract
     # `Admin::Columns::Base` gives every column field.
     def initialize(field:, form_name:, value:, original: nil, locale:, errors: [], id_prefix: nil,
-      translation_state: nil, translation_confirm: nil)
+      translation_state: nil, translation_confirm: nil, translation_record: nil)
       @field = field
       @form_name = form_name
       @value = value
@@ -64,6 +65,7 @@ module Admin
       @id_prefix = id_prefix || self.class.dom_id_prefix(form_name)
       @translation_state = translation_state
       @translation_confirm = translation_confirm
+      @translation_record = translation_record
     end
 
     def label_text = field.name.humanize
@@ -89,18 +91,12 @@ module Admin
     # component re-deriving "non-default locale and translated" itself.
     def show_original? = original.present?
 
-    # An untranslated field renders once regardless of locale, so a non-
-    # default locale needs to say *why* there's no per-language input here
-    # rather than leaving it looking like an oversight.
-    def show_untranslated_hint? = !field.translated? && !show_original? && locale.to_s != Locales.default
-
-    def default_locale_name = Locales.name(Locales.default, native: true)
-
-    # See `Admin::Columns::Base#outdated_note`.
-    def outdated_note
-      return unless translation_state == :outdated
-
-      Admin::TranslationScreen::OutdatedNoteComponent.new(confirm: translation_confirm)
+    # The card showing the primary-language original beside (or above) the
+    # input -- see `Admin::Columns::Base#reference_card`.
+    def reference_card
+      Admin::EditorScreen::ReferenceCardComponent.new(
+        field: field.name, locale: locale, original: original, state: translation_state, confirm: translation_confirm, record: translation_record, suggest: suggest_update_button
+      )
     end
 
     # Text types only get the AI **Translate** button (translation helpers
@@ -109,14 +105,25 @@ module Admin
     # translated prose. See `Admin::Columns::Base#translate_button`.
     TRANSLATABLE_TYPES = %i[string text].freeze
 
+    # Only on an empty field -- see `Admin::Columns::Base#translate_button`.
     def translate_button
-      return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+      return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type) && value.blank?
 
       Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
     end
 
+    # **Suggest update** for an outdated text field -- see
+    # `Admin::Columns::Base#suggest_update_button`.
+    def suggest_update_button
+      return unless translation_state == :outdated && translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+
+      Admin::TranslationScreen::TranslateButtonComponent.new(
+        confirm: translation_confirm, input_id: input_id, characters: original.to_s.length, mode: :update
+      )
+    end
+
     private
 
-    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm
+    attr_reader :field, :form_name, :value, :original, :locale, :errors, :id_prefix, :translation_state, :translation_confirm, :translation_record
   end
 end

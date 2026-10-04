@@ -25,13 +25,18 @@ export default class extends Controller {
   }
 
   slugify(value) {
-    return value
-      .toString()
-      .trim()
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
+    return slugify(value)
   }
+}
+
+// Exported for `admin--new-record`, whose URL line must read exactly like this one.
+export function slugify(value) {
+  return value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }

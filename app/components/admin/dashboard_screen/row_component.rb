@@ -1,76 +1,56 @@
 module Admin
   module DashboardScreen
-    # One record on a dashboard list (dashboard spec §4.2-§4.3): a page, a
-    # post or a library image, linked to its editor (an image to its detail
-    # panel in the Media module), with its type, its publish state (pages
-    # and posts only -- an image has none), a time and who last changed it.
+    # One record in the "Your drafts" or "Going live next" card (design pass
+    # round 2, Task 16): a page or post linked to its editor.
     #
-    # Everything here reads what `Dashboard::Feed` already loaded -- titles
-    # are jsonb columns, a post's type label comes from the in-memory
-    # `ContentTypes` registry, an image's thumbnail from the variants the
-    # feed preloads, and `change` is the feed's own `#last_change` hash with
-    # its actor and user preloaded -- so a row never costs a query of its
-    # own (the dashboard's constant-query test pins this).
+    # * `variant: :draft` -- title, content-type dot (a page says "Page") and
+    #   "edited 2h ago" (the record's `updated_at`).
+    # * `variant: :going_live` -- a date tile (the month in mono, `warn-ink`;
+    #   the day at 18px), the title, "in 5 days" and, when `mine:`, "by you".
     #
-    # `time:` names which moment the row shows: `:published_at` for the
-    # scheduled lists (when it goes live), `:last_change` for "Recently
-    # edited by you" (when *I* last changed it -- the newest event's time,
-    # not `updated_at`, which a later system touch could move), otherwise
-    # `:updated_at`.
+    # Everything is read from the record `Dashboard::Feed` already loaded --
+    # titles are jsonb columns, a post's type label comes from the in-memory
+    # `ContentTypes` registry -- so a row never costs a query of its own (the
+    # dashboard's constant-query test pins this).
     class RowComponent < Admin::AdminComponent
-      def initialize(record:, change:, time: :updated_at)
+      def initialize(record:, variant:, mine: false)
+        raise ArgumentError, "unknown variant #{variant.inspect}" unless %i[draft going_live].include?(variant)
+
         @record = record
-        @change = change
-        @time = time
+        @variant = variant
+        @mine = mine
       end
 
-      def title = record.title.presence || "Untitled"
+      def going_live? = variant == :going_live
 
-      def image? = record.is_a?(Media::Asset)
+      def mine? = @mine
 
-      def type_label
-        case record
-        when Page then "Page"
-        when Post then record.definition&.label || record.content_type.to_s.humanize
-        else "Image"
-        end
-      end
+      def title = record.title.presence || "(untitled)"
 
       def path
-        case record
-        when Page then helpers.admin_page_path(record, **url_options)
-        when Post then helpers.admin_post_path(record, **url_options)
-        else helpers.admin_medium_path(record, **url_options)
-        end
+        record.is_a?(Page) ? helpers.admin_page_path(record, **url_options) : helpers.admin_post_path(record, **url_options)
       end
 
-      def at
-        time == :last_change ? change&.dig(:at) : record.public_send(time)
-      end
+      def month = record.published_at.in_time_zone.strftime("%b")
 
-      def time_prefix = time == :published_at ? "Goes live" : "Updated"
+      def day = record.published_at.in_time_zone.day
 
-      # Spec §4.3's "Who changed it": the newest event's person -- for a
-      # change made through an API token, the token's user, never "API
-      # token #7" (the audit log is where that detail lives) -- and nothing
-      # at all when the record has no event (saved straight through the
-      # model, or before the audit log existed).
-      #
-      # The person is the event's `user_id`, which `Audit.record` fills for
-      # a user and a token alike and which outlives both (`audit_events`
-      # has no foreign key on it -- final fix wave, M4): a deleted token
-      # still names its user, and a deleted user reads "by a deleted user",
-      # not "by System". Only an event with no `user_id` -- a nil actor on
-      # a trusted channel -- is the system's.
-      def changed_by
-        return if change.nil?
+      # By the site's calendar (`Time.zone`), not by 24-hour spans: "in 5 days",
+      # "tomorrow" for the next calendar day, and for later today "in 3h" (or
+      # "soon" within the hour). An exact moment is the tooltip.
+      def going_live_phrase
+        at = record.published_at.in_time_zone
+        days = (at.to_date - Time.zone.today).to_i
+        return "tomorrow" if days == 1
+        return "in #{days} days" if days > 1
 
-        "by #{Admin::UserNameComponent.new(user: change[:user], user_id: change[:user_id]).label}"
+        hours = ((at - Time.zone.now) / 1.hour).floor
+        hours >= 1 ? "in #{hours}h" : "soon"
       end
 
       private
 
-      attr_reader :record, :change, :time
+      attr_reader :record, :variant
 
       # Keeps the editing language across navigation, like every other
       # admin link -- `admin_url_options` is a controller helper, absent

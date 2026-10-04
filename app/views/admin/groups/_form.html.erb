@@ -3,7 +3,7 @@
     an empty list still arrives as one. %>
 <%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
-<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data(dirty: group.errors.any?) do %>
+<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data(dirty: group.errors.any?, always: group.new_record?) do %>
   <div class="mb-4 max-w-md">
     <%= label_tag "group_name", "Name", class: setup_label_class %>
     <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
@@ -23,7 +23,7 @@
     <div class="flex flex-col gap-1">
       <% all_users.each do |user| %>
         <label class="flex items-center gap-2 text-ink">
-          <%= check_box_tag "group[member_ids][]", user.id, selected_member_ids.include?(user.id), id: "group_member_#{user.id}" %>
+          <%= render Admin::CheckboxComponent.new(name: "group[member_ids][]", value: user.id, checked: selected_member_ids.include?(user.id), id: "group_member_#{user.id}") %>
           <span>
             <%= render Admin::UserNameComponent.new(user: user) %>
             <% if user.name.present? %><span class="block text-sm text-meta"><%= user.email_address %></span><% end %>
@@ -39,5 +39,5 @@
     <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale) %>
   </div>
 
-  <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: "Save group") %>
+  <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: "Save") %>
 <% end %>

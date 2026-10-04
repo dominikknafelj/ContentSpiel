@@ -27,7 +27,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
     assert_includes rows_of(groups).map { |row| row[:url] }, Rails.application.routes.url_helpers.admin_medium_path(asset)
   end
 
-  test "groups come in the order Pages, Posts, Media, Settings, Actions" do
+  test "groups come in the order Pages, Posts, Media, Sections, Settings, Actions" do
     create_page(title: "Order page")
     create_post(title: "Order post")
     asset = create_media_asset
@@ -38,7 +38,27 @@ class Jump::SearchTest < ActiveSupport::TestCase
   test "an empty query lists modules and actions only" do
     create_post(title: "Something")
     labels = search("").map { |group| group[:label] }
-    assert_equal %w[Settings Actions], labels
+    assert_equal %w[Sections Settings Actions], labels
+  end
+
+  test "modules are listed under Sections, and Settings holds settings destinations" do
+    groups = search("", actor: @owner)
+    assert_includes groups.map { |g| g[:label] }, "Sections"
+    settings = groups.find { |g| g[:label] == "Settings" }
+    assert_includes settings[:rows].map { |r| r[:title] }, "Settings › Languages"
+    assert_not_includes settings[:rows].map { |r| r[:title] }, "Dashboard"
+    assert_equal [ "Settings › Site", "Settings › Publishing", "Settings › Languages", "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
+    sections = groups.find { |g| g[:label] == "Sections" }
+    assert_includes sections[:rows].map { |r| r[:title] }, "Dashboard"
+  end
+
+  test "settings destinations anchor into the Settings screen and need the permission their section needs" do
+    settings = search("ai trans").find { |g| g[:label] == "Settings" }
+    assert_equal [ "Settings › AI translation" ], settings[:rows].map { |r| r[:title] }
+    assert_match(/\/settings#settings-section-ai\z/, settings[:rows].first[:url])
+
+    nobody = User.create!(email_address: "nobody3@example.com", password: "a long enough password")
+    assert_nil search("", actor: nobody, modules: []).find { |g| g[:label] == "Settings" }
   end
 
   test "a two-letter query does not match a record through a locale key" do

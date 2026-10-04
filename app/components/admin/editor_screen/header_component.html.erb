@@ -1,0 +1,142 @@
+<%# Structure and copy: handoff §4.1 / `Studio Pages.dc.html`, the default
+    ("no drafts") variant. %>
+<%= tag.header class: "admin-editor-header sticky top-0 z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
+      data: { record_type: type, record_id: record.id } do %>
+  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
+      <% breadcrumb.each do |label, url| %>
+        <% if url %>
+          <%= link_to label, url, class: "hover:text-ink hover:underline" %>
+        <% else %>
+          <span><%= label %></span>
+        <% end %>
+        <span aria-hidden="true" class="px-0.5">/</span>
+      <% end %>
+    </nav>
+
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>
+
+      <%# A post nobody lists has no path, so nothing to preview: `link_to` a
+          nil URL raises rather than rendering a dead link. %>
+      <% if preview_path.present? %>
+        <%= link_to "Preview", preview_path, target: "_blank", rel: "noopener", class: setup_secondary_link_class %>
+      <% end %>
+
+      <% if can_publish? %>
+        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } } %>
+      <% end %>
+
+      <% if can_edit_schedule? %>
+        <%= render Admin::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
+      <% end %>
+
+      <% if menu_items? %>
+        <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "More actions", close_on_select: true,
+              button_class: "inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken") do |menu| %>
+          <% if can?("audit.view") %>
+            <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
+          <% end %>
+          <% if can_schedule? %>
+            <% menu.with_item do %><%= tag.button "Schedule…", type: "button", data: dialog_trigger(schedule_dialog_id) %><% end %>
+          <% end %>
+          <% if can_unpublish? %>
+            <% menu.with_item do %><%= tag.button "Unpublish", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
+          <% end %>
+          <% if may_delete? %>
+            <%# The divider is an item of its own (a `role="separator"`, which
+                `admin--menu` skips: it only walks links and buttons). %>
+            <% menu.with_item do %><div role="separator" class="my-1 border-t border-line"></div><% end %>
+            <% menu.with_item do %>
+              <% if can_delete? %>
+                <%= tag.button "Move to trash", type: "button", class: "text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
+              <% else %>
+                <%= tag.button "Move to trash", type: "button", disabled: true, title: delete_disabled_reason, class: "text-danger-ink disabled:cursor-not-allowed disabled:opacity-50" %>
+              <% end %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="mt-3 flex min-w-0 flex-wrap items-center gap-3">
+    <h1 class="min-w-0 truncate text-[26px] font-semibold leading-tight text-ink"><%= title %></h1>
+    <%# Never hidden in an editor: here the state is the point. %>
+    <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
+    <% unless editable? %>
+      <%= render "admin/shared/view_only_badge" %>
+    <% end %>
+    <% unless page? %>
+      <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
+    <% end %>
+  </div>
+
+  <% if public_path.present? %>
+    <div class="mt-1 flex items-center gap-2 font-cs-mono text-[12px] text-dim">
+      <span class="truncate"><%= public_path %></span>
+      <button type="button" data-controller="admin--clipboard" data-admin--clipboard-url-value="<%= public_url %>"
+        data-action="click->admin--clipboard#copy" class="shrink-0 cursor-pointer rounded-cs border border-line-strong px-2 py-0.5 hover:bg-sunken">Copy</button>
+      <% if live? %>
+        <%# The path, not the absolute URL: the public site is served by this
+            same app, so a same-origin link opens the live page wherever CS
+            Studio runs -- on a local checkout too, where the configured
+            public domain doesn't point here. %>
+        <%= link_to "View on site ↗", public_path, target: "_blank", rel: "noopener", class: "shrink-0 underline hover:text-ink" %>
+      <% end %>
+    </div>
+  <% elsif !page? %>
+    <p class="mt-1 text-[13px] text-dim">Not listed on any page yet — add a post list block for this type</p>
+  <% end %>
+
+  <%# Not for a viewer who can't change anything: "changes appear as soon as
+      they're saved" is about their edits, and the view-only hint below is
+      the sentence that is true for them. %>
+  <% if live? && editable? %>
+    <p role="status" class="mt-2 text-[13px] text-dim"><%= live_hint %></p>
+  <% end %>
+
+  <%# `-mb-px` lets the active tab's underline sit on the header's own border. %>
+  <div class="mt-3 -mb-px flex flex-wrap items-end justify-between gap-3">
+    <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+    <% if suggest? %>
+      <div class="ml-auto pb-2"><%= suggest %></div>
+    <% end %>
+  </div>
+
+  <%# Why the editor is read-only, in one whole sentence per case (handoff
+      §10 B20). %>
+  <% unless editable? %>
+    <p data-view-only-hint class="mt-3 text-[13px] text-dim"><%= view_only_hint %></p>
+  <% end %>
+
+  <%# Always present, empty: a 409 autosave answer puts the "Changed
+      elsewhere" bar here (`Admin::AutosaveResponses#stale_streams`). Nothing
+      but the tag inside it, so `:empty` holds until a stream fills it. %>
+  <div id="editor-notice"></div>
+<% end %>
+
+<%# Dialogs: siblings of the header (see the class comment). %>
+<% if can_schedule? || can_edit_schedule? %>
+  <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error, value: schedule_value) %>
+<% end %>
+
+<% if can_unpublish? %>
+  <%= render Admin::ConfirmDialogComponent.new(id: unpublish_dialog_id, title: "Unpublish this #{type}?", body: unpublish_dialog_body) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: unpublish_url, method: :post, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
+        <%= render Admin::ButtonComponent.new(label: "Unpublish", variant: :primary, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if may_delete? && can_delete? %>
+  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this #{type} to the trash?", body: delete_dialog_body) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: record_url, method: :delete, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
+        <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

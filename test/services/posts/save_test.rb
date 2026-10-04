@@ -60,6 +60,52 @@ class Posts::SaveTest < ActiveSupport::TestCase
     assert_equal 1, Tag.where(name: "rails").count
   end
 
+  test "a tag name over the limit fails the save and creates nothing; inner whitespace collapses" do
+    result = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "fine", "x" * (Tag::MAX_NAME_LENGTH + 1) ] },
+      translations: { "en" => { title: "Tagged" } })
+
+    assert_not result.ok?
+    assert result.errors.any? { |message| message.include?("longer than #{Tag::MAX_NAME_LENGTH} characters") }
+    assert_not Tag.exists?(name: "fine")
+
+    ok = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "Two   words" ] }, translations: { "en" => { title: "Spaced" } })
+    assert_equal [ "two words" ], ok.record.tags.map(&:name)
+  end
+
+  # A tag stored before the length limit (or by a console) is reused as it is:
+  # only a name that would be CREATED can be refused.
+  test "a post carrying a legacy over-long tag still saves, and the tag is reused" do
+    legacy = Tag.new(name: "l" * 60).tap { |tag| tag.save!(validate: false) }
+    post = create_post(title: "Legacy")
+    post.tags << legacy
+
+    result = Posts::Save.call(post, attributes: { tag_names: [ "l" * 60, "extra" ] }, translations: { "en" => { title: "Edited" } })
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ "extra", "l" * 60 ], result.record.tags.map(&:name).sort
+    assert_equal 1, Tag.where(name: "l" * 60).count
+    assert_not Tag.exists?(name: "l" * 60 + "x")
+  end
+
+  test "a new over-long name is still refused when an existing long tag is resent" do
+    Tag.new(name: "l" * 60).save!(validate: false)
+
+    result = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "l" * 60, "n" * 60 ] }, translations: { "en" => { title: "Mixed" } })
+
+    assert_not result.ok?
+    assert_equal 1, Tag.where(name: "l" * 60).count
+    assert_not Tag.exists?(name: "n" * 60)
+  end
+
+  test "an existing tag with inner double spaces is matched on its exact name, not duplicated" do
+    spaced = Tag.create!(name: "two  words")
+
+    result = Posts::Save.call(attributes: { content_type: "blog", tag_names: [ "Two  Words" ] }, translations: { "en" => { title: "Spaced" } })
+
+    assert_equal [ spaced.id ], result.record.tags.map(&:id)
+    assert_equal 1, Tag.count
+  end
+
   test "invalid input comes back as a failed result, nothing saved" do
     result = Posts::Save.call(attributes: { content_type: "nope" }, translations: { "en" => { title: "X" } })
     assert_not result.ok?

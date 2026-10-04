@@ -1,25 +1,27 @@
 <% translate = show_original? ? translate_button : nil %>
+<%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
+    its reference card): one id, `SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
+<% box_button = translate || (show_original? ? suggest_update_button : nil) %>
 <div class="admin-field mb-4" data-field-name="<%= field.name %>">
-  <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
-
-  <div class="<%= show_original? ? "grid gap-3 md:grid-cols-2" : "" %>">
-    <div>
-      <%= render input_component %>
-      <%= render "admin/shared/translation_box", button: translate %>
-    </div>
-
-    <% if show_original? %>
-      <div class="rounded-cs border border-line bg-sunken px-3 py-2">
-        <p class="<%= setup_label_class %> mb-1"><%= default_locale_name %></p>
-        <p data-original-for="<%= field.name %>" class="text-ink"><%= original %></p>
-        <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
-        <% if (note = outdated_note) %><%= render note %><% end %>
-      </div>
+  <%# One side of the translation pair (or the whole field): label, input, the Translate button
+      and the suggestion box. The error slot stays a direct child of `.admin-field`. %>
+  <% field_side = capture do %>
+    <%# A switch carries its own label beside it (`Admin::Fields::BooleanField`); a second one above it would say it twice. %>
+    <% unless field.type == :boolean %>
+      <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
     <% end %>
-  </div>
+    <%= render input_component %>
+    <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
+    <%= render "admin/shared/translation_box", button: box_button %>
+  <% end %>
 
-  <% if show_untranslated_hint? %>
-    <p class="mt-1 text-sm text-meta">Same in all languages</p>
+  <% if show_original? %>
+    <div class="admin-translation-pair">
+      <div class="min-w-0"><%= field_side %></div>
+      <%= render reference_card %>
+    </div>
+  <% else %>
+    <%= field_side %>
   <% end %>
 
   <%= helpers.render "admin/shared/field_errors", id: errors_id, messages: errors %>

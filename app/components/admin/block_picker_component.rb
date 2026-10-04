@@ -1,12 +1,10 @@
 module Admin
-  # "+ Add block" (cs-studio spec §5.1): a `BlockTypes.all` button list,
-  # collapsed behind a small trigger between two existing cards, or shown
-  # as the page's own final "+ Add block" call to action at the end of the
-  # list (`after_id: nil`) -- the one case every card's own *trailing*
-  # picker (`Admin::BlockCardComponent`, rendered for every card but the
-  # last) can't cover, since there's no card there to nest it inside of, and
-  # is also what an empty page (no blocks yet at all) falls back to
-  # entirely on its own.
+  # The one "+ Add block" row at the end of the block list (design pass round
+  # 2, handoff §4.1): a dashed row with the registered block types as inline
+  # buttons. There are no between-cards pickers any more -- a new block is
+  # appended and can be moved from its "⋯" menu or dragged, and Duplicate
+  # (`Admin::ContentBlocksController#duplicate`) is what inserts below a block.
+  # An empty page shows just this row.
   #
   # Every button is a plain `button_to` POSTing straight to `create`
   # (`Admin::ContentBlocksController#create`) -- Turbo Drive appends
@@ -14,31 +12,27 @@ module Admin
   # its own (no `data-controller`/`data-turbo-stream` needed here), so the
   # controller's Turbo Stream response is applied in place automatically;
   # only the drag/move-up-down side of the block list needs a real Stimulus
-  # controller (`admin--blocks`).
+  # controller (`admin--blocks`). The controller still honours an `after_id`
+  # param on `create`, but nothing here sends one.
   class BlockPickerComponent < AdminComponent
-    def initialize(page:, locale:, url_options: {}, after_id: nil)
+    BUTTON_CLASS = [ Admin::ButtonComponent::SMALL_CLASS, Admin::ButtonComponent::VARIANT_CLASSES[:secondary] ].join(" ").freeze
+
+    def initialize(page:, locale:, url_options: {})
       @page = page
       @locale = locale
       @url_options = url_options
-      @after_id = after_id
     end
 
     def types = BlockTypes.all
 
     def create_path = helpers.admin_page_content_blocks_path(page, **url_options)
 
-    # Between two cards it's the small, collapsed "+" the spec calls for;
-    # at the end of the list it's the page's own prominent "+ Add block",
-    # open by default so an editor never has to discover a second click
-    # just to see what's on offer.
-    def between_cards? = after_id.present?
+    def id = "block-picker-end"
 
-    def trigger_label = between_cards? ? "+" : "+ Add block"
-
-    def id = between_cards? ? "block-picker-after-#{after_id}" : "block-picker-end"
+    def button_class = BUTTON_CLASS
 
     private
 
-    attr_reader :page, :locale, :url_options, :after_id
+    attr_reader :page, :locale, :url_options
   end
 end

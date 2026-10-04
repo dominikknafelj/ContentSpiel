@@ -365,4 +365,23 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_not PublicPath.exists?(record: post)
     assert_not PublicPath.exists?(record: page)
   end
+
+  test "canonical_pages ranks a listing page that has no closure rows like a page with an empty ancestry, never raising" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = create_post(title: "Hello")
+    PageHierarchy.where(descendant_id: blog.id).delete_all
+
+    assert_equal blog, PublicSite::Paths.canonical_page(post)
+    assert_equal({ post => blog }, PublicSite::Paths.canonical_pages([ post ]))
+  end
+
+  test "canonical_pages answers every post at once" do
+    blog = create_page(title: "Blog")
+    ContentBlock.create!(owner: blog, block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    listed = create_post(title: "Listed")
+    other = Post.new(content_type: "now_update")
+
+    assert_equal({ listed => blog, other => nil }, PublicSite::Paths.canonical_pages([ listed, other ]))
+  end
 end

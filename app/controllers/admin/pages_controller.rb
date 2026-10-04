@@ -14,6 +14,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include Scheduling
     include MediaFields
 
     # Which of `params[:page]`'s keys are translated columns (`Pages::Save`'s
@@ -35,24 +36,38 @@ module Admin
 
     before_action :set_page, only: %i[show update destroy publish unpublish schedule]
 
-    # The Pages module's own index. Someone who can't read any page (a
-    # group with only tags or settings, say) is sent on to the first
-    # module they *can* open rather than shown a 403 -- in practice always
-    # the dashboard now (`BaseController::MODULES`'s first entry, open to
-    # everyone), same as if they'd signed in fresh.
+    # The Pages module's own index (handoff §10 C34): Home's editor when the
+    # viewer can open it (303, with the editing language kept), otherwise the
+    # empty state "Choose a page from the tree" beside the tree -- a viewer
+    # whose grants reach only a deep branch has a tree to choose from but no
+    # Home to land on, and must see neither a 404 nor a hint of what Home
+    # holds. "Can open" is the read scope, the same rule `set_page` applies
+    # to `show`, so this never redirects into a 404. Someone who can't read
+    # any page (a group with only tags or settings, say) is sent on to the
+    # first module they *can* open rather than shown a 403 -- in practice
+    # always the dashboard now (`BaseController::MODULES`'s first entry,
+    # open to everyone), same as if they'd signed in fresh.
+    #
+    # The flash is kept across the redirect: "Starter pages created" is set
+    # by `StarterContentsController` for a redirect to this very URL, and
+    # would otherwise be spent on this hop.
     def index
       return redirect_to(first_admin_module_path) unless can?("pages.read")
+
+      home = root_page
+      if home && admin_scope(Page.where(id: home.id)).exists?
+        flash.keep
+        return redirect_to(admin_page_path(home, **admin_url_options), status: :see_other)
+      end
 
       @page = nil
     end
 
-    # "+" in the tree, or the module's own "Add a page" (spec §5.1) -- both
-    # land here with an optional `parent_id`, asking for nothing but a
-    # title. A page with no parent given yet (no page selected in the tree)
-    # falls back to the homepage in `create` below, not here: leaving
-    # `@page.parent_id` nil is what tells the hidden field (and, if the
-    # title turns out blank, the re-rendered form) to show no parent chosen
-    # rather than silently pre-filling the homepage's id.
+    # The no-JS fallback of the New page dialog (design pass round 2, Task
+    # 15): the same form (`Admin::EditorScreen::NewPageFormComponent`) as a
+    # page of its own. With JavaScript every "+ New page" trigger opens the
+    # dialog in the layout instead and never gets here. `parent_id` presets
+    # Inside; none means Home (the form's own default).
     #
     # The parent is looked up through the read scope (a parent id outside
     # it is a 404, like any other out-of-scope record), and the form is
@@ -60,27 +75,61 @@ module Admin
     # .create` on the parent's branch (design spec §3.3 "Create page"),
     # or on the homepage's when none was named, which is where `create`
     # puts it.
+    #
+    # With no `parent_id` the question is not "may they create under Home"
+    # (a branch editor may not, and is still offered the dialog) but "is there
+    # anywhere they may create": the form having a choice, as `posts#new` asks
+    # of the types. With no page at all it is the right to create the root.
+    # A parent that is readable but in the trash (a tree "+" clicked after the
+    # page was trashed elsewhere) is no preset rather than a 404 the dialog
+    # could never recover from; an unreadable or unknown one stays a 404.
     def new
-      parent = params[:parent_id].present? ? admin_scope(Page.all).find(params[:parent_id]) : nil
+      parent = requested_new_parent
       @page = Page.new(parent: parent)
-      forbidden! unless can?("pages.create", Page.new(parent: parent || root_page))
+      @form = Admin::EditorScreen::NewPageFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+        parent_id: parent&.id, title: params[:title])
+      allowed = if parent then can?("pages.create", Page.new(parent: parent))
+      elsif root_page then @form.choices.any?
+      else can?("pages.create", Page.new)
+      end
+      return forbidden! unless allowed
+
+      # The New page dialog loading its form (`admin--new-record` sets the
+      # frame's `src` to this URL): just the frame, no layout. A normal request
+      # renders the standalone page.
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPageDialogComponent::FRAME_ID
     end
 
-    # Every field but the title goes through the same defaults regardless of
-    # who's asking (spec §5.1): a draft, under whichever parent the tree (or
-    # the empty state's own link) named, or the homepage if none did. The
-    # slug fills itself from the title (`LocalizedSlug#fill_blank_slugs`,
-    # run inside `Pages::Save` -> `Page#save`).
+    # From the New page dialog (title, Inside, Page type) or the standalone
+    # form: a draft under the chosen parent -- the homepage if none was named
+    # -- with the chosen type. The slug fills itself from the title
+    # (`LocalizedSlug#fill_blank_slugs`, run inside `Pages::Save` ->
+    # `Page#save`).
+    #
+    # A refusal that is the editor's to fix (a blank title, a taken or
+    # reserved slug, an unknown page type) answers 422: a Turbo Stream that
+    # replaces just the dialog's form with the typed values and an error
+    # summary, so the dialog stays open and the editor behind it is untouched;
+    # a plain request (no JS) gets the standalone page again. A permission
+    # refusal is the 403 page, and a parent outside the read scope is a 404
+    # (`requested_parent`), as for any forged id.
     def create
-      result = Pages::Save.call(Page.new, attributes: { parent: requested_parent, published: false },
-        translations: { admin_locale => { title: params.dig(:page, :title) } })
+      page_type = new_page_params[:page_type].presence
+      parent = requested_parent
+      return render_new_page_failure(gone: true) if parent == :gone
+
+      # An unknown `page_type` is `Page`'s own validation failure (`enum ...
+      # validate: true`), reported on the field like any other.
+      result = Pages::Save.call(Page.new, attributes: { parent: parent, published: false, page_type: page_type }.compact,
+        translations: { admin_locale => { title: new_page_params[:title] } })
 
       if result.ok?
         redirect_to admin_page_path(result.record, **admin_url_options), status: :see_other
       else
         forbidden_or(result) do
           @page = result.record
-          render :new, status: :unprocessable_entity
+          @page.errors.add(:base, result.errors.to_sentence) if @page.errors.empty?
+          render_new_page_failure
         end
       end
     end
@@ -121,10 +170,15 @@ module Admin
     # still lands its per-field errors instead of falling back to a blank
     # error page.
     def update
+      # Before anything is read off the form or any service is called -- see
+      # `AutosaveResponses#refuse_stale_autosave`.
+      return if refuse_stale_autosave(@page, status_id: "page-save-status", error_prefix: "page", reload_url: admin_page_path(@page, **admin_url_options))
+
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
 
+      stored_hero_id = @page.hero_media_asset_id
       result = Pages::Save.call(@page, attributes: attributes, translations: { admin_locale => translated })
 
       streams = autosave_stream(
@@ -132,8 +186,7 @@ module Admin
         result: result,
         status_id: "page-save-status",
         error_prefix: "page",
-        base_updated_at: params[:base_updated_at],
-        fields: page_error_fields
+        fields: without_untouched_media_slot(page_error_fields, :hero_image, sent: page_params[:hero_media_asset_id], stored_before: stored_hero_id)
       )
 
       # A refused hero choice puts the field back to the stored hero (and
@@ -157,8 +210,7 @@ module Admin
       # render costs a fixed handful of queries however many pages it shows
       # (`Admin::TreeComponent`'s own comment; pinned by
       # test/components/admin/tree_component_test.rb), its translation
-      # markers come from `Translations::CachedStatus` so only the page this
-      # save touched is worked out again, and there's no cheaper way to know
+      # markers are one read of the stored `translation_states`, and there's no cheaper way to know
       # from here whether *this* save happened to be the one that mattered
       # to it.
       streams << tree_replace_stream if result.ok?
@@ -184,7 +236,7 @@ module Admin
       if result.ok?
         notice = count.zero? ? "Moved “#{@page.title}” to the trash" : "Moved “#{@page.title}” and #{helpers.pluralize(count, "subpage")} to the trash"
         flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("page", @page, from: "undo", **admin_url_options) }
-        redirect_to admin_pages_path(**admin_url_options), notice:, status: :see_other
+        redirect_to pages_landing_path, notice:, status: :see_other
       else
         forbidden_or(result) do
           @page = result.record
@@ -211,19 +263,26 @@ module Admin
     # so this is the one action here that can also *un*-schedule a page
     # back to a later date without first unpublishing it.
     def schedule
-      at = Time.zone.parse(params[:published_at].to_s)
+      editor = admin_page_path(@page, **admin_url_options)
 
-      if at.nil?
-        redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: "Choose a date and time"
-        return
+      if params[:remove] == "1"
+        # "Remove schedule" is only offered for a scheduled record; for any
+        # other it must not become an unpublish (a live record's
+        # `published_at` is in the past), so it changes nothing.
+        return redirect_to editor, status: :see_other unless @page.status == "scheduled"
+
+        return redirect_after Pages::Save.call(@page, attributes: { published_at: nil }), success: "Schedule removed"
       end
 
+      at, error = requested_schedule
+      return refuse_schedule(error, editor) if error
+
       redirect_after Pages::Save.call(@page, attributes: { published_at: at }), success: "Scheduled"
-    rescue ArgumentError
-      redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: "Choose a date and time"
     end
 
     private
+
+    helper_method :new_page_params
 
     # Through the read scope (design spec §3.3): a page the actor can't
     # read is a 404 here -- show, autosave, publish and delete alike --
@@ -274,6 +333,35 @@ module Admin
       end
     end
 
+    def requested_new_parent
+      parent_id = params[:parent_id]
+      return nil if parent_id.blank?
+
+      admin_scope(Page.all).find(parent_id)
+    rescue ActiveRecord::RecordNotFound
+      raise unless trashed_readable_page?(parent_id)
+
+      nil
+    end
+
+    def trashed_readable_page?(id)
+      AccessControl.scope(Current.actor, "pages.read", Page.all, trashed: true).exists?(id: id)
+    end
+
+    def render_new_page_failure(gone: false)
+      @page ||= Page.new
+      @page.errors.add(:parent, Admin::EditorScreen::NewPageFormComponent::GONE) if gone
+      form = Admin::EditorScreen::NewPageFormComponent.new(
+        url_options: admin_url_options, locale: admin_locale, parent_id: (@page.parent_id || new_page_params[:parent_id] unless gone),
+        title: new_page_params[:title], page_type: new_page_params[:page_type], errors: @page.errors
+      )
+
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: turbo_stream.replace(form.form_id, form), status: :unprocessable_entity }
+        format.html { render :new, status: :unprocessable_entity }
+      end
+    end
+
     # No `parent_id` at all (the empty state's "Add a page" names none) is
     # "use the homepage". A named one is looked up through the read scope
     # like every other record here, the same way `new` does: an id the
@@ -281,9 +369,30 @@ module Admin
     # silent fallback to the homepage that would put the page somewhere
     # the editor didn't choose. `Pages::Save` then decides `pages.create`
     # against the parent's branch.
+    #
+    # One exception to that 404, for `create` only: a parent the viewer can
+    # read that has been moved to the trash since the dialog's form was loaded
+    # is not "an id forged outside my scope" -- the editor just lost the race --
+    # so it comes back as `:gone`, answered with the form and "Choose a page
+    # that still exists." on Inside rather than a bare 404 in an empty dialog.
+    # The dialog's three fields, read as scalars only. `params.dig(:page, ...)`
+    # raises on `page=x` (a String has no `dig`), and a hash or array where a
+    # scalar belongs reached `parameterize` / `find` and 500ed; `permit`
+    # drops anything non-scalar, so a forged shape is the ordinary blank-title
+    # 422 or the default parent (final review A, M3).
+    def new_page_params
+      @new_page_params ||= (params[:page].respond_to?(:permit) ? params[:page] : ActionController::Parameters.new).permit(:title, :parent_id, :page_type)
+    end
+
     def requested_parent
-      parent_id = params.dig(:page, :parent_id)
-      parent_id.present? ? admin_scope(Page.all).find(parent_id) : root_page
+      parent_id = new_page_params[:parent_id]
+      return root_page if parent_id.blank?
+
+      admin_scope(Page.all).find(parent_id)
+    rescue ActiveRecord::RecordNotFound
+      raise unless trashed_readable_page?(parent_id)
+
+      :gone
     end
   end
 end

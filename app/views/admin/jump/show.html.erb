@@ -22,11 +22,17 @@
       <ul role="group" aria-labelledby="<%= heading_id %>" class="py-1">
         <li role="presentation" id="<%= heading_id %>" class="px-4 pb-1 pt-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= group[:label] %></li>
         <% group[:rows].each_with_index do |row, row_index| %>
-          <li role="option" id="jump-option-<%= group_index %>-<%= row_index %>" aria-selected="false">
-            <%= link_to row[:url], data: { turbo_frame: "_top" }, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
+          <li role="option" id="jump-option-<%= group_index %>-<%= row_index %>" aria-selected="false" class="group">
+            <%# A row with a `dialog` (New page, New post) closes the palette and opens that
+                dialog; its `href` stays for a viewer without JavaScript. %>
+            <% data = row[:dialog] ? { turbo_frame: "_top", action: "admin--command-palette#close admin--dialog#open", "admin--dialog-id-param": row[:dialog] } : { turbo_frame: "_top" } %>
+            <%= link_to row[:url], data: data, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
               <span class="min-w-0 flex-1 truncate"><%= row[:title] %></span>
               <% if row[:hint] %><%= render Admin::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
+              <%# Right-hand end: a non-Live status, then -- on the selected row
+                  only (`group-aria-selected`) -- the "↵" that says Enter opens it. %>
               <% if row[:status] %><%= render Admin::StatusChipComponent.new(status: row[:status], hide_live: true) %><% end %>
+              <span aria-hidden="true" class="admin-palette__enter hidden font-cs-mono text-[10px] text-meta group-aria-selected:inline">↵</span>
             <% end %>
           </li>
         <% end %>
@@ -37,7 +43,7 @@
     <div class="px-4 py-4 text-sm text-dim">
       <p>No results for “<%= query %>”.</p>
       <% if can?("posts.create") %>
-        <p class="pt-2"><%= link_to "New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "_top" }, class: "underline" %></p>
+        <p class="pt-2"><%= link_to "New post", new_admin_post_path(**admin_url_options), data: { turbo_frame: "_top", action: "admin--command-palette#close admin--dialog#open", "admin--dialog-id-param": "new-post-dialog" }, class: "underline" %></p>
       <% end %>
     </div>
   <% end %>

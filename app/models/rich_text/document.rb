@@ -126,6 +126,20 @@ module RichText
 
     def to_h = @hash
 
+    # One plain-text string per top-level block node, in order, empty ones
+    # dropped; an image, YouTube or rule node reads as "[image]", "[video]"
+    # or "[rule]". What `Translations::Tracker` keeps of an original so the
+    # translations screen can diff it later (`Translations::SourceDiff`).
+    # Marks are dropped, a hard break is a newline, and the items of a list
+    # or quote are separated by newlines.
+    PLAIN_PLACEHOLDERS = { "image" => "[image]", "youtube" => "[video]", "horizontalRule" => "[rule]" }.freeze
+
+    PLAIN_BLOCK_CONTAINERS = %w[bulletList orderedList listItem blockquote].freeze
+
+    def plain_paragraphs
+      Array(@hash["content"]).filter_map { |node| plain_text_of(node).strip.presence }
+    end
+
     # Renders this document to Markdown (design spec §3.4) -- MCP's read
     # path for `posts.body`/`content_blocks.body`. Delegates to
     # `RichText::Markdown.dump`; see `.from_markdown` above for why the
@@ -411,6 +425,18 @@ module RichText
       end
 
       result_holder[0]
+    end
+
+    def plain_text_of(node, depth = 0)
+      return "" unless node.is_a?(Hash) && depth <= MAX_DEPTH
+
+      type = node["type"]
+      return PLAIN_PLACEHOLDERS[type] if PLAIN_PLACEHOLDERS.key?(type)
+      return node["text"].to_s if type == "text"
+      return "\n" if type == "hardBreak"
+
+      parts = Array(node["content"]).map { |child| plain_text_of(child, depth + 1) }
+      PLAIN_BLOCK_CONTAINERS.include?(type) ? parts.join("\n") : parts.join
     end
 
     def content?(node, depth = 0)

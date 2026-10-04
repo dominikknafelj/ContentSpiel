@@ -32,7 +32,7 @@
     <%= render Admin::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>
   </div>
 <% else %>
-  <table class="admin-api-tokens-table w-full border-collapse text-sm">
+  <table class="admin-api-tokens-table admin-card-table w-full border-collapse text-sm">
     <thead>
       <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
         <th class="py-2 pr-4">Created</th>
@@ -62,7 +62,7 @@
           <td class="py-2 pr-4 font-cs-mono text-ink"><%= api_token.last_used_ip.presence || "—" %></td>
           <td class="py-2 text-right">
             <% unless api_token.revoked_at %>
-              <%= render Admin::ButtonComponent.new(label: "Revoke", variant: :danger_outline, type: "button",
+              <%= render Admin::ButtonComponent.new(label: "Revoke", variant: :danger_text, type: "button",
                     data: dialog_trigger(dialog_id)) %>
 
               <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Revoke this token?",

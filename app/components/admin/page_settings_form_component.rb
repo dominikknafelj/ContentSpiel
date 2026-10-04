@@ -17,6 +17,12 @@ module Admin
   class PageSettingsFormComponent < AdminComponent
     ID_PREFIX = "page"
 
+    # The soft lengths under SEO (handoff §9 B22): what search results show
+    # before cutting a title or description off. Counters only -- a longer
+    # value still saves.
+    META_TITLE_LIMIT = 60
+    META_DESCRIPTION_LIMIT = 160
+
     def initialize(page:, locale:, url_options: {})
       @page = page
       @locale = locale
@@ -78,9 +84,9 @@ module Admin
     end
 
     # The "Original changed" note's options for a translated field
-    # (translation helpers spec §4) -- see `Admin::TranslationScreen
-    # ::OutdatedNoteComponent.options_for`.
-    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(page, field, locale: locale, confirmable: editable?)
+    # (translation helpers spec §4) -- see `Admin::EditorScreen
+    # ::ReferenceCardComponent.options_for`.
+    def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(page, field, locale: locale, confirmable: editable?)
 
     # The homepage has no slug of its own (`Page#generates_slugs?`) -- its
     # path is "/" by design, so there's nothing here for an editor to type.
@@ -94,6 +100,8 @@ module Admin
     # otherwise show "//slug" in front of its children (design pass bug 1).
     def slug_base_url = (PublicSite::Urls.new.path_for(page.parent, locale) || "").sub(%r{/+\z}, "")
 
+    def translation_tab? = locale.to_s != ::Locales.default
+
     def page_type_options = Page.page_types.keys.map { |key| [ key.humanize, key ] }
 
     def landing? = page.landing?
@@ -101,7 +109,7 @@ module Admin
     # A page the user can read but not edit (access-control design spec §5,
     # `can_edit?`: `pages.edit`, plus `pages.publish` once published): every
     # field disabled by one `<fieldset disabled>`, and no `admin--autosave`,
-    # so nothing is ever sent (Review Focus 4). `Admin::RecordHeaderComponent`
+    # so nothing is ever sent (Review Focus 4). `Admin::EditorScreen::HeaderComponent`
     # shows the "View only" badge above.
     def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(page))
 

@@ -44,7 +44,7 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
 
   test "in another language the primary original is shown read-only with a translate slot" do
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
-    assert_select "[data-original-for='title']", text: "About"
+    assert_select "[data-original-for='title'] p", text: "About"
     assert_select "[data-translate-slot='title']"
   end
 
@@ -55,21 +55,21 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
   end
 
   # `limit` is a post_list block's own untranslated schema field (`t.field
-  # :limit, :integer, min: 1` -- no `translated: true`) -- rendering it in a
-  # non-default locale must show the "Same in all languages" hint (spec §6.2)
-  # instead of a read-only original/translate-slot pair, and saving it must
-  # never write a `translated_settings["de"]` entry the way a *translated*
-  # field's own save would.
-  test "a block's untranslated field shows Same in all languages, and saving it in a non-default locale never creates a translated entry" do
+  # :limit, :integer, min: 1` -- no `translated: true`) -- on a non-default
+  # locale it is no longer an input at all but a read-only line in the card's
+  # "Shared fields" list (design pass round 2, Task 7), and a forged save of
+  # it must still never write a `translated_settings["de"]` entry the way a
+  # *translated* field's own save would.
+  test "a block's untranslated field is listed under Shared fields, and saving it in a non-default locale never creates a translated entry" do
     result = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "post_list", settings: { limit: 3 } })
     assert result.ok?, result.errors.to_sentence
     block = result.record
 
     get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
-    assert_select "[data-field-name='limit']" do
-      assert_select "p", text: "Same in all languages"
-      assert_select "[data-original-for='limit']", count: 0
-    end
+    assert_select "[data-field-name='limit']", count: 0
+    assert_select "input[name='block[settings][limit]']", count: 0
+    assert_select "details.admin-shared-fields", text: /Limit/
+    assert_select "details.admin-shared-fields", text: /3/
 
     patch "/cs-studio/pages/#{@page.id}/content_blocks/#{block.id}",
       params: { locale: "de", block: { settings: { limit: 5 } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
@@ -85,12 +85,12 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
   # post's own typed `fields` -- `test/event#venue` (`t.field :venue,
   # :string`, no `translated: true`) is `Post#fields_are_valid`'s
   # equivalent of a block's untranslated settings field, so it has to show
-  # the same "Same in all languages" hint with no read-only original in a
-  # non-default locale. `test/event#title` (a plain Mobility column, always
+  # the same Shared-fields listing, with no input and no read-only original in
+  # a non-default locale. `test/event#title` (a plain Mobility column, always
   # translated) is the control: it must still show its original the way
   # every other translated field already does, proving this isn't just
   # "post-level fields never show an original."
-  test "a post's untranslated field shows Same in all languages, while its translated title still shows the original" do
+  test "a post's untranslated field is listed under Shared fields, while its translated title still shows the original" do
     with_test_types do
       post = Posts::Save.call(Post.new, attributes: { content_type: "test/event", fields: { venue: "Main Hall" } },
         translations: { Locales.default => { title: "Launch day" } }).record
@@ -98,12 +98,12 @@ class Admin::LanguagesTest < ActionDispatch::IntegrationTest
 
       get "/cs-studio/posts/#{post.id}", params: { locale: "de" }
 
-      assert_select "[data-field-name='venue']" do
-        assert_select "p", text: "Same in all languages"
-        assert_select "[data-original-for='venue']", count: 0
-      end
+      assert_select "[data-field-name='venue']", count: 0
+      assert_select "input[name='post[fields][venue]']", count: 0
+      assert_select "details.admin-shared-fields", text: /Venue/
+      assert_select "details.admin-shared-fields", text: /Main Hall/
 
-      assert_select "[data-original-for='title']", text: "Launch day"
+      assert_select "[data-original-for='title'] p", text: "Launch day"
     end
   end
 end

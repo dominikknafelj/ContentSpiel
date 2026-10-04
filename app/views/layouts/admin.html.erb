@@ -8,8 +8,9 @@
     <%= render "shared/theme_head" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags "admin" %>
-    <%# Per-screen head tags -- today only the API token reveal's
-        `turbo-cache-control` (admin/api_tokens/create). %>
+    <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
+        token reveal (admin/api_tokens/create) and on the page and post
+        editors (admin/pages/show, admin/posts/show). %>
     <%= yield :head %>
   </head>
 
@@ -73,6 +74,12 @@
         fixed target. Empty on a frame request -- see the relay above. %>
     <%= render Admin::ToastRegionComponent.new(flash: turbo_frame_request? ? {} : flash) %>
 
+    <%# The pending-suggestion box `admin--translate` clones into a field's
+        suggestion slot before each AI request (`Admin::TranslationScreen::
+        PendingComponent`): a `<template>` is inert, so its buttons and spinner
+        do nothing here, and it sits outside every form. %>
+    <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
+
     <%# The one Leave dialog (design pass spec §4): `admin--save-bar` opens it
         when a Turbo visit would drop unsaved changes, and wires its Leave
         button (`data-leave-confirm`) per open, as a listener rather than an
@@ -96,14 +103,33 @@
         (`Media::PickerComponent`'s own comment). %>
     <%= render Media::PickerComponent.new(url_options: admin_url_options) %>
 
-    <%# The one form every "Mark as up to date" button submits
-        (`Admin::TranslationScreen::OutdatedNoteComponent`): empty, here
+    <%# The New page and New post dialogs (design pass round 2, Task 15): once
+        each, here, outside `#content` and every form. Every "+ New page" /
+        "New post" trigger (tree header and rows, ⌘K, the pages empty state,
+        the dashboard, the posts list) opens one of these. Only the SHELL is
+        rendered (no query, only for a viewer who holds the create right
+        somewhere): the form loads into its turbo-frame when the dialog opens. The no-JS `new` pages render
+        the same form on their own and skip the dialogs (`:standalone_new_record`),
+        so no id appears twice. %>
+    <% unless content_for?(:standalone_new_record) %>
+      <%= render Admin::EditorScreen::NewPageDialogComponent.new(url_options: admin_url_options) %>
+      <%= render Admin::EditorScreen::NewPostDialogComponent.new(url_options: admin_url_options) %>
+    <% end %>
+
+    <%# The rich-text editor's image, YouTube and Page link dialogs (design pass
+        round 2, Task 13): one of each, here for the same reason as the picker
+        -- outside `#content` and every autosave form. The editor that opens
+        one is the only one that hears its answer. %>
+    <%= render Admin::EditorScreen::RichTextDialogsComponent.new %>
+
+    <%# The one form every "Still correct — mark up to date" button submits
+        (`Admin::EditorScreen::ReferenceCardComponent`): empty, here
         outside `#content` and every autosave form for the same reason as
         the picker -- forms can't nest, so each button names this one as
         its owner (`form=`) and its own record in `formaction`. It carries
         only the CSRF token. %>
     <%= form_with url: admin_translation_confirmation_path, method: :post,
-          id: Admin::TranslationScreen::OutdatedNoteComponent::FORM_ID, class: "hidden" do %>
+          id: Admin::EditorScreen::ReferenceCardComponent::FORM_ID, class: "hidden" do %>
     <% end %>
   </body>
 </html>

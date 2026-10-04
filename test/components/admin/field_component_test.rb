@@ -40,22 +40,9 @@ class Admin::FieldComponentTest < ViewComponent::TestCase
     assert_equal "post_fields_speakers_0", Admin::FieldComponent.dom_id_prefix("post[fields][speakers][0]")
   end
 
-  test "an untranslated field in a non-default locale shows the same-in-all-languages hint" do
-    field = Field.new(name: "cite", type: :url, options: {})
-    render_inline Admin::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "de")
-    assert_text "Same in all languages"
-  end
-
-  test "no hint for an untranslated field in the default locale" do
-    field = Field.new(name: "cite", type: :url, options: {})
-    render_inline Admin::FieldComponent.new(field:, form_name: "block[settings]", value: nil, locale: "en")
-    refute_text "Same in all languages"
-  end
-
-  test "no hint or original for a translated field with no original given" do
+  test "no original for a translated field with no original given" do
     field = Field.new(name: "headline", type: :string, options: { translated: true })
     render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hello", locale: "en")
-    refute_text "Same in all languages"
     refute_selector "[data-original-for]"
   end
 
@@ -80,12 +67,12 @@ end
 class Admin::FieldComponentTranslationTest < ViewComponent::TestCase
   Field = ContentModel::Definition::Field
 
-  test "an outdated translated field shows the note beside its original" do
+  test "an outdated translated field shows the changed card beside its original" do
     field = Field.new(name: "headline", type: :string, options: { translated: true })
     render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de",
       translation_state: :outdated, translation_confirm: { record_type: "Post", record_id: 4, field: "headline", locale: "de" })
 
-    assert_selector "[data-original-for='headline'] ~ #translation-note-post-4-headline button", text: "Mark as up to date"
+    assert_selector "[data-original-for='headline'] button[form='translation-confirm-form']", text: "Still correct — mark up to date"
   end
 
   test "a view-only outdated field shows the note without a button" do
@@ -93,7 +80,7 @@ class Admin::FieldComponentTranslationTest < ViewComponent::TestCase
     render_inline Admin::FieldComponent.new(field:, form_name: "post[fields]", value: "Hallo", original: "Hello!", locale: "de",
       translation_state: :outdated)
 
-    assert_text "Original changed since this was translated"
-    refute_selector "button", text: "Mark as up to date"
+    assert_text "English changed since this was translated."
+    refute_selector "button", text: "Still correct — mark up to date"
   end
 end

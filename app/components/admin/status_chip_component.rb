@@ -36,7 +36,7 @@ module Admin
     def title
       return nil unless status == "scheduled" && at.present?
 
-      at.strftime("%b %-d, %Y %H:%M")
+      at.strftime("%-d %b %Y, %H:%M")
     end
 
     private

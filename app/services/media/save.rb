@@ -29,6 +29,7 @@ module Media
       saved = Media::Asset.transaction do
         assign
         @asset.save || raise(ActiveRecord::Rollback)
+        Translations::StateIndex.refresh(@asset)
 
         changes = Audit::Snapshot.field_changes_for(@asset)
         record_event("media.updated", subject: @asset, field_changes: changes) if changes.any?

@@ -31,16 +31,18 @@ module Admin
   # `pages.create` is `Pages::Move`'s to check, answered in the tree's
   # status line).
   #
-  # `translation_states` is `{ page_id => { locale => state } }` for the
-  # readable rows (`Translations::Status.for`, computed once by
-  # `Admin::TreeComponent`, same reasoning as `children_by_parent`); a row
-  # not complete in some target language gets one marker naming them.
+  # `translation_counts` is `{ page_id => { locale => { missing:, outdated: } } }`
+  # for the readable rows (`Translations::StateIndex.counts_for`, read once by
+  # `Admin::TreeComponent`, same reasoning as `children_by_parent`). A row
+  # shows "↻N" for N outdated fields and "○N" for N missing ones, summed over
+  # the target languages and hidden at zero -- no box, never red; the tooltip
+  # names the languages (handoff §10 B24).
   class TreeNodeComponent < AdminComponent
-    def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_states: {}, selected: nil, locale:, url_options: {}, root: false)
+    def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_counts: {}, selected: nil, locale:, url_options: {}, root: false)
       @page = page
       @children_by_parent = children_by_parent
       @context_only_ids = context_only_ids
-      @translation_states = translation_states
+      @translation_counts = translation_counts
       @selected = selected
       @locale = locale
       @url_options = url_options
@@ -79,21 +81,36 @@ module Admin
 
     def status = page.status
 
-    # `{ locale => :missing | :outdated }`, target languages in order; never
-    # anything for a context-only row (no status shows there at all).
-    def incomplete_locales
-      return {} if context_only?
+    # "outdated" / "missing" -> the number of such fields over every target
+    # language; always 0 for a context-only row (it shows nothing but its title).
+    def translation_total(kind) = (@translation_totals ||= {})[kind] ||= translation_breakdown(kind).values.sum
 
-      translation_states.fetch(page.id, {}).reject { |_code, state| state == :complete }
+    # `{ locale => n }`, only the languages with something to report.
+    def translation_breakdown(kind)
+      (@translation_breakdowns ||= {})[kind] ||=
+        if context_only?
+          {}
+        else
+          translation_counts.fetch(page.id, {}).transform_values { |counts| counts.fetch(kind, 0) }.select { |_code, n| n.positive? }
+        end
     end
 
-    # "Incomplete in Deutsch (missing), Español (outdated)"
-    def translation_marker_label
-      "Incomplete in " + incomplete_locales.map { |code, state| "#{::Locales.name(code, native: true)} (#{state})" }.join(", ")
+    # "3 outdated translations: Deutsch, Español" / "1 missing translation: Español"
+    # -- the languages are in the label too, so a screen reader gets the same
+    # detail the tooltip gives a mouse.
+    def translation_label(kind)
+      total = translation_total(kind)
+      languages = translation_breakdown(kind).keys.map { |code| ::Locales.name(code, native: true) }.join(", ")
+      "#{total} #{kind} #{"translation".pluralize(total)}: #{languages}"
+    end
+
+    # "Deutsch: 2 outdated · Español: 1 outdated"
+    def translation_tooltip(kind)
+      translation_breakdown(kind).map { |code, n| "#{::Locales.name(code, native: true)}: #{n} #{kind}" }.join(" · ")
     end
 
     private
 
-    attr_reader :page, :children_by_parent, :context_only_ids, :translation_states, :selected, :locale, :url_options
+    attr_reader :page, :children_by_parent, :context_only_ids, :translation_counts, :selected, :locale, :url_options
   end
 end

@@ -66,6 +66,9 @@ module Pages
         pending = @page.changes_to_save
         @page.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@page)
+        # Where the page stands in each language (`translation_states`), like
+        # the usage rows above: derived inside the same transaction.
+        Translations::StateIndex.refresh(@page)
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end
@@ -78,6 +81,15 @@ module Pages
       # The hero was deleted between `#media_choice_result`'s check and the
       # save (final fix wave, M1; `Media::Choosing`).
       vanished_media_failure(e, @page, :hero_media_asset_id, :hero_image)
+    rescue ActiveRecord::RecordNotUnique => e
+      # Two creates racing on an empty site both passed `only_one_root_page`;
+      # the partial unique index (`index_pages_on_single_root`) let one win.
+      # The loser fails like the validation it raced. Any other uniqueness
+      # violation is not ours to hide.
+      raise unless e.message.include?("index_pages_on_single_root")
+
+      @page.errors.add(:base, "a root page already exists")
+      failure(@page)
     end
 
     private

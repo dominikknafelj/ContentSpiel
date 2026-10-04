@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
+import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 
 // Drives the page tree column (cs-studio spec §4.2). Every page's own
 // children <ul> is a `list` target (Admin::TreeNodeComponent); they all
@@ -15,11 +16,55 @@ import Sortable from "sortablejs"
 // with a full re-render of the tree, success or failure alike (see its own
 // comment for why), so this never has to guess at what the drop actually
 // did -- it only ever displays what the server says happened.
+//
+// A MOVE IS A WRITE TO THE MOVED PAGE, made from outside its editor (final
+// fix wave 1, reviews A I1 / B I1). `Pages::Move` saves the page, so its
+// `updated_at` moves -- and when that page is the one open in the editor next
+// to the tree, its settings form holds the old value as its autosave base,
+// and a stale base is refused (409, final). The move used to go straight out
+// and tell that form nothing: the editor's next keystroke was "Changed
+// elsewhere" against their own move, the form dead until Reload. So a move is
+// treated exactly like a block write (`admin--blocks`, `autosave/queue.js`):
+// - it takes its turn in the page's write queue (`enqueue`), so it is never
+//   on the wire together with an autosave of the same page, and reads the
+//   base when it is SENT, after the previous answer's was written back;
+// - it carries the open form's base as `X-Page-Base-Updated-At` -- only when
+//   the moved page IS the open one (`pageBaseFor`); the tree lists every
+//   page, and another page's move says nothing about this form;
+// - its answer's `page-base-updated-at` is written into the hidden field
+//   synchronously (`syncBases`), before the next request goes. The server
+//   sends it only when the base was still current
+//   (`Admin::TreeController#page_base_streams`).
+// The toast's Undo is the same PATCH, sent by Turbo from `#toasts`: it is
+// caught by its URL and held in the same queue with the same header
+// (`holdUndo`, as `admin--blocks#addPageBaseToUndo` does for a reorder).
+//
+// No generation is handed to `enqueue`: the tree column sits outside
+// `#content` and outlives a frame navigation, so "the page showing as the
+// move is queued" is the page the move belongs to.
 export default class extends Controller {
   static targets = ["list", "announcer"]
   static values = { moveUrl: String }
 
+  // The page settings form's base field (`Admin::PageSettingsFormComponent`).
+  static pageBaseId = "page-base-updated-at"
+
   connect() {
+    this.holdUndo = (event) => {
+      if (this.element.contains(event.target)) return
+      if (String(event.detail.fetchOptions.method).toUpperCase() === "GET") return
+      const url = event.detail.url
+      if (url?.pathname !== new URL(this.moveUrlValue, window.location.origin).pathname) return
+
+      holdTurboRequest(event, {
+        baseIds: [ this.constructor.pageBaseId ],
+        before: (request) => {
+          const pageBase = this.pageBaseFor(url.searchParams.get("page_id"))
+          if (pageBase) request.fetchOptions.headers["X-Page-Base-Updated-At"] = pageBase
+        }
+      })
+    }
+    document.addEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables = this.listTargets.map((list) =>
       Sortable.create(list, {
         group: "pages",
@@ -51,8 +96,18 @@ export default class extends Controller {
   }
 
   disconnect() {
+    document.removeEventListener("turbo:before-fetch-request", this.holdUndo)
     this.sortables?.forEach((sortable) => sortable.destroy())
     this.sortables = []
+  }
+
+  // The open page settings form's base, when the page it edits is `pageId`
+  // (the editor header names its record); nothing otherwise -- another page
+  // is open, a post, a view-only page (no form), or no editor at all.
+  pageBaseFor(pageId) {
+    const open = document.querySelector("header.admin-editor-header[data-record-type='page']")?.dataset.recordId
+    if (!open || String(open) !== String(pageId)) return null
+    return document.getElementById(this.constructor.pageBaseId)?.value || null
   }
 
   // SortableJS's `onEnd`: where the dragged <li> landed (`event.to`, the
@@ -65,29 +120,42 @@ export default class extends Controller {
   // The one place a move is sent -- the mouse path (`onDrop`) and the
   // keyboard path (`drop`) both end here, so a keyboard drop is exactly the
   // request a mouse drop makes.
+  //
+  // Queued with every other write on the screen (see the class comment). A
+  // move queued behind a save that never answers waits for that save's own
+  // 30 s timeout at most; its own request has the same limit, so it cannot
+  // hold the queue either. A request that fails outright (offline, timed
+  // out) leaves the optimistic DOM move in place with nothing saved, as it
+  // always did: there is no answer to draw.
   async save(item, list, index) {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
+    const pageId = item.dataset.pageId
+    const body = JSON.stringify({ page_id: pageId, parent_id: list.dataset.parentId, position: index })
 
-    const response = await fetch(this.moveUrlValue, {
-      method: "PATCH",
-      headers: {
+    await enqueue(async (isCurrent) => {
+      const headers = {
         "Content-Type": "application/json",
         Accept: "text/vnd.turbo-stream.html",
         "X-CSRF-Token": csrfToken
-      },
-      body: JSON.stringify({
-        page_id: item.dataset.pageId,
-        parent_id: list.dataset.parentId,
-        position: index
-      })
-    })
+      }
+      const pageBase = isCurrent() && this.pageBaseFor(pageId)
+      if (pageBase) headers["X-Page-Base-Updated-At"] = pageBase
 
-    // The tree's own re-render (success or 422 alike) is always a Turbo
-    // Stream body -- rendering it is what actually undoes SortableJS's own
-    // optimistic DOM move on a failed drop, by replacing the whole frame
-    // with the server's (unchanged) version of it. It also appends the
-    // "Moved ... Undo" toast on a success.
-    Turbo.renderStreamMessage(await response.text())
+      const response = await fetch(this.moveUrlValue, { method: "PATCH", headers, body, signal: AbortSignal.timeout(30000) })
+      const text = await response.text()
+      // The page was replaced while the move was on its way (a visit that
+      // gave up waiting, Back): the answer's tree, toast and base belong to
+      // a document that is gone.
+      if (!isCurrent()) return
+
+      if (pageBase) syncBases(text, [ this.constructor.pageBaseId ])
+      // The tree's own re-render (success or 422 alike) is always a Turbo
+      // Stream body -- rendering it is what actually undoes SortableJS's own
+      // optimistic DOM move on a failed drop, by replacing the whole frame
+      // with the server's (unchanged) version of it. It also appends the
+      // "Moved ... Undo" toast on a success.
+      Turbo.renderStreamMessage(text)
+    }).catch(() => {})
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------

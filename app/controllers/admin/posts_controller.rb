@@ -9,22 +9,28 @@ module Admin
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
+    include Scheduling
+    include BulkResponses
 
     # `Posts::Save`'s own translated-column list, not a second hand-kept
     # copy -- same reasoning `Admin::ContentBlocksController::TRANSLATED_
     # COLUMNS` already gives for its own settings columns.
     TRANSLATED_COLUMNS = Posts::Save::TRANSLATED.map(&:to_s).freeze
+    PER_PAGE = 50
 
     before_action :set_post, only: %i[show update destroy publish unpublish schedule]
     # The list (and the module itself) needs `posts.read` somewhere; the
     # rows are then narrowed to the readable ones (`filtered_posts`).
     # "New post" needs `posts.create` for at least one content type.
-    before_action -> { require_permission("posts.read") }, only: :index
+    before_action -> { require_permission("posts.read") }, only: %i[index bulk]
     before_action -> { require_permission("posts.create") }, only: %i[new create]
 
     # Filters as query params (spec §5.2's "filters: content type, status,
-    # tag, title search"): `type` is the bare registered name, `status` is
-    # one of `Publishable::STATUSES`, `tag` is a tag's own name, `q` is a
+    # tag, title search"; design pass round 2, Task 17): `type` is the bare
+    # registered name, `scope` is `all|live|drafts|scheduled` (the old `status`
+    # still reads, see `list_scope`), `tag` is a tag's own name, `translation`
+    # is `needs|outdated|complete` (`filter_by_translation`), `page` is the
+    # 50-row page (`Pagination`), `q` is a
     # title substring matched in the *editing* locale (not every locale --
     # an editor filtering the list they're currently reading in one
     # language expects that language's titles to match, not some other
@@ -37,41 +43,93 @@ module Admin
     def index
       @content_types = ContentTypes.all
       @tags = Tag.order(:name)
-      @posts = filtered_posts.includes(:tags).order(updated_at: :desc).to_a
+      @scope = list_scope
+      @counts = scope_counts
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: @counts.fetch(@scope))
+      # A page past the end shows the "back to page 1" notice and no rows:
+      # don't query rows that were never going to be shown.
+      @posts = @pagination.out_of_range? ? [] : page_of_posts
+      @paths = listed_paths(@posts)
       # The "Languages" column (translation helpers spec §4): every listed
       # post's state per target language, worked out once for the whole
-      # list, so the column costs the same queries however many rows it
-      # shows. Cached per post (`Translations::CachedStatus`, final fix
-      # wave I1): this list isn't paginated, so recomputing every post's
-      # every tracked field per language on each visit would grow with the
-      # whole site; only posts changed since the last visit are worked out
-      # again.
-      @translation_states = Translations::CachedStatus.for(@posts)
+      # page, so the column costs the same queries however many rows it
+      # shows. Read from the stored `translation_states` rows
+      # (`Translations::StateIndex`), one query for the whole page.
+      @translation_states = Translations::StateIndex.states_for(@posts)
     end
 
-    # "New post" (spec §5.2): asks for the content type up front, in the
-    # same form as the title -- unlike a page's own title-only "Add a page",
-    # a post has no tree position to default; its content type is fixed for
-    # good the moment `create` below saves it (`Post#definition` never
-    # changes after that), so there is no second chance to pick one later
-    # the way a page's type-ish choices (page_type) stay editable in its own
-    # settings form.
+    # Publishes or moves to the trash the posts ticked on the list (Task 17).
+    # All the rules live in `Posts::Bulk` (one single-record service per
+    # post, so each post is authorised, audited and answered on its own);
+    # this turns its `Result` into one toast and sends the editor back to
+    # the list they were on, filters and page kept (`list_params`).
+    def bulk
+      action = params[:bulk_action].to_s
+      return refuse_bulk("Unknown bulk action") unless Posts::Bulk::ACTIONS.include?(action)
+
+      ids = bulk_ids
+      return redirect_to(posts_list_path, alert: "Select at least one post.", status: :see_other) if ids.empty?
+
+      begin
+        result = Posts::Bulk.call(action:, ids:)
+      rescue ArgumentError
+        return refuse_bulk("Select at most #{Posts::Bulk::MAX_IDS} posts at a time")
+      end
+
+      trashing = action == "trash"
+      # One Undo for the whole batch, restoring exactly the posts this action
+      # moved (`done`, never "whatever is in the trash"): a route of its own,
+      # which carries the ids and the list's filters. The filters ride in
+      # `back`: they have their own `type`, which must not collide with the
+      # Undo route's `type=post`. They are free text (the search), so an Undo
+      # whose URL would be too long for the session cookie is not offered.
+      undo_url = nil
+      if trashing && result.done.any?
+        url = admin_restore_many_trash_path(type: "post", ids: result.done.map(&:id), back: list_filters, **admin_url_options)
+        undo_url = url if undo_offered?(url)
+      end
+      flash_bulk_result(done: result.done, refused: result.refused, failed: result.failed, reasons: result.reasons,
+        already_live: result.already_live, skipped_scheduled: result.skipped_scheduled, not_found: result.not_found,
+        verb: trashing ? "Moved" : "Published", suffix: trashing ? " to the trash" : "",
+        failed_phrase: trashing ? "moved to the trash" : "published", undo_url:, undo_dropped: trashing && result.done.any? && undo_url.nil?)
+      redirect_to posts_list_path, status: :see_other
+    end
+
+    # The no-JS fallback of the New post dialog (design pass round 2, Task 15):
+    # the same form (`Admin::EditorScreen::NewPostFormComponent`) as a page of
+    # its own; with JavaScript every "New post" trigger opens the dialog in
+    # the layout instead. The content type is chosen here and nowhere else: it
+    # is fixed for good the moment `create` below saves it (`Post#definition`
+    # never changes after that), unlike a page's type, which stays editable.
     def new
-      @post = Post.new
-      @content_types = creatable_content_types
+      @post = Post.new(content_type: params[:type])
+      # `posts.create` for at least one type (the `before_action`) is not yet a
+      # type to offer: the form itself is the judge, as `pages#new` is. The one
+      # instance is what the view renders (its listing-path queries run once).
+      @form = Admin::EditorScreen::NewPostFormComponent.new(url_options: admin_url_options, locale: admin_locale,
+        content_type: params[:type], title: params[:title])
+      return forbidden! unless @form.creatable?
+
+      render :new_frame, layout: false if turbo_frame_request_id == Admin::EditorScreen::NewPostDialogComponent::FRAME_ID
     end
 
+    # From the dialog (type, title) or the standalone form: a draft of the
+    # chosen type. A type the viewer may not create is a `denied` from
+    # `Posts::Save` (one `access.denied` event, the 403 page) however the
+    # request was forged; a blank title is a 422 that, for a Turbo submission,
+    # replaces just the dialog's form (typed values kept, error summary on top)
+    # and, without JS, re-renders the standalone page.
     def create
-      result = Posts::Save.call(Post.new, attributes: { content_type: params.dig(:post, :content_type), published: false },
-        translations: { admin_locale => { title: params.dig(:post, :title) } })
+      result = Posts::Save.call(Post.new, attributes: { content_type: new_post_params[:content_type], published: false },
+        translations: { admin_locale => { title: new_post_params[:title] } })
 
       if result.ok?
         redirect_to admin_post_path(result.record, **admin_url_options), status: :see_other
       else
         forbidden_or(result) do
           @post = result.record
-          @content_types = creatable_content_types
-          render :new, status: :unprocessable_entity
+          @post.errors.add(:base, result.errors.to_sentence) if @post.errors.empty?
+          render_new_post_failure
         end
       end
     end
@@ -89,9 +147,9 @@ module Admin
     # typed `fields` are split *per field*
     # (`split_fields`, mirroring `Admin::ContentBlocksController
     # #split_settings`) since which of them are translated depends on the
-    # registered type, not a fixed allowlist; `tag_names` arrives as one
-    # comma-separated string (spec §5.2's own tag input) and is split into
-    # the Array `Posts::Save` expects here, not in the service -- the
+    # registered type, not a fixed allowlist; `tag_names` arrives as an Array
+    # (the chip input's `tag_names[]`) or as one legacy comma-separated
+    # string, split into the Array `Posts::Save` expects here, not in the service -- the
     # service is also used by MCP/seeds, which already hand it a real Array.
     #
     # `content_type` is never accepted here at all (not even silently
@@ -102,6 +160,8 @@ module Admin
     # own one-shot `publish`/`unpublish`/`schedule` actions below, not
     # something a debounced autosave should ever be able to trigger.
     def update
+      return if refuse_stale_autosave(@post, status_id: "post-save-status", error_prefix: "post", reload_url: admin_post_path(@post, **admin_url_options))
+
       post_params = params.fetch(:post, ActionController::Parameters.new)
       translated = post_params.permit(*TRANSLATED_COLUMNS).to_h
       attributes = {}
@@ -117,7 +177,8 @@ module Admin
         translated[:fields] = translated_fields
       end
 
-      attributes[:tag_names] = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
+      tag_names = split_tag_names(post_params[:tag_names]) if post_params.key?(:tag_names)
+      attributes[:tag_names] = tag_names if tag_names
 
       # The related-posts picker's own contract (`Admin::RelatedPostsComponent`
       # / `Posts::Save#assign_related_posts`): passed on only when the key
@@ -132,7 +193,6 @@ module Admin
         result: result,
         status_id: "post-save-status",
         error_prefix: "post",
-        base_updated_at: params[:base_updated_at],
         fields: post_error_fields
       )
 
@@ -166,19 +226,34 @@ module Admin
     end
 
     def schedule
-      at = Time.zone.parse(params[:published_at].to_s)
+      editor = admin_post_path(@post, **admin_url_options)
 
-      if at.nil?
-        redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: "Choose a date and time"
-        return
+      if params[:remove] == "1"
+        # "Remove schedule" is only offered for a scheduled record; for any
+        # other it must not become an unpublish (a live record's
+        # `published_at` is in the past), so it changes nothing.
+        return redirect_to editor, status: :see_other unless @post.status == "scheduled"
+
+        return redirect_after Posts::Save.call(@post, attributes: { published_at: nil }), success: "Schedule removed"
       end
 
+      at, error = requested_schedule
+      return refuse_schedule(error, editor) if error
+
       redirect_after Posts::Save.call(@post, attributes: { published_at: at }), success: "Scheduled"
-    rescue ArgumentError
-      redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: "Choose a date and time"
     end
 
     private
+
+    helper_method :new_post_params
+
+    # The New post dialog's two fields, read as scalars only (`params.dig`
+    # raises on `post=x`, and a hash for the title reached the slug fill and
+    # 500ed); anything else reads as blank -- the ordinary 422 (final review
+    # A, M3).
+    def new_post_params
+      @new_post_params ||= (params[:post].respond_to?(:permit) ? params[:post] : ActionController::Parameters.new).permit(:title, :content_type)
+    end
 
     # Through the read scope (design spec §3.3): someone else's post an
     # author may not read is a 404 -- for show, autosave, publish and delete
@@ -187,45 +262,158 @@ module Admin
       @post = admin_scope(Post.all).find(params[:id])
     end
 
-    # The content types "New post" offers: the registered ones the actor may
-    # create a post of (`posts.create` scoped by `content_types`, design
-    # spec §3.3 "Create post"), checked against an unsaved post of each.
-    def creatable_content_types
-      ContentTypes.all.select { |type| can?("posts.create", Post.new(content_type: type.name)) }
+    def render_new_post_failure
+      form = Admin::EditorScreen::NewPostFormComponent.new(
+        url_options: admin_url_options, locale: admin_locale, content_type: new_post_params[:content_type],
+        title: new_post_params[:title], errors: @post.errors
+      )
+
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: turbo_stream.replace(form.form_id, form), status: :unprocessable_entity }
+        format.html { render :new, status: :unprocessable_entity }
+      end
     end
 
-    def filtered_posts
+    # The list's own query params, the ones its links carry (`list_params`).
+    # `status` is the old name of `scope` (the dashboard's "All drafts" links
+    # and bookmarks used `status=draft|scheduled|live`): still read, `scope`
+    # wins when both are there.
+    LIST_KEYS = %i[q scope status type tag translation page].freeze
+    SCOPES = %w[all live drafts scheduled].freeze
+
+    def list_scope
+      requested = params[:scope].presence || params[:status].presence
+      requested = "drafts" if requested == "draft"
+      requested.presence_in(SCOPES) || "all"
+    end
+
+    # Everything except the scope: the base the segmented control's counts
+    # are taken over ("counts respect the other filters, not the scope
+    # itself"), and what `filtered_posts` then narrows by scope.
+    def base_posts
       scope = admin_scope(Post.all)
-      scope = scope.where(content_type: params[:type]) if params[:type].present?
-      scope = filter_by_status(scope, params[:status]) if params[:status].present?
+      scope = scope.where(content_type: params[:type]) if params[:type].is_a?(String) && params[:type].present?
       # A subquery, not `scope.joins(:tags).where(tags: { name: ... })`
-      # directly (final-fixes round, finding 6): `index`'s own `.includes
-      # (:tags)` right after this, combined with a `where` that references
-      # the same `tags` table, is exactly what makes Rails silently upgrade
-      # that `includes` into an `eager_load` (a single LEFT OUTER JOIN) --
-      # and once the *listing* query's own join is filtered down to just the
-      # matching tag, that's also all `post.tags` sees for the rest of that
-      # row, not every tag the post actually has. Filtering by a subquery's
-      # `id`s instead leaves the outer scope with no `tags` reference of its
-      # own, so `includes` stays a real `includes` (a separate query,
-      # preloading every tag) no matter which tag this list was filtered by.
-      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].present?
-      scope = filter_by_title(scope, params[:q]) if params[:q].present?
+      # directly (final-fixes round, finding 6): `.includes(:tags)` combined
+      # with a `where` that references the same `tags` table is exactly what
+      # makes Rails silently upgrade that `includes` into an `eager_load` (a
+      # single LEFT OUTER JOIN) -- and once the *listing* query's own join is
+      # filtered down to just the matching tag, that's also all `post.tags`
+      # sees for the rest of that row, not every tag the post actually has.
+      # Filtering by a subquery's `id`s instead leaves the outer scope with no
+      # `tags` reference of its own. (The list shows no tags and preloads none
+      # today; the subquery is what keeps it that way if tags are ever
+      # preloaded here again -- `posts_test.rb` pins that no `LEFT OUTER JOIN
+      # "tags"` appears.)
+      scope = scope.where(id: Post.joins(:tags).where(tags: { name: params[:tag] }).select(:id)) if params[:tag].is_a?(String) && params[:tag].present?
+      scope = filter_by_translation(scope, params[:translation]) if params[:translation].is_a?(String)
+      scope = filter_by_title(scope, params[:q]) if params[:q].is_a?(String) && params[:q].present?
       scope
     end
 
-    def filter_by_status(scope, status)
-      case status
+    def filtered_posts = filter_by_scope(base_posts, @scope)
+
+    def page_of_posts
+      filtered_posts.order(updated_at: :desc, id: :desc).offset(@pagination.offset).limit(PER_PAGE).to_a
+    end
+
+    def filter_by_scope(scope, name)
+      case name
       when "live" then scope.published
-      when "scheduled" then scope.where("published_at > ?", Time.current)
-      when "draft" then scope.where(published_at: nil)
+      when "scheduled" then scope.where("posts.published_at > ?", Time.current)
+      when "drafts" then scope.where(published_at: nil)
       else scope
       end
+    end
+
+    # "All 128 · Live 96 · Drafts 20 · Scheduled 12": one query for the four
+    # numbers (`COUNT ... FILTER`), over `base_posts` -- the other filters
+    # apply, the scope itself does not. The same instant is bound for both
+    # comparisons so a post can't be counted as live and scheduled at once.
+    def scope_counts
+      now = Time.current
+      all, live, drafts, scheduled = base_posts.reorder(nil).pick(
+        Arel.sql("COUNT(*)"),
+        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at <= ?)", now ])),
+        Arel.sql("COUNT(*) FILTER (WHERE posts.published_at IS NULL)"),
+        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at > ?)", now ]))
+      )
+      { "all" => all, "live" => live, "drafts" => drafts, "scheduled" => scheduled }
+    end
+
+    # `needs` (missing or outdated in any target language), `outdated`, or
+    # `complete` (neither, in every target language), read from the stored
+    # `translation_states` rows -- a post with no row reads as complete, the
+    # same rule `Translations::StateIndex` applies everywhere. An EXISTS over
+    # the target languages rather than `StateIndex.joins`, which narrows by
+    # one language: this filter asks about the post as a whole. The states
+    # are the *rolled-up* ones the row's chips show (`Translations::Status`:
+    # a language that is both missing and outdated reads as missing), so
+    # "Outdated" lists exactly the posts with an outdated chip -- never one
+    # whose only chip in that language is missing.
+    def filter_by_translation(scope, name)
+      states = { "needs" => %w[missing outdated], "outdated" => %w[outdated] }[name]
+      return scope unless states || name == "complete"
+
+      exists = Translations::StateIndex.exists_in_any_locale_sql(Post, states: states || %w[missing outdated], locales: Translations.target_locales)
+      states ? scope.where(exists) : scope.where.not(exists)
     end
 
     def filter_by_title(scope, q)
       scope.where("posts.title ->> ? ILIKE ?", admin_locale, "%#{Post.sanitize_sql_like(q)}%")
     end
+
+    # Each listed post's current public path in the editing language, locale
+    # prefix included, in ONE query for the page (`PublicSite::Urls#path_for`
+    # would ask once per post). A post no page lists has no row: "Not listed".
+    def listed_paths(posts)
+      return {} if posts.empty?
+
+      prefix = PublicSite::Urls.new.prefix(admin_locale)
+      PublicPath.current.where(record_type: Post.polymorphic_name, record_id: posts.map(&:id), locale: admin_locale)
+        .pluck(:record_id, :path).to_h { |id, path| [ id, "#{prefix}#{path}" ] }
+    end
+
+    # The ids a bulk request names: an Array of Strings, nothing else (a
+    # forged `ids[a]=b` hash or nested array is no selection at all).
+    def bulk_ids
+      raw = params[:ids]
+      raw.is_a?(Array) ? raw.grep(String) : []
+    end
+
+    # Where a bulk request came from, read from the form's own hidden fields
+    # (a POST's params are not `request.query_parameters`, which is what
+    # `list_params` reads) -- the same keys, plain strings only, plus the
+    # editing locale.
+    def list_query = admin_url_options.merge(list_filters.symbolize_keys)
+
+    # Where to send the editor back to: the list they came from, filters and
+    # page kept -- except that emptying the last page (a bulk trash, or a
+    # bulk publish under Drafts) would land on "Nothing on this page", so a
+    # page past the end of the *returned* filters goes to the last page that
+    # exists (and no `page` at all when nothing is left). `index` itself still
+    # reports an out-of-range page, as ever.
+    def posts_list_path
+      query = list_query
+      if query.key?(:page)
+        @scope = list_scope
+        pagination = Pagination.new(page: query[:page], per_page: PER_PAGE, total: scope_counts.fetch(@scope))
+        if pagination.out_of_range? || pagination.total.zero?
+          query = query.except(:page)
+          query[:page] = pagination.total_pages if pagination.out_of_range? && pagination.total_pages > 1
+        end
+      end
+      admin_posts_path(**query)
+    end
+
+    def list_filters
+      params.to_unsafe_h.slice(*LIST_KEYS.map(&:to_s)).select { |_, value| value.is_a?(String) }
+    end
+
+
+    # A request no screen of ours sends (a forged action, more ids than the
+    # list can show): a plain 422, no redirect to a list that did nothing.
+    def refuse_bulk(message) = render(plain: message, status: :unprocessable_entity)
 
     # `Posts::Save` expects an Array of names (its own `assign_tags` calls
     # `Array(...)` on whatever it's handed, which would treat one
@@ -239,8 +427,24 @@ module Admin
     # input a comma-separated field invites, and this is the one place that
     # already knows the raw string is comma-separated at all -- `assign_tags`
     # only ever sees a plain Array by the time it runs.
+    #
+    # The chip input (`Admin::ChipInputComponent`) submits `post[tag_names][]`
+    # instead -- one element per tag, plus an empty sentinel so an emptied list
+    # still arrives.
+    #
+    # An element is split on commas too (defence in depth): the chip input
+    # already splits pasted text before it makes a chip, and a client that
+    # sent "ruby, rails" as one element means two tags, same as the string.
+    # Anything that is neither a String nor an Array of Strings (a hash, nested
+    # arrays) answers nil -- "no usable tag list", so `update` leaves the tags
+    # alone rather than clearing them; non-String elements of an Array are ignored.
     def split_tag_names(raw)
-      raw.to_s.split(",").map(&:strip).reject(&:blank?)
+      parts = case raw
+      when String then [ raw ]
+      when Array then raw.grep(String)
+      end
+      return nil unless parts
+      parts.flat_map { |part| part.split(",") }.map(&:strip).reject(&:blank?)
     end
 
     # A `groups` field's raw params need straightening into an ordered Array
@@ -314,7 +518,7 @@ module Admin
         # No validation reports against `:tag_names` today (`Posts::Save
         # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
         # duplicate name is already filtered out before it ever reaches
-        # that point) -- wired up anyway so `Admin::TagInputComponent`'s own
+        # that point) -- wired up anyway so `Admin::ChipInputComponent`'s own
         # error slot (fix round 1 review) is always cleared/replaced like
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land

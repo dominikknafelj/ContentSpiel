@@ -54,6 +54,26 @@ class Admin::LinkTargetsTest < ActionDispatch::IntegrationTest
     assert_equal [ "post" ], only_posts.map { |r| r["type"] }.uniq
   end
 
+  # The related-posts chip input shows "· Draft" / "· Scheduled" next to a
+  # post, and the type's colour dot.
+  test "each row carries its publish status, and a post row its type dot" do
+    sign_in_as(users(:one))
+    create_page(title: "Chip Page", published: false)
+    create_post(title: "Chip Draft", published: false)
+    create_post(title: "Chip Live")
+    scheduled = create_post(title: "Chip Later")
+    scheduled.update_columns(published_at: 2.days.from_now)
+
+    rows = get_results(q: "Chip").index_by { |r| r["title"] }
+
+    assert_equal "draft", rows["Chip Page"]["status"]
+    assert_equal "draft", rows["Chip Draft"]["status"]
+    assert_equal "live", rows["Chip Live"]["status"]
+    assert_equal "scheduled", rows["Chip Later"]["status"]
+    assert_match(/\A(bg|border)[ -]/, rows["Chip Live"]["dot"])
+    assert_nil rows["Chip Page"]["dot"]
+  end
+
   test "an unknown type is rejected" do
     sign_in_as(users(:one))
     get "/cs-studio/link_targets", params: { q: "x", type: "snippet" }

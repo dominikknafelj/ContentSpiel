@@ -1,0 +1,30 @@
+<%# No live region of its own: the box it is cloned into (`_translation_box`,
+    `aria-live="polite"`) announces its arrival once. A `role="status"` here
+    would re-announce the whole box every second the counter is rewritten, once
+    per field of a bulk run. The counter is `aria-hidden` for the same reason,
+    and the 25 s message is WRITTEN into its element when the time comes
+    (`translate_controller`, from `data-pending-timeout-text`) -- text that was
+    already in the DOM and was only un-hidden is not announced. %>
+<%= tag.div class: "admin-translation-suggestion mt-2 rounded-cs border border-accent bg-accent-tint p-3 text-sm",
+      data: { translation_pending: true, pending_timeout_seconds: self.class::TIMEOUT_SECONDS, pending_timeout_text: self.class::TIMEOUT_TEXT } do %>
+  <div data-pending-running>
+    <div class="flex items-center gap-2 text-dim">
+      <span data-translate-spinner class="<%= Admin::TranslationScreen::TranslateButtonComponent::SPINNER_CLASS %>" aria-hidden="true"></span>
+      <p>Suggesting a translation… <span data-pending-elapsed aria-hidden="true" class="font-cs-mono">0s</span></p>
+    </div>
+    <div class="mt-2 grid gap-1.5" aria-hidden="true">
+      <div data-pending-skeleton class="h-3 w-full motion-safe:animate-pulse rounded-cs bg-line"></div>
+      <div data-pending-skeleton class="h-3 w-2/3 motion-safe:animate-pulse rounded-cs bg-line"></div>
+    </div>
+    <div class="mt-2">
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+    </div>
+  </div>
+  <div data-pending-timeout hidden>
+    <p data-pending-timeout-message class="text-warn-ink"></p>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <%= render Admin::ButtonComponent.new(label: "Try again", variant: :primary, size: :small, data: { action: "admin--translate#retry" }) %>
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+    </div>
+  </div>
+<% end %>

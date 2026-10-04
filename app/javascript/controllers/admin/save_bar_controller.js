@@ -1,8 +1,9 @@
 import { Controller } from "@hotwired/stimulus"
 
 // The explicit-save pattern for configuration screens (design pass spec §4,
-// handoff §9 B12): the bar appears once something differs from what was
-// loaded, counts the changed fields, and leaving with changes asks first.
+// handoff §9 B12): the form's footer (Save, Cancel) is always there, counts
+// the changed fields, and leaving with changes asks first. Save is disabled
+// while an existing record has nothing to save.
 // A change is counted per *named control* (per group name for radios),
 // comparing against a snapshot taken on connect -- so changing a field back
 // removes it from the count.
@@ -10,11 +11,11 @@ import { Controller } from "@hotwired/stimulus"
 // Two server-driven states sit on top of the snapshot count:
 //   dirty  -- the server re-rendered the form with errors (a 422). The
 //             re-render reconnects this controller, whose snapshot is then the
-//             typed, invalid values (count 0); `dirty` keeps the bar and the
-//             leave guard up regardless, since nothing was saved.
-//   always -- the bar is visible even with nothing changed (a new record, whose
-//             only submit button is the bar's Save). The guard still waits for
-//             a real change.
+//             typed, invalid values (count 0); `dirty` keeps Save enabled and
+//             the leave guard up regardless, since nothing was saved.
+//   always -- Save is enabled even with nothing changed (a new record: the
+//             form's whole point is to be submitted). The guard still waits
+//             for a real change.
 //
 // The guard is page-level, not per form: the account screen has two of these
 // forms, and each asking separately would prompt twice. One document listener
@@ -62,21 +63,8 @@ function clearPendingLeave() {
   shared.pending = null
 }
 
-// Visible bars stack from the bottom in document order, so two dirty forms'
-// sticky bars never cover each other: the last one sits at the bottom, each
-// earlier one above the bars after it.
-function layoutBars() {
-  const visible = [...instances].map((instance) => instance.barTarget).filter((bar) => !bar.hidden)
-  visible.sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
-  let offset = 0
-  for (const bar of visible.reverse()) {
-    bar.style.bottom = `${offset}px`
-    offset += bar.offsetHeight
-  }
-}
-
 export default class extends Controller {
-  static targets = ["bar", "count"]
+  static targets = ["bar", "count", "save"]
   static values = { dirty: Boolean, always: Boolean }
 
   connect() {
@@ -98,16 +86,21 @@ export default class extends Controller {
       window.removeEventListener("beforeunload", onUnload)
       clearPendingLeave()
     }
-    layoutBars()
   }
 
   refresh() {
     const count = this.changes
-    this.barTarget.hidden = !(this.unsaved || this.alwaysValue)
+    // A Save that the password field already governs (`data-password-submit`:
+    // disabled until the password is long enough) is left to it -- two
+    // controllers writing one button's `disabled` on the same keystroke would
+    // undo each other, and such a form can't be saved with nothing typed
+    // anyway.
+    if (this.hasSaveTarget && !("passwordSubmit" in this.saveTarget.dataset)) {
+      this.saveTarget.disabled = !(this.unsaved || this.alwaysValue)
+    }
     this.countTarget.textContent = count > 0
       ? (count === 1 ? "1 unsaved change" : `${count} unsaved changes`)
-      : (this.unsaved ? "Unsaved changes" : "")
-    layoutBars()
+      : (this.unsaved ? "Unsaved changes" : (this.alwaysValue ? "" : "No unsaved changes"))
   }
 
   markSubmitting() { this.submitting = true }

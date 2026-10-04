@@ -22,7 +22,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
       base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success
-    assert_match(/Saved \d\d:\d\d/, response.body)
+    assert_match(/SAVED( TO SITE)? \d\d:\d\d/, response.body)
     assert_equal "New Title", @site.reload.title
     assert_equal "New Tagline", @site.tagline
   end
@@ -55,6 +55,10 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
   test "the explicit remove checkbox detaches the logo" do
     @site.logo.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
     assert @site.logo.attached?
+
+    # In the design system's skin, not a native checkbox (review C, M10).
+    get "/cs-studio/settings"
+    assert_select "input.cs-checkbox[type=checkbox][name='site_setting[remove_logo]']"
 
     patch "/cs-studio/settings", params: { site_setting: { remove_logo: "1" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
 
@@ -181,7 +185,11 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/settings", params: { site_setting: { title: "Second, from a stale tab" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_match(/Changed elsewhere/, response.body)
+    # The Settings form is not one of the three record editors that refuse a
+    # stale save (`AutosaveResponses#refuse_stale_autosave`): it still saves
+    # and says so in its own wording (`:saved_over`), never the refusal's.
+    assert_match(/SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST/, response.body)
+    assert_no_match(/● CHANGED ELSEWHERE/, response.body)
   end
 
   # -- translated title and tagline (translation helpers spec §5) --
@@ -202,8 +210,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_select "input[name='site_setting[tagline]']" do |inputs|
       assert_nil inputs.first["value"].presence
     end
-    assert_select "[data-original-for='title']", text: "Dana's Notes"
-    assert_select "[data-original-for='tagline']", text: "Things I learned"
+    assert_select "[data-original-for='title'] p", text: "Dana's Notes"
+    assert_select "[data-original-for='tagline'] p", text: "Things I learned"
     assert_select "[data-translate-slot='title']"
     # The language switcher, keeping the editing language in the form's URL.
     assert_select "nav.admin-language-tabs a[href='/cs-studio/settings']", text: "English"
@@ -274,8 +282,8 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/settings", params: { locale: "de" }
 
     assert_response :success
-    assert_select "#translation-note-site-setting-#{@site.id}-title", text: /Original changed since this was translated/
-    assert_select "#translation-note-site-setting-#{@site.id}-title button[form='translation-confirm-form']", text: "Mark as up to date"
+    assert_select "#reference-card-site-setting-#{@site.id}-title[data-translation-state='outdated']"
+    assert_select "#reference-card-site-setting-#{@site.id}-title button[form='translation-confirm-form']", text: "Still correct — mark up to date"
     assert_select "#language-switcher-outdated-de"
     assert_select "#language-switcher-outdated-es", count: 0
   end

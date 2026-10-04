@@ -71,11 +71,25 @@ module ContentModel
           field = definition.fields.find { |f| f.name == key } or next
 
           value = serialize(field, raw)
+          # A date typed in free text (design pass round 2: the field is a
+          # `yyyy-mm-dd` input now, not a browser date picker) that doesn't
+          # parse casts to nil, which would be stored as "no date" and so wipe
+          # the stored one without a word. Remember it so the owning record
+          # can refuse the save with an error on the field instead. Only `Post`
+          # consumes this: any other caller (a block's settings) still drops an
+          # unparseable date, and an integer still drops garbage -- known and
+          # accepted for now.
+          rejected_inputs << key if field.type == :date && value.nil? && raw.to_s.strip.present?
           target = field.translated? ? (@translations[@locale] ||= {}) : @values
           value.nil? ? target.delete(key) : target[key] = value
         end
         self
       end
+
+      # The names of the date fields the last `assign` was handed text for that
+      # isn't a `yyyy-mm-dd` date. Not part of what is stored -- a record reads
+      # it straight after `assign` (`Post#assign_fields`).
+      def rejected_inputs = (@rejected_inputs ||= [])
 
       # The JSON-ready hash of every untranslated field -- what a save writes
       # to the record's `settings`/`metadata` column. Blanks are dropped
@@ -170,10 +184,17 @@ module ContentModel
         end
       end
 
+      # Strictly `yyyy-mm-dd`: `Date.iso8601` alone also takes "20240101" and
+      # week dates, which is not what the editor's placeholder promises.
+      DATE_FORMAT = /\A\d{4}-\d{2}-\d{2}\z/
+
       def parse_date(value)
         return value if value.is_a?(Date)
 
-        Date.iso8601(value.to_s)
+        text = value.to_s.strip
+        return nil unless text.match?(DATE_FORMAT)
+
+        Date.iso8601(text)
       rescue ArgumentError, TypeError
         nil
       end

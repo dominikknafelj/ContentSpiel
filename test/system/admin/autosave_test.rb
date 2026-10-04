@@ -38,7 +38,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # DOM subtree) rather than the whole page, since the exact wording
     # (global constraints) is this element's *entire* text content, not
     # just some text on the page.
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
 
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
@@ -92,7 +92,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     # Still exactly one request: the second edit is queued behind the held
     # first one, not sent alongside it.
     assert_equal 1, page.evaluate_script("window.__patchesStarted")
-    assert_selector "#page-save-status", text: "Saving…"
+    assert_selector "#page-save-status", text: /SAVING/
 
     # Releasing the first request lets `admin--autosave` notice `pending`
     # and send the second attempt with whatever the form holds *now*.
@@ -164,7 +164,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     title_field.set("This will never actually save")
     title_field.send_keys(:tab)
 
-    assert_selector "#page-save-status", text: "Not saved — check your connection", wait: 20
+    assert_selector "#page-save-status", text: "NOT SAVED · Retry", wait: 20
   end
 
   private
@@ -198,5 +198,98 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
       sleep 0.1
     end
+  end
+
+  # Ledger m7 (final fix wave 1): a save the server refuses for want of
+  # permission (a tab left open while the editor's rights were taken away)
+  # is answered 403 WITH the stream that says so. 403 was not among the
+  # statuses `admin--autosave` took for an answer, so it was retried as a
+  # network failure three times and ended in "NOT SAVED · Retry" -- which
+  # can never succeed and never says why.
+  test "an autosave refused for want of permission says so at once, and is not retried" do
+    Capybara.reset_sessions!
+    sign_in_via_form(users(:two))
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+    JS
+    # Still allowed to read the page, no longer to change it.
+    AccessControl::Membership.where(user: users(:two)).update_all(group_id: access_control_groups(:read_only).id)
+
+    fill_in "Subtitle", with: "Not mine to change any more"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#page-save-status", text: "Not saved — you don't have permission to change this", wait: 5
+    assert_selector "#toasts .admin-toast[data-kind='error']", text: "You don't have permission to make this change."
+    sleep 1.5 # the first retry would have gone out after one second
+    assert_equal 1, page.evaluate_script("window.__patches"), "a refused save was retried"
+    assert_no_selector "#page-save-status", text: "RETRYING"
+    assert_nil @page.reload.subtitle
+  end
+
+  # Ledger m3 (final fix wave 1): "nothing is sent when the form holds what
+  # its last save sent" compares what the form would submit. An EMPTY file
+  # input submits a File whose `lastModified` is the moment it was read, so
+  # a form with one (Settings, with its logo) never compared equal to itself
+  # and sent a save on every `focusout`.
+  test "leaving a field of a form with an empty file input, without typing, sends nothing" do
+    visit admin_settings_path
+    await_admin_controllers
+    assert_selector "form[data-controller~='admin--autosave'] input[type=file]", visible: :all
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+      const field = document.querySelector("form[data-controller~='admin--autosave'] input[type=text]")
+      field.focus()
+    JS
+    sleep 0.05 # `lastModified` has millisecond precision
+    page.execute_script("document.activeElement.blur()")
+    sleep 0.5
+    assert_equal 0, page.evaluate_script("window.__patches"), "a save was sent though nothing had changed"
+  end
+
+  # Ledger m1 (final fix wave 1): a record editor is never restored from
+  # Turbo's page cache. Back is a restoration visit: nothing drains first, and
+  # the snapshot is taken with whatever the forms held at that moment -- here
+  # an edit that is only sent as the page is torn down, whose answer (and new
+  # base) reaches no document. Forward then restored that snapshot: the text
+  # in the field, the OLD base in the hidden field, and `admin--autosave`
+  # taking what it found for "what the server holds". The next edit was
+  # refused as "Changed elsewhere" against one's own save. With
+  # `turbo-cache-control: no-cache` Forward fetches the editor afresh.
+  test "an editor left with Back while an edit was unsent is fetched afresh by Forward, and keeps saving" do
+    visit admin_root_path
+    await_admin_controllers
+    find("nav[aria-label='Modules'] a", text: "Posts").click
+    assert_current_path(/cs-studio\/posts/, wait: 10)
+    page.execute_script("Turbo.visit(#{"/cs-studio/pages/#{@page.id}".to_json})")
+    assert_field "Title", with: "About", wait: 10
+    await_admin_controllers
+
+    fill_in "Subtitle", with: "Typed, then Back"
+    page.go_back
+    assert_current_path(/cs-studio\/posts/, wait: 10)
+    assert_eventually { @page.reload.subtitle == "Typed, then Back" }
+    sleep 1.1 # past the "changed elsewhere" bar's own one-second tolerance
+
+    page.go_forward
+    assert_field "Subtitle", with: "Typed, then Back", wait: 10
+    await_admin_controllers
+
+    fill_in "Subtitle", with: "Typed after coming back"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#page-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 8
+    assert_equal "Typed after coming back", @page.reload.subtitle
+    assert_no_text "CHANGED ELSEWHERE"
   end
 end

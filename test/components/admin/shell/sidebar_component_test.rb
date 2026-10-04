@@ -52,6 +52,24 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector ".admin-account", text: user.email_address
     assert_selector ".admin-account a", text: "Change password"
     assert_selector ".admin-account button", text: "Sign out"
+    # Email and role share one line (review C, M9).
+    assert_selector ".admin-account span", text: "#{user.email_address} · Owner", count: 1
+  end
+
+  test "the wordmark is uppercase with the site name under it" do
+    render_sidebar(labels: %w[Dashboard])
+    assert_selector ".admin-wordmark", text: "CONTENT·SPIEL"
+    assert_selector ".admin-wordmark + .admin-site-name", text: Current.site.title
+  end
+
+  test "a user without a name shows the email once, with the role inline" do
+    user = users(:one)
+    user.name = nil
+    render_sidebar(labels: %w[Dashboard], user: user)
+    assert_selector ".admin-account", text: user.email_address, count: 1
+    assert_equal 1, page.find(".admin-account").text.scan(user.email_address).size
+    assert_selector ".admin-account", text: "Owner"
+    assert_no_selector ".admin-account .font-cs-mono", text: /owner/i
   end
 
   test "the role line: Owner, up to two groups then +N, or No groups" do

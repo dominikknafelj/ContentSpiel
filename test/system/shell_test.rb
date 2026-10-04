@@ -39,9 +39,68 @@ class ShellTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
+  # Review B, M4: the tree drawer closes when a page picked in it has loaded
+  # into `#content` -- not on any frame's load. ⌘K's results frame loads as
+  # the palette opens and on every keystroke; it used to close the drawer
+  # behind the palette (as did the New page / New post frames and the media
+  # picker's).
+  test "below 1024 the tree drawer stays open while another frame loads, and closes when a tree link has loaded" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    other = create_page(title: "Other")
+    sign_in_via_form users(:one)
+    visit "/cs-studio/pages/#{root_page.id}"
+    await_admin_controllers
+    page.driver.resize(900, 900)
+    find("button[aria-controls='tree-column']").click
+    assert_selector "#tree-column[data-open]"
+
+    # Dispatched, not typed: `send_keys` clicks its node first, and a click on
+    # <body> lands on the drawer's scrim.
+    page.execute_script('window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))')
+    assert_selector "dialog#command-palette[open]"
+    find("dialog#command-palette input").set("Oth")
+    assert_selector "#jump-results [role=option]", text: "Other"
+    assert_selector "#tree-column[data-open]", visible: :all
+
+    page.execute_script('document.getElementById("command-palette").close()')
+    assert_no_selector "dialog#command-palette[open]"
+    assert_selector "#tree-column[data-open]"
+    find("#tree-column li[data-page-id='#{other.id}'] a", text: "Other").click
+    assert_field "Title", with: "Other"
+    assert_no_selector "#tree-column[data-open]"
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "at desktop width there is no top bar and the sidebar stays put" do
     sign_in_via_form users(:one)
     assert_no_selector ".admin-top-bar"
     assert_selector "#sidebar nav[aria-label='Modules']"
+  end
+
+  # Round 1 departure, dark and light: the sidebar's background ran only to the
+  # viewport's bottom. Its grid cell now stretches the whole page and paints the
+  # chrome background; the nav inside stays pinned to the viewport.
+  %w[light dark].each do |theme|
+    test "the sidebar background fills the page and the nav stays pinned on a long page (#{theme})" do
+      sign_in_via_form users(:one)
+      await_admin_controllers
+      page.execute_script("document.documentElement.dataset.theme = '#{theme}'; document.querySelector('main').style.minHeight = '3000px'")
+      page.execute_script("window.scrollTo(0, 1500)")
+
+      metrics = page.evaluate_script(<<~JS)
+        (() => {
+          const cell = document.querySelector(".admin-shell__sidebar").getBoundingClientRect()
+          const nav = document.querySelector("nav[aria-label=Modules]").getBoundingClientRect()
+          return { cellHeight: cell.height, navTop: nav.top, navHeight: nav.height, viewport: window.innerHeight,
+                   cellBackground: getComputedStyle(document.querySelector(".admin-shell__sidebar")).backgroundColor,
+                   chrome: (() => { const p = document.createElement("div"); p.style.background = "var(--cs-chrome)"; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c })() }
+        })()
+      JS
+      assert_operator metrics["cellHeight"], :>=, 3000
+      assert_in_delta 0, metrics["navTop"], 1
+      assert_in_delta metrics["viewport"], metrics["navHeight"], 1
+      assert_equal metrics["chrome"], metrics["cellBackground"]
+    end
   end
 end

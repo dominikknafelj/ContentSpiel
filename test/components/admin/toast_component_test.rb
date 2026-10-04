@@ -70,6 +70,15 @@ class Admin::ToastRegionComponentTest < ViewComponent::TestCase
     assert_selector "#toasts .admin-toast form[action='/u']"
   end
 
+  # Final review C, I4: a bulk action that did some and refused or failed
+  # others names the failures in its one toast; a 4 s success toast would take
+  # them away before they could be read.
+  test "a warning stays until dismissed, keeps its Undo, and is an alert" do
+    render_inline(Admin::ToastRegionComponent.new(flash: { warning: "Moved 2 posts to the trash. 1 was refused: “A”.", undo: { "label" => "Undo", "url" => "/u", "method" => "post" } }))
+    assert_selector "#toasts .admin-toast[role=alert][data-kind=warning][data-admin--toast-timeout-value='0']", text: "1 was refused"
+    assert_selector "#toasts .admin-toast form[action='/u']"
+  end
+
   test "the region is rendered even when empty, so streams have a target" do
     render_inline(Admin::ToastRegionComponent.new(flash: {}))
     assert_selector "#toasts"

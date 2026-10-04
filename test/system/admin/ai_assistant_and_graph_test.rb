@@ -44,20 +44,16 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     await_admin_controllers
 
     find("#post-related_post_ids").send_keys("Sat")
-    # A native click (not `press`), the way an editor picks: its mousedown
-    # blurs the search box, whose `focusout` autosaves at once and turns the
-    # empty status line into "Saving…" before the mouseup. That line used to
-    # take no height while empty, so it pushed the results list down a line
-    # mid-click, the mouseup landed off the button, no `click` fired, and
-    # the pick was never made (`Admin::SaveStatusComponent` now reserves
-    # the line).
-    within("#post-related_post_ids-results") { find(:button, "Satellite").click }
-    assert_selector "[data-controller~='admin--related-posts'] li", text: "Satellite"
-    assert_selector "#post-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    # A native click (not `press`), the way an editor picks: the list's own
+    # mousedown handler keeps focus in the search box, so nothing blurs (and
+    # nothing autosaves) before the click lands.
+    within("#post-related_post_ids-listbox") { find("[role=option]", text: "Satellite").click }
+    assert_selector "[data-controller~='admin--chip-input'] li", text: "Satellite"
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
     assert_equal [ other.id ], post_record.post_relations.reload.pluck(:related_post_id)
 
-    within("[data-controller~='admin--related-posts'] li", text: "Satellite") { press "Remove" }
-    assert_text "No related posts yet."
+    find("[data-controller~='admin--chip-input'] button[aria-label='Remove Satellite']").click
+    assert_no_selector "[data-controller~='admin--chip-input'] li", text: "Satellite"
     wait_until { post_record.post_relations.reload.empty? }
   end
 
@@ -158,9 +154,12 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     # pass bug 4), so this starts from a site with nothing but Home.
     root_page
 
-    visit admin_pages_path
+    visit admin_pages_path # opens Home's editor
     await_admin_controllers
-    within(".admin-empty-state") { press "Create starter pages" }
+    within("#tree") do
+      find("button[aria-label='More page actions']").click
+      press "Create starter pages"
+    end
 
     assert_text "Starter pages created"
     within("#tree") { assert_text "Blog" }

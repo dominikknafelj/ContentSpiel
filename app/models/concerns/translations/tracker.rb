@@ -3,7 +3,23 @@ module Translations
   # primary-language original a translation was saved against (spec §3.2),
   # so a later change to the original can flag the translation as outdated.
   # `translation_sources` (jsonb, on every tracked table) holds
-  # `{ "field" => { "locale" => "<digest of the original>" } }`.
+  # `{ "field" => { "locale" => entry } }`, where an entry is either the bare
+  # digest of the original (the shape before the design pass; still valid,
+  # see `Translations::Source`) or `{ "digest", "text", "saved_at", "from" }` -- the
+  # original's text as it was then, when, and in which language (`from`), so the translations screen can
+  # diff it against the original as it is now.
+  #
+  # Storage cost: the text is kept once per target language a field was
+  # translated into, so a long body is stored (as plain paragraphs) N times
+  # for N languages. Acceptable at CMS scale, and exactly what makes the
+  # diff possible without versioning the original.
+  #
+  # `translation_original_changed_at` (jsonb, `{ "field" => ISO-8601 }`) is
+  # the other half: when each field's *primary-language* value last changed
+  # (by digest, so a whitespace-only edit isn't one). It is written by this
+  # concern's before_save and by nothing else. A field whose original goes
+  # from blank to filled (or filled to blank) counts as changed and is
+  # stamped; only a create sets nothing.
   #
   # Only a target-locale value that *changed in this save* gets a fresh
   # digest; a change to the primary value itself never touches the record's
@@ -41,6 +57,7 @@ module Translations
       class_attribute :translation_schema_reader, instance_writer: false, default: nil
 
       before_save :record_translation_sources
+      before_save :record_original_changes
     end
 
     class_methods do
@@ -85,7 +102,7 @@ module Translations
       return :missing if blank_translation?(translation_value(field, locale))
       return :current if locale == translation_primary_locale
 
-      recorded = translation_sources.dig(field.to_s, locale)
+      recorded = translation_source(field, locale)&.digest
       return :unknown if recorded.nil?
 
       # A cleared original has nothing to be outdated *against* -- the same
@@ -96,6 +113,18 @@ module Translations
       return :unknown if original.nil?
 
       recorded == original ? :current : :outdated
+    end
+
+    # What `field` in `locale` was translated from, or nil when nothing is
+    # recorded. Accepts both stored shapes.
+    def translation_source(field, locale)
+      Translations::Source.wrap(translation_sources.dig(field.to_s, locale.to_s))
+    end
+
+    # When `field`'s original last changed, or nil if it never has since
+    # this was recorded.
+    def translation_original_changed_at_for(field)
+      Translations::Source.parse_time(translation_original_changed_at[field.to_s])&.in_time_zone
     end
 
     # Marks `field` in `locale` as translated from the original as it
@@ -241,6 +270,34 @@ module Translations
       end
     end
 
+    # Stamps `translation_original_changed_at` for every tracked field whose
+    # primary-language value changed in this save, compared by digest (the
+    # database's value against the one being saved) so a whitespace-only or
+    # normalisation-only edit isn't a change. A create sets nothing: a new
+    # original has no earlier version it could have "changed" from.
+    def record_original_changes
+      return if new_record?
+
+      primary = translation_primary_locale
+      stamped = nil
+      self.class.translation_tracked_fields(self).each do |field|
+        before = raw_translation_value(field, primary, in_database: true)
+        after = raw_translation_value(field, primary)
+        next if before == after
+        next if translation_raw_digest(field, before) == translation_raw_digest(field, after)
+
+        stamped ||= translation_original_changed_at.deep_dup
+        stamped[field] = Time.current.iso8601
+      end
+      self.translation_original_changed_at = stamped if stamped
+    end
+
+    # Digest of a raw stored value, the way `translation_value` would read
+    # it (a body is a `RichText::Document`, everything else digests as is).
+    def translation_raw_digest(field, raw)
+      Translations.digest(field == "body" && raw.is_a?(Hash) ? RichText::Document.new(raw) : raw)
+    end
+
     # A blank original has nothing to be a translation *of*: no digest is
     # recorded (and a stale one is dropped), so the value reads `:unknown`
     # until it's saved against a real original.
@@ -249,7 +306,12 @@ module Translations
       return remove_translation_source(field, locale) unless digest
 
       sources = translation_sources.deep_dup
-      (sources[field] ||= {})[locale] = digest
+      (sources[field] ||= {})[locale] = {
+        "digest" => digest,
+        "text" => Translations.source_text(translation_value(field, translation_primary_locale)),
+        "saved_at" => Time.current.iso8601,
+        "from" => translation_primary_locale
+      }
       self.translation_sources = sources
     end
 

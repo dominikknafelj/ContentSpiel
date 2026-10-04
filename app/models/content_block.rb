@@ -105,6 +105,19 @@ class ContentBlock < ApplicationRecord
     respond_to?(key) ? public_send(key) : nil
   end
 
+  # How a typed setting's error names its field: `settings.limit` -> "Limit"
+  # (the label its input carries, `Admin::FieldComponent#label_text`), so the
+  # message reads "Limit must be greater than or equal to 1" in the card's
+  # error slot, the flash and MCP alike. Rails would otherwise print the
+  # dotted path as "Settings limit ...". Everything else -- the block's own
+  # columns -- goes to Rails' default.
+  def self.human_attribute_name(attribute, options = {})
+    name = attribute.to_s
+    return super unless name.start_with?("settings.") && name.size > "settings.".size
+
+    name.delete_prefix("settings.").humanize
+  end
+
   # This block's registered type, or nil for a stored `block_type` that isn't
   # (or is no longer) registered -- e.g. a removed plugin's type. `find`, not
   # `fetch`: an unknown stored type must never raise here, since this is read

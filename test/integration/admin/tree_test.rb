@@ -20,12 +20,26 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   end
 
   test "the pages index shows the tree with status and child counts" do
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@b.id}"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
       # The tree hides Live: only a draft or scheduled page gets a chip.
       assert_select "[data-status='live']", count: 0
       assert_select "[data-child-count]", text: "1"
+      assert_select "[data-child-count][role=img][aria-label='1 subpage']"
     end
+  end
+
+  # Handoff §10 C34.
+  test "/pages opens Home's editor for someone who can open it" do
+    get "/cs-studio/pages"
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}"
+    assert_response :see_other
+  end
+
+  test "/pages keeps the editing language when it redirects" do
+    with_locales(%w[en de], default: "en")
+    get "/cs-studio/pages", params: { locale: "de" }
+    assert_redirected_to "/cs-studio/pages/#{root_page.id}?locale=de"
   end
 
   test "moving a page reparents it and re-renders the tree" do
@@ -33,6 +47,72 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal @b, @child.reload.parent
     assert_includes response.body, %(<turbo-stream action="replace" target="tree">)
+  end
+
+  # Final fix wave 1 (reviews A I1 / B I1): `Pages::Move` saves the moved
+  # page, so its `updated_at` moves -- and the page settings form of that same
+  # page, open next to the tree, holds the old one as its autosave base. Left
+  # alone, its next save was refused as "Changed elsewhere" against the
+  # editor's own move. So the tree move answers like a block write does: the
+  # client sends the open form's base (`X-Page-Base-Updated-At`), and when
+  # that IS the moved page's `updated_at` as it stood before the move, the
+  # answer carries the form's new base.
+  test "moving the open page hands its settings form the new base, so its next save isn't stale" do
+    travel 1.minute
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 },
+      headers: page_base_header(@child.updated_at), as: :turbo_stream
+    assert_response :success
+    fresh = @child.reload.updated_at.iso8601(6)
+    assert_equal fresh, streamed_page_base
+
+    patch "/cs-studio/pages/#{@child.id}", params: { page: { subtitle: "Typed after my own move" }, base_updated_at: fresh }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Typed after my own move", @child.reload.subtitle
+
+    # The Undo is the same request, and answers the same way.
+    travel 1.minute
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @a.id, position: 0, undo: 1 },
+      headers: page_base_header(@child.updated_at), as: :turbo_stream
+    assert_response :success
+    assert_equal @child.reload.updated_at.iso8601(6), streamed_page_base
+  end
+
+  test "a move vouches for no base when the page was saved elsewhere since the form loaded" do
+    stale = @child.updated_at
+    travel 1.minute
+    as(users(:two), channel: :admin) { Pages::Save.call(@child, translations: { "en" => { subtitle: "The other editor's text" } }) }
+
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, headers: page_base_header(stale), as: :turbo_stream
+    assert_response :success
+    assert_nil streamed_page_base_stream, "the open form's next save must still be refused"
+
+    patch "/cs-studio/pages/#{@child.id}", params: { page: { subtitle: "My stale edit" }, base_updated_at: stale.iso8601(6) }, as: :turbo_stream
+    assert_response :conflict
+  end
+
+  # The base in the header is the OPEN page's. Moving any other page must
+  # never hand that form the moved page's `updated_at`: a base newer than the
+  # open page's own would let a stale form overwrite someone else's save.
+  test "moving another page than the open one streams no base, whatever base was sent" do
+    travel 1.minute
+    @a.touch
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, headers: page_base_header(@a.updated_at), as: :turbo_stream
+    assert_response :success
+    assert_nil streamed_page_base_stream
+  end
+
+  test "a move sent without a base, with a junk one, or refused streams no base" do
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @b.id, position: 0 }, as: :turbo_stream
+    assert_response :success
+    assert_nil streamed_page_base_stream
+
+    patch "/cs-studio/tree", params: { page_id: @child.id, parent_id: @a.id, position: 0 }, headers: { "X-Page-Base-Updated-At" => "yesterday" }, as: :turbo_stream
+    assert_response :success
+    assert_nil streamed_page_base_stream
+
+    patch "/cs-studio/tree", params: { page_id: @a.id, parent_id: @child.reload.id, position: 0 }, headers: page_base_header(@a.updated_at), as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_nil streamed_page_base_stream
   end
 
   test "a move answers with an Undo toast that puts the page back where it was" do
@@ -105,37 +185,42 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
     assert_equal @a, @child.reload.parent
   end
 
-  # Translation helpers spec §4 (Task 4): one marker on a page that isn't
-  # complete in some target language, its tooltip naming them.
-  test "the tree marks a page incomplete in some language, naming the languages" do
+  # Handoff §10 B24: "↻N" for outdated and "○N" for missing fields, summed
+  # over the target languages, the tooltip naming them; nothing at zero.
+  test "the tree counts missing translations, naming the languages" do
     with_locales(%w[en de es], default: "en")
     assert Pages::Save.call(@a, translations: { "es" => { title: "Alfa" } }).ok?
     assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" }, "es" => { title: "Beta" } }).ok?
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@b.id}"
 
-    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]" do |markers|
-      assert_equal 1, markers.size
-      assert_equal "Incomplete in Deutsch (missing)", markers.first["title"]
-      assert_equal "Incomplete in Deutsch (missing)", markers.first["aria-label"]
+    assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]", count: 1 do |markers|
+      assert_equal "○1", markers.first.text
+      assert_equal "Deutsch: 1 missing", markers.first["title"]
+      assert_equal "1 missing translation: Deutsch", markers.first["aria-label"]
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker]", count: 0
   end
 
-  test "the tree marker lists outdated languages too" do
+  test "the tree counts outdated fields too" do
     with_locales(%w[en de es], default: "en")
     assert Pages::Save.call(@b, translations: { "de" => { title: "Beta" } }).ok?
     assert Pages::Save.call(@b, translations: { "en" => { title: "Beta!" } }).ok?
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@a.id}"
 
-    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker][title='Incomplete in Deutsch (outdated), Español (missing)']"
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker=outdated]", text: "↻1" do |markers|
+      assert_equal "Deutsch: 1 outdated", markers.first["title"]
+    end
+    assert_select "turbo-frame#tree li[data-page-id='#{@b.id}'] > div [data-translation-marker=missing]", text: "○1" do |markers|
+      assert_equal "Español: 1 missing", markers.first["title"]
+    end
   end
 
   test "the tree shows no marker with one language enabled" do
     with_locales(%w[en], default: "en")
 
-    get "/cs-studio/pages"
+    get "/cs-studio/pages/#{@a.id}"
 
     assert_select "turbo-frame#tree [data-translation-marker]", count: 0
   end
@@ -153,5 +238,16 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
       assert_nil rows.first.at_css("[data-translation-marker]")
     end
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}'] > div [data-translation-marker]"
+  end
+
+  private
+
+  def page_base_header(time) = { "X-Page-Base-Updated-At" => time.iso8601(6) }
+
+  def streamed_page_base_stream = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
+
+  def streamed_page_base
+    assert streamed_page_base_stream, "expected the page form's base in:\n#{response.body}"
+    streamed_page_base_stream.inner_html[/value="([^"]+)"/, 1]
   end
 end

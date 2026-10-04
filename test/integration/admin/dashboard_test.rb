@@ -14,7 +14,10 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
 
   test "the pages list lives at /pages and the sidebar lists Dashboard first" do
     sign_in_as users(:one)
+    root_page
     get admin_pages_path
+    assert_response :see_other # opens Home's editor
+    follow_redirect!
     assert_response :ok
     assert_select "nav[aria-label='Modules'] a", text: "Pages"
     assert_equal "Dashboard", css_select("nav[aria-label='Modules'] a").first.text.strip
@@ -32,38 +35,86 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "h1", "Dashboard"
   end
 
-  # Task 4 (dashboard spec §4): the two columns' lists, quick create and
-  # the permission-dependent links. A user's display name in CS Studio is
-  # their email address (`User` has no name column) -- the same label the
-  # audit log and the trash already use.
-  test "both columns render their lists with labels and links" do
-    @draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
+  # Round 2, Task 16: quick create, three cards and one activity feed (the
+  # old "Your work" / "On the site" columns and their lists are gone).
+  test "the three cards and the activity feed render; the old two columns are gone" do
+    draft = Current.set(actor: users(:one)) { create_post(title: "Half-written", published: false) }
     sign_in_as users(:one)
     get admin_root_path
-    assert_select "section[aria-labelledby=your-work] h2#your-work", "Your work"
-    assert_select "section[aria-labelledby=on-the-site] h2#on-the-site", "On the site"
-    assert_select "section[aria-labelledby=your-work] a[href='#{admin_post_path(@draft)}']", text: /Half-written/
-    assert_select "section[aria-labelledby=on-the-site]", text: /by #{Regexp.escape(users(:one).email_address)}/
+
+    assert_select "section[aria-labelledby=dashboard-drafts] h2", "Your drafts"
+    assert_select "section[aria-labelledby=dashboard-drafts] a[href='#{admin_post_path(draft)}']", text: "Half-written"
+    assert_select "section[aria-labelledby=dashboard-going-live-next] h2", "Going live next"
+    assert_select "section[aria-labelledby=dashboard-activity] h2", "Recent activity"
+    assert_select "section[aria-labelledby=dashboard-activity] li", text: /Half-written/
+    assert_select "#your-work, #on-the-site, #dashboard-recently-updated, #dashboard-recently-edited, #dashboard-scheduled", count: 0
   end
 
-  test "a change made through an API token reads as its user's" do
+  test "the needs-translation card is hidden with one language" do
+    with_locales(%w[en], default: "en")
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "section[aria-labelledby=dashboard-needs-translation]", count: 0
+  end
+
+  test "going live next shows the date tile, a relative phrase and by you" do
+    # Pinned to midday: a phrase counts calendar days, so a run late in the
+    # evening must not change the answer.
+    travel_to Time.zone.local(2030, 1, 10, 12) do
+      post = Current.set(actor: users(:one)) { create_post(title: "Soon", published: false) }
+      post.update_columns(published_at: Time.zone.local(2030, 1, 15, 13))
+      sign_in_as users(:one)
+      get admin_root_path
+
+      assert_select "section[aria-labelledby=dashboard-going-live-next] li", text: /Soon.*in 5 days.*by you/m
+      assert_select "section[aria-labelledby=dashboard-going-live-next]", text: /Schedule a draft to see it here\./
+    end
+  end
+
+  test "empty-state copy doesn't point at a quick-create row the viewer doesn't have" do
+    sign_in_as users(:reader)
+    get admin_root_path
+    assert_match "No drafts.", response.body
+    assert_no_match "start one above", response.body
+    assert_no_match "Schedule a draft to see it here", response.body
+  end
+
+  test "the needs-translation card shows each target language's numbers with several languages" do
+    with_locales(%w[en de], default: "en")
+    Current.set(actor: users(:one)) { create_post(title: "Untranslated") }
+    sign_in_as users(:one)
+    get admin_root_path
+
+    assert_select "section[aria-labelledby=dashboard-needs-translation] [data-locale=de]", text: /Deutsch.*1 missing/m
+    assert_select "section[aria-labelledby=dashboard-needs-translation] [role=progressbar]"
+  end
+
+  test "a change made through an API token reads as its user's, via an API token, never the token" do
     post = Current.set(actor: users(:one)) { create_post(title: "From MCP") }
     token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin))
     Current.set(actor: token, channel: :mcp) { Posts::Save.call(post, translations: { Locales.default => { title: "From MCP!" } }) }
 
     sign_in_as users(:one)
     get admin_root_path
-    assert_select "section[aria-labelledby=on-the-site] li", text: /From MCP!.*by #{Regexp.escape(users(:two).email_address)}/m
+    assert_select "section[aria-labelledby=dashboard-activity] li", text: /#{Regexp.escape(users(:two).email_address)} via an API token edited “From MCP!”/
   end
 
   test "empty lists say so" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_match "No drafts — start one above.", response.body
-    assert_match "Nothing scheduled.", response.body
-    assert_match "Nothing edited yet.", response.body
+    assert_match "No drafts.", response.body
     assert_match "Nothing scheduled on the site.", response.body
-    assert_match "No changes yet.", response.body
+    assert_match "No recent activity.", response.body
+  end
+
+  test "a user who can read nothing gets empty cards and no activity" do
+    Current.set(actor: users(:one)) { create_post(title: "Not for you", published: false) }
+    sign_in_as users(:editor_branch)
+    get admin_root_path
+    assert_response :ok
+    assert_no_match "Not for you", response.body
+    assert_match "No recent activity.", response.body
+    assert_select "section[aria-labelledby=dashboard-needs-translation]", count: 0
   end
 
   test "quick draft creates a draft and opens it" do
@@ -119,23 +170,34 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "form[action='#{admin_dashboard_draft_path}']", count: 0
   end
 
-  test "New page, Upload image and the audit link follow permissions" do
-    sign_in_as users(:reader)
-    get admin_root_path
-    assert_select "a", text: "New page", count: 0
-    assert_select "a", text: "Upload image", count: 0
-    assert_select "a", text: /Full audit log/, count: 0
-
+  test "the type select ends with Page for someone who may create pages, and the bar has no New page or Upload image buttons" do
     sign_in_as users(:one)
     get admin_root_path
-    assert_select "a[href='#{new_admin_page_path}']", text: "New page"
-    assert_select "a[href='#{admin_media_path}']", text: "Upload image"
-    assert_select "a[href='#{admin_audit_events_path}']", text: /Full audit log/
+    assert_equal "page", css_select("select[name=content_type] option").last["value"]
+    assert_select "select[name=content_type] option", text: "Page"
+    assert_select "a", text: "Upload image", count: 0
+    assert_select "form[action='#{admin_dashboard_draft_path}'] a[data-admin--dialog-id-param=new-page-dialog][hidden]", count: 1
+    assert_select "a", text: /Full audit log/
   end
 
-  # Spec §4.5, at the view level: everything a row renders -- status
-  # badges, editor paths, "by" names (a token's user included), image
-  # thumbnails -- comes from the feed's constant set of queries. Signed in
+  test "Page is offered only with pages.create, and the audit link needs audit.view" do
+    sign_in_as users(:reader)
+    get admin_root_path
+    assert_select "select[name=content_type] option[value=page]", count: 0
+    assert_select "a", text: /Full audit log/, count: 0
+  end
+
+  test "submitting the quick draft form with Page goes to the standalone New page screen" do
+    sign_in_as users(:one)
+    assert_no_difference -> { Post.count + Page.count } do
+      post admin_dashboard_draft_path, params: { title: "Ignored", content_type: "page" }
+    end
+    assert_redirected_to new_admin_page_path
+  end
+
+  # Spec §4.5, at the view level: everything a row renders -- editor paths,
+  # type labels, the activity sentences (a token's user included) and the
+  # translation card -- comes from a constant set of queries. Signed in
   # as users(:two), a non-owner Admin-group member, so every `can?` and
   # every read scope goes through the grant path rather than the owner
   # shortcut.
@@ -158,8 +220,9 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
       callback = ->(*, payload) { queries += 1 unless payload[:name] == "SCHEMA" || payload[:sql].start_with?("BEGIN", "COMMIT", "SAVEPOINT", "RELEASE") }
       ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { get admin_root_path }
       assert_response :ok
-      assert_select "section[aria-labelledby=your-work] li"
-      assert_select "section[aria-labelledby=on-the-site] li img"
+      assert_select "section[aria-labelledby=dashboard-drafts] li"
+      assert_select "section[aria-labelledby=dashboard-activity] li"
+      assert_select "section[aria-labelledby=dashboard-needs-translation] li"
       queries
     end
     assert_equal counts.first, counts.last

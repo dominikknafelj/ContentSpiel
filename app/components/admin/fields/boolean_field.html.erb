@@ -1,2 +1,8 @@
-<%= tag.input type: "hidden", name: input_name, value: "0" %>
-<%= check_box_tag input_name, "1", checked?, id: input_id, class: "size-4 rounded-cs border-line-strong text-accent focus:outline-2 focus:outline-accent" %>
+<%# The hidden "0" comes first, so a ticked switch's "1" is the last value under the name (see the class
+    comment). The switch and its label are one control: a `.cs-toggle` checkbox (content-spiel.tailwind.css)
+    with `role="switch"`, and the label beside it names it. A change bubbles to the form's autosave on its own. %>
+<span class="inline-flex items-center gap-2">
+  <%= tag.input type: "hidden", name: input_name, value: "0" %>
+  <%= check_box_tag input_name, "1", checked?, id: input_id, class: "cs-toggle", role: "switch" %>
+  <label for="<%= input_id %>" class="text-sm text-ink"><%= field.name.humanize %></label>
+</span>

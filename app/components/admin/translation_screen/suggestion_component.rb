@@ -39,9 +39,25 @@ module Admin
     class SuggestionComponent < Admin::AdminComponent
       def self.dom_id(input_id) = "translation-suggestion-#{input_id}"
 
+      LABEL = "SUGGESTED TRANSLATION · EDIT BEFORE USING".freeze
+
+      # How much of the existing translation "Current: …" shows.
+      CURRENT_LIMIT = 300
+      MODES = %i[translate update].freeze
+
       BUTTON_CLASS = "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken".freeze
 
-      def initialize(input_id:, locale:, suggestion: nil, warnings: [], error: nil, model: nil)
+      # `mode: :update` is a **Suggest update** answer (`Admin::Translations
+      # Controller#suggest` with `mode=update`): the field already has a
+      # translation, passed as `current:` (plain text -- the controller reads it
+      # from the record, it is never sent to the provider) and shown above the
+      # text so the editor can compare before pressing Use, which replaces the
+      # field's value exactly as it does for a first translation.
+      def initialize(input_id:, locale:, suggestion: nil, warnings: [], error: nil, model: nil, mode: :translate, current: nil)
+        raise ArgumentError, "unknown suggestion mode #{mode.inspect}" unless MODES.include?(mode.to_sym)
+
+        @mode = mode.to_sym
+        @current = current
         @input_id = input_id.to_s
         @model = model.presence
         @locale = locale.to_s
@@ -56,10 +72,20 @@ module Admin
 
       def preview_html = suggestion.to_html(locale: locale, urls: PublicSite::Urls.new(preview: true))
 
-      # The header line: names the model when the controller knew it (it is
-      # configuration -- `AI.model`, the default when none is set -- never
-      # anything about the key), else just says what this is.
-      def heading = model ? "Suggested by #{model}" : "Suggested translation"
+      # The header line's left side is always `LABEL`; the model (when the
+      # controller knew it -- configuration, `AI.model`, the default when none
+      # is set, never anything about the key) is right-aligned beside it.
+      def model_name = model
+
+      # "Current: <the existing translation>" as plain, escaped text cut to
+      # `CURRENT_LIMIT` characters -- only in update mode and only when there
+      # is a current translation to show.
+      def current_text
+        return unless @mode == :update
+
+        text = @current.to_s.strip
+        text.truncate(CURRENT_LIMIT) if text.present?
+      end
 
       def rows = [ suggestion.to_s.lines.count, 2 ].max
 

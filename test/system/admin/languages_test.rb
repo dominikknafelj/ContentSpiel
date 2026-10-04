@@ -32,10 +32,31 @@ class Admin::LanguagesSystemTest < ApplicationSystemTestCase
     # -- see `test/system/admin/autosave_test.rb`'s own comment for why the
     # two-step form can raise `ElementNotFound` before its own explicit
     # wait gets any say.
-    assert_selector "#page-save-status", text: /\ASaved \d{2}:\d{2}\z/, wait: 5
+    assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
 
     @page.reload
     assert_equal "Über uns", @page.title(locale: :de)
     assert_equal "About", @page.title(locale: :en)
+  end
+
+  # Round 1 departure: the state dot is 7px and vertically centred on the label
+  # (it rode low when the underline's padding sat on the label).
+  test "a tab's state dot is 7px and centred on its label" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    geometry = page.evaluate_script(<<~JS)
+      (() => {
+        const dot = document.querySelector(".admin-language-tabs [data-language-state]").getBoundingClientRect()
+        const label = document.querySelector(".admin-language-tabs li [data-language-state]").previousElementSibling
+        const text = document.createRange()
+        text.selectNodeContents(label)
+        const box = text.getBoundingClientRect()
+        return { width: dot.width, height: dot.height, dotMid: dot.top + dot.height / 2, labelMid: box.top + box.height / 2 }
+      })()
+    JS
+    assert_in_delta 7, geometry["width"], 0.5
+    assert_in_delta 7, geometry["height"], 0.5
+    assert_in_delta geometry["labelMid"], geometry["dotMid"], 1.5
   end
 end

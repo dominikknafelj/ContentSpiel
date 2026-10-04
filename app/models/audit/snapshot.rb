@@ -34,8 +34,10 @@ module Audit
     # `translation_sources` (`Translations::Tracker`) is bookkeeping derived
     # from the translated values whose own changes are already listed --
     # digests nobody reads in a changes row. It stays in the full snapshot,
-    # which is the version basis, not a diff.
-    IGNORED_CHANGES = %w[created_at updated_at translation_sources].freeze
+    # which is the version basis, not a diff. `translation_original_changed_at`
+    # is the same kind of bookkeeping (a per-field time derived from the
+    # original's own listed change).
+    IGNORED_CHANGES = %w[created_at updated_at translation_sources translation_original_changed_at].freeze
 
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK
@@ -45,7 +47,22 @@ module Audit
     def for(record)
       return nil if record.nil?
 
-      scrub(serialize(record).as_json)
+      without_source_text(scrub(serialize(record).as_json))
+    end
+
+    # `translation_sources` entries carry the original's text (the word diff's
+    # "before"), once per field and target language -- on the record that is
+    # bounded, but every snapshot of it on the append-only log would repeat
+    # those copies next to the body they were taken from. The snapshot keeps
+    # what says *which* version a translation was made against (`digest`,
+    # `saved_at`, `from`), not the text (final review A, M6).
+    def without_source_text(hash)
+      sources = hash["translation_sources"]
+      return hash unless sources.is_a?(Hash)
+
+      hash.merge("translation_sources" => sources.transform_values do |by_locale|
+        by_locale.is_a?(Hash) ? by_locale.transform_values { |entry| entry.is_a?(Hash) ? entry.except("text") : entry } : by_locale
+      end)
     end
 
     # `record.saved_changes` (so: call it after a save), shaped for the log:

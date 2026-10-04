@@ -132,7 +132,11 @@ class Post < ApplicationRecord
   def assign_fields(hash, locale:)
     object = fields(locale:) or return
 
+    # A key assigned again starts clean: an earlier rejection of it must not
+    # outlive a later, valid value.
+    hash.to_h.each_key { |name| rejected_field_inputs.delete(name.to_s) }
     object.assign(hash)
+    object.rejected_inputs.each { |name| rejected_field_inputs[name] = "must use the form yyyy-mm-dd" }
     self.metadata = object.untranslated_hash
     self.translated_metadata = object.all_translations.merge(locale.to_s => object.translated_hash).compact_blank
   end
@@ -157,8 +161,34 @@ class Post < ApplicationRecord
   # that saved correctly the moment those two locales disagree.
   def fields_are_valid
     object = fields(locale: Locales.default) or return
+    # Text a date field was handed that isn't `yyyy-mm-dd` (`#assign_fields`)
+    # never reached the stored value, so `object` can't see it: reported here.
+    # Every `fields.*` error reads "<label> <message>" through
+    # `.human_attribute_name` below, so it names its field wherever it shows
+    # (the editor's slot, the flash, MCP).
+    rejected_field_inputs.each { |name, message| errors.add("fields.#{name}", :invalid, message: message) }
     return if object.valid?
 
     object.errors.each { |error| errors.add("fields.#{error.attribute}", error.type, message: error.message) }
   end
+
+  # How a typed field's error names it: `fields.company` -> "Company",
+  # `fields.speakers.0.name` -> "Speakers, row 1: name" (a `groups` row),
+  # `fields.address.street` -> "Address: street" (a `group`). Rails would
+  # otherwise print the dotted path ("Fields speakers 0 name ...").
+  def self.human_attribute_name(attribute, options = {})
+    parts = attribute.to_s.split(".")
+    return super unless parts.first == "fields" && parts.size > 1
+
+    _, field, *rest = parts
+    label = field.humanize
+    return label if rest.empty?
+
+    row = rest.first.match?(/\A\d+\z/) ? rest.shift.to_i + 1 : nil
+    sub = rest.join(" ").humanize.downcase
+    row ? "#{label}, row #{row}: #{sub}" : "#{label}: #{sub}"
+  end
+
+  # field name => message, for input a typed field couldn't be built from.
+  def rejected_field_inputs = (@rejected_field_inputs ||= {})
 end

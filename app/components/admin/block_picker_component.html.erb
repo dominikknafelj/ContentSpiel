@@ -1,13 +1,6 @@
-<details id="<%= id %>" class="admin-block-picker my-1" <%= "open" unless between_cards? %>>
-  <summary class="<%= between_cards? ? "mx-auto flex w-8 cursor-pointer list-none items-center justify-center rounded-cs text-meta hover:bg-sunken" : "cursor-pointer list-none #{setup_secondary_link_class}" %>">
-    <%= trigger_label %>
-  </summary>
-
-  <div class="mt-2 flex flex-wrap gap-2 rounded-cs border border-line bg-surface p-2">
-    <% types.each do |type| %>
-      <%= button_to type.label, create_path, method: :post,
-            params: (after_id.present? ? { block: { block_type: type.name }, after_id: after_id } : { block: { block_type: type.name } }),
-            class: setup_secondary_link_class %>
-    <% end %>
-  </div>
-</details>
+<div id="<%= id %>" class="admin-block-picker mt-3 flex flex-wrap items-center gap-2 rounded-cs border border-dashed border-line-strong px-3 py-2.5 text-sm text-dim">
+  <span class="font-medium text-ink">+ Add block</span>
+  <% types.each do |type| %>
+    <%= button_to type.label, create_path, method: :post, params: { block: { block_type: type.name } }, class: button_class %>
+  <% end %>
+</div>

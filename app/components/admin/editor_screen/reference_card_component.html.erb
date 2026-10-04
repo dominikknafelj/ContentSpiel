@@ -1,0 +1,40 @@
+<%= tag.div id: card_id, class: card_class, data: { original_for: field, translation_state: state } do %>
+  <details open>
+    <summary class="flex cursor-pointer items-baseline justify-between gap-2 font-cs-mono text-label uppercase tracking-mono text-meta">
+      <span><%= language_name %></span>
+      <% if changed_at %>
+        <span class="text-warn-ink">↻ Changed <%= render Admin::TimeAgoComponent.new(time: changed_at) %></span>
+      <% end %>
+    </summary>
+
+    <div class="mt-1">
+      <% if outdated_body == :diff %>
+        <% if rich? %>
+          <div class="text-ink">
+            <% paragraphs.each do |segments| %><p class="mt-2 first:mt-0"><%= diff_html(segments) %></p><% end %>
+          </div>
+        <% else %>
+          <p class="whitespace-pre-line text-ink"><%= diff_html(paragraphs.first) %></p>
+        <% end %>
+      <% elsif rich? %>
+        <div class="admin-rich-text-content text-ink"><%= original_html %></div>
+      <% else %>
+        <p class="whitespace-pre-line text-ink"><%= original %></p>
+      <% end %>
+    </div>
+
+    <% if outdated? %>
+      <div class="mt-2 border-t border-line pt-2 text-sm">
+        <% note = outdated_note %>
+        <%= tag.p note, role: "status", class: "text-warn-ink" if note %>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <%= render suggest if suggest %>
+          <% if confirmable? %>
+            <%= tag.button self.class::CONFIRM_LABEL, type: "submit", form: self.class::FORM_ID, formaction: confirm_url,
+                  class: "cursor-pointer rounded-cs border border-transparent px-2 py-0.5 text-dim hover:bg-sunken hover:text-ink" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </details>
+<% end %>

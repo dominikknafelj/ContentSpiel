@@ -1,6 +1,6 @@
 module Admin
   # Loads the record a translation request names by `record_type` and
-  # `record_id` -- "Mark as up to date" (`Admin::TranslationConfirmations
+  # `record_id` -- "Still correct — mark up to date" (`Admin::TranslationConfirmations
   # Controller`) and the AI suggestion endpoint (`Admin::Translations
   # Controller#suggest`) both address any translatable record that way, so
   # both must agree on what an actor may even *find*.

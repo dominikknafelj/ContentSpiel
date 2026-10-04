@@ -1,0 +1,7 @@
+<%# The New page dialog's form, answering the shell's turbo-frame (see
+    `Admin::EditorScreen::NewPageDialogComponent`): rendered without the layout,
+    so it costs the form and nothing else. `#new` built `@form`, preset from
+    `parent_id` and `title`. %>
+<turbo-frame id="<%= Admin::EditorScreen::NewPageDialogComponent::FRAME_ID %>">
+  <%= render @form %>
+</turbo-frame>

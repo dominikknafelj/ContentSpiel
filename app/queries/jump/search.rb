@@ -17,11 +17,30 @@ module Jump
     LIMIT = 5
     MAX_QUERY = 100
 
+    # An action with a `dialog:` opens that dialog (the New page / New post
+    # dialogs) instead of navigating: its row is still a link, to `path`, which
+    # is what a viewer without JavaScript (or a dialog that isn't on the page)
+    # gets. See `admin/jump/show`.
     ACTIONS = [
-      { title: "New page", path: :new_admin_page_path, permission: "pages.create" },
-      { title: "New post", path: :new_admin_post_path, permission: "posts.create" },
+      { title: "New page", path: :new_admin_page_path, permission: "pages.create", dialog: "new-page-dialog" },
+      { title: "New post", path: :new_admin_post_path, permission: "posts.create", dialog: "new-post-dialog" },
       { title: "Upload image", path: :admin_media_path, permission: "media.upload" },
       { title: "Change password", path: :admin_account_password_path, permission: nil }
+    ].freeze
+
+    # The Settings group (spec §7, round 1 second review): destinations
+    # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
+    # id of the section on `admin_settings_path` (see
+    # `Admin::SettingsFormComponent`), nil for Languages, which has a screen of
+    # its own. Each needs the permission its section's own controller asks for,
+    # so a viewer is never offered a link that would 403. Sections (CS Studio's
+    # modules) used to share this group's label -- "Settings" listing
+    # Dashboard and Pages -- and are a group of their own now.
+    SETTINGS_DESTINATIONS = [
+      { title: "Settings › Site", path: :admin_settings_path, anchor: "settings-section-site", permission: "settings.manage" },
+      { title: "Settings › Publishing", path: :admin_settings_path, anchor: "settings-section-publishing", permission: "settings.manage" },
+      { title: "Settings › Languages", path: :admin_settings_languages_path, anchor: nil, permission: "languages.manage" },
+      { title: "Settings › AI translation", path: :admin_settings_path, anchor: "settings-section-ai", permission: "settings.manage" }
     ].freeze
 
     def initialize(actor:, query:, modules:, url_options: {})
@@ -34,7 +53,7 @@ module Jump
     def groups
       [
         group("Pages", page_rows), group("Posts", post_rows), group("Media", media_rows),
-        group("Settings", module_rows), group("Actions", action_rows)
+        group("Sections", module_rows), group("Settings", settings_rows), group("Actions", action_rows)
       ].compact
     end
 
@@ -87,10 +106,16 @@ module Jump
       end
     end
 
+    def settings_rows
+      SETTINGS_DESTINATIONS.select { |dest| AccessControl.holds?(actor, dest[:permission], channel: :admin) }
+        .select { |dest| blank? || matches?(dest[:title]) }
+        .map { |dest| { title: dest[:title], url: routes.public_send(dest[:path], **url_options, anchor: dest[:anchor]) } }
+    end
+
     def action_rows
       ACTIONS.select { |action| action[:permission].nil? || AccessControl.holds?(actor, action[:permission], channel: :admin) }
         .select { |action| blank? || matches?(action[:title]) }
-        .map { |action| { title: action[:title], url: routes.public_send(action[:path], **url_options) } }
+        .map { |action| { title: action[:title], url: routes.public_send(action[:path], **url_options), dialog: action[:dialog] }.compact }
     end
 
     def display_title(record) = Locales.read(record, :title, locale: Locales.default).presence || "(untitled)"

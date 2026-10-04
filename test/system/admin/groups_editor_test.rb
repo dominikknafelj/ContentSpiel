@@ -35,7 +35,7 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
       assert_text "1 branch"
     end
 
-    press "Save group"
+    press "Save"
     assert_text "Group saved"
 
     group = AccessControl::Group.find_by!(name: "About editors")

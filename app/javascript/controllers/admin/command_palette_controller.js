@@ -5,8 +5,10 @@ import { Controller } from "@hotwired/stimulus"
 // (Admin::Shell::CommandPaletteComponent); this controller sits on <body>.
 // Typing reloads the frame (debounced), the arrow keys move the selection
 // (`aria-selected` on the <li role=option>, mirrored for the focused input
-// as `aria-activedescendant`), Enter follows the selected link. Following a link is a `_top` Turbo visit, whose page replacement
-// closes the dialog (it is not part of the new body).
+// as `aria-activedescendant`), Enter follows the selected link and
+// ⌘/Ctrl+Enter opens it in a new tab (the dialog stays open, as in a browser's
+// own ⌘-click). Following a link is a `_top` Turbo visit, whose page
+// replacement closes the dialog (it is not part of the new body).
 export default class extends Controller {
   static values = { url: String }
 
@@ -41,8 +43,15 @@ export default class extends Controller {
   get query() { return Array.from(this.input.value.trim()).slice(0, 100).join("") }
   get stale() { return this.renderedQuery !== this.query }
 
+  // Not over another modal dialog. The shortcut is heard on `window`, so it
+  // also fires while one is up (New page with a typed title, Schedule, a
+  // rich-text dialog, the media picker); the palette stacked on top of it, a
+  // "New post" picked there opened a third, and following a row left the
+  // first dialog's typed input behind without a word. The editor closes
+  // what is open first.
   open() {
     if (!this.dialog || this.dialog.open) return
+    if (Array.from(document.querySelectorAll("dialog[open]")).some((dialog) => dialog !== this.dialog && dialog.matches(":modal"))) return
     this.input.value = ""
     this.pendingEnter = false
     this.load()
@@ -51,6 +60,12 @@ export default class extends Controller {
     this.select(0)
     this.dialog.showModal()
     this.input.focus()
+  }
+
+  // Closes the palette without following anything: a row that opens another
+  // dialog (New page, New post) calls this first, then `admin--dialog#open`.
+  close() {
+    this.dialog?.close()
   }
 
   search() {
@@ -75,19 +90,33 @@ export default class extends Controller {
     if (this.stale) return
     this.select(0)
     if (this.pendingEnter) {
+      const newTab = this.pendingEnter === "newTab"
       this.pendingEnter = false
-      this.options[0]?.click()
+      if (newTab) this.openInNewTab(this.options[0])
+      else this.options[0]?.click()
     }
+  }
+
+  openInNewTab(link) {
+    if (link?.href) window.open(link.href, "_blank", "noopener")
   }
 
   move(event) {
     if (!["ArrowDown", "ArrowUp", "Enter"].includes(event.key)) return
     event.preventDefault()
     // Enter while the results are stale waits for the matching response
-    // and then follows its first row (or does nothing if it has none).
-    if (event.key === "Enter" && this.stale) { this.pendingEnter = true; return }
+    // and then follows its first row (or does nothing if it has none). A
+    // ⌘/Ctrl+Enter waits the same way, remembered as "newTab", and opens that
+    // first row in a new tab instead of following it in this one.
+    if (event.key === "Enter" && this.stale) { this.pendingEnter = (event.metaKey || event.ctrlKey) ? "newTab" : true; return }
     const options = this.options
     if (options.length === 0) return
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      // Not stale here (the guard above caught that case): the selected row
+      // answers the current query.
+      this.openInNewTab(options[this.index])
+      return
+    }
     if (event.key === "Enter") return options[this.index]?.click()
     if (this.stale) return
     this.select((this.index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length)

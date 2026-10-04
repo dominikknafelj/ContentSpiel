@@ -26,6 +26,47 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     browser_options: { "no-sandbox" => nil }
   }
 
+  # A node whose page has been replaced is stale AT ONCE.
+  #
+  # Before every command on a node, Cuprite asks `this.isConnected` through
+  # Ferrum's `evaluate`, which first resolves the node's CDP id
+  # (`DOM.resolveNode`) and -- when Chrome answers "No node with given id
+  # found" -- retries that six times, 0.1 s apart, before giving up
+  # (`Ferrum::Frame::Runtime#call`, `INTERMITTENT_ATTEMPTS`/`_SLEEP`). Only
+  # then does Cuprite raise `ObsoleteNode`, which is what Capybara is waiting
+  # for to run its query again. A dead id never comes back, so that is half a
+  # second of nothing, PER NODE.
+  #
+  # A Turbo visit kills every id a poll is holding: it pushes a history entry
+  # (`Page.navigatedWithinDocument`, on which Ferrum re-reads the document
+  # with `DOM.getDocument`, resetting Chrome's node ids) and swaps the
+  # `<body>`. So an `assert_selector "[role=status]", text: ...` whose poll
+  # was in the middle of reading the old page when the redirect rendered went
+  # through each element it had found -- to filter it, then again to print
+  # "Also found ..." -- at 0.5 s apiece: with an editor's seven
+  # `[role=status]` elements, 4.4 s without looking at the page once. A
+  # success toast stays 4 s (`Admin::ToastComponent::TIMEOUTS`): it was
+  # rendered, shown and dismissed on time while the driver was blind, and the
+  # assertion then failed on a page that no longer had it. That was the
+  # "Undo from the flash" failure of about one run in ten (and "Emptied the
+  # trash", "Restored ..." under load) -- found in the CDP log of a failing
+  # run, where the app had made one request and drawn the toast.
+  #
+  # So the question "is this id still alive?" is asked once, without retries
+  # (`Ferrum::Node#exists?`: a single `DOM.resolveNode`), and a dead node is
+  # reported straight away. Capybara's own polling loop is the retry. A node
+  # that dies between this check and the command still costs its half second
+  # -- once per poll, not once per element. `test/system/stale_node_test.rb`
+  # pins it.
+  module StaleNodeAtOnce
+    def command(name, *args)
+      raise Capybara::Cuprite::ObsoleteNode.new(self, nil) unless node.exists?
+
+      super
+    end
+  end
+  Capybara::Cuprite::Node.prepend(StaleNodeAtOnce)
+
   # Signs in through the real sign-in form (cs-studio spec §3/§9). `Session
   # TestHelper#sign_in_as` -- what every integration test uses -- only ever
   # sets cookies on the test process's own internal Rack::Test session; a
@@ -47,6 +88,13 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     # navigate away before its `Set-Cookie` response ever arrives, and land
     # right back on the sign-in page, unauthenticated.
     assert_selector "nav[aria-label='Modules']"
+  end
+
+  # Opens the editor header's ⋯ menu (Activity, Schedule…, Unpublish, Move to
+  # trash live in it), waiting until its panel is shown.
+  def open_editor_menu
+    find("header.admin-editor-header button[aria-label='More actions']").click
+    assert_selector "header.admin-editor-header [role=menu]"
   end
 
   # Clicks through JavaScript (`element.click()`) instead of a native click.
@@ -84,6 +132,17 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
+  # Polls a condition on the database (a save the browser sends on its own
+  # timer) until it holds, `wait` seconds at most.
+  def assert_eventually(wait: 8, message: "condition never became true")
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+    until yield
+      flunk message if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.1
+    end
+    assert true
+  end
+
   def await_admin_controllers
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]

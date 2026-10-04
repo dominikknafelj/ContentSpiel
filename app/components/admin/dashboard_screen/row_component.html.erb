@@ -1,26 +1,22 @@
-<li class="flex items-center gap-3 border-b border-line py-2 last:border-b-0">
-  <% if image? %>
-    <span class="block size-10 shrink-0 overflow-hidden rounded-cs bg-sunken">
-      <%= image_tag record.thumbnail_url, alt: "", loading: "lazy", class: "h-full w-full object-cover" if record.file.attached? %>
-    </span>
-  <% end %>
-  <div class="min-w-0 flex-1">
-    <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
-    <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
+<% if going_live? %>
+  <span class="flex size-10 shrink-0 flex-col items-center justify-center rounded-cs border border-line bg-sunken leading-none" aria-hidden="true">
+    <span class="font-cs-mono text-label uppercase tracking-mono text-warn-ink"><%= month %></span>
+    <span class="text-[18px] font-semibold text-ink"><%= day %></span>
+  </span>
+<% end %>
+<div class="min-w-0 flex-1">
+  <%= link_to title, path, class: "block truncate font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
+  <div class="flex flex-wrap items-center gap-x-2 text-sm text-meta">
+    <% if going_live? %>
+      <time datetime="<%= record.published_at.iso8601 %>" title="<%= record.published_at.in_time_zone.strftime("%-d %b %Y, %H:%M") %>"><%= going_live_phrase %></time>
+      <% if mine? %><span>by you</span><% end %>
+    <% else %>
       <% if record.is_a?(Post) %>
         <%= render Admin::ContentTypeDotComponent.new(content_type: record.content_type) %>
       <% else %>
-        <span><%= type_label %></span>
+        <span>Page</span>
       <% end %>
-      <% if at %>
-        <span><%= time_prefix %> <%= render Admin::TimeAgoComponent.new(time: at) %></span>
-      <% end %>
-      <% if (by = changed_by) %>
-        <span><%= by %></span>
-      <% end %>
-    </div>
+      <span>edited <%= render Admin::TimeAgoComponent.new(time: record.updated_at) %></span>
+    <% end %>
   </div>
-  <% unless image? %>
-    <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
-  <% end %>
-</li>
+</div>

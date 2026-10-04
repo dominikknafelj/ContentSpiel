@@ -9,6 +9,14 @@ class Admin::DialogComponentTest < ViewComponent::TestCase
     assert_text "Body"
   end
 
+  test "open_on_load marks the dialog for the server-requested open, and is absent otherwise" do
+    render_inline(Admin::DialogComponent.new(id: "d4", title: "t", open_on_load: true)) { "Body" }
+    assert_selector "dialog#d4[data-admin--dialog-open-on-load]", visible: :all
+
+    render_inline(Admin::DialogComponent.new(id: "d5", title: "t")) { "Body" }
+    assert_no_selector "dialog#d5[data-admin--dialog-open-on-load]", visible: :all
+  end
+
   test "an unknown width is a programming error" do
     assert_raises(ArgumentError) { Admin::DialogComponent.new(id: "d", title: "t", width: :huge) }
   end

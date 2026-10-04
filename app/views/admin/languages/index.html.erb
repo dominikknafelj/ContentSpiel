@@ -2,7 +2,7 @@
     language, its position and fallbacks (one bulk form, `Locales::
     Configure`), "Add language" (`Locales::Enable`) and Disable
     (`Locales::Disable`, refused for the default -- no button is rendered
-    for it at all, matching `Admin::RecordHeaderComponent`'s own "just don't
+    for it at all, matching `Admin::EditorScreen::HeaderComponent`'s own "just don't
     show the control" answer for a page that can't be deleted either).
     Three separate `<form>`s, not one -- HTML forbids nesting a form inside
     another, and the reorder/fallbacks form's own table already has one row
@@ -55,7 +55,7 @@
     <li class="flex items-center justify-between rounded-cs border border-line bg-surface px-3 py-2">
       <span class="text-ink"><%= Locales.name(code, native: true) %> (<%= code %>)</span>
       <% if code == @site_setting.default_locale %>
-        <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger_outline, type: "button", disabled: true,
+        <%= render Admin::ButtonComponent.new(label: "Disable", variant: :danger_text, type: "button", disabled: true,
               title: "The default language can't be disabled") %>
       <% else %>
         <%= form_with url: admin_settings_language_path(code, **admin_url_options), method: :delete do %>

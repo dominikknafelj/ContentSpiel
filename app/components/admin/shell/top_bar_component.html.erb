@@ -1,6 +1,9 @@
 <header class="admin-top-bar sticky top-0 z-20 h-12 items-center gap-2 border-b border-line bg-chrome px-3">
   <%= drawer_button(label: "Open navigation", controls: "sidebar", name: "sidebar") { helpers.render "admin/shared/icon", name: :menu } %>
-  <span class="font-semibold text-ink">Content·Spiel</span>
+  <div class="flex min-w-0 flex-col leading-tight">
+    <span class="admin-wordmark font-cs text-xs font-bold uppercase tracking-wide text-ink">CONTENT·SPIEL</span>
+    <span class="admin-site-name truncate text-[13px] text-dim"><%= site_name %></span>
+  </div>
   <% if tree %>
     <%# Under 1024 the tree column is a drawer of its own; above it the
         column is in the grid and this button hides (`.admin-top-bar__tree`). %>

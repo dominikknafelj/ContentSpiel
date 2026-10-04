@@ -18,7 +18,7 @@ class SeedsTest < ActiveSupport::TestCase
       Rails.singleton_class.define_method(:env) { development_env }
 
       assert_difference "User.count", 1 do
-        load Rails.root.join("db/seeds.rb")
+        TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
       assert_equal 5, Page.count
       assert_equal 5, Post.count
@@ -33,7 +33,7 @@ class SeedsTest < ActiveSupport::TestCase
       assert_equal [ "dQw4w9WgXcQ", "dQw4w9WgXcQ" ], youtube_ids
 
       assert_no_difference [ "User.count", "Page.count", "Post.count", "PostRelation.count" ] do
-        load Rails.root.join("db/seeds.rb")
+        TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
     ensure
       Rails.singleton_class.remove_method :env
@@ -50,7 +50,7 @@ class SeedsTest < ActiveSupport::TestCase
       Rails.singleton_class.define_method(:env) { test_env }
 
       assert_no_difference "User.count" do
-        load Rails.root.join("db/seeds.rb")
+        TestOutput.quietly { load Rails.root.join("db/seeds.rb") }
       end
     ensure
       Rails.singleton_class.remove_method :env

@@ -20,14 +20,28 @@ module Admin
   # A block whose stored `block_type` isn't (or is no longer) registered --
   # a removed plugin, spec §8 -- has no `definition` to read a schema or
   # columns from: `unavailable?` switches the template to the minimal
-  # "Unavailable type" card instead, Delete its only action.
+  # "Unavailable type" card instead (danger border, one sentence, "Delete
+  # block…" its only action).
+  #
+  # The header (design pass round 2): drag handle, the type name -- a button
+  # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::MenuComponent`
+  # (Move up, Move down, Duplicate, a divider, "Delete block…"). `first:` and
+  # `last:` only decide whether Move up / Move down start disabled; the page
+  # view and the controller's list re-render work them out, and `admin
+  # --blocks#refreshMoveState` keeps them right in the browser after every
+  # move, add and delete (an insertion streams one card in and touches no
+  # other, so the neighbour's state can only be corrected there).
+  #
+  # A post-list block's Type, Tag and Limit share one row (`#settings_row?`),
+  # Tag being a one-value `Admin::ChipInputComponent` over the tag
+  # suggestions (no creating a tag from a filter).
   #
   # `editable:` is whether the user may change this page's blocks
   # (access-control design spec §5, `can_edit?` on the page -- blocks
   # follow their page's permissions). The page view works it out once and
   # hands it to every card; left nil, the card asks itself. A view-only
-  # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete), no
-  # "+" picker below it, and its form is disabled without `admin--autosave`.
+  # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete) and its
+  # form is disabled without `admin--autosave`.
   class BlockCardComponent < AdminComponent
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
@@ -35,12 +49,13 @@ module Admin
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
-    def initialize(page:, block:, locale:, url_options: {}, last: false, editable: nil)
+    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil)
       @editable = editable
       @page = page
       @block = block
       @locale = locale
       @url_options = url_options
+      @first = first
       @last = last
     end
 
@@ -53,6 +68,8 @@ module Admin
     def label = definition&.label || block.block_type
 
     def unavailable_label = "Unavailable type — #{block.block_type}"
+
+    def first? = @first
 
     def last? = @last
 
@@ -85,11 +102,61 @@ module Admin
 
     def delete_dialog_id = "delete-block-#{block.id}"
 
+    def body_id = "#{error_prefix}-body"
+
+    # The "⋯" menu's items: the panel already styles its buttons (width,
+    # padding, hover); a disabled one dims and drops the hover fill.
+    def menu_item_class = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+
+    # The row-shaped settings of a post list (handoff B22): its three
+    # settings side by side, in this order, whatever order the type declared
+    # them in. Only where the schema fields are inputs (not on a translation
+    # tab, where untranslated fields are listed read-only) and only for a
+    # type that lists posts -- its `content_type`, `tag` and `limit` are
+    # required by `BlockTypeDefinition#finalize!`.
+    SETTINGS_ROW = %w[content_type tag limit].freeze
+
+    def settings_row? = !unavailable? && definition.capability?(:lists_posts) && !translation_tab? && settings_row_fields.size == SETTINGS_ROW.size
+
+    def settings_row_fields = SETTINGS_ROW.filter_map { |name| schema_fields.find { |field| field.name == name } }
+
+    # Everything else in the schema, rendered one per line as before.
+    def other_schema_fields = settings_row? ? schema_fields - settings_row_fields : schema_fields
+
+    # Where the row's Tag chip input asks for suggestions: the same
+    # endpoint the post editor's tags use, open to `pages.edit` as well as
+    # `posts.read`/`tags.manage` (`Admin::TagSuggestionsController`), so an
+    # editor of this page's blocks can always list the tags.
+    def tag_search_url = helpers.admin_tag_suggestions_path(**url_options)
+
+    def tag_chips(field)
+      tag = value_for(field).to_s
+      tag.present? ? [ { value: tag, label: tag } ] : []
+    end
+
     def field_id(name) = "#{error_prefix}-#{name}"
 
     def field_html_name(name) = "block[#{name}]"
 
-    def schema_fields = definition.fields
+    # The schema fields rendered as inputs: on a translation tab only the
+    # translated ones -- an untranslated field is the same in every language,
+    # so it is listed read-only by `#shared_fields` instead of being an input
+    # a translation tab's autosave could send (and change) by accident.
+    def schema_fields
+      translation_tab? ? definition.fields.select(&:translated?) : definition.fields
+    end
+
+    def translation_tab? = locale.to_s != ::Locales.default
+
+    # `[label, value]` for each untranslated schema field, read from the
+    # primary language (where its one value lives); empty off a translation tab.
+    def shared_fields
+      return [] unless translation_tab?
+
+      definition.fields.reject(&:translated?).map do |field|
+        [ field.name.humanize, Admin::EditorScreen::SharedFieldsComponent.display(field, default_settings_object&.public_send(field.name)) ]
+      end
+    end
 
     # This block's own value for a schema field, in whichever locale is
     # being edited -- `settings_object(locale:)` reads the *literal* locale
@@ -109,9 +176,8 @@ module Admin
     # translate from" -- returning it here regardless of `translated?` (the
     # bug this guard fixes) would make `FieldComponent#show_original?` show
     # a read-only original/translate-slot pair for a field that should
-    # instead render its "Same in all languages" hint
-    # (`FieldComponent#show_untranslated_hint?`, which itself only fires
-    # once this method hands back nil).
+    # instead be listed read-only under "Shared fields" on a translation tab
+    # (`#shared_fields`).
     def original_for(field)
       return nil if !field.translated? || locale.to_s == ::Locales.default
 
@@ -145,7 +211,7 @@ module Admin
     # See `Admin::PageSettingsFormComponent#translation` -- a block's own
     # fields, confirmed on the block (`block.translation_confirmed`), with
     # the page's edit right (`editable?`, blocks follow their page).
-    def translation(field) = Admin::TranslationScreen::OutdatedNoteComponent.options_for(block, field, locale: locale, confirmable: editable?)
+    def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(block, field, locale: locale, confirmable: editable?)
 
     # The caption/alt fields are this block's per-use overrides of its
     # image's own defaults (media library design spec §6): blank, the

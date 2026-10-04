@@ -10,4 +10,10 @@ class Admin::Shell::CommandPaletteComponentTest < ViewComponent::TestCase
     assert_selector "dialog turbo-frame#jump-results > #jump-listbox[role=listbox]", visible: :all
     assert_selector "dialog turbo-frame#jump-results[data-action*='admin--command-palette#loaded']:not([src])"
   end
+
+  test "an ESC chip beside the input and a key-hint footer" do
+    render_inline(Admin::Shell::CommandPaletteComponent.new)
+    assert_selector "dialog kbd", text: "ESC", visible: :all
+    assert_selector "dialog .admin-palette__hints", text: "↑↓ MOVE · ↵ OPEN · ⌘↵ NEW TAB", visible: :all
+  end
 end

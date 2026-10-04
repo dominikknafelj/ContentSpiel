@@ -1,14 +1,14 @@
 <%# The reset flow's "form" state: new password with the strength meter and a
     confirmation. A bad or used link never gets here (the controller sends it
     to the "expired" state on the request page). %>
-<div class="rounded-cs border border-line bg-surface p-6">
-  <h1 class="text-h2 font-semibold">Update your password</h1>
+<div class="flex flex-col gap-[18px]">
+  <%= render "admin/shared/auth_heading", title: "Update your password" %>
 
   <% if flash[:alert] %>
-    <p class="mt-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
+    <p class="rounded-cs bg-danger-tint px-3 py-2.5 text-[13px] leading-normal text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
   <% end %>
 
-  <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "mt-5 space-y-4" do |form| %>
+  <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "flex flex-col gap-[18px]" do |form| %>
     <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
     <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
     <%= render Admin::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>

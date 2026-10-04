@@ -70,7 +70,10 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
   test "the Activity link on the edit screen leaves the content frame" do
     get "/cs-studio/users/#{users(:two).id}/edit"
     assert_select "a[data-turbo-frame='_top']", text: "Activity"
-    assert_select "#user-form noscript", count: 1
+    # The footer's Save is server-rendered enabled (only the controller ever
+    # disables it), so the form can be submitted without JavaScript too.
+    assert_select "#user-form .admin-save-bar button[type=submit]:not([disabled])", text: "Save"
+    assert_select "#user-form noscript", count: 0
   end
 
   test "editing a user's email without touching the password" do

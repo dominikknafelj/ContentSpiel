@@ -104,19 +104,22 @@ Rails.application.routes.draw do
     # into a routing 404 before `Admin::TrashController` is ever reached.
     get "trash", to: "trash#index", as: :trash
     delete "trash", to: "trash#empty", as: :empty_trash
+    # A bulk trash's Undo (Task 17): restores exactly the posts it names.
+    post "trash/restore_many", to: "trash#restore_many", as: :restore_many_trash
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
 
-    # "Mark as up to date" for an outdated translation (translation helpers
+    # "Still correct — mark up to date" for an outdated translation (translation helpers
     # spec §3.4/§4): one endpoint for every translatable record kind, named
     # by `record_type`/`record_id` in the params (the editor's button posts
     # them in its `formaction`), the way the trash addresses its items by
     # type rather than one nested route per model.
     post "translations/confirm", to: "translation_confirmations#create", as: :translation_confirmation
 
-    # The Translations overview (translation helpers spec §4): what's
-    # missing or outdated in `?locale=` (a target language), optionally
-    # narrowed by `?type=page|post|media`, paged by `?offset=`. A plain
+    # The Translations matrix (design pass round 2, handoff §4.4): every item
+    # that needs work in any target language, one column per language,
+    # optionally narrowed by `?type=page|post|media|settings` and
+    # `?language=` and paged by `?page=`. A plain
     # `get` rather than `resources :translations, only: :index`, so the
     # AI suggestion action (Task 8) can join the same controller on a
     # route of its own without a resource's implied member routes.
@@ -143,6 +146,10 @@ Rails.application.routes.draw do
     # (Publish now / Unpublish / Schedule…, `Admin::PagesController`'s own
     # comment explains why each is a one-shot POST kept deliberately outside
     # the post form's own autosave, not folded into `update`).
+    # The posts list's bulk bar (Task 17): publish or trash the ticked posts,
+    # one `Posts::Bulk` call. Declared before the resource so "bulk" can never
+    # be read as a post id.
+    post "posts/bulk", to: "posts#bulk", as: :posts_bulk
     resources :posts, only: %i[index new create show update destroy] do
       member do
         post :publish
@@ -156,6 +163,12 @@ Rails.application.routes.draw do
     # an inline rename (`:update`) and a delete (`:destroy`) from the list
     # itself; new tags are only ever created in passing, through a post's own
     # `tag_names` (`Posts::Save`).
+    # The post editor's tag chip input asks this for suggestions
+    # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
+    # module's `tags.manage`, and `suggest` is not a tag id (`resources :tags`
+    # has no `show`, so the two paths can't collide).
+    get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
+
     resources :tags, only: %i[index update destroy]
 
     # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
@@ -239,8 +252,8 @@ Rails.application.routes.draw do
     resources :starter_contents, only: :create
 
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
-    # "Your work", "On the site" and quick create, open to every signed-in
-    # user. The Pages module -- the tree and its own editor -- lives at
+    # quick create, "Your drafts", "Going live next", "Needs translation"
+    # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
     # Quick draft (dashboard spec §4.1): a title and a content type, saved

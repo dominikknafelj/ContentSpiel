@@ -60,4 +60,10 @@ class Admin::TimeAgoComponentTest < ViewComponent::TestCase
     render_inline(Admin::TimeAgoComponent.new(time: nil))
     assert_no_selector "time"
   end
+
+  test "title: replaces the tooltip" do
+    render_inline Admin::TimeAgoComponent.new(time: 2.hours.ago, title: "4 Oct 2026, 09:00 – 09:40")
+
+    assert_selector "time[title='4 Oct 2026, 09:00 – 09:40']"
+  end
 end
