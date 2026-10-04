@@ -130,6 +130,7 @@ module Trash
         # (media library design spec §5.1) -- `media_usages.owner` is
         # polymorphic, so no FK cascade would ever remove them.
         [ page, *blocks ].each { |owner| Media::UsageIndex.refresh(owner) }
+        Translations::StateIndex.remove(page)
       end
       true
     end
@@ -152,6 +153,7 @@ module Trash
       # A destroyed owner's `media_usages` rows go with it (media library
       # design spec §5.1) -- `refresh` computes none for a destroyed record.
       Media::UsageIndex.refresh(@record)
+      Translations::StateIndex.remove(@record)
       true
     end
 
@@ -161,6 +163,7 @@ module Trash
         raise ActiveRecord::Rollback
       end
       @record.destroy || raise(ActiveRecord::Rollback)
+      Translations::StateIndex.remove(@record)
       true
     end
 

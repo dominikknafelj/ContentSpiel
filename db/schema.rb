@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_04_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_110000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -284,6 +284,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_04_100000) do
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_tags_on_name", unique: true
+  end
+
+  create_table "translation_states", force: :cascade do |t|
+    t.string "record_type", null: false
+    t.bigint "record_id", null: false
+    t.string "locale", null: false
+    t.string "state", null: false
+    t.integer "missing_count", default: 0, null: false
+    t.integer "outdated_count", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["locale", "state"], name: "index_translation_states_on_locale_and_state"
+    t.index ["record_type", "record_id", "locale"], name: "index_translation_states_on_record_and_locale", unique: true
   end
 
   create_table "users", force: :cascade do |t|

@@ -38,6 +38,10 @@ module Translations
         # keystroke's save report "Changed elsewhere" against nothing but
         # this click.
         @record.update_columns(translation_sources: @record.translation_sources)
+        # The confirmed field no longer counts as outdated in the stored
+        # state (`translation_states`); `refresh` writes no `updated_at` on
+        # the record either.
+        Translations::StateIndex.refresh(@record)
         record_event("#{EVENT.fetch(@record.class.name)}.translation_confirmed", subject: @record,
           metadata: { "field" => @field, "locale" => @locale })
       end

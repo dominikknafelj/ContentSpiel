@@ -32,6 +32,7 @@ module Media
 
       saved = Media::Asset.transaction do
         asset.save || raise(ActiveRecord::Rollback)
+        Translations::StateIndex.refresh(asset)
 
         record_event("media.uploaded", subject: asset, metadata: { "filename" => asset.file.filename.to_s })
         true

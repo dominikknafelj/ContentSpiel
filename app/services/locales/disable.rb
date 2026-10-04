@@ -37,6 +37,11 @@ module Locales
         next false unless site.save
 
         PublicPath.where(locale: @code).delete_all
+        # Which languages are targets changed, so every stored translation
+        # state (`translation_states`) is recomputed. Synchronous and
+        # proportional to the site's size; fine while sites are small, and
+        # the natural thing to move into a job later.
+        Translations::StateIndex.rebuild_all
         record_event("language.disabled", subject: site, field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
         true
       end

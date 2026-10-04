@@ -74,6 +74,8 @@ module Posts
         # §5.1) -- recomputed from the saved post, so an image removed from
         # one locale's body loses exactly that locale's row.
         Media::UsageIndex.refresh(@post)
+        # The post's stored translation state (`translation_states`).
+        Translations::StateIndex.refresh(@post)
         record_events(related_before)
         true
       end

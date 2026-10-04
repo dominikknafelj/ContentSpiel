@@ -66,6 +66,9 @@ module Pages
         pending = @page.changes_to_save
         @page.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@page)
+        # Where the page stands in each language (`translation_states`), like
+        # the usage rows above: derived inside the same transaction.
+        Translations::StateIndex.refresh(@page)
         record_events(creating, Audit::Snapshot.field_changes_for(@page, pending))
         true
       end

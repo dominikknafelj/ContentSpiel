@@ -60,6 +60,14 @@ module Settings
       saved = SiteSetting.transaction do
         @site.save || raise(ActiveRecord::Rollback)
         ai_key_change = write_ai_key if @ai_key_given
+        # A new default language (or a changed language list) changes what
+        # every record's state is relative to; anything else only the
+        # site's own title and tagline (`translation_states`).
+        if @site.saved_change_to_default_locale? || @site.saved_change_to_locales?
+          Translations::StateIndex.rebuild_all
+        else
+          Translations::StateIndex.refresh(@site)
+        end
 
         changes = Audit::Snapshot.field_changes_for(@site)
         changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing

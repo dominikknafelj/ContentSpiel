@@ -42,6 +42,9 @@ module ContentBlocks
         assign
         @block.save || raise(ActiveRecord::Rollback)
         Media::UsageIndex.refresh(@block)
+        # A block's fields roll up into its owner's stored translation state
+        # (`translation_states`), so this refreshes the page or post.
+        Translations::StateIndex.refresh(@block)
         # Editing a block is editing its owner (final fix wave, I3): bump
         # the owner's `updated_at` so the dashboard's "Recently updated"
         # (ordered by it) sees the edit. `touch` runs no validations and no
