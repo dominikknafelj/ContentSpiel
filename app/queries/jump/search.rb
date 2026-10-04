@@ -31,7 +31,7 @@ module Jump
     # The Settings group (spec §7, round 1 second review): destinations
     # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
     # id of the section on `admin_settings_path` (`site`, `languages`, `publishing`, `ai`; see
-    # `Admin::SettingsScreen::NavComponent`). Each needs the permission its section's own controller asks for,
+    # `Admin::SettingsScreen::NavComponent`). Each needs the right that owns its card on that one screen,
     # so a viewer is never offered a link that would 403. Sections (CS Studio's
     # modules) used to share this group's label -- "Settings" listing
     # Dashboard and Pages -- and are a group of their own now.
