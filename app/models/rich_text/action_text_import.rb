@@ -133,6 +133,10 @@ module RichText
         # can be deleted -- a rich-text reference has no FK to stop it.
         # Reloaded, since `UsageIndex` reads every locale's stored body.
         Media::UsageIndex.refresh(record.reload)
+        # Same reason for the stored translation state: a translated body
+        # can complete (or change) its owner's state in that language; a
+        # block refreshes its owner.
+        Translations::StateIndex.refresh(record)
         :imported
       end
 

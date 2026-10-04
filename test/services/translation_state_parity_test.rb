@@ -65,6 +65,18 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       assert_parity page
       assert Settings::Save.call(attributes: { default_locale: "de" }).ok?
       assert_parity page
+      assert Settings::Save.call(attributes: { locales: [ { "code" => "de" }, { "code" => "en" } ] }).ok?
+      assert_equal %w[en], Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale)
+      assert_parity page
+    end
+  end
+
+  test "purging a post removes its rows" do
+    as_owner do
+      post = create_post(title: "Hello")
+      assert_equal %w[de es], Translations::State.where(record_type: "Post", record_id: post.id).pluck(:locale).sort
+      assert delete_for_good(post)
+      assert_empty Translations::State.where(record_type: "Post", record_id: post.id)
     end
   end
 

@@ -59,8 +59,9 @@ module Admin
       @type = params[:type].presence_in(@types)
 
       relations = needing_work
-      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: relations.values.sum(&:count))
-      @items = items_on_page(relations)
+      sizes = relations.transform_values(&:count)
+      @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: sizes.values.sum)
+      @items = items_on_page(relations, sizes)
     end
 
     # AI suggestions for some of one record's fields (translation helpers
@@ -157,16 +158,17 @@ module Admin
     end
 
     # This page's `Item`s: the relations are laid end to end in type order
-    # and `offset`/`limit` cut across them, so a page costs at most one
-    # query per type plus one for the states.
-    def items_on_page(relations)
+    # and `offset`/`limit` cut across them, so a page costs one COUNT per
+    # type (`sizes`, shared with the total) plus at most one query per type
+    # and one for the states.
+    def items_on_page(relations, sizes)
       skip = @pagination.offset
       want = PER_PAGE
       items = []
       relations.each do |type, relation|
         break if want <= 0
 
-        size = relation.count
+        size = sizes.fetch(type)
         if skip >= size
           skip -= size
           next

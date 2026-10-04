@@ -192,3 +192,6 @@ if root.hero_media_asset_id.blank?
 end
 
 PublicSite::Paths.rebuild!
+# The site settings row above is written around the services, so it has no
+# stored translation state yet; this fills every row from what exists.
+Translations::StateIndex.rebuild_all

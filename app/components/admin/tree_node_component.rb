@@ -32,7 +32,7 @@ module Admin
   # status line).
   #
   # `translation_states` is `{ page_id => { locale => state } }` for the
-  # readable rows (`Translations::Status.for`, computed once by
+  # readable rows (`Translations::StateIndex.states_for`, read once by
   # `Admin::TreeComponent`, same reasoning as `children_by_parent`); a row
   # not complete in some target language gets one marker naming them.
   class TreeNodeComponent < AdminComponent

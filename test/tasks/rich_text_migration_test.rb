@@ -54,6 +54,18 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     assert_match(/ContentBlock: 1 imported, 0 blank, 0 skipped, 0 failed/, output)
   end
 
+  test "an import leaves the stored translation state agreeing with Translations::Status" do
+    with_locales(%w[en de], default: "en")
+    Translations::StateIndex.rebuild_all
+    run_import([ row(@post, "<p>Hallo Welt</p>", locale: "de"), row(@block, "<p>Hallo</p>", locale: "de") ])
+
+    [ @post, root_page ].each do |owner|
+      truth = Translations::Status.for([ owner.reload ])[owner].transform_values(&:to_s)
+      stored = Translations::State.where(record_type: owner.class.polymorphic_name, record_id: owner.id).pluck(:locale, :state).to_h
+      assert_equal truth, stored
+    end
+  end
+
   test "reports unmapped fragments with the record and locale they came from" do
     output = run_import([ row(@post, "<p>Keep <u>this</u></p>") ])
 
