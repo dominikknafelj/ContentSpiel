@@ -31,7 +31,7 @@
                 explains why the save-status cell, a sibling `<td>` rather
                 than a nested element, needs no Stimulus target here to
                 reach it). %>
-            <%= form_with url: admin_tag_path(tag), method: :patch, class: "flex flex-col gap-1",
+            <%= form_with url: admin_tag_path(tag), method: :patch, class: "admin-column flex flex-col gap-1",
                   data: {
                     controller: "admin--autosave",
                     action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",

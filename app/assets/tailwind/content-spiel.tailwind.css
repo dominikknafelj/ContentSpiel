@@ -98,18 +98,14 @@
    spec §4). Autosave streams replace a field's error slot but never its input,
    so the border can't be a class set at render time: it would stay red after
    a fix, or never turn red after a failed autosave. The slot's presence of a
-   message (<p>) is the single source of truth. Only inside `.admin-column`
-   (autosaving forms); explicit-save forms render their class server-side. */
-.admin-column:has([id$="-errors"] > p) :is(input:not([type="file"]), textarea, select, .admin-prefix-input) { border-color: var(--cs-danger); }
+   message (<p>) is the single source of truth. Wrappers that render a slot:
+   `.admin-column` (Columns::*, the settings fields, tag and related-post
+   inputs, the AI key form, a tag row's form) and `.admin-field` (the schema
+   fields of Admin::FieldComponent). Surfaces: native controls, the prefix
+   input's wrapper, and the rich-text editor's toolbar and body (the whole
+   editor border). The media column has no text input, so it has nothing to
+   colour. Explicit-save forms render their class server-side instead. */
+:is(.admin-column, .admin-field):has([id$="-errors"] > p) :is(input:not([type="file"]), textarea, select, .admin-prefix-input, .admin-rich-text-editor, [role="toolbar"]) { border-color: var(--cs-danger); }
 /* The prefix input's own wrapper carries `border-danger` when it is rendered
    invalid; once a stream empties the slot the border must go again. */
-.admin-column:not(:has([id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
-
-/* Drag pattern (handoff §9 A9), shared by the page tree and the block list
-   (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
-   state). The ghost is the placeholder left where the row would land: a dashed
-   outline with its content hidden. The chosen row is the lifted one -- the
-   only drag state that carries a shadow (`--cs-shadow-menu`). */
-.admin-drag-ghost { border: 1px dashed var(--cs-line-strong); background: transparent; }
-.admin-drag-ghost > * { visibility: hidden; }
-.admin-drag-chosen { background: var(--cs-surface); box-shadow: var(--cs-shadow-menu); }
+:is(.admin-column, .admin-field):not(:has([id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
