@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import { enqueue, registerForm, syncBases, unregisterForm } from "autosave/queue"
+import { currentGeneration, enqueue, registerForm, syncBases, unregisterForm } from "autosave/queue"
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -44,6 +44,21 @@ import { enqueue, registerForm, syncBases, unregisterForm } from "autosave/queue
 // tick ("Use all") send the same page base together, one write makes the
 // other's base stale, and the page settings form is left holding a base
 // nobody else made stale -- now a final 409. See the queue's own comment.
+//
+// Two rules keep a save from being sent, or drawn, where it does not belong
+// (fix round 4):
+// - a save belongs to the PAGE THIS FORM WAS RENDERED ON (`generation`, read
+//   in `connect`), whenever it is queued. A form outlives its page by a
+//   moment: as Turbo swaps the body the field that still holds focus gets a
+//   `focusout`, and `saveNow` runs on the outgoing form. That save is still
+//   sent when there is something to send (an edit inside its debounce is not
+//   lost to Back/Forward), but its answer draws nothing and writes no base
+//   into the new document (`send`'s "stale");
+// - nothing is sent when the form holds exactly what its last successful
+//   save sent (`unchanged`). Leaving a field without having typed, a flush
+//   before a header action, that teardown `focusout`: none of them is an
+//   edit, and after Publish the last would be a save on the base Publish
+//   just moved -- a 409 about nothing.
 export default class extends Controller {
   static values = {
     statusId: String,
@@ -91,6 +106,10 @@ export default class extends Controller {
     // The last answer was not a success (refused, invalid, offline, signed
     // out): `clean()` reports it to `drained()` (see `autosave/queue.js`).
     this.failed = false
+    // The page this form belongs to, and what the server holds of it: what
+    // the form was rendered with, then whatever a successful save last sent.
+    this.generation = currentGeneration()
+    this.saved = this.signature(new FormData(this.element))
     registerForm(this)
   }
 
@@ -114,10 +133,17 @@ export default class extends Controller {
   // as soon as that save is answered). Pressing a button normally blurs the
   // field first (`focusout` -> `saveNow`), but not on every path, and never
   // helps an edit made while this form was busy.
-  flush() {
+  //
+  // A retry waiting out its backoff is sent now rather than waited for -- but
+  // only ONCE per drain (`drain` is that `drained()` call's own token). The
+  // drain calls this on every pass, a few milliseconds apart: re-firing the
+  // retry each time burned all three in about 100 ms, so a brief network blip
+  // plus a link click gave up on the save. After its one early attempt the
+  // backoff timers run their course, under the drain's own deadline.
+  flush(drain) {
     if (this.timer) this.saveNow()
-    // A retry waiting out its backoff is sent now rather than waited for.
-    if (this.retryTimer) {
+    if (this.retryTimer && this.retryFlushedIn !== drain) {
+      this.retryFlushedIn = drain
       clearTimeout(this.retryTimer)
       this.retryTimer = null
       this.attempt()
@@ -125,10 +151,14 @@ export default class extends Controller {
   }
 
   // Anything of this form's still to be sent or answered: a debounced edit,
-  // a queued or in-flight save (`busy` also covers the retry backoff), or an
-  // edit waiting behind one (`pending`).
+  // or a queued or in-flight save (`busy` also covers the retry backoff). An
+  // edit waiting behind a save (`pending`) only ever exists while `busy`, and
+  // is deliberately not counted on its own: every branch that ends an attempt
+  // without sending it clears it, and were one ever missed, a stuck `pending`
+  // would make every visit and header action from this screen wait out the
+  // drain's whole limit for a save nobody is going to send.
   outstanding() {
-    return Boolean(this.timer || this.busy || this.pending)
+    return Boolean(this.timer || this.busy)
   }
 
   // Whether the last outcome was fine: not paused by a 409, not a refused,
@@ -152,6 +182,12 @@ export default class extends Controller {
       return
     }
 
+    // Nothing to send (see the class comment). A form whose last save failed
+    // always sends: the server may not hold what `saved` says, the Retry
+    // button means "send it again", and putting an invalid field back the way
+    // it was has to clear the error and the form's unclean state.
+    if (this.unchanged()) return
+
     this.busy = true
     this.pending = false
     this.attempt()
@@ -167,25 +203,31 @@ export default class extends Controller {
     const status = document.getElementById(this.statusIdValue)
     this.setStatus(status && status.hasAttribute("data-live") ? this.constructor.texts.savingLive : this.constructor.texts.saving)
 
-    const outcome = await enqueue((isCurrent) => this.send(isCurrent))
+    const outcome = await enqueue((isCurrent) => this.send(isCurrent), { generation: this.generation })
 
     switch (outcome) {
       case "stale":
-        // The page was replaced while this save was in flight (a restoration
-        // visit, which cannot be drained first): its form is gone and the
-        // answer belongs to no live document. Nothing to retry, report or
-        // render. (The write itself has happened.)
+        // This form's page has been replaced -- while the save was in flight
+        // or waiting its turn, or before it was even queued (a restoration
+        // visit, which cannot be drained first; the `focusout` of a page
+        // being torn down): the answer belongs to no live document. Nothing
+        // to retry, report or render. (The write itself has happened.)
+        this.pending = false
         this.busy = false
         return
       case "retry":
         if (!this.element.isConnected) {
+          this.pending = false
           this.busy = false
           return
         }
         this.scheduleRetry()
         return
       case "signedOut":
+        // No follow-up either: it would only be redirected again (`pending`
+        // is cleared with `busy` in every branch that sends nothing more).
         this.failed = true
+        this.pending = false
         this.retryCount = 0
         this.busy = false
         this.setStatus(this.constructor.texts.signedOut)
@@ -218,8 +260,11 @@ export default class extends Controller {
         this.busy = false
         // A newer edit made while this save was queued or in flight: its own
         // save follows, and (queued behind this one) reads the bases this
-        // answer just wrote.
-        if (this.pending) this.trigger()
+        // answer just wrote. Not for a form that has left the document in the
+        // meantime (a card re-rendered or removed by a stream).
+        const followUp = this.pending && this.element.isConnected
+        this.pending = false
+        if (followUp) this.trigger()
     }
   }
 
@@ -230,11 +275,13 @@ export default class extends Controller {
   // 30 s timeout also aborts a body still being read, and a rejection there
   // would leave `busy` set -- that form reading "Saving…" and never saving again.
   async send(isCurrent) {
+    const body = new FormData(this.element)
+    const sent = this.signature(body)
     let response
     try {
       response = await fetch(this.element.action, {
         method: "PATCH",
-        body: new FormData(this.element),
+        body,
         headers: this.requestHeaders(),
         // A fetch that never answers must not hold the whole screen's queue.
         signal: AbortSignal.timeout(30000)
@@ -280,12 +327,13 @@ export default class extends Controller {
       return "retry"
     }
 
-    // The page changed while the answer was on its way: its bases and
-    // streams belong to a document that is gone (the new one has fields with
-    // the same ids).
+    // This form's page is gone: the answer's bases and streams belong to a
+    // document that no longer exists (the new one has fields with the same
+    // ids).
     if (!isCurrent()) return "stale"
 
     this.lastAnswerOk = response.ok
+    if (response.ok) this.saved = sent
 
     if (response.status === 409) {
       Turbo.renderStreamMessage(text)
@@ -320,6 +368,21 @@ export default class extends Controller {
     return "done"
   }
 
+  // What the form would submit, as one comparable string. The base is left
+  // out: it is bookkeeping the answers rewrite, not something the editor
+  // changed.
+  signature(data) {
+    return JSON.stringify(Array.from(data.entries())
+      .filter(([ name ]) => name !== "base_updated_at")
+      .map(([ name, value ]) => [ name, value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : value ]))
+  }
+
+  // True when the form holds exactly what its last successful save sent (or
+  // what it was rendered with) and that save was not a failure.
+  unchanged() {
+    return !this.failed && this.signature(new FormData(this.element)) === this.saved
+  }
+
   requestHeaders() {
     const headers = {
       Accept: "text/vnd.turbo-stream.html",
@@ -336,6 +399,10 @@ export default class extends Controller {
     if (this.retryCount >= delays.length) {
       this.setStatus(this.constructor.texts.offline, { retry: true })
       this.failed = true
+      // Given up: an edit typed during the backoff waits for Retry or the
+      // next edit like everything else in the form, it is not "about to be
+      // sent" (`outstanding`).
+      this.pending = false
       this.retryCount = 0
       this.busy = false
       return

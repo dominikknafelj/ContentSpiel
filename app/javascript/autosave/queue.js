@@ -35,8 +35,11 @@
 // `drained()`: a promise that resolves when no task is queued or in flight AND
 // no autosave form has a debounced, queued, in-flight or retrying save --
 // forms are asked to send what they hold (`flush()`) in a loop until a pass
-// finds nothing new, bounded by `DRAIN_LIMIT_MS`. It resolves to whether every
-// form ended CLEAN (last answer a success, not paused by a 409, not failed).
+// finds nothing new, bounded by `DRAIN_LIMIT_MS` -- the whole wait, including
+// the wait for a request already on the wire (fix round 4: a save that never
+// answers no longer holds a visit for its own 30 s timeout). It resolves to
+// whether every form ended CLEAN (last answer a success, not paused by a 409,
+// not failed).
 // So no edit is dropped on the way out: before this, a queued save was either
 // cancelled by the visit (lost silently) or sent on a base the action had just
 // moved (refused). The header action additionally refuses to run when a form
@@ -51,12 +54,25 @@
 // `HOLD_LIMIT_MS` regardless.
 //
 // PAGE GENERATIONS. `generation` is bumped on `turbo:before-render`. A task
-// carries the generation it was queued under and is told `isCurrent()`: one
-// whose answer arrives after the page was replaced (a restoration visit --
-// Back/Forward -- has no `before-visit` to drain on) is still SENT, but
-// renders no streams and writes no bases into the NEW document, whose
-// `page-base-updated-at` has the same id. The chain is never reset: the new
-// page's first request waits for the old page's in-flight one.
+// belongs to the page its FORM was rendered on, not to the moment it was
+// queued (fix round 4): a controller reads `currentGeneration()` when it
+// connects and hands it to `enqueue`, and the task is told `isCurrent()`. One
+// that belongs to a replaced page is still SENT -- a debounced edit is not
+// lost to Back/Forward, a restoration visit having no `before-visit` to drain
+// on -- but renders no streams and writes no bases into the NEW document,
+// whose `page-base-updated-at` has the same id. That holds whether the page
+// was replaced while the answer was on its way, while the task waited its
+// turn (a drain that timed out leaves tasks behind), or BEFORE the task was
+// even queued: as Turbo swaps the body, the field that still holds focus gets
+// a `focusout`, after `turbo:before-render`, and the outgoing form's own
+// action is still bound -- stamped at queue time, that save counted as the new
+// page's and drew its 409 bar there (a false "Changed elsewhere" after
+// Publish). The chain is never reset: the new page's first request waits for
+// the old page's in-flight one.
+//
+// (Turbo's morphing page refresh would keep the forms and still fire
+// `turbo:before-render`, leaving them a generation behind for good. CS Studio
+// does not use it; whoever turns it on must re-stamp the controllers.)
 import { Turbo } from "@hotwired/turbo-rails"
 
 const HOLD_LIMIT_MS = 30000
@@ -65,10 +81,17 @@ const DRAIN_LIMIT_MS = 10000
 let tail = Promise.resolve()
 let generation = 0
 let queued = 0
+// Set while an editor header action's own submission is on its way (see
+// `beginAction`).
+let actionInFlight = false
 const forms = new Set()
 
+// The page a controller was rendered on: read in `connect()`, handed back to
+// `enqueue`.
+export function currentGeneration() { return generation }
+
 // Autosave controllers register themselves so `drained()` can ask them to
-// flush and report whether they ended clean. A form offers `flush()`,
+// flush and report whether they ended clean. A form offers `flush(drain)`,
 // `outstanding()` (debounced, queued, in flight, retrying) and `clean()`.
 export function registerForm(form) { forms.add(form) }
 export function unregisterForm(form) { forms.delete(form) }
@@ -82,16 +105,31 @@ export function settled() { return idle() && Array.from(forms).every((form) => f
 // True while any write is queued, in flight, or still held by a form.
 export function busy() { return !idle() }
 
+// Resolves when `promise` does or after `ms`, whichever is first.
+function within(promise, ms) {
+  let timer
+  const limit = new Promise((resolve) => { timer = setTimeout(resolve, Math.max(ms, 0)) })
+  return Promise.race([ promise, limit ]).finally(() => clearTimeout(timer))
+}
+
+// See "THE RULE" above. Never waits longer than `limit` in all: the wait for
+// the chain itself is raced against what is left of it, so a request that
+// does not answer cannot hold the caller past the deadline. Whatever is left
+// behind then still runs, in order, and finds `isCurrent()` false once the
+// page is gone. `drain` is this call's own token: a form uses it to send a
+// retry that is waiting out its backoff at most ONCE per drain (see
+// `admin--autosave#flush`).
 export async function drained({ limit = DRAIN_LIMIT_MS } = {}) {
   const deadline = Date.now() + limit
+  const drain = {}
   let timedOut = false
 
   for (;;) {
-    Array.from(forms).forEach((form) => form.flush())
-    await tail
+    Array.from(forms).forEach((form) => form.flush(drain))
+    await within(tail, deadline - Date.now())
     await new Promise((resolve) => setTimeout(resolve, 25))
     if (idle()) break
-    if (Date.now() > deadline) { timedOut = true; break }
+    if (Date.now() >= deadline) { timedOut = true; break }
   }
 
   return { clean: !timedOut && Array.from(forms).every((form) => form.clean()), timedOut }
@@ -110,11 +148,13 @@ export function acquire() {
 
 // Runs `task` (an async function, handed `isCurrent`) alone: returns its
 // result or rethrows its error -- and in every case lets the next one go.
-export async function enqueue(task) {
-  const queuedUnder = generation
+// `generation` is the page the task belongs to (the caller's
+// `currentGeneration()` at connect -- see "PAGE GENERATIONS"); left out, it is
+// the page showing as the task is queued.
+export async function enqueue(task, { generation: belongsTo = generation } = {}) {
   const release = await acquire()
   try {
-    return await task(() => queuedUnder === generation)
+    return await task(() => belongsTo === generation)
   } finally {
     release()
   }
@@ -153,9 +193,12 @@ export function syncBases(streamText, ids) {
 //   target is no longer connected (the Undo toast auto-dismissed mid-request,
 //   a card re-rendered by a predecessor's stream). For that case only, an
 //   event is accepted as this request's by what identifies it: the answer by
-//   its URL (a block action answers with a stream, never a redirect), the
-//   error by the request's own abort signal -- never "any event on the
-//   document element", which would also match another request's;
+//   its URL, or by being a redirected one (a block action answers with a
+//   stream, but an expired session answers with a redirect to sign-in, whose
+//   final URL is not the request's -- unmatched, the slot stayed held for the
+//   whole `HOLD_LIMIT_MS`); the error by the request's own abort signal --
+//   never "any event on the document element", which would also match
+//   another request's;
 // - `HOLD_LIMIT_MS` passes.
 // `resume()` is always called, even if `before` throws, so Turbo's submission
 // is never left waiting. A request whose page is gone (a generation bump while
@@ -177,7 +220,11 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
 
     let finished = false
     const gone = () => !target.isConnected
-    const isMyResponse = (e) => e.target === target || (gone() && e.target === document.documentElement && e.detail.fetchResponse?.response?.url === url)
+    const isMyResponse = (e) => {
+      if (e.target === target) return true
+      const response = e.detail.fetchResponse?.response
+      return gone() && e.target === document.documentElement && (response?.url === url || Boolean(response?.redirected))
+    }
     const isMyError = (e) => e.target === target || (gone() && e.target === document.documentElement && e.detail.request?.abortSignal === signal)
     const finish = () => {
       if (finished) return
@@ -219,8 +266,20 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
 // the page (a timeout, a refused or failed save still end in the visit; the
 // 409 bar and the leave handling already say what was not saved). `reentry`
 // lets the visit this handler starts through without being intercepted again.
+//
+// One visit is never held: the redirect that answers an editor header action
+// (`actionInFlight`). Turbo proposes it WITH the answer it already fetched;
+// the `Turbo.visit(url)` below would fetch the page a second time, and the
+// flash -- the "Moved to trash · Undo" toast -- was spent on the first.
+// (An edit that lands between that submission and its answer is the price:
+// its save belongs to the page being replaced.) The flag is spent on the
+// first visit it lets through, so it never excuses a second one.
 let reentry = false
 document.addEventListener("turbo:before-visit", (event) => {
+  if (actionInFlight) {
+    actionInFlight = false
+    return
+  }
   if (reentry || event.defaultPrevented || !busy()) return
 
   event.preventDefault()
@@ -235,4 +294,18 @@ document.addEventListener("turbo:before-visit", (event) => {
   })
 })
 
-document.addEventListener("turbo:before-render", () => { generation += 1 })
+// `admin--queue-hold` brackets a header action's real submission with these:
+// `beginAction()` as it lets the submit through, `endAction()` when the
+// submission ends without a redirect to follow (aborted, failed, refused).
+// After a redirect the flag has to outlive `turbo:submit-end`, which Turbo
+// dispatches BEFORE it proposes the redirect's visit
+// (`Navigator#formSubmissionSucceededWithResponse` awaits the body first), so
+// it is dropped by that visit's own `turbo:before-visit` above, and at the
+// latest by the next render -- any render: it cannot stick past the page.
+export function beginAction() { actionInFlight = true }
+export function endAction() { actionInFlight = false }
+
+document.addEventListener("turbo:before-render", () => {
+  generation += 1
+  actionInFlight = false
+})

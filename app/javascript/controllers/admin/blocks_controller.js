@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
 import Sortable from "sortablejs"
-import { enqueue, holdTurboRequest, syncBases } from "autosave/queue"
+import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "autosave/queue"
 
 // Drives the block list's own reordering (cs-studio spec §5.1/§6.1):
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
@@ -41,6 +41,9 @@ export default class extends Controller {
   static pageBaseId = "page-base-updated-at"
 
   connect() {
+    // The page this list was rendered on: a reorder belongs to it whenever it
+    // is queued (`autosave/queue.js`, "PAGE GENERATIONS").
+    this.generation = currentGeneration()
     // A write (never a GET) waits its turn in the page-level queue
     // (`autosave/queue.js`) and reads the page base when it is actually sent;
     // the queue slot is kept until the answer's bases are in the hidden
@@ -172,7 +175,7 @@ export default class extends Controller {
       if (!isCurrent()) return
       syncBases(text, [ this.constructor.pageBaseId ])
       Turbo.renderStreamMessage(text)
-    }).catch(() => {})
+    }, { generation: this.generation }).catch(() => {})
   }
 
   // ---- Keyboard path (handoff §9 A9) -------------------------------------

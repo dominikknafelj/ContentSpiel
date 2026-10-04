@@ -114,22 +114,61 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_no_text "CHANGED ELSEWHERE"
   end
 
+  # Counts the writes on the wire and keeps every write's answer status. It
+  # lives on `window`, which a Turbo render keeps, so it still reports after
+  # the page was replaced.
+  WATCH_WRITES = <<~JS
+    const watchedFetch = window.fetch
+    window.__inFlight = 0
+    window.__statuses = []
+    window.__renders = 0
+    window.fetch = async (url, options = {}) => {
+      const write = (options.method || "GET").toUpperCase() !== "GET"
+      if (write) window.__inFlight += 1
+      try {
+        const response = await watchedFetch(url, options)
+        if (write) window.__statuses.push(response.status)
+        return response
+      } finally {
+        if (write) window.__inFlight -= 1
+      }
+    }
+    document.addEventListener("turbo:render", () => { window.__renders += 1 })
+  JS
+
   # Publish waits for the queue: an edit still queued behind another form's
   # request is saved first, and the action then runs on the fresh state.
+  #
+  # It is also the regression test for a false "Changed elsewhere" (fix round
+  # 4): the Subtitle field keeps focus through Publish, and as Turbo replaces
+  # the page the outgoing field gets a `focusout` -- right AFTER
+  # `turbo:before-render`. That used to queue one more save of the old form,
+  # on the base Publish had just moved, counted as the NEW page's: a 409 whose
+  # bar was drawn into the new document. Nothing may be sent at all here (the
+  # form has nothing unsaved), so the test waits for the new page and for the
+  # wire to be quiet, then looks at every write's status -- not just at the
+  # text a few milliseconds after the redirect, which only caught it one run
+  # in six.
   test "pressing Publish right after typing saves the typed value and publishes, with no conflict" do
     draft = create_page(title: "Draft", published: false)
     block = draft.content_blocks.create!(block_type: :image, position: 0)
     visit "/cs-studio/pages/#{draft.id}"
     await_admin_controllers
+    page.execute_script(WATCH_WRITES)
 
     fill_in id: "block-#{block.id}-caption", with: "A caption"
     fill_in "Subtitle", with: "Typed just before Publish"
+    assert_equal "page-subtitle", page.evaluate_script("document.activeElement.id"), "the field must still hold focus when Publish is pressed"
     press "Publish"
 
     assert_eventually { draft.reload.published_at.present? }
+    assert_eventually { page.evaluate_script("window.__renders > 0 && window.__inFlight === 0") }
+    sleep 0.5 # a stream answer is drawn on the next frame
     assert_equal "Typed just before Publish", draft.subtitle
     assert_equal "A caption", block.reload.caption
+    assert_not_includes page.evaluate_script("window.__statuses"), 409, "a save was refused as stale"
     assert_no_text "CHANGED ELSEWHERE"
+    assert_no_selector "#changed-elsewhere"
   end
 
   # Nothing that replaces the page starts until the queue is empty
@@ -192,5 +231,128 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_nil draft.reload.published_at
     assert_equal "Draft", draft.title
     assert_button "Publish"
+  end
+
+  # A save belongs to the page its form was rendered on (fix round 4). Back
+  # is a restoration visit: nothing drains first, and the outgoing field's
+  # `focusout` queues its save as the page is torn down. That save is still
+  # sent -- here it is refused, the record having changed elsewhere -- but its
+  # answer must not be drawn into the page that comes back, which has a status
+  # line and a notice slot with the very same ids.
+  test "a save sent as its page is left with Back draws nothing into the page that comes back" do
+    other = create_page(title: "Other", parent: @page)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(WATCH_WRITES)
+    page.execute_script("Turbo.visit(#{"/cs-studio/pages/#{other.id}".to_json})")
+    assert_field "Title", with: "Other"
+    await_admin_controllers
+
+    as(users(:two), channel: :admin) { Pages::Save.call(other, translations: { "en" => { subtitle: "The other editor's text" } }) }
+    fill_in "Subtitle", with: "Typed, then Back"
+    page.go_back
+
+    assert_field "Title", with: "About"
+    assert_eventually { page.evaluate_script("window.__statuses.includes(409) && window.__inFlight === 0") }
+    sleep 0.5 # a stream answer is drawn on the next frame
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_no_selector "#changed-elsewhere"
+    assert_equal "The other editor's text", other.reload.subtitle
+  end
+
+  # The drain is bounded as a whole (fix round 4): a save that never answers
+  # holds a visit for `DRAIN_LIMIT_MS` (10 s), not for as long as it hangs.
+  test "a save that never answers holds a sidebar link for the drain's limit, no longer" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.fetch = (url, options = {}) =>
+        (options.method || "GET").toUpperCase() === "PATCH" ? new Promise(() => {}) : originalFetch(url, options)
+    JS
+
+    fill_in "Subtitle", with: "Never answered"
+    page.execute_script("document.activeElement.blur()")
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    page.execute_script(<<~JS)
+      Array.from(document.querySelectorAll("a")).find((a) => a.textContent.trim() === "Dashboard").click()
+    JS
+
+    assert_current_path(/cs-studio\/?\z/, wait: 14)
+    waited = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    assert_operator waited, :>, 8, "the visit did not wait for the save at all"
+    assert_operator waited, :<, 14
+  end
+
+  # After a save was given up on, nothing is "about to be sent" any more, even
+  # when an edit was typed during the backoff: a visit leaves at once instead
+  # of waiting out the drain for a save nobody is going to send.
+  test "after a save was given up on, a sidebar link leaves at once" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const form = document.getElementById("page-subtitle").closest("form")
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--autosave").constructor.retryDelays = [ 2000, 100, 100 ]
+      const originalFetch = window.fetch
+      window.fetch = (url, options = {}) =>
+        (options.method || "GET").toUpperCase() === "PATCH" ? Promise.reject(new TypeError("offline")) : originalFetch(url, options)
+    JS
+
+    fill_in "Subtitle", with: "first"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#page-save-status", text: "NOT SAVED · RETRYING…"
+    fill_in "Subtitle", with: "second, typed during the backoff"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#page-save-status button", text: "Retry", wait: 8
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    page.execute_script(<<~JS)
+      Array.from(document.querySelectorAll("a")).find((a) => a.textContent.trim() === "Dashboard").click()
+    JS
+    assert_current_path(/cs-studio\/?\z/, wait: 14)
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 4, "the visit waited for a save that was given up on"
+  end
+
+  # The refusal is an error toast, and a modal dialog is drawn above the
+  # toasts: the dialog the action was confirmed in closes, so the sentence can
+  # be read.
+  test "Move to trash does not run when the save it waited for was refused: its dialog closes and says why" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    fill_in "Title", with: ""
+    open_editor_menu
+    press "Move to trash"
+    within("dialog#delete-page-#{@page.id}[open]") { press "Move to trash" }
+
+    assert_text "Your last change wasn't saved, so this didn't run.", wait: 10
+    assert_no_selector "dialog[open]"
+    assert_not @page.reload.trashed?
+    assert_equal "About", @page.title
+  end
+
+  # The redirect that answers a header action is not held by the queue, even
+  # when an edit landed while the action was on its way: held, it was fetched
+  # a second time, and the flash -- here the Undo toast -- was spent on the
+  # first.
+  test "an edit landing while Move to trash is on its way does not cost the Undo toast" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    open_editor_menu
+    press "Move to trash"
+    assert_selector "dialog#delete-page-#{@page.id}[open]"
+    # One tick: the confirmed submission goes out, then an edit starts its
+    # debounce -- still outstanding when the redirect is answered.
+    page.execute_script(<<~JS)
+      document.querySelector("dialog[open] form[method=post] button[type=submit]").click()
+      const field = document.getElementById("page-subtitle")
+      field.value = "Typed as the page left"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+    JS
+
+    assert_current_path(/cs-studio\/pages\z/, wait: 10)
+    assert_selector "#toasts button", text: "Undo"
+    assert @page.reload.trashed?
   end
 end
