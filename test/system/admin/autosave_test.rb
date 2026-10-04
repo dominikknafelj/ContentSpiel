@@ -200,6 +200,64 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # Ledger m7 (final fix wave 1): a save the server refuses for want of
+  # permission (a tab left open while the editor's rights were taken away)
+  # is answered 403 WITH the stream that says so. 403 was not among the
+  # statuses `admin--autosave` took for an answer, so it was retried as a
+  # network failure three times and ended in "NOT SAVED · Retry" -- which
+  # can never succeed and never says why.
+  test "an autosave refused for want of permission says so at once, and is not retried" do
+    Capybara.reset_sessions!
+    sign_in_via_form(users(:two))
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+    JS
+    # Still allowed to read the page, no longer to change it.
+    AccessControl::Membership.where(user: users(:two)).update_all(group_id: access_control_groups(:read_only).id)
+
+    fill_in "Subtitle", with: "Not mine to change any more"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#page-save-status", text: "Not saved — you don't have permission to change this", wait: 5
+    assert_selector "#toasts .admin-toast[data-kind='error']", text: "You don't have permission to make this change."
+    sleep 1.5 # the first retry would have gone out after one second
+    assert_equal 1, page.evaluate_script("window.__patches"), "a refused save was retried"
+    assert_no_selector "#page-save-status", text: "RETRYING"
+    assert_nil @page.reload.subtitle
+  end
+
+  # Ledger m3 (final fix wave 1): "nothing is sent when the form holds what
+  # its last save sent" compares what the form would submit. An EMPTY file
+  # input submits a File whose `lastModified` is the moment it was read, so
+  # a form with one (Settings, with its logo) never compared equal to itself
+  # and sent a save on every `focusout`.
+  test "leaving a field of a form with an empty file input, without typing, sends nothing" do
+    visit admin_settings_path
+    await_admin_controllers
+    assert_selector "form[data-controller~='admin--autosave'] input[type=file]", visible: :all
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+      const field = document.querySelector("form[data-controller~='admin--autosave'] input[type=text]")
+      field.focus()
+    JS
+    sleep 0.05 # `lastModified` has millisecond precision
+    page.execute_script("document.activeElement.blur()")
+    sleep 0.5
+    assert_equal 0, page.evaluate_script("window.__patches"), "a save was sent though nothing had changed"
+  end
+
   # Ledger m1 (final fix wave 1): a record editor is never restored from
   # Turbo's page cache. Back is a restoration visit: nothing drains first, and
   # the snapshot is taken with whatever the forms held at that moment -- here

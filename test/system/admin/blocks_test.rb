@@ -122,6 +122,31 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_equal [ second.id, first.id, added.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
   end
 
+  # Ledger m2 (final fix wave 1): moving a card in the DOM (a drag, Move
+  # up/down) disconnects and reconnects its form's `admin--autosave`. The
+  # reconnect used to take whatever the form held for "what the server
+  # holds", and the disconnect had cleared the debounce timer: an edit made
+  # by code inside its debounce (a translation's Use, with focus elsewhere)
+  # was never sent -- not by the timer, not by a later `focusout`, not by the
+  # drain before a visit.
+  test "an edit still inside its debounce survives its card being moved" do
+    first = @page.content_blocks.create!(block_type: "image", position: 0)
+    second = @page.content_blocks.create!(block_type: "image", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const field = document.getElementById("block-#{second.id}-caption")
+      field.value = "Set by code, then the card moved"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      document.querySelector('[data-block-id="#{second.id}"] [data-move="up"]').click()
+    JS
+
+    assert_eventually { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
+    assert_eventually { second.reload.caption == "Set by code, then the card moved" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
   test "the type name collapses and expands the body, and says which" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
     visit "/cs-studio/pages/#{@page.id}"

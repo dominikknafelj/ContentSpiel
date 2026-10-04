@@ -1,6 +1,18 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import { currentGeneration, enqueue, registerForm, syncBases, unregisterForm } from "autosave/queue"
+import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "autosave/queue"
+
+// What the server holds of each autosave form, by form ELEMENT: the signature
+// (`#signature`) the form was first rendered with, then whatever its last
+// successful save sent. Kept here rather than only on the controller because
+// a form's element is disconnected and connected again whenever its card is
+// moved in the DOM (a block drag, Move up/down), and `connect` must not take
+// what the form holds at THAT moment for saved: an edit still inside its
+// debounce -- whose timer `disconnect` has just cleared -- would then compare
+// "unchanged" for good and never be sent (final fix wave 1, ledger m2). A
+// form rendered anew (a stream replacing the card, a page render) is a new
+// element and starts from what it was rendered with, as before.
+const savedSignatures = new WeakMap()
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -58,7 +70,9 @@ import { currentGeneration, enqueue, registerForm, syncBases, unregisterForm } f
 //   save sent (`unchanged`). Leaving a field without having typed, a flush
 //   before a header action, that teardown `focusout`: none of them is an
 //   edit, and after Publish the last would be a save on the base Publish
-//   just moved -- a 409 about nothing.
+//   just moved -- a 409 about nothing. What the server holds is remembered
+//   per form element (`savedSignatures` above), so it survives the form
+//   being moved in the DOM.
 export default class extends Controller {
   static values = {
     statusId: String,
@@ -109,9 +123,17 @@ export default class extends Controller {
     // The page this form belongs to, and what the server holds of it: what
     // the form was rendered with, then whatever a successful save last sent.
     this.generation = currentGeneration()
-    this.saved = this.signature(new FormData(this.element))
+    const reconnected = savedSignatures.has(this.element)
+    if (!reconnected) savedSignatures.set(this.element, this.signature(new FormData(this.element)))
     registerForm(this)
+    // Moved in the DOM while it held an unsent edit (see `savedSignatures`):
+    // the debounce that `disconnect` cleared starts over.
+    if (reconnected && !this.unchanged()) this.queue()
   }
+
+  // What the server holds of this form (see `savedSignatures`).
+  get saved() { return savedSignatures.get(this.element) }
+  set saved(signature) { savedSignatures.set(this.element, signature) }
 
   disconnect() {
     unregisterForm(this)
@@ -312,9 +334,10 @@ export default class extends Controller {
     // controller's own endpoints answer with -- the status texts only ever
     // reach the page through one of *those* streams (`Admin::AutosaveResponses
     // #autosave_stream`), so a response with some other content type, or a
-    // status outside this endpoint's own documented range (2xx a save; 409 a
-    // refused stale save; 410 "this block was deleted"; 422 a failed save's
-    // own per-field errors) was never actually processed by the endpoint at
+    // status outside this endpoint's own documented range (2xx a save; 403 a
+    // save refused for want of permission; 409 a refused stale save; 410
+    // "this block was deleted"; 422 a failed save's own per-field errors) was
+    // never actually processed by the endpoint at
     // all -- a 500, a proxy's own error page, ... -- and takes the same retry
     // path a network error does, rather than being handed to
     // `Turbo.renderStreamMessage` as if it were one.
@@ -343,7 +366,11 @@ export default class extends Controller {
     // A 422 with a body is still a real answer at this point -- the
     // server-rendered stream already turns that into the "Couldn't save"
     // status and the per-field errors, so it counts as success from *this*
-    // controller's own point of view (nothing left to retry).
+    // controller's own point of view (nothing left to retry). So is a 403:
+    // its stream says "Not saved — you don't have permission to change this"
+    // and raises the error toast, and the same request sent again would be
+    // refused again. Either leaves the form unclean (`failed`, set by
+    // `attempt` from `lastAnswerOk`).
     //
     // `Turbo.renderStreamMessage` doesn't patch the DOM synchronously -- its
     // `<turbo-stream>` elements apply on the *next animation frame* -- so the
@@ -370,11 +397,21 @@ export default class extends Controller {
 
   // What the form would submit, as one comparable string. The base is left
   // out: it is bookkeeping the answers rewrite, not something the editor
-  // changed.
+  // changed. A file is named by what identifies it; a file input with NO file
+  // chosen is "" -- `FormData` hands that over as an empty, nameless `File`
+  // whose `lastModified` is the moment it was read, so by its own fields it
+  // would differ from itself every time, and a form with one (Settings, with
+  // its logo) would never be "unchanged" (ledger m3).
   signature(data) {
     return JSON.stringify(Array.from(data.entries())
       .filter(([ name ]) => name !== "base_updated_at")
-      .map(([ name, value ]) => [ name, value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : value ]))
+      .map(([ name, value ]) => [ name, this.comparable(value) ]))
+  }
+
+  comparable(value) {
+    if (!(value instanceof File)) return value
+    if (value.size === 0 && value.name === "") return ""
+    return `${value.name}:${value.size}:${value.lastModified}`
   }
 
   // True when the form holds exactly what its last successful save sent (or
@@ -423,15 +460,21 @@ export default class extends Controller {
   // True for exactly the responses this controller's own PATCH endpoints
   // (`Admin::AutosaveResponses#autosave_stream`'s callers) actually answer
   // with (final-fixes round, finding 4) -- a real Turbo Stream body, at one
-  // of the four statuses those endpoints ever send: a plain 2xx success,
+  // of the five statuses those endpoints ever send: a plain 2xx success,
+  // 403 (refused for want of permission, `Admin::AutosaveResponses
+  // #autosave_status` -- a tab left open while the editor's rights changed),
   // 409 (a stale base, refused), 410 (a destroyed block/post, "This block
-  // was deleted"), or 422 (a failed save's own per-field errors). Anything else -- wrong content
-  // type, or a status this endpoint never documents sending at all -- is
-  // treated as "no real answer arrived," not as this save having somehow
-  // succeeded.
+  // was deleted"), or 422 (a failed save's own per-field errors). Anything
+  // else -- wrong content type, or a status this endpoint never documents
+  // sending at all -- is treated as "no real answer arrived," not as this
+  // save having somehow succeeded. (403 was missing from this list until
+  // final fix wave 1, ledger m7: a refused save was retried three times as
+  // if the network had failed and ended in "NOT SAVED · Retry", which could
+  // never succeed and never said why. A 403 that is NOT a stream -- the
+  // forbidden page of a whole admin area -- still is no answer.)
   isTurboStreamAnswer(response) {
     const contentType = response.headers.get("Content-Type") || ""
-    const answeredStatus = (response.status >= 200 && response.status < 300) || response.status === 409 || response.status === 410 || response.status === 422
+    const answeredStatus = (response.status >= 200 && response.status < 300) || [ 403, 409, 410, 422 ].includes(response.status)
 
     return answeredStatus && contentType.includes("text/vnd.turbo-stream.html")
   }
@@ -440,7 +483,14 @@ export default class extends Controller {
   // offline state. The status line sits in the record header, outside this
   // controller's form, so a `data-action` on the button would never reach
   // it: the listener is bound here instead.
+  //
+  // Nothing is written once this form's page has been replaced (ledger m4):
+  // the page that came in has a status line with the same id, and a
+  // "Saving…" written there by a save of the OUTGOING form (the `focusout` of
+  // a page being torn down) would stay for good -- that save's answer is
+  // drawn nowhere.
   setStatus(text, { retry = false } = {}) {
+    if (!isCurrentGeneration(this.generation)) return
     const status = document.getElementById(this.statusIdValue)
     if (!status) return
 

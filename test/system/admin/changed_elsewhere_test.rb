@@ -368,6 +368,10 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     sleep 0.5 # a stream answer is drawn on the next frame
     assert_no_text "CHANGED ELSEWHERE"
     assert_no_selector "#changed-elsewhere"
+    # Nor its "Saving…" line (ledger m4): written as the save was queued,
+    # into the status element with the same id, it would never be replaced --
+    # the answer is drawn nowhere.
+    assert_no_selector "#page-save-status", text: "SAVING"
     assert_equal "The other editor's text", other.reload.subtitle
   end
 
