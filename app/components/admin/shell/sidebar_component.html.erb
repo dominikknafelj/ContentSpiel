@@ -1,6 +1,13 @@
-<nav aria-label="Modules" class="flex h-full w-60 flex-col border-r border-line bg-chrome">
+<%# `admin-sidebar` (content-spiel.tailwind.css) is the sticky, viewport-high
+    part; its grid cell (`.admin-shell__sidebar`) stretches the full page
+    height and carries the same chrome background, so the column is not cut
+    off at the viewport on a long page. %>
+<nav aria-label="Modules" class="admin-sidebar flex w-60 flex-col border-r border-line bg-chrome">
   <div class="flex flex-col gap-3 p-3">
-    <span class="px-1 font-semibold text-ink">Content·Spiel</span>
+    <div class="flex flex-col gap-0.5 px-1">
+      <span class="admin-wordmark font-cs text-xs font-bold uppercase tracking-wide text-ink">CONTENT·SPIEL</span>
+      <span class="admin-site-name truncate text-[13px] text-dim"><%= site_name %></span>
+    </div>
     <%= tag.button type: "button", data: { action: "admin--command-palette#open" },
           class: "flex w-full cursor-pointer items-center justify-between rounded-cs border border-line-strong px-2 py-1.5 text-left text-sm text-meta" do %>
       <span>Jump to…</span><span class="font-cs-mono text-label">⌘K</span>
@@ -32,8 +39,12 @@
         plus `title` so a long name or email never widens the column. %>
     <div class="admin-account flex min-w-0 flex-col gap-0.5">
       <span class="truncate text-sm font-medium text-ink" title="<%= user.display_name %>"><%= user.display_name %></span>
-      <span class="truncate text-xs text-meta" title="<%= user.email_address %>"><%= user.email_address %></span>
-      <span class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= role_line %></span>
+      <%# The email line only when the name line isn't already the email
+          (a user without a name falls back to it). %>
+      <% if user.display_name != user.email_address %>
+        <span class="truncate text-xs text-meta" title="<%= user.email_address %>"><%= user.email_address %></span>
+      <% end %>
+      <span class="truncate text-xs text-meta"><%= role_line %></span>
       <div class="mt-1 flex items-center gap-3 text-xs">
         <%= link_to "Change password", admin_account_password_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
         <%= button_to "Sign out", admin_sign_out_path, method: :delete, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>
