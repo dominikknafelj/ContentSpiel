@@ -121,7 +121,16 @@ module Admin
     # 403 with the "no permission" status -- the order already on screen is
     # the client's optimistic one, so leaving it unexplained would look
     # saved.
+    #
+    # An Undo toast follows a reorder that changed something: a PATCH to this
+    # same action with the order as it was, read here before the service
+    # runs. The answer to *that* request (`undo=1`) also re-renders the list
+    # (`update`, so the list element itself -- the Sortable container --
+    # stays), since unlike a drop the client's DOM isn't already in the
+    # order the server now has; and it gets a plain confirmation with no
+    # Undo of its own, so two orders can't be bounced between forever.
     def reorder
+      before = @page.content_blocks.reorder(:position, :id).ids
       result = ContentBlocks::Reorder.call(@page, params[:ids])
       status_id = "content-blocks-status"
 
@@ -131,7 +140,12 @@ module Admin
       end
 
       streams = [ turbo_stream.replace(status_id, state) ]
-      result.ok? ? streams.concat(page_base_streams) : streams << picker_error_stream(result.errors)
+      if result.ok?
+        streams.concat(page_base_streams)
+        streams.concat(reorder_undo_streams(before))
+      else
+        streams << picker_error_stream(result.errors)
+      end
       render turbo_stream: streams, status: (result.ok? ? :ok : failure_status(result))
     end
 
@@ -207,6 +221,26 @@ module Admin
       sent.present? && Time.iso8601(sent) >= @page_updated_at_before_write
     rescue ArgumentError
       false
+    end
+
+    def reorder_undo_streams(before)
+      return [ blocks_list_stream, toast_stream("Order restored.") ] if params[:undo].present?
+
+      after = @page.content_blocks.reload.reorder(:position, :id).ids
+      return [] if after == before
+
+      [ toast_stream("Block order changed.", kind: :undo, action: {
+        label: "Undo", method: :patch,
+        url: reorder_admin_page_content_blocks_path(@page, ids: before, undo: 1, **admin_url_options)
+      }) ]
+    end
+
+    # The whole block list, re-rendered in the server's order. The last card
+    # gets no trailing "+" picker (`last:`), as on a page load.
+    def blocks_list_stream
+      blocks = @page.content_blocks.reload.order(:position).to_a
+      cards = blocks.each_with_index.map { |block, index| render_to_string(block_card_component(block, last: index == blocks.size - 1)) }
+      turbo_stream.update("content-blocks-list", html: helpers.safe_join(cards))
     end
 
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
