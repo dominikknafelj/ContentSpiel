@@ -478,6 +478,7 @@ class Translations::TrackerTest < ActiveSupport::TestCase
   end
 
   test "the original-changed time is stamped for a translated schema field" do
+    saved = ContentTypes.all.dup
     ContentTypes.register("test/interview") do |t|
       t.label "Interview"
       t.field :quote, :string, translated: true
@@ -491,5 +492,6 @@ class Translations::TrackerTest < ActiveSupport::TestCase
     end
   ensure
     ContentTypes.reset!
+    saved.each { |definition| ContentTypes.registry_put(definition) }
   end
 end
