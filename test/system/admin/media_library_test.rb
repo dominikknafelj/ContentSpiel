@@ -317,14 +317,20 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
 
     visit "/cs-studio/media"
     await_admin_controllers
+    # The keyboard alone: the tile is focused by script and Enter goes to the
+    # page, whatever has the focus (`press_enter`). `node.send_keys(:enter)` is
+    # NOT that -- Cuprite clicks the node with the mouse first and types
+    # afterwards, so the tile was activated twice within a few milliseconds
+    # (click, then Enter on the link that was still there), two frame
+    # navigations to one URL of which Turbo promotes neither: no `turbo:load`
+    # at all, and a test whose outcome depended on which of the two won.
     page.execute_script("document.querySelector('#media-asset-#{asset.id} a').focus()")
-    # Enter on a tile is the same frame navigation a click is, promoted visit
-    # included -- and the panel takes the focus only when that visit is over.
-    click_frame_link { find("#media-asset-#{asset.id} a").send_keys(:enter) }
+    click_frame_link { press_enter }
 
     assert_eventually(message: "focus never reached the panel") { active_element_id == "media-panel" }
 
-    click_frame_link { find("a[aria-label='Close panel']").send_keys(:enter) }
+    page.execute_script("document.querySelector(\"a[aria-label='Close panel']\").focus()")
+    click_frame_link { press_enter }
 
     assert_no_selector "#media-panel", wait: 5
     assert_eventually(message: "focus never returned to the tile") do
@@ -427,6 +433,9 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   def dispatch_file_drop(*names)
     page.execute_script("#{files_script(*names)} document.querySelector('h1').dispatchEvent(new DragEvent('drop', { dataTransfer: data, bubbles: true, cancelable: true }))")
   end
+
+  # Enter, to whatever has the focus -- no click first (see the keyboard test).
+  def press_enter = page.driver.browser.keyboard.type(:Enter)
 
   # Clicks a tile and waits until the panel is open AND Turbo has finished with
   # the click (`click_frame_link`, which says why): a test that clicked or typed
