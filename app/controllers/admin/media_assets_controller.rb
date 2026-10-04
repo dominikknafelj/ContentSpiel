@@ -8,7 +8,8 @@ module Admin
   # only, JSON in and out. Task 7's Media module (`Admin::MediaController`,
   # `resources :media`) is the library's own browse/edit/delete home, but
   # this controller keeps its own separate route and its own narrower
-  # `{id, url, title}`/`{errors}` JSON contract rather than folding into it --
+  # JSON contract (`Admin::MediaUploadResponses`: `id`, `title`, `url`, the finished
+  # pick tile and the counts, or `{errors}`) rather than folding into it --
   # `admin--media-picker` and `admin--media-upload` are two unrelated callers
   # that happen to share the same underlying `Media::Upload`, not one
   # feature split across two endpoints.

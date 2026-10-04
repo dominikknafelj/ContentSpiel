@@ -270,6 +270,67 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     end
   end
 
+  # Turbo's snapshot clones progress tiles without listeners; Back must not bring
+  # one back as a ghost. The Media index is no-cache now, so these two flows were
+  # already covered by that (they pass without the `reattach` change); the third
+  # test pins `reattach`'s own sweep for any page that does get restored.
+  test "Back after choosing a tile during an upload shows no leftover progress tile" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    hold_uploads
+    dispatch_file_drop("tiny.png")
+    assert_selector "[data-upload-tile]", text: "Uploading…"
+    click_tile(existing)
+    release_uploads
+    assert_selector ".admin-media-grid li[id^=media-asset-] a", text: "tiny", wait: 10
+
+    page.go_back
+    assert_no_selector "#media-panel", wait: 5
+    await_admin_controllers
+    assert_no_selector "[data-upload-tile]"
+  end
+
+  test "Back after choosing a tile with a refused tile showing leaves exactly one, and its Dismiss works" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    existing = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Existing") }
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    dispatch_file_drop("fake.png")
+    assert_selector "[data-upload-tile]", text: /PNG, JPEG, GIF, or WEBP/, wait: 10
+    click_tile(existing)
+    assert_selector "[data-upload-tile]", count: 1
+
+    page.go_back
+    assert_no_selector "#media-panel", wait: 5
+    await_admin_controllers
+    assert_selector "[data-upload-tile]", count: 1
+    find("[data-upload-tile] button", text: "Dismiss").click
+    assert_no_selector "[data-upload-tile]"
+  end
+
+  test "a restored grid's ghost progress tiles are removed when the queue re-attaches" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    # A clone, as Turbo's snapshot would leave: no listeners, no live entry.
+    page.execute_script(<<~JS)
+      const ghost = document.createElement("li")
+      ghost.dataset.uploadTile = ""
+      ghost.id = "ghost-tile"
+      document.querySelector(".admin-media-grid").prepend(ghost)
+    JS
+    assert_selector "#ghost-tile", visible: :all
+    dispatch_file_drop("fake.png")
+    assert_selector "[data-upload-tile]", text: /PNG, JPEG/, wait: 10
+    assert_no_selector "#ghost-tile", visible: :all
+    assert_selector "[data-upload-tile]", count: 1
+  end
+
   private
 
   def active_element_id = page.evaluate_script("document.activeElement && document.activeElement.id")

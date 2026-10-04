@@ -24,14 +24,28 @@ module Admin
       tile = if picker
         Admin::MediaLibrary::TileComponent.new(asset: asset, unused: !asset.used?, pick: true, locale: admin_locale)
       else
-        Admin::MediaLibrary::TileComponent.new(asset: asset, unused: !asset.used?, url: admin_media_path(selected: asset.id, **admin_url_options))
+        # The link keeps the grid's state like every other tile's (`GridComponent#show_path`):
+        # the browser sends `q`, `filter` and `page` along with the file.
+        Admin::MediaLibrary::TileComponent.new(asset: asset, unused: !asset.used?,
+          url: admin_media_path(**upload_list_query, **admin_url_options, selected: asset.id))
       end
 
       {
         id: asset.id, title: asset.title, url: asset.url,
         tile: view_context.render(tile),
-        counts: Media::Search.new(q: params[:q], actor: Current.actor).counts
+        counts: media_counts
       }
+    end
+
+    # The segment counts for the search the grid is showing (they respect the
+    # search, never the segment). One place for the upload answer and the panel's
+    # autosave answer (`Admin::MediaController#grid_streams`).
+    def media_counts
+      Media::Search.new(q: params[:q], actor: Current.actor).counts
+    end
+
+    def upload_list_query
+      params.permit(:q, :filter, :page).to_h.symbolize_keys.select { |_, value| value.is_a?(String) }
     end
   end
 end

@@ -73,7 +73,14 @@ export class UploadTiles {
   // grid is there now, in the order the files were added. Idempotent.
   reattach() {
     const list = this.grid()
-    if (!list || this.live.length === 0) return
+    if (!list) return
+
+    // A page restored from Turbo's snapshot (Back) carries clones of tiles that were
+    // on screen when it was taken: no listeners, no `live` entry, a bar that never
+    // moves. Any upload tile in the grid that is not one of ours is such a ghost.
+    const ours = new Set(this.live.map((entry) => entry.li))
+    list.querySelectorAll("[data-upload-tile]").forEach((tile) => { if (!ours.has(tile)) tile.remove() })
+    if (this.live.length === 0) return
 
     list.parentElement?.querySelector(":scope > [data-media-empty]")?.remove()
     list.prepend(...this.live.map((entry) => entry.li))
@@ -97,14 +104,23 @@ export class UploadTiles {
 
     this.running = true
     const generation = this.generation
-    while (this.queue.length > 0 && generation === this.generation) {
-      const entry = this.queue.shift()
-      this.current = entry
-      await this.upload(entry, generation)
-    }
-    if (generation === this.generation) {
-      this.current = null
-      this.running = false
+    try {
+      while (this.queue.length > 0 && generation === this.generation) {
+        const entry = this.queue.shift()
+        this.current = entry
+        // One file's trouble (a throw from the tile swap or a callback) is that
+        // file's failure, never the queue's: the rest still go.
+        try {
+          await this.upload(entry, generation)
+        } catch {
+          if (generation === this.generation && entry.li.isConnected) this.fail(entry, TEXTS.failedGeneric)
+        }
+      }
+    } finally {
+      if (generation === this.generation) {
+        this.current = null
+        this.running = false
+      }
     }
   }
 
@@ -173,7 +189,9 @@ export class UploadTiles {
 
   progress(entry, fraction) {
     const fill = entry.li.querySelector("[data-upload-fill]")
-    if (fill) fill.style.width = `${Math.round(fraction * 100)}%`
+    const percent = Math.round(fraction * 100)
+    if (fill) fill.style.width = `${percent}%`
+    entry.li.querySelector("[data-upload-bar]")?.setAttribute("aria-valuenow", String(percent))
   }
 
   dismiss(entry) {
@@ -186,13 +204,19 @@ export class UploadTiles {
   buildTile(name) {
     const li = document.createElement("li")
     li.dataset.uploadTile = ""
-    li.setAttribute("role", "group")
-    li.setAttribute("aria-label", name)
-
+    // The group role is on the card, not the <li>: it would replace the item's
+    // listitem role and the grid would stop being a list.
     const card = element("div", "flex flex-col overflow-hidden rounded-cs border border-line bg-surface")
+    card.setAttribute("role", "group")
+    card.setAttribute("aria-label", name)
     const preview = element("div", "flex aspect-[4/3] w-full flex-col justify-end bg-sunken")
     const bar = element("div", "h-[3px] w-full bg-line")
     bar.dataset.uploadBar = ""
+    bar.setAttribute("role", "progressbar")
+    bar.setAttribute("aria-label", `Uploading ${name}`)
+    bar.setAttribute("aria-valuemin", "0")
+    bar.setAttribute("aria-valuemax", "100")
+    bar.setAttribute("aria-valuenow", "0")
     const fill = element("div", "h-full bg-accent")
     fill.dataset.uploadFill = ""
     fill.style.width = "0%"

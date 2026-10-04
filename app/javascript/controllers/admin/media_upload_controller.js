@@ -61,10 +61,17 @@ export default class extends Controller {
     return document.querySelector("#content ul.admin-media-grid")
   }
 
-  // The search the grid is showing, so the counts that come back are for it.
+  // The grid's state (search, segment, page), so the counts that come back are for
+  // the search and the finished tile's link keeps all three.
   get fields() {
+    const fields = {}
     const q = document.querySelector("#content input[type=search][name=q]")?.value
-    return q ? { q } : {}
+    const filter = document.querySelector("#content input[type=radio][name=filter]:checked")?.value
+    const page = new URL(window.location.href).searchParams.get("page")
+    if (q) fields.q = q
+    if (filter) fields.filter = filter
+    if (page) fields.page = page
+    return fields
   }
 
   uploaded({ json }) {

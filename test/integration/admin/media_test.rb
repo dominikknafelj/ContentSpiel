@@ -747,6 +747,26 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_includes tile.text, "NO ALT"
   end
 
+  test "an uploaded tile's link keeps the grid's search, segment and page like every other tile's" do
+    sign_in_as(users(:one))
+
+    post "/cs-studio/media", params: { file: fixture_file_upload("tiny.png", "image/png"), q: "tin", filter: "unused", page: "2" }
+
+    asset = Media::Asset.order(:id).last
+    href = Nokogiri::HTML.fragment(response.parsed_body["tile"]).at_css("a")["href"]
+    query = Rack::Utils.parse_query(URI(href).query)
+    assert_equal({ "q" => "tin", "filter" => "unused", "page" => "2", "selected" => asset.id.to_s }, query.slice("q", "filter", "page", "selected"))
+  end
+
+  test "the picker's grid is a 403 without media.upload, with or without a query" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/media", params: { picker: 1 }
+    assert_response :forbidden
+    get "/cs-studio/media", params: { picker: 1, q: "x", filter: "unused" }
+    assert_response :forbidden
+  end
+
   test "an upload's counts respect the search that was showing" do
     sign_in_as(users(:one))
     upload_asset(filename: "older.png")

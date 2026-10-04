@@ -42,7 +42,8 @@ export default class extends Controller {
   // Enter on a tile that is already selected confirms. The first Enter falls
   // through to the button's own click, which selects.
   key(event) {
-    if (event.key !== "Enter" || event.currentTarget.getAttribute("aria-pressed") !== "true") return
+    // Holding the key repeats keydown: one Enter confirms, not a stream of them.
+    if (event.key !== "Enter" || event.repeat || event.currentTarget.getAttribute("aria-pressed") !== "true") return
 
     event.preventDefault()
     this.confirm()

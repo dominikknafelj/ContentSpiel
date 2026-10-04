@@ -193,7 +193,7 @@ module Admin
     # "Missing alt"), and the panel's own heading. The counts are for the same
     # search the grid is showing (`q` rides on the form's URL).
     def grid_streams(asset)
-      counts = Media::Search.new(q: params[:q], actor: Current.actor).counts
+      counts = media_counts
       tile = Admin::MediaLibrary::TileComponent.new(
         asset: asset, selected: true, unused: !asset.used?,
         url: admin_media_path(**list_query, **admin_url_options, selected: asset.id)
