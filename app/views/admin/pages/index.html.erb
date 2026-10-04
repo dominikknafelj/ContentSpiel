@@ -3,9 +3,11 @@
 <% end %>
 
 <%# "Create starter pages" (design spec §6.1, Task 9) is offered -- in the
-    empty state and in the "More" menu -- only while the starter sections
-    are missing (`StarterContent.added?`, the wizard's own check), the same
-    guard the wizard's optional step implies. Its form posts to `_top`:
+    empty state and in the "More" menu -- only while the site is still empty:
+    Home and nothing else, counting kept pages (design pass bug 4: it used to
+    show whenever the starter sections were missing, i.e. on every site that
+    had built its own pages instead). `StarterContents::Add` still refuses on
+    its own when it isn't permitted or the content exists. Its form posts to `_top`:
     the new pages land in the tree, outside the `content` frame, so the
     redirect back here has to replace the whole shell to show them. %>
 <%# Both offers are shown only when the actor could act on them (access-
@@ -13,7 +15,7 @@
     get past its own permission checks, "Add a page" when `pages.create`
     allows a page under the homepage -- where `Admin::PagesController
     #create` puts a page with no parent named. %>
-<% offer_starter_pages = !StarterContent.added?(locale: Locales.default) && StarterContents::Add.new.permitted? %>
+<% offer_starter_pages = Page.kept.count == 1 && !StarterContent.added?(locale: Locales.default) && StarterContents::Add.new.permitted? %>
 <% offer_new_page = can?("pages.create", Page.new(parent: root_page)) %>
 
 <% if offer_starter_pages %>
