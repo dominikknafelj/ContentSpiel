@@ -165,6 +165,23 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     assert_empty @post.tags.reload
   end
 
+  test "an existing over-long tag is not tinted, only a name typed in this session is" do
+    Tag.new(name: "l" * 60).save!(validate: false)
+    Tag.new(name: "m" * 60).save!(validate: false)
+    @post = create_post(title: "Legacy")
+    @post.tags << Tag.find_by!(name: "l" * 60)
+    open_editor
+
+    assert_selector "li[data-chip-value='#{"l" * 60}']"
+    assert_no_selector "li[data-invalid]"
+
+    tag_field.send_keys("m" * 58)
+    assert_selector "#post-tag_names-listbox [role=option]", text: "m" * 60
+    tag_field.send_keys(:down, :enter)
+    assert_selector "li[data-chip-value='#{"m" * 60}']"
+    assert_no_selector "li[data-invalid]"
+  end
+
   test "an older answer never overwrites a newer one" do
     open_editor
     page.execute_script(<<~JS)

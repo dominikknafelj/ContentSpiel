@@ -44,7 +44,6 @@ export default class extends Controller {
     this.items = []
     this.active = -1
     this.sequence = 0
-    this.chips.forEach((chip) => this.markInvalidLength(chip))
   }
 
   disconnect() {
@@ -80,7 +79,7 @@ export default class extends Controller {
     const parts = this.inputTarget.value.split(",")
     const rest = parts.pop()
     this.inputTarget.value = ""
-    parts.map((part) => part.trim()).filter(Boolean).forEach((part) => this.pick({ value: this.fold(part), label: this.fold(part) }))
+    parts.map((part) => part.trim()).filter(Boolean).forEach((part) => this.pick({ value: this.fold(part), label: this.fold(part), typed: true }))
     this.inputTarget.value = rest.trimStart()
     this.search()
   }
@@ -142,7 +141,7 @@ export default class extends Controller {
     // "Create tag “x”" only when nothing already matches the text exactly,
     // in the results or among the chips (names compare case-insensitively).
     if (this.createValue && query && !rows.some((row) => this.same(row.value, query)) && !this.hasChip(query)) {
-      items.push({ value: this.fold(query), label: this.fold(query), create: true })
+      items.push({ value: this.fold(query), label: this.fold(query), create: true, typed: true })
     }
 
     // A result count or "No matching tags." goes to the live region (the list
@@ -201,7 +200,7 @@ export default class extends Controller {
   // believes it was added, so it is -- a chip, announced like any addition.
   leave() {
     if (this.inputTarget.disabled) return
-    if (this.createValue && this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query) })
+    if (this.createValue && this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query), typed: true })
     else this.close()
   }
 
@@ -251,12 +250,12 @@ export default class extends Controller {
         // Never submits the form.
         event.preventDefault()
         if (!this.listboxTarget.hidden && this.active >= 0) this.pick(this.items[this.active])
-        else if (this.createValue && this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query) })
+        else if (this.createValue && this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query), typed: true })
         break
       case ",":
         if (!this.createValue) return
         event.preventDefault()
-        if (this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query) })
+        if (this.query) this.pick({ value: this.fold(this.query), label: this.fold(this.query), typed: true })
         break
       case "Escape":
         // Also while a search is still on its way: it is cancelled, and
@@ -330,7 +329,7 @@ export default class extends Controller {
     return this.lowercaseValue ? collapsed.toLowerCase() : collapsed
   }
 
-  // `maxLength`: a chip the server would refuse is tinted at once.
+  // `maxLength`: a chip the server would refuse (a NEW name over the limit) is tinted at once.
   markInvalidLength(chip) {
     if (!this.hasMaxLengthValue || chip.dataset.chipValue.length <= this.maxLengthValue) return
     chip.dataset.invalid = "true"
@@ -355,7 +354,10 @@ export default class extends Controller {
     chip.querySelector("input").value = item.value
     this.removeButton(chip).setAttribute("aria-label", `Remove ${item.label}`)
     this.listTarget.append(chip)
-    this.markInvalidLength(chip)
+    // Only a name typed in this session: an existing tag (rendered by the
+    // server or picked from the suggestions) is reused by the server whatever
+    // its length, so it must never be tinted as if it would be refused.
+    if (item.typed) this.markInvalidLength(chip)
 
     this.announce(`Added ${item.label}.`)
     this.changed()

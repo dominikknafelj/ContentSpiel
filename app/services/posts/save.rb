@@ -343,21 +343,38 @@ module Posts
     # confirmed by the "invalid input... nothing saved" test, which would
     # otherwise leave an orphaned Tag/PostTag behind.
     #
-    # Names are normalised the way the chip input shows them: inner runs of
-    # whitespace collapse to one space, case folds (a tag is stored
-    # lower-case) and a name that differs only by case is one tag. A name
-    # `Tag` would refuse (too long) is not assigned -- `tags_valid?` reports
-    # it after the save, as a failure on `tag_names`, which rolls the whole
-    # save back like a refused related post does.
+    # An existing tag is matched on the exact submitted name first (stripped,
+    # case-insensitively), then on the squished one, and reused as it is,
+    # whatever its length or inner spacing: a post that already carries a
+    # legacy over-long tag must keep saving (the editor resubmits every chip,
+    # and MCP resends what it read). Only a name that would be CREATED is
+    # normalised the way the chip input shows it -- inner runs of whitespace
+    # collapse, case folds (a tag is stored lower-case) -- and only that name
+    # can be refused (too long): `tags_valid?` reports it after the save, as a
+    # failure on `tag_names`, which rolls the whole save back like a refused
+    # related post does. Two names for one tag are one tag.
     def assign_tags
       @refused_tag_names = []
-      names = Array(@attributes[:tag_names]).map { |name| name.to_s.squish }.compact_blank.uniq(&:downcase)
-      @refused_tag_names = names.select { |name| name.length > Tag::MAX_NAME_LENGTH }
+      tags = Array(@attributes[:tag_names]).map { |name| name.to_s.strip }.compact_blank.filter_map do |name|
+        find_tag(name) || build_tag(name)
+      end
+      tags = tags.uniq { |tag| tag.persisted? ? [ :id, tag.id ] : [ :name, tag.name ] }
       return if @refused_tag_names.any?
 
-      @post.tags = names.map do |name|
-        Tag.where("LOWER(name) = ?", name.downcase).first || Tag.new(name: name.downcase)
+      @post.tags = tags
+    end
+
+    def find_tag(name)
+      Tag.where("LOWER(name) = ?", name.downcase).first || Tag.where("LOWER(name) = ?", name.squish.downcase).first
+    end
+
+    def build_tag(name)
+      squished = name.squish
+      if squished.length > Tag::MAX_NAME_LENGTH
+        @refused_tag_names << squished
+        return nil
       end
+      Tag.new(name: squished.downcase)
     end
 
     # Runs after `@post.save` (which clears errors added before it): names

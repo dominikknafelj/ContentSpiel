@@ -228,6 +228,18 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_not Tag.exists?(name: "fine")
   end
 
+  test "autosave resubmitting a legacy over-long tag still saves an unrelated edit" do
+    Tag.new(name: "l" * 60).save!(validate: false)
+    post_record = create_post(title: "Legacy")
+    post_record.tags << Tag.find_by!(name: "l" * 60)
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { title: "Renamed", tag_names: [ "l" * 60, "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Renamed", post_record.reload.title
+    assert_equal [ "l" * 60 ], post_record.tags.map(&:name)
+  end
+
   test "inner whitespace in a tag name collapses" do
     post_record = create_post(title: "Chips")
     patch "/cs-studio/posts/#{post_record.id}",
