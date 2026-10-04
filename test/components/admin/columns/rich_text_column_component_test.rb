@@ -44,10 +44,11 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
     assert page.all("[role=toolbar] button", visible: :all).all? { |button| button["type"] == "button" }
   end
 
-  test "the toolbar is one non-wrapping row of grouped tools with an Insert menu" do
+  test "the toolbar is a row of grouped tools with an Insert menu that wraps whole groups instead of spilling" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    assert_selector "[role=toolbar].flex-nowrap"
+    assert_selector "[role=toolbar].flex-wrap"
+    assert_selector "[role=toolbar] [role=group].shrink-0", minimum: 3
     assert_selector "[role=toolbar] [role=separator]", minimum: 3
     assert_selector "[role=toolbar] [data-controller='admin--menu'] button[aria-haspopup=menu]", text: "Insert"
     %w[Image YouTube].each do |label|

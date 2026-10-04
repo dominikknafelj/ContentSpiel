@@ -187,6 +187,35 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   # several rows. It is one row now, and the Insert menu -- which sits inside
   # the toolbar -- is neither clipped by it nor out of reach: its items are
   # visible, inside the viewport, and still run their command.
+  test "in a narrow translation column (page editor beside the tree) the toolbar wraps inside its box and the Insert menu stays reachable" do
+    page.driver.resize(1100, 1000)
+    page_record = create_page(title: "About")
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
+      translations: { "en" => { body: rich_doc("Hello **there**") } }).record
+    visit "/cs-studio/pages/#{page_record.id}?locale=de"
+    await_editors
+    assert_selector "[data-original-for='body']"
+
+    spill = page.evaluate_script(<<~JS)
+      (() => {
+        const toolbar = document.querySelector("#block-#{block.id} [role=toolbar], [role=toolbar]")
+        const original = document.querySelector("[data-original-for='body']").parentElement
+        const t = toolbar.getBoundingClientRect(), o = original.getBoundingClientRect()
+        const inside = Array.from(toolbar.querySelectorAll("button")).filter((b) => b.offsetParent).every((b) => {
+          const r = b.getBoundingClientRect()
+          return r.right <= t.right + 0.5 && r.left >= t.left - 0.5
+        })
+        return { inside, clear: t.right <= o.left + 0.5 }
+      })()
+    JS
+    assert spill["inside"], "a toolbar tool sits outside the toolbar's box"
+    assert spill["clear"], "the toolbar runs into the original's panel"
+    find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
+    assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "in a translation the toolbar is one row and the Insert menu opens and runs YouTube" do
     page.driver.resize(1400, 1000)
     @post.assign_body(rich_doc("Hello **there**"), locale: :en)

@@ -24,17 +24,20 @@
           `data-field-name`'s concern. %>
       <%= tag.input type: "hidden", name: html_name, id: "#{id}-json", value: json_value, data: { "admin--rich-text-target": "input" } %>
 
-      <%# One non-wrapping row (design pass round 1, bug 5): grouped tools with
-          separators, and an Insert menu for everything that inserts. No
+      <%# One row whenever it fits (design pass round 1, bug 5): grouped tools
+          with separators, and an Insert menu for everything that inserts. No
           `overflow-x-auto` -- an overflow container would clip the menu's
-          absolutely positioned panel -- so the grouping itself has to fit.
+          absolutely positioned panel -- so a column too narrow for the whole row
+          (a translation field beside its original, in the page editor under the
+          tree column) wraps whole groups onto a second row (`flex-wrap`, and
+          groups are `shrink-0`) instead of spilling over its neighbour.
           Children stretch (`items-stretch`) so every one shares the
           row's top edge; the separators are full-height boxes whose rule is clipped to their
           content box (`bg-clip-content` + `py-1`), shorter than the row without a margin that
           would shift their top. Choosing a menu item closes the menu (`admin--menu#close`) before the
           command runs; the command then moves focus (editor or popover). %>
       <div role="toolbar" aria-label="<%= name.to_s.humanize %> formatting" aria-controls="<%= editor_id %>"
-           class="flex flex-nowrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
+           class="flex flex-wrap items-stretch gap-0.5 rounded-t-cs border border-b-0 border-line-strong bg-sunken p-1"
            data-action="mousedown->admin--rich-text#keepFocus">
         <% toolbar_groups.each do |group| %>
           <div role="group" class="flex shrink-0 items-center gap-0.5">
