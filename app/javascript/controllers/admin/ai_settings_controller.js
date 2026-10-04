@@ -35,12 +35,34 @@ export default class extends Controller {
       this.refresh()
     }
     document.addEventListener("admin--save-bar:state", this.onState)
+    // The test's own submission. `admin--busy` (on the test form) disables the
+    // button for the flight and, when the answer lands, puts it back ENABLED
+    // from a snapshot -- which would undo this gate (a Model edited during the
+    // flight, a refresh() that re-enabled it for a second concurrent provider
+    // call). So the flight is tracked here, counts as a reason to be disabled,
+    // and the gate is re-applied in a microtask after `submit-end`, once busy's
+    // own handler has run.
+    this.testing = false
+    this.onSubmitStart = (event) => {
+      if (event.target.id !== "settings-ai-test-form") return
+      this.testing = true
+      this.refresh()
+    }
+    this.onSubmitEnd = (event) => {
+      if (event.target.id !== "settings-ai-test-form") return
+      this.testing = false
+      queueMicrotask(() => this.refresh())
+    }
+    document.addEventListener("turbo:submit-start", this.onSubmitStart)
+    document.addEventListener("turbo:submit-end", this.onSubmitEnd)
     this.refresh()
     document.dispatchEvent(new CustomEvent("admin--save-bar:query"))
   }
 
   disconnect() {
     document.removeEventListener("admin--save-bar:state", this.onState)
+    document.removeEventListener("turbo:submit-start", this.onSubmitStart)
+    document.removeEventListener("turbo:submit-end", this.onSubmitEnd)
   }
 
   edit() {
@@ -53,6 +75,11 @@ export default class extends Controller {
     this.inputTarget.value = ""
     this.entryTarget.hidden = true
     this.chipTarget.hidden = false
+    // A refusal ("Enter the API key first.") belongs to the entry just closed.
+    const errors = this.element.querySelector("#settings-ai-key-errors")
+    if (errors) errors.replaceChildren()
+    this.inputTarget.removeAttribute("aria-invalid")
+    this.inputTarget.removeAttribute("aria-describedby")
   }
 
   get changed() {
@@ -63,7 +90,7 @@ export default class extends Controller {
     if (!this.hasTestTarget) return
     const changed = this.changed
     const hint = changed ? SPECIFIC_HINT : this.pending ? PENDING_HINT : ""
-    this.testTarget.disabled = changed || this.pending
+    this.testTarget.disabled = changed || this.pending || this.testing
     if (this.hasTestHintTarget) {
       this.testHintTarget.textContent = hint
       this.testHintTarget.hidden = hint === ""

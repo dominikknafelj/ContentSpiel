@@ -69,6 +69,9 @@ module Admin
       ]
       streams << turbo_stream.replace("settings-base-updated-at", partial: "admin/shared/base_updated_at_field",
         locals: { id: "settings-base-updated-at", value: moved_to }) if moved_to
+      # A successful key write makes a shown "CONNECTED · N MS" stale (it was
+      # measured against the key just replaced or removed): back to the empty slot.
+      streams << turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: notice, kind: :success)) if notice
       streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: error, kind: :error)) if toast && error
       render turbo_stream: streams, status: status

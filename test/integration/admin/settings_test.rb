@@ -398,6 +398,21 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a key REMOVE from a stale form, or with a blank base, moves nothing" do
+    @site.update!(ai_api_key: "sk-ant-to-remove")
+    stale = base
+    save translations(en: { title: "Other tab" })
+    @site.reload.update!(ai_api_key: "sk-ant-to-remove")
+    [ stale, "" ].each do |carried|
+      @site.update!(ai_api_key: "sk-ant-to-remove") unless @site.reload.ai_api_key_set?
+      delete "/cs-studio/settings/ai_key", params: { main_base_updated_at: carried }, as: :turbo_stream
+
+      assert_response :success
+      assert_nil @site.reload.ai_api_key
+      assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
+    end
+  end
+
   test "a blank or unparseable base is not stale" do
     patch "/cs-studio/settings", params: { site_setting: translations(en: { title: "No base" }) }
     assert_response :see_other

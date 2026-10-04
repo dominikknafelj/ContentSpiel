@@ -158,7 +158,12 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=append][target=toasts]", /API key saved/
     # Only the key component and its forms are replaced: the main form's fields are left alone.
     assert_select "turbo-stream[action=replace]" do |streams|
-      assert_equal %w[settings-ai-key settings-ai-key-forms settings-base-updated-at], streams.map { |stream| stream["target"] }.sort
+      assert_equal %w[settings-ai-key settings-ai-key-forms settings-ai-test-result settings-base-updated-at], streams.map { |stream| stream["target"] }.sort
+    end
+    # The replaced forms keep their own wrapper id (or a second action would find no target)
+    # and carry the moved base for the next press.
+    assert_select "turbo-stream[target=settings-ai-key-forms] template > div#settings-ai-key-forms" do
+      assert_select "input[name=main_base_updated_at][value=?]", @site.updated_at.iso8601(6)
     end
     # The main form's base moves with the key write, or its next Save would look stale.
     assert_select "turbo-stream[target='settings-base-updated-at'] input[value=?]", @site.updated_at.iso8601(6)
@@ -181,6 +186,35 @@ class Admin::AISettingsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
     assert_equal KEY, @site.reload.ai_api_key
     assert_equal before, @site.updated_at
+  end
+
+  test "two key answers in a row: the second one's forms carry what the first moved the base to" do
+    save_key(KEY)
+    first = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-base-updated-at] input")["value"]
+    assert_equal @site.reload.updated_at.iso8601(6), first
+
+    # What the page now holds: the forms the first answer rendered, no page load between.
+    patch "/cs-studio/settings/ai_key", params: { site_setting: { ai_api_key: "sk-ant-second" }, main_base_updated_at: first }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[target=settings-ai-key-forms] template > div#settings-ai-key-forms"
+    assert_select "turbo-stream[target=settings-base-updated-at] input[value=?]", @site.reload.updated_at.iso8601(6)
+    assert_equal "sk-ant-second", @site.ai_api_key
+  end
+
+  test "a whitespace-only key is refused like a blank one" do
+    save_key("   ")
+
+    assert_response :unprocessable_entity
+    assert_select_in_stream "settings-ai-key", /Enter the API key first/
+    assert_nil @site.reload.ai_api_key
+  end
+
+  test "a successful key write resets the test result slot" do
+    save_key(KEY)
+
+    assert_select "turbo-stream[target=settings-ai-test-result]"
+    assert_not_includes Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target=settings-ai-test-result]").text, "CONNECTED"
   end
 
   test "a key save from a user without settings.manage is refused" do
