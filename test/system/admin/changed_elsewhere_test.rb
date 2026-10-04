@@ -89,4 +89,46 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_eventually { @page.reload.subtitle == "After add" }
     assert_no_text "CHANGED ELSEWHERE"
   end
+
+  # A held Turbo submission that is aborted (a double press: the second
+  # submission cancels the first) must give its queue slot back at once, not
+  # after the 30 s safety limit -- or every save on the screen stalls.
+  test "a double-pressed Add block does not stall the autosaves behind it" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    fill_in id: "block-#{block.id}-caption", with: "Saving as the next button is pressed"
+    # One tick: blur (the caption save is queued and goes out), then two
+    # submissions of the picker button. The first is held behind the save, the
+    # second makes Turbo abort the first.
+    page.execute_script(<<~JS)
+      document.activeElement.blur()
+      const button = Array.from(document.querySelectorAll("button")).find((b) => b.textContent.trim() === "Rich text")
+      button.click()
+      button.click()
+    JS
+
+    fill_in "Subtitle", with: "Saved promptly"
+    assert_eventually(wait: 6) { @page.reload.subtitle == "Saved promptly" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # Publish waits for the queue: an edit still queued behind another form's
+  # request is saved first, and the action then runs on the fresh state.
+  test "pressing Publish right after typing saves the typed value and publishes, with no conflict" do
+    draft = create_page(title: "Draft", published: false)
+    block = draft.content_blocks.create!(block_type: :image, position: 0)
+    visit "/cs-studio/pages/#{draft.id}"
+    await_admin_controllers
+
+    fill_in id: "block-#{block.id}-caption", with: "A caption"
+    fill_in "Subtitle", with: "Typed just before Publish"
+    press "Publish"
+
+    assert_eventually { draft.reload.published_at.present? }
+    assert_equal "Typed just before Publish", draft.subtitle
+    assert_equal "A caption", block.reload.caption
+    assert_no_text "CHANGED ELSEWHERE"
+  end
 end

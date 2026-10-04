@@ -24,7 +24,7 @@
       <% end %>
 
       <% if can_publish? %>
-        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top" } } %>
+        <%= button_to primary_label, publish_url, method: :post, class: setup_primary_button_class, form: { data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "turbo:before-fetch-request->admin--queue-hold#hold" } } %>
       <% end %>
 
       <% if can_edit_schedule? %>
@@ -121,7 +121,7 @@
 <% if can_unpublish? %>
   <%= render Admin::ConfirmDialogComponent.new(id: unpublish_dialog_id, title: "Unpublish this #{type}?", body: unpublish_dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
-      <%= form_with url: unpublish_url, method: :post, data: { turbo_frame: "_top" } do %>
+      <%= form_with url: unpublish_url, method: :post, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "turbo:before-fetch-request->admin--queue-hold#hold" } do %>
         <%= render Admin::ButtonComponent.new(label: "Unpublish", variant: :primary, type: "submit") %>
       <% end %>
     <% end %>
@@ -131,7 +131,7 @@
 <% if may_delete? && can_delete? %>
   <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this #{type} to the trash?", body: delete_dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>
-      <%= form_with url: record_url, method: :delete, data: { turbo_frame: "_top" } do %>
+      <%= form_with url: record_url, method: :delete, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "turbo:before-fetch-request->admin--queue-hold#hold" } do %>
         <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
       <% end %>
     <% end %>

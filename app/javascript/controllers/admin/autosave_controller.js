@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import { enqueue, syncBases } from "autosave/queue"
+import { CANCELLED, enqueue, syncBases } from "autosave/queue"
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -92,12 +92,24 @@ export default class extends Controller {
 
   disconnect() {
     if (this.timer) clearTimeout(this.timer)
+    // A pending retry belongs to a form that is gone (the page changed under
+    // it): it must not re-enter the queue on the next page.
+    if (this.retryTimer) clearTimeout(this.retryTimer)
   }
 
   queue() {
     if (this.paused) return
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
+  }
+
+  // `autosave:flush` (dispatched on `document` by `admin--queue-hold` just
+  // before a header action is held): an edit still inside its debounce is
+  // sent now, so it is queued AHEAD of that action. Pressing a button
+  // normally blurs the field first (`focusout` -> `saveNow`), but not on
+  // every path (a keyboard-activated or programmatic click).
+  flush() {
+    if (this.timer) this.saveNow()
   }
 
   saveNow() {
@@ -130,10 +142,21 @@ export default class extends Controller {
     const status = document.getElementById(this.statusIdValue)
     this.setStatus(status && status.hasAttribute("data-live") ? this.constructor.texts.savingLive : this.constructor.texts.saving)
 
-    const outcome = await enqueue(() => this.send())
+    const outcome = await enqueue((isCurrent) => this.send(isCurrent))
 
     switch (outcome) {
+      case CANCELLED:
+      case "stale":
+        // The page changed while this save waited or was in flight (a
+        // visit, a Reload): its form is gone and the answer belongs to no
+        // live document. Nothing to retry, report or render.
+        this.busy = false
+        return
       case "retry":
+        if (!this.element.isConnected) {
+          this.busy = false
+          return
+        }
         this.scheduleRetry()
         return
       case "signedOut":
@@ -173,9 +196,12 @@ export default class extends Controller {
   }
 
   // The request, run alone by the queue. Returns "done" (a real answer was
-  // received and rendered), "conflict" (a 409, rendered), "signedOut" or
-  // "retry". It never throws.
-  async send() {
+  // received and rendered), "conflict" (a 409, rendered), "signedOut",
+  // "retry", or "stale" (the page changed while it was in flight: nothing
+  // rendered). It never throws: the body read is inside a `try` too, since the
+  // 30 s timeout also aborts a body still being read, and a rejection there
+  // would leave `busy` set -- that form reading "Saving…" and never saving again.
+  async send(isCurrent) {
     let response
     try {
       response = await fetch(this.element.action, {
@@ -219,7 +245,17 @@ export default class extends Controller {
     // `Turbo.renderStreamMessage` as if it were one.
     if (!this.isTurboStreamAnswer(response)) return "retry"
 
-    const text = await response.text()
+    let text
+    try {
+      text = await response.text()
+    } catch (error) {
+      return "retry"
+    }
+
+    // The page changed while the answer was on its way: its bases and
+    // streams belong to a document that is gone (the new one has fields with
+    // the same ids).
+    if (!isCurrent()) return "stale"
 
     if (response.status === 409) {
       Turbo.renderStreamMessage(text)
@@ -280,7 +316,7 @@ export default class extends Controller {
     // `busy` stays true across the wait: an edit that lands mid-backoff
     // still only ever queues (see the class comment above), it doesn't
     // jump the line and fire its own request ahead of the scheduled retry.
-    setTimeout(() => this.attempt(), delay)
+    this.retryTimer = setTimeout(() => this.attempt(), delay)
   }
 
   // True for exactly the responses this controller's own PATCH endpoints

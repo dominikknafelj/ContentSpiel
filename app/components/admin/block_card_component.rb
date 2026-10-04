@@ -63,7 +63,7 @@ module Admin
 
       {
         controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow autosave:flush@document->admin--autosave#flush",
         "admin--autosave-status-id-value": status_id,
         "admin--autosave-page-base-id-value": "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
       }

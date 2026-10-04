@@ -155,7 +155,7 @@ export default class extends Controller {
   async reorder() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    await enqueue(async () => {
+    await enqueue(async (isCurrent) => {
       const response = await fetch(this.reorderUrlValue, {
         method: "PATCH",
         headers: {
@@ -169,6 +169,7 @@ export default class extends Controller {
       })
 
       const text = await response.text()
+      if (!isCurrent()) return
       syncBases(text, [ this.constructor.pageBaseId ])
       Turbo.renderStreamMessage(text)
     }).catch(() => {})
