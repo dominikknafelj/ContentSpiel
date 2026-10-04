@@ -22,7 +22,7 @@ module Admin
     # tree column and the sidebar's Trash badge showing what they showed
     # before. A full-page visit re-renders them for free.
     #
-    # The dialogs (unpublish, delete) are siblings AFTER the `<header>`, not
+    # The dialogs (schedule, unpublish, delete) are siblings AFTER the `<header>`, not
     # inside it: the header is sticky with its own stacking context, and a
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
