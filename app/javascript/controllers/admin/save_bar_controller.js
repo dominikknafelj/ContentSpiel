@@ -121,16 +121,26 @@ export default class extends Controller {
 
   get unsaved() { return this.dirtyValue || this.changes > 0 }
 
+  // What the form would SUBMIT, not what its controls look like: a disabled
+  // control and an unticked checkbox are both simply absent. That matters
+  // because other controllers inside the form adjust controls on connect --
+  // `admin--branch-picker` ticks and disables every box under a chosen
+  // branch -- and on a Turbo frame navigation this controller connects (and
+  // takes its baseline) *before* they run. Recording a checkbox's `checked`
+  // as such made an untouched group form count "1 unsaved change" and ask
+  // before leaving; a box that is ticked-and-disabled submits exactly what an
+  // unticked one does, so baseline and later snapshots now agree whatever the
+  // connect order.
   snapshot() {
     const values = {}
     for (const field of this.element.elements) {
-      if (!field.name || field.type === "hidden" || field.type === "submit") continue
+      if (!field.name || field.disabled || field.type === "hidden" || field.type === "submit") continue
       if (field.type === "radio") {
         // One value per group: flipping a radio is one change, not two.
         if (field.checked) values[field.name] = field.value
         else values[field.name] ??= ""
       } else if (field.type === "checkbox") {
-        values[`${field.name}=${field.value}`] = String(field.checked)
+        if (field.checked) values[`${field.name}=${field.value}`] = "on"
       } else {
         values[field.name] = field.value
       }

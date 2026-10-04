@@ -67,6 +67,34 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector "dialog#leave-dialog[open]"
   end
 
+  # Reached through the Groups LIST, i.e. a Turbo *frame* navigation: the
+  # form's `admin--save-bar` then connects (and takes its baseline) before the
+  # nested `admin--branch-picker` has ticked and disabled the boxes a chosen
+  # branch implies. The baseline has to describe what would be submitted --
+  # a disabled box and an unticked one are both simply absent -- or the
+  # untouched form counts one change and the sidebar asks "Leave without
+  # saving?". Every other test here uses a direct `visit`, where the order
+  # happens to come out right, which is how this once slipped through.
+  test "a group with a branch grant, opened from the list, has nothing unsaved" do
+    about = create_page(title: "About")
+    create_page(title: "Team", parent: about)
+    group = AccessControl::Group.create!(name: "About editors")
+    group.grants.create!(permission: "pages.edit", scope: { "page_ids" => [ about.id ] })
+
+    sign_in_via_form(@owner)
+    visit admin_groups_path
+    await_admin_controllers
+    within("##{ActionView::RecordIdentifier.dom_id(group)}") { click_link "Edit" }
+
+    assert_field "Name", with: "About editors"
+    assert_selector "[data-permission='pages.edit'] input[type=checkbox][disabled]", visible: :all
+    assert_no_selector ".admin-save-bar"
+
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_current_path admin_posts_path
+    assert_no_selector "dialog#leave-dialog[open]"
+  end
+
   test "the two account forms share one Leave prompt and stack their bars" do
     sign_in_via_form(@owner)
     visit admin_account_password_path
