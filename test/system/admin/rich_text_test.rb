@@ -182,12 +182,13 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_no_text_in_editor "there"
   end
 
-  # The page editor sits beside the tree, so at 1100px a translation's editor
-  # gets a column too narrow for the toolbar's single row. There the toolbar
-  # wraps -- whole groups at a time -- but stays inside its own box: no tool
-  # pokes out sideways or runs into the original's panel next to it, and the
-  # Insert menu still opens.
-  test "in a narrow translation column (page editor beside the tree) the toolbar wraps inside its box and the Insert menu stays reachable" do
+  # The page editor sits beside the tree, so at 1100px a block card's form is
+  # under 880px wide: the original (reference card) stacks ABOVE the editor
+  # (design pass round 2, Task 7), which leaves the toolbar the whole column.
+  # It stays inside its own box -- no tool pokes out sideways, and the
+  # original is above it, not beside it -- and the Insert menu still opens.
+  # (Round 1's `flex-wrap` remains the fallback for a column narrower still.)
+  test "in a narrow translation column (page editor beside the tree) the original stacks above the toolbar, which stays inside its box, and the Insert menu stays reachable" do
     page.driver.resize(1100, 1000)
     page_record = create_page(title: "About")
     block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "rich_text" },
@@ -199,17 +200,17 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     spill = page.evaluate_script(<<~JS)
       (() => {
         const toolbar = document.querySelector("#block-#{block.id} [role=toolbar], [role=toolbar]")
-        const original = document.querySelector("[data-original-for='body']").parentElement
+        const original = document.querySelector("[data-original-for='body']")
         const t = toolbar.getBoundingClientRect(), o = original.getBoundingClientRect()
         const inside = Array.from(toolbar.querySelectorAll("button")).filter((b) => b.offsetParent).every((b) => {
           const r = b.getBoundingClientRect()
           return r.right <= t.right + 0.5 && r.left >= t.left - 0.5
         })
-        return { inside, clear: t.right <= o.left + 0.5 }
+        return { inside, clear: o.bottom <= t.top + 0.5 }
       })()
     JS
     assert spill["inside"], "a toolbar tool sits outside the toolbar's box"
-    assert spill["clear"], "the toolbar runs into the original's panel"
+    assert spill["clear"], "the original should stack above the toolbar, not overlap it"
     find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
     assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
   ensure
