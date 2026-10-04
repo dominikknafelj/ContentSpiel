@@ -101,11 +101,17 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
           const r = t.getBoundingClientRect()
           return r.left < box.left - 1 || r.right > box.right + 1
         }).length
-        return { width: box.width, outside, labelsOutside }
+        const main = document.querySelector("main").getBoundingClientRect()
+        return { width: box.width, mainWidth: main.width, bottom: box.bottom, viewport: window.innerHeight, outside, labelsOutside }
       })()
     JS
     result = page.evaluate_script(inside_box)
-    assert_operator result["width"], :<=, 960
+    # The box fills the view: (almost) the whole content column wide --
+    # main's width minus its padding and the box's border -- and it ends
+    # inside the window, so the graph is visible without scrolling.
+    assert_operator result["width"], :>=, result["mainWidth"] - 60
+    assert_operator result["width"], :<=, result["mainWidth"]
+    assert_operator result["bottom"], :<=, result["viewport"]
     assert_equal 0, result["outside"]
     assert_equal 0, result["labelsOutside"]
 

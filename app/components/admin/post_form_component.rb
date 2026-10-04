@@ -42,7 +42,7 @@ module Admin
     # message the spec calls for verbatim.
     def public_path = urls.path_for(post, locale)
 
-    def public_url = urls.url_for(post, locale)
+    def public_url = absolute_urls.url_for(post, locale)
 
     def preview_path = preview_urls.path_for(post, locale)
 
@@ -177,11 +177,15 @@ module Admin
 
     attr_reader :post, :locale, :url_options
 
+    def urls = PublicSite::Urls.new
+
     # Absolute addresses (the "Copy" button) use the configured public
     # origin, or -- with none configured, as on a local checkout -- the
     # origin this very request came in on, which is where the site is
-    # actually being served.
-    def urls = PublicSite::Urls.new(host: PublicSite::Urls.configured_host || helpers.request.base_url)
+    # actually being served. Its own instance, separate from `urls`:
+    # reading the request needs the view context, which the path readers
+    # above (also called outside a render, e.g. `slug_base_url`) must not.
+    def absolute_urls = PublicSite::Urls.new(host: PublicSite::Urls.configured_host || helpers.request.base_url)
 
     def preview_urls = PublicSite::Urls.new(preview: true)
 
