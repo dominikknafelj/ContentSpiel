@@ -75,7 +75,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
 
     # "Used on" lists all three places.
-    visit "/cs-studio/media/#{@asset.id}"
+    visit "/cs-studio/media?selected=#{@asset.id}"
     assert_link "Hero image — page “Landing”"
     assert_link "Image block — page “Landing”"
     assert_link "Rich text — post “Notes” (en)"
@@ -86,7 +86,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     within("#page-hero-image-section") { assert_button "Choose image" }
     assert_eventually { @landing.reload.hero_media_asset_id.nil? }
 
-    visit "/cs-studio/media/#{@asset.id}"
+    visit "/cs-studio/media?selected=#{@asset.id}"
     assert_link "Image block — page “Landing”"
     assert_no_link "Hero image — page “Landing”"
     assert Media::Asset.exists?(@asset.id)

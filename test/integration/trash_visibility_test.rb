@@ -202,6 +202,36 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert @gone_asset.reload.trashed?
   end
 
+  test "the media grid's Missing alt and Untranslated segments and every segment count hide a trashed image" do
+    with_locales(%w[en de], default: "en")
+    # Both images are missing alt AND, once given an English alt, untranslated:
+    # only the trashed one must be left out of each list and each number.
+    [ @kept_asset, @gone_asset ].each { |asset| assert Media::Save.call(asset, translations: { "en" => { alt: "Sand" } }, actor: users(:one)).ok? }
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { filter: "untranslated" }
+    assert_response :success
+    assert_select "#media-asset-#{@kept_asset.id}"
+    assert_select "#media-asset-#{@gone_asset.id}", count: 0
+    assert_select "#media-count-untranslated", text: "1"
+
+    Media::Save.call(@kept_asset, translations: { "en" => { alt: "" } }, actor: users(:one))
+    @gone_asset.update_columns(alt: {})
+    get "/cs-studio/media", params: { filter: "missing_alt" }
+    assert_select "#media-asset-#{@kept_asset.id}"
+    assert_select "#media-asset-#{@gone_asset.id}", count: 0
+
+    get "/cs-studio/media"
+    assert_select "#media-count-all", text: "1"
+    assert_select "#media-count-unused", text: "1"
+    assert_select "#media-count-missing_alt", text: "1"
+    assert_equal({ all: 1, unused: 1, missing_alt: 1, untranslated: 0, mine: 0 }, Media::Search.new(actor: users(:one)).counts)
+
+    # And the panel: a trashed image is not selectable.
+    get "/cs-studio/media", params: { selected: @gone_asset.id }
+    assert_response :not_found
+  end
+
   test "the ⌘K jump palette lists kept pages, posts and images and never trashed ones" do
     # Distinct titles so a match proves which record answered: the setup's
     # kept and trashed records are titled "Kept ..."/"Gone ..." (images
@@ -214,13 +244,13 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", "/cs-studio/pages/#{@kept_page.id}"
     assert_select "a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
-    assert_select "a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
+    assert_select "a[href=?]", "/cs-studio/media?selected=#{@kept_asset.id}"
 
     get "/cs-studio/jump", params: { q: "gone" }
     assert_response :success
     assert_select "a[href=?]", "/cs-studio/pages/#{@gone_page.id}", count: 0
     assert_select "a[href=?]", "/cs-studio/posts/#{@gone_post.id}", count: 0
-    assert_select "a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_select "a[href=?]", "/cs-studio/media?selected=#{@gone_asset.id}", count: 0
     assert_select "p", text: /No results for/
   end
 
@@ -247,8 +277,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
-    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
-    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media?selected=#{@kept_asset.id}"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media?selected=#{@gone_asset.id}", count: 0
     assert_no_match "Gone post", response.body
     assert_no_match "Gone page", response.body
     assert_no_match "Gone draft", response.body

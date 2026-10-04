@@ -67,7 +67,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
       assert_select "form input[type=hidden][name=picker][value='1']"
       assert_select "form input[type=hidden][name=locale][value='de']"
       assert_select "button[data-action='admin--media-picker#pick']", count: 1
-      assert_select "a[href='/cs-studio/media/#{asset.id}']", count: 0
+      assert_select "a[href*='selected=#{asset.id}']", count: 0
     end
     payload = JSON.parse(css_select("button[data-action='admin--media-picker#pick']").first["data-admin--media-picker-asset-param"])
     assert_equal({ "id" => asset.id, "url" => asset.src, "title" => asset.title, "alt" => "Ein Hund", "caption" => "Unser Hund" }, payload)
@@ -237,13 +237,13 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     asset = upload_asset(filename: "stale.png")
     Media::Usage.insert_all([ { media_asset_id: asset.id, owner_type: "Page", owner_id: 0, role: "hero", locale: nil } ])
 
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
 
     assert_response :success
     assert_not_includes response.body, "Not used anywhere yet."
     assert_includes response.body, "Used somewhere that can’t be shown"
-    assert_select "button[disabled]", text: "Move to trash", count: 0
-    assert_select "button", text: "Move to trash"
+    assert_select "button[disabled]", text: "Move to trash…", count: 0
+    assert_select "button", text: "Move to trash…"
   end
 
   # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
@@ -262,19 +262,19 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     # session pays a one-off query `Setup::RedirectConstraint` only ever
     # runs once, which would otherwise make whichever count below happens
     # to go first look one query more expensive than the other.
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
     assert_response :success
 
     one_count = many_count = nil
     ActiveRecord::Base.uncached do
-      one_count = count_queries { get "/cs-studio/media/#{asset.id}" }
+      one_count = count_queries { get "/cs-studio/media", params: { selected: asset.id } }
       assert_response :success
     end
 
     5.times { |i| add_image_block(asset, page_title: "Page #{i}") }
 
     ActiveRecord::Base.uncached do
-      many_count = count_queries { get "/cs-studio/media/#{asset.id}" }
+      many_count = count_queries { get "/cs-studio/media", params: { selected: asset.id } }
       assert_response :success
     end
 
@@ -290,7 +290,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     result = Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
     assert result.ok?, result.errors.to_sentence
 
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
 
     assert_response :success
     assert_select "a[href*='/cs-studio/pages/#{page.id}']", text: /Hero image/
@@ -308,7 +308,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert result.ok?, result.errors.to_sentence
 
     sign_in_as(viewer)
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
 
     assert_response :success
     assert_select "a[href*='/cs-studio/pages/']", count: 0
@@ -322,10 +322,10 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     result = Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id })
     assert result.ok?, result.errors.to_sentence
 
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
 
     assert_response :success
-    assert_select "button[disabled]", text: "Move to trash"
+    assert_select "button[disabled]", text: "Move to trash…"
     assert_select "#media-trash-help", text: /In use on 1 page\. Remove it there first\./
   end
 
@@ -349,7 +349,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "form[action='#{undo_url}'] button", text: "Undo"
 
     post undo_url
-    assert_redirected_to "/cs-studio/media/#{asset.id}"
+    assert_redirected_to "/cs-studio/media?selected=#{asset.id}"
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
@@ -370,7 +370,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_no_difference -> { Media::Asset.count } do
       delete "/cs-studio/media/#{asset.id}"
     end
-    assert_redirected_to "/cs-studio/media/#{asset.id}"
+    assert_redirected_to "/cs-studio/media?selected=#{asset.id}"
     assert_not asset.reload.trashed?
     follow_redirect!
     assert_response :success
@@ -418,9 +418,13 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     asset = upload_asset(filename: "hero.png", actor: owner)
 
     sign_in_as(users(:author))
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
     assert_response :success
-    assert_select "fieldset[disabled]"
+    # Plain text, not disabled inputs (handoff B19): no form, no trash, the hint.
+    assert_select "#media-panel form", count: 0
+    assert_select "#media-panel input, #media-panel textarea", count: 0
+    assert_select "#media-panel button", text: /Move to trash/, count: 0
+    assert_select "#media-panel", text: /Only the uploader or a media manager can edit this image\./
 
     patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Hack" } }, as: :turbo_stream
     assert_response :forbidden
@@ -431,15 +435,214 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     asset = upload_asset(filename: "hero.png", actor: users(:author))
     sign_in_as(users(:author))
 
-    get "/cs-studio/media/#{asset.id}"
+    get "/cs-studio/media", params: { selected: asset.id }
     assert_response :success
-    assert_select "fieldset[disabled]", count: 0
+    assert_select "#media-panel form input[name='media_asset[title]']"
+    assert_select "#media-panel", text: /Only the uploader or a media manager can edit/, count: 0
 
     patch "/cs-studio/media/#{asset.id}",
       params: { media_asset: { title: "Mine to edit", alt: "", caption: "" }, base_updated_at: asset.updated_at.iso8601(6) },
       as: :turbo_stream
     assert_response :success
     assert_equal "Mine to edit", asset.reload.title
+  end
+
+  # --- Round 3, Task 8: the grid with a side panel ----------------------------
+
+  test "GET /media/:id redirects to the panel, keeping the language" do
+    sign_in_as(users(:one))
+    with_locales(%w[en de], default: "en")
+    asset = upload_asset
+
+    get "/cs-studio/media/#{asset.id}"
+    assert_redirected_to "/cs-studio/media?selected=#{asset.id}"
+
+    get "/cs-studio/media/#{asset.id}", params: { locale: "de" }
+    assert_redirected_to "/cs-studio/media?locale=de&selected=#{asset.id}"
+  end
+
+  test "a trashed or missing image is a 404 as /media/:id and as ?selected=, never a grid with no panel" do
+    sign_in_as(users(:one))
+    gone = upload_asset(filename: "gone.png")
+    gone.update!(trashed_at: Time.current)
+
+    get "/cs-studio/media/#{gone.id}"
+    assert_response :not_found
+    get "/cs-studio/media", params: { selected: gone.id }
+    assert_response :not_found
+    get "/cs-studio/media", params: { selected: 0 }
+    assert_response :not_found
+    get "/cs-studio/media", params: { selected: "nonsense" }
+    assert_response :not_found
+    get "/cs-studio/media?selected[]=1"
+    assert_response :not_found
+
+    get "/cs-studio/media", params: { selected: "" }
+    assert_response :success
+    assert_select "#media-panel", count: 0
+  end
+
+  test "?selected= renders the panel with the autosave form beside the grid, and the grid alone without it" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "sel.png")
+    other = upload_asset(filename: "other.png")
+
+    get "/cs-studio/media"
+    assert_select "#media-panel", count: 0
+    assert_select "#media-asset-#{asset.id} a[aria-current]", count: 0
+
+    get "/cs-studio/media", params: { selected: asset.id, q: "sel", filter: "unused", page: 1 }
+    assert_response :success
+    assert_select "aside #media-panel form[data-controller='admin--autosave'][action^='/cs-studio/media/#{asset.id}?']"
+    assert_select "#media-panel form input[name='media_asset[alt]']"
+    assert_select "#media-panel #media-save-status"
+    assert_select "#media-asset-#{asset.id} a[aria-current='true']"
+    assert_select "#media-asset-#{other.id}", count: 0 # the search still narrows the grid
+    # The tile links keep the grid's state and advance the content frame.
+    assert_select "#media-asset-#{asset.id} a[href=?][data-turbo-frame=content][data-turbo-action=advance]",
+      "/cs-studio/media?filter=unused&page=1&q=sel&selected=#{asset.id}"
+  end
+
+  test "the panel shows the image even when the segment would not list it" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+    Media::Save.call(asset, translations: { "en" => { alt: "Has alt" } })
+
+    get "/cs-studio/media", params: { selected: asset.id, filter: "missing_alt" }
+
+    assert_response :success
+    assert_select "#media-panel"
+    assert_select "#media-asset-#{asset.id}", count: 0
+  end
+
+  test "the toolbar shows five segments with counts that respect the search but not the segment" do
+    sign_in_as(users(:one))
+    with_locales(%w[en de], default: "en")
+    with_alt = upload_asset(filename: "with-alt.png", actor: users(:two))
+    Media::Save.call(with_alt, translations: { "en" => { alt: "Sand" }, "de" => { alt: "Sand" } })
+    upload_asset(filename: "without.png", actor: users(:two))
+    mine = upload_asset(filename: "mine.png", actor: users(:one))
+    upload_asset(filename: "theirs.png", actor: users(:two))
+
+    get "/cs-studio/media", params: { filter: "unused" }
+
+    assert_select "#media-count-all", text: "4"
+    assert_select "#media-count-unused", text: "4"
+    assert_select "#media-count-missing_alt", text: "3"
+    assert_select "#media-count-mine", text: "1"
+    assert_select "input#media-filter-unused[checked]"
+    assert_select "input[name=filter]", count: 5
+
+    get "/cs-studio/media", params: { q: "mine" }
+    assert_select "#media-count-all", text: "1"
+    assert_select "#media-asset-#{mine.id}"
+  end
+
+  test "Untranslated is not a segment on a one-language site" do
+    sign_in_as(users(:one))
+    with_locales(%w[en], default: "en")
+    upload_asset
+
+    get "/cs-studio/media", params: { filter: "untranslated" }
+
+    assert_response :success
+    assert_select "input[name=filter]", count: 4
+    assert_select "input#media-filter-all[checked]"
+  end
+
+  test "a tile carries NO ALT while the default-language alt is empty, and UNUSED while nothing uses it" do
+    sign_in_as(users(:one))
+    bare = upload_asset(filename: "bare.png")
+    covered = upload_asset(filename: "covered.png")
+    Media::Save.call(covered, translations: { "en" => { alt: "Covered" } })
+    page = create_page(title: "Hero page")
+    assert Pages::Save.call(page, attributes: { hero_media_asset_id: covered.id }).ok?
+
+    get "/cs-studio/media"
+
+    assert_select "#media-asset-#{bare.id}", text: /NO ALT/
+    assert_select "#media-asset-#{bare.id}", text: /UNUSED/
+    assert_select "#media-asset-#{covered.id}", text: /NO ALT/, count: 0
+    assert_select "#media-asset-#{covered.id}", text: /UNUSED/, count: 0
+  end
+
+  test "the grid's query count stays constant with the chips and counts" do
+    sign_in_as(users(:one))
+    10.times { |i| build_asset(filename: "few-#{i}.png") }
+    get "/cs-studio/media"
+    few = ActiveRecord::Base.uncached { count_queries { get "/cs-studio/media" } }
+
+    Media::Asset.delete_all
+    60.times { |i| build_asset(filename: "many-#{i}.png") }
+    many = ActiveRecord::Base.uncached { count_queries { get "/cs-studio/media" } }
+
+    assert_equal few, many
+  end
+
+  test "the panel's file facts, uploader and retention help" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "facts.png")
+
+    get "/cs-studio/media", params: { selected: asset.id }
+
+    assert_select "#media-panel", text: /image\/png/
+    assert_select "#media-panel", text: /#{Regexp.escape(users(:one).display_name)}/
+    assert_select "#media-trash-help", text: "Kept in Trash for 30 days."
+
+    site_settings(:default).update!(trash_retention_days: 0)
+    get "/cs-studio/media", params: { selected: asset.id }
+    assert_select "#media-trash-help", text: "Kept in Trash until someone empties it."
+  end
+
+  test "the panel's language tabs keep the selection and the grid's state" do
+    sign_in_as(users(:one))
+    with_locales(%w[en de], default: "en")
+    asset = upload_asset
+
+    get "/cs-studio/media", params: { selected: asset.id, filter: "unused", q: "tiny" }
+
+    assert_select "#media-panel nav[aria-label='Languages'] a[href=?]", "/cs-studio/media?filter=unused&locale=de&q=tiny&selected=#{asset.id}", text: "Deutsch"
+  end
+
+  test "an autosave in the panel answers with the tile and the counts, so nothing reloads under the editor" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "stream.png")
+
+    patch "/cs-studio/media/#{asset.id}?filter=missing_alt&q=stream",
+      params: { media_asset: { title: "Renamed", alt: "Now described", caption: "" }, base_updated_at: asset.updated_at.iso8601(6) },
+      as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template li a[aria-current='true']"
+    assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template", text: /Renamed/
+    assert_select "turbo-stream[action=replace][target='media-asset-#{asset.id}'] template", text: /NO ALT/, count: 0
+    assert_select "turbo-stream[action=update][target='media-count-missing_alt'] template", text: "0"
+    assert_select "turbo-stream[action=update][target='media-count-all'] template", text: "1"
+    assert_select "turbo-stream[action=update][target='media-panel-title'] template", text: "Renamed"
+    # The tile keeps the grid's state in its link.
+    assert_select "turbo-stream[target='media-asset-#{asset.id}'] a[href*='filter=missing_alt'][href*='selected=#{asset.id}']"
+  end
+
+  test "a refused save streams no tile or counts" do
+    sign_in_as(users(:author))
+    asset = upload_asset(actor: users(:two))
+
+    patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Hack" } }, as: :turbo_stream
+
+    assert_response :forbidden
+    assert_select "turbo-stream[target='media-asset-#{asset.id}']", count: 0
+    assert_select "turbo-stream[target='media-count-all']", count: 0
+  end
+
+  test "Undo after trashing lands back on the image's panel, keeping the language" do
+    sign_in_as(users(:one))
+    with_locales(%w[en de], default: "en")
+    asset = upload_asset
+    asset.update!(trashed_at: Time.current)
+
+    post admin_restore_trash_item_path("media", asset, from: "undo", locale: "de")
+
+    assert_redirected_to "/cs-studio/media?locale=de&selected=#{asset.id}"
   end
 
   test "several files upload successfully, one request per file" do

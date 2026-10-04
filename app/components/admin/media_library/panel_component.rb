@@ -2,10 +2,21 @@ module Admin
   # See `Admin::MediaLibrary::GridComponent`'s own class comment for why
   # this namespace is `MediaLibrary`, not `Media`.
   module MediaLibrary
-    # One image's detail panel (media library design spec §6): preview,
-    # type/size/dimensions, an autosaving title/alt/caption form (`Media
-    # ::Save`, alt/caption per locale via the standard language switcher),
-    # "Used on" and Delete.
+    # One image's side panel (round 3, Task 8, handoff §4.6 and B19; it replaced
+    # the detail page, `Admin::MediaController#show`, which now redirects to
+    # `/media?selected=ID`): the preview, the file's facts in mono, the
+    # language tabs, an autosaving title/alt/caption form (`Media::Save`,
+    # alt/caption per locale), "Used on" and Move to trash with its help text.
+    # The form is the detail page's own, moved: it saves through the write
+    # queue (`admin--autosave`) and its answer (`Admin::MediaController#update`)
+    # also moves the tile and the segment counts, so nothing reloads under the
+    # typing editor. The panel is narrower than 880px, so the translation pair
+    # stacks on its own (`container-type` on the form).
+    #
+    # `link_params` is the grid's own state (`q`, `filter`, `page`, symbol keys,
+    # never `locale`, which `url_options` carries): every link out of the panel
+    # (the language tabs, the close button) and the form's own URL keep it, so
+    # the screen behind the panel is the one the editor left.
     #
     # `editable?` mirrors `Media::Ownership` (the service this form's own
     # `update` endpoint actually enforces): `media.manage`, or being this
@@ -14,18 +25,17 @@ module Admin
     # only knows `Post`/`Page`) -- ownership isn't a permission `can?` can
     # answer on its own, so this asks it directly rather than trying to
     # force a `Post`/`Page`-shaped question onto a record that isn't
-    # either. A viewer this says no to still sees every field, just
-    # disabled (`tag.fieldset disabled:`, the same "View only" shape a
-    # page/post editor already gives a reader with no edit rights) --
-    # never hidden, since they can still read this screen at all (design
-    # spec §6: the whole module only ever needs `media.upload`).
-    class DetailComponent < Admin::AdminComponent
+    # either. A viewer this says no to sees the same facts as plain text (no
+    # inputs, no Move to trash; handoff B19) and the sentence naming who may
+    # edit -- the whole module only ever needs `media.upload` to be read.
+    class PanelComponent < Admin::AdminComponent
       ROLE_LABELS = { "hero" => "Hero image", "block_image" => "Image block", "rich_text" => "Rich text" }.freeze
 
-      def initialize(asset:, locale:, url_options: {})
+      def initialize(asset:, locale:, url_options: {}, link_params: {})
         @asset = asset
         @locale = locale.to_s
         @url_options = url_options
+        @link_params = link_params.to_h.symbolize_keys
       end
 
       def editable?
@@ -44,13 +54,29 @@ module Admin
 
       def byte_size = helpers.number_to_human_size(asset.byte_size)
 
+      # "image/png · 68 B · 1 × 1px", the file's own facts on one mono line.
+      def file_facts = [ asset.content_type, byte_size, dimensions ].compact.join(" · ")
+
+      def filename = asset.file.attached? ? asset.file.filename.to_s : nil
+
+      # "2 Oct 2026", in the site time zone (`Admin::BaseController` runs every
+      # request inside it).
+      def uploaded_on = asset.created_at.in_time_zone.strftime("%-d %b %Y")
+
+      def uploader? = asset.created_by_id.present?
+
+      def uploader = asset.created_by
+
       def status_id = "media-save-status"
 
       def base_updated_at_id = "media-base-updated-at"
 
       def base_updated_at_value = asset.updated_at.iso8601(6)
 
-      def form_url = helpers.admin_medium_path(asset, **url_options)
+      # The form's own URL carries the grid's state so the answer can move the
+      # tile (its link keeps the same state) and recount the segments for the
+      # same search.
+      def form_url = helpers.admin_medium_path(asset, **link_params, **url_options)
 
       def form_data
         return {} unless editable?
@@ -102,13 +128,41 @@ module Admin
       # See `Admin::PageSettingsFormComponent#translation`.
       def translation(field) = Admin::EditorScreen::ReferenceCardComponent.options_for(asset, field, locale: locale, confirmable: editable?)
 
+      # The tabs keep `selected` and the grid's state; only the language changes.
       def language_url
-        ->(code) { helpers.admin_medium_path(asset, **(code.to_s == ::Locales.default ? {} : { locale: code })) }
+        ->(code) { helpers.admin_media_path(**link_params, selected: asset.id, **(code.to_s == ::Locales.default ? {} : { locale: code })) }
       end
 
-      def index_path = helpers.admin_media_path(**url_options)
+      # × : the grid alone, as the editor left it.
+      def close_path = helpers.admin_media_path(**link_params, **url_options)
 
       def destroy_path = helpers.admin_medium_path(asset, **url_options)
+
+      # The Alt field's warn border (handoff §4.6, "warn border when empty"):
+      # asked of the DEFAULT language's alt, whatever tab is open, since that is
+      # the text every other language falls back to. Only the class is decided
+      # here; the border itself is drawn while the input is empty
+      # (`:placeholder-shown`, `.admin-media-alt-warn` in the stylesheet), so it
+      # goes as soon as the editor types and needs no stream.
+      def alt_warn? = asset.alt(locale: ::Locales.default).to_s.strip.empty?
+
+      ALT_PLACEHOLDER = "Add alt text".freeze
+
+      # "Kept in Trash for 30 days." / "Kept in Trash until someone empties it."
+      # (`site_settings.trash_retention_days`, 0 = never purged automatically).
+      def retention_help
+        days = Current.site.trash_retention_days.to_i
+        days.positive? ? "Kept in Trash for #{helpers.pluralize(days, "day")}." : "Kept in Trash until someone empties it."
+      end
+
+      # "Only by items in the trash: “About”, “Notes”." naming only the owners
+      # this viewer may read (a trashed page or post they couldn't open is not
+      # named, the same rule as the kept list's "a page you can't open"); the
+      # bare sentence when there is none to name.
+      def trash_only_message
+        names = trash_only_names
+        names.any? ? "Only by items in the trash: #{names.to_sentence}." : "Only by items in the trash."
+      end
 
       def delete_dialog_id = "delete-media-#{asset.id}"
 
@@ -209,7 +263,17 @@ module Admin
 
       private
 
-      attr_reader :asset, :locale, :url_options
+      attr_reader :asset, :locale, :url_options, :link_params
+
+      def trash_only_names
+        usage_summary.filter_map do |entry|
+          place = place_for(entry[:owner])
+          next unless place&.trashed?
+
+          kind = place.is_a?(Post) ? "post" : "page"
+          "“#{Audit::Snapshot.label_for(place)}”" if can?("#{kind}s.read", place)
+        end.uniq
+      end
 
       # The raw, ungrouped-by-visibility `usages_summary` rows, memoized
       # once: `#usage_entries` and `#unresolved_usage?` both need to walk

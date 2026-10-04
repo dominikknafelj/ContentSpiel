@@ -95,7 +95,7 @@ module Jump
     def media_rows
       return [] if blank? || !AccessControl.holds?(actor, "media.upload", channel: :admin)
       Media::Search.call(Media::Asset.kept, query).order(id: :desc).limit(LIMIT).map do |asset|
-        { title: asset.title.presence || "(untitled)", url: routes.admin_medium_path(asset, **url_options) }
+        { title: asset.title.presence || "(untitled)", url: routes.admin_media_path(selected: asset.id, **url_options) }
       end
     end
 

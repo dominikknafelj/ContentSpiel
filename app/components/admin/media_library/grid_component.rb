@@ -13,9 +13,11 @@ module Admin
   # write `::Media::` on its own account. `test/lib/admin_media_namespace_
   # test.rb` guards against this regressing.
   module MediaLibrary
-    # The Media module's own grid (media library design spec §6): one
-    # thumbnail card per asset, each linking to its own detail panel
-    # (`Admin::MediaController#show`). Every asset this renders must be
+    # The Media module's own grid (media library design spec §6, round 3 Task 8):
+    # one `TileComponent` per asset, each linking to `/media?selected=ID` (the
+    # side panel, `PanelComponent`) with the grid's own state (`link_params`:
+    # `q`, `filter`, `page`) kept; `selected_id` is the tile with the ring.
+    # Every asset this renders must be
     # loaded through `Media::Asset.with_variants` (`Admin::MediaController
     # #filtered_assets`) -- `#thumbnail_url` reads `#srcset`, which is
     # exactly the N+1 that scope exists to prevent over a whole page of
@@ -30,11 +32,13 @@ module Admin
     # alt/caption are read in (`#pick_payload`), which the fields the
     # picker fills show as their placeholders.
     class GridComponent < Admin::AdminComponent
-      def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default)
+      def initialize(assets:, url_options: {}, pick: false, locale: ::Locales.default, selected_id: nil, link_params: {})
         @assets = assets
         @url_options = url_options
         @pick = pick
         @locale = locale
+        @selected_id = selected_id
+        @link_params = link_params.to_h.symbolize_keys
       end
 
       def pick? = @pick
@@ -42,7 +46,7 @@ module Admin
       # A search or filter is active (`Admin::MediaController#filtered_assets`'s
       # own params), so an empty grid means "nothing matches", not "nothing
       # uploaded yet".
-      def filtered? = helpers.params[:q].present? || helpers.params[:filter].present?
+      def filtered? = helpers.params[:q].is_a?(String) && helpers.params[:q].present? || helpers.params[:filter].present?
 
       # The unfiltered grid, staying in picker mode inside the picker's own
       # frame (a link inside a `<turbo-frame>` is scoped to it already), or
@@ -54,7 +58,20 @@ module Admin
       # The thumbnail ruling (design spec §6): `Media::Asset#thumbnail_url`.
       def thumbnail_url(asset) = asset.thumbnail_url
 
-      def show_path(asset) = helpers.admin_medium_path(asset, **url_options)
+      # The panel's URL for one tile: the grid's own state, the editing
+      # language, and the choice.
+      def show_path(asset) = helpers.admin_media_path(**link_params, **url_options, selected: asset.id)
+
+      def selected?(asset) = asset.id == selected_id
+
+      # Which of this page's images something uses, in ONE query (a tile's
+      # `UNUSED` chip), the way `Media::Asset.unused` asks it: any `media_usages`
+      # row at all.
+      def used_ids = @used_ids ||= Media::Usage.where(media_asset_id: assets.map(&:id)).distinct.pluck(:media_asset_id).to_set
+
+      def grid_class
+        pick? ? "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
+      end
 
       # What `admin--media-picker#pick` dispatches as `media-picker:picked`'s
       # detail, as one JSON action param (not one param per key: Stimulus
@@ -77,7 +94,7 @@ module Admin
 
       private
 
-      attr_reader :assets, :url_options, :locale
+      attr_reader :assets, :url_options, :locale, :selected_id, :link_params
     end
   end
 end

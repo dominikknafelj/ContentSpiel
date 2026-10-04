@@ -1,0 +1,114 @@
+<%# The side panel of one image (round 3, Task 8). `id="media-panel"` is what the
+    Media screen's own layout and the tests look for; the title, the save status
+    and the base-updated-at field keep stable ids because the autosave answer
+    (`Admin::MediaController#update`) addresses them. %>
+<section id="media-panel" class="admin-media-panel flex flex-col gap-4" aria-labelledby="media-panel-title">
+  <div class="flex items-start justify-between gap-3">
+    <h2 id="media-panel-title" class="min-w-0 break-words text-lg font-semibold text-ink"><%= asset.title %></h2>
+    <%= link_to "×", close_path, aria: { label: "Close panel" }, title: "Close", class: "-mt-1 shrink-0 rounded-cs px-2 text-xl leading-none text-meta hover:text-ink",
+          data: { turbo_frame: "content", turbo_action: "advance" } %>
+  </div>
+
+  <span class="block overflow-hidden rounded-cs border border-line bg-sunken">
+    <%= image_tag preview_url, alt: "", class: "w-full" %>
+  </span>
+
+  <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-cs-mono text-xs text-meta">
+    <% if filename %>
+      <dt>FILE</dt><dd class="min-w-0 break-all text-right text-dim"><%= filename %></dd>
+    <% end %>
+    <dt>TYPE</dt><dd class="text-right text-dim"><%= file_facts %></dd>
+    <dt>UPLOADED</dt>
+    <dd class="text-right text-dim">
+      <% if uploader? %>by <%= render Admin::UserNameComponent.new(user: uploader, user_id: asset.created_by_id) %> · <% end %><%= uploaded_on %>
+    </dd>
+  </dl>
+
+  <div class="flex items-center justify-between gap-3">
+    <%= render Admin::LanguageTabsComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
+    <% if editable? %>
+      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+    <% end %>
+  </div>
+
+  <% if editable? %>
+    <%= form_with url: form_url, method: :patch, class: "admin-translation-form flex flex-col", data: form_data do %>
+      <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "title", id: "media-title", html_name: "media_asset[title]",
+            value: title_value, errors: title_errors
+          ) %>
+
+      <%= tag.div class: ("admin-media-alt-warn" if alt_warn?) do %>
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "alt", id: "media-alt", html_name: "media_asset[alt]",
+              value: alt_value, original: original(:alt), errors: alt_errors, locale: locale, placeholder: ALT_PLACEHOLDER, **translation(:alt)
+            ) %>
+      <% end %>
+
+      <%= render Admin::Columns::PlainColumnComponent.new(
+            name: "caption", id: "media-caption", html_name: "media_asset[caption]",
+            value: caption_value, original: original(:caption), errors: caption_errors, locale: locale, multiline: true,
+            **translation(:caption)
+          ) %>
+    <% end %>
+  <% else %>
+    <%# View only (handoff B19): the same facts as plain text, no inputs, no autosave, no Move to trash. %>
+    <dl class="flex flex-col gap-3 text-sm">
+      <% { "Title" => title_value, "Alt text" => alt_value, "Caption" => caption_value }.each do |label, text| %>
+        <div>
+          <dt class="<%= setup_label_class %> mb-1"><%= label %></dt>
+          <dd class="whitespace-pre-line text-ink"><%= text.presence || "—" %></dd>
+        </div>
+      <% end %>
+    </dl>
+    <p class="text-sm text-dim">Only the uploader or a media manager can edit this image.</p>
+  <% end %>
+
+  <div>
+    <h3 id="media-used-on" class="mb-2 scroll-mt-4 font-semibold text-ink">Used on</h3>
+    <% if unresolved_usage? %>
+      <p class="text-sm text-meta">Used somewhere that can’t be shown — the record of where may be out of date.</p>
+    <% elsif usage_state == :trash_only %>
+      <p class="text-sm text-meta"><%= trash_only_message %></p>
+    <% elsif usage_entries.empty? %>
+      <p class="text-sm text-meta">Not used anywhere yet.</p>
+    <% else %>
+      <ul class="flex flex-col gap-1 text-sm">
+        <% usage_entries.each do |entry| %>
+          <li>
+            <% if entry[:path] %>
+              <%= link_to entry[:label], entry[:path], class: "text-ink hover:underline", data: { turbo_frame: "_top" } %>
+            <% else %>
+              <span class="text-ink"><%= entry[:label] %></span>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% end %>
+  </div>
+
+  <% if can_delete? %>
+    <div class="flex flex-col items-start gap-1.5 border-t border-line pt-4">
+      <% if move_to_trash_disabled? %>
+        <%= render Admin::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button", disabled: true, aria: { describedby: "media-trash-help" }) %>
+        <%# `text-dim`, not `text-meta`: the low contrast was bug 7. %>
+        <p id="media-trash-help" class="text-sm text-dim"><%= in_use_reason %> <a href="#media-used-on" class="underline">See where it's used</a></p>
+      <% else %>
+        <%= render Admin::ButtonComponent.new(label: "Move to trash…", variant: :danger_text, type: "button",
+              data: dialog_trigger(delete_dialog_id), aria: { describedby: "media-trash-help" }) %>
+        <p id="media-trash-help" class="text-sm text-dim"><%= retention_help %></p>
+        <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Move this image to the trash?", body: "You can restore it from the trash.") do |dialog| %>
+          <% dialog.with_confirm_action do %>
+            <%# `_top`: a whole-page visit, so the sidebar's Trash badge
+                updates and the Undo toast isn't relayed out of the frame. %>
+            <%= form_with url: destroy_path, method: :delete, data: { turbo_frame: "_top" } do %>
+              <%= render Admin::ButtonComponent.new(label: "Move to trash", variant: :danger, type: "submit") %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+</section>

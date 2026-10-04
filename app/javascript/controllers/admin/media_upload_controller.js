@@ -20,6 +20,12 @@ export default class extends Controller {
   static targets = [ "input", "list" ]
   static values = { url: String }
 
+  // The header's "Upload images" button: the same file input the drop zone
+  // wraps, so one path -- `filesSelected` -- handles both.
+  browse() {
+    this.inputTarget.click()
+  }
+
   filesSelected() {
     this.upload(Array.from(this.inputTarget.files))
     // Cleared immediately (not after the batch settles): re-picking the

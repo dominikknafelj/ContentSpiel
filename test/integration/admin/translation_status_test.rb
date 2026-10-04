@@ -166,7 +166,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand" }, "de" => { alt: "Sand (de)" } }).ok?
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand dunes" } }).ok?
 
-    get "/cs-studio/media/#{asset.id}", params: { locale: "de" }
+    get "/cs-studio/media", params: { selected: asset.id, locale: "de" }
 
     assert_response :success
     assert_select "[data-original-for='alt'] p", text: /Sand.*dunes/

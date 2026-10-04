@@ -238,6 +238,12 @@
    border only while unfocused. */
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
+/* The Media panel's Alt field while the default-language alt is empty (handoff
+   §4.6: "warn border when empty"): the warn colour, drawn only while the input
+   is empty (it carries a placeholder) so it clears as soon as the editor types,
+   and never over an error, whose red border stays. Warn is a hue, not the only
+   cue: the placeholder says "Add alt text" and the tile says NO ALT. */
+.admin-media-alt-warn .admin-column:not(:has(> [id$="-errors"] > p)) :is(input, textarea):placeholder-shown { border-color: var(--cs-warn); }
 
 /* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the

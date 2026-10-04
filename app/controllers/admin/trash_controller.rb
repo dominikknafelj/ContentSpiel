@@ -204,7 +204,7 @@ module Admin
       case params[:type]
       when "page" then admin_page_path(@item, **admin_url_options)
       when "post" then admin_post_path(@item, **admin_url_options)
-      when "media" then admin_medium_path(@item, **admin_url_options)
+      when "media" then admin_media_path(selected: @item.id, **admin_url_options)
       end
     end
 

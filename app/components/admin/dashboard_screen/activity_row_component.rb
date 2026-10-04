@@ -52,7 +52,7 @@ module Admin
         case record
         when Page then helpers.admin_page_path(record, **url_options)
         when Post then helpers.admin_post_path(record, **url_options)
-        else helpers.admin_medium_path(record, **url_options)
+        else helpers.admin_media_path(selected: record.id, **url_options)
         end
       end
 

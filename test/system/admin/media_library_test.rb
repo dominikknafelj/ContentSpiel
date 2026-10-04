@@ -1,9 +1,10 @@
 require "application_system_test_case"
 
-# The Media module's own grid and detail panel (media library design spec
-# §6, Task 7): a real multi-file upload through the file input
-# (`admin--media-upload`), then opening one of the uploaded images and
-# setting its German alt text.
+# The Media module's own grid and side panel (media library design spec
+# §6, Task 7; round 3 Task 8): a real multi-file upload through the file
+# input (`admin--media-upload`), then opening one of the uploaded images and
+# setting its German alt text; and the panel's live effect on the tile and the
+# segment counts.
 class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   test "uploading two files by the file input, opening one, and setting a German alt text persists" do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -22,10 +23,9 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_equal 2, Media::Asset.count
 
     asset = Media::Asset.find_by!(title: "wide")
-    click_on asset.title
+    click_tile(asset)
 
-    assert_selector "a", text: "← Back to media" # sanity: the detail panel actually opened
-    await_admin_controllers
+    assert_selector "#media-panel" # sanity: the side panel actually opened, beside the grid
 
     within("nav[aria-label='Languages']") { press "Deutsch" }
     # Waits for the language switch's own full top-level Turbo visit
@@ -46,7 +46,75 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_predicate asset.reload.alt(locale: :en), :blank?
   end
 
+  test "choosing a tile opens the panel and advances the URL; typing an alt text takes NO ALT off the tile and drops the Missing alt count" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    with_locales(%w[en de], default: "en")
+    bare = create_media_asset(filename: "tiny.png").tap { |asset| asset.update!(title: "Bare image") }
+    described = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Described image") }
+    assert Media::Save.call(described, translations: { "en" => { alt: "A wide view" } }).ok?
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media"
+    await_admin_controllers
+    assert_selector "#media-count-missing_alt", text: "1"
+    assert_selector "#media-asset-#{bare.id}", text: "NO ALT"
+    assert_no_selector "#media-panel"
+
+    click_tile(bare)
+
+    assert_current_path(/\?selected=#{bare.id}\z/)
+    assert_selector "#media-asset-#{bare.id} a[aria-current='true']"
+
+    fill_in "Alt", with: "A bare wall"
+    assert_selector "#media-save-status", text: /SAVED/, wait: 5
+
+    assert_no_selector "#media-asset-#{bare.id}", text: "NO ALT", wait: 5
+    assert_selector "#media-count-missing_alt", text: "0"
+    assert_selector "#media-count-all", text: "2"
+    assert_equal "A bare wall", bare.reload.alt(locale: :en)
+    # The selection survived: the panel is still there, on the same image.
+    assert_selector "#media-panel #media-title[value='Bare image']"
+
+    page.go_back
+    assert_no_selector "#media-panel", wait: 5
+  end
+
+  test "in the panel a translation tab stacks the original above the field" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    with_locales(%w[en de], default: "en")
+    asset = create_media_asset
+    assert Media::Save.call(asset, translations: { "en" => { alt: "A wide view" } }).ok?
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media?selected=#{asset.id}"
+    await_admin_controllers
+    within("nav[aria-label='Languages']") { press "Deutsch" }
+    assert_selector "nav[aria-label='Languages'] [aria-current='true']", text: /deutsch/i
+    assert_selector "#media-panel [data-original-for='alt']"
+
+    width = page.evaluate_script(%(document.querySelector("#media-panel form.admin-translation-form").clientWidth))
+    assert_operator width, :<, 880, "the premise: the panel's form is narrower than 880px (was #{width})"
+    original_top = page.evaluate_script(%(document.querySelector("#media-panel [data-original-for='alt']").getBoundingClientRect().top))
+    field_top = page.evaluate_script(%(document.querySelector("#media-alt").getBoundingClientRect().top))
+    assert_operator original_top, :<, field_top - 4, "the original should sit above the field when stacked"
+  end
+
   private
+
+  # Clicks a tile and waits until the panel is open AND Turbo has finished with
+  # the click. A tile is a link into the `content` frame with `data-turbo-action
+  # ="advance"`, which Turbo promotes to a page visit once the frame has loaded:
+  # a few dozen ms after the panel's DOM appears it fires `turbo:visit` and
+  # re-renders the body. A test that clicked or typed in that gap would have its
+  # visit superseded (a language tab) or its text replaced (a field) -- a gap no
+  # person lives in, but a scripted browser does.
+  def click_tile(asset)
+    page.execute_script("window.__tileVisitDone = false; document.addEventListener('turbo:load', () => { window.__tileVisitDone = true }, { once: true })")
+    find("#media-asset-#{asset.id} a").click
+    assert_selector "#media-panel", wait: 5
+    assert_eventually(message: "the tile's promoted visit never finished") { page.evaluate_script("window.__tileVisitDone") }
+    await_admin_controllers
+  end
 
   # Same "poll the record, not the status text" reasoning `Admin
   # ::GroupsSystemTest#assert_speakers_eventually` gives its own: the

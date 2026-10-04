@@ -1,55 +1,51 @@
-<%# The Media module's own grid (media library design spec §6): search,
-    filters, the multi-file upload dropzone, and the grid itself
-    (`Admin::MediaLibrary::GridComponent`). No tree column (a library image
-    has no tree position of its own, the same reason Tags/Posts render
-    plain content frames) and no language switcher (title/alt/caption per
-    locale only exist once an image is open -- `Admin::MediaLibrary
-    ::DetailComponent`'s own). %>
-<h1 class="mb-4 text-h1 text-ink">Media</h1>
-
+<%# The Media module (media library design spec §6; round 3 Task 8, handoff §4.6):
+    the header with "Upload images", the drop zone, the toolbar (search and
+    segments with counts) and the grid, with the chosen image's side panel
+    (`Admin::MediaLibrary::PanelComponent`) at the right -- 340px; with nothing
+    chosen the grid takes the width. Choosing a tile is a link into the `content`
+    frame that keeps the search, the segment, the page and the language, so Back
+    returns to the previous choice. No tree column (a library image has no tree
+    position of its own, the same reason Tags/Posts render plain content frames). %>
 <%# The wrapper keeps `admin--media-upload`'s own dragover/drop (a drop anywhere
     on it uploads); the FileDropComponent inside is the visible zone and the
     labelled file input, and stops its own drops from reaching that handler
-    twice (file_drop_controller.js). %>
-<div class="mb-6"
+    twice (file_drop_controller.js). The header's button opens the same input. %>
+<div class="mb-4 flex flex-col gap-4"
      data-controller="admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
      data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
-  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
-        hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
-        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
-  <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-h1 text-ink">Media</h1>
+    <%= render Admin::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
+  </div>
+  <div>
+    <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
+          hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
+          data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
+    <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
+  </div>
 </div>
 
-<% filter_keys = %i[q filter] %>
-<%= form_with(**filter_form_options(admin_media_path(**admin_url_options))) do %>
-  <% if admin_locale != Locales.default %>
-    <%= hidden_field_tag :locale, admin_locale %>
-  <% end %>
+<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options) %>
 
-  <div>
-    <%= label_tag :q, "Search", class: setup_label_class %>
-    <%= search_field_tag :q, params[:q], placeholder: "Title, alt text or filename", class: setup_input_class %>
+<% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
+<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>">
+  <div class="min-w-0 <%= "order-2 lg:order-1" if @selected %>">
+    <% if @pagination.out_of_range? %>
+      <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+    <% else %>
+      <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params) %>
+      <% if @pagination.total_pages > 1 %>
+        <div class="mt-4 rounded-cs border border-line bg-surface">
+          <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+        </div>
+      <% end %>
+    <% end %>
   </div>
 
-  <div>
-    <%= label_tag :filter, "Show", class: setup_label_class %>
-    <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-          class: setup_select_class %>
-  </div>
-
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
-  <%= filter_clear_link(admin_media_path(**admin_url_options), filter_keys) %>
-<% end %>
-
-<% page_url = ->(page) { admin_media_path(list_params(:q, :filter).merge("page" => page)) } %>
-<% if @pagination.out_of_range? %>
-  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
-<% else %>
-  <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
-  <% if @pagination.total_pages > 1 %>
-    <div class="mt-4 rounded-cs border border-line bg-surface">
-      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
-    </div>
+  <% if @selected %>
+    <aside class="order-1 min-w-0 rounded-cs border border-line bg-surface p-4 lg:order-2 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto" aria-label="Image details">
+      <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
+    </aside>
   <% end %>
-<% end %>
+</div>

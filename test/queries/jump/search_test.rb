@@ -24,7 +24,7 @@ class Jump::SearchTest < ActiveSupport::TestCase
     groups = search("quokka")
     assert_equal %w[Pages Media], groups.map { |group| group[:label] } & %w[Pages Media]
     assert_includes rows_of(groups).map { |row| row[:url] }, Rails.application.routes.url_helpers.admin_page_path(page)
-    assert_includes rows_of(groups).map { |row| row[:url] }, Rails.application.routes.url_helpers.admin_medium_path(asset)
+    assert_includes rows_of(groups).map { |row| row[:url] }, Rails.application.routes.url_helpers.admin_media_path(selected: asset.id)
   end
 
   test "groups come in the order Pages, Posts, Media, Sections, Settings, Actions" do
