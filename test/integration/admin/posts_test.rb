@@ -28,7 +28,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
       post schedule_admin_post_path(post_record), params: { published_at: "2026-10-06T09:00" }
       assert_equal "scheduled", post_record.reload.status
       get admin_post_path(post_record)
-      assert_select "dialog#schedule-post-#{post_record.id} button[name=remove]", text: "Remove schedule"
+      assert_select "dialog#schedule-post-#{post_record.id} form input[name=remove][value='1'] ~ button", text: "Remove schedule"
 
       post schedule_admin_post_path(post_record), params: { remove: "1" }
       assert_nil post_record.reload.published_at

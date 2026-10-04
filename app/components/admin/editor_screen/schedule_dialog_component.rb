@@ -22,12 +22,13 @@ module Admin
     # and its buttons live in the dialog's footer, outside the form, so they
     # reach it through `form=`.
     class ScheduleDialogComponent < Admin::AdminComponent
-      def initialize(record:, url_options: {}, error: nil)
+      def initialize(record:, url_options: {}, error: nil, value: nil)
         raise ArgumentError, "the schedule dialog is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
 
         @record = record
         @url_options = url_options
         @error = error.presence
+        @submitted_value = value
       end
 
       # The one place the id is spelled (the header's triggers use it too).
@@ -55,7 +56,17 @@ module Admin
         @default_time ||= scheduled? ? record.published_at.in_time_zone(zone) : (zone.now + 1.day).change(hour: 9, min: 0)
       end
 
-      def input_value = default_time.strftime(FORMAT)
+      # After a refusal the editor sees what they typed: a blank stays blank
+      # (they never chose a time), a well-formed value comes back as it was,
+      # anything else ("soon") falls back to the default. Only the
+      # `datetime-local` shape is ever echoed, and `tag.input` escapes it.
+      def input_value
+        if error && @submitted_value.is_a?(String)
+          return "" if @submitted_value.empty?
+          return @submitted_value if @submitted_value.match?(SUBMITTED_FORMAT)
+        end
+        default_time.strftime(FORMAT)
+      end
 
       def min_value = zone.now.strftime(FORMAT)
 
@@ -63,7 +74,15 @@ module Admin
       # is one sentence per string). The offset is the one in force at the
       # time shown in the field, so a summer schedule reads GMT+2.
       def zone_line
-        "#{zone_name} (#{gmt_offset(default_time.utc_offset)}), the site’s time zone."
+        offset = gmt_offset(default_time.utc_offset)
+        name = zone.name
+        if name.include?("(")
+          "#{name}, #{offset}, the site’s time zone."   # no nested parentheses
+        elsif name.match?(/time|\AUTC\z/i)
+          "#{name} (#{offset}), the site’s time zone."
+        else
+          "#{name} time (#{offset}), the site’s time zone."
+        end
       end
 
       attr_reader :error
@@ -71,14 +90,9 @@ module Admin
       private
 
       FORMAT = "%Y-%m-%dT%H:%M".freeze
+      SUBMITTED_FORMAT = /\A\d{4}-\d\d-\d\dT\d\d:\d\d\z/
 
       attr_reader :record, :url_options
-
-      # Rails zone names are city names ("Berlin") or already end in "Time"
-      # ("Eastern Time (US & Canada)"); only the former takes " time".
-      def zone_name
-        zone.name.match?(/time/i) ? zone.name : "#{zone.name} time"
-      end
 
       def gmt_offset(seconds)
         sign = seconds.negative? ? "-" : "+"

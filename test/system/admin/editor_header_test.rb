@@ -108,6 +108,25 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_nil @draft.reload.published_at
   end
 
+  test "Enter in the date field of a scheduled record reschedules it; it never removes the schedule" do
+    Current.set(actor: users(:one)) { Pages::Save.call(@draft, attributes: { published_at: Time.current + 3.days }) }
+    sign_in_via_form(users(:one))
+    visit admin_page_path(@draft)
+    await_admin_controllers
+    dialog = "dialog#schedule-page-#{@draft.id}"
+
+    find("header.admin-editor-header button", text: "Edit schedule").click
+    assert_selector "#{dialog}[open] button", text: "Remove schedule"
+    new_time = (Time.current + 6.days).change(sec: 0, usec: 0)
+    set_schedule_value("schedule-page-#{@draft.id}", new_time.in_time_zone(Current.site.effective_time_zone).strftime("%Y-%m-%dT%H:%M"))
+    page.execute_script("document.querySelector('#{dialog} input[name=published_at]').focus()")
+    page.driver.browser.keyboard.type(:Enter)
+
+    assert_no_selector "#{dialog}[open]", wait: 10
+    assert_selector "header.admin-editor-header .admin-status-chip[data-status=scheduled]"
+    assert_in_delta new_time.to_f, @draft.reload.published_at.to_f, 60
+  end
+
   test "a refused schedule's dialog is not reopened when Back restores the page from the cache" do
     sign_in_via_form(users(:one))
     visit admin_page_path(@draft)

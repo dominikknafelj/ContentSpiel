@@ -115,7 +115,7 @@
 
 <%# Dialogs: siblings of the header (see the class comment). %>
 <% if can_schedule? || can_edit_schedule? %>
-  <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error) %>
+  <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error, value: schedule_value) %>
 <% end %>
 
 <% if can_unpublish? %>

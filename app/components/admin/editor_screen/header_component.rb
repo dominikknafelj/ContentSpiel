@@ -74,6 +74,9 @@ module Admin
       # error is not a toast.
       def schedule_error = helpers.flash[:schedule_error]
 
+      # What the editor typed, carried back with it.
+      def schedule_value = helpers.flash[:schedule_value]
+
       # The record's own address, always shown while it has one (a draft page
       # has a would-be URL, so there is something to copy ahead of publishing;
       # "View on site" is gated on `live?` instead -- a draft's public address

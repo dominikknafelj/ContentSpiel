@@ -16,6 +16,7 @@ module Admin
   # (the dialog reopens with it), never in a toast.
   module Scheduling
     BLANK_OR_JUNK = "Choose a date and time".freeze
+    MAX_YEARS_AHEAD = 50
     IN_THE_PAST = "Pick a time in the future.".freeze
 
     private
@@ -28,7 +29,10 @@ module Admin
         nil
       end
 
-      return [ nil, BLANK_OR_JUNK ] if at.nil?
+      # An absurd year parses happily but is junk to an editor and can be
+      # beyond what Postgres stores (a 500 at the write); nothing is ever
+      # scheduled further out than this.
+      return [ nil, BLANK_OR_JUNK ] if at.nil? || at > MAX_YEARS_AHEAD.years.from_now
       return [ nil, IN_THE_PAST ] if at <= Time.current
 
       [ at, nil ]
@@ -36,6 +40,9 @@ module Admin
 
     def refuse_schedule(message, path)
       flash[:schedule_error] = message
+      # Echoed back into the field (the component only accepts the
+      # datetime-local shape); capped so a junk value can't bloat the cookie.
+      flash[:schedule_value] = params[:published_at].to_s.first(40)
       redirect_to path, status: :see_other
     end
   end

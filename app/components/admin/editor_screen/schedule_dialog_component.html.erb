@@ -10,7 +10,15 @@
   <% end %>
   <% dialog.with_footer do %>
     <% if scheduled? %>
-      <%= render Admin::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit", name: "remove", value: "1", form: form_id, formnovalidate: true, class: "mr-auto") %>
+      <%# Its own form, NOT a submit button of the schedule form: the default
+          button of a form (what Enter in the date field presses) is the first
+          submit whose owner it is, and this one sits first in the footer --
+          Enter would have removed the schedule instead of saving the new
+          time. "Schedule" is the schedule form's only submit. %>
+      <%= form_with url: url, method: :post, class: "mr-auto", data: { turbo_frame: "_top" } do %>
+        <%= hidden_field_tag :remove, "1", id: nil %>
+        <%= render Admin::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit") %>
+      <% end %>
     <% end %>
     <%= tag.form method: "dialog" do %>
       <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>

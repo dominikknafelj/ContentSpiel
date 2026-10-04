@@ -154,6 +154,40 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a refusal carries what was typed back into the field; blank stays blank" do
+    page = create_page(title: "Later", published: false)
+    travel_to Time.zone.local(2026, 10, 4, 12, 0) do
+      post schedule_admin_page_path(page), params: { published_at: "2026-10-01T09:00" }
+      follow_redirect!
+      assert_select "dialog#schedule-page-#{page.id} input[name=published_at][value='2026-10-01T09:00']"
+
+      post schedule_admin_page_path(page), params: { published_at: "" }
+      follow_redirect!
+      assert_select "dialog#schedule-page-#{page.id} input[name=published_at][value='']"
+    end
+  end
+
+  test "an absurd but parseable date is junk, not a 500" do
+    page = create_page(title: "Later", published: false)
+    [ "9999999-01-01T00:00", "275760-01-01T00:00", "5000-01-01T00:00" ].each do |value|
+      post schedule_admin_page_path(page), params: { published_at: value }
+      assert_response :see_other, value
+      follow_redirect!
+      assert_select "dialog#schedule-page-#{page.id} [role=alert]", text: "Choose a date and time"
+      assert_nil page.reload.published_at
+    end
+  end
+
+  test "an ambiguous local time (the repeated hour when clocks go back) is accepted as ActiveSupport resolves it" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    page = create_page(title: "Later", published: false)
+    travel_to Time.utc(2026, 10, 4, 10, 0) do
+      post schedule_admin_page_path(page), params: { published_at: "2026-10-25T02:30" }
+      assert_response :see_other
+      assert_equal Time.use_zone("Berlin") { Time.zone.parse("2026-10-25T02:30") }, page.reload.published_at
+    end
+  end
+
   test "the error shows once, not again on the next visit" do
     page = create_page(title: "Later", published: false)
     post schedule_admin_page_path(page), params: { published_at: "" }
@@ -195,7 +229,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
 
     Current.set(actor: users(:one)) { Pages::Save.call(page, attributes: { published_at: 3.days.from_now }) }
     get admin_page_path(page)
-    assert_select "dialog#schedule-page-#{page.id} button[name=remove][value='1']", text: "Remove schedule"
+    assert_select "dialog#schedule-page-#{page.id} form input[name=remove][value='1'] ~ button", text: "Remove schedule"
   end
 
   # Deleting moves the page to the trash (`Trash::Move`), its subpages
