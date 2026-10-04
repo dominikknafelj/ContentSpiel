@@ -1,7 +1,5 @@
 <span class="flex size-7 shrink-0 items-center justify-center text-xs font-semibold <%= avatar_class %>" aria-hidden="true"><%= initial %></span>
-<p class="min-w-0 flex-1 text-sm text-ink">
-  <span class="font-semibold"><%= name %></span><%= " via #{via_label}" if via_token? %> <%= before %> “<%= link_to title, path, class: "font-semibold hover:underline", data: { turbo_frame: "_top" } %>”<%= after %>
-</p>
+<p class="min-w-0 flex-1 text-sm text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></p>
 <% if via_token? %>
   <%= render Admin::ChannelChipComponent.new(channel: channel) %>
 <% end %>

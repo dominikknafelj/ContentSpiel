@@ -15,7 +15,7 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 
     assert_selector "span.rounded-full", text: users(:one).display_name[0].upcase
-    assert_text "#{users(:one).display_name} created “Hello”"
+    assert_text "You created “Hello”" # the viewer's own change, as in the audit log
     assert_selector "a[href='/cs-studio/posts/#{row.record.id}']", text: "Hello"
     assert_text "Draft"
     assert_selector "time"
@@ -42,11 +42,11 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
   end
 
   test "a named user reads by name, not email" do
-    users(:one).update!(name: "Ada Lovelace")
-    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for)
+    users(:two).update!(name: "Ada Lovelace")
+    render_inline Admin::DashboardScreen::ActivityRowComponent.new(row: row_for(actor: users(:two)))
 
     assert_text "Ada Lovelace created"
-    assert_no_text users(:one).email_address
+    assert_no_text users(:two).email_address
   end
 
   test "a live record has no chip" do
@@ -62,7 +62,8 @@ class Admin::DashboardScreen::ActivityRowComponentTest < ViewComponent::TestCase
   test "a coalesced burst shows its span as the time's tooltip" do
     post = Current.set(actor: users(:one), channel: :admin) { create_post(title: "Typing", published: false) }
     event = Audit::Event.find_by!(subject_type: "Post", subject_id: post.id)
-    row = Dashboard::Activity::Row.new(event:, record: post, sentence_parts: [ "edited", post, "" ], actor_name: "Ada", via_label: nil,
+    target = Audit::Sentence::Target.new(post.title, Audit::Sentence.route_for(post))
+    row = Dashboard::Activity::Row.new(event:, record: post, sentence: Audit::Sentence.build(event, viewer: users(:one), target:),
       at: Time.zone.local(2030, 1, 10, 9, 0), span_end: Time.zone.local(2030, 1, 10, 9, 40))
     render_inline Admin::DashboardScreen::ActivityRowComponent.new(row:)
 

@@ -15,8 +15,10 @@ module Admin
 
       def row(via_label:)
         post = Post.first || Post.new(id: 1, content_type: "blog", title: "A sample post")
-        Dashboard::Activity::Row.new(event: Audit::Event.new(channel: via_label ? "mcp" : "admin"), record: post, sentence_parts: [ "published", post, "" ], actor_name: "Dominik",
-          via_label:, at: 2.hours.ago, span_end: nil)
+        event = Audit::Event.new(action: "post.published", channel: via_label ? "mcp" : "admin", subject_label: post.title,
+          actor_type: ("ApiToken" if via_label), actor_label: via_label)
+        target = Audit::Sentence::Target.new(post.title, Audit::Sentence.route_for(post))
+        Dashboard::Activity::Row.new(event:, record: post, sentence: Audit::Sentence.build(event, viewer: nil, target:), at: 2.hours.ago, span_end: nil)
       end
     end
   end

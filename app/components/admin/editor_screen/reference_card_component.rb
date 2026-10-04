@@ -194,9 +194,7 @@ module Admin
         paragraphs
       end
 
-      def diff_html(segments)
-        safe_join(segments.map { |segment_kind, text| segment_tag(segment_kind, text) })
-      end
+      def diff_html(segments) = render(Admin::WordDiffComponent.new(segments:))
 
       def confirmable? = confirm.present?
 
@@ -215,18 +213,6 @@ module Admin
         source = record&.translation_source(field, locale)
         current = Translations.source_text(rich? ? document : original)
         @diff = (Translations::SourceDiff.call(from: source.text, to: current) if source&.comparable? && !current.nil?)
-      end
-
-      # A screen-reader-only cue inside the element: `aria-label` on `del`/`ins`
-      # (name-prohibited roles) is unreliable and may replace the word itself.
-      def cue(label) = content_tag(:span, label, class: "sr-only")
-
-      def segment_tag(segment_kind, text)
-        case segment_kind
-        when :delete then content_tag(:del, safe_join([ cue("Removed: "), text ]), class: "text-danger-ink bg-danger-tint")
-        when :insert then content_tag(:ins, safe_join([ cue("Added: "), text ]), class: "text-ok-ink bg-ok-tint underline decoration-ok-ink")
-        else content_tag(:span, text)
-        end
       end
     end
   end

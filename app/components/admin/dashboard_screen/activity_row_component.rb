@@ -8,34 +8,30 @@ module Admin
     #
     # A change through a token names the token's *user*, with the user's own
     # round avatar, and says "via <token name>" beside an MCP chip. The name
-    # is the one recorded on the event (`Row#via_label`), escaped like any
+    # is the one recorded on the event (the sentence's actor), escaped like any
     # text; no part of the token's value is ever rendered, and the row doesn't
-    # even carry the token. Everything comes from a `Dashboard::Activity::Row`
-    # (record, user and time already loaded), so a row never queries.
+    # even carry the token. The wording is the audit log's own
+    # (`Admin::AuditScreen::SentenceComponent` over `Audit::Sentence`).
+    # Everything comes from a `Dashboard::Activity::Row` (record, user and time
+    # already loaded), so a row never queries.
     class ActivityRowComponent < Admin::AdminComponent
       def initialize(row:)
         @row = row
       end
 
-      def name = row.actor_name
+      def sentence = row.sentence
 
-      def via_label = row.via_label
+      # The avatar's letter: the person's own initial, "You" included.
+      def initial
+        actor = sentence.actor
+        Admin::UserNameComponent.new(user: actor.user, user_id: actor.user_id).label.to_s.strip[0].to_s.upcase
+      end
 
-      def via_token? = row.via_label.present?
+      def via_token? = sentence.actor.via_label.present?
 
       def channel = row.event.channel
 
-      def initial = name.to_s.strip[0].to_s.upcase
-
-      def before = row.sentence_parts[0]
-
-      def record = row.sentence_parts[1]
-
-      def after = row.sentence_parts[2]
-
-      def title
-        record.title.presence || "(untitled)"
-      end
+      def record = row.record
 
       # Pages and posts have a publish state; an image has none.
       def status? = !record.is_a?(Media::Asset)
@@ -47,14 +43,6 @@ module Admin
       end
 
       def shown_at = row.span_end || row.at
-
-      def path
-        case record
-        when Page then helpers.admin_page_path(record, **url_options)
-        when Post then helpers.admin_post_path(record, **url_options)
-        else helpers.admin_media_path(selected: record.id, **url_options)
-        end
-      end
 
       def avatar_class
         "rounded-full bg-sunken text-ink"
