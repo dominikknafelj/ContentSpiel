@@ -270,8 +270,9 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
   end
 
   # Translation helpers spec §4 (Task 4): the "Languages" column shows one
-  # badge per *target* language -- ✓ complete, ! missing, ↻ outdated --
+  # chip per *target* language -- plain complete, ○ missing, ↻ outdated --
   # each with a title and an accessible label, and none for the original.
+  # (Chip labels: Task 5 of the design pass; no red, no ✓/! glyphs.)
   test "the list shows a translation badge per target language" do
     with_locales(%w[en de es], default: "en")
     post_record = create_post(title: "Hello")
@@ -285,11 +286,11 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "tr#post_#{post_record.id}" do
       assert_select "[data-translation-state][data-locale='en']", count: 0
-      assert_select "[data-locale='de'][data-translation-state='complete'][title='Deutsch: complete'][aria-label='Deutsch: complete']", text: /✓/
-      assert_select "[data-locale='es'][data-translation-state='missing'][title='Español: missing'][aria-label='Español: missing']", text: /!/
+      assert_select "[data-locale='de'][data-translation-state='complete'][title='Translated'][aria-label='Deutsch: translated']", text: "de"
+      assert_select "[data-locale='es'][data-translation-state='missing'][title='Not translated'][aria-label='Español: not translated']", text: /○/
     end
     assert_select "tr#post_#{stale.id}" do
-      assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated']", text: /↻/
+      assert_select "[data-locale='de'][data-translation-state='outdated'][aria-label='Deutsch: outdated'][title='English changed since translation']", text: /↻/
       assert_select "[data-locale='es'][data-translation-state='outdated']"
     end
   end

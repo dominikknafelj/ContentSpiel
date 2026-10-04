@@ -9,7 +9,7 @@
           <% group_items.each do |item| %>
             <li id="<%= row_id(item) %>" class="flex items-center gap-3 py-2">
               <%= link_to title(item), editor_path(item), class: "flex-1 truncate font-semibold text-ink hover:underline" %>
-              <%= render Admin::TranslationScreen::StateBadgeComponent.new(state: item.state, locale: locale) %>
+              <%= render Admin::TranslationChipComponent.new(state: item.state, locale: locale) %>
             </li>
           <% end %>
         </ul>

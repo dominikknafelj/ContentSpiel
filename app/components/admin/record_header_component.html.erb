@@ -28,7 +28,7 @@
       <% end %>
       <%= render Admin::LanguageSwitcherComponent.new(current: locale, missing: missing_locales, outdated: outdated_locales, url: language_url) %>
       <span data-status="<%= status %>">
-        <%= render Admin::StatusBadgeComponent.new(status: status, at: scheduled_at) %>
+        <%= render Admin::StatusChipComponent.new(status: status, at: scheduled_at) %>
       </span>
     </div>
   </div>

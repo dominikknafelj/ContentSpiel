@@ -81,7 +81,7 @@
                 ring and the raw name for a type nobody registers any more. %>
             <%= render Admin::ContentTypeDotComponent.new(content_type: post.content_type) %>
           </td>
-          <td class="py-2 pr-4"><%= render Admin::StatusBadgeComponent.new(status: post.status, at: post.published_at) %></td>
+          <td class="py-2 pr-4"><%= render Admin::StatusChipComponent.new(status: post.status, at: post.published_at, hide_live: true) %></td>
           <td class="py-2 pr-4 text-meta"><%= post.published_at&.strftime("%b %-d, %Y") %></td>
           <td class="py-2 pr-4 text-meta"><%= post.tags.map(&:name).join(", ") %></td>
           <%# One badge per *target* language (translation helpers spec §4):
@@ -90,7 +90,7 @@
           <td class="py-2">
             <span class="inline-flex flex-wrap gap-1">
               <% @translation_states.fetch(post).each do |code, state| %>
-                <%= render Admin::TranslationScreen::StateBadgeComponent.new(state: state, locale: code) %>
+                <%= render Admin::TranslationChipComponent.new(state: state, locale: code) %>
               <% end %>
             </span>
           </td>

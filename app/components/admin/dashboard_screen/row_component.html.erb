@@ -21,6 +21,6 @@
     </div>
   </div>
   <% unless image? %>
-    <%= render Admin::StatusBadgeComponent.new(status: record.status, at: record.published_at) %>
+    <%= render Admin::StatusChipComponent.new(status: record.status, at: record.published_at, hide_live: true) %>
   <% end %>
 </li>

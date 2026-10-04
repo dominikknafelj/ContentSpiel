@@ -22,7 +22,8 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
   test "the pages index shows the tree with status and child counts" do
     get "/cs-studio/pages"
     assert_select "turbo-frame#tree li[data-page-id='#{@a.id}']" do
-      assert_select "[data-status='live']"
+      # The tree hides Live: only a draft or scheduled page gets a chip.
+      assert_select "[data-status='live']", count: 0
       assert_select "[data-child-count]", text: "1"
     end
   end

@@ -20,9 +20,8 @@
             aria: (selected? ? { current: "page" } : {}),
             class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
-      <span data-status="<%= status %>" class="shrink-0">
-        <%= render Admin::StatusBadgeComponent.new(status: status, at: page.published_at) %>
-      </span>
+      <%# The chip carries `data-status` itself and renders nothing for Live. %>
+      <%= render Admin::StatusChipComponent.new(status: status, at: page.published_at, hide_live: true) %>
 
       <% if incomplete_locales.any? %>
         <%# One marker for every language at once (translation helpers spec

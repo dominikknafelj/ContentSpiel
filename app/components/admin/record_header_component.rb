@@ -26,7 +26,7 @@ module Admin
 
     def live? = page.live?
 
-    # Only meaningful for a scheduled page (`StatusBadgeComponent` itself
+    # Only meaningful for a scheduled page (`StatusChipComponent` itself
     # ignores `at:` for every other status), but harmless to pass either
     # way -- simpler than branching here on the exact same condition that
     # component already re-checks internally.

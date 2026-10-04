@@ -1,0 +1,5 @@
+<%= tag.span class: "admin-status-chip inline-flex shrink-0 items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5 text-xs text-ink",
+      title: title, data: { status: status } do %>
+  <%= tag.span "", class: "h-1.5 w-1.5 rounded-full #{dot_class}", aria: { hidden: true } %>
+  <%= label %>
+<% end %>
