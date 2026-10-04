@@ -147,7 +147,7 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     Trash::Move.call(gone)
     refused = Trash::Restore.call(parent.reload, parent: gone.reload)
     assert_not refused.ok?
-    assert_equal [ "Choose a page that isn't in the trash" ], refused.errors
+    assert_equal [ Trash::Restore::UNKNOWN_PARENT ], refused.errors
     assert parent.reload.trashed?
   end
 
@@ -281,15 +281,51 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     AccessControl::Grant.where(group: access_control_groups(:branch_editors), permission: "pages.create").delete_all
     grant.("pages.move", a)
     grant.("pages.create", a)
+    # Readable, but not theirs to create under: the ordinary refusal. (A
+    # target they can't even read is the test below.)
+    read_b = grant.("pages.read", b)
     no_create = as(users(:editor_branch)) { Trash::Restore.call(page.reload, parent: b) }
     assert no_create.denied?
     assert_equal [ "You don't have permission to #{AccessControl::Permissions.fetch("pages.create").label.downcase}" ], no_create.errors
     assert page.reload.trashed?
     assert_equal a, page.parent
 
+    # `pages.create` alone is enough from here: a write right on a branch is
+    # also the right to read it.
+    read_b.destroy!
     grant.("pages.create", b)
     assert as(users(:editor_branch)) { Trash::Restore.call(page.reload, parent: b) }.ok?
     assert_equal b, page.reload.parent
+  end
+
+  # "Not found, not forbidden": a parent outside the actor's read scope gets
+  # the answer a page that doesn't exist (any more) gets -- the same failure
+  # a trashed target does, never a permission refusal, and no `access.denied`
+  # event. A refusal would say "there is a page with this id, and you may
+  # not use it", to someone who is not supposed to know it exists.
+  test "a new parent the actor can't read is refused like one that doesn't exist" do
+    a, hidden, gone, page = as_owner do
+      a = create_page(title: "Branch A")
+      hidden = create_page(title: "Hidden")
+      gone = create_page(title: "Gone").tap { |target| Trash::Move.call(target) }
+      page = create_page(title: "Doomed", parent: a)
+      Trash::Move.call(page)
+      [ a, hidden, gone.reload, page.reload ]
+    end
+    %w[pages.delete pages.move pages.create].each do |key|
+      AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ a.id ] })
+    end
+
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      [ hidden, gone ].each do |target|
+        refused = as(users(:editor_branch)) { Trash::Restore.call(page.reload, parent: target) }
+        assert_not refused.ok?
+        assert_not refused.denied?, "a hidden parent was answered as forbidden"
+        assert_equal [ Trash::Restore::UNKNOWN_PARENT ], refused.errors
+      end
+    end
+    assert page.reload.trashed?
+    assert_equal a, page.parent
   end
 
   test "restoring needs the item's delete right" do

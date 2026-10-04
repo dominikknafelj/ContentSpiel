@@ -252,4 +252,63 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}']"
     assert_select "nav[aria-label='Modules'] [data-badge]", count: 0
   end
+
+  # --- The restore form's parent is looked up through the read scope ---------
+  #
+  # "Not found, not forbidden" for the forged `parent_id`: a page outside the
+  # viewer's read scope, a trashed one and an id that names nothing all get
+  # the one answer -- the same redirect, the same sentence, nothing restored,
+  # nothing in the audit log -- so the form can't be used to find out which
+  # page ids exist.
+
+  test "a restore under a parent that is hidden, trashed or nonexistent gets one answer and restores nothing" do
+    branch, hidden, page = Current.set(actor: users(:one)) do
+      branch = create_page(title: "Branch")
+      hidden = create_page(title: "Hidden")
+      page = create_page(title: "Doomed", parent: branch)
+      Trash::Move.call(page)
+      [ branch, hidden, page ]
+    end
+    %w[pages.delete pages.move pages.create].each do |key|
+      AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: { "page_ids" => [ branch.id ] })
+    end
+    sign_in_as users(:editor_branch)
+
+    answers = { hidden: hidden.id, trashed: @section.id, nonexistent: Page.maximum(:id) + 1000 }.transform_values do |parent_id|
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+        post admin_restore_trash_item_path("page", page), params: { parent_id: parent_id }
+      end
+      [ response.status, response.location, flash[:alert], flash[:notice] ]
+    end
+
+    assert_equal [ 303, admin_trash_url, Trash::Restore::UNKNOWN_PARENT, nil ], answers[:nonexistent]
+    assert_equal answers[:nonexistent], answers[:hidden]
+    assert_equal answers[:nonexistent], answers[:trashed]
+    assert page.reload.trashed?
+    assert_equal branch, page.parent
+
+    # A parent they can read but not create under is the ordinary refusal...
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.read", scope: { "page_ids" => [ hidden.id ] })
+    post admin_restore_trash_item_path("page", page), params: { parent_id: hidden.id }
+    assert_response :forbidden
+    assert page.reload.trashed?
+
+    # ...and one the picker offers works.
+    post admin_restore_trash_item_path("page", page), params: { parent_id: branch.id }
+    assert_redirected_to admin_trash_path
+    assert_not page.reload.trashed?
+  end
+
+  # A parent id that names nothing used to be dropped, and the restore went
+  # ahead in place as if no parent had been chosen.
+  test "a nonexistent parent id is refused even for someone who may restore in place" do
+    page = Current.set(actor: users(:one)) { create_page(title: "Doomed").tap { |doomed| Trash::Move.call(doomed) } }
+    sign_in_as users(:one)
+
+    post admin_restore_trash_item_path("page", page), params: { parent_id: Page.maximum(:id) + 1000 }
+
+    assert_redirected_to admin_trash_path
+    assert_equal Trash::Restore::UNKNOWN_PARENT, flash[:alert]
+    assert page.reload.trashed?
+  end
 end

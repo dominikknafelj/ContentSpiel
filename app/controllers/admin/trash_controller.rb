@@ -85,8 +85,15 @@ module Admin
     # chose to open. Every other restore -- from the Trash list itself, in
     # place or under a new parent -- still lands back there, with the fuller
     # `restored_notice` (slug changes, images brought along).
+    #
+    # A `parent_id` that names no page this viewer can read is refused here
+    # (`chosen_parent`), before the service is called, with the service's own
+    # sentence for a target that doesn't exist.
     def restore
-      service = Trash::Restore.new(@item, parent: chosen_parent)
+      parent = chosen_parent
+      return redirect_to(admin_trash_path(**admin_url_options), alert: Trash::Restore::UNKNOWN_PARENT, status: :see_other) if parent == :unknown
+
+      service = Trash::Restore.new(@item, parent: parent)
       result = service.call
       return forbidden_or(result) { redirect_to admin_trash_path(**admin_url_options), alert: result.errors.to_sentence, status: :see_other } unless result.ok?
 
@@ -201,10 +208,23 @@ module Admin
       end
     end
 
-    # A parent picked in the restore form: kept pages only -- whether the
-    # actor may put the page there is `Trash::Restore`'s own check.
+    # A parent picked in the restore form (pages only; a post or an image
+    # has none, and the service ignores one). Looked up through the read
+    # scope, which is kept pages only: "not found, not forbidden". An id
+    # outside the viewer's read scope, the id of a trashed page and an id
+    # that names nothing are all `:unknown`, and `restore` answers the three
+    # alike -- loaded with a bare `Page.kept.find_by`, a hidden page reached
+    # the service and came back as a 403 (so the form told a forged id that
+    # exists from one that doesn't), and an id that named nothing was
+    # dropped, the restore going ahead in place as if no parent had been
+    # chosen. Whether the actor may put the page under a parent they CAN
+    # read is `Trash::Restore`'s own check; the picker offers what
+    # `AccessControl.creatable_parents` allows, and a right to create under
+    # a page is also the right to read it.
     def chosen_parent
-      Page.kept.find_by(id: params[:parent_id]) if params[:parent_id].present?
+      return nil unless params[:type] == "page" && params[:parent_id].present?
+
+      admin_scope(Page.all).find_by(id: params[:parent_id].to_s) || :unknown
     end
 
     # "Restored “About” as about-2 (the URL was taken) and 1 image". Slug
