@@ -68,8 +68,16 @@ import { Controller } from "@hotwired/stimulus"
 //    were added, capturing or not (measured in Chrome 154: a capturing
 //    listener added later still runs later), and Turbo added its own when it
 //    started. `guardPopState` therefore takes Turbo's listener off, adds this
-//    one and puts Turbo's back behind it -- once, for the life of the
-//    document; the listener does nothing while no form is unsaved. That
+//    one and puts Turbo's back behind it -- once, when the first of these
+//    forms connects, and it is NEVER UNDONE: unlike the other listeners,
+//    which come and go with the forms, `onPopState` stays on `window` for the
+//    life of the document, on every screen visited afterwards. That is
+//    harmless: with no form unsaved (and so on every screen without one) it
+//    returns at its first check and Turbo's listener, next in line, hears the
+//    event exactly as before. Taking it off again would only mean reordering
+//    again for the next form. Should Turbo's history ever be stopped and
+//    started (`history.stop()` / `start()`), it removes and re-adds its
+//    listener, which then lands behind this one again -- the order holds. That
 //    reaches into Turbo (`Turbo.session.history.onPopState`, the function it
 //    registered): if it is not there, nothing is reordered and Back is
 //    guarded by case 4 alone, as it was. Stopping Turbo before it starts is
@@ -152,13 +160,46 @@ function onVisit(event) {
 function navigatesContentFrame(link) {
   const id = link.getAttribute("data-turbo-frame")
   if (id === "_top") return false
-  const frame = id ? document.getElementById(id) : link.closest("turbo-frame")
+  // A name that matches no element falls back to the enclosing frame, as it
+  // does in Turbo.
+  const frame = (id && document.getElementById(id)) || link.closest("turbo-frame")
   return frame?.id === "content"
+}
+
+// A `#field` link to the page that is showing (the error summary's links,
+// `Admin::ErrorSummaryComponent`). Turbo skips a link whose `href` begins
+// with "#" -- but tests the absolute `link.href`, which never does
+// (`findLinkFromClickTarget`), so it takes these for navigations too.
+function withinThePage(url) {
+  try {
+    const target = new URL(url, document.baseURI)
+    return target.hash.length > 1 && target.origin === location.origin &&
+      target.pathname === location.pathname && target.search === location.search
+  } catch {
+    return false
+  }
 }
 
 function onFrameLink(event) {
   const link = event.target
-  if (event.defaultPrevented || !(link instanceof Element) || !mustAsk()) return
+  if (event.defaultPrevented || !(link instanceof Element)) return
+
+  // A jump within the page leaves nothing, so nobody asks -- but left to
+  // Turbo it is a frame navigation that fetches this screen again, without
+  // the typed values and without the errors the link belongs to (the summary
+  // only exists after a refused save, when the form is unsaved). Turbo is
+  // kept out of it (cancelling `turbo:click` makes the session stand back,
+  // stopping it here keeps it from the frames) and the click itself is NOT
+  // cancelled: the browser follows the fragment on its own, scrolling to the
+  // field and giving it the focus. Whether or not a form is unsaved: the
+  // fetch was never wanted.
+  if (withinThePage(event.detail.url) && navigatesContentFrame(link)) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
+
+  if (!mustAsk()) return
   if (link.closest("[data-save-bar-cancel]") || !navigatesContentFrame(link)) return
 
   event.preventDefault()
@@ -185,9 +226,34 @@ function onPopState(event) {
   }
   if (!mustAsk()) return
 
+  // THE SAME PAGE. Two traversals arrive on the page the form is on, and
+  // neither leaves anything, so neither asks -- and Turbo must not hear of
+  // either, because it answers every `popstate` with a restoration visit
+  // (or, for an entry it didn't write, by adopting it), and a restoration of
+  // this page fetches the form again over the typed text:
+  // - to the very entry Turbo is on (`to === from`). That is Back from a
+  //   `#field` entry -- the browser made that entry itself when an error
+  //   summary's link was followed (`onFrameLink`), so Turbo's history never
+  //   moved -- and it is the guard's own undo arriving after
+  //   `RETURN_LIMIT_MS`, no longer expected;
+  // - to an entry Turbo didn't write (no index in its state) that differs
+  //   from where Turbo is by its hash alone: Forward to that `#field` entry.
+  //   Where Turbo is, is `Turbo.session.history.location` (another internal;
+  //   without it this simply doesn't match and the event goes to Turbo, as
+  //   any entry it didn't write does).
+  // An entry Turbo DID write is never taken for the same page by its URL:
+  // the same screen can be in the history twice, and a traversal between the
+  // two is a real one.
   const to = event.state?.turbo?.restorationIndex
   const from = window.Turbo?.session?.history?.currentIndex
-  if (!Number.isInteger(to) || !Number.isInteger(from) || to === from) return
+  const withoutHash = (url) => { try { const u = new URL(url); u.hash = ""; return u.href } catch { return null } }
+  const turboLocation = window.Turbo?.session?.history?.location
+  const fragmentOfThisPage = !Number.isInteger(to) && Boolean(turboLocation) && withoutHash(turboLocation) === withoutHash(location.href)
+  if (fragmentOfThisPage || (Number.isInteger(to) && to === from)) {
+    event.stopImmediatePropagation()
+    return
+  }
+  if (!Number.isInteger(to) || !Number.isInteger(from)) return
 
   event.stopImmediatePropagation()
   // `returned` resolves once the undo has arrived, and Discard waits for it:
@@ -277,8 +343,10 @@ function clearPendingLeave() {
 // `admin--pending-lock` is its listener: instant actions beside the form are
 // disabled while changes are pending (decision D10).
 // A listener that connects later than the forms asks for the state again by
-// dispatching `admin--pending-lock:connect` -- controllers are registered by
-// one dynamic import each, so no connect order can be relied on.
+// dispatching `admin--save-bar:query` on `document`, which is answered with
+// the same event -- controllers are registered by one dynamic import each, so
+// no connect order can be relied on. The question is anybody's to ask; the
+// answer is still the one thing told.
 function announce() {
   const unsaved = [...instances].filter((instance) => instance.unsaved)
   document.dispatchEvent(new CustomEvent("admin--save-bar:state", {
@@ -298,7 +366,7 @@ export default class extends Controller {
       document.addEventListener("turbo:click", onFrameLink, true)
       guardPopState()
       window.addEventListener("beforeunload", onUnload)
-      document.addEventListener("admin--pending-lock:connect", announce)
+      document.addEventListener("admin--save-bar:query", announce)
     }
     instances.add(this)
     shared.leaving = false
@@ -311,7 +379,7 @@ export default class extends Controller {
       document.removeEventListener("turbo:before-visit", onVisit)
       document.removeEventListener("turbo:click", onFrameLink, true)
       window.removeEventListener("beforeunload", onUnload)
-      document.removeEventListener("admin--pending-lock:connect", announce)
+      document.removeEventListener("admin--save-bar:query", announce)
       clearPendingLeave()
     }
     // After the listeners are gone: the form leaving is a change of state too

@@ -75,4 +75,39 @@ class Admin::PendingLockTest < ApplicationSystemTestCase
     assert_selector "#lock-button[disabled]"
     assert_selector "#lock-hint", text: "Save or cancel your changes first.", visible: :visible
   end
+
+  # Disabling a field of the explicit-save form itself would take it out of
+  # what the form submits -- which the footer counts as a change, so the lock
+  # could never open again. Such a control is left alone; an unnamed button
+  # inside that form (a dialog's trigger) submits nothing and is locked.
+  test "a control that belongs to the explicit-save form is never locked" do
+    sign_in_via_form(@owner)
+    visit edit_admin_user_path(@target)
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      document.querySelector("#user-form .admin-save-bar").insertAdjacentHTML("beforebegin", `
+        <div id="lock" data-controller="admin--pending-lock">
+          <input id="lock-field" name="user[note]" value="kept" data-admin--pending-lock-target="control">
+          <button type="button" id="lock-button" data-admin--pending-lock-target="control">Instant</button>
+          <p id="lock-hint" hidden data-admin--pending-lock-target="hint"></p>
+        </div>`)
+      const form = document.getElementById("user-form")
+      const parent = form.parentNode, next = form.nextSibling
+      form.remove()
+      parent.insertBefore(form, next)
+    JS
+    await_admin_controllers
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+
+    original = find_field("Name").value
+    fill_in "Name", with: "#{original} changed"
+    assert_selector "#lock-button[disabled]"
+    assert_selector "#lock-field:not([disabled])"
+    assert_selector ".admin-save-bar", text: /1 unsaved change\b/i
+
+    fill_in "Name", with: original
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_selector "#lock-button:not([disabled])"
+    assert_selector "#lock-hint", visible: :hidden
+  end
 end

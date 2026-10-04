@@ -19,7 +19,7 @@ import { Controller } from "@hotwired/stimulus"
 // themselves before this controller connected -- each controller arrives by
 // its own dynamic import, and a form re-rendered with errors is unsaved from
 // the start -- so on connect it asks for the state once
-// (`admin--pending-lock:connect`, which `admin--save-bar` answers). With no
+// (`admin--save-bar:query`, which `admin--save-bar` answers). With no
 // such form on the page nobody answers and nothing is locked.
 //
 // A button, input or select is `disabled`. A link can't be: it gets
@@ -27,6 +27,13 @@ import { Controller } from "@hotwired/stimulus"
 // phase and before Turbo or any `data-action` on the link sees it (Turbo
 // ignores a click that is already cancelled). A control that was disabled
 // for its own reasons is never touched, so unlocking doesn't enable it.
+//
+// A `control` target must be a button, a link, or a control of ANOTHER form
+// (an instant action's own). A NAMED control of an explicit-save form is
+// never locked: disabled, it drops out of what that form submits, the footer
+// counts that as a change, and the lock it caused would keep itself locked
+// for good. (An unnamed button inside that form -- a dialog's trigger -- is
+// no part of what it submits, and is locked like any other.)
 const HINT = "Save or cancel your changes first."
 const MARK = "data-pending-locked"
 
@@ -46,7 +53,7 @@ export default class extends Controller {
     document.addEventListener("admin--save-bar:state", this.onState)
     this.element.addEventListener("click", this.swallow, true)
     this.apply(false)
-    document.dispatchEvent(new CustomEvent("admin--pending-lock:connect"))
+    document.dispatchEvent(new CustomEvent("admin--save-bar:query"))
   }
 
   disconnect() {
@@ -70,6 +77,7 @@ export default class extends Controller {
 
   lock(control) {
     if (control.hasAttribute(MARK)) return
+    if (control.form?.matches("[data-controller~='admin--save-bar']") && control.name) return
     if (control instanceof HTMLAnchorElement) {
       if (control.getAttribute("aria-disabled") === "true") return
       control.setAttribute("aria-disabled", "true")

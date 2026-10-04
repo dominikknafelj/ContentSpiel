@@ -142,20 +142,171 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   # A screen opened by a link in the content frame is rendered first, and only
   # then does Turbo propose the visit that navigation is promoted to -- to the
-  # screen's own URL. Typing in that moment once made the guard take the
-  # promoted visit for a way out and ask about the screen that had just opened.
-  test "typing straight after arriving by a frame link doesn't ask to leave the screen just opened" do
+  # screen's own URL (`turbo:frame-render` on `#content`, then
+  # `turbo:before-visit`). A change made in between once made the guard take
+  # the promoted visit for a way out and ask about the screen that had just
+  # opened. The real gap is a few milliseconds wide, so the two events are
+  # replayed here by hand, with the change already typed: the visit that
+  # follows the frame's render is let through, once -- the same visit again is
+  # a way out like any other.
+  test "the visit a frame navigation is promoted to is let through, once" do
     sign_in_via_form(@owner)
-    visit admin_users_path
-    await_admin_controllers
-    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
-    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    open_edit_from_the_list
     fill_in "Name", with: "Typed at once"
-
-    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
-    assert_no_selector "dialog#leave-dialog[open]"
-    assert_equal "Typed at once", find_field("Name").value
     assert_selector ".admin-save-bar", text: /1 unsaved change/i
+
+    propose = <<~JS
+      (() => {
+        const frame = document.getElementById("content")
+        if (arguments[0]) frame.dispatchEvent(new CustomEvent("turbo:frame-render", { bubbles: true }))
+        const visit = new CustomEvent("turbo:before-visit", { bubbles: true, cancelable: true, detail: { url: frame.src } })
+        document.dispatchEvent(visit)
+        return visit.defaultPrevented
+      })()
+    JS
+    assert_equal false, page.evaluate_script(propose, true), "the promoted visit was stopped"
+    assert_no_selector "dialog#leave-dialog[open]"
+
+    assert_equal true, page.evaluate_script(propose, false), "a later visit to the same URL was not asked about"
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_equal "Typed at once", find_field("Name").value
+  end
+
+  # `to - from`, the other way and by more than one entry.
+  test "Forward with a typed change asks first, and Discard goes forward" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+    within("nav[aria-label='Modules']") { click_link "Posts" }
+    assert_current_path admin_posts_path
+    assert_no_field "Name"
+    page.execute_script("history.back()")
+    assert_current_path edit_admin_user_path(@target)
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    await_admin_controllers
+
+    fill_in "Name", with: "Typed before Forward"
+    page.execute_script("history.forward()")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_current_path edit_admin_user_path(@target)
+    assert_equal "Typed before Forward", find_field("Name").value
+
+    page.execute_script("history.forward()")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_current_path admin_posts_path
+    assert_no_field "Name"
+  end
+
+  test "Back by two entries asks first, and Discard goes back by two" do
+    sign_in_via_form(@owner)
+    visit admin_groups_path
+    await_admin_controllers
+    page.execute_script("document.addEventListener('turbo:load', () => { window.turboLoads = (window.turboLoads || 0) + 1 })")
+    within("nav[aria-label='Modules']") { click_link "Users" }
+    assert_current_path admin_users_path
+    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    assert_current_path edit_admin_user_path(@target)
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.turboLoads >= 2") }
+
+    fill_in "Name", with: "Typed before going back two"
+    page.execute_script("history.go(-2)")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Keep editing" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_current_path edit_admin_user_path(@target)
+    assert_equal "Typed before going back two", find_field("Name").value
+
+    page.execute_script("history.go(-2)")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_current_path admin_groups_path
+    assert_no_field "Name"
+  end
+
+  # A dialog's `close` event is dispatched a task after it closes, so the one
+  # from "Keep editing" can arrive when the dialog is already open again. It
+  # once disarmed that second opening's Discard, which then did nothing.
+  # Replayed by hand: a `close` event while the dialog is open.
+  test "a close event left over from an earlier opening doesn't disarm Discard" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+    fill_in "Name", with: "Typed"
+    page.execute_script("history.back()")
+    assert_selector "dialog#leave-dialog[open]"
+    page.execute_script("document.getElementById('leave-dialog').dispatchEvent(new Event('close'))")
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_current_path admin_users_path
+    assert_no_field "Name"
+  end
+
+  # A `popstate` for the entry the form is already on (the guard's own undo
+  # arriving too late to be recognised; a fragment entry of the same page):
+  # nothing is being left, so nobody asks -- and Turbo must not answer it with
+  # a restoration visit, which would fetch the form again over the typed text.
+  test "a popstate for the entry the form is on neither asks nor reloads the form" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+    fill_in "Name", with: "Typed"
+    page.execute_script(<<~JS)
+      document.getElementById("user-form").dataset.sameForm = "yes"
+      document.addEventListener("turbo:visit", () => { window.restorationStarted = true })
+      window.dispatchEvent(new PopStateEvent("popstate", { state: history.state }))
+    JS
+    sleep 0.5
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_nil page.evaluate_script("window.restorationStarted")
+    assert_selector "#user-form[data-same-form=yes]"
+    assert_equal "Typed", find_field("Name").value
+  end
+
+  # The error summary's links are `#field` links inside the content frame, and
+  # the summary only exists after a refused save -- when the form is unsaved.
+  # Turbo takes such a link for a frame navigation (it compares the absolute
+  # `href`), so the guard asked "Leave without saving?", and Discard fetched
+  # the form again without the typed values or the errors. It is a jump within
+  # the page: nobody asks, nothing is fetched, and Back from it stays put.
+  test "an error summary's link jumps to its field without asking, and Back from it stays on the form" do
+    sign_in_via_form(@owner)
+    visit new_admin_user_path
+    await_admin_controllers
+    fill_in "Email address", with: @target.email_address
+    fill_in "Password", with: "a much Longer passw0rd"
+    fill_in "Confirm password", with: "a much Longer passw0rd"
+    press "Create user"
+    assert_selector ".admin-error-summary a[href='#user_email_address']", wait: 10
+    await_admin_controllers
+    page.execute_script("document.getElementById('user-form').dataset.sameForm = 'yes'; document.addEventListener('turbo:visit', () => { window.restorationStarted = true })")
+
+    find(".admin-error-summary a[href='#user_email_address']").click
+    assert_eventually(message: "the link never jumped") { page.evaluate_script("location.hash") == "#user_email_address" }
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_selector "#user-form[data-same-form=yes]"
+    assert_selector ".admin-error-summary"
+    assert_equal @target.email_address, find_field("Email address").value
+    assert_equal "user_email_address", page.evaluate_script("document.activeElement.id")
+
+    page.execute_script("history.back()")
+    assert_eventually(message: "Back never left the fragment") { page.evaluate_script("location.hash") == "" }
+    sleep 0.5
+    assert_current_path new_admin_user_path
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_nil page.evaluate_script("window.restorationStarted")
+    assert_selector "#user-form[data-same-form=yes]"
+    assert_selector ".admin-error-summary"
+    assert_equal @target.email_address, find_field("Email address").value
+
+    # And Forward to it again: an entry the browser made, not Turbo.
+    page.execute_script("history.forward()")
+    assert_eventually(message: "Forward never reached the fragment") { page.evaluate_script("location.hash") == "#user_email_address" }
+    sleep 0.5
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_nil page.evaluate_script("window.restorationStarted")
+    assert_selector "#user-form[data-same-form=yes]"
+    assert_equal @target.email_address, find_field("Email address").value
   end
 
   test "Back with nothing typed just goes back" do
