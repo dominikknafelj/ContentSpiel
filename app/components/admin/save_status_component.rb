@@ -61,7 +61,7 @@ module Admin
       when :retrying then "NOT SAVED · RETRYING…"
       # The Retry button is rendered after this text (see the template).
       when :offline then "NOT SAVED · "
-      when :stale then "Changed elsewhere — reload to see the latest"
+      when :stale then "● CHANGED ELSEWHERE"
       when :signed_out then "Signed out — sign in again to keep saving"
       end
     end
@@ -73,7 +73,11 @@ module Admin
     # `text-ok-ink` marks a live record's saved line only; a failure or
     # anything else keeps the neutral colour.
     def css_class
-      "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{state == :saved && live ? "text-ok-ink" : "text-meta"}"
+      colour = if state == :saved && live then "text-ok-ink"
+      elsif state == :stale then "text-warn-ink"
+      else "text-meta"
+      end
+      "min-h-[1lh] font-cs-mono text-[11px] tracking-mono #{colour}"
     end
 
     private

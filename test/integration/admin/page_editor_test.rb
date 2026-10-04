@@ -72,12 +72,50 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_match(/can.*?t be blank/, response.body)
   end
 
-  test "a stale base still saves and warns" do
-    stale = 1.hour.ago.iso8601(6)
-    patch "/cs-studio/pages/#{@page.id}", params: { page: { subtitle: "Hi" }, base_updated_at: stale }, as: :turbo_stream
+  test "a save made on a stale base is refused, names who changed it, and keeps the newer text" do
+    page = create_page(title: "About 2")
+    stale = page.updated_at.iso8601(6)
+    as(users(:two), channel: :admin) { Pages::Save.call(page, translations: { "en" => { subtitle: "Changed by someone else" } }) }
+
+    patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "My stale edit" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal "Changed by someone else", page.reload.subtitle
+    assert_select_in_stream "page-save-status", /CHANGED ELSEWHERE/
+    assert_select_in_stream "editor-notice", /Changed by .+Reload/m
+    assert_select_in_stream "editor-notice", /#{Regexp.escape(users(:two).display_name)}/
+    assert_no_match(/page-base-updated-at/, response.body, "the base must not advance, or the next save would overwrite")
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      patch admin_page_path(page), params: { base_updated_at: stale, page: { subtitle: "Again" } }, as: :turbo_stream
+    end
+  end
+
+  test "a save on a current base still saves" do
+    page = create_page(title: "About 3")
+    patch admin_page_path(page), params: { base_updated_at: page.updated_at.iso8601(6), page: { subtitle: "Fresh" } }, as: :turbo_stream
     assert_response :success
-    assert_equal "Hi", @page.reload.subtitle(locale: :en)
-    assert_includes response.body, "Changed elsewhere — reload to see the latest"
+    assert_equal "Fresh", page.reload.subtitle
+  end
+
+  test "a save with no base at all still saves (scripted and non-JS clients send none)" do
+    patch admin_page_path(@page), params: { page: { subtitle: "Scripted" } }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Scripted", @page.reload.subtitle
+  end
+
+  test "the editor has an empty notice slot a stream can target" do
+    get admin_page_path(@page)
+    assert_select "#editor-notice:empty"
+  end
+
+  test "a view-only editor says so, and why" do
+    @page.content_blocks.create!(block_type: :rich_text, position: 0)
+    sign_in_as(users(:reader))
+    get admin_page_path(@page)
+    assert_response :success
+    assert_select "[data-view-only-hint]", "You can view this page but not change it."
+    assert_select "[role=toolbar]", 0
+    assert_select ".admin-view-only"
+    assert_select "#editor-notice"
   end
 
   test "publish, schedule and unpublish" do

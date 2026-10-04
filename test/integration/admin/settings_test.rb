@@ -181,7 +181,10 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/settings", params: { site_setting: { title: "Second, from a stale tab" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :success
-    assert_match(/Changed elsewhere/, response.body)
+    # The Settings form is not one of the three record editors that refuse a
+    # stale save (`AutosaveResponses#refuse_stale_autosave`): it still saves
+    # and warns, now in the new wording.
+    assert_match(/CHANGED ELSEWHERE/, response.body)
   end
 
   # -- translated title and tagline (translation helpers spec §5) --

@@ -122,6 +122,10 @@ module Admin
     # still lands its per-field errors instead of falling back to a blank
     # error page.
     def update
+      # Before anything is read off the form or any service is called -- see
+      # `AutosaveResponses#refuse_stale_autosave`.
+      return if refuse_stale_autosave(@page, status_id: "page-save-status", reload_url: admin_page_path(@page, **admin_url_options))
+
       page_params = params.fetch(:page, ActionController::Parameters.new).permit(*TRANSLATED_FIELDS, *ATTRIBUTE_FIELDS)
       translated = page_params.slice(*TRANSLATED_FIELDS).to_h
       attributes = page_params.slice(*ATTRIBUTE_FIELDS).to_h
@@ -133,7 +137,6 @@ module Admin
         result: result,
         status_id: "page-save-status",
         error_prefix: "page",
-        base_updated_at: params[:base_updated_at],
         fields: page_error_fields
       )
 

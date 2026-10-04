@@ -71,6 +71,31 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal "draft", created.status
   end
 
+  test "a save made on a stale base is refused, names who changed it, and keeps the newer text" do
+    post_record = create_post(title: "Engineer")
+    stale = post_record.updated_at.iso8601(6)
+    as(users(:two), channel: :admin) { Posts::Save.call(post_record, translations: { "en" => { excerpt: "Changed by someone else" } }) }
+
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: stale, post: { excerpt: "My stale edit" } }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal "Changed by someone else", post_record.reload.excerpt
+    assert_select_in_stream "post-save-status", /CHANGED ELSEWHERE/
+    assert_select_in_stream "editor-notice", /Changed by .+Reload/m
+    assert_no_match(/post-base-updated-at/, response.body)
+  end
+
+  test "a post save on a current base still saves" do
+    post_record = create_post(title: "Engineer")
+    patch "/cs-studio/posts/#{post_record.id}", params: { base_updated_at: post_record.updated_at.iso8601(6), post: { excerpt: "Fresh" } }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Fresh", post_record.reload.excerpt
+  end
+
+  test "the editor has an empty notice slot a stream can target" do
+    get "/cs-studio/posts/#{create_post(title: "Engineer").id}"
+    assert_select "#editor-notice:empty"
+  end
+
   test "typed fields and tags autosave" do
     post_record = create_post(title: "Engineer", content_type: "resume_entry")
     patch "/cs-studio/posts/#{post_record.id}",

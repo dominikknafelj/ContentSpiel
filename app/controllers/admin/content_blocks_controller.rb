@@ -67,6 +67,13 @@ module Admin
       block = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless block
 
+      # The block's own base (its `updated_at`), not the page's. A refused
+      # save vouches for nothing, so it also streams no page base
+      # (`page_base_streams` is only reached on success) -- see
+      # `AutosaveResponses#refuse_stale_autosave`.
+      return if refuse_stale_autosave(block, status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
+        reload_url: admin_page_path(@page, **admin_url_options))
+
       attributes, translations = split_block_params(block)
       result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
@@ -75,7 +82,6 @@ module Admin
         result: result,
         status_id: Admin::BlockCardComponent.error_prefix(block) + "-save-status",
         error_prefix: Admin::BlockCardComponent.error_prefix(block),
-        base_updated_at: params[:base_updated_at],
         fields: block_error_fields(block)
       )
 

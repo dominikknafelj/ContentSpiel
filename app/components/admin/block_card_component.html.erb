@@ -40,10 +40,10 @@
 
   <% unless unavailable? %>
     <div data-block-body class="flex flex-col gap-3 p-3">
-      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
+      <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
 
       <%= form_with url: form_url, method: :patch, class: "flex flex-col gap-4", data: form_data do %>
-      <%= tag.fieldset disabled: !editable?, class: "contents" do %>
+      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
         <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
 
         <% schema_fields.each do |field| %>
@@ -60,7 +60,7 @@
             <%= render Admin::Columns::RichTextColumnComponent.new(
                   name: "body", id: field_id("body"), html_name: field_html_name("body"),
                   value: column_value("body"), original: column_original("body"), errors: column_errors("body"), locale: locale,
-                  **translation("body")
+                  editable: editable?, **translation("body")
                 ) %>
           <% when "caption" %>
             <%= render Admin::Columns::PlainColumnComponent.new(

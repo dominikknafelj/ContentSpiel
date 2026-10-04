@@ -27,12 +27,13 @@ module Admin
     # modal opened from within it would be clipped by it. Dialog forms still
     # cannot nest in the editor form -- the header is never inside one.
     #
-    # Slots: `suggest` is the right-aligned end of the language row (today
-    # `TranslateAllComponent`, rendered by the caller), `notice` a line under
-    # the rows (a later task's "Changed elsewhere" banner).
+    # Slot: `suggest` is the right-aligned end of the language row (today
+    # `TranslateAllComponent`, rendered by the caller). Under the rows the
+    # header itself owns two things: the view-only hint, and the empty
+    # `#editor-notice` a stale autosave's 409 fills with the "Changed
+    # elsewhere" bar.
     class HeaderComponent < Admin::AdminComponent
       renders_one :suggest
-      renders_one :notice
 
       def initialize(record:, locale:, url_options: {})
         raise ArgumentError, "the editor header is for a Page or a Post, not #{record.class}" unless record.is_a?(::Page) || record.is_a?(::Post)
@@ -88,6 +89,18 @@ module Admin
       # the trash `.delete` -- absent, not disabled, without them. A readable
       # record the viewer cannot edit says "View only".
       def editable? = defined?(@editable) ? @editable : (@editable = can_edit?(record))
+
+      # Why a record that is readable cannot be changed -- one whole string per
+      # case. The editing right is there but the record is published (or
+      # scheduled) and the viewer cannot publish: `can_edit?`'s own rule
+      # ("editing a published record needs publish too", the interim rule
+      # until revisions exist).
+      def view_only_hint
+        hint = "You can view this #{type} but not change it."
+        return hint unless can?("#{type}s.edit", record) && record.published_at.present?
+
+        "#{hint} It is #{live? ? "live" : "scheduled"}, and changing a #{live? ? "live" : "scheduled"} #{type} needs the right to publish."
+      end
 
       def may_publish? = can?("#{type}s.publish", record)
 

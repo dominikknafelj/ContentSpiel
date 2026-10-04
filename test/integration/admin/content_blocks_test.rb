@@ -442,6 +442,40 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal @page.reload.updated_at.iso8601(6), streamed_page_base
   end
 
+  test "a block save made on a stale base is refused, names who changed it, and keeps the newer text" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    stale = block.updated_at.iso8601(6)
+    travel 1.minute
+    as(users(:two), channel: :admin) { ContentBlocks::Save.call(block, translations: { "en" => { caption: "Changed by someone else" } }) }
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "My stale edit" }, base_updated_at: stale }, as: :turbo_stream
+    assert_response :conflict
+    assert_equal "Changed by someone else", block.reload.caption
+    assert_select_in_stream "block-#{block.id}-save-status", /CHANGED ELSEWHERE/
+    assert_select_in_stream "editor-notice", /Changed by .+Reload/m
+    assert_no_match(/block-#{block.id}-base-updated-at/, response.body)
+    assert_no_match(/page-base-updated-at/, response.body, "a refused save vouches for nothing")
+  end
+
+  test "a block save on a current base still saves" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Fresh" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Fresh", block.reload.caption
+  end
+
+  test "a block on a live page saves 'to site', like the page does; on a draft page it just saves" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    assert @page.live?
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Live" }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_select_in_stream "block-#{block.id}-save-status", /● SAVED TO SITE \d\d:\d\d/
+
+    draft = create_page(title: "Draft page", published: false)
+    draft_block = draft.content_blocks.create!(block_type: :image, position: 0)
+    patch "/cs-studio/pages/#{draft.id}/content_blocks/#{draft_block.id}", params: { block: { caption: "Draft" }, base_updated_at: draft_block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_select_in_stream "block-#{draft_block.id}-save-status", /\ASAVED \d\d:\d\d/
+  end
+
   # Fix round 2: the refresh above must never paper over a real conflict.
   # A loaded the editor, B then saved the page's settings, then A edited a
   # block: A's page form still holds the pre-B base, so the block response
@@ -460,9 +494,11 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_nil Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='page-base-updated-at']")
 
     patch "/cs-studio/pages/#{@page.id}", params: { page: { subtitle: "A's subtitle" }, base_updated_at: a_base.iso8601(6) }, as: :turbo_stream
-    assert_response :success
-    assert_match(/Changed elsewhere/, response.body)
-    assert_equal "B's title", @page.reload.title
+    assert_response :conflict
+    assert_match(/CHANGED ELSEWHERE/, response.body)
+    assert_select_in_stream "editor-notice", /Changed by two@example\.com/
+    assert_nil @page.reload.subtitle
+    assert_equal "B's title", @page.title
   end
 
   # No page base sent (a client that doesn't send one): nothing to vouch

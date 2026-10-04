@@ -101,9 +101,16 @@
     <% end %>
   </div>
 
-  <% if notice? %>
-    <div class="pb-3 pt-3"><%= notice %></div>
+  <%# Why the editor is read-only, in one whole sentence per case (handoff
+      §10 B20). %>
+  <% unless editable? %>
+    <p data-view-only-hint class="mt-3 text-[13px] text-dim"><%= view_only_hint %></p>
   <% end %>
+
+  <%# Always present, empty: a 409 autosave answer puts the "Changed
+      elsewhere" bar here (`Admin::AutosaveResponses#stale_streams`). Nothing
+      but the tag inside it, so `:empty` holds until a stream fills it. %>
+  <div id="editor-notice"></div>
 <% end %>
 
 <%# Dialogs: siblings of the header (see the class comment). %>

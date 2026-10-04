@@ -74,6 +74,9 @@ export default class extends Controller {
     this.busy = false
     this.pending = false
     this.retryCount = 0
+    // Set by a 409 ("changed elsewhere"): this form's saves are over until
+    // the page is reloaded (see `attempt`).
+    this.paused = false
   }
 
   disconnect() {
@@ -81,17 +84,20 @@ export default class extends Controller {
   }
 
   queue() {
+    if (this.paused) return
     if (this.timer) clearTimeout(this.timer)
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
   }
 
   saveNow() {
+    if (this.paused) return
     if (this.timer) clearTimeout(this.timer)
     this.trigger()
   }
 
   trigger() {
     this.timer = null
+    if (this.paused) return
 
     if (this.busy) {
       this.pending = true
@@ -148,13 +154,35 @@ export default class extends Controller {
     // page through one of *those* streams (`Admin::AutosaveResponses
     // #autosave_stream`), so a response with some other content type, or a
     // status outside this endpoint's own documented range (2xx a save;
-    // 410 "this block was deleted"; 422 a failed save's own per-field
-    // errors) was never actually processed by the endpoint at all -- a 500,
+    // 409 a refused stale save; 410 "this block was deleted"; 422 a failed
+    // save's own per-field errors) was never actually processed by the endpoint at all -- a 500,
     // a proxy's own error page, ... -- and takes the same retry path a
     // network error does, rather than being handed to
     // `Turbo.renderStreamMessage` as if it were one.
     if (!this.isTurboStreamAnswer(response)) {
       this.scheduleRetry()
+      return
+    }
+
+    // 409: the server refused this save because the record changed since the
+    // form loaded (`Admin::AutosaveResponses#refuse_stale_autosave`). It is
+    // FINAL, unlike every other failure here: no retry (the same request
+    // would be refused again), and no further saves from this form at all
+    // (`paused`), because the editor's text on screen is the only copy of
+    // what they typed and any later save would be refused too -- or, were
+    // the base ever advanced, would overwrite the other editor's work. The
+    // stream puts the "Changed elsewhere" status and bar up; the fields are
+    // left exactly as they are so the text can be copied, and Reload (a full
+    // page visit) discards it. No base is read out of the answer, there
+    // being none -- a refusal never vouches for a newer one.
+    if (response.status === 409) {
+      Turbo.renderStreamMessage(await response.text())
+      this.paused = true
+      this.pending = false
+      this.retryCount = 0
+      this.busy = false
+      if (this.timer) clearTimeout(this.timer)
+      this.timer = null
       return
     }
 
@@ -247,15 +275,15 @@ export default class extends Controller {
   // True for exactly the responses this controller's own PATCH endpoints
   // (`Admin::AutosaveResponses#autosave_stream`'s callers) actually answer
   // with (final-fixes round, finding 4) -- a real Turbo Stream body, at one
-  // of the three statuses those endpoints ever send: a plain 2xx success,
-  // 410 (a destroyed block/post, "This block was deleted"), or 422 (a
-  // failed save's own per-field errors). Anything else -- wrong content
+  // of the four statuses those endpoints ever send: a plain 2xx success,
+  // 409 (a stale base, refused), 410 (a destroyed block/post, "This block
+  // was deleted"), or 422 (a failed save's own per-field errors). Anything else -- wrong content
   // type, or a status this endpoint never documents sending at all -- is
   // treated as "no real answer arrived," not as this save having somehow
   // succeeded.
   isTurboStreamAnswer(response) {
     const contentType = response.headers.get("Content-Type") || ""
-    const answeredStatus = (response.status >= 200 && response.status < 300) || response.status === 410 || response.status === 422
+    const answeredStatus = (response.status >= 200 && response.status < 300) || response.status === 409 || response.status === 410 || response.status === 422
 
     return answeredStatus && contentType.includes("text/vnd.turbo-stream.html")
   }

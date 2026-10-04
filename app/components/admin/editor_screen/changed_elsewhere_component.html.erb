@@ -1,0 +1,14 @@
+<%# `role="alert"`: announced at once, since the editor's typing was just
+    not saved. Warn (amber), never red: nothing is wrong with what they
+    typed. %>
+<div id="changed-elsewhere" role="alert" class="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-cs bg-warn-tint px-3 py-2 text-[13px] text-warn-ink">
+  <p class="min-w-0 flex-1">
+    <% if change %>
+      Changed by <%= render Admin::UserNameComponent.new(user: change.user, user_id: change.user_id) %> <%= render Admin::TimeAgoComponent.new(time: change.last_occurred_at) %>.
+    <% else %>
+      Changed elsewhere.
+    <% end %>
+    Your text is still here so you can copy it; reloading shows the latest version.
+  </p>
+  <%= link_to "Reload", reload_url, class: "shrink-0 font-semibold underline hover:text-ink", data: { turbo_frame: "_top" } %>
+</div>

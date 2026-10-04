@@ -100,6 +100,8 @@ module Admin
     # own one-shot `publish`/`unpublish`/`schedule` actions below, not
     # something a debounced autosave should ever be able to trigger.
     def update
+      return if refuse_stale_autosave(@post, status_id: "post-save-status", reload_url: admin_post_path(@post, **admin_url_options))
+
       post_params = params.fetch(:post, ActionController::Parameters.new)
       translated = post_params.permit(*TRANSLATED_COLUMNS).to_h
       attributes = {}
@@ -130,7 +132,6 @@ module Admin
         result: result,
         status_id: "post-save-status",
         error_prefix: "post",
-        base_updated_at: params[:base_updated_at],
         fields: post_error_fields
       )
 

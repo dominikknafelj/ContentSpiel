@@ -30,7 +30,8 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
     assert_text "NOT SAVED · Retry"
 
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :stale)
-    assert_text "Changed elsewhere — reload to see the latest"
+    assert_text "● CHANGED ELSEWHERE"
+    assert_selector "p.text-warn-ink"
 
     # Fix (final-fixes round, finding 4): never rendered by a server
     # response (see this state's own class comment), but its exact text

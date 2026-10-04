@@ -58,4 +58,21 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_text "Original body"
     assert_equal "Hands off", @post.reload.title
   end
+
+  test "a read-only user's page editor says why, shows no tools, and cannot type" do
+    page_record = create_page(title: "Look only")
+    page_record.content_blocks.create!(block_type: :rich_text, position: 0)
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_admin_controllers
+
+    assert_selector "[data-view-only-hint]", text: "You can view this page but not change it."
+    assert_selector "#editor-notice"
+    assert_no_selector "[role=toolbar]"
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "button[aria-label='Block actions'], summary[aria-label='Block actions']"
+    assert_no_text "Add block"
+    assert_no_selector "[data-controller~='admin--autosave']"
+    assert_selector ".admin-view-only"
+    assert find_field("Title", disabled: true).disabled?
+  end
 end

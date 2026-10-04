@@ -51,7 +51,20 @@ module Admin
     # `media-picker:picked` event bubbles from the button to this
     # controller's element. There's no upload of the editor's own any more;
     # the picker's Upload tab covers it.
+    #
+    # `editable: false` (a view-only editor, handoff §10 B20) renders no
+    # toolbar at all -- a row of dead, disabled buttons would only suggest
+    # something could be done. `admin--rich-text` already mounts the editor
+    # read-only inside a `fieldset[disabled]` and guards every popover and
+    # command on that, so the missing toolbar costs it nothing.
     class RichTextColumnComponent < Base
+      def initialize(editable: true, **options)
+        super(**options)
+        @editable = editable
+      end
+
+      def editable? = @editable
+
       # [action, accessible name, visible text, toggle?]. `action` is the
       # `admin--rich-text` method the button runs (`data-action` below) and
       # the key the controller reports active state under. Toggle buttons

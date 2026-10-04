@@ -210,3 +210,9 @@
 /* The placeholder is also the "chosen" element for the length of a mouse
    drag: it stays the dashed, empty slot, and the clone is what looks lifted. */
 .admin-drag-ghost.admin-drag-chosen { background: transparent; box-shadow: none; }
+
+/* A view-only editor (handoff §10 B20): the fieldset that disables a
+   record's fields also marks them as plainly read-only -- sunken and dim,
+   the same look a disabled field already has, but on the rich-text editor
+   too (a `<fieldset disabled>` doesn't reach a contenteditable). */
+.admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { background: var(--cs-sunken); color: var(--cs-dim); }
