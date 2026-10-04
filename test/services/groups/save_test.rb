@@ -280,6 +280,66 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal [ { "content_types" => %w[blog retired_type] } ], group.grants.reload.map(&:scope)
   end
 
+  # --- Fix round 1 (C1): only what the editor CARRIES is ignored ----------------
+  # An unregistered name is dormant until a plugin registers it, then it grants.
+  # Only a name the STORED grant of the same permission already holds as gone may
+  # be left out of the comparisons; any other goes through the rules.
+
+  test "a non-owner can't plant an unregistered type name in a grant they could only hand out as blog" do
+    group = AccessControl::Group.create!(name: "Planting")
+    grant(group, "posts.edit", "content_types" => %w[blog])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Planting", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog ghost] } } ] })
+    end
+
+    assert result.denied?
+    assert_equal [ { "content_types" => %w[blog] } ], group.grants.reload.map(&:scope)
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+  end
+
+  test "a blog-only holder can't add a new grant carrying an unregistered type" do
+    group = AccessControl::Group.create!(name: "Fresh")
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Fresh", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog acme/events] } } ] })
+    end
+
+    assert result.denied?
+    assert_empty group.grants.reload
+  end
+
+  test "a stored retired type is carried, but an extra unregistered name beside it is refused; untouched still saves quietly" do
+    group = AccessControl::Group.create!(name: "Both")
+    grant(group, "posts.edit", "content_types" => %w[blog retired])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    widened = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Both", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired ghost] } } ] })
+    end
+    assert widened.denied?
+    assert_equal [ { "content_types" => %w[blog retired] } ], group.grants.reload.map(&:scope)
+
+    assert_no_difference -> { Audit::Event.count } do
+      untouched = as(users(:editor_branch)) do
+        Groups::Save.call(group, attributes: { name: "Both", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+      end
+      assert untouched.ok?, untouched.errors.inspect
+    end
+  end
+
+  test "an owner may still store what they post" do
+    group = AccessControl::Group.create!(name: "Owned")
+    grant(group, "posts.edit", "content_types" => %w[blog])
+
+    result = as_owner { Groups::Save.call(group, attributes: { name: "Owned", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog ghost] } } ] }) }
+
+    assert result.ok?
+    assert_equal [ { "content_types" => %w[blog ghost] } ], group.grants.reload.map(&:scope)
+  end
+
   private
 
   def grant(group, permission, scope = {})

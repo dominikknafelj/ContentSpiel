@@ -77,9 +77,10 @@ module Admin
         return [] unless ticked?
 
         items = branch_shown ? branch_items : type_items
-        return [ Chip.new(label: branch_shown ? "All pages" : "All content types", kind: :dim, dot: nil) ] if items.empty? && removed_types.empty?
-
-        shown = items.first(MAX_CHIPS)
+        # Nothing live ticked is "all", which is what Save stores even while a removed
+        # type is still carried (`GroupsController#grants_from`), so the chip says so
+        # and the warn chips follow it.
+        shown = items.empty? ? [ Chip.new(label: branch_shown ? "All pages" : "All content types", kind: :dim, dot: nil) ] : items.first(MAX_CHIPS)
         shown << Chip.new(label: "+#{items.size - MAX_CHIPS}", kind: :more, dot: nil) if items.size > MAX_CHIPS
         shown + removed_types.sort.map { |name| Chip.new(label: "! #{name} · type removed", kind: :warn, dot: nil) }
       end

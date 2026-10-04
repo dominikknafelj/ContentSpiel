@@ -82,6 +82,28 @@ class Admin::GroupsScreen::PermissionRowComponentTest < ViewComponent::TestCase
     assert_no_selector "[class*=danger]"
   end
 
+  test "only a removed type left means the chips say all content types, then the warn chip" do
+    row("posts.edit", scope: { "content_types" => %w[retired_type] })
+
+    chips = page.all("[data-chips] .admin-scope-chip").map(&:text)
+    assert_equal [ "All content types", "! retired_type · type removed" ], chips
+  end
+
+  test "a chosen root below another chosen root is carried as a hidden input beside its disabled box" do
+    home = create_page(title: "Home y")
+    about = create_page(title: "About", parent: home)
+    team = create_page(title: "Team", parent: about)
+
+    row("pages.edit", scope: { "page_ids" => [ about.id, team.id ] }, tree: tree_for([ home, about, team ]))
+
+    assert_selector "input[type=checkbox][value='#{team.id}'][checked][disabled]"
+    assert_selector "input[type=hidden][name='group[grants][pages.edit][page_ids][]'][value='#{team.id}']:not([disabled])", visible: :all
+    # A chosen root that is not implied has one too, but off: its own box submits it, never both.
+    assert_selector "input[type=hidden][value='#{about.id}'][disabled]", visible: :all
+    assert_selector "input[type=hidden][value='#{about.id}']:not([disabled])", count: 0, visible: :all
+    assert_selector "[data-chips] .admin-scope-chip", count: 1, text: "Under About"
+  end
+
   test "pages: the tree, tri-state, server-rendered" do
     home = create_page(title: "Home x")
     about = create_page(title: "About", parent: home)

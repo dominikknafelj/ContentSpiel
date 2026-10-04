@@ -84,22 +84,33 @@ module Groups
       end.uniq.sort_by { |grant| [ grant[:permission], grant[:scope].to_json ] }
     end
 
-    # The desired grants as `LiveGrants` would read them: a content type that
-    # is no longer registered is a dead scope value, not part of what the
-    # grant means. The editor CARRIES such a value (a chip with Remove, a
-    # hidden input until it is pressed) so that a form submitted as rendered
-    # changes nothing; compared raw, that carried value would make every
-    # untouched save look like a changed -- or, for the escalation and
-    # removal rules, a widened -- grant. Only the *comparisons* use this;
-    # what is stored, and what the audit event lists, is the raw list, so
-    # pressing Remove (the value gone from the submission) is a real change.
-    def live(grants)
+    # The desired grants with the content types the EDITOR CARRIES left out:
+    # a type that is no longer registered and that the STORED grant of the same
+    # permission already holds. That is a dead scope value the group has today,
+    # not part of what the grant means, and the editor submits it (a chip with
+    # Remove, a hidden input) so that a form saved as rendered changes nothing.
+    # Compared raw, every untouched save would look like a changed grant.
+    #
+    # Nothing else is left out. Any other unregistered name -- one the stored
+    # grant doesn't hold -- stays in the compared scope and goes through
+    # `can_grant?` / `can_manage_group?` like any value: it is dormant only until
+    # a plugin registers a type of that name, and then it would grant on it.
+    # Only the *comparisons* use this; what is stored, and what the audit event
+    # lists, is the raw list, so pressing Remove (the value gone from the
+    # submission) is a real change.
+    def stored_grants = @stored_grants ||= (@group.persisted? ? @group.grants.to_a : [])
+
+    def live(grants, stored_grants)
       registered = AccessControl::Permissions.content_type_choices
+      carried = stored_grants.group_by(&:permission).transform_values do |held|
+        held.flat_map(&:scope_content_types).uniq - registered
+      end
       grants.map do |grant|
         types = grant[:scope]["content_types"]
-        next grant unless types
+        gone = carried.fetch(grant[:permission], [])
+        next grant if types.nil? || gone.empty?
 
-        { permission: grant[:permission], scope: grant[:scope].merge("content_types" => types & registered) }
+        { permission: grant[:permission], scope: grant[:scope].merge("content_types" => types - gone) }
       end
     end
 
@@ -129,7 +140,7 @@ module Groups
     def removal_refusal(stored, desired, removed_member_ids)
       return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
 
-      removed_grants = desired ? stored.attributes - live(desired) : []
+      removed_grants = desired ? stored.attributes - live(desired, stored_grants) : []
       return if removed_member_ids.empty? && removed_grants.empty?
       return if AccessControl.can_manage_group?(actor, @group)
 
@@ -144,7 +155,7 @@ module Groups
       return if actor.nil? || AccessControl.owner?(actor)
 
       unchanged = stored.attributes
-      desired = live(desired) if desired
+      desired = live(desired, stored_grants) if desired
       Array(desired).each do |grant|
         next if unchanged.include?(grant)
         return denied(grant[:permission], @group) unless AccessControl.can_grant?(actor, grant[:permission], grant[:scope])

@@ -265,6 +265,8 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_not_includes submitted["pages.edit"]["page_ids"], fixture[:section].id.to_s
     assert_not_includes submitted["pages.edit"]["page_ids"], fixture[:a1].id.to_s
     assert_equal [ "blog", "retired_type" ], submitted["posts.edit"]["content_types"].reject(&:blank?).sort
+    # The chosen-and-implied root is carried, so it survives (the box itself is disabled).
+    assert_equal [ fixture[:section].id.to_s, fixture[:a1].id.to_s ].sort, submitted["pages.publish"]["page_ids"].sort
 
     before = grants_snapshot(fixture[:group])
     assert_no_difference -> { Audit::Event.count } do
@@ -358,6 +360,24 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_select "[class*='mx-auto']", count: 0
   end
 
+  test "a non-owner can't plant an unregistered content type name through the form (403, nothing stored)" do
+    group = AccessControl::Group.create!(name: "Planted")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    managers = AccessControl::Group.create!(name: "Group managers")
+    AccessControl::Grant.create!(group: managers, permission: "groups.manage", scope: {})
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    sign_in_as(users(:editor_branch))
+
+    patch "/cs-studio/groups/#{group.id}", params: { group: {
+      name: "Planted", member_ids: [ "" ],
+      grants: { "posts.edit" => { enabled: "1", content_types: [ "", "blog", "ghost" ] } }
+    } }
+
+    assert_response :forbidden
+    assert_equal [ { "content_types" => [ "blog" ] } ], group.grants.reload.map(&:scope)
+  end
+
   private
 
   # The group of the Review Focus 3 tests, and the pages it points at. `editor_branch`
@@ -381,6 +401,8 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     AccessControl::Grant.create!(group: group, permission: "posts.create", scope: {})
     AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ a.id, hidden.id ].sort })
     AccessControl::Grant.create!(group: group, permission: "pages.read", scope: { "page_ids" => [ section.id ] })
+    # A redundant stored root: a1 sits under section, which is chosen too (siblings, then one moved under the other).
+    AccessControl::Grant.create!(group: group, permission: "pages.publish", scope: { "page_ids" => [ section.id, a1.id ].sort })
     AccessControl::Grant.create!(group: group, permission: "tags.manage", scope: {})
     AccessControl::Membership.create!(user: users(:author), group: group)
 

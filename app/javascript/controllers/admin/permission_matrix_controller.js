@@ -116,10 +116,9 @@ export default class extends Controller {
     const items = pages ? this.pageItems(editor) : this.typeItems(editor)
     const removed = Array.from(editor.querySelectorAll("[data-removed-type]:not([hidden])")).map((chip) => chip.dataset.removedType)
 
-    if (items.length === 0 && removed.length === 0) {
-      container.append(this.chip(pages ? "All pages" : "All content types", "dim"))
-      return
-    }
+    // Nothing live ticked is "all" -- what Save stores even while a removed type
+    // is still carried -- so say so, then the warn chips.
+    if (items.length === 0) container.append(this.chip(pages ? "All pages" : "All content types", "dim"))
 
     items.slice(0, 3).forEach((item) => container.append(this.chip(item.label, "plain", item.dot)))
     if (items.length > 3) container.append(this.chip(`+${items.length - 3}`, "more"))

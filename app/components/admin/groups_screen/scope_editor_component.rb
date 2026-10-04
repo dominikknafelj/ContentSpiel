@@ -106,7 +106,15 @@ module Admin
                 tag.span(mark_for(state), class: "admin-tri-mark inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-cs border border-line-strong text-xs", aria: { hidden: true }, data: { admin__branch_picker_target: "mark" }) + node.title
               end
             end
-            control + tag.span(note_for(state), class: "ml-auto text-xs text-meta", data: { admin__branch_picker_target: "note" })
+            # A root that is chosen AND below another chosen root (a stored state the
+            # editor never writes itself: sibling roots, then one moved under the other)
+            # has a disabled box, which isn't submitted -- so an untouched save would
+            # normalise it away. This carries it, in the row, submitted exactly while it
+            # is chosen and implied; `admin--branch-picker#refresh` keeps that in step
+            # (the box takes over once the ancestor is unticked, never both). Untracked:
+            # a hidden input never counts towards the footer, so nothing here is a change.
+            carried = node.readable && state.chosen ? hidden_field_tag(field_name("page_ids") + "[]", page_id, id: nil, disabled: state.state != :implied) : "".html_safe
+            control + carried + tag.span(note_for(state), class: "ml-auto text-xs text-meta", data: { admin__branch_picker_target: "note" })
           end
           row + tag.div(branch_list(node.child_ids), class: "ml-5")
         end

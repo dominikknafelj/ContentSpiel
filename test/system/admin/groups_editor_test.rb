@@ -133,4 +133,36 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     assert_equal "false", find("#{row} button[aria-controls]")["aria-expanded"]
     assert page.evaluate_script("document.activeElement === document.querySelector(\"#{row} button[aria-controls]\")")
   end
+
+  test "with only a removed type left, the chips say all content types, then the warn chip (what Save will store)" do
+    group = AccessControl::Group.create!(name: "Leftover")
+    group.grants.create!(permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+
+    visit edit_admin_group_path(group)
+    await_admin_controllers
+    row = "[data-permission='posts.edit']"
+    within(row) { click_button "Edit scope" }
+    within("#{row} [data-scope-editor]") { uncheck "Blog" }
+
+    chips = page.all("#{row} [data-chips] .admin-scope-chip").map(&:text)
+    assert_equal [ "All content types", "! retired_type · type removed" ], chips
+  end
+
+  test "a redundant stored root survives untouched, and the carried input steps aside when its ancestor is unticked" do
+    group = AccessControl::Group.create!(name: "Redundant")
+    group.grants.create!(permission: "pages.edit", scope: { "page_ids" => [ @about.id, @team.id ].sort })
+
+    visit edit_admin_group_path(group)
+    await_admin_controllers
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    row = "[data-permission='pages.edit']"
+    carried = "#{row} input[type=hidden][name='group[grants][pages.edit][page_ids][]'][value='#{@team.id}']"
+    assert_selector carried, visible: :all
+    assert_not find(carried, visible: :all).disabled?
+
+    within(row) { click_button "Edit scope" }
+    within("#{row} [data-scope-editor]") { uncheck "About" }
+    assert find(carried, visible: :all).disabled?
+    within("#{row} [data-scope-editor]") { assert_not find_field("Team").disabled? }
+  end
 end

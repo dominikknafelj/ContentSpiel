@@ -54,6 +54,13 @@ export default class extends Controller {
         box.indeterminate = partial
       }
 
+      // A chosen root that is also implied is carried as a hidden input (the
+      // server renders it only for a chosen one): submitted exactly while it is
+      // chosen AND implied, so the disabled box and it are never both submitted
+      // and an untouched save keeps a redundant stored root.
+      const carried = node.querySelector(":scope > div input[type=hidden]")
+      if (carried) carried.disabled = !(chosen && implied)
+
       const mark = node.querySelector(":scope > div [data-admin--branch-picker-target='mark']")
       if (mark) mark.textContent = implied || chosen ? "✓" : partial ? "–" : ""
 
