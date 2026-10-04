@@ -554,6 +554,11 @@ document.addEventListener("turbo:before-frame-render", (event) => {
   const rendering = () => {
     frameRenders += 1
     expectVisit("promoted", frame.getAttribute("src"))
+    // See "THE PROMOTION HOLD": from here to the promoted visit's start.
+    const promotes = Boolean(frame.getAttribute("src")) && !frameFormRefused
+    frameFormRefused = false
+    if (promotes) promotionStarts(PROMOTION_LIMIT_MS)
+    else promotionEnds()
   }
   let fetchedAt = frameRequestedAt
   frameRequestedAt = null
@@ -625,12 +630,19 @@ window.addEventListener("turbo:before-fetch-request", (event) => {
     // than.
     if (forms.size > 0) delete event.detail.fetchRequest
     frameRequestedAt = writes
+    // See "THE PROMOTION HOLD": the fetch window.
+    frameFormRefused = false
+    promotionStarts(PROMOTION_FETCH_LIMIT_MS)
   }
   if (!busy()) return
 
   event.preventDefault()
   drained().then(() => {
-    if (frameGet) frameRequestedAt = writes
+    if (frameGet) {
+      frameRequestedAt = writes
+      // The limit counts from the request going out, not from the drain.
+      if (promotion) promotionStarts(PROMOTION_FETCH_LIMIT_MS)
+    }
     event.detail.resume()
   })
 })
@@ -638,7 +650,135 @@ window.addEventListener("turbo:before-fetch-request", (event) => {
 document.addEventListener("turbo:submit-end", (event) => {
   const { success, fetchResponse } = event.detail
   expectVisit("answered", success && fetchResponse?.redirected ? fetchResponse.location : null)
+  // See "THE PROMOTION HOLD": a refused frame form is re-rendered in place and
+  // promoted to nothing.
+  if (!success) frameFormRefused = true
 })
+
+// THE PROMOTION HOLD (round 3, final wave B, ledger C-Q1). A link into
+// `#content` is a frame navigation that Turbo PROMOTES to a page visit once
+// the frame has rendered (the frame carries `data-turbo-action="advance"`;
+// `FrameController#proposeVisitIfNavigatedWithAction` arms
+// `fetchResponseLoaded`, which `#loadFrameResponse` awaits after the render
+// and which calls `session.visit(frame.src, { willRender: false, ... })`).
+// That visit begins with `Navigator#startVisit` -> `Navigator#stop()`, and
+// `stop()` STOPS THE NAVIGATOR'S FORM SUBMISSION (`this.formSubmission.stop()`
+// aborts its fetch): every form Turbo's session submits rather than a frame --
+// one carrying `data-turbo-frame="_top"` or sitting outside `#content` (the
+// Trash's Restore and Delete, the media panel's Move to trash, the tags'
+// Merge, the editor header's actions, "Still correct", Sign out, every Undo
+// toast). Its POST has reached the server by then; only the ANSWER is thrown
+// away -- the redirect, the toast. The write is done and the screen does not
+// show it: the row is still there, and pressing again is a 404.
+// The window is the whole frame fetch (click a tab, then Restore on the old
+// list that is still showing: hundreds of milliseconds on a real connection)
+// plus the moment after the render in which Turbo reads the answer's body
+// once more before it proposes the visit.
+//
+// So for that window a non-GET form submission is not started at all. A
+// CAPTURING `submit` listener on `window` -- ahead of Turbo's own
+// (`FormSubmitObserver`, on `document`), of `admin--queue-hold` and of every
+// Stimulus action -- cancels it and keeps (form, submitter); when the promoted
+// visit has COMPLETED (`turbo:load`) the form is submitted again with
+// `requestSubmit`, and everybody sees that one submit as if it were the first.
+// Never released on the promoted visit's `turbo:before-visit`: `stop()` runs
+// just after it.
+// - Which renders are promoted: every `#content` render with a `src`, except
+//   the one that re-renders a REFUSED frame form (a 422): Turbo's
+//   `formSubmissionFailedWithResponse` loads the answer without arming the
+//   visit. Its `turbo:submit-end` (dispatched before the render, which awaits
+//   the body) says so (`frameFormRefused`); that render ends the hold at once.
+// - The fetch window starts where this module already sees the frame's GET go
+//   out, with a longer limit; it ends early when the fetch fails
+//   (`turbo:fetch-request-error`) or its answer has no such frame
+//   (`turbo:frame-missing`). A second link clicked meanwhile restarts the
+//   limit and keeps what is held.
+// - `method="dialog"` is never held: Keep editing and Cancel close at once.
+//   Nor is a GET (a filter form replaces nothing a visit could lose), nor a
+//   form Turbo does not drive (`data-turbo="false"`: a real navigation).
+// - A double press holds one entry (a `Map` keyed by the form), and the form
+//   is `aria-busy` while it waits.
+// - A held form that is NO LONGER CONNECTED at release belonged to the
+//   content the navigation replaced. Nothing was sent. If the new content has
+//   the very same action -- same URL, same method, the same values in
+//   whatever the editor could set (`formFields`; the Trash's Restore for a
+//   row that is also in the tab just opened) -- that form is submitted in its
+//   place: it is what the editor pressed. A submitter that carries a name or
+//   a `formaction` of its own is never stood in for.
+//   Anything else is dropped: the screen it belonged to is gone, as it would
+//   be had the press come a moment later.
+// - It composes with the two other holds. `admin--queue-hold` never saw the
+//   held submit (propagation stopped here), so the resubmit is its first; and
+//   its own `requestSubmit` after a drain, if caught here, is released with
+//   its `passing` flag still set. The request the resubmit makes is held by
+//   "TURBO FORM SUBMISSIONS" like any other while a save is outstanding.
+// - Never longer than the limits: a promotion that does not come (cancelled,
+//   a frame that never loads) must not swallow a press for good.
+// The LINK variant -- a `_top` link clicked during a frame fetch loses to the
+// promoted visit -- is not covered (it loses a navigation, not a write).
+const PROMOTION_LIMIT_MS = 500
+const PROMOTION_FETCH_LIMIT_MS = 10000
+let promotion = null
+let frameFormRefused = false
+
+function promotionStarts(limit) {
+  clearTimeout(promotion?.timer)
+  promotion = { held: promotion?.held || new Map(), timer: setTimeout(promotionEnds, limit) }
+}
+
+const formMethod = (form, submitter) => (submitter?.getAttribute("formmethod") || form.getAttribute("method") || "get").toLowerCase()
+// What the editor could have set in a form: its named controls other than the
+// hidden ones (the CSRF token, `_method` and a "come back to this tab" field
+// are the render's, and differ between two renders of one action).
+const formFields = (form) => Array.from(form.elements)
+  .filter((field) => field.name && !field.disabled && ![ "hidden", "submit", "button" ].includes(field.type))
+  .map((field) => `${field.name}=${[ "checkbox", "radio" ].includes(field.type) ? field.checked : field.value}`)
+  .join("&")
+
+// See "A held form that is NO LONGER CONNECTED" above.
+function standInFor(form, submitter, signature) {
+  if (submitter?.name || submitter?.hasAttribute("formaction")) return null
+  return Array.from(document.forms).find((candidate) =>
+    candidate.getAttribute("action") === form.getAttribute("action") &&
+    formMethod(candidate) === formMethod(form) && formFields(candidate) === signature) || null
+}
+
+function promotionEnds() {
+  if (!promotion) return
+  const { held, timer } = promotion
+  promotion = null
+  clearTimeout(timer)
+  held.forEach(({ submitter, signature }, form) => {
+    form.removeAttribute("aria-busy")
+    const target = form.isConnected ? form : standInFor(form, submitter, signature)
+    if (!target) return
+    try {
+      target.requestSubmit(target === form && submitter?.isConnected ? submitter : undefined)
+    } catch {
+      target.requestSubmit()
+    }
+  })
+}
+
+window.addEventListener("submit", (event) => {
+  const form = event.target
+  if (!promotion || event.defaultPrevented || !(form instanceof HTMLFormElement)) return
+  const submitter = event.submitter
+  const method = formMethod(form, submitter)
+  if (method === "get" || method === "dialog") return
+  if (form.closest("[data-turbo='false']") || submitter?.closest("[data-turbo='false']")) return
+
+  event.preventDefault()
+  // Nobody has seen it; the resubmit is the one submit.
+  event.stopImmediatePropagation()
+  if (promotion.held.has(form)) return
+  promotion.held.set(form, { submitter, signature: formFields(form) })
+  form.setAttribute("aria-busy", "true")
+}, true)
+
+document.addEventListener("turbo:load", promotionEnds)
+document.addEventListener("turbo:fetch-request-error", (event) => { if (event.target?.id === "content") promotionEnds() })
+document.addEventListener("turbo:frame-missing", (event) => { if (event.target?.id === "content") promotionEnds() })
 
 // See "WHAT A GENERATION IS": the body Turbo is about to replace is retired
 // now, a moment before the swap.
