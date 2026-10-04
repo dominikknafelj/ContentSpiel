@@ -178,6 +178,44 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The picker's height changes while it is open -- the Library frame is empty
+  # until its request answers, and the Upload panel is shorter than a loaded
+  # library -- and a centred dialog moved its tab row with every change (112px
+  # up when the library arrived). A click aimed at "Upload" just after opening
+  # then landed on the library that had slid under the pointer and the tab
+  # never switched: CI's "Unable to find visible file field "Image file"", one
+  # run in ten. The picker hangs from a fixed top edge now (`.admin-media-picker`),
+  # so the tabs stay put. The library's answer is held back here until the
+  # first measurement is taken, so the test sees both states every time
+  # instead of whichever the timing gives it.
+  test "the picker's tabs stay where they are when the library arrives and when the tab changes" do
+    visit_editor
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.__libraryHeld = new Promise((release) => { window.__releaseLibrary = release })
+      window.fetch = (url, options) => {
+        if (!String(url?.url || url).includes("picker=1")) return original(url, options)
+        return window.__libraryHeld.then(() => original(url, options))
+      }
+    JS
+    tab_top = -> { page.evaluate_script("document.getElementById('media-picker-upload-tab').getBoundingClientRect().top") }
+
+    within("#page-hero-image-section") { click_on "Choose image" }
+    assert_selector "dialog#media-picker[open]"
+    assert_no_selector "#media-picker-library *", visible: :all, wait: 0.5
+    before_library = tab_top.call
+
+    page.execute_script("window.__releaseLibrary()")
+    within("dialog[open]") { assert_button @asset.title }
+    assert_equal before_library, tab_top.call, "the tab row moved when the library loaded"
+
+    within("dialog[open]") do
+      click_on "Upload"
+      assert_field "Image file"
+    end
+    assert_equal before_library, tab_top.call, "the tab row moved when the tab changed"
+  end
+
   private
 
   # Round 1 second review: Design's screenshot showed the picker at the bottom
