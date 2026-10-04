@@ -108,7 +108,8 @@ class DialogSystemTest < ApplicationSystemTestCase
     assert_selector "dialog[open]", text: "Delete this block?"
     within("dialog[open]") { click_button "Cancel" }
     assert_no_selector "dialog[open]"
-    assert_equal "Block actions", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    # (Polled: the dialog's `close` event follows its closing by a task.)
+    assert_selector "[data-block-id='#{block.id}'] button[aria-label='Block actions']:focus"
 
     # The editor header's menu; Escape closes like Cancel.
     open_editor_menu
@@ -116,6 +117,6 @@ class DialogSystemTest < ApplicationSystemTestCase
     assert_selector "dialog[open]", text: "Unpublish this page?"
     find("dialog[open]").send_keys(:escape)
     assert_no_selector "dialog[open]"
-    assert_equal "More actions", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_selector "header.admin-editor-header button[aria-label='More actions']:focus"
   end
 end
