@@ -56,9 +56,14 @@
       <%= label_tag field_id("trash_retention_days"), "Empty trash automatically after", class: setup_label_class %>
       <div class="flex items-center gap-2">
         <%= number_field_tag field_html_name("trash_retention_days"), site_setting.trash_retention_days,
-              id: field_id("trash_retention_days"), min: 0, step: 1, class: "#{setup_input_class} w-24" %>
-        <span class="text-ink">days (0 = never)</span>
+              id: field_id("trash_retention_days"), min: 0, step: 1, class: "#{setup_input_class} w-18",
+              aria: { describedby: field_id("trash_retention_days_help") } %>
+        <span class="whitespace-nowrap text-ink">days</span>
       </div>
+      <%# The explanation lives below the field as help, not crammed after the
+          unit (design pass bug 2: "days (0 = never)" wrapped inside the
+          column). The error slot stays a direct child of the wrapper. %>
+      <p id="<%= field_id("trash_retention_days_help") %>" class="mt-1 text-sm text-meta">Items in the trash are deleted for good after this many days. 0 keeps them until you empty the trash.</p>
       <div id="<%= errors_id("trash_retention_days") %>" class="mt-1 text-sm text-danger-ink"></div>
     </div>
 
