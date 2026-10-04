@@ -34,8 +34,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # real editor would: an actual POST the browser itself sends.
   def sign_in_via_form(user, password: "password")
     visit admin_sign_in_path
-    fill_in "Enter your email address", with: user.email_address
-    fill_in "Enter your password", with: password
+    fill_in "Email", with: user.email_address
+    fill_in "Password", with: password
     press "Sign in"
 
     # `press`'s own click fires a real (async) browser form submission --

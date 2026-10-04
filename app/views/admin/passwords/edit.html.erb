@@ -1,19 +1,16 @@
-<div class="mx-auto w-full md:w-2/3">
-  <% if alert = flash[:alert] %>
-    <p class="mb-5 inline-block rounded-cs border border-danger bg-danger-tint px-3 py-2 font-medium text-danger-ink" role="alert" id="alert"><%= alert %></p>
+<%# The reset flow's "form" state: new password with the strength meter and a
+    confirmation. A bad or used link never gets here (the controller sends it
+    to the "expired" state on the request page). %>
+<div class="rounded-cs border border-line bg-surface p-6">
+  <h1 class="text-h2 font-semibold">Update your password</h1>
+
+  <% if flash[:alert] %>
+    <p class="mt-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert" id="alert"><%= flash[:alert] %></p>
   <% end %>
 
-  <h1 class="text-h1 font-semibold">Update your password</h1>
-
-  <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "mt-6 space-y-4" do |form| %>
-    <div>
-      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
-    </div>
-
-    <div>
-      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
-    </div>
-
-    <%= form.submit "Save", class: setup_primary_button_class, data: { password_submit: true } %>
+  <%= form_with url: admin_update_password_path(params[:token]), method: :patch, class: "mt-5 space-y-4" do |form| %>
+    <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, autofocus: true) %>
+    <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Repeat new password") %>
+    <%= render Admin::ButtonComponent.new(label: "Set password", type: "submit", class: "w-full", data: { password_submit: true }) %>
   <% end %>
 </div>

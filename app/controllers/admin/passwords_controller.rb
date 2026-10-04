@@ -16,7 +16,11 @@ module Admin
         PasswordsMailer.reset(user).deliver_later
       end
 
-      redirect_to admin_sign_in_path, notice: "Password reset instructions sent (if user with that email address exists)."
+      # The "sent" state is a param on the request page, not a flash and not
+      # something the lookup decides: a known and an unknown address take the
+      # same redirect and render the same words, so the page can't be used
+      # to find out which addresses have an account.
+      redirect_to new_admin_password_path(sent: 1)
     end
 
     def edit
@@ -42,7 +46,9 @@ module Admin
       def set_user_by_token
         @user = User.find_by_password_reset_token!(params[:token])
       rescue ActiveSupport::MessageVerifier::InvalidSignature
-        redirect_to new_admin_password_path, alert: "Password reset link is invalid or has expired."
+        # `expired` selects the "This link has expired" state of the request
+        # page (a bad signature and a lapsed 15 minutes look the same).
+        redirect_to new_admin_password_path(expired: 1)
       end
   end
 end
