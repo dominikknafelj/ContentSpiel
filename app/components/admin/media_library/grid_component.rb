@@ -10,8 +10,8 @@ module Admin
   # without touching a single line of this module's own code -- named
   # `MediaLibrary` instead, so `Admin.const_defined?(:Media, false)` never
   # becomes true and no other `Admin::*` file ever has to remember to
-  # write `::Media::` on its own account. `test/lib/admin_media_namespace_
-  # test.rb` guards against this regressing.
+  # write `::Media::` on its own account. `test/lib/admin_namespace_shadow_
+  # test.rb` guards against this regressing, for every domain module.
   module MediaLibrary
     # The Media module's own grid (media library design spec §6, round 3 Task 8):
     # one `TileComponent` per asset, each linking to `/media?selected=ID` (the

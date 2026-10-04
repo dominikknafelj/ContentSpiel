@@ -298,8 +298,10 @@ module Audit
         # What it was refused ON, when the event names a subject (a page, a
         # post, a user...): the event page's Object line has always shown it;
         # the sentence says it too, linked like any other subject when the
-        # viewer may open it. An area refusal (settings, the audit log) has no
-        # subject and stays as it was.
+        # viewer may open it. An area refusal can carry one too (`users.manage`
+        # refused on a user, `settings.manage` on the site row) and reads the
+        # same way; only a refusal recorded with no subject at all (a module
+        # gate's key asked without a record) stays "was refused permission to …".
         subject = subject_label
         subject ? parts + [ text(" on "), Part.new(:subject, subject) ] : parts
       end

@@ -180,7 +180,7 @@ class Admin::TrashScreenTest < ActionDispatch::IntegrationTest
 
     sign_in_as users(:two)
     get admin_trash_path
-    assert_select "#trash-post-#{by_token.id}", text: /You via Deploy bot · /
+    assert_select "#trash-post-#{by_token.id}", text: /You, via Deploy bot · /
 
     # The token row is deleted: the name written on the event still says
     # which token it was.

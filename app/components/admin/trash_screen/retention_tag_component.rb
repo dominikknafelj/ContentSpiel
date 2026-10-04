@@ -14,9 +14,12 @@ module Admin
     # not a time, because the sweep runs on a schedule -- and it says "on or
     # after": the date is the first day the item CAN go (`Trash::
     # PurgeExpiredJob` takes what was trashed more than the retention period
-    # ago, so never before this date in the site's zone), not the day it
-    # will. A daily sweep that runs before the due moment that day takes it
-    # the day after. The wording is deliberately not tied to the sweep's hour
+    # ago), not the day it will. A daily sweep that runs before the due moment
+    # that day takes it the day after. One known gap: this date counts
+    # calendar days in the site's zone, the job's cutoff is days × 24 hours,
+    # so across a clock change the two can differ by the hour that was added
+    # or dropped -- an item trashed in the first hour of a day can become
+    # purgeable an hour before the date shown (a roadmap row). The wording is deliberately not tied to the sweep's hour
     # (`config/recurring.yml`), which can change without this component.
     # `test/jobs/trash/purge_expired_job_test.rb` runs the job around the
     # boundary against this component's own date.

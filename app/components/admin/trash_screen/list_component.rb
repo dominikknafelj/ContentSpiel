@@ -24,6 +24,8 @@ module Admin
       # The page-number footer (`Admin::PaginationComponent`), inside the card.
       renders_one :footer
 
+      YOU = "You".freeze
+
       # How many names the "Includes N subpages: …" line gives before "and N more".
       NAMED_SUBPAGES = 3
 
@@ -43,7 +45,7 @@ module Admin
       # they are the one viewer who is shown what the whole trash holds (the
       # Empty trash dialog's sentence), and "The trash is empty" beside "Empty
       # trash… deletes 1 page" was a contradiction on one screen.
-      HIDDEN_ITEMS = [ "Nothing here you can restore.", "The trash holds items you can't restore or delete one by one. Empty trash deletes them too." ].freeze
+      HIDDEN_ITEMS = [ "Nothing here you can restore.", "The trash holds items you can't restore or delete one by one. Empty trash deletes them." ].freeze
 
       # `tab` is the active tab's key ("pages", ... or nil for All): the empty
       # state's wording, and the tab a restore or delete comes back to.
@@ -113,7 +115,8 @@ module Admin
       end
 
       # Who trashed the item: "You", the user's name, "a deleted user" or
-      # "System" -- then " via <token name>" when an API token did it.
+      # "System" -- then " via <token name>" when an API token did it ("You,
+      # via <token name>" for the viewer's own token).
       #
       # Two sources. `trashed_by` is the row's own answer (the acting user, or
       # the token's user). The item's `*.trashed` audit event (`#trashing_
@@ -140,13 +143,17 @@ module Admin
           elsif event&.via_label then Admin::UserNameComponent::DELETED_USER
           else return Admin::UserNameComponent::NOBODY
           end
-        event&.via_label ? "#{label} via #{event.via_label}" : label
+        return label unless event&.via_label
+
+        # "You, via <token>" with the comma, "<name> via <token>" without: the
+        # audit log's own two forms (`Admin::AuditScreen::SentenceComponent`).
+        "#{label}#{"," if label == YOU} via #{event.via_label}"
       end
 
       # A user who was there: "You", their name, or -- gone since -- "a deleted
       # user" (`Admin::UserNameComponent`, the one place a user is named).
       def label_for(user)
-        return "You" if user && Current.actor.is_a?(User) && Current.actor.id == user.id
+        return YOU if user && Current.actor.is_a?(User) && Current.actor.id == user.id
 
         user ? Admin::UserNameComponent.new(user:).label : Admin::UserNameComponent::DELETED_USER
       end

@@ -322,7 +322,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
   # Fix round 1 (review of `0695e7a`): `Media::Asset#usages_summary`'s own
   # `owner.owner` second hop -- a block-owned usage is named by its page or
-  # post, never the block itself (`Admin::MediaLibrary::DetailComponent
+  # post, never the block itself (`Admin::MediaLibrary::PanelComponent
   # #place_for`) -- used to cost one query per block-owned usage. `Media
   # ::Asset.preload_usage_places` batches it, one query per owner type, so
   # this stays flat whether the image sits on one block or six.
@@ -918,7 +918,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   # A real image block, on a fresh page, pointing at `asset` -- for tests
   # that need several distinct block-owned usages of the same asset (the
   # query-count test above; a block's usage is always named by its own
-  # page, `Admin::MediaLibrary::DetailComponent#place_for`).
+  # page, `Admin::MediaLibrary::PanelComponent#place_for`).
   def add_image_block(asset, page_title:)
     page = create_page(title: page_title)
     result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "image", media_asset_id: asset.id })
