@@ -105,7 +105,23 @@ module Admin
     # page with no canonical listing yet, e.g.) -- the editor still gets a
     # title and an id to link to, just nothing to preview yet.
     def target_json(type, record, urls)
-      { type: type, id: record.id, title: record.public_send(Mobility.normalize_locale_accessor(:title, locale)), path: urls.path_for(record, locale) }
+      {
+        type: type, id: record.id, title: record.public_send(Mobility.normalize_locale_accessor(:title, locale)), path: urls.path_for(record, locale),
+        status: record.status, dot: type_dot(record)
+      }
+    end
+
+    # `status` is the record's publish state ("draft" / "scheduled" / "live"):
+    # the related-posts chip input shows "· Draft" next to a post that isn't
+    # live. `dot` is the Tailwind class of the post's content-type dot
+    # (`Admin::ContentTypeDotComponent#mark_class`, the one place those class
+    # names are spelled out, so the scanner sees them), so a chip the browser
+    # builds from a search row carries the same mark a server-rendered one
+    # does. A page has no content type, hence no dot; neither has a post
+    # whose type is no longer registered.
+    def type_dot(record)
+      definition = record.is_a?(Post) ? ::ContentTypes.find(record.content_type) : nil
+      definition && Admin::ContentTypeDotComponent.new(content_type: record.content_type).mark_class(definition.colour_index)
     end
   end
 end

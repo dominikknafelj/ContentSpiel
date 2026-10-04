@@ -156,6 +156,12 @@ Rails.application.routes.draw do
     # an inline rename (`:update`) and a delete (`:destroy`) from the list
     # itself; new tags are only ever created in passing, through a post's own
     # `tag_names` (`Posts::Save`).
+    # The post editor's tag chip input asks this for suggestions
+    # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
+    # module's `tags.manage`, and `suggest` is not a tag id (`resources :tags`
+    # has no `show`, so the two paths can't collide).
+    get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
+
     resources :tags, only: %i[index update destroy]
 
     # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`

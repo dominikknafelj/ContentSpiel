@@ -19,6 +19,12 @@ module Admin
   # own list; relations read as undirected everywhere else
   # (`Post#all_related_posts`).
   #
+  # The field itself is `Admin::ChipInputComponent` (design pass round 2):
+  # each related post a chip with its content-type dot, its title and
+  # "· Draft" / "· Scheduled" when it isn't live. This component keeps what
+  # is specific to relations -- which posts those are, the hidden count and
+  # the read-only "Also related from" line.
+  #
   # Searching goes to `<admin>/link_targets?type=post` (the internal-link
   # picker's own endpoint, `Admin::LinkTargetsController`), built through
   # its route helper, never a hand-written path -- which only offers posts
@@ -48,7 +54,26 @@ module Admin
 
     def errors_id = Admin::FieldComponent.error_id(ID_PREFIX, "related_post_ids")
 
-    def search_url = helpers.admin_link_targets_path(type: "post")
+    # `locale:` so the rows' titles are in the language being edited.
+    def search_url = helpers.admin_link_targets_path(type: "post", locale: locale)
+
+    def chips
+      related.map do |record|
+        { value: record.id.to_s, label: title_for(record), hint: (record.status.humanize unless record.live?), dot: dot_class(record) }
+      end
+    end
+
+    def hidden_note
+      hidden = hidden_related_count
+      "+#{pluralize(hidden, 'related post')} you can’t open (kept)" if hidden.positive?
+    end
+
+    def dot_class(record)
+      definition = ::ContentTypes.find(record.content_type)
+      definition && Admin::ContentTypeDotComponent.new(content_type: record.content_type).mark_class(definition.colour_index)
+    end
+
+    delegate :pluralize, to: :helpers
 
     def editor_path(record) = helpers.admin_post_path(record, **url_options)
 

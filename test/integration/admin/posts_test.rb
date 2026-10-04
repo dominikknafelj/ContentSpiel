@@ -178,6 +178,33 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     assert_equal Date.new(2024, 1, 31), post_record.reload.fields.start_date
   end
 
+  # The chip input submits one `post[tag_names][]` per chip plus an empty
+  # sentinel (so an emptied list still arrives and clears the tags).
+  test "tag_names as an array is saved case-insensitively deduplicated, the sentinel ignored" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "Rails", "rails", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ "rails" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "an array element containing a comma is kept whole; only the legacy string splits on commas" do
+    post_record = create_post(title: "Chips")
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "rails, ruby", "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_equal [ "rails, ruby" ], post_record.reload.tags.map(&:name)
+  end
+
+  test "an array holding only the sentinel clears the tags" do
+    post_record = create_post(title: "Chips", tags: [ "ruby" ])
+    patch "/cs-studio/posts/#{post_record.id}",
+      params: { post: { tag_names: [ "" ] }, base_updated_at: post_record.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_empty post_record.reload.tags
+  end
+
   test "typed fields and tags autosave" do
     post_record = create_post(title: "Engineer", content_type: "resume_entry")
     patch "/cs-studio/posts/#{post_record.id}",
@@ -365,7 +392,7 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/posts/#{post_record.id}"
 
-    assert_select "[data-controller~='admin--related-posts'][data-admin--related-posts-search-url-value='/cs-studio/link_targets?type=post']" do
+    assert_select "[data-controller~='admin--chip-input'][data-admin--chip-input-search-url-value='/cs-studio/link_targets?locale=en&type=post']" do
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='']", 1
       assert_select "input[type=hidden][name='post[related_post_ids][]'][value='#{related.id}']", 1
       assert_select "li", text: /Related one/

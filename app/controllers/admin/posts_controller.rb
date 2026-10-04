@@ -87,9 +87,9 @@ module Admin
     # typed `fields` are split *per field*
     # (`split_fields`, mirroring `Admin::ContentBlocksController
     # #split_settings`) since which of them are translated depends on the
-    # registered type, not a fixed allowlist; `tag_names` arrives as one
-    # comma-separated string (spec §5.2's own tag input) and is split into
-    # the Array `Posts::Save` expects here, not in the service -- the
+    # registered type, not a fixed allowlist; `tag_names` arrives as an Array
+    # (the chip input's `tag_names[]`) or as one legacy comma-separated
+    # string, split into the Array `Posts::Save` expects here, not in the service -- the
     # service is also used by MCP/seeds, which already hand it a real Array.
     #
     # `content_type` is never accepted here at all (not even silently
@@ -243,8 +243,15 @@ module Admin
     # input a comma-separated field invites, and this is the one place that
     # already knows the raw string is comma-separated at all -- `assign_tags`
     # only ever sees a plain Array by the time it runs.
+    #
+    # The chip input (`Admin::ChipInputComponent`) submits `post[tag_names][]`
+    # instead -- one element per tag, plus an empty sentinel so an emptied list
+    # still arrives. An Array is already split: an element is one whole name,
+    # comma and all (the comma is only the *legacy string's* separator), so
+    # it is stripped and blank-dropped but never split again.
     def split_tag_names(raw)
-      raw.to_s.split(",").map(&:strip).reject(&:blank?)
+      names = raw.is_a?(Array) ? raw : raw.to_s.split(",")
+      names.map { |name| name.to_s.strip }.reject(&:blank?)
     end
 
     # A `groups` field's raw params need straightening into an ordered Array
@@ -318,7 +325,7 @@ module Admin
         # No validation reports against `:tag_names` today (`Posts::Save
         # #assign_tags` finds-or-builds a `Tag` per name, and a blank/
         # duplicate name is already filtered out before it ever reaches
-        # that point) -- wired up anyway so `Admin::TagInputComponent`'s own
+        # that point) -- wired up anyway so `Admin::ChipInputComponent`'s own
         # error slot (fix round 1 review) is always cleared/replaced like
         # every other field's, and a later validation on this attribute
         # (e.g. rejecting a tag name that's too long) has somewhere to land

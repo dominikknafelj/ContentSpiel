@@ -217,6 +217,18 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
   end
 
+  test "tag suggestions never count a trashed post, and a tag only trashed posts use still appears with 0" do
+    sign_in_as users(:one)
+    create_post(title: "Kept tagged", tags: [ "shared-tag" ])
+    create_post(title: "Gone tagged", tags: [ "shared-tag", "only-trashed" ]).update_columns(trashed_at: Time.current)
+
+    get "/cs-studio/tags/suggest", params: { q: "shared" }
+    assert_equal [ "1 post" ], response.parsed_body.map { |row| row["hint"] }
+
+    get "/cs-studio/tags/suggest", params: { q: "only-" }
+    assert_equal [ "0 posts" ], response.parsed_body.map { |row| row["hint"] }
+  end
+
   test "the related-posts editor neither shows a trashed post nor counts it as one you can't open" do
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
     component = Admin::RelatedPostsComponent.new(post: @kept_post, locale: "en")

@@ -78,8 +78,11 @@
         editable: editable?, **translation(:body)
       ) %>
 
-  <%= render Admin::TagInputComponent.new(
-        value: tag_names_value, name: field_html_name("tag_names"), id: field_id("tag_names"), errors: field_errors("tag_names")
+  <%# Tags are shared by every language (they are not translated), and a new name is created on save. %>
+  <%= render Admin::ChipInputComponent.new(
+        name: "#{field_html_name("tag_names")}[]", id: field_id("tag_names"), label: "Tags", chips: tag_chips,
+        search_url: helpers.admin_tag_suggestions_path, create: true, noun: "tag", placeholder: "Add a tag…",
+        errors: field_errors("tag_names"), help: "Press Enter or a comma to add. New tags are created when you save."
       ) %>
 
   <%= render Admin::RelatedPostsComponent.new(

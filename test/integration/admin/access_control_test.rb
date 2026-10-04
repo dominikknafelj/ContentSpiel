@@ -261,12 +261,12 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-field-name='related_post_ids']" do
-      assert_select "li[data-post-id='#{@other_post.id}']", count: 0
+      assert_select "li[data-chip-value='#{@other_post.id}']", count: 0
       assert_select "input[type=hidden][value='#{@other_post.id}']", count: 0
       assert_select "a[href='/cs-studio/posts/#{@other_post.id}']", count: 0
-      assert_select "p", text: "+1 related post you can't open"
+      assert_select "p", text: "+1 related post you can’t open (kept)"
     end
-    assert_no_match(/data-post-id="#{@other_post.id}"/, response.body)
+    assert_no_match(/data-chip-value="#{@other_post.id}"/, response.body)
     assert_not_includes response.body, "Other post"
     assert_not_includes response.body, "Pointing here" # "Also related from"
   end

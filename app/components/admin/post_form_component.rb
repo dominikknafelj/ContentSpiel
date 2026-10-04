@@ -146,7 +146,7 @@ module Admin
 
     def field_errors_for(field) = post.errors.full_messages_for("fields.#{field.name}")
 
-    def tag_names_value = post.tags.order(:name).map(&:name).join(", ")
+    def tag_chips = post.tags.order(:name).map { |tag| { value: tag.name, label: tag.name } }
 
     private
 
