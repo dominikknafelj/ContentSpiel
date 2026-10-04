@@ -1,0 +1,33 @@
+<div id="<%= ID %>" class="admin-column" data-ai-key-component>
+  <label for="settings-ai_api_key" class="<%= setup_label_class %>">API key</label>
+
+  <div class="mt-1 flex flex-wrap items-center gap-2" data-admin--ai-settings-target="chip" <%= "hidden" if editing? %>>
+    <span class="inline-flex items-center gap-1.5 rounded-cs border border-line bg-sunken px-2.5 py-1 text-sm text-ink"
+          data-ai-key-state="<%= key_set? ? "set" : "unset" %>">
+      <span aria-hidden="true" class="<%= key_set? ? "text-ok-ink" : "text-meta" %>">●</span>
+      <%= chip_text %>
+    </span>
+    <% if key_set? %>
+      <%= render Admin::ButtonComponent.new(label: "Replace", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
+      <%= render Admin::ButtonComponent.new(label: "Remove…", variant: :danger_text, size: :small, data: dialog_trigger(REMOVE_DIALOG).merge(LOCK)) %>
+    <% else %>
+      <%= render Admin::ButtonComponent.new(label: "Add key", variant: :secondary, size: :small, data: LOCK.merge(action: "admin--ai-settings#edit")) %>
+    <% end %>
+  </div>
+
+  <%# The key's own form (`form=`, never the Settings form): never pre-filled. %>
+  <div class="mt-1 flex flex-wrap items-center gap-2" data-admin--ai-settings-target="entry" <%= "hidden" unless editing? %>>
+    <%= password_field_tag "site_setting[ai_api_key]", nil, id: "settings-ai_api_key", form: KEY_FORM, autocomplete: "off", spellcheck: false,
+          placeholder: key_set? ? "Paste a new key to replace it" : "Paste the provider's API key",
+          aria: { describedby: ("settings-ai-key-errors" if error.present?), invalid: (true if error.present?) },
+          class: "#{setup_input_class} !mt-0 max-w-md",
+          data: LOCK.merge("admin--ai-settings-target": "input", action: "keydown.esc->admin--ai-settings#cancel") %>
+    <%= render Admin::ButtonComponent.new(label: "Save key", variant: :primary, type: "submit", form: KEY_FORM, data: LOCK) %>
+    <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, data: { action: "admin--ai-settings#cancel" }) %>
+  </div>
+
+  <div id="settings-ai-key-errors" class="mt-1 text-sm text-danger-ink" role="alert">
+    <% if error.present? %><p class="flex gap-1.5"><span aria-hidden="true" class="font-cs-mono font-semibold">!</span><span><%= error %></span></p><% end %>
+  </div>
+  <p class="mt-1 text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+</div>

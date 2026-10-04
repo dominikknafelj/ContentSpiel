@@ -1,22 +1,29 @@
 <%# locals: site_setting, main_base -- the forms of the AI card's instant actions, kept
     OUTSIDE the Settings form (forms can't nest; a dialog's form can't be
-    inside one either). The card's controls reach them by `form=`. Replaced as
-    one element by a key save (`Admin::SettingsController#ai_key`). %>
-<%= form_with method: :post, id: "settings-ai-test-form", html: { class: "hidden" },
-      data: { controller: "admin--busy" }, url: test_ai_connection_admin_settings_path do end %>
-<%= form_with url: ai_key_admin_settings_path, method: :patch, id: "settings-ai-key-form", html: { class: "hidden" } do %>
-  <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
-<% end %>
+    inside one either). The card's controls reach them by `form=`. The wrapper
+    carries the id a key save's Turbo Stream replaces
+    (`Admin::AiKeysController`): the Remove dialog only exists while a key does.
 
-<% if site_setting.ai_api_key_set? %>
-  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: "settings-ai-remove-key-dialog", title: "Remove the API key?",
-        body: "AI translation stops working until a new key is saved.") do |dialog| %>
-    <% dialog.with_confirm_action do %>
-      <%= form_with url: ai_key_admin_settings_path, method: :patch do %>
-        <%= hidden_field_tag "site_setting[remove_ai_key]", "1", id: nil %>
-        <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
-        <%= render Admin::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
+    `main_base` is the Settings form's `base_updated_at` AS IT WAS WHEN THIS
+    WAS RENDERED, carried as `main_base_updated_at` so the key's answer can
+    tell whether the form is still current (see the controller). It is
+    deliberately not read from the main form's live field. %>
+<div id="settings-ai-key-forms">
+  <%= form_with method: :post, id: "settings-ai-test-form", html: { class: "hidden" },
+        data: { controller: "admin--busy" }, url: test_ai_connection_admin_settings_path do end %>
+  <%= form_with url: admin_settings_ai_key_path, method: :patch, id: Admin::SettingsScreen::AiKeyComponent::KEY_FORM, html: { class: "hidden" } do %>
+    <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
+  <% end %>
+
+  <% if site_setting.ai_api_key_set? %>
+    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: Admin::SettingsScreen::AiKeyComponent::REMOVE_DIALOG, title: "Remove the API key?",
+          body: "AI translation stops working until a new key is saved.") do |dialog| %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: admin_settings_ai_key_path, method: :delete do %>
+          <%= hidden_field_tag :main_base_updated_at, main_base, id: nil %>
+          <%= render Admin::ButtonComponent.new(label: "Remove key", variant: :danger, type: "submit") %>
+        <% end %>
       <% end %>
     <% end %>
   <% end %>
-<% end %>
+</div>

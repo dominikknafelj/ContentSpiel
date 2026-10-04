@@ -22,14 +22,12 @@ module Admin
   class SettingsController < BaseController
     include FileParams
 
-    ID_PREFIX = "settings"
-
     STALE_MESSAGE = "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
 
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
-    # The AI test and the key are `settings.manage` actions; the module gate
-    # above would also let a languages-only viewer reach them.
-    before_action -> { require_permission("settings.manage") }, only: %i[test_ai_connection ai_key]
+    # The AI test is a `settings.manage` action; the module gate above would
+    # also let a languages-only viewer reach it.
+    before_action -> { require_permission("settings.manage") }, only: :test_ai_connection
 
     def show
       @site_setting = Current.site
@@ -93,50 +91,18 @@ module Admin
 
     # Test connection (translation helpers spec §6.2): one tiny request
     # with the *saved* provider, model and key (`AI.provider`, then the
-    # provider's own `#test_connection`), reported inline under the button.
-    # Writes nothing, so it's not a service.
+    # provider's own `#test_connection`), reported inline under the button:
+    # "CONNECTED · 412 MS" with the provider call's elapsed time, measured here
+    # on the server, or the provider's own message. Neither carries the key.
+    # Writes nothing, so it's not a service. (The key's save and remove are
+    # `Admin::AiKeysController`.)
     def test_ai_connection
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       AI.provider.test_connection
-      render turbo_stream: ai_test_result_stream(message: "Connection OK.", ok: true)
+      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+      render turbo_stream: ai_test_result_stream(milliseconds: elapsed)
     rescue AI::Error => error
-      render turbo_stream: ai_test_result_stream(message: error.message, ok: false), status: :unprocessable_entity
-    end
-
-    # Save key / Remove key (translation helpers spec §6.2): an instant action
-    # of its own, because the key is deliberately not part of the Settings
-    # form (it is never rendered, so it can't be a pending change). A blank
-    # `ai_api_key` keeps the stored key, `remove_ai_key` clears it unless a new
-    # one was typed in the same submit. Answers with the key section (and the
-    # forms that sit beside it) replaced, and the main form's base moved on --
-    # the key write touches `updated_at`, and a base left behind would make
-    # the next Save look stale. Round 3's Task 7 rebuilds this card.
-    def ai_key
-      site = Current.site
-      before = site.updated_at
-      carried = params[:main_base_updated_at]
-      attributes = {}
-      key = params.dig(:site_setting, :ai_api_key).to_s
-      attributes["ai_api_key"] = key if key.present?
-      attributes["ai_api_key"] = nil if ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_ai_key)) && key.blank?
-
-      result = attributes.any? ? Settings::Save.call(site, attributes: attributes) : nil
-      site.reload
-      # The main form's base moves on only when this request wrote something AND
-      # the base the form carried was still current before the write -- the rule
-      # the editors use for a block's answer. A key save from a stale tab must
-      # neither unlock its Save nor cancel a 409 it was already shown, and a
-      # press that wrote nothing (an empty field) moves nothing.
-      move_base = site.updated_at != before && !base_older_than?(before, carried)
-      main_base = move_base ? site.updated_at.iso8601(6) : (carried.presence || before.iso8601(6))
-      streams = [
-        turbo_stream.replace("#{ID_PREFIX}-ai-key-section", partial: "admin/settings/ai_key_field", locals: { site_setting: site }),
-        turbo_stream.replace("#{ID_PREFIX}-ai-key-forms", partial: "admin/settings/ai_key_forms", locals: { site_setting: site, main_base: main_base })
-      ]
-      streams << turbo_stream.replace("#{ID_PREFIX}-base-updated-at", partial: "admin/shared/base_updated_at_field",
-        locals: { id: "#{ID_PREFIX}-base-updated-at", value: main_base }) if move_base
-      streams << turbo_stream.append("toasts", Admin::ToastComponent.new(message: result.errors.to_sentence, kind: :error)) if result && !result.ok?
-
-      render turbo_stream: streams, status: (result && !result.ok? ? (result.denied? ? :forbidden : :unprocessable_entity) : :ok)
+      render turbo_stream: ai_test_result_stream(message: error.message), status: :unprocessable_entity
     end
 
     private
@@ -217,8 +183,8 @@ module Admin
       errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
     end
 
-    def ai_test_result_stream(message:, ok:)
-      turbo_stream.replace("#{ID_PREFIX}-ai-test-result", partial: "admin/settings/ai_test_result", locals: { message: message, ok: ok })
+    def ai_test_result_stream(milliseconds: nil, message: nil)
+      turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message))
     end
   end
 end

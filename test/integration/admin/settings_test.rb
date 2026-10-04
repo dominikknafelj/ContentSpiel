@@ -383,8 +383,19 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     carried = base
     save_key(carried, "")
 
-    assert_response :success
+    # Refused in the key component (a blank key), nothing written, so nothing moves.
+    assert_response :unprocessable_entity
     assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
+  end
+
+  test "a key save carrying a blank or unparseable base writes, but moves nothing" do
+    [ "", "yesterday" ].each do |carried|
+      save_key(carried, "sk-ant-key-#{carried.presence || 'blank'}")
+
+      assert_response :success
+      assert_equal "sk-ant-key-#{carried.presence || 'blank'}", @site.reload.ai_api_key
+      assert_select "turbo-stream[target='settings-base-updated-at']", count: 0
+    end
   end
 
   test "a blank or unparseable base is not stale" do

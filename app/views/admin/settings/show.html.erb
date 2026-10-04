@@ -60,8 +60,8 @@
           <%= render Admin::SettingsScreen::PublishingCardComponent.new(values: values,
                 errors: (@errors.full_messages_for(:trash_retention_days) if @errors.respond_to?(:full_messages_for)).to_a) %>
           <% field_errors = ->(name) { @errors.respond_to?(:full_messages_for) ? @errors.full_messages_for(name) : [] } %>
-          <%= render "admin/settings/ai_card", site_setting: @site_setting, values: values,
-                provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model) %>
+          <%= render Admin::SettingsScreen::AiCardComponent.new(site_setting: @site_setting, values: values,
+                provider_errors: field_errors.call(:ai_provider), model_errors: field_errors.call(:ai_model)) %>
         <% end %>
 
         <%= render Admin::SaveBarComponent.new(form_id: "settings-form", cancel_url: admin_settings_path(**admin_url_options), save_label: "Save") %>
@@ -69,7 +69,7 @@
 
       <%# Forms of their own, outside the one above (see the comment at the top). %>
       <% if manage_settings %>
-        <div id="settings-ai-key-forms"><%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %></div>
+        <%= render "admin/settings/ai_key_forms", site_setting: @site_setting, main_base: base %>
       <% end %>
       <% if manage_languages %>
         <div id="settings-language-forms"><%= render Admin::SettingsScreen::LanguageDialogsComponent.new(site_setting: @site_setting) %></div>
