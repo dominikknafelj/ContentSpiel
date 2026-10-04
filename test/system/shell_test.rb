@@ -39,6 +39,39 @@ class ShellTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
+  # Review B, M4: the tree drawer closes when a page picked in it has loaded
+  # into `#content` -- not on any frame's load. ⌘K's results frame loads as
+  # the palette opens and on every keystroke; it used to close the drawer
+  # behind the palette (as did the New page / New post frames and the media
+  # picker's).
+  test "below 1024 the tree drawer stays open while another frame loads, and closes when a tree link has loaded" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    other = create_page(title: "Other")
+    sign_in_via_form users(:one)
+    visit "/cs-studio/pages/#{root_page.id}"
+    await_admin_controllers
+    page.driver.resize(900, 900)
+    find("button[aria-controls='tree-column']").click
+    assert_selector "#tree-column[data-open]"
+
+    # Dispatched, not typed: `send_keys` clicks its node first, and a click on
+    # <body> lands on the drawer's scrim.
+    page.execute_script('window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))')
+    assert_selector "dialog#command-palette[open]"
+    find("dialog#command-palette input").set("Oth")
+    assert_selector "#jump-results [role=option]", text: "Other"
+    assert_selector "#tree-column[data-open]", visible: :all
+
+    page.execute_script('document.getElementById("command-palette").close()')
+    assert_no_selector "dialog#command-palette[open]"
+    assert_selector "#tree-column[data-open]"
+    find("#tree-column li[data-page-id='#{other.id}'] a", text: "Other").click
+    assert_field "Title", with: "Other"
+    assert_no_selector "#tree-column[data-open]"
+  ensure
+    page.driver.resize(1400, 1400)
+  end
+
   test "at desktop width there is no top bar and the sidebar stays put" do
     sign_in_via_form users(:one)
     assert_no_selector ".admin-top-bar"

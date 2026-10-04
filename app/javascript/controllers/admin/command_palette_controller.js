@@ -43,8 +43,15 @@ export default class extends Controller {
   get query() { return Array.from(this.input.value.trim()).slice(0, 100).join("") }
   get stale() { return this.renderedQuery !== this.query }
 
+  // Not over another modal dialog. The shortcut is heard on `window`, so it
+  // also fires while one is up (New page with a typed title, Schedule, a
+  // rich-text dialog, the media picker); the palette stacked on top of it, a
+  // "New post" picked there opened a third, and following a row left the
+  // first dialog's typed input behind without a word. The editor closes
+  // what is open first.
   open() {
     if (!this.dialog || this.dialog.open) return
+    if (Array.from(document.querySelectorAll("dialog[open]")).some((dialog) => dialog !== this.dialog && dialog.matches(":modal"))) return
     this.input.value = ""
     this.pendingEnter = false
     this.load()

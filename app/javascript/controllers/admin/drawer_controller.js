@@ -59,8 +59,13 @@ export default class extends Controller {
 
   // A page picked in the tree loads into the content frame: that closes the
   // tree drawer (the sidebar's own links are full visits, handled by
-  // `turbo:before-visit`).
-  frameLoaded() {
+  // `turbo:before-visit`). Only `#content`: the layout hears every frame's
+  // load on `document` -- the ⌘K results (on each keystroke), the New page /
+  // New post dialogs' forms, the media picker's library -- and none of those
+  // is a page having been picked; ⌘K with the tree drawer open used to close
+  // the drawer behind the palette.
+  frameLoaded(event) {
+    if (event.target.id !== "content") return
     const tree = this.panelNamed("tree")
     if (tree?.hasAttribute("data-open")) this.close(tree)
   }

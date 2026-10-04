@@ -106,8 +106,12 @@ export default class extends Controller {
     if (url) this.imagePreviewTarget.src = url
   }
 
+  // Starts clean on every opening, the invalid mark a refused Insert left
+  // included: an empty field with the error border and no message says
+  // nothing.
   prepareYoutube() {
     this.youtubeInputTarget.value = ""
+    this.youtubeInputTarget.removeAttribute("aria-invalid")
     this.youtubeStatusTarget.textContent = ""
     this.youtubeErrorTarget.textContent = ""
   }

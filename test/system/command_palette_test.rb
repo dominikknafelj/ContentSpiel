@@ -127,4 +127,26 @@ class CommandPaletteTest < ApplicationSystemTestCase
       assert_no_text "Dashboard"
     end
   end
+
+  # Review B, M5: the shortcut is heard on `window`, so also while another
+  # modal dialog is up. The palette used to stack on top of it, and following
+  # a row left that dialog's typed input behind without a word.
+  test "Ctrl+K does nothing while another dialog is open" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    sign_in_via_form users(:one)
+    visit "/cs-studio/pages/#{root_page.id}"
+    await_admin_controllers
+
+    find("#tree a", text: "+ New page").click
+    assert_selector "dialog#new-page-dialog[open]"
+    find("dialog#new-page-dialog").send_keys([ :control, "k" ])
+    sleep 0.3
+    assert_no_selector "dialog#command-palette[open]"
+    assert_selector "dialog#new-page-dialog[open]"
+
+    find("dialog#new-page-dialog").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    find("body").send_keys([ :control, "k" ])
+    assert_selector "dialog#command-palette[open]"
+  end
 end

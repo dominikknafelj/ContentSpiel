@@ -7,6 +7,15 @@ import { Controller } from "@hotwired/stimulus"
 // `autofocus` element if there is one (Cancel, on destructive dialogs),
 // else the first focusable -- the dialog's × -- so we move it to the first
 // form field when there is one.
+//
+// Focus on the way back: the browser returns it to whatever had it before
+// `showModal()`. When that was an item of a menu (`Admin::MenuComponent` --
+// the block card's "Delete block…", the editor header's Schedule… /
+// Unpublish / Move to trash, a list row's Move to trash), the menu has
+// closed on the pick and the item is hidden, so focus fell to <body>: a
+// keyboard user was sent back to the top of the page. `open` therefore
+// remembers the menu's own button and `returnFocus` gives it focus when the
+// dialog closes with focus on nothing.
 export default class extends Controller {
   // A server-requested dialog (`data-admin--dialog-open-on-load`, a form
   // dialog reopened with its error after a refused submit). The controller
@@ -47,8 +56,28 @@ export default class extends Controller {
     // trigger's own `data-*` (`admin--new-record`: Inside and Title).
     // Dispatched on <body>, bubbling to `document`, before the dialog shows.
     this.dispatch("opening", { detail: { dialog, trigger: event.currentTarget } })
+    this.returnFocus(dialog, event.currentTarget)
     dialog.showModal()
     this.focusFirstField(dialog)
+  }
+
+  // See the class comment. Only for a trigger inside a menu's panel, only
+  // once, and only when the close left focus nowhere (a dialog whose action
+  // replaced the page or removed the card has nothing to return to, and one
+  // that handed focus on itself is left alone).
+  returnFocus(dialog, trigger) {
+    const button = trigger.closest?.("[role=menu]")?.closest("[data-controller~='admin--menu']")?.querySelector("[data-admin--menu-target='button']")
+    if (!button) return
+
+    // As `close` fires, focus has not reached <body> yet: the item it should
+    // go back to cannot take it, so it is still on an element that is no
+    // longer drawn (the closed dialog's own button, in Chrome) until the
+    // browser's next rendering step. An element with no box counts as lost.
+    dialog.addEventListener("close", () => {
+      const active = document.activeElement
+      const lost = !active || active === document.body || active.getClientRects().length === 0
+      if (lost && button.isConnected) button.focus()
+    }, { once: true })
   }
 
   // `click` fires on the nearest common ancestor of the mousedown and

@@ -619,6 +619,29 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "youtube" } }
   end
 
+  # Review B, M3: a refused Insert marks the field invalid; the next opening
+  # starts clean -- no message, and no invalid border without one.
+  test "the YouTube dialog reopens without the invalid mark a refused Insert left" do
+    visit_post
+
+    editor.click
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") do
+      fill_in "YouTube URL or video ID", with: "hello"
+      press "Insert video"
+      assert_selector "#rich-text-youtube-url[aria-invalid=true]"
+      press "Cancel"
+    end
+    refute_selector "dialog[open]"
+
+    press_insert "YouTube"
+    within("dialog#rich-text-youtube-dialog[open]") do
+      assert_field "YouTube URL or video ID", with: ""
+      assert_no_selector "#rich-text-youtube-url[aria-invalid]"
+      assert_no_text "That doesn’t look like a YouTube link."
+    end
+  end
+
   test "Escape and Cancel close a dialog, insert nothing and return focus to the editor" do
     visit_post
 
