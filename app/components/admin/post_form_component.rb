@@ -44,7 +44,7 @@ module Admin
 
       {
         controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow autosave:flush@document->admin--autosave#flush",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
         "admin--autosave-status-id-value": save_status_id
       }
     end

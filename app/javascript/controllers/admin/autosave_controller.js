@@ -1,6 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
-import { CANCELLED, enqueue, syncBases } from "autosave/queue"
+import { enqueue, registerForm, syncBases, unregisterForm } from "autosave/queue"
 
 // Autosaves a page/post editor form (cs-studio spec §6.1): the page settings
 // form, a block card, and the post form all share this one controller.
@@ -88,9 +88,14 @@ export default class extends Controller {
     // Set by a 409 ("changed elsewhere"): this form's saves are over until
     // the page is reloaded (see `attempt`).
     this.paused = false
+    // The last answer was not a success (refused, invalid, offline, signed
+    // out): `clean()` reports it to `drained()` (see `autosave/queue.js`).
+    this.failed = false
+    registerForm(this)
   }
 
   disconnect() {
+    unregisterForm(this)
     if (this.timer) clearTimeout(this.timer)
     // A pending retry belongs to a form that is gone (the page changed under
     // it): it must not re-enter the queue on the next page.
@@ -103,13 +108,33 @@ export default class extends Controller {
     this.timer = setTimeout(() => this.trigger(), this.debounceValue)
   }
 
-  // `autosave:flush` (dispatched on `document` by `admin--queue-hold` just
-  // before a header action is held): an edit still inside its debounce is
-  // sent now, so it is queued AHEAD of that action. Pressing a button
-  // normally blurs the field first (`focusout` -> `saveNow`), but not on
-  // every path (a keyboard-activated or programmatic click).
+  // Called by `drained()` (`autosave/queue.js`) before a header action or a
+  // visit: an edit still inside its debounce is sent now, and so is one
+  // typed while a save was in flight (`saveNow` -> `pending`, which sends it
+  // as soon as that save is answered). Pressing a button normally blurs the
+  // field first (`focusout` -> `saveNow`), but not on every path, and never
+  // helps an edit made while this form was busy.
   flush() {
     if (this.timer) this.saveNow()
+    // A retry waiting out its backoff is sent now rather than waited for.
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer)
+      this.retryTimer = null
+      this.attempt()
+    }
+  }
+
+  // Anything of this form's still to be sent or answered: a debounced edit,
+  // a queued or in-flight save (`busy` also covers the retry backoff), or an
+  // edit waiting behind one (`pending`).
+  outstanding() {
+    return Boolean(this.timer || this.busy || this.pending)
+  }
+
+  // Whether the last outcome was fine: not paused by a 409, not a refused,
+  // invalid, offline or signed-out save.
+  clean() {
+    return !this.paused && !this.failed
   }
 
   saveNow() {
@@ -145,11 +170,11 @@ export default class extends Controller {
     const outcome = await enqueue((isCurrent) => this.send(isCurrent))
 
     switch (outcome) {
-      case CANCELLED:
       case "stale":
-        // The page changed while this save waited or was in flight (a
-        // visit, a Reload): its form is gone and the answer belongs to no
-        // live document. Nothing to retry, report or render.
+        // The page was replaced while this save was in flight (a restoration
+        // visit, which cannot be drained first): its form is gone and the
+        // answer belongs to no live document. Nothing to retry, report or
+        // render. (The write itself has happened.)
         this.busy = false
         return
       case "retry":
@@ -160,6 +185,7 @@ export default class extends Controller {
         this.scheduleRetry()
         return
       case "signedOut":
+        this.failed = true
         this.retryCount = 0
         this.busy = false
         this.setStatus(this.constructor.texts.signedOut)
@@ -179,6 +205,7 @@ export default class extends Controller {
         // -- a refusal never vouches for a newer one. A paused form drops out
         // of the queue by simply never queueing again; other forms go on.
         this.paused = true
+        this.failed = true
         this.pending = false
         this.retryCount = 0
         this.busy = false
@@ -186,6 +213,7 @@ export default class extends Controller {
         this.timer = null
         return
       default:
+        this.failed = !this.lastAnswerOk
         this.retryCount = 0
         this.busy = false
         // A newer edit made while this save was queued or in flight: its own
@@ -257,6 +285,8 @@ export default class extends Controller {
     // the same ids).
     if (!isCurrent()) return "stale"
 
+    this.lastAnswerOk = response.ok
+
     if (response.status === 409) {
       Turbo.renderStreamMessage(text)
       return "conflict"
@@ -305,6 +335,7 @@ export default class extends Controller {
 
     if (this.retryCount >= delays.length) {
       this.setStatus(this.constructor.texts.offline, { retry: true })
+      this.failed = true
       this.retryCount = 0
       this.busy = false
       return
@@ -316,7 +347,10 @@ export default class extends Controller {
     // `busy` stays true across the wait: an edit that lands mid-backoff
     // still only ever queues (see the class comment above), it doesn't
     // jump the line and fire its own request ahead of the scheduled retry.
-    this.retryTimer = setTimeout(() => this.attempt(), delay)
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null
+      this.attempt()
+    }, delay)
   }
 
   // True for exactly the responses this controller's own PATCH endpoints

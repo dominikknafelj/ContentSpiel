@@ -1,5 +1,5 @@
 <%= render Admin::DialogComponent.new(id: dialog_id, title: "Schedule publishing", width: :form_narrow, open_on_load: error.present?) do |dialog| %>
-  <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "turbo:before-fetch-request->admin--queue-hold#hold" }, html: { novalidate: true } do %>
+  <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }, html: { novalidate: true } do %>
     <label for="<%= input_id %>" class="<%= setup_label_class %>">Date and time</label>
     <%= tag.input type: "datetime-local", id: input_id, name: "published_at", value: input_value, min: min_value,
           class: setup_input_class, aria: { invalid: (error ? "true" : nil), describedby: error_id } %>
@@ -15,7 +15,7 @@
           submit whose owner it is, and this one sits first in the footer --
           Enter would have removed the schedule instead of saving the new
           time. "Schedule" is the schedule form's only submit. %>
-      <%= form_with url: url, method: :post, class: "mr-auto", data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "turbo:before-fetch-request->admin--queue-hold#hold" } do %>
+      <%= form_with url: url, method: :post, class: "mr-auto", data: { turbo_frame: "_top", controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" } do %>
         <%= hidden_field_tag :remove, "1", id: nil %>
         <%= render Admin::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit") %>
       <% end %>

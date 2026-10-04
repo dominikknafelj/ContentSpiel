@@ -131,4 +131,66 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_equal "A caption", block.reload.caption
     assert_no_text "CHANGED ELSEWHERE"
   end
+
+  # Nothing that replaces the page starts until the queue is empty
+  # (`autosave/queue.js`, "THE RULE"). The wrapper below slows every PATCH so a
+  # save is reliably still in flight when the next thing happens.
+  SLOW_PATCHES = <<~JS
+    const originalFetch = window.fetch
+    window.fetch = async (url, options = {}) => {
+      if ((options.method || "GET").toUpperCase() === "PATCH") await new Promise((resolve) => setTimeout(resolve, 1200))
+      return originalFetch(url, options)
+    }
+  JS
+
+  # A: an edit made while the SAME form's save is on the wire is a follow-up
+  # that waits behind it; Publish must wait for that follow-up too.
+  test "an edit typed while the same form's save is in flight is saved before Publish runs" do
+    draft = create_page(title: "Draft", published: false)
+    visit "/cs-studio/pages/#{draft.id}"
+    await_admin_controllers
+    page.execute_script(SLOW_PATCHES)
+
+    fill_in "Subtitle", with: "first"
+    page.execute_script("document.activeElement.blur()") # the save for "first" goes out, and is slow
+    fill_in "Subtitle", with: "second, typed while that save is in flight"
+    press "Publish"
+
+    assert_eventually(wait: 15) { draft.reload.published_at.present? }
+    assert_equal "second, typed while that save is in flight", draft.subtitle
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # B: a plain visit waits for every queued edit instead of dropping it.
+  test "following a sidebar link right after typing in two forms saves both edits" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(SLOW_PATCHES)
+
+    fill_in "Subtitle", with: "Page edit"
+    fill_in id: "block-#{block.id}-caption", with: "Block edit" # blurs Subtitle: its (slow) save is now in flight
+    page.execute_script("document.activeElement.blur()")       # the caption's save is queued behind it, unsent
+    page.execute_script(<<~JS)
+      Array.from(document.querySelectorAll("a")).find((a) => a.textContent.trim() === "Dashboard").click()
+    JS
+
+    assert_eventually(wait: 15) { @page.reload.subtitle == "Page edit" && block.reload.caption == "Block edit" }
+    assert_current_path(/cs-studio\/?\z/, wait: 15)
+  end
+
+  # C: a flushed save that was refused stops the action, and says so.
+  test "Publish does not run when the save it waited for was refused, and says why" do
+    draft = create_page(title: "Draft", published: false)
+    visit "/cs-studio/pages/#{draft.id}"
+    await_admin_controllers
+
+    fill_in "Title", with: ""
+    press "Publish"
+
+    assert_text "Your last change wasn't saved, so this didn't run.", wait: 10
+    assert_nil draft.reload.published_at
+    assert_equal "Draft", draft.title
+    assert_button "Publish"
+  end
 end

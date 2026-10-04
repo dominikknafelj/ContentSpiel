@@ -464,6 +464,30 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "Fresh", block.reload.caption
   end
 
+  # The same rule as the page hero's (`MediaFields#without_untouched_media_slot`),
+  # for an image block: a later save of the block that does not touch its image
+  # leaves the refusal message in place; choosing or clearing the image clears it.
+  test "a refused image choice's message survives a later save that leaves the image alone" do
+    block = @page.content_blocks.create!(block_type: :image, position: 0)
+    slot = "block-#{block.id}-image-errors"
+    gone = Media::Asset.maximum(:id).to_i + 1000
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { media_asset_id: gone.to_s }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_match(/doesn.*t exist/, response.body)
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { caption: "Later", media_asset_id: "" }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_nil Nokogiri::HTML5.fragment(response.body).css("turbo-stream[target='#{slot}']").find { |stream| stream.at_css("template").text.strip.present? },
+      "the refusal message must not be rewritten by a save that left the image alone"
+    assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{slot}']").nil?, "its slot is not even touched"
+
+    chosen = create_media_asset
+    patch "#{blocks_path}/#{block.id}", params: { block: { media_asset_id: chosen.id.to_s }, base_updated_at: block.reload.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[target='#{slot}']"), "choosing an image is acting on the field: its slot is rewritten"
+  end
+
   test "a block on a live page saves 'to site', like the page does; on a draft page it just saves" do
     block = @page.content_blocks.create!(block_type: :image, position: 0)
     assert @page.live?
