@@ -93,6 +93,32 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_not @second.reload.trashed?
   end
 
+  # Review C, I1 (the other call sites of the menu-opened dialog) and Task 17's
+  # p3: a row's Move to trash replaces the selection with that one row; a
+  # cancelled dialog puts the editor's own ticks back and focus returns to the
+  # row's ⋯ button, not <body>.
+  test "cancelling a row's Move to trash restores the previous selection and returns focus to the row's menu button" do
+    visit admin_posts_path
+    await_admin_controllers
+    tick(@first)
+    tick(@third)
+    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
+
+    find("tr#post_#{@second.id} button[aria-label^='Actions for']").click
+    find("tr#post_#{@second.id} [role=menu] button", text: "Move to trash").click
+    within("dialog#bulk-trash-dialog[open]") do
+      assert_text "This moves 1 post to the trash."
+      press "Cancel"
+    end
+    assert_no_selector "dialog[open]"
+    assert_selector "[data-admin--bulk-select-target=bar]", text: "2 selected"
+    assert find("#select-post-#{@first.id}").checked?
+    assert find("#select-post-#{@third.id}").checked?
+    assert_not find("#select-post-#{@second.id}").checked?
+    assert_equal "Actions for #{@second.title}", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_not @second.reload.trashed?
+  end
+
   test "the Translation filter narrows the list without a button" do
     with_locales(%w[en de], default: "en") do
       Translations::State.where(record_type: "Post").delete_all
@@ -117,5 +143,10 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     find("[role=menu] a", text: "New resume entry").click
     assert_selector "dialog#new-post-dialog[open]"
     assert_selector "dialog#new-post-dialog input[type=radio][value=resume_entry]:checked", visible: :all, wait: 10
+
+    # The pick came from a menu item: Escape hands focus back to the caret.
+    find("dialog#new-post-dialog").send_keys(:escape)
+    assert_no_selector "dialog[open]"
+    assert_equal "Choose another type of post", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
   end
 end

@@ -32,19 +32,41 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = [ "row", "all", "bar", "count", "ids", "confirmCount", "status" ]
 
+  // `announced` is set BEFORE the first `sync`, which announces any change
+  // from it: a render with ticked boxes (a page restored from Turbo's cache)
+  // is not a change the user made, and read "Selection cleared" or "N posts
+  // selected" out on every connect.
   connect() {
-    this.sync()
     this.announced = this.rowTargets.filter((box) => box.checked).length
+    this.sync()
   }
 
   // A row's own "Move to trash": selects just that post (unticking the rest)
   // and lets the same click open the bulk trash confirmation, so a single
   // trash goes through `posts/bulk` -- confirmed, filters and page kept, with
   // the same Undo -- instead of a second path of its own.
+  //
+  // The row's click replaced the selection the editor had built, so a dialog
+  // that is cancelled (Cancel, Escape) puts the previous ticks back; one that
+  // is confirmed submits first, and the page it answers with is a fresh render.
   only(event) {
     const id = String(event.params.id)
+    const previous = this.rowTargets.filter((box) => box.checked).map((box) => box.value)
     this.rowTargets.forEach((box) => { box.checked = box.value === id })
     this.sync()
+
+    const dialog = document.getElementById(event.params.dialogId)
+    if (!dialog) return
+    let submitted = false
+    // A `method=dialog` form (Cancel) submits too, but only to close.
+    const onSubmit = (e) => { if (e.target.method !== "dialog") submitted = true }
+    dialog.addEventListener("submit", onSubmit)
+    dialog.addEventListener("close", () => {
+      dialog.removeEventListener("submit", onSubmit)
+      if (submitted) return
+      this.rowTargets.forEach((box) => { box.checked = previous.includes(box.value) })
+      this.sync()
+    }, { once: true })
   }
 
   toggleAll() {

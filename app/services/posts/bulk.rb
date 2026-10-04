@@ -69,10 +69,18 @@ module Posts
       posts = readable_posts
       done, refused, failed, already_live, skipped, reasons = [], [], [], [], [], {}
 
+      # One instant for the whole batch, one status read per post: `status`
+      # compares `published_at` with the clock each time it is called, so two
+      # reads of it could disagree about a post scheduled for this very
+      # moment (live on one, scheduled on the next) and a long batch would
+      # judge its last post by a later clock than its first.
+      now = Time.current
+
       posts.each do |post|
-        if @action == "publish" && post.status == "live"
+        status = @action == "publish" ? status_at(post, now) : nil
+        if status == "live"
           already_live << post
-        elsif @action == "publish" && post.status == "scheduled"
+        elsif status == "scheduled"
           skipped << post
         else
           result = act_on(post)
@@ -89,6 +97,13 @@ module Posts
     end
 
     private
+
+    def status_at(post, now)
+      if post.published_at.nil? then "draft"
+      elsif post.published_at > now then "scheduled"
+      else "live"
+      end
+    end
 
     def readable_posts
       numeric = @ids.grep(Integer)

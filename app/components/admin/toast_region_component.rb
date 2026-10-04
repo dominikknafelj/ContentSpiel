@@ -4,6 +4,10 @@ module Admin
   # here) or from a Turbo Stream (`toast_stream`, which appends to this id).
   # It renders even when empty, precisely so a stream has a target.
   #
+  # `flash[:warning]` is a warning toast: something was done and something was
+  # not (a bulk action's partial result, which names the failures) -- it never
+  # auto-hides, like an error, and keeps its Undo.
+  #
   # `flash[:notice]` is a success toast -- an undo toast when `flash[:undo]`
   # (`{ label:, url:, method: }`, string keys after the session round trip)
   # rides along -- and `flash[:alert]` is an error toast.
@@ -31,6 +35,8 @@ module Admin
     def notice = flash[:notice]
 
     def alert = flash[:alert]
+
+    def warning = flash[:warning]
 
     def undo = flash[:undo].presence&.to_h&.with_indifferent_access
   end

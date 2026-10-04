@@ -21,6 +21,25 @@ class Admin::PostsScreen::TableComponentTest < ViewComponent::TestCase
     assert_text "FOOTER"
   end
 
+  # Review C, M7 and M16.
+  test "a viewer who can neither publish nor trash gets no selection column" do
+    post_record = create_post(title: "Readable")
+    Current.actor = users(:reader)
+    render_table([ post_record ])
+    assert_no_selector "input[type=checkbox]"
+    assert_no_selector "[data-admin--bulk-select-target]"
+    assert_selector "tbody tr#post_#{post_record.id} th[scope=row] a", text: /Readable/
+  end
+
+  test "column headers are scoped, the title is the row header, and the sort is announced without the arrow glyph" do
+    render_table([ create_post(title: "A draft", published: false) ])
+    assert_selector "thead th[scope=col]", minimum: 6
+    assert_no_selector "thead th:not([scope])"
+    assert_selector "thead th[aria-sort=descending]", text: /\AUpdated/
+    assert_selector "thead th[aria-sort=descending] span[aria-hidden=true]", text: "↓"
+    assert_selector "tbody th[scope=row]", count: 1
+  end
+
   test "title links to the editor with its path under it, or Not listed" do
     listed = create_post(title: "Listed")
     unlisted = create_post(title: "Unlisted")

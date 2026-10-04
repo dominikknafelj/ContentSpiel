@@ -235,7 +235,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
 
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ other.id, mine.id ] }
-    assert_equal "Published 1 post. 1 was refused: “Not mine”.", flash[:notice]
+    assert_equal "Published 1 post. 1 was refused: “Not mine”.", flash[:warning]
     assert mine.reload.live?
     assert_nil other.reload.published_at
   end
@@ -318,7 +318,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     bad2 = create_post(title: "Bad two", published: false)
     [ bad1, bad2 ].each { |bad| bad.update_columns(content_type: "not_registered") }
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ ok.id, bad1.id ] }
-    assert_match(/\APublished 1 post\. 1 couldn't be published: “Bad one” \(.+\)\.\z/, flash[:notice])
+    assert_match(/\APublished 1 post\. 1 couldn't be published: “Bad one” \(.+\)\.\z/, flash[:warning])
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ bad1.id, bad2.id ] }
     assert_match(/\ANothing was changed\. 2 couldn't be published: “Bad one” and “Bad two” \(.+\)\.\z/, flash[:alert])
     post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ bad1.id ] }
@@ -337,7 +337,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     AccessControl::Membership.create!(group: group, user: users(:reader))
     sign_in_as(users(:reader))
     post "/cs-studio/posts/bulk", params: { bulk_action: "publish", ids: [ mine.id, other.id, bad.id ] }
-    assert_match(/\APublished 1 post\. 1 was refused: “Not mine”\. 1 couldn't be published: “Broken” \(.+\)\.\z/, flash[:notice])
+    assert_match(/\APublished 1 post\. 1 was refused: “Not mine”\. 1 couldn't be published: “Broken” \(.+\)\.\z/, flash[:warning])
   end
 
   test "bulk publish skips a scheduled post and says so; an already-live one is not counted as published" do
@@ -388,6 +388,16 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     assert_select "h3", text: "Nothing on this page"
   end
 
+  # The `page = total_pages` branch: more than one page is left, so the
+  # redirect names the last one rather than dropping `page` (which is only for
+  # a list that fits on one).
+  test "emptying the last page of a list that still has several lands on its last page" do
+    insert_posts(101, published_at: nil, prefix: "Last")
+    alone_on_page_three = Post.where("title ->> 'en' LIKE 'Last%'").order(updated_at: :desc, id: :desc).offset(100).pick(:id)
+    post "/cs-studio/posts/bulk", params: { bulk_action: "trash", ids: [ alone_on_page_three ], page: "3", q: "Last" }
+    assert_redirected_to "/cs-studio/posts?page=2&q=Last"
+  end
+
   test "the toolbar counts of a content_types-scoped viewer count each readable post once" do
     2.times { |i| create_post(title: "Blog #{i}", tags: [ "a", "b" ]) }
     create_post(title: "Resume", content_type: "resume_entry")
@@ -411,7 +421,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     as_owner { Trash::Move.call(trashed) }
     post "/cs-studio/trash/restore_many", params: { type: "post", ids: [ trashed.id, kept.id, page.id, 99_999_999, "abc" ] }
     assert_redirected_to "/cs-studio/posts"
-    assert_equal "Restored 1 post. 4 posts were not found.", flash[:notice]
+    assert_equal "Restored 1 post. 4 posts were not found.", flash[:warning]
     assert_not trashed.reload.trashed?
     assert_equal 1, Audit::Event.where(action: "post.restored").count
   end

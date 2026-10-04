@@ -12,9 +12,12 @@ module Admin
   # - "Moved 3 posts to the trash." (with Undo)
   # - "Nothing was changed. 2 posts were not found."
   #
-  # Something done is a success toast (`flash[:notice]`); nothing done, with
-  # something refused, failed or not found, is an error toast
-  # (`flash[:alert]`). An id that names no kept post the viewer can read is
+  # Something done and nothing wrong is a success toast (`flash[:notice]`);
+  # something done AND something refused, failed or not found is a warning
+  # toast (`flash[:warning]`), because the toast is the only place the
+  # failures are named and a warning never auto-hides (a success one goes
+  # after 4 s, an Undo one after 8); nothing done, with something refused,
+  # failed or not found, is an error toast (`flash[:alert]`). An id that names no kept post the viewer can read is
   # only ever *counted* -- never named -- so a hidden post's existence isn't
   # disclosed ("not found, not forbidden").
   #
@@ -28,6 +31,12 @@ module Admin
     TITLE_LENGTH = 60
     REASON_LENGTH = 120
     MAX_UNDO_URL = 1_500
+    # The whole of what rides in the session cookie for one bulk answer: the
+    # sentences plus the Undo URL, in BYTES (titles and the search text are
+    # multi-byte; the cookie's limit is 4 KB for everything the session
+    # holds). Over it, the Undo is dropped and the toast says where to find
+    # the posts instead.
+    MAX_FLASH_BYTES = 2_000
 
     private
 
@@ -46,10 +55,12 @@ module Admin
         sentences << "#{failed.size} couldn't be #{failed_phrase}: #{names(failed)}#{" (#{reason})" if reason.present?}."
       end
       sentences << "#{helpers.pluralize(not_found, "post")} #{not_found == 1 ? "was" : "were"} not found." if not_found.positive?
-      sentences << "Find them in the Trash." if undo_dropped && done.any?
+      over_budget = undo_url && (sentences.sum(&:bytesize) + sentences.size + undo_url.bytesize) > MAX_FLASH_BYTES
+      undo_url = nil if over_budget
+      sentences << "Find them in the Trash." if (undo_dropped || over_budget) && done.any?
 
       problem = refused.any? || failed.any? || not_found.positive?
-      flash[done.any? || !problem ? :notice : :alert] = sentences.join(" ")
+      flash[!problem ? :notice : (done.any? ? :warning : :alert)] = sentences.join(" ")
       flash[:undo] = { "label" => "Undo", "url" => undo_url } if undo_url && done.any?
     end
 

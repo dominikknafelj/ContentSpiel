@@ -35,6 +35,12 @@ module Admin
 
       attr_reader :posts, :paths, :translation_states, :url_options, :locale
 
+      # The selection column is there only for someone who can act on a
+      # selection: the bulk bar (`BulkBarComponent#render?`) offers Publish or
+      # Move to trash, so a viewer holding neither would tick rows and see
+      # nothing happen (final review C, M7).
+      def selectable? = can?("posts.publish") || can?("posts.delete")
+
       def title_of(post) = post.title(locale: locale).presence || "(untitled)"
 
       def editor_path(post, **extra) = helpers.admin_post_path(post, **url_options.merge(extra))

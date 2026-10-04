@@ -68,7 +68,7 @@ class Posts::BulkTest < ActiveSupport::TestCase
     assert_equal 0, Audit::Event.where(action: "access.denied").count
   end
 
-  test "trash moves each post with its own event; already-live posts publish as a no-op that still counts as done" do
+  test "trash moves each post with its own event, a live one included" do
     a = create_post(title: "A")
     b = create_post(title: "B", published: true)
     as(users(:one), channel: :admin) do

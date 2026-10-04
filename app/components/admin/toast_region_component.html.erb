@@ -1,5 +1,6 @@
 <% toasts = capture do %>
   <%= render Admin::ToastComponent.new(message: notice, kind: notice_kind, action: undo) if notice.present? %>
+  <%= render Admin::ToastComponent.new(message: warning, kind: :warning, action: undo) if warning.present? %>
   <%= render Admin::ToastComponent.new(message: alert, kind: :error) if alert.present? %>
 <% end %>
 <% if relay %>
