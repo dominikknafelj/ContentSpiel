@@ -67,7 +67,7 @@
       <% @events.each do |event| %>
         <tr id="<%= dom_id(event) %>" class="border-b border-line align-top">
           <td class="py-2 pr-4">
-            <%= link_to event.occurred_at.strftime("%b %-d, %Y %H:%M"), admin_audit_event_path(event, **admin_url_options), class: "hover:underline" %>
+            <%= link_to render(Admin::TimeAgoComponent.new(time: event.occurred_at)), admin_audit_event_path(event, **admin_url_options), class: "hover:underline" %>
           </td>
           <td class="py-2 pr-4"><%= audit_actor_label(event) %></td>
           <td class="py-2 pr-4 text-meta"><%= audit_channel_label(event.channel) %></td>

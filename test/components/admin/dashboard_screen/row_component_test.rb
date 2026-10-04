@@ -27,7 +27,7 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "a[href='/cs-studio/posts/#{post.id}']", text: "Coming soon"
     assert_text "Blog"
     assert_text "Scheduled"
-    assert_selector "time[datetime='#{post.published_at.iso8601}']", text: post.published_at.strftime("%b %-d, %Y %H:%M")
+    assert_selector "time[datetime='#{post.published_at.iso8601}']", text: post.published_at.strftime("%-d %b, %H:%M")
   end
 
   test "an image row shows a thumbnail, links to its detail panel, and has no status badge" do

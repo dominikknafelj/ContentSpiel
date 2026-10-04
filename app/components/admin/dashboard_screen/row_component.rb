@@ -18,8 +18,6 @@ module Admin
     # not `updated_at`, which a later system touch could move), otherwise
     # `:updated_at`.
     class RowComponent < Admin::AdminComponent
-      TIME_FORMAT = "%b %-d, %Y %H:%M".freeze
-
       def initialize(record:, change:, time: :updated_at)
         @record = record
         @change = change
@@ -51,8 +49,6 @@ module Admin
       end
 
       def time_prefix = time == :published_at ? "Goes live" : "Updated"
-
-      def formatted_at = at.strftime(TIME_FORMAT)
 
       # Spec §4.3's "Who changed it": the newest event's person -- for a
       # change made through an API token, the token's user, never "API

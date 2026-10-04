@@ -46,17 +46,17 @@
       <% @api_tokens.each do |api_token| %>
         <% dialog_id = "revoke-api-token-#{api_token.id}" %>
         <tr id="<%= dom_id(api_token) %>" class="border-b border-line align-top">
-          <td class="py-2 pr-4 text-ink"><%= l(api_token.created_at, format: :short) %></td>
+          <td class="py-2 pr-4 text-ink"><%= render Admin::TimeAgoComponent.new(time: api_token.created_at) %></td>
           <td class="py-2 pr-4 text-ink"><%= render Admin::UserNameComponent.new(user: api_token.user, user_id: api_token.user_id) %></td>
           <td class="py-2 pr-4 text-ink"><%= api_token.group.name %></td>
           <td class="py-2 pr-4">
             <% if api_token.revoked_at %>
-              <span class="text-meta">Revoked <%= l(api_token.revoked_at, format: :short) %></span>
+              <span class="text-meta">Revoked <%= render Admin::TimeAgoComponent.new(time: api_token.revoked_at) %></span>
             <% else %>
               <span class="text-ok-ink">Active</span>
             <% end %>
           </td>
-          <td class="py-2 pr-4 text-ink"><%= api_token.last_used_at ? l(api_token.last_used_at, format: :short) : "Never" %></td>
+          <td class="py-2 pr-4 text-ink"><%= api_token.last_used_at ? render(Admin::TimeAgoComponent.new(time: api_token.last_used_at)) : "Never" %></td>
           <td class="py-2 pr-4 font-cs-mono text-ink"><%= api_token.last_used_ip.presence || "—" %></td>
           <td class="py-2 text-right">
             <% unless api_token.revoked_at %>

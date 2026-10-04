@@ -46,7 +46,7 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
 
     get admin_audit_events_path
     assert_response :success
-    assert_match "Jul 1, 2026 09:30", response.body
+    assert_match "title=\"1 Jul 2026, 09:30\"", response.body # the tooltip: the site zone, not UTC
 
     get admin_audit_event_path(event)
     assert_response :success
@@ -57,7 +57,7 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
 
     get admin_trash_path
     assert_response :success
-    assert_match "Jul 1, 2026 09:30", response.body
+    assert_match "title=\"1 Jul 2026, 09:30\"", response.body
   end
 
   # Fix round 1: a row written around `SiteSetting`'s own validation (raw

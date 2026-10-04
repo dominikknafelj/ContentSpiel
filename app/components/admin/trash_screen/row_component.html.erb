@@ -23,7 +23,7 @@
   <td class="py-2 pr-4">
     <div><%= trashed_by_label %></div>
     <div class="text-meta">
-      <time datetime="<%= item.trashed_at.iso8601 %>" title="<%= item.trashed_at.strftime("%b %-d, %Y %H:%M") %>"><%= helpers.time_ago_in_words(item.trashed_at) %> ago</time>
+      <%= render Admin::TimeAgoComponent.new(time: item.trashed_at) %>
     </div>
     <% if (text = countdown) %>
       <div class="text-meta"><%= text %></div>

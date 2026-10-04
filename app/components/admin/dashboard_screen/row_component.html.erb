@@ -13,7 +13,7 @@
         <span><%= type_label %></span>
       <% end %>
       <% if at %>
-        <span><%= time_prefix %> <time datetime="<%= at.iso8601 %>"><%= formatted_at %></time></span>
+        <span><%= time_prefix %> <%= render Admin::TimeAgoComponent.new(time: at) %></span>
       <% end %>
       <% if (by = changed_by) %>
         <span><%= by %></span>
