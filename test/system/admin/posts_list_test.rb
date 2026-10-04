@@ -119,6 +119,30 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_not @second.reload.trashed?
   end
 
+  # Task 17's p1: connecting over boxes that are already ticked (a page
+  # restored from Turbo's cache) is not a change the user made, so nothing is
+  # announced; ticking one afterwards is.
+  test "reconnecting over ticked rows announces nothing until the selection changes" do
+    visit admin_posts_path
+    await_admin_controllers
+    status = "[data-admin--bulk-select-target=status]"
+
+    page.execute_script(<<~JS)
+      document.querySelector("#select-post-#{@first.id}").checked = true
+      const root = document.querySelector("[data-controller~='admin--bulk-select']")
+      window.__root = root
+      window.__controllers = root.getAttribute("data-controller")
+      root.setAttribute("data-controller", "")
+    JS
+    sleep 0.3 # Stimulus disconnects on the mutation, a task later
+    page.execute_script("window.__root.setAttribute('data-controller', window.__controllers)")
+    assert_selector "[data-admin--bulk-select-target=bar]", text: "1 selected"
+    assert_equal "", find(status, visible: :all).text(:all)
+
+    tick(@second)
+    assert_selector status, text: "2 posts selected", visible: :all
+  end
+
   test "the Translation filter narrows the list without a button" do
     with_locales(%w[en de], default: "en") do
       Translations::State.where(record_type: "Post").delete_all
