@@ -61,7 +61,9 @@ module Admin
         forbidden_or(result) do
           load_screen
           @name = name
-          @selected_group_id = group&.id
+          # A refusal that named no group (or one that is gone) offers the
+          # default again rather than an empty select.
+          @selected_group_id = group&.id || default_group&.id
           messages = result.errors.presence || [ "The token couldn't be created" ]
           @name_errors, @group_errors = messages.partition { |message| message.start_with?("Name ") }
           render :index, status: :unprocessable_entity

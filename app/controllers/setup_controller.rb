@@ -11,7 +11,7 @@ class SetupController < ApplicationController
   OPTIONAL_STEPS = %w[system_check mcp_token starter_content].freeze
   LABELS = {
     "token" => "Setup token", "system_check" => "System check", "admin" => "Admin account",
-    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "AI agent",
+    "site" => "Site identity", "languages" => "Languages", "mcp_token" => "MCP token",
     "starter_content" => "Starter content", "review" => "Review"
   }.freeze
 

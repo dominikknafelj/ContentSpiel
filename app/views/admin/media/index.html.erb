@@ -38,10 +38,11 @@
     <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
     <p class="sr-only" role="status" aria-live="polite" data-admin--media-upload-target="status"></p>
   </div>
-  <%# Centred by flex over the whole window, and never in the way of the drop
+  <%# Centred by flex over the whole window, translucent (the page stays
+      visible behind it, as in the mock), and never in the way of the drop
       itself (`pointer-events-none`: the drag keeps its real target). %>
   <div hidden data-admin--media-drop-target="overlay" aria-hidden="true"
-       class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint">
+       class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint/85">
     <p class="rounded-cs bg-surface px-6 py-4 text-h2 text-ink shadow-menu">Drop images to upload</p>
   </div>
 </div>

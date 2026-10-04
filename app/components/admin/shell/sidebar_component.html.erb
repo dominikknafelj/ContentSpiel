@@ -21,7 +21,11 @@
         <ul class="flex flex-col gap-0.5">
           <% entries.each do |entry| %>
             <li>
-              <%= link_to module_path(entry), class: link_classes(entry), aria: { current: (current?(entry) ? "page" : nil) } do %>
+              <%# System status runs its checks on every GET (a storage probe
+                  writes and deletes a blob): never fetched just because the
+                  pointer crossed the link. %>
+              <%= link_to module_path(entry), class: link_classes(entry), aria: { current: (current?(entry) ? "page" : nil) },
+                    data: { turbo_prefetch: (false if entry[:path] == :admin_system_status_path) } do %>
                 <%= helpers.render "admin/shared/icon", name: entry[:icon] %><span><%= entry[:label] %></span>
                 <% if (badge = badge_for(entry)) %><span data-badge class="ml-auto font-cs-mono text-label text-meta"><%= badge %></span><% end %>
               <% end %>
