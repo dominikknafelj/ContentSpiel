@@ -20,7 +20,8 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     assert_selector "[data-translation-suggestion].bg-accent-tint"
     assert_selector "textarea[data-translate-suggestion-text][aria-label='Suggested translation']", text: "Hallo Welt"
     assert_no_selector "textarea[name]", visible: :all
-    assert_text(/suggested by claude-sonnet-5/i)
+    assert_selector "[data-suggestion-label]", text: "SUGGESTED TRANSLATION · EDIT BEFORE USING"
+    assert_selector "[data-suggestion-model].ml-auto", text: "claude-sonnet-5"
     assert_selector "button", text: "Use"
     assert_selector "button", text: "Discard"
   end
@@ -44,10 +45,46 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     %w[input change focusout].each { |event| assert_includes actions, "#{event}->admin--translate#contain" }
   end
 
-  test "without a model name it just says Suggested translation" do
+  test "without a model name there is only the label" do
     render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo"))
-    assert_text(/suggested translation/i)
-    assert_no_text(/suggested by/i)
+    assert_selector "[data-suggestion-label]", text: "SUGGESTED TRANSLATION · EDIT BEFORE USING"
+    assert_no_selector "[data-suggestion-model]"
+  end
+
+  test "Use is the small primary button, Discard the secondary one" do
+    render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "Hallo"))
+    assert_selector "button[data-translate-use].bg-accent.text-sm", text: "Use"
+    assert_no_selector "button[data-action='admin--translate#discard'].bg-accent"
+  end
+
+  test "repair notes are warn-ink lines after the text and before Use / Discard" do
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "b-json", locale: "de", suggestion: doc("Hallo"),
+      warnings: [ "Unknown directive ::foo was kept as text", "An empty quote was removed" ])
+
+    notes = page.all("p.text-warn-ink[data-suggestion-warning]")
+    assert_equal [ "Unknown directive ::foo was kept as text", "An empty quote was removed" ], notes.map(&:text)
+    html = page.native.to_html
+    assert_operator html.index("An empty quote was removed"), :<, html.index(">Use<")
+    assert_operator html.index(">Use<"), :<, html.index(">Discard<")
+  end
+
+  test "mode update shows the current translation, escaped and cut to 300 characters" do
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "Über uns neu", mode: :update, current: "Über uns")
+    assert_selector "[data-suggestion-current]", text: "Current: Über uns"
+
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "x", mode: :update, current: "<b>y</b>" + "z" * 400)
+    assert_no_selector "[data-suggestion-current] b"
+    text = page.find("[data-suggestion-current]").text
+    assert_operator text.length, :<=, "Current: ".length + 300
+    assert_includes text, "<b>y</b>"
+  end
+
+  test "without mode update there is no Current line, and a blank current shows none" do
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "x", current: "Über uns")
+    assert_no_selector "[data-suggestion-current]"
+
+    render_inline Admin::TranslationScreen::SuggestionComponent.new(input_id: "t", locale: "de", suggestion: "x", mode: :update, current: " ")
+    assert_no_selector "[data-suggestion-current]"
   end
 
   test "the suggestion text is escaped inside the textarea" do
@@ -68,7 +105,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
     assert_equal suggestion.to_h, JSON.parse(use["data-translate-document"])
     assert_equal({}, JSON.parse(use["data-translate-assets"]))
     assert_equal({}, JSON.parse(use["data-translate-link-titles"]))
-    assert_selector "li", text: "Unknown directive ::foo was kept as text"
+    assert_selector "p.text-warn-ink", text: "Unknown directive ::foo was kept as text"
   end
 
   test "a rich-text suggestion's images travel with Use, so the editor can show them" do

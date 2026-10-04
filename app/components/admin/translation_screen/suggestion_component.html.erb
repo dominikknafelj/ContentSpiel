@@ -12,22 +12,25 @@
 <% else %>
   <%= tag.div class: "admin-translation-suggestion mt-2 rounded-cs border border-accent bg-accent-tint p-3 text-sm",
         data: { translation_suggestion: true, action: "input->admin--translate#contain change->admin--translate#contain focusout->admin--translate#contain" } do %>
-    <p class="<%= setup_label_class %>"><%= heading %></p>
+    <div class="flex items-baseline gap-3">
+      <p class="<%= setup_label_class %>" data-suggestion-label><%= self.class::LABEL %></p>
+      <% if model_name %><p class="ml-auto font-cs-mono text-label text-meta" data-suggestion-model><%= model_name %></p><% end %>
+    </div>
+    <% if current_text %>
+      <p class="mt-1 whitespace-pre-line text-dim" data-suggestion-current>Current: <%= current_text %></p>
+    <% end %>
     <% if rich? %>
       <div class="admin-rich-text-content mt-1 text-ink"><%= preview_html %></div>
     <% else %>
       <%= text_area_tag nil, suggestion, rows: rows, class: "#{setup_input_class} mt-1", data: { translate_suggestion_text: true }, aria: { label: "Suggested translation" } %>
     <% end %>
-    <% if warnings.any? %>
-      <ul class="mt-2 list-disc pl-5 text-warn-ink">
-        <% warnings.each do |warning| %>
-          <li><%= warning %></li>
-        <% end %>
-      </ul>
+    <%# Repair notes: one warn-ink line each, under the text and before the buttons. %>
+    <% warnings.each do |warning| %>
+      <p class="mt-1 text-warn-ink" data-suggestion-warning><%= warning %></p>
     <% end %>
     <div class="mt-2 flex flex-wrap gap-2">
-      <%= tag.button "Use", type: "button", class: self.class::BUTTON_CLASS, data: use_data %>
-      <%= tag.button "Discard", type: "button", class: self.class::BUTTON_CLASS, data: { action: "admin--translate#discard" } %>
+      <%= render Admin::ButtonComponent.new(label: "Use", variant: :primary, size: :small, data: use_data) %>
+      <%= render Admin::ButtonComponent.new(label: "Discard", variant: :secondary, size: :small, data: { action: "admin--translate#discard" }) %>
     </div>
   <% end %>
 <% end %>

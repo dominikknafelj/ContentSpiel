@@ -77,8 +77,13 @@ module Admin
       # set up and `ai.translate`; see `Admin::TranslationScreen
       # ::TranslateButtonComponent`. Nil when there's no confirm at all (the
       # primary language, an untracked column, a view-only viewer).
+      #
+      # Only on an **empty** field (design pass round 2, handoff §4.1): a field
+      # that already has a translation is not asked to be translated again --
+      # when its original moved on, the outdated card's **Suggest update**
+      # (`suggest_update_button`) is the way in.
       def translate_button
-        return unless translation_confirm
+        return unless translation_confirm && translation_field_empty?
 
         Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, **translate_target)
       end
@@ -91,6 +96,10 @@ module Admin
 
         Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, mode: :update, **translate_target)
       end
+
+      # What the field holds as it was rendered; the rich-text column reads its
+      # document instead.
+      def translation_field_empty? = value.blank?
 
       private
 

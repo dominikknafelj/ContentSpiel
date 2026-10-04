@@ -8,7 +8,7 @@
         in a non-default language, for a viewer who may edit the page, with AI
         set up and `ai.translate`. It asks for the page's own fields and its
         blocks' alike -- whatever has a Translate button below. %>
-    <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: admin_locale, editable: can_edit?(@page)) %>
+    <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: @page, locale: admin_locale, editable: can_edit?(@page)) %>
   <% end %>
 <% end %>
 

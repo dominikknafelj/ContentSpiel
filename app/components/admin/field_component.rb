@@ -105,8 +105,10 @@ module Admin
     # translated prose. See `Admin::Columns::Base#translate_button`.
     TRANSLATABLE_TYPES = %i[string text].freeze
 
+    #
+    # Only on an empty field -- see `Admin::Columns::Base#translate_button`.
     def translate_button
-      return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type)
+      return unless translation_confirm && TRANSLATABLE_TYPES.include?(field.type) && value.blank?
 
       Admin::TranslationScreen::TranslateButtonComponent.new(confirm: translation_confirm, input_id: input_id, characters: original.to_s.length)
     end

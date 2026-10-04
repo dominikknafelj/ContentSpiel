@@ -1,0 +1,24 @@
+<%# `role="status"`: a screen reader hears the box appear and, by `hidden`, which state it is in. %>
+<%= tag.div class: "admin-translation-suggestion mt-2 rounded-cs border border-accent bg-accent-tint p-3 text-sm",
+      role: "status", data: { translation_pending: true, pending_timeout_seconds: self.class::TIMEOUT_SECONDS } do %>
+  <div data-pending-running>
+    <div class="flex items-center gap-2 text-dim">
+      <span data-translate-spinner class="<%= Admin::TranslationScreen::TranslateButtonComponent::SPINNER_CLASS %>" aria-hidden="true"></span>
+      <p>Suggesting a translation… <span data-pending-elapsed class="font-cs-mono">0s</span></p>
+    </div>
+    <div class="mt-2 grid gap-1.5" aria-hidden="true">
+      <div data-pending-skeleton class="h-3 w-full animate-pulse rounded-cs bg-line"></div>
+      <div data-pending-skeleton class="h-3 w-2/3 animate-pulse rounded-cs bg-line"></div>
+    </div>
+    <div class="mt-2">
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+    </div>
+  </div>
+  <div data-pending-timeout hidden>
+    <p class="text-warn-ink"><%= self.class::TIMEOUT_TEXT %></p>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <%= render Admin::ButtonComponent.new(label: "Try again", variant: :primary, size: :small, data: { action: "admin--translate#retry" }) %>
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancelPending" }) %>
+    </div>
+  </div>
+<% end %>

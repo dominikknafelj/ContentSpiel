@@ -29,11 +29,18 @@ module Admin
 
     BASE_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-4 py-2 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
 
-    def initialize(label:, variant: :primary, type: "button", **html)
+    # `size: :small` is the compact button of an inline box (the AI
+    # suggestion's Use): `BASE_CLASS`'s padding swapped for a tighter one.
+    # Spelled out whole because Tailwind only sees complete class names.
+    SMALL_CLASS = "inline-flex cursor-pointer items-center justify-center gap-2 rounded-cs px-2 py-0.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+
+    def initialize(label:, variant: :primary, type: "button", size: :regular, **html)
       raise ArgumentError, "unknown button variant #{variant.inspect}" unless VARIANT_CLASSES.key?(variant)
+      raise ArgumentError, "unknown button size #{size.inspect}" unless %i[regular small].include?(size)
 
       @label = label
       @variant = variant
+      @size = size
       @type = type
       @html = html
     end
@@ -42,11 +49,11 @@ module Admin
     # the variant's classes -- a caller adding e.g. a width utility
     # shouldn't have to also repeat this component's whole class string.
     def html_attrs
-      html.merge(type: type, class: [ BASE_CLASS, VARIANT_CLASSES.fetch(variant), html[:class] ].compact.join(" "))
+      html.merge(type: type, class: [ (size == :small ? SMALL_CLASS : BASE_CLASS), VARIANT_CLASSES.fetch(variant), html[:class] ].compact.join(" "))
     end
 
     private
 
-    attr_reader :label, :variant, :type, :html
+    attr_reader :label, :variant, :type, :size, :html
   end
 end

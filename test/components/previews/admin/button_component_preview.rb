@@ -21,6 +21,10 @@ module Admin
       render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost)
     end
 
+    def small
+      render Admin::ButtonComponent.new(label: "Use", size: :small)
+    end
+
     def disabled
       render Admin::ButtonComponent.new(label: "Saving…", disabled: true)
     end

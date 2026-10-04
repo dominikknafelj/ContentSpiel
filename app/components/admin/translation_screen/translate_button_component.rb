@@ -48,11 +48,15 @@ module Admin
       # `mode: :update` is the outdated reference card's **Suggest update**
       # (`Admin::EditorScreen::ReferenceCardComponent`): the same wrapper and
       # the same single-field request as **Translate**, carrying
-      # `data-translate-mode="update"` so the request can tell the two apart
-      # (until the suggestion endpoint gives `mode=update` its own meaning it
-      # behaves as a plain Translate). The header's "Translate empty fields"
-      # skips it (`admin--translate#translateEmpty`): its field already has
-      # another wrapper under the input.
+      # `data-translate-mode="update"` so `admin--translate` sends `mode=update`
+      # and the suggestion that comes back also shows the field's current
+      # translation (`SuggestionComponent` `mode: :update`). The header's bulk
+      # run skips it (`admin--translate`'s `emptyFields`): its field already has
+      # a translation.
+      #
+      # **Translate** itself only renders on an empty field; the renderers
+      # (`Admin::Columns::Base#translate_button`, `Admin::FieldComponent`) decide
+      # that, and put the suggestion box under the input for either mode.
       def initialize(confirm:, input_id:, kind: :plain, characters: 0, mode: :translate)
         raise ArgumentError, "unknown translate mode #{mode.inspect}" unless MODES.include?(mode.to_sym)
 

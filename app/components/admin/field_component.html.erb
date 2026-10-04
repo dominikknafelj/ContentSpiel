@@ -1,4 +1,7 @@
 <% translate = show_original? ? translate_button : nil %>
+<%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
+    its reference card): one id, `SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
+<% box_button = translate || (show_original? ? suggest_update_button : nil) %>
 <div class="admin-field mb-4" data-field-name="<%= field.name %>">
   <%# One side of the translation pair (or the whole field): label, input, the Translate button
       and the suggestion box. The error slot stays a direct child of `.admin-field`. %>
@@ -6,7 +9,7 @@
     <label class="<%= setup_label_class %> mb-1" for="<%= input_id %>"><%= label_text %></label>
     <%= render input_component %>
     <div data-translate-slot="<%= field.name %>"><% if translate %><%= render translate %><% end %></div>
-    <%= render "admin/shared/translation_box", button: translate %>
+    <%= render "admin/shared/translation_box", button: box_button %>
   <% end %>
 
   <% if show_original? %>

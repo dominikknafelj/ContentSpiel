@@ -1,4 +1,7 @@
 <% translate = show_original? ? translate_button : nil %>
+<%# The suggestion box is shared by Translate (an empty field) and Suggest update (an outdated one, in
+    its reference card): one id, `SuggestionComponent.dom_id(input_id)`, so either lands under the input. %>
+<% box_button = translate || (show_original? ? suggest_update_button : nil) %>
 <div class="admin-column mb-4" data-field-name="<%= name %>">
   <%# One side of the translation pair (or the whole field, with no original to show): label,
       input, the per-field Translate button and the suggestion box under it. The error slot
@@ -12,7 +15,7 @@
       <%= tag.input(**html.merge(type: "text", name: html_name, id: id, value: value, class: input_class, **invalid_attrs)) %>
     <% end %>
     <div data-translate-slot="<%= name %>"><% if translate %><%= render translate %><% end %></div>
-    <%= render "admin/shared/translation_box", button: translate %>
+    <%= render "admin/shared/translation_box", button: box_button %>
   <% end %>
 
   <% if show_original? %>

@@ -77,6 +77,14 @@ module Admin
     # any other failure) but the streams are sent either way, so
     # `admin--translate` always has something to show under the field.
     #
+    # `mode=update` is the outdated card's **Suggest update**: the fields
+    # already have a translation, and each answer then also shows it
+    # ("Current: …", read from the record and never sent to the provider --
+    # `SuggestionComponent`) so the editor can compare before pressing Use,
+    # which replaces the field's value. Which fields are translated is
+    # unchanged: only the requested ones, blank originals still skipped. Any
+    # other value of `mode` is the ordinary translate.
+    #
     # A request in which no field names a valid input id has nowhere to show
     # anything, so it's a bare 422 before `AI::Translate` runs: no provider
     # call (nothing paid for that nobody could see), no `ai.translated`
@@ -94,7 +102,7 @@ module Admin
       elsif result.denied? then :forbidden
       else :unprocessable_entity
       end
-      render turbo_stream: suggestion_streams(fields, translation, result), status: status
+      render turbo_stream: suggestion_streams(record, fields, translation, result), status: status
     end
 
     private
@@ -114,20 +122,30 @@ module Admin
       inputs.permit(*fields).to_h.select { |_, input_id| input_id.is_a?(String) && INPUT_ID.match?(input_id) }
     end
 
-    def suggestion_streams(fields, translation, result)
-      # The model is configuration, shown in the box's heading; nothing about
+    def suggestion_streams(record, fields, translation, result)
+      # The model is configuration, shown beside the box's label; nothing about
       # the key is ever read here.
       named = { model: AI.model }
+      update = params[:mode].to_s == "update"
       requested_inputs(fields).map do |field, input_id|
         box = Admin::TranslationScreen::SuggestionComponent
         component =
           if !result.ok? then box.new(input_id: input_id, locale: params[:locale], error: result.errors.to_sentence)
           elsif translation.suggestions.key?(field)
-            box.new(input_id: input_id, locale: params[:locale], suggestion: translation.suggestions[field], warnings: translation.warnings[field], **named)
+            box.new(input_id: input_id, locale: params[:locale], suggestion: translation.suggestions[field], warnings: translation.warnings[field],
+              mode: (update ? :update : :translate), current: (current_translation(record, field) if update), **named)
           else box.new(input_id: input_id, locale: params[:locale], error: NOTHING_TO_TRANSLATE)
           end
         turbo_stream.update(box.dom_id(input_id), component)
       end
+    end
+
+    # The field's existing translation as plain text (`Translations
+    # .source_text`: a string as it is, a rich-text body as its paragraphs,
+    # nothing for a value with no sensible text).
+    def current_translation(record, field)
+      value = Translations.source_text(record.translation_value(field, params[:locale].to_s))
+      value.is_a?(Array) ? value.join("\n\n") : value
     end
 
     # Same keys as the sidebar entry (`MODULES`): either read right opens

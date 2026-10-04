@@ -39,10 +39,10 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
 
   def paragraph(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
 
-  def suggest(record, fields, inputs:, locale: "de")
+  def suggest(record, fields, inputs:, locale: "de", mode: nil)
     post "/cs-studio/translations/suggest", as: :turbo_stream, params: {
-      record_type: record.class.name, record_id: record.id, fields: fields, locale: locale, inputs: inputs
-    }
+      record_type: record.class.name, record_id: record.id, fields: fields, locale: locale, inputs: inputs, mode: mode
+    }.compact
   end
 
   def stream(target) = css_select(%(turbo-stream[target="#{target}"])).first
@@ -79,7 +79,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     assert_equal "post-title", use["data-translate-input-id"]
     assert_nil use["data-translate-text"]
     assert_equal "[de] Hello", box.at_css("textarea[data-translate-suggestion-text]").text.strip
-    assert_includes box.text, "Suggested by #{AI.model}", "the model is configuration (the default when unset), shown in the heading"
+    assert_includes box.at_css("[data-suggestion-model]").text, AI.model, "the model is configuration (the default when unset), shown beside the label"
     refute_includes stream("translation-suggestion-post-title").to_s, "sk-test", "never anything about the key"
     assert box.at_css("button[type='button']", text: "Discard")
     assert_includes stream_fragment("translation-suggestion-post-excerpt").text, "[de] A summary"
@@ -255,7 +255,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
     assert_select "[data-translate-slot='title'] #translation-suggestion-post-title", count: 0
     assert_select "[data-field-name='title'] > div > div > #translation-suggestion-post-title[data-translation-box]"
     assert_select "[data-translate-slot='body'] [data-translate-input-id='post-body-json'][data-translate-kind='rich']"
-    assert_select "button[type='button'][data-action~='admin--translate#translateEmpty']", text: "Translate empty fields"
+    assert_select "button[type='button'][data-action~='admin--translate#translateEmpty']", text: "Suggest translations for 2 empty fields"
     assert_select "[data-admin--translate-max-fields-value='#{AI::Translate::MAX_FIELDS}'][data-admin--translate-max-characters-value='#{AI::Translate::MAX_CHARACTERS}']"
   end
 
@@ -294,7 +294,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-translate-slot='title'] [data-translate-record-type='SiteSetting'][data-translate-input-id='settings-title']"
-    assert_select "button", text: "Translate empty fields"
+    assert_select "button", text: /Suggest translations for \d+ empty field/
 
     with_test_types do
       page = create_page(title: "About")
@@ -306,7 +306,70 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_select "[data-translate-slot='title'] [data-translate-input-id='page-title']"
       assert_select "[data-translate-slot='text'] [data-translate-record-type='ContentBlock'][data-translate-record-id='#{block.id}'][data-translate-input-id='block-#{block.id}-text']"
-      assert_select "button", text: "Translate empty fields"
+      assert_select "button", text: "Suggest translations for 2 empty fields"
     end
+  end
+
+  # -- mode=update (Suggest update on an outdated field) --
+
+  test "mode=update on a filled field streams a suggestion that shows the current translation" do
+    record = create_post(title: "About us")
+    assert Posts::Save.call(record, translations: { "de" => { title: "Über uns" } }).ok?
+
+    suggest(record.reload, %w[title], inputs: { title: "post-title" }, mode: "update")
+
+    assert_response :success
+    box = stream_fragment("translation-suggestion-post-title")
+    assert_includes box.text, "[de] About us"
+    assert_includes box.at_css("[data-suggestion-current]").text, "Current: Über uns"
+    assert_not_includes response.body, "sk-test"
+    assert_equal "Über uns", record.reload.title(locale: "de", fallback: false), "a suggestion saves nothing"
+  end
+
+  test "without mode=update a requested filled field is translated as before, with no Current line" do
+    record = create_post(title: "About us")
+    assert Posts::Save.call(record, translations: { "de" => { title: "Über uns" } }).ok?
+
+    suggest(record.reload, %w[title], inputs: { title: "post-title" })
+
+    assert_response :success
+    box = stream_fragment("translation-suggestion-post-title")
+    assert_includes box.text, "[de] About us"
+    assert_nil box.at_css("[data-suggestion-current]")
+  end
+
+  test "an unknown mode is the ordinary translate mode, and a blank original is still skipped in update mode" do
+    record = create_post(title: "About us")
+    assert Posts::Save.call(record, translations: { "de" => { title: "Über uns" } }).ok?
+
+    suggest(record.reload, %w[title], inputs: { title: "post-title" }, mode: "whatever")
+    assert_nil stream_fragment("translation-suggestion-post-title").at_css("[data-suggestion-current]")
+
+    suggest(record, %w[excerpt], inputs: { excerpt: "post-excerpt" }, mode: "update")
+    assert_includes stream_fragment("translation-suggestion-post-excerpt").text, Admin::TranslationsController::NOTHING_TO_TRANSLATE
+  end
+
+  test "a rich-text body's current translation is its text, in update mode" do
+    record = create_post(title: "Hello")
+    assert Posts::Save.call(record, translations: { "en" => { body: paragraph("New body") }, "de" => { body: paragraph("Alter Text") } }).ok?
+
+    suggest(record.reload, %w[body], inputs: { body: "post-body-json" }, mode: "update")
+
+    assert_includes stream_fragment("translation-suggestion-post-body-json").at_css("[data-suggestion-current]").text, "Current: Alter Text"
+  end
+
+  test "the editor: an empty field has Translate, an outdated one has Suggest update and a box to land in, a current one neither" do
+    record = create_post(title: "Hello")
+    assert Posts::Save.call(record, translations: { "en" => { excerpt: "A summary", body: paragraph("Body") } }).ok?
+    assert Posts::Save.call(record, translations: { "de" => { excerpt: "Eine Zusammenfassung" } }).ok?
+    assert Posts::Save.call(record, translations: { "en" => { excerpt: "A new summary" } }).ok?
+
+    get "/cs-studio/posts/#{record.id}", params: { locale: "de" }
+
+    assert_response :success
+    assert_select "[data-translate-slot='title'] button[data-action='admin--translate#translate']", text: "Translate"
+    assert_select "[data-translate-slot='excerpt'] button", count: 0
+    assert_select "[data-original-for='excerpt'] [data-translate-mode='update'] button", text: "Suggest update"
+    assert_select "[data-field-name='excerpt'] #translation-suggestion-post-excerpt[data-translation-box]"
   end
 end

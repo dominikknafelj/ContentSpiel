@@ -4,7 +4,7 @@
   <%# Translate empty fields / Use all -- see `Admin::EditorScreen::HeaderComponent`.
       Anyone on this screen holds `settings.manage`, the settings' edit
       right. %>
-  <%= render Admin::TranslationScreen::TranslateAllComponent.new(locale: locale, editable: true) %>
+  <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: locale, editable: true) %>
   <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle) %>
 </div>
 

@@ -44,4 +44,11 @@ class Admin::ButtonComponentTest < ViewComponent::TestCase
     render_inline Admin::ButtonComponent.new(label: "Delete", variant: :danger)
     assert_selector "button.bg-danger", text: "Delete"
   end
+
+  test "small swaps the padding for a compact one and keeps the variant" do
+    render_inline Admin::ButtonComponent.new(label: "Use", size: :small)
+    assert_selector "button.bg-accent.px-2.py-0\\.5.text-sm", text: "Use"
+    assert_no_selector "button.px-4"
+    assert_raises(ArgumentError) { Admin::ButtonComponent.new(label: "x", size: :huge) }
+  end
 end

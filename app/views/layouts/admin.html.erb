@@ -73,6 +73,12 @@
         fixed target. Empty on a frame request -- see the relay above. %>
     <%= render Admin::ToastRegionComponent.new(flash: turbo_frame_request? ? {} : flash) %>
 
+    <%# The pending-suggestion box `admin--translate` clones into a field's
+        suggestion slot before each AI request (`Admin::TranslationScreen::
+        PendingComponent`): a `<template>` is inert, so its buttons and spinner
+        do nothing here, and it sits outside every form. %>
+    <template id="translation-pending-template"><%= render Admin::TranslationScreen::PendingComponent.new %></template>
+
     <%# The one Leave dialog (design pass spec §4): `admin--save-bar` opens it
         when a Turbo visit would drop unsaved changes, and wires its Leave
         button (`data-leave-confirm`) per open, as a listener rather than an

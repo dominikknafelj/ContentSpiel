@@ -19,9 +19,14 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   include TestTypes
 
   class StubProvider
+    # Seconds to wait before answering: how a slow provider is staged (Cancel
+    # while a request is out).
+    cattr_accessor :delay, default: 0
+
     def initialize(api_key:, model:); end
 
     def translate(texts:, from:, to:, format:)
+      sleep delay if delay.positive?
       raise AI::Error, "The AI provider is unavailable." if texts.any? { |text| text.to_s.downcase.include?("boom") }
 
       texts.map { |text| "[#{to}] #{text}" }
@@ -29,6 +34,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   end
 
   setup do
+    StubProvider.delay = 0
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de es], default: "en")
     AI::Providers.register("test/stub", StubProvider)
@@ -85,7 +91,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     press_within slot("title"), "Translate"
     suggestion = find("#translation-suggestion-post-title textarea[data-translate-suggestion-text]")
     assert_equal "[de] Hello", suggestion.value
-    assert_selector "#translation-suggestion-post-title", text: /Suggested by claude-sonnet-5/i
+    assert_selector "#translation-suggestion-post-title", text: /SUGGESTED TRANSLATION · EDIT BEFORE USING\s+claude-sonnet-5/
     # Under the field's own input, in its column -- not in the original's panel.
     assert_selector "[data-field-name='title'] #translation-suggestion-post-title"
     assert_no_selector "#{slot("title")} #translation-suggestion-post-title"
@@ -136,8 +142,8 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       visit "/cs-studio/pages/#{page_record.id}?locale=de"
       await_admin_controllers
 
-      press "Translate empty fields"
-      assert_text "Suggestions are ready"
+      press "Suggest translations for 3 empty fields"
+      assert_text "3 suggestions ready"
       assert_suggestion "translation-suggestion-page-title", "[de] About"
       assert_suggestion "translation-suggestion-page-subtitle", "[de] Who we are"
       assert_suggestion "translation-suggestion-block-#{block.id}-text", "[de] To be"
@@ -173,8 +179,8 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       visit "/cs-studio/pages/#{page_record.id}?locale=de"
       await_admin_controllers
 
-      press "Translate empty fields"
-      assert_text "Suggestions are ready"
+      press "Suggest translations for 3 empty fields"
+      assert_text "3 suggestions ready"
       press "Use all"
       blocks.each { |block| assert_selector "#block-#{block.id}-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5 }
 
@@ -195,10 +201,11 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
       # The page's own fields are one request (it fails), the block's
       # another (it works): one record per request.
-      press "Translate empty fields"
+      press "Suggest translations for 2 empty fields"
       assert_selector "#translation-suggestion-page-title [role='alert']", text: "The AI provider is unavailable."
       assert_suggestion "translation-suggestion-block-#{block.id}-text", "[de] To be"
-      assert_text "Suggestions are ready"
+      # The error box is no suggestion: only the block's counts.
+      assert_text "1 suggestion ready"
 
       press_within "#translation-suggestion-page-title", "Dismiss"
       assert_no_selector "#translation-suggestion-page-title [role='alert']"
@@ -208,6 +215,125 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
       assert_equal "[de] To be", block.reload.translated_settings.dig("de", "text")
       assert_nil page_record.reload.title(locale: "de", fallback: false)
     end
+  end
+
+  def post_with_excerpt
+    post = create_post(title: "Hello")
+    assert Posts::Save.call(post, translations: { "en" => { excerpt: "A summary" } }).ok?
+    post
+  end
+
+  test "the header counts the empty fields, shows a pending box per field, then the ready line; an edited suggestion is what Use all applies" do
+    post = post_with_excerpt
+    StubProvider.delay = 1.5
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    assert_button "Suggest translations for 2 empty fields"
+
+    press "Suggest translations for 2 empty fields"
+    assert_text "Suggesting 1 of 2 fields"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]", text: /\d+s/
+    assert_selector "#translation-suggestion-post-excerpt [data-translation-pending]"
+    assert_text "2 suggestions ready", wait: 8
+    assert_no_selector "[data-translation-pending]"
+    assert_suggestion "translation-suggestion-post-title", "[de] Hello"
+    assert_suggestion "translation-suggestion-post-excerpt", "[de] A summary"
+    assert_nil post.reload.title(locale: "de", fallback: false), "suggesting saves nothing"
+
+    find("#translation-suggestion-post-excerpt textarea[data-translate-suggestion-text]").fill_in with: "Edited summary"
+    press "Use all"
+
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_equal "[de] Hello", find_field(id: "post-title").value
+    assert_equal "Edited summary", find_field(id: "post-excerpt").value
+    assert_no_selector "[data-translation-suggestion]"
+    # Nothing is empty any more: the header has nothing left to offer.
+    assert_no_button "Suggest translations for"
+    assert_no_text "suggestions ready"
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    assert_equal "[de] Hello", find_field(id: "post-title").value
+    assert_equal "Edited summary", find_field(id: "post-excerpt").value
+    post.reload
+    assert_equal "Edited summary", post.excerpt(locale: "de", fallback: false)
+  end
+
+  test "Discard all removes every suggestion and saves nothing" do
+    post = post_with_excerpt
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    press "Suggest translations for 2 empty fields"
+    assert_text "2 suggestions ready"
+
+    press "Discard all"
+
+    assert_no_selector "[data-translation-suggestion]"
+    assert_no_text "suggestions ready"
+    assert_button "Suggest translations for 2 empty fields"
+    sleep 1.5
+    assert_no_selector "#post-save-status", text: /SAVED|SAVING/, wait: 0
+    post.reload
+    assert_nil post.title(locale: "de", fallback: false)
+    assert_nil post.excerpt(locale: "de", fallback: false)
+  end
+
+  test "Cancel in the header removes the pending boxes, and the late answer never appears" do
+    post = post_with_excerpt
+    StubProvider.delay = 2
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    press "Suggest translations for 2 empty fields"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+
+    within("[data-admin--translate-target='running']") { find(:button, "Cancel").execute_script("this.click()") }
+
+    assert_no_selector "[data-translation-pending]"
+    assert_button "Suggest translations for 2 empty fields"
+    sleep 3
+    assert_no_selector "[data-translation-suggestion]"
+    assert_nil post.reload.title(locale: "de", fallback: false)
+  end
+
+  test "Cancel on one pending box stops that request only" do
+    post = post_with_excerpt
+    StubProvider.delay = 2
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    press_within slot("title"), "Translate"
+    assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+
+    press_within "#translation-suggestion-post-title [data-translation-pending]", "Cancel"
+
+    assert_no_selector "[data-translation-pending]"
+    sleep 3
+    assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
+    assert_nil post.reload.title(locale: "de", fallback: false)
+  end
+
+  test "Suggest update on an outdated field shows the full new text and the current translation, and Use replaces the value" do
+    post = create_post(title: "About us")
+    assert Posts::Save.call(post, translations: { "de" => { title: "Über uns" } }).ok?
+    assert Posts::Save.call(post, translations: { "en" => { title: "About our team" } }).ok?
+
+    visit "/cs-studio/posts/#{post.id}?locale=de"
+    await_admin_controllers
+    assert_no_selector "#{slot("title")} button", text: "Translate"
+
+    press_within "[data-original-for='title']", "Suggest update"
+
+    assert_suggestion "translation-suggestion-post-title", "[de] About our team"
+    assert_selector "#translation-suggestion-post-title [data-suggestion-current]", text: "Current: Über uns"
+    assert_equal "Über uns", find_field(id: "post-title").value, "a suggestion is not applied until Use"
+
+    press_within "#translation-suggestion-post-title", "Use"
+
+    assert_selector "#post-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_equal "[de] About our team", post.reload.title(locale: "de", fallback: false)
+    assert_equal :current, post.translation_state("title", "de")
   end
 
   test "an answer that isn't a stream shows a generic error the editor can dismiss" do
