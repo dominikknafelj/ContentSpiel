@@ -178,12 +178,20 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
   # of the page, cut off, with the page behind shifted and a black band on top.
   # This opens it in a real browser (1400x900) with the page scrolled down 600px
   # and checks the dialog lies inside the viewport and nothing behind it moved.
+  # The page is scrolled to where the Choose image button sits 300px below the
+  # viewport top (about 600px down), not to a fixed 600: the editor header is
+  # sticky now, and at a fixed offset the button can sit under it, where the
+  # driver's click first scrolls the page to reach it -- a scroll of the test's
+  # own making, not the picker's.
   test "the picker opens inside the viewport on a scrolled page, and the page behind does not move" do
     page.driver.resize(1400, 900)
     visit_editor
     # Make sure there is 600px to scroll whatever the editor's own height is.
-    page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 600)")
-    assert_equal 600, page.evaluate_script("Math.round(window.scrollY)")
+    page.execute_script("document.querySelector('main').style.minHeight = '3000px'; window.scrollTo(0, 0)")
+    button_top = page.evaluate_script("Math.round(document.querySelector('#page-hero-image-section button').getBoundingClientRect().top)")
+    scrolled_to = [ button_top - 300, 1 ].max
+    page.execute_script("window.scrollTo(0, #{scrolled_to})")
+    assert_equal scrolled_to, page.evaluate_script("Math.round(window.scrollY)")
 
     within("#page-hero-image-section") { click_on "Choose image" }
     assert_selector "dialog#media-picker[open]"
@@ -199,7 +207,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_operator box["left"], :>=, 0
     assert_operator box["bottom"], :<=, box["height"]
     assert_operator box["right"], :<=, box["width"]
-    assert_equal 600, box["scrollY"]
+    assert_equal scrolled_to, box["scrollY"]
   ensure
     page.driver.resize(1400, 1400)
   end
