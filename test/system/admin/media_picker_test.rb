@@ -58,7 +58,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{post.id}"
     await_admin_controllers
     find(".ProseMirror").click
-    find("[role=toolbar] button[aria-label='Image']").click
+    press_insert "Image"
     pick_from_library(@asset)
     # The per-use fields show the image's own defaults as placeholders
     # (fix round 1, I1).

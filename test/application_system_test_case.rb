@@ -62,6 +62,16 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     find(:link_or_button, label).execute_script("this.click()")
   end
 
+  # A rich-text editor's Insert menu item (Page link, Image, YouTube,
+  # Divider): opens the menu, then presses the item -- which is only
+  # *visible* (so findable) while the menu is open, which is part of what
+  # this checks. `within:` scopes to one editor's toolbar when a page has
+  # several.
+  def press_insert(label, within: "[role=toolbar]")
+    find("#{within} button[aria-haspopup=menu]", match: :first).execute_script("this.click()")
+    find("#{within} [role=menu] button", text: label, match: :first).execute_script("this.click()")
+  end
+
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
   # by the `admin` entry point (app/javascript/admin.js) through one dynamic
   # `import()` each, so they connect a moment *after* the page has loaded,

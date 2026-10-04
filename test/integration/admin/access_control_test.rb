@@ -304,7 +304,8 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_response :success
     titles = JSON.parse(css_select("[data-admin--rich-text-link-titles-value]").first["data-admin--rich-text-link-titles-value"])
     assert_equal({ "page:#{@outside.id}" => "A page you can't open" }, titles)
-    assert_not_includes response.body, "Outside"
+    # Whole word: the toolbar's Insert menu carries a `closeOutside` action.
+    assert_no_match(/\bOutside\b/, response.body)
 
     # The link was already there, so editing the block around it still saves.
     patch "/cs-studio/pages/#{@inside.id}/content_blocks/#{block.id}",

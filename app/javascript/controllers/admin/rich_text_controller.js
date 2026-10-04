@@ -173,7 +173,8 @@ export default class extends Controller {
 
   // Keeps the editor's selection (and focus) when a toolbar button is
   // pressed with the mouse -- the button would otherwise take focus first,
-  // blurring the editor mid-command.
+  // blurring the editor mid-command. The Insert menu's items are buttons
+  // inside the toolbar element, so they are covered too.
   keepFocus(event) {
     if (event.target.closest("button")) event.preventDefault()
   }
@@ -208,7 +209,11 @@ export default class extends Controller {
       return
     }
     this.closePopover({ refocus: false })
-    window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener: event.currentTarget } }))
+    // Focus returns to the opener on Cancel/Escape: the item itself sits in
+    // the Insert menu, which has closed by then (hidden, unfocusable), so the
+    // menu's own button is the opener there.
+    const opener = event.currentTarget.closest("[role=menu]")?.closest("[data-controller~='admin--menu']")?.querySelector("[aria-haspopup=menu]") || event.currentTarget
+    window.dispatchEvent(new CustomEvent("media-picker:open", { detail: { opener } }))
   }
 
   run(build) {

@@ -38,10 +38,24 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
   test "renders spec §4.1's toolbar as plain buttons" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    labels = page.all("[role=toolbar] button").map { |button| button["aria-label"] }
-    assert_equal [ "Bold", "Italic", "Strikethrough", "Inline code", "Heading 2", "Heading 3", "Heading 4", "Bullet list",
-      "Numbered list", "Quote", "Code block", "Horizontal rule", "Link", "Internal link", "Image", "YouTube" ], labels
-    assert page.all("[role=toolbar] button").all? { |button| button["type"] == "button" }
+    labels = page.all("[role=toolbar] button", visible: :all).map { |button| button["aria-label"] }
+    assert_equal [ "Heading 2", "Heading 3", "Heading 4", "Bold", "Italic", "Strikethrough", "Inline code", "Bullet list",
+      "Numbered list", "Quote", "Code block", "Link", nil, "Internal link", "Image", "YouTube", "Horizontal rule" ], labels
+    assert page.all("[role=toolbar] button", visible: :all).all? { |button| button["type"] == "button" }
+  end
+
+  test "the toolbar is one non-wrapping row of grouped tools with an Insert menu" do
+    render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
+
+    assert_selector "[role=toolbar].flex-nowrap"
+    assert_selector "[role=toolbar] [role=separator]", minimum: 3
+    assert_selector "[role=toolbar] [data-controller='admin--menu'] button[aria-haspopup=menu]", text: "Insert"
+    %w[Image YouTube].each do |label|
+      assert_selector "[role=toolbar] [role=menu] button", text: label, visible: :all
+    end
+    assert_no_selector "[role=toolbar] > button", text: "Image"
+    # Every menu item closes the menu before its command runs.
+    assert page.all("[role=menu] button", visible: :all).all? { |button| button["data-action"].include?("click->admin--menu#close") }
   end
 
   # Only toggle buttons announce a pressed state; the ones that open a
@@ -49,8 +63,8 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
   test "aria-pressed only on the toggle buttons" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    pressed = page.all("[role=toolbar] button[aria-pressed]").map { |button| button["aria-label"] }
-    assert_equal [ "Bold", "Italic", "Strikethrough", "Inline code", "Heading 2", "Heading 3", "Heading 4", "Bullet list",
+    pressed = page.all("[role=toolbar] button[aria-pressed]", visible: :all).map { |button| button["aria-label"] }
+    assert_equal [ "Heading 2", "Heading 3", "Heading 4", "Bold", "Italic", "Strikethrough", "Inline code", "Bullet list",
       "Numbered list", "Quote", "Code block" ], pressed
     assert_selector "[role=toolbar] button[aria-label='Link'][aria-haspopup=dialog]"
   end
@@ -61,7 +75,7 @@ class Admin::Columns::RichTextColumnComponentTest < ViewComponent::TestCase
   test "the Image button opens the media picker instead of a file input" do
     render_inline Admin::Columns::RichTextColumnComponent.new(name: "body", value: nil)
 
-    assert_selector "[role=toolbar] button[aria-label='Image'][aria-haspopup=dialog]"
+    assert_selector "[role=toolbar] button[aria-label='Image'][aria-haspopup=dialog]", visible: :all
     assert_no_selector "input[type=file]", visible: :all
     assert_includes controller_element["data-action"], "media-picker:picked->admin--rich-text#picked"
     assert_nil controller_element["data-admin--rich-text-upload-url-value"]
