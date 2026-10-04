@@ -26,6 +26,15 @@ module Admin
     PER_PAGE = 48
 
     before_action -> { require_permission("media.upload") }, only: %i[index show create]
+    # `update` and `destroy` are gated too, BEFORE the asset is looked up
+    # (final fix wave, S-M7): left to the services alone, a user with no media
+    # right at all got the 404 for an id that names nothing and the service's
+    # 403 for one that exists -- which tells them which ids exist. The gate is
+    # "holds a right that could ever let these through", so it changes nothing
+    # for anyone the services would allow: `media.manage` (any image), or
+    # `media.upload` (the uploader's own -- `Media::Ownership`). Whether THIS
+    # image is theirs to change is still the service's answer.
+    before_action -> { forbidden! unless holds_any?(%w[media.upload media.manage]) }, only: %i[update destroy]
     before_action :set_asset, only: %i[show update destroy]
 
     # The grid (design spec §6, round 3 Task 8): search (title, alt in any
@@ -138,14 +147,19 @@ module Admin
     # link's own URL carries `from: "undo"` (`Admin::TrashController
     # #restore`) so restoring lands the actor back on this image's detail
     # panel, not the Trash screen.
+    #
+    # Both redirects keep the grid's own state (`list_query`: the search, the
+    # segment and the page, which ride on the panel's delete form URL like on
+    # its autosave form's), so trashing the fifth unused image on page 3 of a
+    # search goes back to that list rather than to the top of the library.
     def destroy
       result = Trash::Move.call(@asset)
 
       if result.ok?
         flash[:undo] = { "label" => "Undo", "url" => admin_restore_trash_item_path("media", @asset, from: "undo", **admin_url_options) }
-        redirect_to admin_media_path(**admin_url_options), status: :see_other, notice: "Moved “#{@asset.title}” to the trash"
+        redirect_to admin_media_path(**list_query, **admin_url_options), status: :see_other, notice: "Moved “#{@asset.title}” to the trash"
       else
-        forbidden_or(result) { redirect_to admin_media_path(selected: @asset.id, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
+        forbidden_or(result) { redirect_to admin_media_path(**list_query, selected: @asset.id, **admin_url_options), status: :see_other, alert: result.errors.to_sentence }
       end
     end
 

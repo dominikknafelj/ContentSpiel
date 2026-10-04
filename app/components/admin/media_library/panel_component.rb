@@ -136,7 +136,7 @@ module Admin
       # × : the grid alone, as the editor left it.
       def close_path = helpers.admin_media_path(**link_params, **url_options)
 
-      def destroy_path = helpers.admin_medium_path(asset, **url_options)
+      def destroy_path = helpers.admin_medium_path(asset, **link_params, **url_options)
 
       # The Alt field's warn border (handoff §4.6, "warn border when empty"):
       # asked of the DEFAULT language's alt, whatever tab is open, since that is

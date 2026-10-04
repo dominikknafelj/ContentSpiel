@@ -92,8 +92,14 @@ class Media::Search
 
   # The default-language alt is blank (absent, null or whitespace): an alt
   # written only in German is still "missing" while English is the default.
+  #
+  # "Whitespace" as Ruby's `String#strip` means it, because that is what the
+  # tile's NO ALT chip and the panel's warning use (`TileComponent#no_alt?`,
+  # `PanelComponent#alt_warn?`): `!~ '\S'` is "holds no non-whitespace
+  # character". Postgres's one-argument `btrim` removes spaces only, so an alt
+  # of a newline or a tab wore the chip without being listed here.
   def missing_alt_sql
-    Media::Asset.sanitize_sql_array([ "COALESCE(btrim(media_assets.alt ->> ?), '') = ''", Locales.default.to_s ])
+    Media::Asset.sanitize_sql_array([ "COALESCE(media_assets.alt ->> ?, '') !~ '\\S'", Locales.default.to_s ])
   end
 
   # `missing` in ANY target language, from the stored `translation_states`

@@ -16,6 +16,50 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  # Final fix wave (S-M7): update and destroy sat outside the module gate, so
+  # for a user who can't even open Media the asset lookup ran first -- a 404
+  # for an id that names nothing, the service's 403 for one that exists. One
+  # answer for both now, before anything is looked up.
+  test "without any media right, an edit or a delete is the 403 whether or not the id exists" do
+    asset = upload_asset
+    missing = Media::Asset.maximum(:id) + 1000
+    sign_in_as(users(:reader))
+
+    [ asset.id, missing ].each do |id|
+      patch "/cs-studio/media/#{id}", params: { media_asset: { title: "Hack" } }, as: :turbo_stream
+      assert_response :forbidden, "PATCH #{id}"
+      patch "/cs-studio/media/#{id}", params: { media_asset: { title: "Hack" } }
+      assert_response :forbidden, "PATCH (html) #{id}"
+      delete "/cs-studio/media/#{id}"
+      assert_response :forbidden, "DELETE #{id}"
+    end
+    assert_not_equal "Hack", asset.reload.title
+    assert_not asset.trashed?
+  end
+
+  # The gate is "holds a media right", not `media.upload` alone: `media.manage`
+  # edits and deletes any image by itself (`Media::Save`, `Trash::Move`), and a
+  # group can hold it without `media.upload`.
+  test "a media.manage holder without media.upload still edits and trashes by id, and a missing id is their 404" do
+    asset = upload_asset
+    group = AccessControl::Group.create!(name: "Media managers only")
+    AccessControl::Grant.create!(group: group, permission: "media.manage", scope: {})
+    manager = User.create!(email_address: "media-manager@example.org", password: "a-long-enough-password")
+    AccessControl::Membership.create!(user: manager, group: group)
+    sign_in_as(manager)
+
+    patch "/cs-studio/media/#{asset.id}", params: { media_asset: { title: "Managed", alt: "", caption: "" } }, as: :turbo_stream
+    assert_response :success
+    assert_equal "Managed", asset.reload.title
+
+    delete "/cs-studio/media/#{Media::Asset.maximum(:id) + 1000}"
+    assert_response :not_found
+
+    delete "/cs-studio/media/#{asset.id}"
+    assert_response :see_other
+    assert asset.reload.trashed?
+  end
+
   test "an image's own detail panel needs media.upload too" do
     sign_in_as(users(:reader))
     asset = upload_asset
@@ -386,6 +430,26 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_select "#toasts .admin-toast[role=status]", text: "Restored “#{asset.title}”"
   end
 
+  # Final fix wave (Task 8 M-4): trashing from the panel used to drop the
+  # search, the segment and the page the editor was working through.
+  test "trashing from the panel keeps the grid's search, segment and page" do
+    sign_in_as(users(:one))
+    asset = upload_asset(filename: "unused.png")
+
+    get "/cs-studio/media", params: { selected: asset.id, q: "unused", filter: "unused", page: "1" }
+    assert_select "#media-panel form[action='/cs-studio/media/#{asset.id}?filter=unused&page=1&q=unused'] input[name=_method][value=delete]"
+
+    delete "/cs-studio/media/#{asset.id}?filter=unused&page=1&q=unused"
+    assert_redirected_to "/cs-studio/media?filter=unused&page=1&q=unused"
+    assert asset.reload.trashed?
+
+    # A refusal goes back to the panel, in the same list.
+    used = upload_asset(filename: "hero.png")
+    assert Pages::Save.call(create_page(title: "About"), attributes: { hero_media_asset_id: used.id }).ok?
+    delete "/cs-studio/media/#{used.id}?q=hero&page[]=junk"
+    assert_redirected_to "/cs-studio/media?q=hero&selected=#{used.id}"
+  end
+
   # The disabled button is only ever a courtesy -- `Trash::Move` itself is
   # what actually refuses this, with the same "used on" wording, whether
   # the request came from the disabled-button's own dialog (impossible
@@ -566,6 +630,25 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { q: "mine" }
     assert_select "#media-count-all", text: "1"
     assert_select "#media-asset-#{mine.id}"
+  end
+
+  # Final fix wave (Task 8 M-6): the tile and the panel call an alt of only
+  # whitespace missing (`String#strip`); the segment's SQL trimmed spaces only,
+  # so an alt of a newline or a tab wore the NO ALT chip but wasn't listed.
+  test "Missing alt lists an alt of only whitespace of any kind, as the tile's NO ALT chip does" do
+    sign_in_as(users(:one))
+    blanks = [ "\n", "\t", " \r\n ", "" ].map.with_index do |alt, index|
+      upload_asset(filename: "blank-#{index}.png").tap { |asset| asset.update_columns(alt: { "en" => alt }) }
+    end
+    described = upload_asset(filename: "described.png").tap { |asset| asset.update_columns(alt: { "en" => " a\tb " }) }
+
+    search = Media::Search.new(filter: "missing_alt", actor: users(:one))
+    assert_equal blanks.map(&:id).sort, search.results.pluck(:id).sort
+    assert_equal blanks.size, search.counts.fetch(:missing_alt)
+
+    get "/cs-studio/media", params: { filter: "missing_alt" }
+    blanks.each { |asset| assert_select "##{Admin::MediaLibrary::TileComponent.dom_id(asset)}", text: /NO ALT/ }
+    assert_select "##{Admin::MediaLibrary::TileComponent.dom_id(described)}", count: 0
   end
 
   test "Untranslated is not a segment on a one-language site" do
