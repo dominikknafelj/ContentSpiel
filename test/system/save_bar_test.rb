@@ -112,6 +112,13 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   end
 
   # Back is a restoration visit, which fires no `turbo:before-visit`.
+  #
+  # This is also the test that says so when a Turbo upgrade breaks the guard
+  # (`turbo-rails` is pinned in the Gemfile for that reason). It rests on three
+  # Turbo internals -- `history.state.turbo.restorationIndex`,
+  # `Turbo.session.history.currentIndex` and `Turbo.session.history.onPopState`
+  # -- and with any one of them gone the guard stands back and the first
+  # "dialog is open" below fails (each was taken away in turn to check).
   test "Back with a typed change asks first; Keep editing leaves the URL and the form as they were" do
     sign_in_via_form(@owner)
     open_edit_from_the_list
