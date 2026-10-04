@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_05_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -283,6 +283,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_110000) do
     t.string "ai_model"
     t.text "ai_api_key"
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.datetime "ai_api_key_saved_at"
   end
 
   create_table "tags", force: :cascade do |t|

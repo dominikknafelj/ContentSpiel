@@ -26,15 +26,29 @@ module Settings
   # to decide (`Admin::SettingsController#assign_ai_key`) -- here, nil
   # clears the key like any other attribute.
   #
-  # Needs `settings.manage`; one that changes the enabled `locales` too
-  # needs `languages.manage`, the right that owns them everywhere else
-  # (`Locales::Enable`/`Disable`/`Configure`). The default language stays a
-  # settings field, as on the Settings screen. Recorded as
-  # `settings.updated`, and only when something actually changed.
+  # `languages:` (decision D5) is CS Studio's path for the language order and
+  # each language's fallback: the complete ordered `[{ "code", "fallbacks" }]`
+  # list, applied through `Locales::Configure#apply` INSIDE this service's
+  # transaction, so one Save is all-or-nothing and records `settings.updated`
+  # and/or `language.configured` (each only when something changed). It needs
+  # `languages.manage`; the site fields (`attributes`, `translations`) need
+  # `settings.manage`. A call that carries both parts needs both rights, and
+  # a missing one refuses the WHOLE call: nothing is written and exactly one
+  # `access.denied` is recorded. `settings.manage` is checked first, so an
+  # actor lacking both is denied for that one. A call with only `languages:`
+  # needs only `languages.manage`.
+  #
+  # The setup wizard still passes `default_locale` and `locales` in
+  # `attributes` (needs `settings.manage` plus, for `locales`,
+  # `languages.manage`); CS Studio's settings form never permits them -- the
+  # default language is `Locales::MakeDefault`, the language list
+  # `Enable`/`Disable`/`languages:`.
+  #
+  # Recorded as `settings.updated`, and only when something actually changed.
   class Save < ApplicationService
     TRANSLATED = %i[title tagline].freeze
 
-    def initialize(site = Current.site, attributes: {}, translations: {}, actor: Current.actor)
+    def initialize(site = Current.site, attributes: {}, translations: {}, languages: nil, actor: Current.actor)
       @site = site
       @attributes = attributes.to_h.symbolize_keys
       misplaced = @attributes.keys & TRANSLATED
@@ -45,36 +59,55 @@ module Settings
       @new_ai_key = @attributes.delete(:ai_api_key).to_s.strip.presence
 
       @translations = translations.to_h
+      @languages = languages
       @actor = actor
     end
 
     def call
-      return denied("settings.manage", @site) unless authorize!("settings.manage", @site)
-      if @attributes.key?(:locales) && !authorize!("languages.manage", @site)
+      # Every right is checked BEFORE anything is assigned or written, so a
+      # refusal leaves nothing behind and records the single `access.denied`.
+      if site_part? && !authorize!("settings.manage", @site)
+        return denied("settings.manage", @site)
+      end
+      if (@languages || @attributes.key?(:locales)) && !authorize!("languages.manage", @site)
         return denied("languages.manage", @site)
       end
 
       assign
       logo_changing = @site.attachment_changes.key?("logo")
 
+      language_errors = []
       saved = SiteSetting.transaction do
         @site.save || raise(ActiveRecord::Rollback)
         ai_key_change = write_ai_key if @ai_key_given
         # A new default language (or a changed language list) changes what
         # every record's state is relative to; anything else only the
         # site's own title and tagline (`translation_states`).
-        if @site.saved_change_to_default_locale? || @site.saved_change_to_locales?
-          Translations::StateIndex.rebuild_all
-        else
-          Translations::StateIndex.refresh(@site)
-        end
+        locales_changed = @site.saved_change_to_default_locale? || @site.saved_change_to_locales?
 
+        # The settings event is built from THIS save's changes, before the
+        # languages write below saves the row a second time (which replaces
+        # `saved_changes`).
         changes = Audit::Snapshot.field_changes_for(@site)
         changes["logo"] = [ nil, @site.logo.attached? ? @site.logo.filename.to_s : nil ] if logo_changing
         changes["AI key"] = ai_key_change if ai_key_change
         record_event("settings.updated", subject: @site, field_changes: changes) if changes.any?
+
+        if @languages
+          language_errors = Locales::Configure.new(@languages, actor: @actor).apply(@site)
+          raise ActiveRecord::Rollback if language_errors.any?
+
+          locales_changed ||= @site.saved_change_to_locales?
+        end
+
+        if locales_changed
+          Translations::StateIndex.rebuild_all
+        else
+          Translations::StateIndex.refresh(@site)
+        end
         true
       end
+      return failure(@site, language_errors) if language_errors.any?
       return failure(@site) unless saved
 
       success(@site)
@@ -96,12 +129,24 @@ module Settings
     # the `_key` filter, which would drop it again), or nil when nothing
     # changed (removing a key that isn't there). A new key always counts as
     # a change: telling it apart from the stored one would mean decrypting.
+    #
+    # `ai_api_key_saved_at` (decision D11) is written in the same statement
+    # and cleared with the key: it is when the key was saved, not an audited
+    # setting (`Audit::Snapshot::IGNORED_CHANGES`; the event already says "AI
+    # key: set / not set"). An unrelated save never touches it.
     def write_ai_key
       before = @site.ai_api_key_set?
       return nil if !before && @new_ai_key.nil?
 
-      @site.update_columns(ai_api_key: @new_ai_key, updated_at: Time.current)
+      now = Time.current
+      @site.update_columns(ai_api_key: @new_ai_key, ai_api_key_saved_at: (now if @new_ai_key), updated_at: now)
       [ before, @new_ai_key.present? ].map { |set| set ? "set" : "not set" }
+    end
+
+    # Whether the call carries site fields (or nothing at all, which has
+    # always meant a settings save); false for a call that is only `languages:`.
+    def site_part?
+      @languages.nil? || @attributes.any? || @ai_key_given || @translations.any?
     end
 
     def assign

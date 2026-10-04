@@ -68,6 +68,10 @@ class TranslationStateParityTest < ActiveSupport::TestCase
       assert Settings::Save.call(attributes: { locales: [ { "code" => "de" }, { "code" => "en" } ] }).ok?
       assert_equal %w[en], Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale)
       assert_parity page
+      assert Locales::MakeDefault.call("en").ok?
+      assert_parity page
+      assert Settings::Save.call(languages: [ { "code" => "en" }, { "code" => "de" } ]).ok?
+      assert_parity page
     end
   end
 

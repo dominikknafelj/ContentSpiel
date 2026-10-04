@@ -25,6 +25,21 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     result.record
   end
 
+  test "translated_record_count counts distinct kept records holding a translation, in one query" do
+    base = Translations::StateIndex.translated_record_count
+    translated = create_page(title: "About", translations: { "de" => { title: "Über" }, "es" => { title: "Acerca" } })
+    half = create_post(title: "Hello")
+    assert Posts::Save.call(half, translations: { "de" => { title: "Hallo" } }).ok?
+    create_page(title: "Untranslated")
+    # Two languages translated still count the page once.
+    assert_equal base + 2, Translations::StateIndex.translated_record_count
+    assert_equal 1, count_queries { ActiveRecord::Base.uncached { Translations::StateIndex.translated_record_count } }
+
+    assert Trash::Move.call(half).ok?
+    assert_equal base + 1, Translations::StateIndex.translated_record_count
+    assert translated
+  end
+
   test "a new page is missing in every other language" do
     page = create_page(title: "About")
     assert_equal %w[missing missing], %w[de es].map { |l| state(page, l).state }

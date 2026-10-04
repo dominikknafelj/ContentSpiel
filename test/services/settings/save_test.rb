@@ -73,4 +73,157 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert_raises(ArgumentError) { Settings::Save.new(Current.site, attributes: { "tagline" => "Ambient" }) }
     assert_equal "Test Site", Current.site.reload.title(locale: "en")
   end
+
+  # --- languages: (decision D5) ---
+
+  def reorder(*codes) = codes.map { |code| { "code" => code } }
+
+  def grant_to_branch_editors(*keys)
+    keys.each { |key| AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: key, scope: {}) }
+  end
+
+  test "languages: reorders and sets fallbacks, recording language.configured" do
+    result = as_owner do
+      Settings::Save.call(Current.site, languages: [ { "code" => "es" }, { "code" => "en" }, { "code" => "de", "fallbacks" => [ "en" ] } ])
+    end
+
+    assert result.ok?, result.errors.inspect
+    site = Current.site.reload
+    assert_equal %w[es en de], site.locale_codes
+    assert_equal [ "en" ], site.locale_entry("de")["fallbacks"]
+    assert Audit::Event.exists?(action: "language.configured")
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "languages: that change nothing record nothing" do
+    as_owner { Settings::Save.call(Current.site, languages: reorder("en", "de", "es")) }
+
+    assert_not Audit::Event.exists?(action: "language.configured")
+  end
+
+  test "site fields and languages in one call write both and record both events" do
+    result = as_owner do
+      Settings::Save.call(Current.site, attributes: { time_zone: "Europe/Berlin" }, translations: { "en" => { tagline: "Hi" } },
+        languages: reorder("de", "en", "es"))
+    end
+
+    assert result.ok?, result.errors.inspect
+    site = Current.site.reload
+    assert_equal %w[de en es], site.locale_codes
+    assert_equal "Hi", site.tagline(locale: "en")
+    settings_event = Audit::Event.find_by!(action: "settings.updated")
+    assert_equal "Hi", settings_event.field_changes["en tagline"].last
+    assert_not settings_event.field_changes.key?("locales"), "the language order belongs to language.configured"
+    assert Audit::Event.exists?(action: "language.configured")
+  end
+
+  test "languages-only needs only languages.manage" do
+    grant_to_branch_editors("languages.manage")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(Current.site, languages: reorder("de", "en", "es")) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal %w[de en es], Current.site.reload.locale_codes
+  end
+
+  test "an actor with only languages.manage is refused the whole call: nothing written, one access.denied" do
+    grant_to_branch_editors("languages.manage")
+
+    result = as(users(:editor_branch)) do
+      Settings::Save.call(Current.site, attributes: { time_zone: "Europe/Berlin" }, languages: reorder("de", "en", "es"))
+    end
+
+    assert result.denied?
+    site = Current.site.reload
+    assert_equal %w[en de es], site.locale_codes
+    assert_not_equal "Europe/Berlin", site.time_zone
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_equal "settings.manage", Audit::Event.find_by!(action: "access.denied").metadata["permission"]
+    assert_not Audit::Event.exists?(action: "language.configured")
+  end
+
+  test "an actor with only settings.manage is refused the whole call: nothing written, one access.denied" do
+    grant_to_branch_editors("settings.manage")
+
+    result = as(users(:editor_branch)) do
+      Settings::Save.call(Current.site, attributes: { time_zone: "Europe/Berlin" }, languages: reorder("de", "en", "es"))
+    end
+
+    assert result.denied?
+    site = Current.site.reload
+    assert_equal %w[en de es], site.locale_codes
+    assert_not_equal "Europe/Berlin", site.time_zone
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_equal "languages.manage", Audit::Event.find_by!(action: "access.denied").metadata["permission"]
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "an actor with neither right is denied once, for settings.manage (checked first)" do
+    result = as(users(:editor_branch)) do
+      Settings::Save.call(Current.site, translations: { "en" => { tagline: "x" } }, languages: reorder("de", "en", "es"))
+    end
+
+    assert result.denied?
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_equal "settings.manage", Audit::Event.find_by!(action: "access.denied").metadata["permission"]
+  end
+
+  test "an invalid site field rolls the language order back" do
+    result = as_owner do
+      Settings::Save.call(Current.site, attributes: { time_zone: "Not/AZone" }, languages: reorder("de", "en", "es"))
+    end
+
+    assert_not result.ok?
+    assert_equal %w[en de es], Current.site.reload.locale_codes
+    assert_not Audit::Event.exists?(action: "language.configured")
+  end
+
+  test "an invalid language list rolls the site fields back and records no event" do
+    result = as_owner do
+      Settings::Save.call(Current.site, translations: { "en" => { tagline: "Rolled back" } }, languages: reorder("en", "de"))
+    end
+
+    assert_not result.ok?
+    assert_equal [ "must list exactly the enabled languages" ], result.errors
+    assert_nil Current.site.reload.tagline(locale: "en")
+    assert_not Audit::Event.exists?(action: "settings.updated")
+    assert_not Audit::Event.exists?(action: "language.configured")
+  end
+
+  # --- the AI key's date (decision D11) ---
+
+  test "saving a key stamps its date, removing it clears it, an unrelated save leaves it" do
+    as_owner { assert Settings::Save.call(Current.site, attributes: { ai_api_key: "sk-test-1" }).ok? }
+    site = Current.site.reload
+    assert site.ai_api_key_set?
+    assert_in_delta Time.current, site.ai_api_key_saved_at, 5.seconds
+    assert_equal site.ai_api_key_saved_at.in_time_zone(site.effective_time_zone).to_date, site.ai_api_key_saved_on
+
+    stamped = site.ai_api_key_saved_at
+    as_owner { assert Settings::Save.call(Current.site, translations: { "en" => { tagline: "Other" } }).ok? }
+    assert_equal stamped, Current.site.reload.ai_api_key_saved_at
+
+    as_owner { assert Settings::Save.call(Current.site, attributes: { ai_api_key: nil }).ok? }
+    site = Current.site.reload
+    assert_not site.ai_api_key_set?
+    assert_nil site.ai_api_key_saved_at
+    assert_nil site.ai_api_key_saved_on
+  end
+
+  test "a key stored before the column existed has no date" do
+    as_owner { Settings::Save.call(Current.site, attributes: { ai_api_key: "sk-test-1" }) }
+    Current.site.update_columns(ai_api_key_saved_at: nil)
+
+    assert Current.site.reload.ai_api_key_set?
+    assert_nil Current.site.ai_api_key_saved_on
+  end
+
+  test "the key's date is never an audited change and the key never reaches the event" do
+    as_owner { Settings::Save.call(Current.site, attributes: { ai_api_key: "sk-test-1" }) }
+
+    event = Audit::Event.find_by!(action: "settings.updated")
+    assert_equal [ "not set", "set" ], event.field_changes["AI key"]
+    assert_not_includes event.field_changes.keys, "ai_api_key_saved_at"
+    assert_not_includes event.to_json, "sk-test-1"
+  end
 end

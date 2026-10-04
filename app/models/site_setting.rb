@@ -122,6 +122,15 @@ class SiteSetting < ApplicationRecord
   # plaintext, decrypts.
   def ai_api_key_set? = ai_api_key_before_type_cast.present?
 
+  # The day the stored key was saved, in the site time zone (what the Settings
+  # screen prints as "added 2 Oct"); nil when there is no key or it predates
+  # the column. Never decrypts anything.
+  def ai_api_key_saved_on
+    return nil unless ai_api_key_set?
+
+    ai_api_key_saved_at&.in_time_zone(effective_time_zone)&.to_date
+  end
+
   def locale_codes
     Array(locales).map { |entry| entry["code"].to_s }
   end

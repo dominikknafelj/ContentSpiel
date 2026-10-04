@@ -85,6 +85,22 @@ module Translations
       end
     end
 
+    # The number of distinct records that hold a translation today: a
+    # `translation_states` row whose state isn't `missing`, in any target
+    # language (the Default-language dialog's "(N items)", decision D8). One
+    # query; pages, posts and images count only while kept (a trashed record
+    # keeps its rows but isn't content any more), the site settings row has no
+    # trash and counts as it is. A record with no row at all holds nothing.
+    def translated_record_count
+      kept = [ Page, Post, Media::Asset ].map do |model|
+        "(translation_states.record_type = #{State.connection.quote(model.polymorphic_name)} AND EXISTS (" \
+        "#{model.kept.where("#{model.quoted_table_name}.id = translation_states.record_id").select(1).to_sql}))"
+      end
+      settings = "translation_states.record_type = #{State.connection.quote(SiteSetting.polymorphic_name)}"
+      State.where.not(state: "missing").where((kept + [ settings ]).join(" OR "))
+        .distinct.count(Arel.sql("translation_states.record_type || ':' || translation_states.record_id"))
+    end
+
     # `relation` (pages, posts or images) narrowed to the records whose state
     # in `locale` is one of `states` (Strings; `complete` includes a record
     # with no row). A join, so it composes with the caller's own

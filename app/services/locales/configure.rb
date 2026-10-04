@@ -28,6 +28,25 @@ module Locales
       # with no per-record scope.
       return denied("languages.manage", site) unless authorize!("languages.manage", site)
 
+      errors = []
+      SiteSetting.transaction do
+        errors = apply(site)
+        raise ActiveRecord::Rollback if errors.any?
+      end
+      return failure(site, errors) if errors.any?
+
+      success(site)
+    end
+
+    # The write itself, minus the permission check and the transaction: what
+    # `Settings::Save` runs inside ITS transaction when one save carries the
+    # language order as well as site fields (decision D5), so the two are
+    # all-or-nothing and no second top-level transaction commits on its own.
+    # The caller has already authorized `languages.manage` (and answers a
+    # denial itself, as the one `access.denied`), and rolls back when this
+    # returns errors. Still records `language.configured`, and only when
+    # something changed. Returns the errors, empty on success.
+    def apply(site)
       # A code this call doesn't already recognize as enabled -- an
       # attempt to sneak `Enable`/`Disable` in through this endpoint
       # instead, or a stale form submitted after another tab already
@@ -38,20 +57,15 @@ module Locales
       # and self-consistent, not that they match whatever was enabled a
       # moment ago.
       unless @entries.map { |entry| entry["code"] }.sort == site.locale_codes.sort
-        return failure(site, "must list exactly the enabled languages")
+        return [ "must list exactly the enabled languages" ]
       end
 
       site.locales = @entries
-      saved = SiteSetting.transaction do
-        site.save || raise(ActiveRecord::Rollback)
+      return site.errors.full_messages.presence || [ "Languages could not be saved" ] unless site.save
 
-        changes = Audit::Snapshot.field_changes_for(site)
-        record_event("language.configured", subject: site, field_changes: changes) if changes.any?
-        true
-      end
-      return failure(site) unless saved
-
-      success(site)
+      changes = Audit::Snapshot.field_changes_for(site)
+      record_event("language.configured", subject: site, field_changes: changes) if changes.any?
+      []
     end
 
     private
