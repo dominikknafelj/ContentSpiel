@@ -675,6 +675,45 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/cs-studio/media?locale=de&selected=#{asset.id}"
   end
 
+  test "an empty library says No images unless a search or a real segment is active (a forged or unavailable segment filters nothing)" do
+    sign_in_as(users(:one))
+    with_locales(%w[en], default: "en")
+
+    [ {}, { filter: "bogus" }, { filter: "untranslated" }, { filter: "all" } ].each do |params|
+      get "/cs-studio/media", params: params
+      assert_select "p, h2, h3", text: "No images"
+      assert_select "p, h2, h3", text: "No matches", count: 0
+    end
+
+    [ { filter: "unused" }, { filter: "mine" }, { q: "zzz" } ].each do |params|
+      get "/cs-studio/media", params: params
+      assert_select "p, h2, h3", text: "No matches"
+    end
+
+    get "/cs-studio/media", params: { picker: 1, filter: "bogus" }
+    assert_select "p, h2, h3", text: "No images"
+  end
+
+  test "the Media screen is never restored from Turbo's cache or prefetched, like the editors" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/media"
+
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']"
+    assert_select "head meta[name='turbo-prefetch'][content='false']"
+  end
+
+  test "the panel follows the grid in the DOM with no order swap, and the controller that moves focus wraps both" do
+    sign_in_as(users(:one))
+    asset = upload_asset
+
+    get "/cs-studio/media", params: { selected: asset.id }
+
+    assert_select "[data-controller='admin--media-panel'] > div + aside #media-panel[tabindex='-1']"
+    assert_no_match(/\border-[12]\b/, css_select("[data-controller='admin--media-panel']").first.to_s)
+    assert_select "#media-asset-#{asset.id} a[data-action='click->admin--media-panel#choose']"
+  end
+
   test "several files upload successfully, one request per file" do
     sign_in_as(users(:one))
 

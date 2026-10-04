@@ -15,6 +15,6 @@
   <% if pick? %>
     <%= tag.button face, type: "button", class: PICK_CARD, aria: { pressed: "false" }, data: pick_data %>
   <% else %>
-    <%= link_to face, url, class: card_class, aria: { current: (selected? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "advance" } %>
+    <%= link_to face, url, class: card_class, aria: { current: (selected? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "advance", action: "click->admin--media-panel#choose" } %>
   <% end %>
 </li>

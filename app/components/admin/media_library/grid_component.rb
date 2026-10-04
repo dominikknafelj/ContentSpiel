@@ -18,8 +18,8 @@ module Admin
     # side panel, `PanelComponent`) with the grid's own state (`link_params`:
     # `q`, `filter`, `page`) kept; `selected_id` is the tile with the ring.
     # Every asset this renders must be
-    # loaded through `Media::Asset.with_variants` (`Admin::MediaController
-    # #filtered_assets`) -- `#thumbnail_url` reads `#srcset`, which is
+    # loaded through `Media::Asset.with_variants` (`Media::Search`'s default
+    # scope has it) -- `#thumbnail_url` reads `#srcset`, which is
     # exactly the N+1 that scope exists to prevent over a whole page of
     # cards.
     #
@@ -47,10 +47,15 @@ module Admin
 
       def pick? = @pick
 
-      # A search or filter is active (`Admin::MediaController#filtered_assets`'s
-      # own params), so an empty grid means "nothing matches", not "nothing
-      # uploaded yet".
-      def filtered? = helpers.params[:q].is_a?(String) && helpers.params[:q].present? || helpers.params[:filter].present?
+      # A search or a segment is active, so an empty grid means "nothing
+      # matches", not "nothing uploaded yet". The segment is judged as
+      # `Media::Search` normalises it: a forged value, or `untranslated` on a
+      # one-language site, is `all` and filters nothing. (The picker's grid asks
+      # the same, from the same params.)
+      def filtered?
+        query = helpers.params[:q]
+        (query.is_a?(String) && query.present?) || ::Media::Search.new(filter: helpers.params[:filter]).filter != "all"
+      end
 
       # The unfiltered grid, staying in picker mode inside the picker's own
       # frame (a link inside a `<turbo-frame>` is scoped to it already), or

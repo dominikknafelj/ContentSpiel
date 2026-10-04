@@ -1,3 +1,11 @@
+<%# The editors' two head tags (`admin/pages/show`): Back never restores a panel form
+    with a stale `base_updated_at` (or a stale NO ALT chip or segment count) from
+    Turbo's page cache, and a hover-prefetched tile answer older than a save is
+    never used for a click. %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+  <meta name="turbo-prefetch" content="false">
+<% end %>
 <%# The Media module (media library design spec §6; round 3 Task 8, handoff §4.6):
     the header with "Upload images", the drop zone, the toolbar (search and
     segments with counts) and the grid, with the chosen image's side panel
@@ -39,8 +47,12 @@
 <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options) %>
 
 <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
-<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>">
-  <div class="min-w-0 <%= "order-2 lg:order-1" if @selected %>">
+<%# DOM order is visual order at every width (grid, then panel; the panel stacks
+    below the grid under 1024px): no `order-*` swap, so tab order never contradicts
+    what is drawn. `admin--media-panel` moves focus into the panel when a tile was
+    chosen, and back to the tile when the panel is closed. %>
+<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>" data-controller="admin--media-panel">
+  <div class="min-w-0">
     <% if @pagination.out_of_range? %>
       <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
     <% else %>
@@ -54,7 +66,7 @@
   </div>
 
   <% if @selected %>
-    <aside class="order-1 min-w-0 rounded-cs border border-line bg-surface p-4 lg:order-2 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto" aria-label="Image details">
+    <aside class="min-w-0 rounded-cs border border-line bg-surface p-4 lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto" aria-label="Image details">
       <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
     </aside>
   <% end %>

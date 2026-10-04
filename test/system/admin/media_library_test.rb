@@ -215,7 +215,64 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-panel"
   end
 
+  # The Media screen carries the editors' `turbo-cache-control: no-cache`: without
+  # it Back restores the cached panel (a form with the base it had when it was
+  # cached, and a tile with the NO ALT it had), so the next edit would be told the
+  # image "also changed elsewhere" although only this tab touched it.
+  test "Back after typing an alt text and choosing another tile shows the saved state, and the next edit is a plain save" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    first = create_media_asset(filename: "tiny.png").tap { |asset| asset.update!(title: "First image") }
+    second = create_media_asset(filename: "wide.png").tap { |asset| asset.update!(title: "Second image") }
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media"
+    await_admin_controllers
+    click_tile(first)
+
+    fill_in "Alt", with: "Typed just before leaving"
+    click_tile(second) # held by the write queue until the save is out
+    assert_selector "#media-panel #media-title[value='Second image']"
+    assert_equal "Typed just before leaving", first.reload.alt(locale: :en)
+
+    page.go_back
+    assert_selector "#media-panel #media-title[value='First image']", wait: 5
+    assert_no_selector "#media-asset-#{first.id}", text: "NO ALT"
+    await_admin_controllers
+
+    fill_in "Title", with: "First image, renamed"
+    assert_selector "#media-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
+    assert_equal "First image, renamed", first.reload.title
+  end
+
+  test "by keyboard: choosing a tile moves focus into the panel, and closing it returns focus to that tile; a plain load steals none" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset.tap { |record| record.update!(title: "Keyboard image") }
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media?selected=#{asset.id}"
+    await_admin_controllers
+    assert_selector "#media-panel"
+    sleep 0.3
+    assert_not_equal "media-panel", active_element_id, "a plain page load must not move focus into the panel"
+
+    visit "/cs-studio/media"
+    await_admin_controllers
+    page.execute_script("document.querySelector('#media-asset-#{asset.id} a').focus()")
+    find("#media-asset-#{asset.id} a").send_keys(:enter)
+
+    assert_eventually(message: "focus never reached the panel") { active_element_id == "media-panel" }
+
+    find("a[aria-label='Close panel']").send_keys(:enter)
+
+    assert_no_selector "#media-panel", wait: 5
+    assert_eventually(message: "focus never returned to the tile") do
+      page.evaluate_script("document.activeElement.closest('#media-asset-#{asset.id}') !== null")
+    end
+  end
+
   private
+
+  def active_element_id = page.evaluate_script("document.activeElement && document.activeElement.id")
 
   # Holds every upload's request in the page until `release_uploads`, so a test
   # sees the progress tiles instead of whatever the timing gives it.

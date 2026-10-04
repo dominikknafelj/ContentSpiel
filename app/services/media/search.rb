@@ -4,11 +4,11 @@
 # anywhere in the SQL this builds, only the named bind Postgres substitutes
 # safely.
 #
-# Pulled out of `Admin::MediaController#search` (Task 7) so the MCP
-# `list_media_tool` (Task 9) can search the same way without duplicating
-# this SQL -- both callers hand it a `Media::Asset` relation (already
-# scoped/filtered however they like) and get the same relation narrowed by
-# `query`.
+# Pulled out of `Admin::MediaController` (Task 7) so the MCP `list_media_tool`,
+# the ⌘K palette and the Media screen all search the same way without
+# duplicating this SQL. `Media::Search.call(scope, query)` narrows any
+# `Media::Asset` relation by the query alone; `Media::Search.new(...)` is the
+# Media screen's form (the search plus a segment, and the segments' counts).
 class Media::Search
   # The library's segments (round 3, Task 8, decision D13). `untranslated`
   # exists only while the site has a target language to be untranslated in.
