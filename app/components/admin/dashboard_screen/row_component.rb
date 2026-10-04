@@ -25,7 +25,7 @@ module Admin
 
       def mine? = @mine
 
-      def title = record.title.presence || "Untitled"
+      def title = record.title.presence || "(untitled)"
 
       def path
         record.is_a?(Page) ? helpers.admin_page_path(record, **url_options) : helpers.admin_post_path(record, **url_options)

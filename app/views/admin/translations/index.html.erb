@@ -33,6 +33,12 @@
   <% end %>
 <% end %>
 
+<%# Spec §4: "Clear" only when a filter is active. The only other way back from
+    a language card was clicking the highlighted card again. %>
+<% if @language || @type.present? %>
+  <p class="mb-3 mt-2 text-sm"><%= link_to "Clear", admin_translations_path(admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %></p>
+<% end %>
+
 <% page_url = ->(page) { admin_translations_path(list_params(:type, :language).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>

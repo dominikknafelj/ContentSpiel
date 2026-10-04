@@ -132,7 +132,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_equal :current, post.translation_state("body", "de")
   end
 
-  test "Translate empty fields, then Use all, fills the page's fields and its block's" do
+  test "Suggest translations for N empty fields, then Use all, fills the page's fields and its block's" do
     with_test_types do
       page_record = create_page(title: "About")
       assert Pages::Save.call(page_record, translations: { "en" => { subtitle: "Who we are" } }).ok?
@@ -190,7 +190,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     end
   end
 
-  test "a provider error during Translate empty fields shows under its fields and doesn't stop the others" do
+  test "a provider error during Suggest translations for N empty fields shows under its fields and doesn't stop the others" do
     with_test_types do
       page_record = create_page(title: "Boom")
       block = ContentBlocks::Save.call(ContentBlock.new(owner: page_record), attributes: { block_type: "test/quote" },
@@ -421,7 +421,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
   end
 
-  test "editing the English title flags the German one, and Mark as up to date clears it" do
+  test "editing the English title flags the German one, and Still correct — mark up to date clears it" do
     post = create_post(title: "Hello")
     assert Posts::Save.call(post, translations: { "de" => { title: "Hallo" } }).ok?
 

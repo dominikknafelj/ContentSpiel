@@ -52,6 +52,8 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     assert_selector ".admin-account", text: user.email_address
     assert_selector ".admin-account a", text: "Change password"
     assert_selector ".admin-account button", text: "Sign out"
+    # Email and role share one line (review C, M9).
+    assert_selector ".admin-account span", text: "#{user.email_address} · Owner", count: 1
   end
 
   test "the wordmark is uppercase with the site name under it" do

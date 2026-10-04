@@ -1,5 +1,5 @@
 module Translations
-  # "Mark as up to date" (translation helpers spec §3.4): the original
+  # "Still correct — mark up to date" (translation helpers spec §3.4): the original
   # changed, but the translator judged the translation still right. Stores
   # the current original's digest for one field in one language
   # (`Translations::Tracker#confirm_translation`) without touching the value,

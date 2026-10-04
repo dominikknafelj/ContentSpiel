@@ -103,7 +103,7 @@ module Admin
 
     # AI suggestions for some of one record's fields (translation helpers
     # spec §6.4), asked by the editor's Translate buttons and its
-    # "Translate empty fields" (one request per record and cap-sized part,
+    # "Suggest translations for N empty fields" (one request per record and cap-sized part,
     # `TranslateAllComponent`). `AI::Translate` decides everything --
     # `ai.translate`, the record's edit right, the caps -- and saves
     # nothing (Review Focus 4); this only loads the record (a 404 outside

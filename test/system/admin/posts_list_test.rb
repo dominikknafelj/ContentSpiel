@@ -115,7 +115,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert find("#select-post-#{@first.id}").checked?
     assert find("#select-post-#{@third.id}").checked?
     assert_not find("#select-post-#{@second.id}").checked?
-    assert_equal "Actions for #{@second.title}", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_selector "tr#post_#{@second.id} button[aria-label^='Actions for']:focus"
     assert_not @second.reload.trashed?
   end
 
@@ -147,6 +147,6 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     # The pick came from a menu item: Escape hands focus back to the caret.
     find("dialog#new-post-dialog").send_keys(:escape)
     assert_no_selector "dialog[open]"
-    assert_equal "Choose another type of post", page.evaluate_script("document.activeElement.getAttribute('aria-label')")
+    assert_selector "button[aria-label='Choose another type of post']:focus"
   end
 end

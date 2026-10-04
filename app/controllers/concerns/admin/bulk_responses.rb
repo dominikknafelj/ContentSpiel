@@ -67,7 +67,7 @@ module Admin
     def counted(count, one, many) = count == 1 ? "1 #{one}" : "#{count} #{many}"
 
     def names(posts)
-      listed = posts.first(NAMED_PER_SENTENCE).map { |post| "“#{(post.title(locale: admin_locale).presence || "Untitled").truncate(TITLE_LENGTH)}”" }
+      listed = posts.first(NAMED_PER_SENTENCE).map { |post| "“#{(post.title(locale: admin_locale).presence || "(untitled)").truncate(TITLE_LENGTH)}”" }
       rest = posts.size - listed.size
       rest.positive? ? "#{listed.join(", ")} and #{rest} more" : listed.to_sentence
     end

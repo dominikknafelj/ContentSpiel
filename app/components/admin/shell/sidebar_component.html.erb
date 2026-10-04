@@ -39,12 +39,11 @@
         plus `title` so a long name or email never widens the column. %>
     <div class="admin-account flex min-w-0 flex-col gap-0.5">
       <span class="truncate text-sm font-medium text-ink" title="<%= user.display_name %>"><%= user.display_name %></span>
-      <%# The email line only when the name line isn't already the email
-          (a user without a name falls back to it). %>
-      <% if user.display_name != user.email_address %>
-        <span class="truncate text-xs text-meta" title="<%= user.email_address %>"><%= user.email_address %></span>
-      <% end %>
-      <span class="truncate text-xs text-meta"><%= role_line %></span>
+      <%# "email · role" on one line (handoff: "name, email and role"); the email
+          only when the name line isn't already the email (a user without a name
+          falls back to it). `title` carries the whole line when it is cut off. %>
+      <% line = [ (user.email_address if user.display_name != user.email_address), role_line ].compact.join(" · ") %>
+      <span class="truncate text-xs text-meta" title="<%= line %>"><%= line %></span>
       <div class="mt-1 flex items-center gap-3 text-xs">
         <%= link_to "Change password", admin_account_password_path(**link_options), class: "text-dim underline-offset-2 hover:text-ink hover:underline" %>
         <%= button_to "Sign out", admin_sign_out_path, method: :delete, class: "cursor-pointer text-dim underline-offset-2 hover:text-ink hover:underline" %>

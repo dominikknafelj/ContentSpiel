@@ -109,7 +109,7 @@ Rails.application.routes.draw do
     post "trash/:type/:id/restore", to: "trash#restore", as: :restore_trash_item, constraints: { type: /page|post|media/ }
     delete "trash/:type/:id", to: "trash#purge", as: :trash_item, constraints: { type: /page|post|media/ }
 
-    # "Mark as up to date" for an outdated translation (translation helpers
+    # "Still correct — mark up to date" for an outdated translation (translation helpers
     # spec §3.4/§4): one endpoint for every translatable record kind, named
     # by `record_type`/`record_id` in the params (the editor's button posts
     # them in its `formaction`), the way the trash addresses its items by
@@ -252,8 +252,8 @@ Rails.application.routes.draw do
     resources :starter_contents, only: :create
 
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):
-    # "Your work", "On the site" and quick create, open to every signed-in
-    # user. The Pages module -- the tree and its own editor -- lives at
+    # quick create, "Your drafts", "Going live next", "Needs translation"
+    # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
     # Quick draft (dashboard spec §4.1): a title and a content type, saved

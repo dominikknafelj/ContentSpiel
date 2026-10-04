@@ -457,7 +457,7 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/pages/#{@page.id}", params: { page: { title: "About us" }, base_updated_at: fresh }, as: :turbo_stream
     assert_response :success
-    assert_no_match(/Changed elsewhere/, response.body)
+    assert_no_match(/CHANGED ELSEWHERE|changed-elsewhere/, response.body)
 
     travel 1.minute
     patch "#{blocks_path}/reorder", params: { ids: [ block.id ] }, headers: page_base_header(@page.reload.updated_at), as: :turbo_stream

@@ -21,7 +21,7 @@ module Admin
   # translation helpers spec §4) -- a second, solid warn dot
   # with its own title and screen-reader text, since "something changed
   # since" asks for a different job than "something is still empty". Each
-  # one carries a stable id (`.outdated_marker_id`) so "Mark as up to date"
+  # one carries a stable id (`.outdated_marker_id`) so "Still correct — mark up to date"
   # can stream it away once the last outdated field in that language is
   # confirmed (`Admin::TranslationConfirmationsController`).
   class LanguageTabsComponent < AdminComponent

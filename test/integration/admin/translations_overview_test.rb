@@ -190,11 +190,15 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     done_image = image_with_alt("A dog", "de" => { alt: "Ein Hund" }, "es" => { alt: "Un perro" })
     trashed_image = image_with_alt("A bird")
     assert Trash::Move.call(trashed_image).ok?
+    # An image whose original has no alt has nothing to translate: it is
+    # complete in every language, so the matrix leaves it out (review C, M22 --
+    # through `StateIndex` and the matrix, not only the model).
+    no_alt = create_media_asset
 
     get "/cs-studio/translations"
 
     assert_response :success
-    [ [ "post", done ], [ "post", trashed ], [ "page", done_page ], [ "media", done_image ], [ "media", trashed_image ] ].each do |type, record|
+    [ [ "post", done ], [ "post", trashed ], [ "page", done_page ], [ "media", done_image ], [ "media", trashed_image ], [ "media", no_alt ] ].each do |type, record|
       assert_select row(type, record), count: 0
     end
   end
@@ -266,10 +270,23 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "thead th[scope=col]", text: "Español" # every column stays
     assert_select "[data-translation-summary] [data-locale=de] a[aria-current=true][href='/cs-studio/translations?type=post']"
     assert_select "input[type=hidden][name=language][value=de]"
+    assert_select "a", text: "Clear"
 
     get "/cs-studio/translations", params: { language: "xx" }
     assert_response :success
     assert_select row("post", only_es)
+  end
+
+  # Review C, M8 (spec §4): "Clear" only while a filter is active.
+  test "Clear appears only when a language or a type filter is active, and leads to the unfiltered matrix" do
+    create_post(title: "Needs work")
+    get "/cs-studio/translations"
+    assert_select "a", text: "Clear", count: 0
+
+    [ { language: "de" }, { type: "post" } ].each do |params|
+      get "/cs-studio/translations", params: params
+      assert_select "a[href='/cs-studio/translations']", text: "Clear"
+    end
   end
 
   test "the Site settings row appears only for settings.manage and only while incomplete" do

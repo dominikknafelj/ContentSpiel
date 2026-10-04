@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# "Mark as up to date" in a real browser (translation helpers spec §4): the
+# "Still correct — mark up to date" in a real browser (translation helpers spec §4): the
 # button sits inside the post form's autosave `<form>` but is owned by the
 # layout's separate confirm form (`form=`, since forms can't nest), so
 # clicking it must post *that* form -- not the autosave one -- and Turbo

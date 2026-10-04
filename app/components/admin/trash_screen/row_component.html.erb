@@ -13,7 +13,7 @@
         <summary class="cursor-pointer">+<%= helpers.pluralize(subpages.size, "subpage") %></summary>
         <ul class="mt-1 list-disc pl-5">
           <% subpages.each do |subpage| %>
-            <li><%= subpage.title.presence || "Untitled" %></li>
+            <li><%= subpage.title.presence || "(untitled)" %></li>
           <% end %>
         </ul>
       </details>

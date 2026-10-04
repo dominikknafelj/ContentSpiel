@@ -22,9 +22,21 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     sleep 1.2
     as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
+    # Count what this browser sends: "final" is a claim about the CLIENT (the
+    # form stops sending), which the server's own refusal of every later save
+    # on the same stale base would hide.
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+    JS
     fill_in "Subtitle", with: "My text"
 
     assert_selector "#page-save-status", text: "● CHANGED ELSEWHERE", wait: 5
+    assert_equal 1, page.evaluate_script("window.__patches"), "the refused save was the only one sent"
     assert_selector "#editor-notice #changed-elsewhere[role=alert]", text: /Changed by two@example\.com .+Your text is still here/m
     assert_equal "The other editor's text", @page.reload.subtitle
     assert_equal "My text", find_field("Subtitle").value
@@ -33,6 +45,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     # margin -- an absence needs the wait itself).
     fill_in "Subtitle", with: "My text, edited again"
     sleep 2
+    assert_equal 1, page.evaluate_script("window.__patches"), "the paused form sent another request"
     assert_equal "The other editor's text", @page.reload.subtitle
     assert_equal "My text, edited again", find_field("Subtitle").value
 

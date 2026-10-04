@@ -80,6 +80,16 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     assert_equal "published_at", page.evaluate_script("document.activeElement.getAttribute('name')")
     assert_no_selector "#{dialog} button", text: "Remove schedule"
 
+    # Opened from the ⋯ menu's Schedule… item, so Escape hands focus back to
+    # that menu's button, not <body> (review C, I1).
+    find("#{dialog}[open]").send_keys(:escape)
+    assert_no_selector "#{dialog}[open]"
+    # (Polled: the dialog's `close` event follows its closing by a task.)
+    assert_selector "header.admin-editor-header button[aria-label='More actions']:focus"
+    open_editor_menu
+    press "Schedule…"
+    assert_selector "#{dialog}[open]"
+
     # A past time: the browser must not block the submit (`novalidate`), the
     # server refuses, and the editor comes back with the dialog open.
     set_schedule_value("schedule-page-#{@draft.id}", "2020-01-01T09:00")
@@ -91,9 +101,11 @@ class EditorHeaderSystemTest < ApplicationSystemTestCase
     # Back/forward restores the page from Turbo's cache: the dialog does not reopen.
     within("#{dialog}[open]") { press "Cancel" }
     assert_no_selector "#{dialog}[open]"
-
+    # Reopened the way an editor does, through the menu (not by script).
+    open_editor_menu
+    press "Schedule…"
+    assert_selector "#{dialog}[open]"
     set_schedule_value("schedule-page-#{@draft.id}", (Time.current + 5.days).strftime("%Y-%m-%dT%H:%M"))
-    page.execute_script("document.querySelector('#{dialog}').showModal()")
     within("#{dialog}[open]") { press "Schedule" }
     assert_selector "header.admin-editor-header .admin-status-chip[data-status=scheduled]", wait: 10
     assert_no_selector "#{dialog}[open]"

@@ -1,5 +1,5 @@
 module Admin
-  # "Mark as up to date" (translation helpers spec §3.4/§4): the button an
+  # "Still correct — mark up to date" (translation helpers spec §3.4/§4): the button an
   # outdated translation shows beside its original
   # (`Admin::EditorScreen::ReferenceCardComponent`) posts here with
   # `record_type`, `record_id`, `field` and `locale`; `Translations::Confirm`

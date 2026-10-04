@@ -30,7 +30,7 @@ module Admin
       #
       # `translation_state:` is this field's `Translations::Tracker
       # #translation_state` in the locale being edited, and
-      # `translation_confirm:` what its "Mark as up to date" button posts
+      # `translation_confirm:` what its "Still correct — mark up to date" button posts
       # (nil for a viewer who can't) -- see `#reference_card`. Both are the
       # caller's to work out: only it knows the record behind the value.
       #

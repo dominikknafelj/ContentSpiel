@@ -299,7 +299,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     fill_in "Title", with: "About the Studio"
     assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
-    assert_no_text "Changed elsewhere"
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_no_selector "#changed-elsewhere"
     assert_equal "About the Studio", @page.reload.title(locale: :en)
   end
   # Fix round 3: a card's queued follow-up save (`admin--autosave`'s
@@ -345,7 +346,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
 
     fill_in "Title", with: "About the Studio"
     assert_selector "#page-save-status", text: /\A(● )?SAVED( TO SITE)? \d{2}:\d{2}\z/, wait: 5
-    assert_no_text "Changed elsewhere"
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_no_selector "#changed-elsewhere"
   end
 
   private

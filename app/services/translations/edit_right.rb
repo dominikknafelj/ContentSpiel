@@ -1,7 +1,7 @@
 module Translations
   # The "edit right" of a translatable record (translation helpers spec
   # §3.4/§6.3): exactly the right an ordinary edit of that record, in its
-  # current state, would need -- so "Mark as up to date" (`Translations::
+  # current state, would need -- so "Still correct — mark up to date" (`Translations::
   # Confirm`) and, later, requesting an AI suggestion (`AI::Translate`) can
   # never do more than typing into the editor could:
   #

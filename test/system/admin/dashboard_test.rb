@@ -1,8 +1,8 @@
 require "application_system_test_case"
 
 # The dashboard is CS Studio's start page (dashboard spec §2-§4): sign-in
-# lands here, a quick draft shows up under "Your work" immediately, and
-# once it's scheduled it shows up under "On the site" at its go-live time
+# lands here, a quick draft shows up under "Your drafts" immediately, and
+# once it's scheduled it shows up under "Going live next" at its go-live time
 # -- rendered in the site's time zone, not UTC (spec §5), which is the
 # other half of this sub-project.
 class Admin::DashboardSystemTest < ApplicationSystemTestCase
@@ -26,7 +26,12 @@ class Admin::DashboardSystemTest < ApplicationSystemTestCase
     post.update!(published_at: Time.find_zone("Europe/Berlin").local(2030, 7, 1, 9, 30))
 
     visit admin_root_path
-    within("section[aria-labelledby=dashboard-going-live-next]") { assert_text "From the dashboard" }
+    within("section[aria-labelledby=dashboard-going-live-next]") do
+      assert_text "From the dashboard"
+      # 09:30 BERLIN time on 1 July -- the stored UTC instant is 07:30, so a
+      # row drawn in UTC would say 07:30 here (final review C, I5).
+      assert_selector "time[title='1 Jul 2030, 09:30']"
+    end
   end
 
   test "quick create makes a blog draft and opens its editor" do

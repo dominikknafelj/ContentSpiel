@@ -234,6 +234,6 @@ module Admin
       back.slice(*keys).select { |_, value| value.is_a?(String) }.symbolize_keys.merge(admin_url_options)
     end
 
-    def title_of(item) = item.title.presence || "Untitled"
+    def title_of(item) = item.title.presence || "(untitled)"
   end
 end

@@ -18,6 +18,26 @@ class Admin::DashboardScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "time"
   end
 
+  # Final review C, I5: the dashboard shows dates in the SITE time zone.
+  # 23:30 UTC on 30 June is already 1 July in Berlin; the tile, the phrase's
+  # calendar day and the tooltip must all say 1 July, 01:30.
+  test "a going-live row's tile, phrase and tooltip use the site time zone, not UTC" do
+    post = create_post(title: "Midnight", published: false)
+    post.update_columns(published_at: Time.utc(2030, 6, 30, 23, 30))
+
+    Time.use_zone("Europe/Berlin") do
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live)
+    end
+    assert_selector "span", text: /\AJul\z/i
+    assert_selector "span", text: "1"
+    assert_selector "time[title='1 Jul 2030, 01:30']"
+
+    Time.use_zone("UTC") do
+      render_inline Admin::DashboardScreen::RowComponent.new(record: post, variant: :going_live)
+    end
+    assert_selector "time[title='30 Jun 2030, 23:30']"
+  end
+
   test "a draft page row says Page" do
     page = create_page(title: "About", published: false)
 

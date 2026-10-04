@@ -5,7 +5,7 @@
     old switcher had. %>
 <% marks = ->(code) do %>
   <%# The `sr-only` sentence lives INSIDE the mark (no `aria-hidden` on it),
-      so when "Mark as up to date" streams the marker away by id the
+      so when "Still correct — mark up to date" streams the marker away by id the
       announcement goes with the dot. %>
   <% if missing?(code) %>
     <%= tag.span class: "size-[7px] shrink-0 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" } do %>

@@ -97,6 +97,30 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_equal 1, Media::Asset.count
   end
 
+  # Review C, M22: the toolbar route to editing a selected image. An inserted
+  # image is left node-selected, so Insert, Image then edits it instead of
+  # inserting another.
+  test "Insert, Image with an image selected edits that image through the toolbar" do
+    asset = create_media_asset
+    asset.update!(title: "Lake")
+    visit_post
+    editor.click
+    press_insert "Image"
+    within("dialog[open]") { click_on "Lake" }
+    within("dialog#rich-text-image-dialog[open]") { press "Insert image" }
+    refute_selector "dialog[open]"
+    saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" } }
+
+    press_insert "Image"
+    within("dialog#rich-text-image-dialog[open]") do
+      assert_selector "h2", text: "Edit image"
+      fill_in "Caption", with: "Via the toolbar"
+      press "Save"
+    end
+    document = saved_post_document { |doc| nodes(doc).any? { |node| node["type"] == "image" && node.dig("attrs", "caption") == "Via the toolbar" } }
+    assert_equal 1, nodes(document).count { |node| node["type"] == "image" }
+  end
+
   test "the image dialog shows the library text as placeholders, an empty one leaves the node without overrides, and Cancel inserts nothing" do
     asset = create_media_asset
     asset.update!(title: "Lake", alt: "A calm lake", caption: "Lake at dawn")

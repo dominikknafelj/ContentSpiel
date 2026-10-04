@@ -104,7 +104,7 @@ export default class extends Controller {
     const status = statusLabel(row)
     return {
       value: String(row.value ?? row.id),
-      label: row.label ?? row.title ?? "Untitled",
+      label: row.label ?? row.title ?? "(untitled)",
       hint: row.hint ?? status,
       chipHint: status,
       dot: row.dot ?? null

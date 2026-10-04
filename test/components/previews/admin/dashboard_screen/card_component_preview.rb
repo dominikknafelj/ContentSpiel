@@ -6,7 +6,7 @@ module Admin
       def with_rows
         render Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "preview-drafts", empty: "No drafts — start one above.",
           link: [ "#", "All drafts" ]) do |card|
-          [ "A half-written idea", "Notes from the road", "Untitled" ].each { |title| card.with_row { title } }
+          [ "A half-written idea", "Notes from the road", "(untitled)" ].each { |title| card.with_row { title } }
         end
       end
 

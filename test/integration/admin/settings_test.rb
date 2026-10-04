@@ -56,6 +56,10 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     @site.logo.attach(io: File.open(file_fixture("tiny.png")), filename: "tiny.png", content_type: "image/png")
     assert @site.logo.attached?
 
+    # In the design system's skin, not a native checkbox (review C, M10).
+    get "/cs-studio/settings"
+    assert_select "input.cs-checkbox[type=checkbox][name='site_setting[remove_logo]']"
+
     patch "/cs-studio/settings", params: { site_setting: { remove_logo: "1" }, base_updated_at: @site.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success

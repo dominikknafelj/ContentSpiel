@@ -50,7 +50,7 @@ module Admin
 
       def purge_dialog_id = "purge-#{type_key}-#{item.id}"
 
-      def title = item.title.presence || "Untitled"
+      def title = item.title.presence || "(untitled)"
 
       def image? = item.is_a?(Media::Asset)
 

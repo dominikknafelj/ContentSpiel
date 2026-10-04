@@ -3,7 +3,7 @@
     dialogs are siblings of it, so they sit outside this form. %>
 <%= render Admin::EditorScreen::HeaderComponent.new(record: post, locale: locale, url_options: url_options) do |header| %>
   <% header.with_suggest do %>
-    <%# Translate empty fields / Use all (translation helpers spec §6.4). %>
+    <%# Suggest translations for N empty fields / Use all (translation helpers spec §6.4). %>
     <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: post, locale: locale, editable: editable?) %>
   <% end %>
 <% end %>

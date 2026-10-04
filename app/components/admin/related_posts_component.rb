@@ -90,7 +90,7 @@ module Admin
       readable(Post.where(id: PostRelation.where(related_post_id: post.id).select(:post_id))).order(:id).to_a
     end
 
-    def title_for(record) = Locales.read(record, :title, locale: locale).presence || "Untitled"
+    def title_for(record) = Locales.read(record, :title, locale: locale).presence || "(untitled)"
 
     private
 

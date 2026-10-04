@@ -2,7 +2,7 @@ require "test_helper"
 
 # AI translation suggestions in the editor (translation helpers spec §6.4,
 # Task 8): the Translate buttons beside a translated field's original, the
-# header's "Translate empty fields", and `Admin::TranslationsController
+# header's "Suggest translations for N empty fields", and `Admin::TranslationsController
 # #suggest`, which answers with Turbo Streams putting a suggestion box (or
 # an inline error) under each field -- and never saves anything (Review
 # Focus 4). The provider is a stub registered as `test/stub`, never the
@@ -232,7 +232,7 @@ class Admin::TranslationSuggestionsTest < ActionDispatch::IntegrationTest
 
   # -- the buttons in the editors --
 
-  test "the post editor in German shows Translate beside each original, and Translate empty fields" do
+  test "the post editor in German shows Translate beside each original, and Suggest translations for N empty fields" do
     record = create_post(title: "Hello")
     record.assign_body(paragraph("Body"), locale: :en)
     record.save!

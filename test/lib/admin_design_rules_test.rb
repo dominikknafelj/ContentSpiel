@@ -70,10 +70,24 @@ class AdminDesignRulesTest < ActiveSupport::TestCase
     end
   end
 
-  test "translation chips and language tabs never use the danger colour" do
-    %w[app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb].each do |path|
+  # Every place a translation STATE is drawn: red is for destruction and
+  # failure, never for "missing" or "outdated" (final review C, M13).
+  test "translation chips, language tabs, tree markers, the matrix and the summary and dashboard cards never use the danger colour" do
+    %w[
+      app/components/admin/translation_chip_component.rb app/components/admin/language_tabs_component.html.erb
+      app/components/admin/tree_node_component.html.erb app/components/admin/tree_node_component.rb
+      app/components/admin/translation_screen/matrix_component.html.erb app/components/admin/translation_screen/matrix_component.rb
+      app/components/admin/translation_screen/summary_card_component.html.erb app/components/admin/translation_screen/summary_card_component.rb
+      app/components/admin/dashboard_screen/translation_card_component.html.erb app/components/admin/dashboard_screen/translation_card_component.rb
+    ].each do |path|
       assert_no_match(/danger/, Rails.root.join(path).read, path)
     end
+  end
+
+  # One placeholder for a record with no title, everywhere: "(untitled)".
+  test "a blank title reads (untitled), never Untitled" do
+    offenders = Dir[Rails.root.join("app/**/*.{rb,erb,js}")].select { |f| File.read(f).match?(/["']Untitled["']/) }
+    assert_empty offenders.map { |f| Pathname(f).relative_path_from(Rails.root).to_s }
   end
 
   test "the replaced components are gone" do

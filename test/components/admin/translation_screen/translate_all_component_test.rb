@@ -1,6 +1,6 @@
 require "test_helper"
 
-# "Translate empty fields" and "Use all" in an editor's header (translation
+# "Suggest translations for N empty fields" and "Use all" in an editor's header (translation
 # helpers spec §6.4): only in a non-default language, for a viewer who may
 # edit the record, with AI set up and `ai.translate`. The caps it splits
 # its requests by come from `AI::Translate`.

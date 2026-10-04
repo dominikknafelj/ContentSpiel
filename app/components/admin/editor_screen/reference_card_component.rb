@@ -12,7 +12,7 @@ module Admin
     # `:missing`, nil meaning an untracked field, read as current). Tests and
     # the translation screens find the original through the first. When the
     # card knows its `record` it also has a stable DOM id (`.dom_id`), which is
-    # what the "Mark as up to date" Turbo Stream replaces
+    # what the "Still correct — mark up to date" Turbo Stream replaces
     # (`Admin::TranslationConfirmationsController`).
     #
     # The body is a `<details open>`: when the pair stacks (narrower than

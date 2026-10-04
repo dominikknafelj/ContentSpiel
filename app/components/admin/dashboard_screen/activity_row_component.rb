@@ -30,7 +30,7 @@ module Admin
       def after = row.sentence_parts[2]
 
       def title
-        record.title.presence || "Untitled"
+        record.title.presence || "(untitled)"
       end
 
       # Pages and posts have a publish state; an image has none.

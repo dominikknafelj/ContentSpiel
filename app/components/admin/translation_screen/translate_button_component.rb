@@ -20,7 +20,7 @@ module Admin
     #
     # Everything the `admin--translate` controller needs to ask for this
     # field is on the wrapper as plain `data-translate-*` attributes rather
-    # than Stimulus values, because the header's "Translate empty fields"
+    # than Stimulus values, because the header's "Suggest translations for N empty fields"
     # (`TranslateAllComponent`, another instance of the same controller)
     # reads them off every field on the screen:
     # - `input-id` is the input **Use** fills -- for rich text the editor's
