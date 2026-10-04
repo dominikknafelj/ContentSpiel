@@ -111,7 +111,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
 
     visit admin_mind_graph_path
     await_admin_controllers
-    assert_selector "svg[data-admin--mind-graph-target=svg] circle", count: posts.size
+    assert_selector "svg[data-admin--mind-graph-target=svg] circle.mg-dot", count: posts.size
     assert_selector "svg[data-admin--mind-graph-target=svg] g.mg-tag rect", count: 1
     # The controller sets data-settled once the simulation has cooled down.
     assert_selector "svg[data-settled]", wait: 15
@@ -206,7 +206,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     assert_selector "svg[data-admin--mind-graph-target=svg] g[data-post-id]", count: 1
   end
 
-  test "a draft is drawn hollow, a live post filled, and nodes are keyboard links" do
+  test "a draft is drawn as a dashed ring, a live post filled, and nodes are keyboard links" do
     live = create_post(title: "Live one")
     draft = create_post(title: "Draft one")
     draft.update_column(:published_at, nil)
@@ -217,6 +217,15 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "svg[data-admin--mind-graph-target=svg] g.mg-node.mg-hollow[data-post-id='#{draft.id}']"
     assert_no_selector "svg[data-admin--mind-graph-target=svg] g.mg-node.mg-hollow[data-post-id='#{live.id}']"
+    # The cue is the outline's style, not a colour: dashed for the draft (with
+    # its type's hue as a core, the type being one of the first six), solid
+    # and filled for the live one.
+    dash = ->(post) { page.evaluate_script("getComputedStyle(document.querySelector(\"g[data-post-id='#{post.id}'] .mg-dot\")).strokeDasharray") }
+    assert_not_equal "none", dash.call(draft)
+    assert_equal "none", dash.call(live)
+    assert_selector "g[data-post-id='#{draft.id}'] circle.mg-core"
+    assert_no_selector "g[data-post-id='#{live.id}'] circle.mg-core"
+    assert_no_selector "svg[data-admin--mind-graph-target=svg] g.mg-tint"
     assert_selector "svg[data-admin--mind-graph-target=svg] g[data-post-id='#{live.id}'][role=link][tabindex='0']"
 
     page.execute_script("document.querySelector(\"svg[data-admin--mind-graph-target=svg] g[data-post-id='#{draft.id}']\").focus()")

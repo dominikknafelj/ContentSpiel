@@ -57,7 +57,9 @@ export default class extends Controller {
       ...tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" }))
     ]
     this.edges = edges
-    this.mode = "all"
+    // The radios may not be on "All": Back restores the page with the one that
+    // was chosen still checked, and the graph has to show what the control says.
+    this.mode = this.element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
 
     this.measure()
 
@@ -146,6 +148,8 @@ export default class extends Controller {
     this.visibleEdges = this.edges.filter(shows)
     this.visibleNodes = this.nodes.filter((node) => this.mode === "all" || connected.has(node.id))
     const visibleIds = new Set(this.visibleNodes.map((node) => node.id))
+    // For `tick`: asked once per node per tick, so a Set, not a list search.
+    this.visibleSet = new Set(this.visibleNodes)
 
     this.edges.forEach((edge, index) => this.edgeElements[index].classList.toggle("mg-hidden", !shows(edge)))
     this.nodes.forEach((node, index) => this.nodeElements[index].classList.toggle("mg-hidden", !visibleIds.has(node.id)))
@@ -202,7 +206,7 @@ export default class extends Controller {
       this.nodeElements[index].setAttribute("transform", `translate(${node.x}, ${node.y})`)
     })
     this.nodes.forEach((node, index) => {
-      if (this.visibleNodes.includes(node)) this.placeLabel(index, node)
+      if (this.visibleSet.has(node)) this.placeLabel(index, node)
     })
   }
 
@@ -217,7 +221,12 @@ export default class extends Controller {
 
     const crossesRight = node.x + LABEL_OFFSET + this.labelWidths[index] > this.width
     const onLeft = crossesRight && node.x > this.width / 2
-    label.setAttribute("x", onLeft ? -LABEL_OFFSET : LABEL_OFFSET)
+    // On the left its END is at `x`: a label longer than the room to the
+    // node's left would start outside the box, so its end is pushed right
+    // until its start is inside (over the node, if it must be: readable beats
+    // tidy).
+    const leftX = Math.max(-LABEL_OFFSET, 2 - node.x + this.labelWidths[index])
+    label.setAttribute("x", onLeft ? leftX : LABEL_OFFSET)
     label.setAttribute("text-anchor", onLeft ? "end" : "start")
   }
 
@@ -230,20 +239,29 @@ export default class extends Controller {
     return line
   }
 
-  // The `.mg-*` classes a post's mark needs. `colour_index` follows
-  // `Admin::ContentTypeDotComponent`: 1-6 are the six hues, 7-12 the same
-  // hues again, 13+ cycle -- here 7-12 are a pale tint (see the CSS for why
-  // not a ring). No index at all (a type that isn't registered any more) is
-  // the neutral `meta` hue. A post that isn't live is hollow.
+  // The `.mg-*` classes a post's mark needs (the CSS says what each draws).
+  // `colour_index` follows `Admin::ContentTypeDotComponent`: 1-6 are the six
+  // hues filled, 7-12 the same hues as a ring (`mg-ring`), 13+ cycle. No index
+  // at all (a type that isn't registered any more) is a ring in the neutral
+  // `meta` hue. A post that isn't live is `mg-hollow`: a dashed ring.
   postClasses(node) {
     const classes = ["mg-node"]
     if (node.colour_index != null) {
       const slot = (node.colour_index - 1) % 12
       classes.push(`mg-cat-${(slot % 6) + 1}`)
-      if (slot >= 6) classes.push("mg-tint")
+      if (slot >= 6) classes.push("mg-ring")
+    } else {
+      classes.push("mg-ring")
     }
     if (node.status !== "live") classes.push("mg-hollow")
     return classes.join(" ")
+  }
+
+  circle(className, radius) {
+    const circle = document.createElementNS(SVG_NS, "circle")
+    circle.setAttribute("class", className)
+    circle.setAttribute("r", radius)
+    return circle
   }
 
   buildNodeElement(node) {
@@ -275,9 +293,11 @@ export default class extends Controller {
           this.open(node.url)
         }
       })
-      const circle = document.createElementNS(SVG_NS, "circle")
-      circle.setAttribute("r", 8)
-      group.appendChild(circle)
+      // The focus ring outside, the dot, and -- only where it is drawn, so no
+      // element sits in the SVG without a box -- the core a dashed 1-6 ring
+      // keeps its hue in.
+      group.append(this.circle("mg-focus", 12), this.circle("mg-dot", 8))
+      if (group.classList.contains("mg-hollow") && !group.classList.contains("mg-ring")) group.append(this.circle("mg-core", 3))
     }
 
     // `textContent`, never markup -- a title is plain text whatever it
@@ -286,8 +306,10 @@ export default class extends Controller {
     // Counted and cut by character (code point), not by UTF-16 unit: slicing
     // the string itself can split an emoji or any other astral character in
     // two and leave half of it, a lone surrogate, at the end of the label.
+    // A tag's label carries its count: how many readable posts share it was
+    // only in the tooltip, which a touch screen and a keyboard never see.
     const title = String(node.title)
-    const characters = Array.from(title)
+    const characters = Array.from(node.kind === "tag" ? `${title} (${node.count})` : title)
     label.textContent = characters.length > MAX_LABEL_CHARACTERS ? `${characters.slice(0, MAX_LABEL_CHARACTERS - 1).join("")}\u2026` : characters.join("")
     label.setAttribute("x", 12)
     label.setAttribute("y", 4)
