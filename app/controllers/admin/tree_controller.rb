@@ -7,6 +7,12 @@ module Admin
   # (`Page::TreeRanking`), so nothing short of a real re-render is
   # trustworthy afterward. See `app/javascript/controllers/admin/
   # tree_controller.js` for the client side this answers.
+  #
+  # A move is a write to the moved page (`Pages::Move` saves it, so its
+  # `updated_at` moves), made from OUTSIDE that page's editor forms -- and the
+  # page settings form of that very page may be open next to the tree,
+  # holding the old `updated_at` as its autosave base. See
+  # `#page_base_streams` for how the answer keeps that form able to save.
   class TreeController < BaseController
     include AutosaveResponses
 
@@ -23,6 +29,8 @@ module Admin
       # Where the page stands *now*, read before the service runs: an Undo
       # is just this same move with these values (see `undo_toast`).
       before = placement(page)
+      # Before the write touches it -- see `#page_base_streams`.
+      updated_at_before_move = page.updated_at
       result = Pages::Move.call(page, parent: parent, position: params[:position])
 
       status = if result.ok? then :ok
@@ -31,7 +39,10 @@ module Admin
       end
       message = result.ok? ? nil : result.errors.to_sentence
       streams = tree_stream(selected: page, message: message)
-      streams.concat(Array(move_toast(page, before))) if result.ok?
+      if result.ok?
+        streams.concat(Array(move_toast(page, before)))
+        streams.concat(page_base_streams(page, updated_at_before_move))
+      end
       render turbo_stream: streams, status: status
     rescue ActiveRecord::RecordNotFound
       # The dragged page or its drop target was deleted elsewhere (another
@@ -75,6 +86,44 @@ module Admin
         label: "Undo", method: :patch,
         url: admin_tree_path(page_id: page.id, parent_id: parent_id, position: position, undo: 1, **admin_url_options)
       })
+    end
+
+    # The page settings form's new base, when the form that is open is the
+    # MOVED page's and was current (final fix wave 1, reviews A I1 / B I1).
+    #
+    # Since a stale autosave base is refused (`Admin::AutosaveResponses
+    # #refuse_stale_autosave`), a move of the page one has open -- which is
+    # what the New page dialog tells an editor to do ("Drag it in the tree to
+    # move it") -- locked that page's own form: its next save was a final
+    # 409, "Changed elsewhere" against the editor's own move, the typed text
+    # not saved. So this answers the way a block write does (`Admin::
+    # ContentBlocksController#page_base_streams`): `admin--tree` sends the
+    # open form's base as `X-Page-Base-Updated-At`, through the same queue as
+    # every other write on the screen, and the form's base is moved forward
+    # to the page's new `updated_at`.
+    #
+    # Only when the sent base EQUALS the moved page's `updated_at` as loaded
+    # for this request. That one test says both things that have to hold:
+    # - the open form is this page's. The client only sends the header when
+    #   it is, but the tree lists every page, and handing a form another
+    #   page's (newer) `updated_at` as its base would let a stale form pass
+    #   the staleness check and overwrite someone else's save. Hence `==`
+    #   here, where the blocks controller -- whose requests can only be about
+    #   their own page -- has `>=`;
+    # - nobody saved the page since the form loaded it. If someone did, the
+    #   base is left alone and the form's next save is still, rightly,
+    #   refused.
+    # No header (the moved page is not the open one, or an older client) or
+    # an unparseable one: nothing to vouch for.
+    def page_base_streams(page, updated_at_before_move)
+      sent = request.headers["X-Page-Base-Updated-At"]
+      return [] unless sent.present? && Time.iso8601(sent) == updated_at_before_move
+
+      id = "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      [ turbo_stream.replace(id, partial: "admin/shared/base_updated_at_field",
+        locals: { id: id, value: Page.where(id: page.id).pick(:updated_at).iso8601(6) }) ]
+    rescue ArgumentError
+      []
     end
 
     def tree_stream(selected:, message: nil)
