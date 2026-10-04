@@ -37,7 +37,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
   def row_id(type, record) = "translation-item-#{type}-#{record.id}"
 
   def sidebar_labels
-    css_select("nav[aria-label='Modules'] > ul a").map { |link| link.text.strip }
+    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge])").text.strip }
   end
 
   test "lists missing and outdated pages, posts and images for one language, grouped, linking to the editor there" do

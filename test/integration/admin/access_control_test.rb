@@ -36,9 +36,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
       # both hold, and `reader` (Read only) doesn't. Trash (trash spec §6)
       # opens for any one of the rights that act on a trashed item, so
       # `author`'s `media.upload` is enough -- its own trashed images.
-      users(:two) => [ "Dashboard", "Pages", "Posts", "Tags", "Media", "Translations", "Trash", "Settings", "Users", "Groups", "AI assistant", "Mind graph", "System status", "Audit log" ],
-      users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Trash", "AI assistant", "Mind graph" ],
-      users(:reader) => [ "Dashboard", "Pages", "Posts", "Translations", "AI assistant", "Mind graph" ]
+      users(:two) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Tags", "Mind graph", "Trash", "Users", "Groups", "Settings", "AI assistant", "System status", "Audit log" ],
+      users(:author) => [ "Dashboard", "Pages", "Posts", "Media", "Translations", "Mind graph", "Trash", "AI assistant" ],
+      users(:reader) => [ "Dashboard", "Pages", "Posts", "Translations", "Mind graph", "AI assistant" ]
     }
 
     expectations.each do |user, labels|
@@ -621,7 +621,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
   end
 
   def sidebar_labels
-    css_select("nav[aria-label='Modules'] > ul a").map { |link| link.text.strip }
+    css_select("nav[aria-label='Modules'] section a").map { |link| link.at_css("span:not([data-badge])").text.strip }
   end
 
   # Every SQL statement the block issues, answered from the query cache or

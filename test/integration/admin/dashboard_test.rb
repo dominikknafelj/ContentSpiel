@@ -164,4 +164,14 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     end
     assert_equal counts.first, counts.last
   end
+
+  test "a user with no groups sees only the open modules, no empty group headings, and No groups" do
+    user = User.create!(email_address: "nobody@example.com", password: "a long enough password")
+    sign_in_as user
+    get admin_root_path
+    assert_response :success
+    assert_select "nav[aria-label='Modules'] h2", count: 2 # Content (Dashboard) and System (AI assistant)
+    assert_select "nav[aria-label='Modules'] h2", text: "People", count: 0
+    assert_select ".admin-account", text: /No groups/
+  end
 end

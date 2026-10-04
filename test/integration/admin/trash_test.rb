@@ -189,10 +189,10 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
   test "the sidebar shows Trash to holders of any delete right, not to a reader" do
     sign_in_as users(:reader)
     get admin_root_path
-    assert_select "nav[aria-label='Modules'] a", text: "Trash", count: 0
+    assert_select "nav[aria-label='Modules'] a", text: /\ATrash/, count: 0
     sign_in_as users(:two)
     get admin_root_path
-    assert_select "nav[aria-label='Modules'] a", text: "Trash"
+    assert_select "nav[aria-label='Modules'] a", text: /\ATrash/
   end
 
   test "a trashed id outside the trash, or of the wrong type, 404s" do
@@ -202,5 +202,34 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_response :not_found
     post admin_restore_trash_item_path("page", @post)
     assert_response :not_found
+  end
+
+  # The sidebar's Trash badge (design pass spec §4): the same delete-right
+  # scopes the screen lists with, so each viewer's number is what they'd
+  # see on the Trash screen itself -- an owner counts the page branch (one
+  # root, not its members), the post and the image; an author holding only
+  # `media.upload` counts just the images they uploaded.
+  test "the sidebar's Trash badge counts what this viewer could act on" do
+    mine = create_media_asset
+    mine.update!(created_by_id: users(:author).id)
+    Current.set(actor: users(:one)) { Trash::Move.call(mine) }
+
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "4"
+
+    sign_in_as users(:author)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}'] [data-badge]", text: "1"
+    get admin_trash_path
+    assert_select "[id^=trash-]", count: 1
+  end
+
+  test "an empty trash shows no badge" do
+    Current.set(actor: users(:one)) { Trash::Empty.call }
+    sign_in_as users(:one)
+    get admin_root_path
+    assert_select "nav[aria-label='Modules'] a[href='#{admin_trash_path}']"
+    assert_select "nav[aria-label='Modules'] [data-badge]", count: 0
   end
 end
