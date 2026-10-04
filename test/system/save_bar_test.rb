@@ -149,6 +149,9 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # replayed here by hand, with the change already typed: the visit that
   # follows the frame's render is let through, once -- the same visit again is
   # a way out like any other.
+  # Being replayed, it would still pass if Turbo stopped sending these two
+  # events in this order: on a Turbo upgrade, check that by hand as well
+  # (`FrameController#proposeVisitIfNavigatedWithAction`).
   test "the visit a frame navigation is promoted to is let through, once" do
     sign_in_via_form(@owner)
     open_edit_from_the_list
@@ -268,45 +271,81 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # Turbo takes such a link for a frame navigation (it compares the absolute
   # `href`), so the guard asked "Leave without saving?", and Discard fetched
   # the form again without the typed values or the errors. It is a jump within
-  # the page: nobody asks, nothing is fetched, and Back from it stays put.
-  test "an error summary's link jumps to its field without asking, and Back from it stays on the form" do
+  # the page: nobody asks, nothing is fetched -- and no history entry is made.
+  # (Left to the browser, the jump added a `#field` entry Turbo knew nothing
+  # of; Back to it after a successful save showed the users LIST under the
+  # form's URL.)
+  test "an error summary's link moves focus to its field without asking and without a history entry" do
     sign_in_via_form(@owner)
-    visit new_admin_user_path
+    visit admin_users_path
     await_admin_controllers
+    page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
+    click_link "+ New user"
+    assert_current_path new_admin_user_path
+    assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
+    await_admin_controllers
+
     fill_in "Email address", with: @target.email_address
     fill_in "Password", with: "a much Longer passw0rd"
     fill_in "Confirm password", with: "a much Longer passw0rd"
     press "Create user"
     assert_selector ".admin-error-summary a[href='#user_email_address']", wait: 10
     await_admin_controllers
-    page.execute_script("document.getElementById('user-form').dataset.sameForm = 'yes'; document.addEventListener('turbo:visit', () => { window.restorationStarted = true })")
+    entries = page.evaluate_script("history.length")
+    page.execute_script("document.getElementById('user-form').dataset.sameForm = 'yes'")
 
     find(".admin-error-summary a[href='#user_email_address']").click
-    assert_eventually(message: "the link never jumped") { page.evaluate_script("location.hash") == "#user_email_address" }
+    assert_eventually(message: "focus never reached the field") { page.evaluate_script("document.activeElement.id") == "user_email_address" }
+    assert_equal "", page.evaluate_script("location.hash")
+    assert_equal entries, page.evaluate_script("history.length")
     assert_no_selector "dialog#leave-dialog[open]"
     assert_selector "#user-form[data-same-form=yes]"
     assert_selector ".admin-error-summary"
     assert_equal @target.email_address, find_field("Email address").value
-    assert_equal "user_email_address", page.evaluate_script("document.activeElement.id")
 
+    # Saved after all, then Back: the form's URL shows the form.
+    fill_in "Email address", with: "someone.new@example.com"
+    fill_in "Password", with: "a much Longer passw0rd"
+    fill_in "Confirm password", with: "a much Longer passw0rd"
+    press "Create user"
+    assert_current_path admin_users_path
+    assert_text "someone.new@example.com"
+    sleep 0.5
     page.execute_script("history.back()")
-    assert_eventually(message: "Back never left the fragment") { page.evaluate_script("location.hash") == "" }
-    sleep 0.5
     assert_current_path new_admin_user_path
-    assert_no_selector "dialog#leave-dialog[open]"
-    assert_nil page.evaluate_script("window.restorationStarted")
-    assert_selector "#user-form[data-same-form=yes]"
-    assert_selector ".admin-error-summary"
-    assert_equal @target.email_address, find_field("Email address").value
+    assert_equal "", page.evaluate_script("location.hash")
+    assert_field "Email address"
+    assert_selector ".admin-save-bar button[type=submit]", text: "Create user"
+  end
 
-    # And Forward to it again: an entry the browser made, not Turbo.
-    page.execute_script("history.forward()")
-    assert_eventually(message: "Forward never reached the fragment") { page.evaluate_script("location.hash") == "#user_email_address" }
-    sleep 0.5
+  # The same on a form with nothing unsaved: focus moves, the history doesn't,
+  # so a change typed afterwards and Back ask about leaving for the PREVIOUS
+  # screen, one step away as ever. A target that can't take focus is made able
+  # to (`tabindex="-1"`, as a skip link's target is).
+  test "a fragment link on a clean form adds no history entry, and Back still leaves for the previous screen" do
+    sign_in_via_form(@owner)
+    open_edit_from_the_list
+    page.execute_script(<<~JS)
+      document.getElementById("user-form").insertAdjacentHTML("beforebegin",
+        '<a id="jump-field" href="#user_email_address">To the email</a> <a id="jump-text" href="#user_name_help">To the help</a>')
+    JS
+    entries = page.evaluate_script("history.length")
+
+    find("#jump-text").click
+    assert_eventually(message: "focus never reached the paragraph") { page.evaluate_script("document.activeElement.id") == "user_name_help" }
+    find("#jump-field").click
+    assert_eventually(message: "focus never reached the field") { page.evaluate_script("document.activeElement.id") == "user_email_address" }
+    assert_equal "", page.evaluate_script("location.hash")
+    assert_equal entries, page.evaluate_script("history.length")
     assert_no_selector "dialog#leave-dialog[open]"
-    assert_nil page.evaluate_script("window.restorationStarted")
-    assert_selector "#user-form[data-same-form=yes]"
-    assert_equal @target.email_address, find_field("Email address").value
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+
+    fill_in "Name", with: "Typed after the jump"
+    page.execute_script("history.back()")
+    assert_selector "dialog#leave-dialog[open]"
+    within("dialog#leave-dialog") { press "Discard changes" }
+    assert_current_path admin_users_path
+    assert_no_field "Name"
   end
 
   test "Back with nothing typed just goes back" do

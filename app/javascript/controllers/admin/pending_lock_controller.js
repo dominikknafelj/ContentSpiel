@@ -33,9 +33,13 @@ import { Controller } from "@hotwired/stimulus"
 // never locked: disabled, it drops out of what that form submits, the footer
 // counts that as a change, and the lock it caused would keep itself locked
 // for good. (An unnamed button inside that form -- a dialog's trigger -- is
-// no part of what it submits, and is locked like any other.)
+// no part of what it submits, and is locked like any other.) That includes a
+// named `type="button"`, which looks like an action but is in the form's
+// `elements` like a field: it is skipped too, with a warning in the console
+// naming it.
 const HINT = "Save or cancel your changes first."
 const MARK = "data-pending-locked"
+const warned = new WeakSet()
 
 export default class extends Controller {
   static targets = ["control", "hint"]
@@ -77,7 +81,16 @@ export default class extends Controller {
 
   lock(control) {
     if (control.hasAttribute(MARK)) return
-    if (control.form?.matches("[data-controller~='admin--save-bar']") && control.name) return
+    if (control.form?.matches("[data-controller~='admin--save-bar']") && control.name) {
+      // Said once per element, so whoever marked it up notices: the lock has
+      // silently done nothing for it. (In every environment -- the page has
+      // no way to tell which it is in -- and to the console only.)
+      if (!warned.has(control)) {
+        warned.add(control)
+        console.warn("admin--pending-lock: not locking a named control of the explicit-save form (it would count as a change); give the action its own form or drop the name", control)
+      }
+      return
+    }
     if (control instanceof HTMLAnchorElement) {
       if (control.getAttribute("aria-disabled") === "true") return
       control.setAttribute("aria-disabled", "true")

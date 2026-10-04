@@ -57,6 +57,10 @@ import { Controller } from "@hotwired/stimulus"
 //    The footer's Cancel (`data-save-bar-cancel`) is such a link and the one
 //    that never asks: discarding is what it is for.
 //    Discard clicks the link again, so Turbo does exactly what it would have.
+//    A `#field` link to the page itself (the error summary's) is no way out
+//    and is never asked about; while one of these forms is on the screen it
+//    is neither a frame navigation nor a history entry -- the focus is moved
+//    by hand (`onFrameLink`, `jumpTo`).
 //    NOT covered: a GET *form* submitted into `#content`, and a script setting
 //    the frame's `src`. No explicit-save screen has either.
 //
@@ -167,17 +171,32 @@ function navigatesContentFrame(link) {
 }
 
 // A `#field` link to the page that is showing (the error summary's links,
-// `Admin::ErrorSummaryComponent`). Turbo skips a link whose `href` begins
-// with "#" -- but tests the absolute `link.href`, which never does
-// (`findLinkFromClickTarget`), so it takes these for navigations too.
-function withinThePage(url) {
+// `Admin::ErrorSummaryComponent`): the element it names, or null. Turbo skips
+// a link whose `href` begins with "#" -- but tests the absolute `link.href`,
+// which never does (`findLinkFromClickTarget`), so it takes these for
+// navigations too.
+function targetWithinThePage(url) {
   try {
     const target = new URL(url, document.baseURI)
-    return target.hash.length > 1 && target.origin === location.origin &&
-      target.pathname === location.pathname && target.search === location.search
+    if (target.hash.length < 2 || target.origin !== location.origin ||
+        target.pathname !== location.pathname || target.search !== location.search) return null
+    return { element: document.getElementById(decodeURIComponent(target.hash.slice(1))) }
   } catch {
-    return false
+    return null
   }
+}
+
+// What following the fragment would have done, without the history entry: the
+// focus on the element (one that can't take it is made able to, as a skip
+// link's target is) and the element in view. `scrollIntoView` with no
+// `behavior` jumps unless the page's CSS asks for smooth scrolling, so it is
+// named: no animation for a reader who asked for reduced motion.
+function jumpTo(element) {
+  if (!element) return
+  if (element.tabIndex < 0 && !element.hasAttribute("tabindex")) element.setAttribute("tabindex", "-1")
+  element.focus({ preventScroll: true })
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  element.scrollIntoView({ block: "center", behavior: still ? "instant" : "auto" })
 }
 
 function onFrameLink(event) {
@@ -187,15 +206,24 @@ function onFrameLink(event) {
   // A jump within the page leaves nothing, so nobody asks -- but left to
   // Turbo it is a frame navigation that fetches this screen again, without
   // the typed values and without the errors the link belongs to (the summary
-  // only exists after a refused save, when the form is unsaved). Turbo is
-  // kept out of it (cancelling `turbo:click` makes the session stand back,
-  // stopping it here keeps it from the frames) and the click itself is NOT
-  // cancelled: the browser follows the fragment on its own, scrolling to the
-  // field and giving it the focus. Whether or not a form is unsaved: the
-  // fetch was never wanted.
-  if (withinThePage(event.detail.url) && navigatesContentFrame(link)) {
+  // only exists after a refused save, when the form is unsaved). And left to
+  // the BROWSER it adds a history entry (`…/new#user_email_address`) that
+  // Turbo didn't write and never adopts: after the save went through, Back to
+  // that entry found no form unsaved, so Turbo took it over without rendering
+  // -- the users list on screen under the form's URL, its snapshot cached
+  // under that URL, Turbo's index one off from then on.
+  // So neither gets it. Turbo is kept out (cancelling `turbo:click` makes the
+  // session stand back, stopping it here keeps it from the frames), the click
+  // itself is cancelled, and the jump is made by hand (`jumpTo`): no
+  // `location.hash`, no history entry. Whether or not a form is unsaved --
+  // neither the fetch nor the entry was ever wanted on a screen whose Back
+  // has to mean "the previous screen".
+  const within = targetWithinThePage(event.detail.url)
+  if (within && navigatesContentFrame(link)) {
     event.preventDefault()
     event.stopPropagation()
+    event.detail.originalEvent?.preventDefault()
+    jumpTo(within.element)
     return
   }
 
@@ -226,30 +254,14 @@ function onPopState(event) {
   }
   if (!mustAsk()) return
 
-  // THE SAME PAGE. Two traversals arrive on the page the form is on, and
-  // neither leaves anything, so neither asks -- and Turbo must not hear of
-  // either, because it answers every `popstate` with a restoration visit
-  // (or, for an entry it didn't write, by adopting it), and a restoration of
-  // this page fetches the form again over the typed text:
-  // - to the very entry Turbo is on (`to === from`). That is Back from a
-  //   `#field` entry -- the browser made that entry itself when an error
-  //   summary's link was followed (`onFrameLink`), so Turbo's history never
-  //   moved -- and it is the guard's own undo arriving after
-  //   `RETURN_LIMIT_MS`, no longer expected;
-  // - to an entry Turbo didn't write (no index in its state) that differs
-  //   from where Turbo is by its hash alone: Forward to that `#field` entry.
-  //   Where Turbo is, is `Turbo.session.history.location` (another internal;
-  //   without it this simply doesn't match and the event goes to Turbo, as
-  //   any entry it didn't write does).
-  // An entry Turbo DID write is never taken for the same page by its URL:
-  // the same screen can be in the history twice, and a traversal between the
-  // two is a real one.
+  // THE ENTRY THE FORM IS ON (`to === from`): the guard's own undo, arriving
+  // after `RETURN_LIMIT_MS` and so no longer expected. Nothing is being left,
+  // so nobody asks -- and Turbo must not hear of it, because it answers every
+  // `popstate` with a restoration visit, and a restoration of this page
+  // fetches the form again over the typed text.
   const to = event.state?.turbo?.restorationIndex
   const from = window.Turbo?.session?.history?.currentIndex
-  const withoutHash = (url) => { try { const u = new URL(url); u.hash = ""; return u.href } catch { return null } }
-  const turboLocation = window.Turbo?.session?.history?.location
-  const fragmentOfThisPage = !Number.isInteger(to) && Boolean(turboLocation) && withoutHash(turboLocation) === withoutHash(location.href)
-  if (fragmentOfThisPage || (Number.isInteger(to) && to === from)) {
+  if (Number.isInteger(to) && to === from) {
     event.stopImmediatePropagation()
     return
   }
