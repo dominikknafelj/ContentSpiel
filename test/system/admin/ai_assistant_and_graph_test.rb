@@ -76,6 +76,39 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
     assert_current_path admin_post_path(b)
   end
 
+  # Design pass round 1 (Task 17): the graph used to fill the whole content
+  # column and fling nodes past its edge.
+  test "the mind graph keeps to its box and every node stays inside it" do
+    posts = %w[Alpha Beta Gamma Delta Epsilon Zeta].map { |title| create_post(title: title) }
+    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    PostRelation.create!(post: posts.first, related_post: posts.last)
+
+    visit admin_mind_graph_path
+    await_admin_controllers
+    assert_selector "svg[data-admin--mind-graph-target=svg] circle", count: posts.size
+    # The controller sets data-settled once the simulation has cooled down.
+    assert_selector "svg[data-settled]", wait: 15
+
+    inside_box = <<~JS
+      (() => {
+        const svg = document.querySelector("svg[data-admin--mind-graph-target=svg]")
+        const box = svg.getBoundingClientRect()
+        const outside = Array.from(svg.querySelectorAll("circle")).filter((c) => {
+          const r = c.getBoundingClientRect()
+          return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1
+        }).length
+        return { width: box.width, outside }
+      })()
+    JS
+    result = page.evaluate_script(inside_box)
+    assert_operator result["width"], :<=, 960
+    assert_equal 0, result["outside"]
+
+    # Shrinking the window moves the box; the nodes must follow it in.
+    page.current_window.resize_to(700, 800)
+    wait_until(timeout: 10) { page.evaluate_script(inside_box)["outside"].zero? }
+  end
+
   # Fix round 1 (I1): Turbo snapshots the graph before `disconnect()`
   # clears it, so Back used to restore the old nodes and draw a second
   # live set on top.

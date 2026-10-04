@@ -1,5 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
-import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation } from "d3-force"
+import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY } from "d3-force"
 
 // CS Studio's mind graph (`admin/mind_graph/show`, design spec §6.1):
 // d3-force computes node positions, this controller turns them into SVG and
@@ -20,6 +20,10 @@ const FALLBACK_NODE_COLOR = "#9ca3af"
 // apart after the fact.
 const CLICK_DRAG_THRESHOLD = 5
 
+// Minimum distance between a node's centre and the SVG's edge: the circle's
+// radius (8) plus some air, so no node is ever cut off by the box.
+const EDGE_PADDING = 16
+
 export default class extends Controller {
   static targets = ["data", "svg"]
 
@@ -35,7 +39,7 @@ export default class extends Controller {
     this.nodes = nodes
     this.edges = edges
 
-    const { width, height } = this.svgTarget.getBoundingClientRect()
+    this.measure()
 
     this.edgeElements = this.edges.map(() => this.buildEdgeElement())
     this.nodeElements = this.nodes.map((node) => this.buildNodeElement(node))
@@ -43,17 +47,84 @@ export default class extends Controller {
     this.simulation = forceSimulation(this.nodes)
       .force("charge", forceManyBody().strength(-250))
       .force("link", forceLink(this.edges).id((node) => node.id).distance(90))
-      .force("center", forceCenter(width / 2, height / 2))
+      .force("center", forceCenter(this.width / 2, this.height / 2))
+      // A gentle pull towards the middle on each axis, so repulsion pushes
+      // nodes towards the edges less often than it would with forceCenter
+      // alone (which only moves the *mean* position).
+      .force("x", forceX(this.width / 2).strength(0.04))
+      .force("y", forceY(this.height / 2).strength(0.04))
       .force("collide", forceCollide(36))
       .on("tick", () => this.tick())
+      // `end` fires once alpha drops below alphaMin, i.e. the layout has
+      // cooled down. Exposed as a DOM attribute so tests can wait on it.
+      .on("end", () => this.svgTarget.setAttribute("data-settled", ""))
+
+    // The box is `w-full` of a shell column, so it changes with the window.
+    // The observer also fires once on observe(); that first call finds the
+    // size unchanged and does nothing.
+    this.resizeObserver = new ResizeObserver(() => this.resize())
+    this.resizeObserver.observe(this.svgTarget)
   }
 
   disconnect() {
+    this.resizeObserver?.disconnect()
     this.simulation?.stop()
     this.svgTarget.replaceChildren()
   }
 
+  measure() {
+    const { width, height } = this.svgTarget.getBoundingClientRect()
+    this.width = width
+    this.height = height
+  }
+
+  // The box changed size: re-centre the forces on the new middle, pull any
+  // node that is now outside back in, and reheat so the layout resettles.
+  resize() {
+    const { width, height } = this.svgTarget.getBoundingClientRect()
+    if (width === this.width && height === this.height) return
+
+    this.width = width
+    this.height = height
+    this.simulation
+      .force("center", forceCenter(width / 2, height / 2))
+      .force("x", forceX(width / 2).strength(0.04))
+      .force("y", forceY(height / 2).strength(0.04))
+    this.clampNodes()
+    this.reheat(0.3)
+  }
+
+  reheat(alpha) {
+    this.svgTarget.removeAttribute("data-settled")
+    this.simulation.alpha(alpha).restart()
+  }
+
+  clampX(x) {
+    return Math.max(EDGE_PADDING, Math.min(this.width - EDGE_PADDING, x))
+  }
+
+  clampY(y) {
+    return Math.max(EDGE_PADDING, Math.min(this.height - EDGE_PADDING, y))
+  }
+
+  clampNodes() {
+    for (const node of this.nodes) {
+      node.x = this.clampX(node.x)
+      node.y = this.clampY(node.y)
+      // A pinned (being dragged) node's fx/fy would put it back outside on
+      // the next tick.
+      if (node.fx != null) node.fx = this.clampX(node.fx)
+      if (node.fy != null) node.fy = this.clampY(node.fy)
+    }
+  }
+
   tick() {
+    // Keep every node inside the box (design pass round 1): forceCenter
+    // only centres the *mean* position, so a strongly repelled or dragged
+    // node could drift, or be flung, past the edge -- and the box used to
+    // fill the whole content column, so "past the edge" was off-screen.
+    this.clampNodes()
+
     this.edges.forEach((edge, index) => {
       const line = this.edgeElements[index]
       line.setAttribute("x1", edge.source.x)
@@ -114,13 +185,16 @@ export default class extends Controller {
       let totalMovement = 0
       node.fx = node.x
       node.fy = node.y
+      this.svgTarget.removeAttribute("data-settled")
       this.simulation.alphaTarget(0.3).restart()
 
       const onMove = (moveEvent) => {
         totalMovement += Math.abs(moveEvent.movementX) + Math.abs(moveEvent.movementY)
         const point = this.toSvgPoint(moveEvent.clientX, moveEvent.clientY)
-        node.fx = point.x
-        node.fy = point.y
+        // Clamped too: a node held at the pointer outside the box would
+        // otherwise be drawn outside it for as long as the drag lasts.
+        node.fx = this.clampX(point.x)
+        node.fy = this.clampY(point.y)
       }
 
       const onUp = () => {
