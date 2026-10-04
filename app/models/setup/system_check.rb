@@ -26,7 +26,17 @@ module Setup
     # user (a password reset after a compromise must not leave the other party
     # signed in). From `bin/rails runner` there is no actor or channel, which
     # the checker trusts like the console, and no acting session to keep. `p`
-    # prints `true`/`false` so a refusal isn't silent.
+    # prints `true`/`false` so a refusal isn't silent -- and
+    # `MAIL_FALLBACK_MESSAGE`, shown above the command, says what each means.
+    #
+    # The password is typed twice (the service takes a confirmation), inside
+    # double quotes inside the shell's single quotes: a new password
+    # containing either kind of quote would end the string early. Rather than
+    # a more elaborate command, the message says so; everything stays one
+    # fixed string.
+    MAIL_FALLBACK_MESSAGE = "Password reset by email isn't configured. To set a password from the server instead, run this command with the account's email address, " \
+      "replacing “a new password” in both places with the new one (at least #{User::MINIMUM_PASSWORD_LENGTH} characters, with no quotes in it). " \
+      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
     MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
 
     # Talks to the storage service directly rather than through
@@ -110,7 +120,7 @@ module Setup
         if configured
           ok("Outgoing mail", "Outgoing mail is configured.")
         else
-          warning("Outgoing mail", "Password reset by email isn't configured.", command: MAIL_FALLBACK_COMMAND)
+          warning("Outgoing mail", MAIL_FALLBACK_MESSAGE, command: MAIL_FALLBACK_COMMAND)
         end
       end
 

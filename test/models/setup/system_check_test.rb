@@ -48,7 +48,13 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     check = result("Outgoing mail", run_check(mail_host: "example.com"))
 
     assert_equal :warning, check.status
-    assert_equal "Password reset by email isn't configured.", check.message
+    # The message is the command's instructions (final fix wave): what to
+    # replace, the one thing a pasted password must not contain, and what the
+    # printed `true`/`false` mean -- a bare "false" told nobody anything.
+    assert_equal Setup::SystemCheck::MAIL_FALLBACK_MESSAGE, check.message
+    assert_equal "Password reset by email isn't configured. To set a password from the server instead, run this command with the account's email address, " \
+      "replacing “a new password” in both places with the new one (at least 12 characters, with no quotes in it). " \
+      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).", check.message
     # Static text with a placeholder address and password: it is shown to
     # anyone who may view the status page, so it never carries a real value.
     assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
@@ -73,6 +79,28 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
 
     assert user.reload.authenticate("a brand new pass 1")
     assert_equal 0, user.sessions.count
+  end
+
+  # What the message promises about the command, proved on the command itself.
+  test "the mail fallback command prints false, changes nothing and ends no session when the password is refused" do
+    user = users(:reader)
+    user.sessions.create!
+    digest = user.password_digest
+    ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1].sub("you@example.com", user.email_address)
+
+    # Too short (the rule the message names).
+    output, = capture_io { assert_equal false, eval(ruby.gsub("a new password", "short")) }
+    assert_equal "false\n", output
+    # Replaced in one place only: the two don't match.
+    output, = capture_io { assert_equal false, eval(ruby.sub("a new password", "a brand new pass 1")) }
+    assert_equal "false\n", output
+
+    assert_equal digest, user.reload.password_digest
+    assert_equal 1, user.sessions.count
+    # The placeholder appears exactly twice, and the constant has no value of anyone's.
+    assert_equal 2, Setup::SystemCheck::MAIL_FALLBACK_COMMAND.scan("a new password").size
+    assert Setup::SystemCheck::MAIL_FALLBACK_COMMAND.frozen?
+    assert Setup::SystemCheck::MAIL_FALLBACK_MESSAGE.frozen?
   end
 
   test "a Result built without a command or docs link has neither" do
