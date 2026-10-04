@@ -104,7 +104,9 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   end
 
   test "create starter pages refreshes the tree" do
-    create_page(title: "Existing") # a root page, but no starter sections yet
+    # Starter pages are offered only while Home is the only kept page (design
+    # pass bug 4), so this starts from a site with nothing but Home.
+    root_page
 
     visit admin_pages_path
     await_admin_controllers
