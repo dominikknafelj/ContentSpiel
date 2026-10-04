@@ -1,0 +1,18 @@
+<%= tag.div class: "admin-reference-card min-w-0 rounded-cs border border-line bg-paper p-3",
+      data: { original_for: field, translation_state: state } do %>
+  <details open>
+    <summary class="<%= setup_label_class %> cursor-pointer"><%= language_name %></summary>
+
+    <div class="mt-1">
+      <% if rich? %>
+        <div class="admin-rich-text-content text-ink"><%= original_html %></div>
+      <% else %>
+        <p class="whitespace-pre-line text-ink"><%= original %></p>
+      <% end %>
+    </div>
+
+    <%= header_note %>
+    <% if (note = default_note) %><%= render note %><% end %>
+    <%= actions %>
+  </details>
+<% end %>
