@@ -1,18 +1,25 @@
 module Admin
   module TrashScreen
-    # One trashed item on the Trash screen (trash spec §7): its title (a
-    # thumbnail for an image), type, who trashed it and when, how long until
-    # the retention job (`Trash::PurgeExpiredJob`) deletes it, and its two
-    # actions -- Restore and Delete permanently.
+    # One trashed item on the Trash screen (trash spec §7, handoff §4.9): its
+    # title (a thumbnail for an image) and, for a page, what comes back with
+    # it ("Includes 2 subpages: A, B"); its type; "<who> · <time ago>"; the
+    # retention tag (`RetentionTagComponent`); and its two actions -- Restore
+    # and "Delete now…".
     #
     # Restore is a one-click POST, except for a page that can't go back where
-    # it was (`.needs_parent?`): then it's a small form with a `<select
-    # name="parent_id">` of `parent_choices`, since `Trash::Restore` would
-    # only refuse the one-click version. Delete permanently always confirms
-    # (`Admin::ConfirmDialogComponent`, never a browser dialog); an image
-    # something still uses -- necessarily something in the trash, or it
-    # couldn't have been trashed -- gets a disabled button instead, the
-    # same refusal `Trash::Purge` would give, said up front.
+    # it was (`.needs_parent?`: a branch member whose root is gone, or a page
+    # whose parent is trashed): then it is a small inline form, "Restore
+    # under" a `<select name="parent_id">` of `parent_choices` and a Restore
+    # button, since `Trash::Restore` would only refuse the one-click version.
+    # "Delete now…" always confirms in its own `Admin::ConfirmDialogComponent`
+    # (one per row, 50 at most per page -- a small `<dialog>` each, rather than
+    # a shared one that a script would have to fill); an image something in
+    # the trash still uses gets a disabled button instead -- the refusal
+    # `Trash::Purge` would give, said up front as visible text under the
+    # button (and as its tooltip), not hover-only.
+    #
+    # Everything beyond the item itself is looked up once for the whole page
+    # by `ListComponent` and handed in: nothing here queries.
     class RowComponent < Admin::AdminComponent
       TYPE_KEYS = { Page => "page", Post => "post", Media::Asset => "media" }.freeze
       TYPE_LABELS = { "page" => "Page", "post" => "Post", "media" => "Image" }.freeze
@@ -28,19 +35,26 @@ module Admin
         item.trash_root_id != item.id || item.parent.nil? || item.parent.trashed?
       end
 
-      # `subpages` are the branch members listed under the title (what a
-      # restore brings back); `purge_subpage_count` is every page under it,
-      # a descendant trashed separately included -- what a purge takes
-      # (`Trash::Purge#branch_deepest_first`), so the two can differ.
-      def initialize(item:, retention_days:, subpages: [], purge_subpage_count: 0, in_use: false, parent_choices: nil, url_options: {})
+      # `subpage_sentence` is the "Includes N subpages: …" line (nil for
+      # anything but a page with branch members); `purge_subpage_count` is
+      # every page under it, a descendant trashed separately included -- what
+      # a purge takes (`Trash::Purge#branch_deepest_first`), so the two can
+      # differ. `who` is the finished "You" / name / "System" label;
+      # `used_by` the number of items in the trash still using an image (nil
+      # when none does); `tab` the tab to come back to after an action.
+      def initialize(item:, retention_days:, who:, subpage_sentence: nil, purge_subpage_count: 0, used_by: nil, parent_choices: nil, tab: nil, url_options: {})
         @item = item
         @retention_days = retention_days
-        @subpages = subpages
+        @who = who
+        @subpage_sentence = subpage_sentence
         @purge_subpage_count = purge_subpage_count
-        @in_use = in_use
+        @used_by = used_by
         @parent_choices = parent_choices
+        @tab = tab
         @url_options = url_options
       end
+
+      attr_reader :who, :subpage_sentence, :tab
 
       def type_key = TYPE_KEYS.fetch(item.class)
 
@@ -56,29 +70,20 @@ module Admin
 
       def needs_parent? = self.class.needs_parent?(item)
 
-      def in_use? = @in_use
+      def in_use? = @used_by.to_i.positive?
 
-      # A nil `trashed_by` is either a user deleted since (the FK nullifies)
-      # or nobody at all (a console or system move); only the `*.trashed`
-      # event's actor could tell them apart, which would be a query per row,
-      # so the label claims neither.
-      def trashed_by_label
-        item.trashed_by ? "Trashed by #{item.trashed_by.display_name}" : "Trashed by unknown"
-      end
+      # Why "Delete now…" is disabled: a bare count, never names (an owner in
+      # the trash may be one the viewer can't read).
+      def in_use_reason = "Still used by #{helpers.pluralize(@used_by, "item")} in the trash"
+
+      def reason_id = "#{row_id}-why"
+
+      def purge_dialog_title = "Delete “#{title}”?"
 
       def purge_dialog_body
-        return "This can't be undone." unless @purge_subpage_count.positive?
-
-        "#{helpers.pluralize(@purge_subpage_count, "subpage")} under it #{@purge_subpage_count == 1 ? "is" : "are"} deleted too. This can't be undone."
-      end
-
-      # `retention - days since trashed`, never below 0; nil (nothing shown)
-      # when retention is 0, which means "never purge automatically".
-      def countdown
-        return if retention_days.zero?
-
-        days_left = [ retention_days - ((Time.current - item.trashed_at) / 1.day).floor, 0 ].max
-        days_left.zero? ? "Deleted permanently today" : "Deleted permanently in #{helpers.pluralize(days_left, "day")}"
+        body = +"It will be deleted for good, with all its translations."
+        body << " #{helpers.pluralize(@purge_subpage_count, "subpage")} under it #{@purge_subpage_count == 1 ? "is" : "are"} deleted too." if @purge_subpage_count.positive?
+        body << " This can't be undone."
       end
 
       def restore_path = helpers.admin_restore_trash_item_path(type_key, item, **url_options)
@@ -89,7 +94,7 @@ module Admin
 
       private
 
-      attr_reader :item, :retention_days, :subpages, :parent_choices, :url_options
+      attr_reader :item, :retention_days, :parent_choices, :url_options
     end
   end
 end

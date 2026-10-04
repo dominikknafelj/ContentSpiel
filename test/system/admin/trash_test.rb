@@ -37,7 +37,7 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
 
     visit admin_trash_path
     within("#trash-page-#{@section.id}") do
-      assert_text "+1 subpage"
+      assert_text "Includes 1 subpage: Child"
       press "Restore"
     end
     assert_selector "[role=status]", text: "Restored “Section”"
@@ -74,13 +74,16 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
     visit admin_trash_path
 
-    within("#trash-media-#{@asset.id}") { press "Delete permanently" }
+    within("#trash-media-#{@asset.id}") { press "Delete now…" }
     within("dialog#purge-media-#{@asset.id}[open]") { press "Delete permanently" }
     assert_selector "[role=status]", text: "permanently"
     assert_not Media::Asset.exists?(@asset.id)
 
-    press "Empty trash"
-    within("dialog[open]") { press "Empty trash" }
+    press "Empty trash…"
+    within("dialog[open]") do
+      assert_text "This deletes 1 post for good. It can't be undone."
+      press "Empty trash"
+    end
     assert_selector "[role=status]", text: "Emptied the trash: 1 deleted permanently"
     assert_equal 0, Post.trashed.count
     assert_text(/the trash is empty/i)
@@ -95,7 +98,7 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
     visit admin_trash_path
 
-    within("#trash-post-#{@gone.id}") { press "Delete permanently" }
+    within("#trash-post-#{@gone.id}") { press "Delete now…" }
     within("dialog#purge-post-#{@gone.id}[open]") do
       assert_text "This can't be undone."
       press "Delete permanently"
@@ -106,5 +109,33 @@ class Admin::TrashSystemTest < ApplicationSystemTestCase
     within("#trash-post-#{@back.id}") { press "Restore" }
     assert_selector "[role=status]", text: "Restored “Back post”"
     assert_not @back.reload.trashed?
+  end
+
+  test "tabs carry their counts, and a page whose parent is in the trash restores under a chosen one" do
+    Current.set(actor: users(:one)) do
+      Trash::Move.call(create_post(title: "Gone post"))
+      Trash::Move.call(@child)
+      Trash::Move.call(@section.reload)
+    end
+    elsewhere = Current.set(actor: users(:one)) { create_page(title: "Elsewhere") }
+    sign_in_via_form(users(:one))
+    visit admin_trash_path
+
+    assert_selector "nav[aria-label='Filter by type']", text: /All\s+3/
+    assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+2/
+    within("nav[aria-label='Filter by type']") { click_link "Posts" }
+    assert_selector "#trash-post-#{Post.trashed.first.id}"
+    assert_no_selector "tr[id^=trash-page-]"
+    within("nav[aria-label='Filter by type']") { click_link "Pages" }
+    assert_selector "tr[id^=trash-page-]", count: 2
+
+    within("#trash-page-#{@child.id}") do
+      select "Elsewhere", from: "Restore under"
+      press "Restore"
+    end
+    assert_selector "[role=status]", text: "Restored “Child”", wait: 10
+    assert_equal elsewhere, @child.reload.parent
+    assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages"
+    assert_selector "nav[aria-label='Filter by type']", text: /Pages\s+1/
   end
 end

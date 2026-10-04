@@ -1,29 +1,37 @@
-<%# The Trash screen (trash spec §7): what the viewer could restore or
-    delete permanently, newest first, filterable by type, 50 per page
-    (`Admin::TrashController`). The list itself, its Empty trash button
+<%# The Trash screen (trash spec §7, handoff §4.9): what the viewer could restore
+    or delete for good, newest first, in tabs that carry their counts, 50 per
+    page (`Admin::TrashController`). The header holds the retention line (its
+    Change link for a `settings.manage` holder) and "Empty trash…"; the list
     and every row's actions are `Admin::TrashScreen::ListComponent`'s. %>
-<h1 class="mb-2 text-h1 text-ink">Trash</h1>
-<p class="mb-4 text-meta">
-  <% if @retention_days.zero? %>
-    Items stay in the trash until someone deletes them permanently.
-  <% else %>
-    Items are deleted permanently <%= pluralize(@retention_days, "day") %> after they're moved to the trash.
+<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1 class="mb-2 text-h1 text-ink">Trash</h1>
+    <p class="text-meta">
+      <% if @retention_days.zero? %>
+        Items stay in the trash until someone deletes them for good.
+      <% else %>
+        Items are deleted for good after <%= pluralize(@retention_days, "day") %>.
+      <% end %>
+      <% if can?("settings.manage") %>
+        <%= link_to "Change", admin_settings_path(**admin_url_options, anchor: "publishing") %>
+      <% end %>
+    </p>
+  </div>
+  <% if @everything %>
+    <%= render Admin::TrashScreen::EmptyTrashComponent.new(**@everything, url_options: admin_url_options) %>
   <% end %>
-</p>
+</div>
 
-<nav aria-label="Filter by type" class="mb-4 flex flex-wrap gap-2">
-  <% [ [ "All", nil ], [ "Pages", "page" ], [ "Posts", "post" ], [ "Images", "media" ] ].each do |label, type| %>
-    <%= link_to label, admin_trash_path(type:, **admin_url_options),
-          class: "rounded-cs px-3 py-1 #{@type == type ? "bg-sunken font-semibold text-ink" : "text-meta hover:bg-sunken"}",
-          aria: { current: (@type == type ? "page" : nil) } %>
-  <% end %>
-</nav>
+<div class="mb-4 flex">
+  <%= render Admin::TrashScreen::TabsComponent.new(counts: @counts, current: @tab,
+        url: ->(tab) { admin_trash_path(**{ type: tab }.compact, **admin_url_options) }) %>
+</div>
 
 <% page_url = ->(page) { admin_trash_path(list_params(:type).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>
-  <%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, url_options: admin_url_options) do |list| %>
+  <%= render Admin::TrashScreen::ListComponent.new(items: @items, retention_days: @retention_days, tab: @tab, url_options: admin_url_options) do |list| %>
     <% list.with_footer { render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) } %>
   <% end %>
 <% end %>

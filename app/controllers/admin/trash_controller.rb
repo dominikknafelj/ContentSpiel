@@ -26,6 +26,11 @@ module Admin
     PER_PAGE = 50
     MODELS = { "page" => Page, "post" => Post, "media" => Media::Asset }.freeze
 
+    # The tabs' `?type=` values (plural, as the tabs name themselves) and the
+    # model key each one lists. The singular keys the screen used before are
+    # still read, so an old bookmark keeps its tab; anything else is "All".
+    TABS = { "pages" => "page", "posts" => "post", "images" => "media" }.freeze
+
     # Trashed items of `type` ("page"/"post"/"media") that `actor` may act
     # on, as a relation -- the one place that rule lives, shared by this
     # screen (`visible`, `roots`) and the sidebar's Trash badge
@@ -54,15 +59,23 @@ module Admin
     private_class_method :visible_assets
 
     # What the screen lists and counts: `visible`, narrowed for pages to
-    # branch roots (`trash_root_id = id`) -- a branch member shows as "+N
-    # subpages" under its root, never as a row (or a count) of its own.
+    # branch roots (`trash_root_id = id`) -- a branch member shows as "Includes
+    # N subpages" under its root, never as a row (or a count) of its own. A
+    # member whose root is gone from the trash (`trash_root_id` nullified with
+    # it) is a row of its own: it is shown on its own, with "Restore under",
+    # and counts.
     def self.roots(type, actor)
       relation = visible(type, actor)
-      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
+      type == "page" ? relation.where("(pages.trash_root_id = pages.id OR pages.trash_root_id IS NULL)") : relation
     end
 
-    # The total the sidebar badge shows: one COUNT per type over `roots`.
-    def self.badge_count(actor) = MODELS.keys.sum { |type| roots(type, actor).count }
+    # One COUNT per type over `roots`: the numbers on the screen's tabs.
+    # The sidebar's badge is their sum (`badge_count`), so a tab, the badge
+    # and the rows a tab lists are one code path and cannot drift.
+    def self.counts(actor) = MODELS.keys.index_with { |type| roots(type, actor).count }
+
+    # The total the sidebar badge shows.
+    def self.badge_count(actor) = counts(actor).values.sum
 
     include BulkResponses
 
@@ -70,12 +83,15 @@ module Admin
     before_action :set_item, only: %i[restore purge]
 
     def index
-      @type = params[:type].presence_in(MODELS.keys)
+      @type = tab_type(params[:type])
+      @tab = TABS.key(@type)
+      @counts = self.class.counts(Current.actor)
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
       # A page past the end shows the "back to page 1" notice and no rows:
       # don't load `offset + 50` records per type just to drop them all.
       @items = @pagination.out_of_range? ? [] : listed_items
       @retention_days = Current.site.trash_retention_days
+      @everything = everything_counts if can?("trash.empty")
     end
 
     # `params[:from] == "undo"` is the flash's own Undo link (Task 10, added
@@ -91,16 +107,16 @@ module Admin
     # sentence for a target that doesn't exist.
     def restore
       parent = chosen_parent
-      return redirect_to(admin_trash_path(**admin_url_options), alert: Trash::Restore::UNKNOWN_PARENT, status: :see_other) if parent == :unknown
+      return redirect_to(trash_return_path, alert: Trash::Restore::UNKNOWN_PARENT, status: :see_other) if parent == :unknown
 
       service = Trash::Restore.new(@item, parent: parent)
       result = service.call
-      return forbidden_or(result) { redirect_to admin_trash_path(**admin_url_options), alert: result.errors.to_sentence, status: :see_other } unless result.ok?
+      return forbidden_or(result) { redirect_to trash_return_path, alert: result.errors.to_sentence, status: :see_other } unless result.ok?
 
       if params[:from] == "undo"
         redirect_to item_screen_path, notice: "Restored “#{title_of(@item)}”", status: :see_other
       else
-        redirect_to admin_trash_path(**admin_url_options), notice: restored_notice(service), status: :see_other
+        redirect_to trash_return_path, notice: restored_notice(service), status: :see_other
       end
     end
 
@@ -130,9 +146,9 @@ module Admin
     def purge
       title = title_of(@item)
       result = Trash::Purge.call(@item)
-      return forbidden_or(result) { redirect_to admin_trash_path(**admin_url_options), alert: result.errors.to_sentence, status: :see_other } unless result.ok?
+      return forbidden_or(result) { redirect_to trash_return_path, alert: result.errors.to_sentence, status: :see_other } unless result.ok?
 
-      redirect_to admin_trash_path(**admin_url_options), notice: "Deleted “#{title}” permanently", status: :see_other
+      redirect_to trash_return_path, notice: "Deleted “#{title}” permanently", status: :see_other
     end
 
     def empty
@@ -165,12 +181,36 @@ module Admin
 
     def types = @type ? [ @type ] : MODELS.keys
 
-    # What the rows are loaded from, before any eager loading: the sum of
-    # one scoped count per model. Each goes through `visible`
-    # (`AccessControl.scope` / the image rule) and, for pages, the
-    # branch-root filter -- so the total can never count a row the list
-    # wouldn't show.
-    def total_count = types.sum { |type| roots(type).count }
+    # The `?type=` of a tab (plural) or an older bookmark's model key; nil
+    # (All) for anything else.
+    def tab_type(value) = TABS[value.to_s] || value.to_s.presence_in(MODELS.keys)
+
+    # Where a restore, a delete or an empty lands: the trash, on the tab the
+    # form was submitted from (`tab`, a hidden field of each row's forms;
+    # junk means All). The page number isn't kept: after a restore it may be
+    # past the end.
+    def trash_return_path
+      tab = params[:tab].to_s.presence_in(TABS.keys)
+      admin_trash_path(**{ type: tab }.compact, **admin_url_options)
+    end
+
+    # What the rows are loaded from, before any eager loading: the tab's
+    # own count (`@counts`, from `counts` -- the same scoped counts the
+    # badge sums), so the total can never count a row the list wouldn't
+    # show.
+    def total_count = types.sum { |type| @counts.fetch(type) }
+
+    # What "Empty trash…" would really delete, for its dialog's sentence:
+    # `Trash::Empty` runs over `Trash.roots` -- EVERYTHING trashed, not what
+    # this viewer may list (`trash.empty` is its own, unscoped right) -- so
+    # these are not the tabs' counts. Pages are the branch roots plus every
+    # page that goes with one (a branch member).
+    def everything_counts
+      roots = Trash.roots
+      pages = roots[:pages].count
+      members = Page.trashed.where("pages.trash_root_id IS NOT NULL AND pages.trash_root_id <> pages.id").count
+      { pages:, subpages: members, posts: roots[:posts].count, images: roots[:assets].count }
+    end
 
     # Merged in Ruby across the three tables: each source contributes at
     # most `offset + PER_PAGE` of its newest rows -- enough that the merged,

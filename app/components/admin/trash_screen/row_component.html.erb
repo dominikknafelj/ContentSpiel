@@ -1,5 +1,5 @@
 <tr id="<%= row_id %>" class="border-b border-line align-top">
-  <td class="py-2 pr-4">
+  <td class="py-3 pr-4">
     <div class="flex items-center gap-3">
       <% if image? %>
         <span class="block size-12 shrink-0 overflow-hidden rounded-cs bg-sunken">
@@ -8,51 +8,49 @@
       <% end %>
       <span class="font-semibold text-ink"><%= title %></span>
     </div>
-    <% if subpages.any? %>
-      <details class="mt-1 text-meta">
-        <summary class="cursor-pointer">+<%= helpers.pluralize(subpages.size, "subpage") %></summary>
-        <ul class="mt-1 list-disc pl-5">
-          <% subpages.each do |subpage| %>
-            <li><%= subpage.title.presence || "(untitled)" %></li>
+    <% if subpage_sentence %>
+      <p class="mt-1 text-sm text-meta"><%= subpage_sentence %></p>
+    <% end %>
+  </td>
+  <td class="py-3 pr-4 text-meta"><%= type_label %></td>
+  <td class="py-3 pr-4">
+    <span class="text-ink"><%= who %></span>
+    <span class="text-meta"> · <%= render Admin::TimeAgoComponent.new(time: item.trashed_at) %></span>
+  </td>
+  <td class="py-3 pr-4"><%= render Admin::TrashScreen::RetentionTagComponent.new(trashed_at: item.trashed_at, retention_days:) %></td>
+  <td class="py-3">
+    <div class="flex flex-col items-end gap-1">
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <% if needs_parent? %>
+          <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center justify-end gap-2", data: { turbo_frame: "_top" } do %>
+            <%= hidden_field_tag :tab, tab, id: nil %>
+            <%= label_tag parent_select_id, "Restore under", class: "text-sm text-meta" %>
+            <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: setup_select_class,
+                  disabled: parent_choices.blank? %>
+            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: parent_choices.blank?) %>
           <% end %>
-        </ul>
-      </details>
-    <% end %>
-  </td>
-  <td class="py-2 pr-4 text-meta"><%= type_label %></td>
-  <td class="py-2 pr-4">
-    <div><%= trashed_by_label %></div>
-    <div class="text-meta">
-      <%= render Admin::TimeAgoComponent.new(time: item.trashed_at) %>
-    </div>
-    <% if (text = countdown) %>
-      <div class="text-meta"><%= text %></div>
-    <% end %>
-  </td>
-  <td class="py-2">
-    <div class="flex flex-wrap items-start justify-end gap-2">
-      <% if needs_parent? %>
-        <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center gap-2", data: { turbo_frame: "_top" } do %>
-          <%= label_tag parent_select_id, "Restore under", class: "text-meta" %>
-          <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: setup_select_class,
-                disabled: parent_choices.blank? %>
-          <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit", disabled: parent_choices.blank?) %>
+        <% else %>
+          <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top" } do %>
+            <%= hidden_field_tag :tab, tab, id: nil %>
+            <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit") %>
+          <% end %>
         <% end %>
-      <% else %>
-        <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top" } do %>
-          <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit") %>
-        <% end %>
-      <% end %>
 
+        <% if in_use? %>
+          <%= render Admin::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button", disabled: true,
+                title: in_use_reason, aria: { describedby: reason_id }) %>
+        <% else %>
+          <%= render Admin::ButtonComponent.new(label: "Delete now…", variant: :danger_text, type: "button",
+                data: dialog_trigger(purge_dialog_id)) %>
+        <% end %>
+      </div>
       <% if in_use? %>
-        <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger_text, type: "button", disabled: true,
-              title: "Still used by an item in the trash") %>
+        <p id="<%= reason_id %>" class="text-sm text-meta"><%= in_use_reason %></p>
       <% else %>
-        <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger_text, type: "button",
-              data: dialog_trigger(purge_dialog_id)) %>
-        <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: purge_dialog_id, title: "Delete permanently?", body: purge_dialog_body) do |dialog| %>
+        <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: purge_dialog_id, title: purge_dialog_title, body: purge_dialog_body) do |dialog| %>
           <% dialog.with_confirm_action do %>
             <%= form_with url: purge_path, method: :delete, data: { turbo_frame: "_top" } do %>
+              <%= hidden_field_tag :tab, tab, id: nil %>
               <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "submit") %>
             <% end %>
           <% end %>
