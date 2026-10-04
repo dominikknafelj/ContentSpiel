@@ -15,6 +15,12 @@ module Admin
   # is there to be submitted (a new record): Save must be pressable before
   # any typing. The leave guard still waits for a real change.
   #
+  # `after:` -- the id of another explicit-save form on the screen that has to
+  # be saved (or cancelled) first: while THAT form is unsaved this one's Save
+  # is locked and its footer says "Save or cancel your changes first." (the
+  # account screen: changing the password re-renders the screen and would
+  # drop a typed name).
+  #
   # A screen with one of these forms is never restored from Turbo's page
   # cache (`turbo-cache-control: no-cache`, added to the head once however
   # many forms the screen has): a snapshot holds the footer as it stood when
@@ -23,7 +29,7 @@ module Admin
   # screen fetches it afresh, as the page and post editors do. (A frame
   # navigation's answer carries the tag too, and the promoted visit merges it
   # into the head.)
-  def save_bar_form_data(dirty: false, always: false)
+  def save_bar_form_data(dirty: false, always: false, after: nil)
     unless @save_bar_no_cache
       @save_bar_no_cache = true
       content_for :head, tag.meta(name: "turbo-cache-control", content: "no-cache")
@@ -33,8 +39,9 @@ module Admin
       controller: "admin--save-bar",
       "admin--save-bar-dirty-value": dirty,
       "admin--save-bar-always-value": always,
-      action: "input->admin--save-bar#refresh change->admin--save-bar#refresh turbo:submit-start->admin--save-bar#markSubmitting turbo:submit-end->admin--save-bar#submitEnded"
-    }
+      "admin--save-bar-after-value": after,
+      action: "input->admin--save-bar#refresh change->admin--save-bar#refresh submit->admin--save-bar#guardSubmit turbo:submit-start->admin--save-bar#markSubmitting turbo:submit-end->admin--save-bar#submitEnded"
+    }.compact
   end
   end
 end

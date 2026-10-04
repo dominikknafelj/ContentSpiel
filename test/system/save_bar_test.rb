@@ -518,7 +518,11 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     fill_in "Your name", with: "Someone New"
     assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: "Save name"
+    # The current password alone is not a change (a password manager fills it
+    # in on load): only what would be saved counts.
     fill_in "Current password", with: "whatever"
+    assert_selector "#password-form .admin-save-bar", text: "No unsaved changes"
+    fill_in "New password", with: "a-new-long-password"
 
     # One under each form, never covering each other.
     rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
@@ -548,9 +552,69 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # the new one doesn't, so the toast is the visible proof.)
     assert_text "Name saved.", wait: 10
     assert_equal "Saved Name", @owner.reload.name
-    # The answer re-renders the whole shell (`data-turbo-frame="_top"`), so the
-    # sidebar's account block follows, and the field shows what was saved.
+    # The answer is a stream that keeps the screen and replaces the sidebar's
+    # account block; the field shows what was saved, and its footer is clean.
     assert_equal "Saved Name", find_field("Your name").value
     assert_selector "span[title='Saved Name']", text: "Saved Name", wait: 5
+  end
+  # Final wave B, ledger C-I1: neither Save may throw away what the other
+  # form holds.
+  test "Save name keeps what the password form holds, and asks nothing" do
+    sign_in_via_form(@owner)
+    visit admin_account_password_path
+    await_admin_controllers
+
+    fill_in "Current password", with: "password"
+    fill_in "New password", with: "a-new-long-password"
+    fill_in "Your name", with: "Kept Both"
+    within("#profile-form") { press "Save name" }
+
+    assert_text "Name saved.", wait: 10
+    assert_no_selector "dialog#leave-dialog[open]"
+    assert_equal "Kept Both", @owner.reload.name
+    assert_selector "#account-identity span[title='Kept Both']"
+    assert_equal "a-new-long-password", find_field("New password").value
+    assert_equal "password", find_field("Current password").value
+    # The name form took what it saved as its baseline: clean, Save disabled,
+    # and typing the old value back is a change again.
+    assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes"
+    assert_selector "#profile-form button[type=submit][disabled]", text: "Save name"
+    assert_selector "#password-form .admin-save-bar", text: "1 unsaved change"
+    fill_in "Your name", with: "Kept Both, again"
+    assert_selector "#profile-form .admin-save-bar", text: "1 unsaved change"
+  end
+
+  test "Change password is locked while the name is unsaved, and unlocks when it is saved" do
+    sign_in_via_form(@owner)
+    visit admin_account_password_path
+    await_admin_controllers
+
+    fill_in "Current password", with: "password"
+    fill_in "New password", with: "a-new-long-password"
+    fill_in "Confirm new password", with: "a-new-long-password"
+    assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
+
+    fill_in "Your name", with: "Typed Name"
+    assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
+    assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel your changes first."
+    # Enter in a field submits past a disabled button: refused all the same.
+    find_field("Confirm new password").send_keys(:enter)
+    assert_no_selector "[role=status]", text: "Password changed", wait: 1
+    assert @owner.reload.authenticate("password")
+    assert_equal "Typed Name", find_field("Your name").value
+    # Typing more of the password does not unlock it.
+    fill_in "New password", with: "a-new-long-password!"
+    assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
+    fill_in "New password", with: "a-new-long-password"
+
+    within("#profile-form") { press "Save name" }
+    assert_text "Name saved.", wait: 10
+    assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
+    assert_no_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel"
+
+    within("#password-form") { press "Change password" }
+    assert_text "Password changed. Your other sessions were signed out.", wait: 10
+    assert @owner.reload.authenticate("a-new-long-password")
+    assert_equal "Typed Name", find_field("Your name").value
   end
 end

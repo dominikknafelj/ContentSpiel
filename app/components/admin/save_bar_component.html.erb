@@ -13,6 +13,9 @@
   <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
   <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
   <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
+  <%# Shown while another form on the screen has to be saved first
+      (`save_bar_form_data(after:)`); the controller writes the sentence. %>
+  <span data-admin--save-bar-target="blocked" role="status" class="text-[13px] text-dim" hidden></span>
   <%# Anything the screen wants at the far end of the bar (the account
       screen's "Forgot your current password?"). %>
   <% if content.present? %><div class="ml-auto"><%= content %></div><% end %>

@@ -360,15 +360,32 @@ function clearPendingLeave() {
 // no connect order can be relied on. The question is anybody's to ask; the
 // answer is still the one thing told.
 function announce() {
+  // One form's change can lock or unlock another's Save ("ONE FORM AFTER
+  // ANOTHER", below).
+  instances.forEach((instance) => instance.applyBlock())
   const unsaved = [...instances].filter((instance) => instance.unsaved)
   document.dispatchEvent(new CustomEvent("admin--save-bar:state", {
     detail: { unsaved: unsaved.length > 0, count: unsaved.reduce((sum, instance) => sum + instance.changes, 0) }
   }))
 }
 
+// ONE FORM AFTER ANOTHER (final wave B, ledger C-I1). A screen with two of
+// these forms (the account screen: name, password) must not let one Save throw
+// away what the other form holds. A form whose answer re-renders the screen
+// names the other in `after` (`save_bar_form_data(after:)`): while THAT form
+// is unsaved, this one's Save is disabled, its `blocked` target says "Save or
+// cancel your changes first." (decision D10's sentence), and a submit that
+// comes anyway -- Enter in a field -- is refused (`guardSubmit`). The other
+// form is then saved in a way that keeps the screen (a Turbo Stream answer).
+// The Save a password field governs (`data-password-submit`) is written by
+// that controller on every keystroke; it reads `data-save-bar-blocked` on the
+// button and keeps it disabled, and is asked to measure again when the block
+// lifts.
+const BLOCKED_HINT = "Save or cancel your changes first."
+
 export default class extends Controller {
-  static targets = ["bar", "count", "save"]
-  static values = { dirty: Boolean, always: Boolean }
+  static targets = ["bar", "count", "save", "blocked"]
+  static values = { dirty: Boolean, always: Boolean, after: String }
 
   connect() {
     this.initial = this.snapshot()
@@ -407,7 +424,7 @@ export default class extends Controller {
     // undo each other, and such a form can't be saved with nothing typed
     // anyway.
     if (this.hasSaveTarget && !("passwordSubmit" in this.saveTarget.dataset)) {
-      this.saveTarget.disabled = !(this.unsaved || this.alwaysValue)
+      this.saveTarget.disabled = this.blocked || !(this.unsaved || this.alwaysValue)
     }
     this.countTarget.textContent = count > 0
       ? (count === 1 ? "1 unsaved change" : `${count} unsaved changes`)
@@ -415,13 +432,62 @@ export default class extends Controller {
     announce()
   }
 
-  markSubmitting() { this.submitting = true }
+  // See "ONE FORM AFTER ANOTHER".
+  get blocked() {
+    const ids = this.afterValue.split(/\s+/).filter(Boolean)
+    if (ids.length === 0) return false
+    return [...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)
+  }
+
+  // Called for every form whenever any form's state changes (`announce`).
+  applyBlock() {
+    if (!this.afterValue) return
+    const blocked = this.blocked
+    if (this.hasBlockedTarget) {
+      this.blockedTarget.textContent = blocked ? BLOCKED_HINT : ""
+      this.blockedTarget.hidden = !blocked
+    }
+    if (!this.hasSaveTarget) return
+    const save = this.saveTarget
+    const was = save.hasAttribute("data-save-bar-blocked")
+    save.toggleAttribute("data-save-bar-blocked", blocked)
+    if ("passwordSubmit" in save.dataset) {
+      if (blocked) save.disabled = true
+      // The password field decides again, now that nothing blocks. Its own
+      // `measure`, called directly: an `input` event would be a change.
+      else if (was) this.element.querySelectorAll("[data-controller~='password-field']").forEach((field) => this.application.getControllerForElementAndIdentifier(field, "password-field")?.measure())
+    } else {
+      save.disabled = blocked || !(this.unsaved || this.alwaysValue)
+    }
+  }
+
+  guardSubmit(event) {
+    if (this.blocked) event.preventDefault()
+  }
+
+  // What is being sent is what a success will have saved (`submitEnded`).
+  markSubmitting() {
+    this.submitting = true
+    this.sent = this.snapshot()
+  }
 
   // A submit that didn't go through (a 422 re-renders and reconnects anyway;
   // a network error or an abort leaves this form in place): the form is
   // unsaved again, so leaving must ask again.
+  // One that DID go through has saved what was sent, so that is the baseline
+  // from now on, and nothing is "submitting" any more. Mostly the answer then
+  // replaces the form (a redirect, a frame render) and none of this is seen.
+  // But a form can outlive its own save: an answer that keeps the screen (a
+  // Turbo Stream -- the account screen's "Save name"), or a redirect whose
+  // visit the leave guard stopped for ANOTHER form and the editor chose
+  // "Keep editing". Left `submitting` with the old baseline, such a form was
+  // never guarded again and counted its saved values as changes.
   submitEnded(event) {
-    if (!event.detail.success) this.submitting = false
+    this.submitting = false
+    if (!event.detail.success) return
+    this.initial = this.sent || this.snapshot()
+    this.dirtyValue = false
+    this.refresh()
   }
 
   get unsaved() { return this.dirtyValue || this.changes > 0 }
@@ -457,6 +523,9 @@ export default class extends Controller {
     const positions = {}
     for (const field of this.element.elements) {
       if (!field.name || field.disabled || field.type === "submit") continue
+      // Nothing to save by itself, and filled in by a password manager on
+      // load (the account screen's current password).
+      if ("saveBarIgnore" in field.dataset) continue
       if (field.type === "hidden" && !("saveBarTrack" in field.dataset)) continue
       if (field.type === "radio") {
         if (field.checked) values[field.name] = field.value

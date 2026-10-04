@@ -41,10 +41,27 @@ module Admin
     # "Your name" (design pass spec §5.1): the one profile field. Not
     # `Users::Save` -- that needs `users.manage`; `Users::UpdateProfile` is
     # open to every user for their own account only.
+    #
+    # A success answers Turbo with a STREAM, not a redirect: the screen has a
+    # second form (the password), and re-rendering the screen -- or the whole
+    # shell, as the `_top` redirect did -- threw away whatever was typed into
+    # it, after asking "Leave without saving?" about a save that had already
+    # happened. The stream replaces the one thing a new name changes outside
+    # the field itself, the sidebar's account block, and says "Name saved.";
+    # the footer takes what it sent as its new baseline
+    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
     def update_profile
       result = Users::UpdateProfile.call(Current.user, name: params[:name])
       if result.ok?
-        redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+        respond_to do |format|
+          format.turbo_stream do
+            render turbo_stream: [
+              turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
+              turbo_stream.append("toasts", Admin::ToastComponent.new(message: "Name saved.", kind: :success))
+            ]
+          end
+          format.html { redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved." }
+        end
       else
         @profile_errors = result.errors
         render :edit, status: :unprocessable_entity

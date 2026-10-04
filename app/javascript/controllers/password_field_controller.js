@@ -53,9 +53,15 @@ export default class extends Controller {
       bar.classList.toggle("bg-line-strong", value === "" || index >= level.bars)
       if (value !== "" && index < level.bars) bar.classList.add(level.colour)
     })
-    this.hintTarget.textContent = value === "" && this.initialHint ? this.initialHint : level.hint(this.minimumValue)
+    // Written only when it changes: the line is a live region, and a text
+    // node replaced by an equal one is read out again on every keystroke.
+    const hint = value === "" && this.initialHint ? this.initialHint : level.hint(this.minimumValue)
+    if (this.hintTarget.textContent !== hint) this.hintTarget.textContent = hint
     const submit = this.element.closest("form")?.querySelector("[data-password-submit]")
-    if (submit) submit.disabled = length < this.minimumValue
+    // `data-save-bar-blocked`: the form's footer holds this Save back until
+    // another form on the screen is saved (`admin--save-bar`, "ONE FORM AFTER
+    // ANOTHER"); it asks for a new measure when that is over.
+    if (submit) submit.disabled = length < this.minimumValue || submit.hasAttribute("data-save-bar-blocked")
   }
 
   // 0 too short; then one step per extra character class or 16+ length.

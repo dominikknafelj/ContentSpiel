@@ -121,6 +121,21 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_equal "Ada", user.reload.name
   end
 
+  # The account screen has a second form: Turbo gets a stream that keeps the
+  # screen (and what the password form holds) instead of a redirect.
+  test "saving a name answers Turbo with a stream: the sidebar's account block and a toast" do
+    sign_in_as(users(:one))
+    patch admin_account_profile_path, params: { name: "Ada <i>L</i>" }, as: :turbo_stream
+
+    assert_response :ok
+    assert_equal "Ada <i>L</i>", users(:one).reload.name
+    assert_select "turbo-stream[action=replace][target=account-identity]"
+    assert_select "turbo-stream[action=append][target=toasts]"
+    assert_includes response.body, "Name saved."
+    assert_includes response.body, "Ada &lt;i&gt;L&lt;/i&gt;"
+    assert_not_includes response.body, "<i>L</i>"
+  end
+
   test "signed out, saving a name redirects to sign-in" do
     patch "/cs-studio/account/profile", params: { name: "Ada" }
     assert_redirected_to "/cs-studio/sign-in"
