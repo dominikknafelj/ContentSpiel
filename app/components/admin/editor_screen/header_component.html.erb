@@ -89,7 +89,10 @@
     <p class="mt-1 text-[13px] text-dim">Not listed on any page yet — add a post list block for this type</p>
   <% end %>
 
-  <% if live? %>
+  <%# Not for a viewer who can't change anything: "changes appear as soon as
+      they're saved" is about their edits, and the view-only hint below is
+      the sentence that is true for them. %>
+  <% if live? && editable? %>
     <p role="status" class="mt-2 text-[13px] text-dim"><%= live_hint %></p>
   <% end %>
 

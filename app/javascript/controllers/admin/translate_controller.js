@@ -409,6 +409,7 @@ function startJob(fields, { url, locale, signal, focus }) {
         const node = pending.get(box)?.node
         if (!node?.isConnected) return
         node.querySelector("[data-pending-running]").hidden = true
+        node.querySelector("[data-pending-timeout-message]").textContent = node.dataset.pendingTimeoutText
         node.querySelector("[data-pending-timeout]").hidden = false
       })
     }, timeoutSeconds(template) * 1000)

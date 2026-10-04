@@ -82,7 +82,10 @@ class Admin::TranslationScreen::TranslateAllComponentTest < ViewComponent::TestC
     assert_selector "[data-admin--translate-target='ready'][hidden]", visible: :hidden
     assert_selector "[data-admin--translate-target='ready'] button[type='button'][data-action='admin--translate#useAll']", text: "Use all", visible: :hidden
     assert_selector "[data-admin--translate-target='ready'] button[type='button'][data-action='admin--translate#discardAll']", text: "Discard all", visible: :hidden
-    assert_selector "[role='status'][data-admin--translate-target='status']", visible: :all
+    # Persistent live region, screen readers only (the running and ready
+    # lines already show the same sentence; two copies were visible).
+    assert_selector "[role='status'][data-admin--translate-target='status'].sr-only", visible: :all
+    assert_selector "[class*='motion-reduce:transition-none'][data-translate-progress-bar]", visible: :all
   end
 
   test "nothing in the default language, for a view-only viewer, or without ai.translate" do

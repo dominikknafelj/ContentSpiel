@@ -38,6 +38,11 @@ class Admin::EditorScreen::NewPostDialogComponentTest < ViewComponent::TestCase
     assert_text "Created as a draft in English. Everything can be changed in the editor."
   end
 
+  test "a chosen card is bold as well as tinted (selection is not colour alone)" do
+    render_form
+    assert_selector "label[class*='has-checked:font-semibold']"
+  end
+
   test "the first type is preselected unless one is asked for" do
     render_form
     assert_selector "input[type=radio][checked]", count: 1, visible: :all

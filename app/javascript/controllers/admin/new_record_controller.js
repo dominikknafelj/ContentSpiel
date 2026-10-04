@@ -72,8 +72,7 @@ export default class extends Controller {
       : { type: params.newPostTypeParam, title: params.newPostTitleParam }
     Object.entries(preset).forEach(([name, value]) => { if (value) url.searchParams.set(name, value) })
 
-    this.failureTarget.hidden = true
-    this.submitFailureTarget.hidden = true
+    this.hideFailures()
     this.loadingTarget.hidden = false
     if (this.footerButton) this.footerButton.disabled = true
     this.frame.removeAttribute("src")
@@ -96,7 +95,7 @@ export default class extends Controller {
     // typed form, say so, and let Create be pressed again (`submitted` has
     // already re-enabled it).
     if (event.type === "turbo:fetch-request-error" && event.target !== this.frame) {
-      this.submitFailureTarget.hidden = false
+      this.submitFailureTarget.textContent = this.submitFailureTarget.dataset.message
       return
     }
 
@@ -112,7 +111,16 @@ export default class extends Controller {
     event.preventDefault()
     this.frame.replaceChildren()
     this.loadingTarget.hidden = true
+    // Shown first, written second: the message is announced as it is inserted.
     this.failureTarget.hidden = false
+    this.failureTarget.querySelector("[role=alert]").textContent = this.failureTarget.dataset.message
+  }
+
+  // Both messages go away empty, so the next failure is a fresh insertion.
+  hideFailures() {
+    this.failureTarget.hidden = true
+    this.failureTarget.querySelector("[role=alert]").textContent = ""
+    this.submitFailureTarget.textContent = ""
   }
 
   watchForm() {
@@ -122,7 +130,7 @@ export default class extends Controller {
     if (!form) return
 
     this.loadingTarget.hidden = true
-    this.failureTarget.hidden = true
+    this.hideFailures()
     if (this.button) this.button.disabled = false
     this.update()
     const summary = form.querySelector(".admin-error-summary")
@@ -145,7 +153,7 @@ export default class extends Controller {
   }
 
   submitting() {
-    this.submitFailureTarget.hidden = true
+    this.submitFailureTarget.textContent = ""
     if (this.button) this.button.disabled = true
   }
 

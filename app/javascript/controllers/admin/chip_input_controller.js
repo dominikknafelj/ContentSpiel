@@ -308,6 +308,12 @@ export default class extends Controller {
     chip.dataset.invalid = "true"
     chip.classList.remove("bg-sunken", "text-ink")
     chip.classList.add("bg-danger-tint", "text-danger-ink")
+    // Colour is never the only cue: say it in words, to screen readers.
+    const note = document.createElement("span")
+    note.className = "sr-only"
+    note.dataset.chipInvalidNote = ""
+    note.textContent = " (too long)"
+    chip.querySelector("[data-chip-label]")?.after(note)
   }
 
   pick(item) {

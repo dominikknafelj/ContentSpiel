@@ -13,7 +13,7 @@
     <div>
       <p class="text-sm text-dim" data-translate-progress-text>Suggesting…</p>
       <div class="mt-1 h-1 w-48 overflow-hidden rounded-full bg-line" aria-hidden="true">
-        <div class="h-1 w-0 rounded-full bg-accent transition-[width]" data-translate-progress-bar></div>
+        <div class="h-1 w-0 rounded-full bg-accent transition-[width] motion-reduce:transition-none" data-translate-progress-bar></div>
       </div>
     </div>
     <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :secondary, size: :small, data: { action: "admin--translate#cancel" }) %>
@@ -26,5 +26,6 @@
     <%= render Admin::ButtonComponent.new(label: "Discard all", variant: :secondary, size: :small, data: { action: "admin--translate#discardAll" }) %>
   <% end %>
 
-  <p role="status" aria-live="polite" class="text-sm text-meta" data-admin--translate-target="status"></p>
+  <%# Screen readers only: the visible states (running line, ready line) already show this text. %>
+  <p role="status" aria-live="polite" class="sr-only" data-admin--translate-target="status"></p>
 <% end %>

@@ -30,7 +30,9 @@
                 </td>
               <% end %>
               <td class="px-4 py-2 text-right text-sm whitespace-nowrap">
-                <%= link_to cta(item), focus, class: "text-accent hover:text-accent-hover", data: { turbo_frame: "_top" } %>
+                <%# 50 of these share a visible phrase: the name starts with it (so the visible text is in the
+                    name) and goes on with the item's, for a screen reader's link list. %>
+                <%= link_to cta(item), focus, class: "text-accent hover:text-accent-hover", aria: { label: "#{cta(item).delete_suffix(" →")}: #{title(item)}" }, data: { turbo_frame: "_top" } %>
               </td>
             </tr>
           <% end %>

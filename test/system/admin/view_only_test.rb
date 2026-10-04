@@ -15,6 +15,16 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:reader))
   end
 
+  # Task 19's visual difference 9: the chip input's frame is a div, so the
+  # sunken look of a disabled field missed it and it kept a white frame around
+  # a sunken inner field.
+  test "the tag chip input's frame is as sunken as the other disabled fields" do
+    visit "/cs-studio/posts/#{@post.id}"
+    await_admin_controllers
+    background = ->(selector) { page.evaluate_script("getComputedStyle(document.querySelector(#{selector.to_json})).backgroundColor") }
+    assert_equal background.call("#post-title"), background.call(".admin-chip-field")
+  end
+
   test "a read-only user's post editor is view only and never autosaves" do
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers

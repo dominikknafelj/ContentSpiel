@@ -281,3 +281,6 @@
    the same look a disabled field already has, but on the rich-text editor
    too (a `<fieldset disabled>` doesn't reach a contenteditable). */
 .admin-view-only :is(input, textarea, select, .admin-rich-text-editor) { background: var(--cs-sunken); color: var(--cs-dim); }
+/* The chip input's frame is a div around its input, so the rule above misses
+   it: sunken too, or it keeps a white frame around a sunken inner field. */
+.admin-view-only .admin-chip-field { background: var(--cs-sunken); }

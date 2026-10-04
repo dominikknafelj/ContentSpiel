@@ -20,14 +20,21 @@ class Admin::TranslationScreen::PendingComponentTest < ViewComponent::TestCase
     render_inline Admin::TranslationScreen::PendingComponent.new
 
     assert_selector "[data-pending-timeout][hidden]", visible: :hidden
-    assert_equal "No suggestion after 25 seconds.", page.find("[data-pending-timeout] p", visible: :all).text(:all)
+    # The message is written when the time comes, not un-hidden: the text
+    # ships as a data attribute and the element starts empty.
+    assert_equal "", page.find("[data-pending-timeout] p", visible: :all).text(:all)
+    assert_selector "[data-translation-pending][data-pending-timeout-text='No suggestion after 25 seconds.']"
     assert_selector "[data-pending-timeout] button[type='button'][data-action='admin--translate#retry']", text: "Try again", visible: :hidden
     assert_equal 25, Admin::TranslationScreen::PendingComponent::TIMEOUT_SECONDS
   end
 
-  test "the box says it is busy to screen readers" do
+  # Final review C, I3: the box is a child of a polite live region that
+  # announces its insertion once; its own `role=status` plus a counter
+  # rewritten every second made a screen reader read it out every second.
+  test "the box is not a live region of its own and its counter is hidden from screen readers" do
     render_inline Admin::TranslationScreen::PendingComponent.new
 
-    assert_selector "[data-translation-pending][role='status']"
+    assert_no_selector "[role=status], [aria-live]", visible: :all
+    assert_selector "[data-pending-elapsed][aria-hidden='true']"
   end
 end

@@ -5,7 +5,7 @@
     <legend class="<%= setup_label_class %>">Type</legend>
     <div class="mt-1 flex flex-wrap gap-2">
       <% choices.each do |choice| %>
-        <label class="inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken has-checked:border-accent has-checked:bg-accent-tint has-focus-visible:outline-2 has-focus-visible:outline-accent">
+        <label class="inline-flex cursor-pointer items-center rounded-cs border border-line-strong bg-surface px-3 py-2 text-ink hover:bg-sunken has-checked:border-accent has-checked:bg-accent-tint has-checked:font-semibold has-focus-visible:outline-2 has-focus-visible:outline-accent">
           <%= radio_button_tag "post[content_type]", choice.name, selected?(choice), id: "#{TYPE_ID}-#{choice.name.parameterize}", class: "sr-only",
                 data: { path: choice.path, admin__new_record_target: "type" } %>
           <%= render Admin::ContentTypeDotComponent.new(content_type: choice.name) %>

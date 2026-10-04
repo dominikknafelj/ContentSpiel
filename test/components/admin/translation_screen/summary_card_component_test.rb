@@ -39,5 +39,8 @@ class Admin::TranslationScreen::SummaryCardComponentTest < ViewComponent::TestCa
 
     render_inline Admin::TranslationScreen::SummaryCardComponent.new(locale: "de", summary: { total: 1, complete: 0, missing: 1, outdated: 0 }, url: "/x", current: true)
     assert_selector "a[aria-current=true][aria-label='Deutsch: show all languages']"
+    # Not colour alone (review C, M18): the current card's name is underlined.
+    assert_selector "a[aria-current=true].underline"
+    assert_no_selector "a:not([aria-current]).underline"
   end
 end

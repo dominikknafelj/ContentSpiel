@@ -10,10 +10,15 @@ import { Controller } from "@hotwired/stimulus"
 // hint, never a validation). It only reads the input, so it never sets a value
 // and has nothing to tell autosave.
 export default class extends Controller {
-  static targets = [ "input", "output" ]
+  static targets = [ "input", "output", "announcement" ]
   static values = { limit: Number }
 
+  // The count is not a live region (it would be read out on every
+  // keystroke); the field is `aria-describedby` it instead, and only the
+  // moment the text goes over the recommended length, or back under it, is
+  // said, through the separate `announcement` target. Connecting is silent.
   connect() {
+    this.long = Array.from(this.inputTarget.value).length > this.limitValue
     this.update()
   }
 
@@ -24,5 +29,10 @@ export default class extends Controller {
     this.outputTarget.textContent = long ? `${length} / ${this.limitValue} · long` : `${length} / ${this.limitValue}`
     this.outputTarget.classList.toggle("text-warn-ink", long)
     this.outputTarget.classList.toggle("text-meta", !long)
+
+    if (long !== this.long && this.hasAnnouncementTarget) {
+      this.announcementTarget.textContent = long ? `Over the recommended length: ${length} of ${this.limitValue}.` : "Back within the recommended length."
+    }
+    this.long = long
   }
 }

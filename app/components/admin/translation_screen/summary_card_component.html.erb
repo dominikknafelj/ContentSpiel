@@ -1,7 +1,7 @@
 <div class="flex flex-col gap-2 rounded-cs border bg-surface px-4 py-3.5 <%= current? ? "border-accent" : "border-line" %>" data-locale="<%= locale %>">
   <div class="flex items-baseline justify-between gap-3">
     <% if url %>
-      <%= link_to name, url, class: "font-semibold text-ink hover:underline", aria: { label: link_label, current: (current? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "replace" } %>
+      <%= link_to name, url, class: "font-semibold text-ink hover:underline #{"underline decoration-accent decoration-2 underline-offset-4" if current?}", aria: { label: link_label, current: (current? ? "true" : nil) }, data: { turbo_frame: "content", turbo_action: "replace" } %>
     <% else %>
       <span class="font-semibold text-ink"><%= name %></span>
     <% end %>

@@ -9,6 +9,11 @@ class Admin::PostsScreen::ToolbarComponentTest < ViewComponent::TestCase
       content_types: ContentTypes.all, tags: [ Tag.new(name: "rails") ], filters: { q: nil, type: nil, tag: nil, translation: nil }.merge(filters), **options)
   end
 
+  test "the checked segment is bold as well as tinted" do
+    render_toolbar(scope: "drafts")
+    assert_selector "label[class*='has-[:checked]:font-semibold']", count: 4
+  end
+
   test "a GET form that applies as it changes, with the four counts in a radio group" do
     render_toolbar(scope: "drafts")
     assert_selector "form[method=get][data-controller='admin--auto-submit'][data-turbo-frame=content]"

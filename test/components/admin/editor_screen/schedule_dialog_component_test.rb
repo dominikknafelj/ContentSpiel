@@ -46,6 +46,22 @@ class Admin::EditorScreen::ScheduleDialogComponentTest < ViewComponent::TestCase
     assert_selector "input[name=published_at][aria-invalid=true]", visible: :all
   end
 
+  # Review C, I2: the field is described by the error AND the zone line, each
+  # by its own id (the id used to sit on the zone line alone, so the reason
+  # for "invalid" was never read out).
+  test "the field is described by the error and the zone line, each with its own id" do
+    page_record = create_page(title: "Later", published: false)
+    render_dialog(page_record, error: "Pick a time in the future.")
+    input = page.find("input[name=published_at]", visible: :all)
+    ids = input["aria-describedby"].split
+    assert_equal 2, ids.size
+    assert_equal "Pick a time in the future.", page.find("##{ids.first}", visible: :all).text(:all)
+    assert_match(/time zone/, page.find("##{ids.last}", visible: :all).text(:all))
+
+    render_dialog(page_record)
+    assert_equal 1, page.find("input[name=published_at]", visible: :all)["aria-describedby"].split.size
+  end
+
   test "the zone line: an offset with minutes, UTC, and a zone name that already says Time or carries parentheses" do
     { "Kolkata" => "Kolkata time (GMT+5:30), the site’s time zone.",
       "UTC" => "UTC (GMT+0), the site’s time zone." }.each do |zone, line|

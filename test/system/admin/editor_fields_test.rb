@@ -24,6 +24,26 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the long meta title was never saved") { about.reload.meta_title(locale: "en").to_s.length == 70 }
   end
 
+  # Review C, M14: not a live region rewritten per keystroke; the crossing of
+  # the limit is the one thing said.
+  test "the counter announces only the crossing of the limit" do
+    about = create_page(title: "About")
+    visit "/cs-studio/pages/#{about.id}"
+    await_admin_controllers
+
+    find("summary", text: "SEO · META TITLE, META DESCRIPTION").click
+    announcement = "[data-admin--char-count-target=announcement]"
+    assert_no_selector "[data-admin--char-count-target=output][aria-live]", visible: :all
+    fill_in "Meta title", with: "x" * 59
+    assert_selector announcement, text: "", visible: :all
+    fill_in "Meta title", with: "x" * 61
+    assert_selector announcement, text: "Over the recommended length: 61 of 60.", visible: :all
+    fill_in "Meta title", with: "x" * 62
+    assert_selector announcement, text: "Over the recommended length: 61 of 60.", visible: :all
+    fill_in "Meta title", with: "x" * 10
+    assert_selector announcement, text: "Back within the recommended length.", visible: :all
+  end
+
   test "Reset empties an overridden hero alt, shows the library alt as the placeholder and saves the cleared value" do
     asset = create_media_asset
     asset.update!(alt: "A dog on a beach")

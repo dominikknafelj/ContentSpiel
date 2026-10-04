@@ -45,12 +45,14 @@
       <% end %>
 
       <% if child_count.positive? %>
-        <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+        <%# `role="img"` and a label, like the translation markers: a bare "3" says nothing. %>
+        <%= tag.span child_count, data: { child_count: true }, role: "img", aria: { label: pluralize(child_count, "subpage") },
+              title: pluralize(child_count, "subpage"), class: "shrink-0 font-cs-mono text-label text-meta" %>
       <% end %>
 
       <% if can_add_child? %>
         <%= link_to "+", new_child_path, data: dialog_trigger("new-page-dialog").merge("new-page-parent-id-param": page.id, turbo_frame: "content"),
-              class: "shrink-0 rounded-cs px-1 text-meta opacity-0 hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover/node:opacity-100",
+              class: "shrink-0 rounded-cs px-1 text-meta opacity-0 hover:bg-surface hover:text-ink focus-visible:opacity-100 group-hover/node:opacity-100 pointer-coarse:opacity-100",
               aria: { label: "Add a page under #{title}" } %>
       <% end %>
     </div>

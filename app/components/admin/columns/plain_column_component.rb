@@ -31,6 +31,20 @@ module Admin
 
       def counter? = counter.present?
 
+      def counter_id = "#{id}-count"
+
+      # The field is described by its counter (read when the field is entered,
+      # with the current count) rather than the counter being a live region
+      # rewritten on every keystroke; only crossing the limit is announced
+      # (`admin--char-count`'s announcement target). The error slot keeps its
+      # own id in the same list.
+      def invalid_attrs
+        ids = [ (counter_id if counter?), (errors_id if errors.any?) ].compact
+        attrs = errors.any? ? { aria: { invalid: "true" } } : {}
+        attrs[:aria] = (attrs[:aria] || {}).merge(describedby: ids.join(" ")) if ids.any?
+        attrs
+      end
+
       def override? = override.present?
 
       # "42 / 60", as first painted; `admin--char-count` keeps it current (and

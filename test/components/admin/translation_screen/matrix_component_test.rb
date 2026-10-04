@@ -32,6 +32,8 @@ class Admin::TranslationScreen::MatrixComponentTest < ViewComponent::TestCase
 
     assert_selector "#{row} th[scope=row] a[href='/cs-studio/posts/#{@post.id}?locale=es']"
     assert_selector "#{row} td a", text: "Translate →"
+    # Each action link is told apart by its item (review C, M20).
+    assert_selector "#{row} td a[aria-label^='Translate: ']"
   end
 
   test "a complete language in an incomplete row is the solid chip and still links" do

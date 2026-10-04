@@ -40,7 +40,9 @@ module Admin
   # `lowercase: true` a chip made from typed text is lower-cased, because
   # the server stores the names that way (tags) and the chip should read as it
   # will after a reload. `max_length:` marks a chip longer than that as invalid
-  # at once (danger tint, `aria-invalid`), where the server would refuse the
+  # at once (danger tint, plus a visually hidden "(too long)" -- a chip is a
+  # list item, which can't carry `aria-invalid`, and colour must not be the
+  # only cue), where the server would refuse the
   # whole save (`Tag`'s length limit) and name it in the error slot.
   #
   # In a view-only editor the surrounding `<fieldset disabled>` disables the

@@ -18,7 +18,7 @@ module Admin
       TRANSLATIONS = [ [ "Needs translation", "needs" ], [ "Outdated", "outdated" ], [ "Complete", "complete" ] ].freeze
 
       SEGMENT_CLASS = "flex cursor-pointer items-center gap-1.5 border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken " \
-                      "has-[:checked]:bg-accent-tint has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent".freeze
+                      "has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent".freeze
 
       # `filters` is a Hash of the active values (`q`, `type`, `tag`,
       # `translation`; blank when unset), `counts` the four scope numbers.

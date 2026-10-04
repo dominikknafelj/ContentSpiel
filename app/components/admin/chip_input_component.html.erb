@@ -16,13 +16,14 @@
   <%= tag.input type: "hidden", name: name, value: "", autocomplete: "off", data: { "admin--chip-input-target": "sentinel" } %>
 
   <%# One border around the chips and the text input; clicking the empty part focuses the input. %>
-  <div class="admin-chip-field relative flex flex-wrap items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent"
+  <div class="admin-chip-field relative flex flex-wrap items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2 py-1.5 focus-within:border-accent focus-within:outline-2 focus-within:outline-accent"
        data-action="click->admin--chip-input#focusInput">
     <ul class="flex flex-wrap gap-1.5" aria-label="<%= label %>" data-admin--chip-input-target="list">
       <% chips.each do |chip| %>
         <%= tag.li class: chip_class(chip), data: { "chip-value": chip[:value], invalid: (true if chip[:invalid]) } do %>
           <% if chip[:dot].present? %><span class="admin-chip__dot h-[7px] w-[7px] shrink-0 rounded-full <%= chip[:dot] %>" aria-hidden="true"></span><% end %>
           <span class="min-w-0 truncate" data-chip-label><%= chip[:label] %></span>
+          <% if chip[:invalid] %><span class="sr-only" data-chip-invalid-note> (invalid)</span><% end %>
           <% if chip[:hint].present? %><span class="shrink-0 text-meta" data-chip-hint>· <%= chip[:hint] %></span><% end %>
           <%= tag.input type: "hidden", name: name, value: chip[:value], autocomplete: "off" %>
           <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"

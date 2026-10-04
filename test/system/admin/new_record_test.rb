@@ -119,8 +119,11 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     good = page.evaluate_script("document.querySelector('[data-admin--new-record-kind-value=page]').dataset['admin-NewRecordUrlValue'] || document.querySelector('[data-admin--new-record-kind-value=page]').getAttribute('data-admin--new-record-url-value')")
     page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', '/cs-studio/pages/does-not-exist')")
 
+    # Review C, M15: the alert is empty until the failure happens (text that is
+    # already in the page and merely un-hidden is not announced).
+    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--new-record-target=failure] [role=alert]').textContent")
     click_link "+ New page"
-    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=failure]", text: "The form couldn’t be loaded.", visible: :visible
+    assert_selector "dialog#new-page-dialog [data-admin--new-record-target=failure] [role=alert]", text: "The form couldn’t be loaded.", visible: :visible
     assert_button "Create page", disabled: true
 
     page.execute_script("document.querySelector('[data-admin--new-record-kind-value=page]').setAttribute('data-admin--new-record-url-value', #{good.to_json})")
@@ -184,6 +187,7 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     page.execute_script("const real = window.fetch; window.fetch = (url, options) => (options && options.method && options.method.toUpperCase() === 'POST') ? Promise.reject(new TypeError('offline')) : real(url, options)")
 
     fill_in "new-page-title", with: "Offline attempt"
+    assert_equal "", page.evaluate_script("document.querySelector('[data-admin--new-record-target=submitFailure]').textContent")
     click_button "Create page"
 
     assert_selector "[data-admin--new-record-target=submitFailure]", text: "Couldn’t save.", visible: :visible

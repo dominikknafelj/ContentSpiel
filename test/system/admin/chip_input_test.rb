@@ -161,6 +161,7 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     tag_field.send_keys("x" * 51, :enter)
 
     assert_selector "li.bg-danger-tint[data-invalid]"
+    assert_selector "li[data-invalid] .sr-only[data-chip-invalid-note]", text: "(too long)", visible: :all
     assert_selector "#post-tag_names-errors", text: "longer than 50 characters", wait: 6
     assert_empty @post.tags.reload
   end

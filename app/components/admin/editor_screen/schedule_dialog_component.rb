@@ -44,6 +44,12 @@ module Admin
 
       def error_id = "#{dialog_id}-error"
 
+      # The time-zone line has its own id: the field is described by the error
+      # (when there is one) and then the zone, so a screen reader that lands in
+      # the reopened dialog's field hears why it is invalid, not only the zone
+      # (final review C, I2).
+      def zone_id = "#{dialog_id}-zone"
+
       def url = helpers.public_send("schedule_admin_#{type}_path", record, **url_options)
 
       # Only a record that has a schedule can have it removed.

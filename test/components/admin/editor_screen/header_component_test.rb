@@ -92,6 +92,18 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_no_selector "button", text: /Publish|Unpublish|Schedule|Move to trash/, visible: :all
   end
 
+  # Task 19's f2: the "changes appear as soon as they're saved" hint is about
+  # the viewer's own edits.
+  test "a view-only viewer of a live record is not told their changes go live" do
+    post = create_post(title: "Read me", published: true)
+    render_header(post, actor: users(:reader))
+    assert_no_text "Changes appear on the site"
+    assert_selector "[data-view-only-hint]"
+
+    render_header(post)
+    assert_text "Changes appear on the site as soon as they’re saved."
+  end
+
   test "a post shows its type and, unlisted, says so" do
     post = create_post(title: "Loose")
     render_header(post)

@@ -25,6 +25,7 @@ class Admin::TreeTest < ActionDispatch::IntegrationTest
       # The tree hides Live: only a draft or scheduled page gets a chip.
       assert_select "[data-status='live']", count: 0
       assert_select "[data-child-count]", text: "1"
+      assert_select "[data-child-count][role=img][aria-label='1 subpage']"
     end
   end
 

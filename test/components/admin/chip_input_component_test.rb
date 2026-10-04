@@ -51,6 +51,8 @@ class Admin::ChipInputComponentTest < ViewComponent::TestCase
     render_chips(chips: [ { value: "bad", label: "bad", invalid: true } ])
 
     assert_selector "li[data-chip-value='bad'].bg-danger-tint[data-invalid]"
+    # Colour is not the only cue (review C, M19).
+    assert_selector "li[data-chip-value='bad'] .sr-only[data-chip-invalid-note]", text: "(invalid)", visible: :all
   end
 
   test "the controller's configuration is on the root" do
