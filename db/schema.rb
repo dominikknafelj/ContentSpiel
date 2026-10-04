@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_04_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -120,6 +120,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.jsonb "body", default: {}, null: false
     t.bigint "media_asset_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["media_asset_id"], name: "index_content_blocks_on_media_asset_id"
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
   end
@@ -138,6 +139,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.datetime "trashed_at"
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["created_by_id"], name: "index_media_assets_on_created_by_id"
     t.index ["trashed_at"], name: "index_media_assets_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_media_assets_on_trashed_by_id"
@@ -187,6 +189,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.bigint "trashed_by_id"
     t.bigint "trash_root_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
     t.index ["trash_root_id"], name: "index_pages_on_trash_root_id"
@@ -229,6 +232,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.datetime "trashed_at"
     t.bigint "trashed_by_id"
     t.jsonb "translation_sources", default: {}, null: false
+    t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
     t.index ["trashed_at"], name: "index_posts_on_trashed_at"
@@ -272,6 +276,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_03_120000) do
     t.string "ai_provider"
     t.string "ai_model"
     t.text "ai_api_key"
+    t.jsonb "translation_original_changed_at", default: {}, null: false
   end
 
   create_table "tags", force: :cascade do |t|

@@ -34,6 +34,19 @@ module Translations
     end
   end
 
+  # What a translation's `translation_sources` entry keeps of an original so
+  # a later change can be shown as a diff: a stripped, newline-normalised
+  # String for plain text, one plain string per top-level block for rich
+  # text, nil for anything else (a schema group's raw Hash/Array -- no
+  # sensible text to show).
+  def source_text(value)
+    case value
+    when RichText::Document then value.plain_paragraphs
+    when Hash, Array, nil then nil
+    else normalize_newlines(value.to_s).strip.presence
+    end
+  end
+
   # CRLF (and a lone CR) as LF -- the one spelling of a line break both
   # `digest` and `Tracker#translation_value_changed?` compare by.
   def normalize_newlines(text) = text.gsub(/\r\n?/, "\n")

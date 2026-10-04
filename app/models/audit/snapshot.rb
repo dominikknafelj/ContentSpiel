@@ -34,8 +34,10 @@ module Audit
     # `translation_sources` (`Translations::Tracker`) is bookkeeping derived
     # from the translated values whose own changes are already listed --
     # digests nobody reads in a changes row. It stays in the full snapshot,
-    # which is the version basis, not a diff.
-    IGNORED_CHANGES = %w[created_at updated_at translation_sources].freeze
+    # which is the version basis, not a diff. `translation_original_changed_at`
+    # is the same kind of bookkeeping (a per-field time derived from the
+    # original's own listed change).
+    IGNORED_CHANGES = %w[created_at updated_at translation_sources translation_original_changed_at].freeze
 
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK
