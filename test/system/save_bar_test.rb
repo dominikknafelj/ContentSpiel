@@ -1,8 +1,9 @@
 require "application_system_test_case"
 
-# The explicit-save bar and the Leave dialog in a real browser (cs-studio
-# design pass, Task 11): the bar counts changed fields against what was
-# loaded, and leaving the screen with changes asks first.
+# The explicit-save footer and the Leave dialog in a real browser (cs-studio
+# design pass, Task 11): the footer is always there with Save and Cancel,
+# counts changed fields against what was loaded, keeps Save disabled while an
+# existing record has nothing to save, and leaving with changes asks first.
 class SaveBarSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -10,22 +11,28 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     @target = users(:two)
   end
 
-  test "the bar counts changes, drops back to hidden, and guards leaving" do
+  test "the footer is always there, counts changes, disables Save when nothing changed, and guards leaving" do
     sign_in_via_form(@owner)
     visit edit_admin_user_path(@target)
     await_admin_controllers
 
-    assert_no_selector ".admin-save-bar"
+    # An existing record with nothing changed: Save and Cancel are on screen,
+    # Save can't be pressed, and the footer says why.
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_selector ".admin-save-bar a", text: "Cancel"
+    assert_selector ".admin-save-bar button[type=submit][disabled]", text: "Save"
 
     original = find_field("Name").value
     fill_in "Name", with: "#{original}x"
     assert_selector ".admin-save-bar", text: /1 unsaved change/i
+    assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: "Save"
 
     fill_in "Name", with: original
-    assert_no_selector ".admin-save-bar"
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_selector ".admin-save-bar button[type=submit][disabled]"
 
     fill_in "Name", with: "Typed again"
-    assert_selector ".admin-save-bar"
+    assert_selector ".admin-save-bar", text: /1 unsaved change/i
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"
@@ -42,13 +49,17 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   # A failed save re-renders the form (the controller reconnects with the typed
   # values as its baseline): the bar and the leave guard must survive that.
-  test "a new user form shows its Save from the start and keeps the bar after a 422" do
+  test "a new user form can be submitted from the start and stays unsaved after a 422" do
     sign_in_via_form(@owner)
     visit new_admin_user_path
     await_admin_controllers
 
     # Reachable before any typing, without the leave guard armed yet.
-    assert_selector ".admin-save-bar", text: /Create user/
+    # (Create user itself waits for a long enough password: the password
+    # field governs that button, not the footer.)
+    assert_selector ".admin-save-bar button[type=submit]", text: "Create user"
+    assert_selector ".admin-save-bar a", text: "Cancel"
+    assert_no_selector ".admin-save-bar", text: /unsaved/i
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_current_path admin_posts_path
     assert_no_selector "dialog#leave-dialog[open]"
@@ -88,35 +99,43 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     assert_field "Name", with: "About editors"
     assert_selector "[data-permission='pages.edit'] input[type=checkbox][disabled]", visible: :all
-    assert_no_selector ".admin-save-bar"
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_selector ".admin-save-bar button[type=submit][disabled]", text: "Save"
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_current_path admin_posts_path
     assert_no_selector "dialog#leave-dialog[open]"
   end
 
-  # Round 1 departure: the bar is full-bleed across <main> (with a top border),
-  # even though the users form sits in a narrow `max-w-md` column; the count is
-  # sans 13px, not mono capitals; and the Save button reads "Save".
-  test "the bar spans the whole content area, in sans type, and the button reads Save" do
+  # The footer belongs to its form: it sits in the form's own column, right
+  # under the fields (not across the whole content area, where its buttons
+  # ended up far from the form), Save first; the count is sans 13px, not mono
+  # capitals; and the Save button reads "Save".
+  test "the footer sits in the form's column under the fields, Save first, in sans type" do
     sign_in_via_form(@owner)
     visit edit_admin_user_path(@target)
     await_admin_controllers
-    fill_in "Name", with: "Full bleed"
-    assert_selector ".admin-save-bar"
+    fill_in "Name", with: "In the column"
+    assert_selector ".admin-save-bar", text: /1 unsaved change/i
 
     geometry = page.evaluate_script(<<~JS)
       (() => {
-        const bar = document.querySelector(".admin-save-bar").getBoundingClientRect()
-        const main = document.querySelector("main").getBoundingClientRect()
-        const count = getComputedStyle(document.querySelector("[data-admin--save-bar-target=count]"))
-        return { barLeft: bar.left, barRight: bar.right, mainLeft: main.left, mainRight: main.right,
+        const bar = document.querySelector(".admin-save-bar")
+        const rect = bar.getBoundingClientRect()
+        const form = document.getElementById("user-form").getBoundingClientRect()
+        const save = bar.querySelector("button[type=submit]").getBoundingClientRect()
+        const cancel = bar.querySelector("a").getBoundingClientRect()
+        const count = getComputedStyle(bar.querySelector("[data-admin--save-bar-target=count]"))
+        return { barLeft: rect.left, barRight: rect.right, formLeft: form.left, formRight: form.right,
+                 saveLeft: save.left, cancelLeft: cancel.left,
                  font: count.fontFamily, size: count.fontSize, transform: count.textTransform,
-                 borderTop: getComputedStyle(document.querySelector(".admin-save-bar")).borderTopWidth }
+                 borderTop: getComputedStyle(bar).borderTopWidth }
       })()
     JS
-    assert_in_delta geometry["mainLeft"], geometry["barLeft"], 1
-    assert_in_delta geometry["mainRight"], geometry["barRight"], 1
+    assert_in_delta geometry["formLeft"], geometry["barLeft"], 1
+    assert_operator geometry["barRight"], :<=, geometry["formRight"] + 1
+    assert_in_delta geometry["barLeft"], geometry["saveLeft"], 1
+    assert_operator geometry["saveLeft"], :<, geometry["cancelLeft"]
     assert_equal "13px", geometry["size"]
     assert_equal "none", geometry["transform"]
     assert_no_match(/mono/i, geometry["font"])
@@ -124,24 +143,22 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar button[type=submit]", text: /\ASave\z/
   end
 
-  test "the two account forms share one Leave prompt and stack their bars" do
+  test "the two account forms each keep their own footer and share one Leave prompt" do
     sign_in_via_form(@owner)
     visit admin_account_password_path
     await_admin_controllers
 
-    fill_in "Your name", with: "Someone New"
-    assert_selector ".admin-save-bar", count: 1
-    fill_in "Current password", with: "whatever"
     assert_selector ".admin-save-bar", count: 2
+    assert_selector ".admin-save-bar button[type=submit][disabled]", text: "Save name"
 
-    # Stacked, not covering each other.
-    rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
+    fill_in "Your name", with: "Someone New"
+    assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: "Save name"
+    fill_in "Current password", with: "whatever"
+
+    # One under each form, never covering each other.
+    rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
     first, second = rects.sort_by(&:first)
     assert_operator first.last, :<=, second.first + 1
-
-    # Both full-bleed, even stacked.
-    edges = page.evaluate_script("(() => { const main = document.querySelector('main').getBoundingClientRect(); return Array.from(document.querySelectorAll('.admin-save-bar')).filter((b) => !b.hidden).map((b) => { const r = b.getBoundingClientRect(); return [r.left - main.left, r.right - main.right] }) })()")
-    edges.each { |left, right| assert_in_delta 0, left, 1 and assert_in_delta 0, right, 1 }
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"

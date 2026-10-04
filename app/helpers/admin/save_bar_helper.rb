@@ -7,13 +7,13 @@ module Admin
   # `dirty:` -- the server re-rendered this form with errors (a 422). The
   # re-render replaces the form, so the controller reconnects and snapshots
   # the typed, invalid values as its baseline: without this it would count 0
-  # changes, hide the only Save button and leave the edits unguarded. While
-  # `dirty` the bar shows and leaving asks first, whatever the snapshot says.
+  # changes, disable the only Save button and leave the edits unguarded.
+  # While `dirty` Save stays enabled and leaving asks first, whatever the
+  # snapshot says.
   #
-  # `always:` -- the bar is visible even with nothing changed. For a form
-  # whose only submit is the bar's Save and which is valid to submit as it
-  # stands (a new record): it must be reachable before any typing. The leave
-  # guard still waits for a real change.
+  # `always:` -- Save is enabled even with nothing changed. For a form that
+  # is there to be submitted (a new record): Save must be pressable before
+  # any typing. The leave guard still waits for a real change.
   def save_bar_form_data(dirty: false, always: false)
     {
       controller: "admin--save-bar",

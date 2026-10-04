@@ -1,16 +1,12 @@
-<%# `hidden` is the initial state; `admin--save-bar#refresh` toggles it. The
-    count is a polite live region so a screen reader hears the number change.
-    Full-bleed: the form that holds the bar is usually a narrow column, so
-    `admin--save-bar` gives the bar negative side margins that reach the
-    edges of `<main>` (`bleed`) -- no fixed `-mx-` here would be right for
-    every column. %>
-<div hidden data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 mt-6 flex items-center justify-end gap-3 border-t border-line bg-surface px-6 py-3">
-  <span data-admin--save-bar-target="count" aria-live="polite" class="mr-auto text-[13px] text-dim"></span>
+<%# The form's footer: always there, so a form never looks as if it had no
+    way to save. It sits in the form's own column, under the fields, and
+    sticks to the bottom of the window while a long form (a group's
+    permissions) scrolls. `admin--save-bar#refresh` writes the count -- a
+    polite live region, so a screen reader hears the number change -- and
+    disables Save while an existing record has nothing to save. Without
+    JavaScript nothing disables it, so it is a plain working submit button. %>
+<div data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3">
+  <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
   <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-  <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data) %>
+  <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
 </div>
-<%# The bar above starts `hidden` and only `admin--save-bar` ever shows it, so
-    without JavaScript the form would have no submit button at all. This one
-    exists only then (a browser with scripting on never parses it into the
-    page), the way the filter forms keep their "Filter" button. %>
-<noscript><%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id) %></noscript>
