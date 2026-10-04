@@ -223,7 +223,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
   test "a subject link only renders when the current viewer can read that record" do
     group = AccessControl::Group.create!(name: "Audit only #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "audit.view")
-    viewer = User.create!(email_address: "audit-only@example.com", password: "password", password_confirmation: "password")
+    viewer = User.create!(email_address: "audit-only@example.com", password: "password12345", password_confirmation: "password12345")
     AccessControl::Membership.create!(user: viewer, group: group)
 
     post_record = as(users(:one)) { create_post(title: "Gated post", published: false) }
@@ -277,7 +277,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     group = AccessControl::Group.create!(name: "Audit branch #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "audit.view")
     group.grants.create!(permission: "pages.read", scope: { "page_ids" => [ branch.id ] })
-    viewer = User.create!(email_address: "audit-branch@example.com", password: "password", password_confirmation: "password")
+    viewer = User.create!(email_address: "audit-branch@example.com", password: "password12345", password_confirmation: "password12345")
     AccessControl::Membership.create!(user: viewer, group: group)
 
     travel_to(Date.new(2026, 3, 1)) do

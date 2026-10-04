@@ -7,7 +7,7 @@ class Mcp::Tools::GetPostTest < ActiveSupport::TestCase
   end
 
   setup do
-    @user = User.create!(email_address: "agent@example.com", password: "password123")
+    @user = User.create!(email_address: "agent@example.com", password: "password12345")
   end
 
   test "returns the full post, including body" do

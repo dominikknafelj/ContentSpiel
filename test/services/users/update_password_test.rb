@@ -39,7 +39,7 @@ class Users::UpdatePasswordTest < ActiveSupport::TestCase
 
   test "a blank or unconfirmed password fails" do
     blank = as(users(:reader)) { Users::UpdatePassword.call(users(:reader), password: "", password_confirmation: "", actor: users(:reader)) }
-    assert_includes blank.record.errors[:password], "can't be blank"
+    assert_includes blank.record.errors[:password], "Password can't be blank"
 
     mismatched = as(users(:reader)) { Users::UpdatePassword.call(users(:reader), password: "one-password", password_confirmation: "another", actor: users(:reader)) }
     assert_not mismatched.ok?

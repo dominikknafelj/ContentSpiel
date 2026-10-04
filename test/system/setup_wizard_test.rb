@@ -23,8 +23,8 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     assert_selector "h1", text: "Create the admin account"
     fill_in "Email address", with: "owner@example.com"
-    fill_in "Password", with: "password123"
-    fill_in "Confirm password", with: "password123"
+    fill_in "Password", with: "password12345"
+    fill_in "Confirm password", with: "password12345"
     press "Create account"
 
     assert_selector "h1", text: "Site identity"

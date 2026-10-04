@@ -41,7 +41,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
 
   test "update" do
     assert_changes -> { @user.reload.password_digest } do
-      patch admin_update_password_path(@user.password_reset_token), params: { password: "new", password_confirmation: "new" }
+      patch admin_update_password_path(@user.password_reset_token), params: { password: "a-new-password-1", password_confirmation: "a-new-password-1" }
       assert_redirected_to admin_sign_in_path
     end
 
@@ -52,7 +52,7 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
   test "update with non matching passwords" do
     token = @user.password_reset_token
     assert_no_changes -> { @user.reload.password_digest } do
-      patch admin_update_password_path(token), params: { password: "no", password_confirmation: "match" }
+      patch admin_update_password_path(token), params: { password: "long-enough-pw-1", password_confirmation: "long-enough-pw-2" }
       assert_redirected_to admin_edit_password_path(token)
     end
 

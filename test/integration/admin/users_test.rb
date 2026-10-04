@@ -21,7 +21,7 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
   test "creating a user" do
     assert_difference -> { User.count }, 1 do
       post "/cs-studio/users", params: { user: {
-        email_address: "new@example.com", password: "password123", password_confirmation: "password123"
+        email_address: "new@example.com", password: "password12345", password_confirmation: "password12345"
       } }
     end
 
@@ -29,13 +29,13 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     user = User.find_by!(email_address: "new@example.com")
-    assert user.authenticate("password123")
+    assert user.authenticate("password12345")
   end
 
   test "creating a user with mismatched confirmation fails" do
     assert_no_difference -> { User.count } do
       post "/cs-studio/users", params: { user: {
-        email_address: "new@example.com", password: "password123", password_confirmation: "nope"
+        email_address: "new@example.com", password: "password12345", password_confirmation: "nope"
       } }
     end
 
@@ -46,7 +46,7 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
   test "creating a user with an email already taken (case-insensitively) fails" do
     assert_no_difference -> { User.count } do
       post "/cs-studio/users", params: { user: {
-        email_address: users(:one).email_address.upcase, password: "password123", password_confirmation: "password123"
+        email_address: users(:one).email_address.upcase, password: "password12345", password_confirmation: "password12345"
       } }
     end
 

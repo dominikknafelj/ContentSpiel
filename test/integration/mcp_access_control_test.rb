@@ -40,7 +40,7 @@ class McpAccessControlTest < ActionDispatch::IntegrationTest
     # the token sees the intersection, never more than either side.
     reader_only_blogs = AccessControl::Group.create!(name: "Blog readers")
     reader_only_blogs.grants.create!(permission: "posts.read", scope: { "content_types" => [ "blog" ] })
-    user = User.create!(email_address: "blog-reader@example.com", password: "password123")
+    user = User.create!(email_address: "blog-reader@example.com", password: "password12345")
     AccessControl::Membership.create!(user: user, group: reader_only_blogs)
     AccessControl::Membership.create!(user: user, group: access_control_groups(:read_only))
     raw = token_for(user, reader_only_blogs)
@@ -196,7 +196,7 @@ class McpAccessControlTest < ActionDispatch::IntegrationTest
   # --- Instructions ------------------------------------------------------
 
   test "the initialize response names the token's group, and nothing about other tokens or users" do
-    other = User.create!(email_address: "someone-else@example.com", password: "password123")
+    other = User.create!(email_address: "someone-else@example.com", password: "password12345")
     ApiToken.generate!(other, group: access_control_groups(:editor))
     raw = token_for(users(:author), access_control_groups(:author))
 

@@ -98,7 +98,7 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     bloggers = AccessControl::Group.create!(name: "Bloggers")
     bloggers.grants.create!(permission: "posts.read", scope: {})
     bloggers.grants.create!(permission: "posts.create", scope: { "content_types" => [ "blog" ] })
-    blogger = User.create!(email_address: "blogger@example.com", password: "password123")
+    blogger = User.create!(email_address: "blogger@example.com", password: "password12345")
     AccessControl::Membership.create!(user: blogger, group: bloggers)
 
     sign_in_as blogger

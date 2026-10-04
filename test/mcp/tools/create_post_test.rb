@@ -7,7 +7,7 @@ class Mcp::Tools::CreatePostTest < ActiveSupport::TestCase
   end
 
   setup do
-    @user = User.create!(email_address: "agent@example.com", password: "password123")
+    @user = User.create!(email_address: "agent@example.com", password: "password12345")
   end
 
   test "creates a post and returns it" do

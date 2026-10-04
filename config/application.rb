@@ -48,6 +48,13 @@ module ContentSpiel
     config.i18n.available_locales = SUPPORTED_LOCALES.keys.map(&:to_sym)
     config.i18n.default_locale = :en
 
+    # Lets config/locales/en.yml set a per-attribute `format` for validation
+    # messages (Rails ignores it otherwise). Used for exactly one thing:
+    # User's password length message is a whole sentence ("Use at least 12
+    # characters.") that must read the same everywhere, without a "Password "
+    # prefix in `full_messages`.
+    config.active_model.i18n_customize_full_message = true
+
     # Active Record encryption -- today only for the AI API key
     # (`SiteSetting` `encrypts :ai_api_key`, translation helpers spec §6.2).
     # Keys come from, in order of precedence:

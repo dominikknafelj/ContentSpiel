@@ -7,7 +7,7 @@ class McpRateLimitTest < ActionDispatch::IntegrationTest
   include ActiveSupport::Testing::TimeHelpers
 
   setup do
-    @user = User.create!(email_address: "agent@example.com", password: "password123")
+    @user = User.create!(email_address: "agent@example.com", password: "password12345")
     @token, @raw_token = ApiToken.generate!(@user)
     host! "127.0.0.1"
   end
@@ -37,7 +37,7 @@ class McpRateLimitTest < ActionDispatch::IntegrationTest
   end
 
   test "a different token has its own, unaffected limit" do
-    other_user = User.create!(email_address: "agent2@example.com", password: "password123")
+    other_user = User.create!(email_address: "agent2@example.com", password: "password12345")
     _other_token, other_raw = ApiToken.generate!(other_user)
 
     travel_to Time.current do

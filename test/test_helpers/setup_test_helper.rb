@@ -20,7 +20,7 @@ module SetupTestHelper
 
   def create_setup_admin(email: "owner@example.com")
     patch setup_step_path("admin"), params: { user: {
-      email_address: email, password: "password123", password_confirmation: "password123"
+      email_address: email, password: "password12345", password_confirmation: "password12345"
     } }
   end
 end

@@ -2,7 +2,7 @@ require "test_helper"
 
 class ApiTokenTest < ActiveSupport::TestCase
   setup do
-    @user = User.create!(email_address: "agent@example.com", password: "password123")
+    @user = User.create!(email_address: "agent@example.com", password: "password12345")
   end
 
   test "generate! returns a persisted token bound to the given user, and the raw value" do

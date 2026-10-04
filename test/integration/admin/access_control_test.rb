@@ -77,7 +77,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:author))
 
     assert_no_difference -> { User.count } do
-      post "/cs-studio/users", params: { user: { email_address: "new@example.com", password: "password123", password_confirmation: "password123" } }
+      post "/cs-studio/users", params: { user: { email_address: "new@example.com", password: "password12345", password_confirmation: "password12345" } }
     end
     assert_response :forbidden
   end

@@ -29,7 +29,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
   test "a password confirmation mismatch is shown, nothing is created" do
     assert_no_difference "User.count" do
       patch setup_step_path("admin"), params: { user: {
-        email_address: "owner@example.com", password: "password123", password_confirmation: "different"
+        email_address: "owner@example.com", password: "password12345", password_confirmation: "different"
       } }
     end
 
@@ -38,7 +38,7 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
   end
 
   test "a blank email is rejected" do
-    patch setup_step_path("admin"), params: { user: { email_address: " ", password: "password123", password_confirmation: "password123" } }
+    patch setup_step_path("admin"), params: { user: { email_address: " ", password: "password12345", password_confirmation: "password12345" } }
 
     assert_response :unprocessable_entity
     assert_includes response.body, "Email address can&#39;t be blank"

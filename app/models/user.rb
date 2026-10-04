@@ -7,6 +7,17 @@ class User < ApplicationRecord
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
+  MINIMUM_PASSWORD_LENGTH = 12
+
+  # Design pass spec §5.5. `allow_nil` is what keeps existing shorter
+  # passwords working: `password` is only non-nil while one is being set,
+  # so the rule applies to setup, new user, change and reset -- never to a
+  # save that leaves the password alone. Length counts characters, not
+  # bytes (Ruby's String#length), so twelve multibyte characters pass.
+  # The message is a whole sentence; config/locales/en.yml drops the
+  # "Password " prefix for this attribute so `full_messages` reads the same.
+  validates :password, length: { minimum: MINIMUM_PASSWORD_LENGTH, message: "Use at least 12 characters." }, allow_nil: true
+
   # Optional (design pass spec §5.1): shown wherever a user is named, with
   # the email as the fallback -- `display_name` is the one reader, so no
   # screen decides the fallback for itself. A blank name is stored as nil,

@@ -286,7 +286,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
   test "an owner the viewer can't read gets a neutral label instead of a link" do
     group = AccessControl::Group.create!(name: "Media only #{SecureRandom.hex(4)}")
     group.grants.create!(permission: "media.upload")
-    viewer = User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password", password_confirmation: "password")
+    viewer = User.create!(email_address: "media-only-#{SecureRandom.hex(4)}@example.com", password: "password12345", password_confirmation: "password12345")
     AccessControl::Membership.create!(user: viewer, group: group)
 
     asset = upload_asset(filename: "hero.png")
