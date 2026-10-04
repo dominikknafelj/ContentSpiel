@@ -22,6 +22,7 @@
   <% end %>
 </dl>
 
-<div class="mt-6">
+<div class="mt-6 flex items-center gap-4">
   <%= button_to "Finish setup", setup_step_path("review"), method: :patch, class: setup_primary_button_class %>
+  <%= render "setup/back" %>
 </div>

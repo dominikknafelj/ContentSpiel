@@ -23,6 +23,18 @@ module SetupHelper
     "inline-block cursor-pointer rounded-cs border border-line-strong px-4 py-2 text-ink hover:bg-sunken"
   end
 
+  # "Skip" on an optional step: no border, no fill, so Continue stays the one
+  # emphasised action (same look as Admin::ButtonComponent's :ghost).
+  def setup_ghost_link_class
+    "inline-flex cursor-pointer items-center justify-center rounded-cs px-4 py-2 font-semibold text-dim hover:bg-sunken hover:text-ink"
+  end
+
+  # The wizard's step list is "done" for every step before the current one:
+  # steps are strictly ordered and each persists as it is submitted.
+  def setup_step_done?(step, current)
+    SetupController::STEPS.index(step) < SetupController::STEPS.index(current)
+  end
+
   # Native name (e.g. "Deutsch" for "de") -- the setup wizard is naming
   # languages for whoever picks them, not describing them in English.
   def language_name(code)

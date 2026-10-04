@@ -44,7 +44,7 @@ class SetupController < ApplicationController
     if: -> { params[:step] == "token" },
     with: -> { redirect_to setup_step_path("token"), alert: "Too many attempts. Try again in a few minutes." }
 
-  helper_method :step_label, :optional_step?, :next_step
+  helper_method :step_label, :optional_step?, :next_step, :previous_step
 
   def index
     redirect_to setup_step_path(first_step)
@@ -109,6 +109,17 @@ class SetupController < ApplicationController
 
     def next_step
       STEPS[STEPS.index(@step) + 1]
+    end
+
+    # The step a "Back" link goes to: nil on the first step, and on "site",
+    # whose predecessor (creating the admin) can't be revisited once the
+    # account exists -- `require_step_access` bounces a signed-in visitor off
+    # "token" and "admin".
+    def previous_step
+      index = STEPS.index(@step)
+      return if index.zero? || @step == "site"
+
+      STEPS[index - 1]
     end
 
     def step_label(step) = LABELS.fetch(step)

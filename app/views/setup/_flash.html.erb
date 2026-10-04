@@ -1,6 +1,8 @@
+<%# An inline box, not a toast: toasts are CS Studio only (they need the
+    admin JS entry, which the wizard doesn't load). %>
 <% if flash[:alert] %>
-  <p class="mb-4 rounded-cs border border-danger bg-danger-tint px-3 py-2 text-danger-ink" role="alert"><%= flash[:alert] %></p>
+  <p class="mb-4 rounded-cs bg-danger-tint px-3 py-2 text-sm text-danger-ink" role="alert"><%= flash[:alert] %></p>
 <% end %>
 <% if flash[:notice] %>
-  <p class="mb-4 rounded-cs border border-ok bg-ok-tint px-3 py-2 text-ok-ink" role="status"><%= flash[:notice] %></p>
+  <p class="mb-4 rounded-cs bg-ok-tint px-3 py-2 text-sm text-ok-ink" role="status"><%= flash[:notice] %></p>
 <% end %>

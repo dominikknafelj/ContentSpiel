@@ -7,7 +7,8 @@
 
 <%= render "setup/system_check_results", results: @results %>
 
-<div class="mt-6 flex gap-3">
+<div class="mt-6 flex items-center gap-3">
   <%= link_to "Continue", setup_step_path(next_step), class: setup_primary_button_class %>
   <%= link_to "Re-run checks", setup_step_path("system_check"), class: setup_secondary_link_class %>
+  <%= render "setup/back" %>
 </div>

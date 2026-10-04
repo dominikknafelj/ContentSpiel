@@ -16,6 +16,27 @@ class SetupEarlyStepsTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", setup_step_path("admin"), text: "Continue"
   end
 
+  test "the step list marks the current step, done steps and optional ones" do
+    get setup_step_path("admin")
+
+    assert_select "nav[aria-label='Setup steps'] li[aria-current=step]", text: /Admin account/
+    assert_select "nav[aria-label='Setup steps'] li", text: /✓.*Setup token/m
+    assert_select "nav[aria-label='Setup steps'] li", text: /System check\s+optional/
+    assert_select "header", text: /Content·Spiel/
+    assert_select "[role=radiogroup][aria-label='Theme']"
+  end
+
+  test "the admin step failing shows the error summary and keeps field names" do
+    patch setup_step_path("admin"), params: { user: { email_address: "owner@example.com", password: "short", password_confirmation: "short" } }
+
+    assert_response :unprocessable_entity
+    assert_select "[role=alert]", text: /Use at least 12 characters\./
+    assert_select "input[name='user[email_address]']"
+    assert_select "input[name='user[password]']"
+    assert_select "input[name='user[password_confirmation]']"
+    assert_select "button", text: "Continue"
+  end
+
   test "creating the admin signs them in and moves to site identity" do
     assert_difference "User.count", 1 do
       create_setup_admin

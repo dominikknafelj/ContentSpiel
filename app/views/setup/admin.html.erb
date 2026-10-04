@@ -3,7 +3,7 @@
 <p class="mt-2 text-dim">You'll use this account to sign in to the admin.</p>
 
 <%= form_with model: @user, url: setup_step_path("admin"), method: :patch, class: "mt-6 space-y-4" do |form| %>
-  <%= render "setup/errors", record: @user %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors) %>
   <div>
     <%= form.label :email_address, "Email address", class: setup_label_class %>
     <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", class: setup_input_class %>
@@ -14,5 +14,8 @@
   <div>
     <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm password") %>
   </div>
-  <%= form.submit "Create account", class: setup_primary_button_class, data: { password_submit: true } %>
+  <div class="flex items-center gap-4">
+    <%= render Admin::ButtonComponent.new(label: "Continue", type: "submit", data: { password_submit: true }) %>
+    <%= render "setup/back" %>
+  </div>
 <% end %>
