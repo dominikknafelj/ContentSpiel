@@ -22,7 +22,7 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     Post.insert_all(rows)
   end
 
-  def row_titles = css_select("tbody tr td:nth-child(2) span:first-child").map { |node| node.text.strip }
+  def row_titles = css_select("tbody tr th[scope=row] span:first-child").map { |node| node.text.strip }
 
   def query_count
     count = 0
