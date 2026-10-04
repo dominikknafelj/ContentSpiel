@@ -26,9 +26,11 @@ module Admin
   # and removes it on the next successful save. Without one, no `id` attribute
   # is rendered at all.
   #
-  # Every toast is `data-turbo-temporary`: Turbo drops it from the page-cache
-  # snapshot, so coming Back to a screen never shows a stale Undo (whose
-  # target may be long gone) or an error that has since been fixed.
+  # A toast never comes back from Turbo's page cache (coming Back to a
+  # screen must not show a stale Undo, or an error that has since been
+  # fixed). `admin--toast` sees to that, and its comment says why this
+  # element must NOT carry `data-turbo-temporary` to get there: Turbo would
+  # delete a live, just-relayed toast on the next frame navigation.
   class ToastComponent < AdminComponent
     KINDS = %i[success undo warning error].freeze
     TIMEOUTS = { success: 4000, undo: 8000, warning: 0, error: 0 }.freeze

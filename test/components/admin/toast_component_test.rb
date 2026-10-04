@@ -33,11 +33,16 @@ class Admin::ToastComponentTest < ViewComponent::TestCase
     assert_selector ".admin-toast form[action='/u'] button", text: "Undo"
   end
 
-  # A Turbo page-cache snapshot must never bring a toast back: an Undo whose
-  # eight seconds are long over, or an error that has since been fixed.
-  test "a toast is left out of Turbo's page cache" do
+  # A page-cache snapshot must never bring a toast back -- but not by way of
+  # `data-turbo-temporary`: Turbo removes such an element from the *live*
+  # page whenever it caches a snapshot, which a frame navigation promoted to
+  # a history entry does too, deleting the toast that frame's response had
+  # just relayed. `admin--toast` strips toasts from cached renders instead
+  # (test/system/toast_test.rb: "going Back ... never brings its toast back").
+  test "a toast is not data-turbo-temporary, which would delete a relayed toast as it appears" do
     render_inline(Admin::ToastComponent.new(message: "Moved.", kind: :undo, action: { label: "Undo", url: "/u" }))
-    assert_selector ".admin-toast[data-turbo-temporary]"
+    assert_selector ".admin-toast"
+    assert_no_selector ".admin-toast[data-turbo-temporary]"
   end
 
   test "it has no id unless given one, and carries the one it is given" do
