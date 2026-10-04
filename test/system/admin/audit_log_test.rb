@@ -28,6 +28,9 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
     assert_selector "input#to"
 
     select "Any time", from: "Date"
+    # The answer re-renders the toolbar: wait for it, or the next choice is
+    # made on a select that is about to be replaced (and is lost with it).
+    assert_selector "#audit_event_#{@old.id}", wait: 5
     select "MCP", from: "Channel"
     assert_no_selector "#audit_event_#{@recent.id}", wait: 5
     assert_selector "#audit_event_#{@old.id}"

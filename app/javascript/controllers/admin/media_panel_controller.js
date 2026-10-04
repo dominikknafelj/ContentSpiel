@@ -19,12 +19,16 @@ import { Controller } from "@hotwired/stimulus"
 // is.
 //
 // The click only leaves a note (module state, which outlives the DOM it was
-// made in); the NEXT `connect` -- the controller's element is re-rendered by
-// the frame navigation, or by the visit a language tab is -- carries it out
-// and spends it. (The visit Turbo promotes a frame navigation to renders
-// nothing, so there is no second connect to keep the note for.) A note older
-// than WINDOW_MS (a click that went nowhere: a link opened in a new tab, a
-// refused visit) is ignored, never acted on by some later, unrelated render.
+// made in); the NEXT `connect` carries it out -- the controller's element is
+// re-rendered by the frame navigation, or by the visit a language tab is. The
+// note is NOT spent by that first connect: on the way through a frame
+// navigation and the visit Turbo promotes it to, the element connects again
+// and the focus just given is dropped with the element that had it (measured:
+// spending the note at once fails the keyboard system test every time). So it
+// is kept until the navigation is over (`turbo:load`) and every connect in
+// between acts on it. A note older than WINDOW_MS (a click that went nowhere:
+// a link opened in a new tab, a refused visit) is ignored, never acted on by
+// some later, unrelated render.
 const WINDOW_MS = 3000
 let pending = null
 
@@ -37,11 +41,16 @@ export default class extends Controller {
     }
     this.element.addEventListener("click", this.onTab)
 
+    if (!pending) return
+    if (Date.now() - pending.at > WINDOW_MS) {
+      pending = null
+      return
+    }
+
     const note = pending
-    pending = null
-    if (!note || Date.now() - note.at > WINDOW_MS) return
     // After the render settles: Turbo's own post-render work would otherwise win.
     requestAnimationFrame(() => this.moveFocus(note))
+    document.addEventListener("turbo:load", () => { pending = null }, { once: true })
   }
 
   disconnect() {
