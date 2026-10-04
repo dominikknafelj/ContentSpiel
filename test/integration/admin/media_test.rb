@@ -326,7 +326,7 @@ class Admin::MediaTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "button[disabled]", text: "Move to trash"
-    assert_includes response.body, asset.reload.in_use_message(kept_only: true)
+    assert_select "#media-trash-help", text: /In use on 1 page\. Remove it there first\./
   end
 
   # Task 10: the redirect carries a flash naming the image and an Undo that

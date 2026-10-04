@@ -134,13 +134,23 @@ module Admin
       # server wouldn't.
       def move_to_trash_disabled? = usage_state == :in_use
 
-      # The same wording `Trash::Move`'s own refusal uses
-      # (`Media::Asset#in_use_message(kept_only: true)`), so the disabled
-      # button's reason and the 422 an editor would get from forging past it
-      # never disagree. Memoized like `#usage_state`/`#usage_entries` above:
-      # the template reads it twice (the disabled button's own `title:` and
-      # the paragraph under it), and `#in_use_message` runs its own queries.
-      def in_use_reason = defined?(@in_use_reason) ? @in_use_reason : (@in_use_reason = asset.in_use_message(kept_only: true))
+      # Why the disabled button is disabled, as whole sentences (design pass
+      # bug 7): the count of kept places that use the image, read from the
+      # same `#usage_entries` the "Used on" list below shows, so the two
+      # never disagree. (`Trash::Move`'s own refusal wording stays
+      # `Media::Asset#in_use_message`; this is the editor-facing explanation.)
+      # One whole string per case -- never assembled from sentence parts.
+      # Zero entries while still `:in_use` means every kept usage is one this
+      # panel can't name (an unresolvable row), which `Trash::Move` still
+      # refuses.
+      def in_use_reason
+        @in_use_reason ||=
+          case usage_entries.size
+          when 0 then "In use somewhere that can’t be shown. Remove it there first."
+          when 1 then "In use on 1 #{usage_entries.first[:kind]}. Remove it there first."
+          else "In use in #{usage_entries.size} places. Remove it there first."
+          end
+      end
 
       # "Used on" (design spec §6): one entry per distinct place, grouped
       # the same way `Media::Asset#usages_summary` already groups its raw
@@ -179,9 +189,9 @@ module Admin
           kind = place.is_a?(Post) ? "post" : "page"
 
           if can?("#{kind}s.read", place)
-            { label: "#{role_label} — #{kind} “#{Audit::Snapshot.label_for(place)}”#{locale_suffix}", path: place_path(place, kind) }
+            { label: "#{role_label} — #{kind} “#{Audit::Snapshot.label_for(place)}”#{locale_suffix}", path: place_path(place, kind), kind: kind }
           else
-            { label: "#{role_label} — a #{kind} you can't open#{locale_suffix}", path: nil }
+            { label: "#{role_label} — a #{kind} you can't open#{locale_suffix}", path: nil, kind: kind }
           end
         end
       end
