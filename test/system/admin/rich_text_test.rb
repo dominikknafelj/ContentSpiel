@@ -182,11 +182,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     assert_no_text_in_editor "there"
   end
 
-  # Design pass round 1, bug 5: with the primary-language original shown
-  # beside the editor (half the column each) the toolbar used to wrap onto
-  # several rows. It is one row now, and the Insert menu -- which sits inside
-  # the toolbar -- is neither clipped by it nor out of reach: its items are
-  # visible, inside the viewport, and still run their command.
+  # The page editor sits beside the tree, so at 1100px a translation's editor
+  # gets a column too narrow for the toolbar's single row. There the toolbar
+  # wraps -- whole groups at a time -- but stays inside its own box: no tool
+  # pokes out sideways or runs into the original's panel next to it, and the
+  # Insert menu still opens.
   test "in a narrow translation column (page editor beside the tree) the toolbar wraps inside its box and the Insert menu stays reachable" do
     page.driver.resize(1100, 1000)
     page_record = create_page(title: "About")
@@ -216,6 +216,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     page.driver.resize(1400, 1400)
   end
 
+  # Design pass round 1, bug 5: with the primary-language original shown
+  # beside the editor (half the column each) the toolbar used to wrap onto
+  # several rows. It is one row now, and the Insert menu -- which sits inside
+  # the toolbar -- is neither clipped by it nor out of reach: its items are
+  # visible, inside the viewport, and still run their command.
   test "in a translation the toolbar is one row and the Insert menu opens and runs YouTube" do
     page.driver.resize(1400, 1000)
     @post.assign_body(rich_doc("Hello **there**"), locale: :en)

@@ -70,7 +70,9 @@ module Admin
     def index
       @type = params[:type].presence_in(MODELS.keys)
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: total_count)
-      @items = listed_items
+      # A page past the end shows the "back to page 1" notice and no rows:
+      # don't load `offset + 50` records per type just to drop them all.
+      @items = @pagination.out_of_range? ? [] : listed_items
       @retention_days = Current.site.trash_retention_days
     end
 

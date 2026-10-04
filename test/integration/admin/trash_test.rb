@@ -64,6 +64,26 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     assert_select "a", text: "Back to page 1"
   end
 
+  # A page past the end has nothing to list, so nothing is loaded for it:
+  # the window `listed_items` reads is `offset + 50` rows per type, i.e.
+  # everything in the trash for a large enough `?page=`.
+  test "an out-of-range page loads no trashed rows" do
+    sign_in_as users(:one)
+    row_queries = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+      row_queries << payload[:sql] if payload[:sql].match?(/ORDER BY .*trashed_at.* DESC/i)
+    end
+    get admin_trash_path(page: 9999)
+    assert_response :success
+    assert_empty row_queries
+
+    row_queries.clear
+    get admin_trash_path
+    assert_not_empty row_queries, "the probe does see the list's own queries on a real page"
+  ensure
+    ActiveSupport::Notifications.unsubscribe(subscriber)
+  end
+
   test "restore brings an item back and says where" do
     sign_in_as users(:one)
     post admin_restore_trash_item_path("post", @post)

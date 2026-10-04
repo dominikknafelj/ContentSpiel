@@ -125,7 +125,7 @@ module Admin
     def suggestion_streams(fields, translation, result)
       # The model is configuration, shown in the box's heading; nothing about
       # the key is ever read here.
-      named = { provider: Current.site.ai_provider, model: AI.model }
+      named = { model: AI.model }
       requested_inputs(fields).map do |field, input_id|
         box = Admin::TranslationScreen::SuggestionComponent
         component =

@@ -99,9 +99,12 @@ export default class extends Controller {
   // also make are offered: the destination must be one of this controller's
   // own `list` targets (`data-admin--tree-target="list"`): the homepage's own
   // level has none (the homepage is the one root; a page can't leave it), and
-  // neither does a context-only page's list, so ArrowRight under such a
-  // sibling and ArrowLeft out to such a level do nothing. A page can only nest
-  // under a *sibling*, never into its own subtree.
+  // neither does a context-only page's list, so ArrowLeft out to a level
+  // whose parent is context-only does nothing. (ArrowRight never meets a
+  // context-only sibling: a row only has a handle when its parent is a page
+  // the editor can read -- `Admin::TreeNodeComponent#movable?` -- and every
+  // page under a readable one is readable.) A page can only nest under a
+  // *sibling*, never into its own subtree.
   //
   // A picked row whose handle loses focus is put back (`blur`): the DOM move
   // has saved nothing, so leaving it displaced and styled would show an order

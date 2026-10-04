@@ -87,6 +87,15 @@
   .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
 }
 @media (min-width: 1024px) { .admin-top-bar__tree { display: none; } }
+/* The scrim belongs to a drawer, and `admin--drawer` only un-hides it when
+   one opens -- it knows nothing about widths. A drawer left open while the
+   window is widened stops being a drawer (the rules above no longer apply),
+   and its scrim would be left covering a page that has nothing over it. So
+   the scrim never shows where no drawer can exist: at all from 1280px, and
+   from 1024px unless it is the modules sidebar (still a drawer there) that
+   is open. */
+@media (min-width: 1280px) { .admin-shell__scrim { display: none; } }
+@media (min-width: 1024px) { body:not(:has(.admin-shell__sidebar[data-open])) .admin-shell__scrim { display: none; } }
 @media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
 
 /* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
@@ -108,14 +117,22 @@
 
 /* Styled native select (design pass spec §4). The chevron is two CSS
    gradients rather than an image so it takes the token colour in both
-   themes. Size/width come from the utility classes beside it. */
+   themes. Size/width come from the utility classes beside it.
+
+   The chevron (and `appearance: none`, and the room kept for it on the
+   right) are for a drop-down only. A `multiple` select is a list box --
+   setup's "other languages" -- with nothing to drop down: it keeps the
+   border and colours and its native list. */
 .cs-select {
-  appearance: none;
   border: 1px solid var(--cs-line-strong);
   border-radius: var(--cs-radius);
   background-color: var(--cs-surface);
   color: var(--cs-ink);
-  padding: 0.5rem 2rem 0.5rem 0.625rem;
+  padding: 0.5rem 0.625rem;
+}
+.cs-select:not([multiple]) {
+  appearance: none;
+  padding-right: 2rem;
   background-image: linear-gradient(45deg, transparent 50%, var(--cs-meta) 50%), linear-gradient(135deg, var(--cs-meta) 50%, transparent 50%);
   background-position: calc(100% - 15px) 55%, calc(100% - 10px) 55%;
   background-size: 5px 5px, 5px 5px;

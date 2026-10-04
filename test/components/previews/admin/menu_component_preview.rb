@@ -4,7 +4,6 @@ module Admin
     def default
       render Admin::MenuComponent.new(label: "More ▾") do |menu|
         menu.with_item { "<a href=\"#\">Rename</a>".html_safe }
-        menu.with_divider
         menu.with_item { "<a href=\"#\">Delete…</a>".html_safe }
       end
     end
@@ -12,7 +11,6 @@ module Admin
     def aligned_left
       render Admin::MenuComponent.new(label: "More ▾", align: :left) do |menu|
         menu.with_item { "<a href=\"#\">Rename</a>".html_safe }
-        menu.with_divider
         menu.with_item { "<a href=\"#\">Delete…</a>".html_safe }
       end
     end

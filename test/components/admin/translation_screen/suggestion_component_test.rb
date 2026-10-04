@@ -16,7 +16,7 @@ class Admin::TranslationScreen::SuggestionComponentTest < ViewComponent::TestCas
 
   test "a plain suggestion is editable and names the model that wrote it" do
     render_inline(Admin::TranslationScreen::SuggestionComponent.new(input_id: "post_title", locale: "de", suggestion: "Hallo Welt",
-      provider: "anthropic", model: "claude-sonnet-5"))
+      model: "claude-sonnet-5"))
     assert_selector "[data-translation-suggestion].bg-accent-tint"
     assert_selector "textarea[data-translate-suggestion-text][aria-label='Suggested translation']", text: "Hallo Welt"
     assert_no_selector "textarea[name]", visible: :all

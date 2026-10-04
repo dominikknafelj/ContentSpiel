@@ -41,9 +41,8 @@ module Admin
 
       BUTTON_CLASS = "cursor-pointer rounded-cs border border-line-strong bg-surface px-2 py-0.5 text-ink hover:bg-sunken".freeze
 
-      def initialize(input_id:, locale:, suggestion: nil, warnings: [], error: nil, provider: nil, model: nil)
+      def initialize(input_id:, locale:, suggestion: nil, warnings: [], error: nil, model: nil)
         @input_id = input_id.to_s
-        @provider = provider.presence
         @model = model.presence
         @locale = locale.to_s
         @suggestion = suggestion
@@ -77,7 +76,7 @@ module Admin
 
       private
 
-      attr_reader :input_id, :locale, :suggestion, :warnings, :error, :provider, :model
+      attr_reader :input_id, :locale, :suggestion, :warnings, :error, :model
     end
   end
 end

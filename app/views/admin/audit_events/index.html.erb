@@ -97,9 +97,10 @@
   <%# The audit log keeps its cursor-style paging (`Admin::AuditEventsController`'s
       own comment: an offset over a log that keeps growing can't give a
       reliable page count, so no page numbers). "Load older" is the footer
-      of the card; every other filter param carries over via
-      `request.query_parameters`, which already includes `offset` when one
-      was submitted, so `merge` here always wins over a stale one. %>
+      of the card; the filters carry over via `list_params(*filter_keys)`
+      (`Admin::ListLinksHelper`: only the keys this list names, never
+      `request.query_parameters` wholesale), which doesn't include `offset`,
+      so each link sets its own. %>
   <% if @offset.positive? || @has_next %>
     <div class="flex items-center justify-center gap-3 border-t border-line px-4 py-3">
       <% if @offset.positive? %>

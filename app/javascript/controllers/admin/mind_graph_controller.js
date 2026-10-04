@@ -195,8 +195,12 @@ export default class extends Controller {
     // `textContent`, never markup -- a title is plain text whatever it
     // contains.
     const label = document.createElementNS(SVG_NS, "text")
+    // Counted and cut by character (code point), not by UTF-16 unit: slicing
+    // the string itself can split an emoji or any other astral character in
+    // two and leave half of it, a lone surrogate, at the end of the label.
     const title = String(node.title)
-    label.textContent = title.length > MAX_LABEL_CHARACTERS ? `${title.slice(0, MAX_LABEL_CHARACTERS - 1)}\u2026` : title
+    const characters = Array.from(title)
+    label.textContent = characters.length > MAX_LABEL_CHARACTERS ? `${characters.slice(0, MAX_LABEL_CHARACTERS - 1).join("")}\u2026` : characters.join("")
     label.setAttribute("x", 12)
     label.setAttribute("y", 4)
     label.setAttribute("font-size", "12")

@@ -1,10 +1,13 @@
 module Admin
   # A popover menu (handoff §10): a button that owns a hidden `role="menu"`
-  # panel, replacing the native `<details>` the first overflow menus used
-  # (a `<details>` has no arrow-key movement, no Escape, no outside click).
-  # Each item is arbitrary content -- a `link_to`, a `button_to`, or
-  # `with_divider` -- and `admin--menu` gives every link or button inside the
-  # panel `role="menuitem"` and the keyboard behaviour.
+  # panel, with what a native `<details>` lacks -- arrow-key movement,
+  # Escape, closing on an outside click. It is what new menus use (the
+  # rich-text toolbar's Insert menu, the language tabs' overflow). It has
+  # NOT replaced the older `<details>` menus: a block card's "⋯" and the page
+  # header's "More" are still `<details>`.
+  # Each item is arbitrary content -- a `link_to` or a `button_to` -- and
+  # `admin--menu` gives every link or button inside the panel
+  # `role="menuitem"` and the keyboard behaviour.
   #
   # `align` is the edge the panel hangs from (`:right` is the right edge of
   # the button, for a menu at the end of a row); `button_class` replaces the
@@ -18,10 +21,6 @@ module Admin
       @label = label
       @align = align
       @button_class = button_class
-    end
-
-    def with_divider
-      with_item { tag.div(role: "separator", class: "my-1 border-t border-line") }
     end
 
     private

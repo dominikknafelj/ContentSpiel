@@ -45,6 +45,19 @@ class Admin::PasswordsControllerTest < ActionDispatch::IntegrationTest
     assert_match "If that address belongs to an account, we've sent a link. It expires in 15 minutes.", known
   end
 
+  # The states are selected by exactly the value the controller redirects
+  # with; any other value is just the request form.
+  test "only sent=1 and expired=1 select a state" do
+    get new_admin_password_path(sent: "0")
+    assert_select "h1", text: "Check your email", count: 0
+    get new_admin_password_path(expired: "false")
+    assert_select "h1", text: "This link has expired", count: 0
+    get new_admin_password_path(sent: "1")
+    assert_select "h1", text: "Check your email"
+    get new_admin_password_path(expired: "1")
+    assert_select "h1", text: "This link has expired"
+  end
+
   test "an expired or invalid reset link shows the expired state with a way to ask again" do
     get admin_edit_password_path(token: "not-a-token")
     follow_redirect! if response.redirect?
