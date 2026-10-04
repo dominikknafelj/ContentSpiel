@@ -217,7 +217,12 @@ Rails.application.routes.draw do
     # `resources :users` so `suggest` is never read as a user id.
     get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
 
-    resources :users, only: %i[index new create edit update destroy]
+    resources :users, only: %i[index new create edit update destroy] do
+      # "Make owner…" / "Remove owner rights…" (round 3 Task 12, D18): an instant
+      # action of its own, `owner=1|0`, answered by `Users::Save` like any other
+      # change to a user -- never a field of the editor's form.
+      member { patch :owner }
+    end
 
     # The Groups module (access-control design spec §5): the list, the
     # editor (name, description, members, the permission matrix) and

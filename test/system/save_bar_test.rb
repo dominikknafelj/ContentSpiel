@@ -23,7 +23,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     visit admin_users_path
     await_admin_controllers
     page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
-    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address }
     assert_current_path edit_admin_user_path(@target)
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
     assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
@@ -210,7 +210,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     page.execute_script("document.addEventListener('turbo:load', () => { window.turboLoads = (window.turboLoads || 0) + 1 })")
     within("nav[aria-label='Modules']") { click_link "Users" }
     assert_current_path admin_users_path
-    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link "Edit" }
+    within("##{ActionView::RecordIdentifier.dom_id(@target)}") { click_link @target.email_address }
     assert_current_path edit_admin_user_path(@target)
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
     assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.turboLoads >= 2") }
@@ -280,7 +280,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     visit admin_users_path
     await_admin_controllers
     page.execute_script("document.addEventListener('turbo:load', () => { window.promotedVisitDone = true })")
-    click_link "+ New user"
+    click_link "New user"
     assert_current_path new_admin_user_path
     assert_eventually(message: "the promoted visit never completed") { page.evaluate_script("window.promotedVisitDone === true") }
     await_admin_controllers
@@ -475,7 +475,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # The footer belongs to its form: it sits in the form's own column, right
   # under the fields (not across the whole content area, where its buttons
   # ended up far from the form), Save first; the count is sans 13px, not mono
-  # capitals; and the Save button reads "Save".
+  # capitals; and the Save button reads "Save user" (round 3 Task 12).
   test "the footer sits in the form's column under the fields, Save first, in sans type" do
     sign_in_via_form(@owner)
     visit edit_admin_user_path(@target)
@@ -505,7 +505,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_equal "none", geometry["transform"]
     assert_no_match(/mono/i, geometry["font"])
     assert_equal "1px", geometry["borderTop"]
-    assert_selector ".admin-save-bar button[type=submit]", text: /\ASave\z/
+    assert_selector ".admin-save-bar button[type=submit]", text: /\ASave user\z/
   end
 
   test "the two account forms each keep their own footer and share one Leave prompt" do
