@@ -1,0 +1,18 @@
+<%# Fixed to the top of the window, outside the layout's content column; the
+    layout pads the body by the same 36px (`h-9` here, `pt-9` there) so
+    nothing sits underneath it. A labelled region, and the first thing in the
+    document, so its two links are the first stops in the tab order. The title
+    is ERB-escaped and cut to one line with CSS. %>
+<div role="region" aria-label="Preview" class="fixed inset-x-0 top-0 z-50 flex <%= HEIGHT_CLASS %> items-center gap-3 bg-preview-bg px-4 font-cs-mono text-label tracking-mono text-preview-ink">
+  <span class="shrink-0 font-semibold uppercase">Preview</span>
+  <span aria-hidden="true" class="shrink-0">·</span>
+  <span class="min-w-0 truncate"><%= title %></span>
+  <span aria-hidden="true" class="shrink-0">·</span>
+  <span class="shrink-0"><%= status %></span>
+  <span aria-hidden="true" class="shrink-0">·</span>
+  <span class="shrink-0"><%= language %></span>
+  <span class="ml-auto flex shrink-0 items-center gap-4">
+    <%= link_to "Edit", editor_path, class: "underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-preview-ink" %>
+    <%= link_to "Exit preview", exit_path, class: "underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-preview-ink" %>
+  </span>
+</div>

@@ -31,6 +31,25 @@ class DesignTokensTest < ActionDispatch::IntegrationTest
     assert_includes stylesheet("tailwind.css"), "md\\:rounded-l-cs"
   end
 
+  # The preview bar looks the same in light and dark: two tokens, declared once
+  # in the base block and never in the dark one, readable at 4.5:1 or better.
+  test "the preview bar tokens are the same in light and dark and have readable contrast" do
+    tokens = Rails.root.join("app/assets/tailwind/themes/default/tokens.css").read
+    dark_block = tokens[/\[data-theme="dark"\]\s*\{.*?\}/m]
+
+    assert_not_includes dark_block, "--th-preview"
+    background = tokens[/--th-preview-bg:\s*#(\h{6})/, 1] or flunk("--th-preview-bg missing")
+    ink = tokens[/--th-preview-ink:\s*#(\h{6})/, 1] or flunk("--th-preview-ink missing")
+
+    luminance = ->(hex) do
+      hex.scan(/../).map { |pair| (channel = pair.hex / 255.0) <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055)**2.4 }
+        .zip([ 0.2126, 0.7152, 0.0722 ]).sum { |value, weight| value * weight }
+    end
+    light, dark = [ luminance.(background), luminance.(ink) ].minmax.reverse
+    assert_operator (light + 0.05) / (dark + 0.05), :>=, 4.5
+    assert_includes stylesheet("theme-default.css"), ".bg-preview-bg"
+  end
+
   test "both builds point at the digested, served font files" do
     font_path = helpers.asset_path("archivo-latin-400-normal.woff2")
 

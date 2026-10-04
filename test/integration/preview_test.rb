@@ -16,10 +16,71 @@ class PreviewTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     get "/preview/draft"
     assert_response :success
-    assert_select "[role=status]", /Draft/
+    assert_select "[role=region][aria-label=Preview]", /Draft/
     assert_equal "private, no-store", response.headers["Cache-Control"]
     assert_equal "noindex", response.headers["X-Robots-Tag"]
     assert_select "a[href=?]", "/cs-studio/pages/#{@draft.id}"
+  end
+
+  test "the bar names the record, its status and the language's own name, and links Edit with the locale" do
+    with_locales(%w[en de], default: "en") do
+      Mobility.with_locale(:de) { @draft.update!(title: "Entwurf <b>", slug: "entwurf") }
+      sign_in_as(users(:one))
+
+      get "/preview/de/entwurf"
+
+      assert_response :success
+      assert_select "[role=region][aria-label=Preview]" do
+        assert_select "span.truncate", text: "Entwurf <b>"
+        assert_select "b", count: 0
+        assert_select "span", text: "Draft"
+        assert_select "span", text: "Deutsch"
+        assert_select "a[href=?]", "/cs-studio/pages/#{@draft.id}?locale=de", text: "Edit"
+      end
+    end
+  end
+
+  test "Exit preview leaves for the public URL of a live record and for the editor otherwise" do
+    live = Page.create!(parent: @root, title: "Live", published_at: 1.day.ago)
+    sign_in_as(users(:one))
+
+    get "/preview/live"
+    assert_select "[role=region] a[href=?]", "/live", text: "Exit preview"
+
+    get "/preview/draft"
+    assert_select "[role=region] a[href=?]", "/cs-studio/pages/#{@draft.id}", text: "Exit preview"
+  end
+
+  test "a post's bar edits the post and exits to its public URL when live" do
+    blog = Page.create!(parent: @root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    sign_in_as(users(:one))
+    get "/preview/blog/hello"
+
+    assert_response :success
+    assert_select "[role=region] a[href=?]", "/cs-studio/posts/#{post.id}", text: "Edit"
+    assert_select "[role=region] a[href=?]", "/blog/hello", text: "Exit preview"
+  end
+
+  test "the bar is the first thing in the body, outside the content column, and the body is padded for it" do
+    sign_in_as(users(:one))
+    get "/preview/draft"
+
+    assert_select "body.pt-9 > [role=region][aria-label=Preview]:first-child"
+    assert_select "html.scroll-pt-9"
+    assert_select "div.max-w-3xl [role=region]", count: 0
+  end
+
+  test "a live public page has no bar and no padding" do
+    Page.create!(parent: @root, title: "Live", published_at: 1.day.ago)
+
+    get "/live"
+
+    assert_response :success
+    assert_select "[aria-label=Preview]", count: 0
+    assert_select "body.pt-9", count: 0
   end
 
   test "links inside a preview stay in preview" do

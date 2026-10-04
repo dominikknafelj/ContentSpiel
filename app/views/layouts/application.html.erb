@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="<%= I18n.locale %>">
+<html lang="<%= I18n.locale %>"<%= " class=\"scroll-pt-9\"".html_safe if content_for?(:preview_banner) %>>
   <head>
     <title><%= content_for(:title) || "ContentSpiel" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -39,10 +39,14 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
+  <%# In a preview the bar (layouts/public/_preview_banner) is fixed to the
+      top of the window and out of the flow, so the body is pushed down by its
+      height (`pt-9`, 36px) and anchor jumps keep clear of it (`scroll-pt-9` on
+      <html>). Neither exists on the public site proper. %>
+  <body class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark<%= " pt-9" if content_for?(:preview_banner) %>">
+    <%= yield :preview_banner %>
     <div class="mx-auto max-w-3xl px-4">
       <%= render "layouts/public/header" %>
-      <%= yield :preview_banner %>
       <main class="py-12"><%= yield %></main>
       <%= render "layouts/public/footer" %>
     </div>
