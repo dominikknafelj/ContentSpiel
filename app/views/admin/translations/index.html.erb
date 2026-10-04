@@ -7,12 +7,15 @@
 
 <div class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(15rem,1fr))] gap-3" data-translation-summary>
   <% @target_locales.each do |locale| %>
-    <%= render Admin::TranslationScreen::SummaryCardComponent.new(locale: locale, summary: @summaries.fetch(locale)) %>
+    <%= render Admin::TranslationScreen::SummaryCardComponent.new(locale: locale, summary: @summaries.fetch(locale),
+          current: @language == locale,
+          url: admin_translations_path(list_params(:type, :language).except("language", "page").merge(@language == locale ? {} : { "language" => locale }))) %>
   <% end %>
 </div>
 
 <% if @types.size > 1 %>
   <%= form_with(**filter_form_options(admin_translations_path)) do %>
+    <% if @language %><%= hidden_field_tag :language, @language, id: nil %><% end %>
     <fieldset class="m-0 min-w-0 border-0 p-0">
       <legend class="sr-only">Type</legend>
       <div class="inline-flex flex-wrap overflow-hidden rounded-cs border border-line-strong bg-surface">
@@ -30,7 +33,7 @@
   <% end %>
 <% end %>
 
-<% page_url = ->(page) { admin_translations_path(list_params(:type).merge("page" => page)) } %>
+<% page_url = ->(page) { admin_translations_path(list_params(:type, :language).merge("page" => page)) } %>
 <% if @pagination.out_of_range? %>
   <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
 <% else %>

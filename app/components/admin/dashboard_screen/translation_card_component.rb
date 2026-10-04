@@ -26,7 +26,7 @@ module Admin
       def link
         return unless can?("pages.read") || can?("posts.read")
 
-        [ helpers.admin_translations_path(locale: entries.first.locale), "Open the translations overview" ]
+        [ helpers.admin_translations_path, "Open the translations overview" ]
       end
 
       def counts(entry)

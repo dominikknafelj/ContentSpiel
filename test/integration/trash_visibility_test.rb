@@ -283,9 +283,17 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
       assert_select "tbody tr[id^='translation-item-post-']", count: 1
       assert_select "label", text: /Posts\s*1\b/
 
-      kept_total = Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])[:total]
-      assert_equal kept_total, Translations::StateIndex.summaries(%w[de], [ Page.kept, Post.kept, Media::Asset.kept ]).dig("de", :total)
-      assert_operator kept_total, :<, Translations::StateIndex.summary("de", [ Page.all, Post.all, Media::Asset.all ])[:total]
+      # The rendered cards (what the viewer reads), not just the model: the
+      # trashed page, post and image are missing in German too, so a count
+      # taken over an unscoped relation would show a larger number.
+      kept = Translations::StateIndex.summary("de", [ Page.kept, Post.kept, Media::Asset.kept ])
+      everything = Translations::StateIndex.summary("de", [ Page.all, Post.all, Media::Asset.all ])
+      assert_operator kept[:missing], :<, everything[:missing]
+      assert_select "[data-translation-summary] [data-locale=de]" do
+        assert_select "span", text: "#{kept[:missing]} missing"
+        assert_select "[role=progressbar][aria-valuenow=?]", (kept[:complete] * 100.0 / kept[:total]).round.to_s
+      end
+      assert_select "[data-translation-summary] [data-locale=de] span", text: "#{everything[:missing]} missing", count: 0
     end
   end
 

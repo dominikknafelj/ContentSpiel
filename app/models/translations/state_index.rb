@@ -95,14 +95,10 @@ module Translations
     end
 
     # `{ total:, complete:, missing:, outdated: }` over the given (already
-    # read-scoped) relations: items, not fields.
+    # read-scoped) relations: items, not fields. One language's entry of
+    # `summaries`.
     def summary(locale, relations)
-      totals = Hash.new(0)
-      Array(relations).each do |relation|
-        relation.unscope(:order).joins(join_sql(relation.klass, locale))
-          .group(Arel.sql("COALESCE(translation_states.state, 'complete')")).count.each { |state, count| totals[state] += count }
-      end
-      { total: totals.values.sum, complete: totals["complete"], missing: totals["missing"], outdated: totals["outdated"] }
+      summaries([ locale ], relations).fetch(locale.to_s).slice(:total, :complete, :missing, :outdated)
     end
 
     # `{ locale => { total:, complete:, missing:, outdated: } }` for every
@@ -141,6 +137,36 @@ module Translations
       "EXISTS (#{rows.to_sql})"
     end
 
+    # Matches what `Time#iso8601` writes into `translation_original_changed_at`
+    # (`Translations::Tracker#record_original_changes`), with or without a
+    # zone offset (the site time zone applies while an editor saves), and
+    # nothing else: only a value like this is cast, so one malformed stored
+    # value can never raise a cast error and 500 the screen.
+    ISO_TIMESTAMP = "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-]([01]\\d|2[0-3]):[0-5]\\d)$".freeze
+
+    # SQL for when this record's original text last changed, "the most
+    # recently changed original" the translations matrix sorts by: the
+    # greatest of the stamps in the record's own `translation_original_changed_at`
+    # (any tracked field) and, for a page or post, of its blocks' stamps (a
+    # block's original changing is the page's original changing; one
+    # correlated aggregate over the `owner_type, owner_id` index), falling
+    # back to `updated_at` for a record that predates the stamps. A save that
+    # changes only a translation, or a Confirm, moves none of it.
+    def original_changed_at_sql(model)
+      table = model.quoted_table_name
+      parts = [ stamps_max_sql("#{table}.translation_original_changed_at") ]
+      if [ Page, Post ].include?(model)
+        parts << stamps_max_sql("blocks.translation_original_changed_at", from: "#{ContentBlock.quoted_table_name} blocks, ",
+          where: "WHERE blocks.owner_type = #{ActiveRecord::Base.connection.quote(model.polymorphic_name)} AND blocks.owner_id = #{table}.id")
+      end
+      "COALESCE(GREATEST(#{parts.join(", ")}), #{table}.updated_at)"
+    end
+
+    def stamps_max_sql(column, from: "", where: "")
+      "(SELECT max(CASE WHEN stamp.value ~ '#{ISO_TIMESTAMP}' THEN stamp.value::timestamptz END) " \
+      "FROM #{from}jsonb_each_text(CASE WHEN jsonb_typeof(#{column}) = 'object' THEN #{column} ELSE '{}'::jsonb END) stamp #{where})"
+    end
+
     def join_sql(model, locale)
       ActiveRecord::Base.sanitize_sql_array([
         "LEFT JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{model.quoted_table_name}.id " \
@@ -176,6 +202,6 @@ module Translations
 
     def key(record) = [ record.class.polymorphic_name, record.id ]
 
-    private_class_method :join_sql, :write, :rows_for, :key
+    private_class_method :stamps_max_sql, :join_sql, :write, :rows_for, :key
   end
 end

@@ -77,9 +77,9 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     old_missing.update_columns(updated_at: 5.days.ago)
     new_missing = create_post(title: "New missing")
     older_outdated = outdated_post("Older outdated")
-    older_outdated.update_columns(updated_at: 3.days.ago)
+    original_changed(older_outdated, 3.days.ago)
     newer_outdated = outdated_post("Newer outdated")
-    newer_outdated.update_columns(updated_at: 1.day.ago)
+    original_changed(newer_outdated, 1.day.ago)
     # The homepage is missing everywhere too; push it to the very end.
     Page.update_all(updated_at: 30.days.ago)
 
@@ -87,6 +87,88 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
 
     ids = css_select("tbody tr").map { |tr| tr["id"] }
     assert_equal [ newer_outdated, older_outdated, new_missing, old_missing ].map { |post| row_id("post", post) }, ids
+  end
+
+  # "Outdated first, the most recently changed ORIGINAL first" (handoff §4.4):
+  # the time each original last changed is stored per field
+  # (`translation_original_changed_at`); `updated_at` moves on any save.
+  def original_changed(record, time)
+    record.update_columns(translation_original_changed_at: { "title" => time.utc.iso8601 }, updated_at: Time.current)
+  end
+
+  def order_of(**params)
+    get "/cs-studio/translations", params: params
+    css_select("tbody tr[id^='translation-item-']").map { |tr| tr["id"] }
+  end
+
+  test "a translation-only save does not reorder the outdated rows" do
+    older = outdated_post("Older original")
+    newer = outdated_post("Newer original")
+    original_changed(older, 3.days.ago)
+    original_changed(newer, 1.day.ago)
+    assert_equal [ newer, older ].map { |post| row_id("post", post) }, order_of(type: "post")
+
+    # Translating the older post's German title is a save (updated_at moves)
+    # but changes no original; Spanish keeps it outdated.
+    assert Posts::Save.call(older, translations: { "de" => { title: "Älteres Original" } }).ok?
+    assert_operator older.reload.updated_at, :>, newer.reload.updated_at
+
+    assert_equal [ newer, older ].map { |post| row_id("post", post) }, order_of(type: "post")
+  end
+
+  test "a newer original change moves a row to the top, and a Confirm elsewhere moves nothing" do
+    first = outdated_post("First")
+    second = outdated_post("Second")
+    original_changed(first, 3.days.ago)
+    original_changed(second, 1.day.ago)
+    assert_equal [ second, first ].map { |post| row_id("post", post) }, order_of(type: "post")
+
+    original_changed(first, 1.hour.ago)
+
+    assert_equal [ first, second ].map { |post| row_id("post", post) }, order_of(type: "post")
+  end
+
+  test "a block's original changing more recently counts for its page" do
+    quiet = complete_page("Quiet page")
+    assert Pages::Save.call(quiet, translations: { "en" => { title: "Quiet page!" } }).ok?
+    busy = complete_page("Busy page")
+    assert Pages::Save.call(busy, translations: { "en" => { title: "Busy page!" } }).ok?
+    quiet.update_columns(translation_original_changed_at: { "title" => 2.days.ago.utc.iso8601 })
+    busy.update_columns(translation_original_changed_at: { "title" => 4.days.ago.utc.iso8601 })
+    quiet.update_columns(updated_at: 1.minute.from_now) # a plain updated_at order would put quiet first
+    block = ContentBlock.create!(owner: busy, block_type: "rich_text", position: 1)
+    block.update_columns(translation_original_changed_at: { "caption" => 1.hour.ago.utc.iso8601 })
+
+    ids = order_of(type: "page")
+
+    assert_equal [ busy, quiet ].map { |page| row_id("page", page) }, ids.first(2)
+  end
+
+  test "a malformed stored timestamp never breaks the screen" do
+    post = outdated_post("Odd")
+    post.update_columns(translation_original_changed_at: { "title" => "not a time", "excerpt" => "2026-13-45T99:99:99Z" })
+
+    assert_includes order_of(type: "post"), row_id("post", post)
+    assert_response :success
+  end
+
+  test "outdated-first order is stable across a page boundary and across types" do
+    posts = Array.new(30) { |i| outdated_post("Stale post #{i}") }
+    pages = Array.new(30) do |i|
+      page = complete_page("Stale page #{i}")
+      assert Pages::Save.call(page, translations: { "en" => { title: "Stale page #{i}!" } }).ok?
+      page
+    end
+    (posts + pages).each_with_index { |record, i| record.update_columns(translation_original_changed_at: { "title" => (i + 1).hours.ago.utc.iso8601 }) }
+    # Unrelated saves must not matter.
+    posts.each { |post| post.update_columns(updated_at: Time.current) }
+    expected = (posts + pages).sort_by { |record| record.reload.translation_original_changed_at["title"] }.reverse.map { |record| row_id(record.is_a?(Post) ? "post" : "page", record) }
+
+    page_one = order_of(page: 1).reject { |id| id == "translation-item-settings" }
+    page_two = order_of(page: 2)
+
+    assert_equal expected.first(50), page_one
+    assert_equal expected.drop(50), page_two.first(expected.size - 50)
   end
 
   test "the order also holds across types" do
@@ -165,6 +247,29 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select row("page", page), count: 0
     assert_select "input[name=type][value=post][checked]"
     assert_select "label", text: /Posts\s*1/
+  end
+
+  test "a summary card links to the matrix narrowed to its language, keeping the type filter" do
+    both = create_post(title: "Needs both")
+    only_es = create_post(title: "Only Spanish left")
+    assert Posts::Save.call(only_es, translations: { "de" => { title: "Nur Spanisch" } }).ok?
+
+    get "/cs-studio/translations", params: { type: "post" }
+    assert_select "[data-translation-summary] [data-locale=de] a[href='/cs-studio/translations?language=de&type=post']", text: "Deutsch"
+    assert_select "[data-translation-summary] [data-locale=de] a[aria-label='Deutsch: show items to translate']"
+
+    get "/cs-studio/translations", params: { type: "post", language: "de" }
+    assert_response :success
+    assert_select row("post", both)
+    assert_select row("post", only_es), count: 0
+    assert_select "tbody th[scope=col]", count: 0
+    assert_select "thead th[scope=col]", text: "Español" # every column stays
+    assert_select "[data-translation-summary] [data-locale=de] a[aria-current=true][href='/cs-studio/translations?type=post']"
+    assert_select "input[type=hidden][name=language][value=de]"
+
+    get "/cs-studio/translations", params: { language: "xx" }
+    assert_response :success
+    assert_select row("post", only_es)
   end
 
   test "the Site settings row appears only for settings.manage and only while incomplete" do
@@ -276,25 +381,30 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
   end
 
   test "the number of queries does not depend on the rows or the languages" do
-    count_queries = lambda do
-      queries = 0
-      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| queries += 1 unless payload[:name] == "SCHEMA" }
+    queries_for_request = lambda do
+      statements = []
+      subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] unless payload[:name] == "SCHEMA" }
       get "/cs-studio/translations"
       ActiveSupport::Notifications.unsubscribe(subscriber)
       assert_response :success
-      assert_operator queries, :>, 0
-      queries
+      statements
     end
     5.times { |i| outdated_post("Few #{i}") }
-    get "/cs-studio/translations" # warm lazily loaded things
-    few = count_queries.call
+    # The first request after anything that rewrites `site_settings` (the very
+    # first of a process, and `with_locales`, which saves the languages) also
+    # runs the setup-complete check (`SELECT 1 FROM site_settings WHERE
+    # setup_completed_at IS NOT NULL`, then remembered): one query, shown by
+    # diffing the statements, that has nothing to do with this screen. Each
+    # measurement therefore follows an unmeasured request.
+    get "/cs-studio/translations"
+    few = queries_for_request.call
 
     60.times { |i| i.even? ? create_post(title: "Many #{i}") : create_page(title: "Many page #{i}") }
-    assert_equal few, count_queries.call, "more rows"
+    assert_equal few.size, queries_for_request.call.size, "more rows"
 
     with_locales(%w[en de es fr it], default: "en")
-    count_queries.call # the first request after a language change loads the new languages' own settings
-    assert_equal few, count_queries.call, "more languages"
+    get "/cs-studio/translations"
+    assert_equal few.size, queries_for_request.call.size, "more languages"
   end
 
   test "with one language enabled there is nothing to translate into" do

@@ -31,4 +31,13 @@ class Admin::TranslationScreen::SummaryCardComponentTest < ViewComponent::TestCa
     html = card(total: 3, complete: 0, missing: 2, outdated: 1).to_html
     assert_no_match(/danger/, html)
   end
+
+  test "with a url the name is a link, labelled by what it does; the chosen language says how to clear it" do
+    render_inline Admin::TranslationScreen::SummaryCardComponent.new(locale: "de", summary: { total: 1, complete: 0, missing: 1, outdated: 0 }, url: "/x?language=de")
+    assert_selector "a[href='/x?language=de'][aria-label='Deutsch: show items to translate']", text: "Deutsch"
+    assert_no_selector "a[aria-current]"
+
+    render_inline Admin::TranslationScreen::SummaryCardComponent.new(locale: "de", summary: { total: 1, complete: 0, missing: 1, outdated: 0 }, url: "/x", current: true)
+    assert_selector "a[aria-current=true][aria-label='Deutsch: show all languages']"
+  end
 end

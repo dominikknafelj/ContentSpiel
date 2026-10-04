@@ -11,10 +11,20 @@ module Admin
     # shares); translation states are never red, the bar is `ok` on a `line`
     # track and the outdated count reads in `warn-ink`.
     class SummaryCardComponent < Admin::AdminComponent
-      def initialize(locale:, summary:)
+      # `url` is the matrix narrowed to this language (or, for the language
+      # already chosen, back to every language); `current` marks that one.
+      def initialize(locale:, summary:, url: nil, current: false)
         @locale = locale.to_s
         @summary = summary
+        @url = url
+        @current = current
       end
+
+      attr_reader :url
+
+      def current? = @current
+
+      def link_label = current? ? "#{name}: show all languages" : "#{name}: show items to translate"
 
       def name = ::Locales.name(locale, native: true)
 

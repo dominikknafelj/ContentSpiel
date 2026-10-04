@@ -5,7 +5,8 @@ module Admin
   # outdated"), a type filter, then a matrix whose rows are the items that
   # need work in ANY target language and whose columns are the languages;
   # each cell is that language's state chip linking to the item's editor in
-  # that language. `?type=page|post|media|settings` narrows it; `?locale=` is
+  # that language. `?type=page|post|media|settings` narrows it, `?language=de`
+  # (a summary card's link) keeps the rows that need work in that language; `?locale=` is
   # a retired parameter from the one-page-per-language screen and is ignored,
   # so old links (the dashboard card's, bookmarks) still answer 200.
   #
@@ -35,7 +36,7 @@ module Admin
   #
   # Order (§4.4): rows with an outdated language first -- they are already
   # visible on the site -- the most recently changed first, then rows that
-  # only miss something, also by `updated_at`. Paging is by page number
+  # only miss something, in the same order of original change. Paging is by page number
   # (`Pagination`, design pass spec §4); the Site settings row isn't paged,
   # it tops the first page.
   class TranslationsController < BaseController
@@ -74,6 +75,10 @@ module Admin
       readable = readable_relations
       @types = TYPES.keys.select { |type| readable.key?(type) || (type == "settings" && can?("settings.manage")) }
       @type = params[:type].presence_in(@types)
+      # `?language=de` (a summary card's link, the dashboard's): only the rows
+      # that need work in that language. All the columns stay.
+      @language = params[:language].presence_in(@target_locales)
+      @needed_in = @language ? [ @language ] : @target_locales
 
       @summaries = Translations::StateIndex.summaries(@target_locales, readable.values)
       # What each type would list: the filter's counts, grouped SQL over the
@@ -81,6 +86,10 @@ module Admin
       @counts = readable.transform_values { |relation| relation.where(needs_work_sql(relation.klass)).count }
       settings = settings_item
       @counts["settings"] = settings ? 1 : 0 if @types.include?("settings")
+      # The settings row is on top of the page's 50, not one of them: page 1
+      # renders 51 rows with it, the pagination total (and so the page count)
+      # leaves it out because it is never paged, while the toolbar's "All" and
+      # "Site settings" counts include it, being what those filters show.
 
       shown = (@type ? [ @type ] : readable.keys).select { |type| readable.key?(type) }
       @pagination = Pagination.new(page: params[:page], per_page: PER_PAGE, total: shown.sum { |type| @counts.fetch(type) })
@@ -195,7 +204,7 @@ module Admin
     end
 
     def needs_work_sql(model, states: %w[missing outdated])
-      Translations::StateIndex.exists_in_any_locale_sql(model, states:, locales: @target_locales)
+      Translations::StateIndex.exists_in_any_locale_sql(model, states:, locales: @needed_in)
     end
 
     # The settings row, when the actor may manage settings and the title or
@@ -205,11 +214,14 @@ module Admin
 
       site = Current.site
       states = Translations::StateIndex.states_for([ site ], locales: @target_locales).fetch(site)
-      Item.new(type: "settings", record: site, states:) unless states.values.all?(:complete)
+      Item.new(type: "settings", record: site, states:) if @needed_in.any? { |locale| states[locale] != :complete }
     end
 
     # This page's `Item`s. Each type's relation is ordered outdated-first then
-    # newest-changed-first and cut to `offset + per_page` rows; the windows are
+    # by when its ORIGINAL last changed, newest first (`StateIndex
+    # .original_changed_at_sql`: the stored per-field stamps, blocks rolled in,
+    # never `updated_at`, which any save -- a translation-only one included --
+    # moves), and cut to `offset + per_page` rows; the windows are
     # merged by the same key (ties: type order, then newest id) and sliced.
     def items_on_page(relations)
       window = @pagination.offset + PER_PAGE
@@ -217,12 +229,13 @@ module Admin
       candidates = relations.flat_map do |type, relation|
         table = relation.klass.quoted_table_name
         outdated = needs_work_sql(relation.klass, states: %w[outdated])
+        changed = Translations::StateIndex.original_changed_at_sql(relation.klass)
         relation.where(needs_work_sql(relation.klass))
-          .reorder(Arel.sql("#{outdated} DESC"), Arel.sql("#{table}.updated_at DESC"), Arel.sql("#{table}.id DESC"))
-          .select(Arel.sql("#{table}.*"), Arel.sql("#{outdated} AS has_outdated"))
+          .reorder(Arel.sql("#{outdated} DESC"), Arel.sql("#{changed} DESC"), Arel.sql("#{table}.id DESC"))
+          .select(Arel.sql("#{table}.*"), Arel.sql("#{outdated} AS has_outdated"), Arel.sql("#{changed} AS original_changed_at"))
           .limit(window).map { |record| [ type, record ] }
       end
-      page = candidates.sort_by { |type, record| [ record[:has_outdated] ? 0 : 1, -record.updated_at.to_r, type_order.index(type), -record.id ] }
+      page = candidates.sort_by { |type, record| [ record[:has_outdated] ? 0 : 1, -record[:original_changed_at].to_r, type_order.index(type), -record.id ] }
         .slice(@pagination.offset, PER_PAGE) || []
       states = Translations::StateIndex.states_for(page.map(&:last), locales: @target_locales)
       page.map { |type, record| Item.new(type:, record:, states: states.fetch(record)) }

@@ -4,7 +4,7 @@
       <div class="flex min-w-0 flex-1 flex-col gap-1.5" data-locale="<%= entry.locale %>">
         <div class="flex items-baseline justify-between gap-3">
           <% if link %>
-            <%= link_to entry.name, helpers.admin_translations_path(locale: entry.locale), class: "font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
+            <%= link_to entry.name, helpers.admin_translations_path(language: entry.locale), class: "font-semibold text-ink hover:underline", data: { turbo_frame: "_top" } %>
           <% else %>
             <span class="font-semibold text-ink"><%= entry.name %></span>
           <% end %>
