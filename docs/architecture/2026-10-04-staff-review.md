@@ -281,7 +281,9 @@ What exists: one application cache (the rich-text body render, `app/models/rich_
 - `app/controllers/pages_controller.rb:36`: `expires_in 0, public: true, must_revalidate: true`. Every visitor request reaches Puma's three threads and, at best, ends in a 304 that still costs S7's 15 queries and S8's preload.
 - The container starts through Thruster (`Dockerfile:77`, `CMD ["./bin/thrust", "./bin/rails", "server"]`), which has an HTTP cache. With `max-age=0` it stores nothing.
 - The preconditions hold: the public response is the same for every visitor (no cookies, no CSRF tag, the theme toggle is client-side), and `/preview` already answers `private, no-store` (`app/controllers/preview_controller.rb:16`).
-- Direction: a short shared lifetime, for example `s-maxage=60`, keeping the ETag. Trade-off: a publish or a scheduled go-live shows up to that long late. **This is the user's decision and is still open.** If publishes must be instant, S7's version row and C4 come first.
+- Direction, revised after the user asked for a Clear cache button (C6): a button that takes a minute to work would look broken, so the first cache is **inside Rails**: the whole rendered page in `Rails.cache`, keyed on S7's version row, the path, the language and `RichText.code_revision`. A version bump then invalidates everything at once with no purge mechanism. A request costs one version read and one cache read.
+- A short shared lifetime at the proxy (for example `s-maxage=60`, keeping the ETag) is an optional layer on top. Its trade-off: a publish, a scheduled go-live or a Clear cache shows up to that long late. Only add it if the user accepts that delay. **Not asked explicitly; the default taken here is "no delay".**
+- Scheduled go-lives need a version bump of their own at the scheduled time (or the next go-live time in the key), since nothing is written when the clock passes `published_at`.
 - **Not checked:** which directives Thruster honours, and whether it can purge or serve stale while revalidating. Its cache is in memory, per container.
 
 ### C2. Library images are served in Active Storage's redirect mode — checked (code), general knowledge (behaviour)
@@ -295,11 +297,17 @@ What exists: one application cache (the rich-text body render, `app/models/rich_
 - Already in the roadmap as "Caching / CDN purge". It removes C1's staleness trade-off once a real CDN is in front. S7's narrow version row is what a purge would key on, and the path-change events from Phase 1 name the URLs.
 
 ### C5. Deferred on purpose
-- Fragment or whole-page caching inside Rails: worth much less once the proxy holds pages. Revisit only if a miss is still slow after S7 and S8.
-- The rich-text body cache: a detail of the miss path. Keep it only if measuring shows it beats no cache.
+- Fragment caching: worth little once whole pages are cached.
+- The rich-text body cache: a detail of the miss path. Keep it only if measuring shows it still helps under the whole-page cache.
 - CS Studio caching (S10, S13): not a priority now.
 
-Order: C1 (after the decision), S7 + S8 to make a miss cheap, C2, C3, then C4.
+### C6. A "Clear cache" button in CS Studio — requested by the user
+- Two layers of invalidation. **Automatic:** every service that changes published output (publish, unpublish, a title or slug change, a move, trash, restore, a newly processed image variant) bumps the site version after commit, so editors never think about the cache when publishing. **Manual:** the button, for what the services cannot see (a console change, a restored backup, a stuck CDN).
+- Site-wide by default. One change reaches further than its own URL: a title is in the navigation of every page, a post is on every listing page that shows it, a slug is in every page that links to it. Tracking those dependencies per page is where CMS caches go wrong; a site this size re-warms quickly.
+- Shape: "Clear cache" under System (its own permission, for example `cache.clear`, seeded onto Admin; an `ApplicationService` that records `cache.cleared`), and "Clear this page's cache" in the editor's ⋯ menu for when one page looks wrong. The per-page action can delete that page's entries per language, or simply bump the site version too; start with whichever is simpler.
+- When a CDN exists, the same service also calls its purge API (C4).
+
+Order: S7's version row and S8, then C1 with C6, then C2, C3 and C4.
 
 ## 10. Checked and found sound
 
