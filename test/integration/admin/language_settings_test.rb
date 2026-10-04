@@ -285,6 +285,15 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
     save_languages([ { fallback: "en" }, { code: "de" }, { code: "en" } ])
     assert_response :see_other
     assert_equal %w[de en], @site.reload.locale_codes
+
+    # A fallback that is no scalar (a list, a hash) is no choice at all: the row
+    # is read as untouched, its stored fallbacks kept, and nothing raises.
+    @site.update!(locales: [ { "code" => "en" }, { "code" => "de", "fallbacks" => [ "en" ] } ])
+    save_languages([ { code: "en", fallback: { "x" => "de" } }, { code: "de", fallback: [ "", "junk" ] } ])
+    assert_response :see_other
+    assert_equal %w[en de], @site.reload.locale_codes
+    assert_equal [ "en" ], @site.locale_entry("de")["fallbacks"]
+    assert_empty Array(@site.locale_entry("en")["fallbacks"])
   end
 
   test "a languages.manage-only viewer's Save (rows and the base, no site field) is a languages-only call that leaves the site row alone" do

@@ -26,17 +26,21 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     within(row) { click_button "Edit scope" }
     assert_selector "#{row} button[aria-expanded='true']", text: "Done"
     within("#{row} [data-scope-editor]") do
+      # The child first, then its parent: a page ticked in this session and then
+      # covered by a ticked ancestor must end as "included" all the same.
+      check "Team"
       check "About"
 
       # Team sits under About: included, so a greyed tick that is not submitted.
-      team = find_field("Team", disabled: true)
-      assert team.checked?
+      assert_selector "#grant-pages-edit-page-#{@team.id}:checked:disabled"
       assert_text "included"
       assert_text "includes 1 subpage"
     end
-    # The ancestors of the chosen page are partial: indeterminate, unchecked.
-    home_box = page.evaluate_script("Array.from(document.querySelectorAll(\"#{row} .admin-branch-picker input[type=checkbox]\")).filter((box) => box.indeterminate).length")
-    assert_operator home_box, :>=, 1
+    # The ancestor of the chosen page is partial: Home's own box, and only that
+    # one, is indeterminate and unchecked. (`indeterminate` is a property, so it
+    # is read in the page; the `:indeterminate` selector makes the read wait.)
+    assert_selector "#{row} .admin-branch-picker input[type=checkbox]:indeterminate", count: 1
+    assert_selector "#grant-pages-edit-page-#{@about.parent_id}:indeterminate:not(:checked)"
 
     within(row) { click_button "Done" }
     assert_no_selector "#{row} [data-scope-editor]"
@@ -119,19 +123,19 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     visit edit_admin_group_path(group)
     await_admin_controllers
     row = "[data-permission='posts.read']"
-    button = find("#{row} button[aria-controls]")
-    assert_equal "false", button["aria-expanded"]
+    button = find("#{row} button[aria-controls][aria-expanded='false']")
     editor_id = button["aria-controls"]
 
+    # Every state below is waited for, never read once: the controller sets the
+    # attribute, shows the editor and moves the focus in separate steps.
     button.click
-    assert_equal "true", find("#{row} button[aria-controls]")["aria-expanded"]
-    assert_equal editor_id, find("##{editor_id}")["id"]
-    assert page.evaluate_script("document.getElementById('#{editor_id}').contains(document.activeElement)")
+    assert_selector "#{row} button[aria-controls='#{editor_id}'][aria-expanded='true']"
+    assert_selector "##{editor_id}"
+    assert_selector "##{editor_id} :focus"
 
     find("##{editor_id} input[type=checkbox]", match: :first).send_keys(:escape)
     assert_no_selector "##{editor_id}"
-    assert_equal "false", find("#{row} button[aria-controls]")["aria-expanded"]
-    assert page.evaluate_script("document.activeElement === document.querySelector(\"#{row} button[aria-controls]\")")
+    assert_selector "#{row} button[aria-controls='#{editor_id}'][aria-expanded='false']:focus"
   end
 
   test "with only a removed type left, the chips say all content types, then the warn chip (what Save will store)" do
@@ -144,8 +148,10 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     within(row) { click_button "Edit scope" }
     within("#{row} [data-scope-editor]") { uncheck "Blog" }
 
-    chips = page.all("#{row} [data-chips] .admin-scope-chip").map(&:text)
-    assert_equal [ "All content types", "! retired_type · type removed" ], chips
+    # Waited for (the chips are redrawn by script after the change), and in order.
+    assert_selector "#{row} [data-chips] .admin-scope-chip", count: 2
+    assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(1)", text: "All content types", exact_text: true
+    assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(2)", text: "! retired_type · type removed", exact_text: true
   end
 
   test "a redundant stored root survives untouched, and the carried input steps aside when its ancestor is unticked" do
@@ -157,12 +163,11 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
     row = "[data-permission='pages.edit']"
     carried = "#{row} input[type=hidden][name='group[grants][pages.edit][page_ids][]'][value='#{@team.id}']"
-    assert_selector carried, visible: :all
-    assert_not find(carried, visible: :all).disabled?
+    assert_selector "#{carried}:enabled", visible: :all
 
     within(row) { click_button "Edit scope" }
     within("#{row} [data-scope-editor]") { uncheck "About" }
-    assert find(carried, visible: :all).disabled?
-    within("#{row} [data-scope-editor]") { assert_not find_field("Team").disabled? }
+    assert_selector "#{carried}:disabled", visible: :all
+    assert_selector "#grant-pages-edit-page-#{@team.id}:enabled:checked"
   end
 end

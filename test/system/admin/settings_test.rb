@@ -46,10 +46,13 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     # A social link row added is counted, and removed it is not.
     click_on "+ Add link"
-    assert_selector footer, text: /\b1 unsaved change/i # a blank row is nothing yet
+    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 2
+    assert_selector footer, text: /\b1 unsaved change\b/i # a blank row is nothing yet
+    page.all("[data-admin--repeat-rows-target=row]").last.find("input[name$='[name]']").set("GitHub")
+    assert_selector footer, text: /\b2 unsaved changes\b/i # typed in, it is one more
     page.all("[data-admin--repeat-rows-target=row]").last.find("button[aria-label='Remove link']").click
-    assert_selector footer, text: /\b1 unsaved change/i
-    assert_equal 1, page.all("[data-admin--repeat-rows-target=list] input[name$='[name]']").size
+    assert_selector footer, text: /\b1 unsaved change\b/i # and gone with its row
+    assert_selector "[data-admin--repeat-rows-target=list] input[name$='[name]']", count: 1
 
     click_on "English"
     fill_in "settings-en-tagline", with: "Things I learned lately"
@@ -107,10 +110,11 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
     within("nav[aria-label='Settings sections']") { click_link "AI translation" }
 
+    # The focus arriving is what says the jump has happened; everything else is read after it.
+    assert_selector "#ai:focus"
     assert_no_selector "dialog#leave-dialog[open]"
     assert_equal entries, page.evaluate_script("history.length")
     assert_equal "Typed, then jump", find_field("settings-en-title").value
-    assert_equal "ai", page.evaluate_script("document.activeElement.id")
   end
 
   test "a blank social row counts nothing, a typed label counts one" do
@@ -152,8 +156,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     click_on "Deutsch"
     assert_no_selector "#settings-en-title"
     find(".admin-error-summary a[href='#settings-en-title']").click
-    assert_selector "#settings-en-title"
-    assert_equal "settings-en-title", page.evaluate_script("document.activeElement.id")
+    assert_selector "#settings-en-title:focus"
   end
 
   # ⌘K "Settings › AI translation" used ON Settings is a `_top` link to a
@@ -223,6 +226,16 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
 
   def language_tab_names = page.all("#settings-site-card nav.admin-language-tabs [role=tab]").map(&:text)
 
+  # The rows' order, waited for: a drop, an Escape and a re-render each move the
+  # rows a moment after the key or the answer, so one read can see the old order.
+  def assert_language_order(codes)
+    seen = nil
+    assert_eventually(message: -> { "the language rows never read #{codes.inspect} (last seen #{seen.inspect})" }) do
+      seen = page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+      seen == codes
+    end
+  end
+
   test "a keyboard reorder is one pending change, locks the instant actions, and Save puts the tabs in the new order" do
     visit admin_settings_path
     await_admin_controllers
@@ -234,7 +247,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     handle.send_keys(:down)
     handle.send_keys(:space)
     assert_selector "[data-admin--sortable-rows-target=announcer]", text: /Dropped English\. Position 2 of 3/, visible: :all
-    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
 
     # D10: Default, Turn off and Add wait for Save or Cancel, and say so.
@@ -248,7 +261,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast", text: "Settings saved"
     assert_selector footer, text: /No unsaved changes/i
     assert_equal %w[de en es], site_settings(:default).reload.locale_codes
-    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_language_order %w[de en es]
     assert_equal "Deutsch", language_tab_names.first
     assert_selector "#settings-languages-card button:not([disabled])", text: "Make default", count: 2
     assert_no_text "Save or cancel your changes first."
@@ -263,7 +276,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     handle.send_keys(:down)
     handle.send_keys(:escape)
 
-    assert_equal %w[en de es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_language_order %w[en de es]
     assert_selector footer, text: /No unsaved changes/i
   end
 
@@ -306,7 +319,8 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     within("dialog#language-default-dialog-de") { click_on "Change default language" }
 
     assert_selector "#toasts .admin-toast", text: "Deutsch is now the default language"
-    assert_current_path(/\/settings(\?.*)?#languages|\/settings/)
+    # Back on Settings itself (the 303 names `#languages`; the path and query are what a browser reports).
+    assert_current_path admin_settings_path
     assert_selector "#language-de [data-default-tag]", text: /default/i
     assert_selector "button[aria-label='Make English the default language']"
     site = site_settings(:default).reload
@@ -354,7 +368,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_no_selector "body > .admin-drag-fallback [id], body > .admin-drag-fallback [name]", visible: :all
     mouse.up
 
-    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
     assert_selector "#language-en [data-default-tag]", count: 1
   end
@@ -377,7 +391,7 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#settings-languages-card li[data-picked]"
     mouse.up
 
-    assert_equal %w[de en es], page.all("#settings-languages-card li[data-code]").map { |li| li["data-code"] }
+    assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
   end
 end

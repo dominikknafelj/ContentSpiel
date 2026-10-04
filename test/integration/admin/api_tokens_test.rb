@@ -17,7 +17,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
 
   # CS Studio has no standalone show page (the list is the whole screen), so
   # a token's owner is asserted against its own list row.
-  test "the list shows active and revoked tokens with the owner's email, last used and IP" do
+  test "the list shows active and revoked tokens with who each acts as (the display name: the email while there is no name), last used and IP" do
     sign_in_as(users(:one))
     active, = ApiToken.generate!(users(:one), name: "claude-desktop")
     active.record_usage!("203.0.113.5")
@@ -294,7 +294,10 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_select "[role=alert], #token-group-error", text: /Choose a group for the token/
+    # Under Group and nowhere else: its own slot, tied to the select -- not "any alert on the page".
+    assert_select "#token-group-error", text: "Choose a group for the token", count: 1
+    assert_select "select#group_id[aria-describedby~='token-group-error']"
+    assert_select "#token-name-error", count: 0
   end
 
   test "users see only their own tokens unless they have tokens.manage" do

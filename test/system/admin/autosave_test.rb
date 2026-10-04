@@ -233,6 +233,49 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_nil @page.reload.subtitle
   end
 
+  # Ledger m3 (final fix wave 1): "nothing is sent when the form holds what
+  # its last save sent" compares what the form would submit. An EMPTY file
+  # input submits a File whose `lastModified` is the moment it was read, so
+  # a form with one never compared equal to itself and sent a save on every
+  # `focusout` (`admin--autosave#comparable`). No autosave form carries a file
+  # input any more (Settings, the one that did, saves with a footer now), so
+  # the test gives the page form one: a copy of the form with an empty file
+  # input in it takes the form's place -- a new element, so the controller
+  # takes its first signature with the input already there.
+  test "leaving a field of a form with an empty file input, without typing, sends nothing" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    subtitle = find_field("Subtitle")[:id]
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__patches = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "PATCH") window.__patches += 1
+        return originalFetch(url, options)
+      }
+      const form = document.getElementById(#{subtitle.to_json}).closest("form[data-controller~='admin--autosave']")
+      const copy = form.cloneNode(true)
+      const file = document.createElement("input")
+      file.type = "file"
+      file.name = "page[probe]"
+      copy.append(file)
+      form.replaceWith(copy)
+    JS
+    await_admin_controllers
+    assert_selector "form[data-controller~='admin--autosave'] input[type=file][name='page[probe]']", visible: :all
+
+    page.execute_script("document.getElementById(#{subtitle.to_json}).focus()")
+    sleep 0.05 # `lastModified` has millisecond precision
+    page.execute_script("document.activeElement.blur()")
+    sleep 0.5 # nothing to wait FOR: the claim is that no request goes out
+    assert_equal 0, page.evaluate_script("window.__patches"), "a save was sent though nothing had changed"
+
+    # And the probe is live: the same form does send once something is typed.
+    fill_in "Subtitle", with: "Typed"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually { page.evaluate_script("window.__patches") >= 1 }
+  end
+
   # Ledger m1 (final fix wave 1): a record editor is never restored from
   # Turbo's page cache. Back is a restoration visit: nothing drains first, and
   # the snapshot is taken with whatever the forms held at that moment -- here

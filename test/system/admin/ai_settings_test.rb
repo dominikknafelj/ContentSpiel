@@ -52,6 +52,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#toasts .admin-toast", text: "API key saved"
     assert_selector "#settings-ai-key [data-ai-key-state=set]", text: /Key saved · added \d{1,2} \w{3}/
     assert_not_includes page.html, KEY, "never rendered, not even in a hidden input or attribute"
+    # The markup can't show a value that was only typed, so the controls are asked too: the entry the key was typed
+    # into is gone, and nothing on the page holds the key as its value.
+    assert_no_selector "#settings-ai_api_key"
+    assert_equal 0, page.evaluate_script("Array.from(document.querySelectorAll('input, textarea')).filter((control) => control.value.includes(#{KEY.to_json})).length")
     assert_equal KEY, site_settings(:default).reload.ai_api_key
     # The page and its state stay: no navigation happened, the footer is clean.
     assert_selector footer, text: /No unsaved changes/i
@@ -177,10 +181,15 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
 
-    # Edited during a flight and left edited: it is still gated when the answer lands.
+    # Edited during a flight and left edited: it is still gated when the answer lands. The first test's
+    # "CONNECTED" is still in the slot and the button is disabled during any flight, so neither says the second
+    # answer has landed: the slot is emptied first, and the button is looked at only once it is no longer busy.
+    page.execute_script("document.getElementById('settings-ai-test-result').replaceChildren()")
+    assert_no_selector "#settings-ai-test-result", text: /CONNECTED/
     click_on "Test connection"
     fill_in "Model", with: "claude-opus-5"
     assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
+    assert_no_selector "button", text: "Testing…"
     assert_selector "button[form='settings-ai-test-form'][disabled]"
     assert_text "Save provider and model first. Tests the saved settings."
   end

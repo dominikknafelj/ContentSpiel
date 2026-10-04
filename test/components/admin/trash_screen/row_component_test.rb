@@ -64,7 +64,7 @@ class Admin::TrashScreen::RowComponentTest < ViewComponent::TestCase
     assert_selector "p", text: "Still used by 1 item in the trash"
 
     render_inline row(asset.reload, used_by: nil)
-    assert_selector "dialog#purge-media-#{asset.id}", text: "Delete “"
+    assert_selector "dialog#purge-media-#{asset.id} h2", text: "Delete “#{asset.title}”?", exact_text: true
     assert_selector "dialog form[action='/cs-studio/trash/media/#{asset.id}'] input[name=_method][value=delete]", visible: :all
   end
 

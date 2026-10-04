@@ -128,7 +128,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     save translations(en: { title: "" }, de: { title: "Danas Notizen" })
 
     assert_response :unprocessable_entity
-    assert_select ".admin-error-summary a[href='#settings-en-title']"
+    assert_select ".admin-error-summary a[href='#settings-en-title']", text: "Title can't be blank"
     assert_select "input#settings-de-title[value=?]", "Danas Notizen"
     assert_select "form#settings-form[data-admin--save-bar-dirty-value='true']"
     assert_not_equal "", @site.reload.title(locale: "en")
@@ -172,7 +172,20 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     save translations(en: { title: "Kept" }, fr: { title: "Nope" })
 
     assert_response :see_other
-    assert_nil @site.reload.read_attribute(:title)["fr"]
+    assert_equal "Kept", @site.reload.title(locale: "en")
+    assert_nil @site.read_attribute(:title)["fr"]
+
+    # Nothing but the unknown language: what is left of `translations` is an
+    # empty hash, and the service is handed no translation at all -- nothing is
+    # written and nothing is recorded.
+    stamp = @site.updated_at
+    assert_no_difference -> { Audit::Event.where(action: "settings.updated").count } do
+      save translations(fr: { title: "Nope" })
+    end
+
+    assert_response :see_other
+    assert_equal stamp, @site.reload.updated_at
+    assert_nil @site.read_attribute(:title)["fr"]
   end
 
   test "a forged default_locale changes nothing" do
@@ -250,7 +263,7 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/settings", params: { site_setting: { social_links: { name: "x", url: "y" } }, base_updated_at: base }
 
-    assert_includes [ 303, 422 ], response.status
+    assert_response :see_other
     assert_equal({ "GitHub" => "https://github.com/dana" }, @site.reload.social_links.to_h)
   end
 

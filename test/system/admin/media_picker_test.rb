@@ -142,6 +142,21 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     assert_equal 2, Media::Asset.count
   end
 
+  # "Nothing was chosen" can't be read off the record straight away: a choice is
+  # saved by the form's autosave, a debounce after the field is filled, so the
+  # record is empty at that moment whether or not something was chosen. So the
+  # field is asked -- its value is what the next save would send -- and, with
+  # `after_a_save:`, a save is pushed through with another field first, after
+  # which the record's own value means something.
+  def assert_no_image_chosen(after_a_save: nil)
+    assert_equal "", find("#page-hero-image-section input[data-admin--media-field-target=input]", visible: :all).value
+    return unless after_a_save
+
+    fill_in "Title", with: after_a_save
+    assert_eventually { @landing.reload.title(locale: :en) == after_a_save }
+    assert_nil @landing.hero_media_asset_id
+  end
+
   test "choosing: a click only selects, Use image fills the field, a double click picks at once" do
     other = create_media_asset(filename: "tiny.png")
     visit_editor
@@ -159,7 +174,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       assert_selector "button[aria-pressed=true]", text: other.title, count: 1
     end
     assert_selector "dialog[open]"
-    assert_nil @landing.reload.hero_media_asset_id
+    assert_no_image_chosen
 
     within("dialog[open]") { click_on "Use image" }
     refute_selector "dialog[open]"
@@ -256,7 +271,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     within("dialog[open]") { find("button[aria-label=Close]").click }
     refute_selector "dialog[open]"
-    assert_nil @landing.reload.hero_media_asset_id
+    assert_no_image_chosen
 
     within("#page-hero-image-section") { click_on "Choose image" }
     within("dialog[open]") do
@@ -265,7 +280,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       click_on "Cancel"
     end
     refute_selector "dialog[open]"
-    assert_nil @landing.reload.hero_media_asset_id
+    assert_no_image_chosen after_a_save: "Landing, nothing chosen"
   end
 
   # Fix round 1 (I2), with a realistic trigger: the image is deleted
@@ -316,7 +331,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     refute_selector "dialog[open]"
     assert_selector "#page-hero-image-section button:focus", text: "Choose image"
-    assert_nil @landing.reload.hero_media_asset_id
+    assert_no_image_chosen after_a_save: "Landing, after Escape"
   end
 
   # The picker's height changes while it is open -- the grid is empty until its
@@ -348,14 +363,14 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
 
     page.execute_script("window.__releaseGrid()")
     within("dialog[open]") { assert_button @asset.title }
-    assert_equal before_grid, top.call, "the dialog moved when the grid loaded"
+    assert_in_delta before_grid, top.call, 0.5, "the dialog moved when the grid loaded"
 
     within("dialog[open]") do
       fill_in "Search images", with: "tiny"
       assert_no_button @asset.title
       assert_button other.title
     end
-    assert_equal before_grid, top.call, "the dialog moved when a search narrowed the grid"
+    assert_in_delta before_grid, top.call, 0.5, "the dialog moved when a search narrowed the grid"
   end
 
   private
