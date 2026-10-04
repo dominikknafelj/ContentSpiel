@@ -25,7 +25,8 @@
         field_ids: { current_password: "current_password", password: "password", password_confirmation: "password_confirmation" }) %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
-  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8", data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
+  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8",
+        data: save_bar_form_data(dirty: Array(@profile_errors).any?).merge(turbo_frame: "_top") do %>
     <div class="mb-4">
       <%= label_tag "name", "Your name", class: setup_label_class %>
       <%= text_field_tag "name", Current.user.name, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>

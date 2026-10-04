@@ -7,10 +7,12 @@
   <span class="shrink-0 font-semibold uppercase">Preview</span>
   <span aria-hidden="true" class="shrink-0">·</span>
   <span class="min-w-0 truncate"><%= title %></span>
-  <span aria-hidden="true" class="shrink-0">·</span>
-  <span class="shrink-0"><%= status %></span>
-  <span aria-hidden="true" class="shrink-0">·</span>
-  <span class="shrink-0"><%= language %></span>
+  <%# Status and language drop out below `sm` (640px): on a phone the title
+      truncates and Edit / Exit preview must stay on screen. %>
+  <span class="hidden shrink-0 items-center gap-3 sm:flex">
+    <span aria-hidden="true">·</span><span><%= status %></span>
+    <span aria-hidden="true">·</span><span><%= language %></span>
+  </span>
   <span class="ml-auto flex shrink-0 items-center gap-4">
     <%= link_to "Edit", editor_path, class: "underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-preview-ink" %>
     <%= link_to "Exit preview", exit_path, class: "underline underline-offset-2 hover:no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-preview-ink" %>

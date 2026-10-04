@@ -20,7 +20,14 @@ module Setup
     # to a clipboard: so it is this fixed string, a placeholder address and
     # password, and nothing computed -- never a real address, secret, path
     # or environment value.
-    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'User.find_by(email_address: "you@example.com").update!(password: "a new password")').freeze
+    #
+    # It goes through `Users::UpdatePassword` rather than `update!` on the
+    # model: the service audits the change and ends every session of that
+    # user (a password reset after a compromise must not leave the other party
+    # signed in). From `bin/rails runner` there is no actor or channel, which
+    # the checker trusts like the console, and no acting session to keep. `p`
+    # prints `true`/`false` so a refusal isn't silent.
+    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
 
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before

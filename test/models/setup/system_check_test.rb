@@ -51,8 +51,28 @@ class Setup::SystemCheckTest < ActiveSupport::TestCase
     assert_equal "Password reset by email isn't configured.", check.message
     # Static text with a placeholder address and password: it is shown to
     # anyone who may view the status page, so it never carries a real value.
-    assert_equal %(bin/rails runner 'User.find_by(email_address: "you@example.com").update!(password: "a new password")'), check.command
+    assert_equal Setup::SystemCheck::MAIL_FALLBACK_COMMAND, check.command
+    assert_match(/\Abin\/rails runner '.*Users::UpdatePassword/, check.command)
     assert_nil check.docs
+  end
+
+  # The command is a static string, so prove it works: put a real address and
+  # password where the placeholders are, run the Ruby inside the quotes (not a
+  # subprocess) and look at what it did.
+  test "the mail fallback command sets the password, ends every session and is audited" do
+    user = users(:reader)
+    user.sessions.create!
+    user.sessions.create!
+    ruby = Setup::SystemCheck::MAIL_FALLBACK_COMMAND[/runner '(.*)'\z/, 1]
+      .sub("you@example.com", user.email_address).gsub("a new password", "a brand new pass 1")
+
+    assert_difference -> { Audit::Event.where(action: "user.updated", subject: user).count }, 1 do
+      output, = capture_io { assert_equal true, eval(ruby) }
+      assert_equal "true\n", output
+    end
+
+    assert user.reload.authenticate("a brand new pass 1")
+    assert_equal 0, user.sessions.count
   end
 
   test "a Result built without a command or docs link has neither" do

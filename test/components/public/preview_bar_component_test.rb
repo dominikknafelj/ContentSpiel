@@ -54,6 +54,14 @@ class Public::PreviewBarComponentTest < ActiveSupport::TestCase
     assert_equal [ "Edit", "Exit preview" ], page_links
   end
 
+  test "Exit preview goes to the pages landing for a non-live page and the posts list for a non-live post" do
+    render_inline(Public::PreviewBarComponent.new(record: Page.create!(parent: @root, title: "Draft"), locale: "en"))
+    assert_selector "a[href='/cs-studio/pages']", text: "Exit preview"
+
+    render_inline(Public::PreviewBarComponent.new(record: Post.create!(content_type: :blog, title: "P"), locale: "en"))
+    assert_selector "a[href='/cs-studio/posts']", text: "Exit preview"
+  end
+
   private
     def page_links = page.all("a").map(&:text)
 end

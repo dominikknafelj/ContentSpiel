@@ -16,9 +16,11 @@ module Public
   # - Edit: the record's CS Studio editor in the previewed language (`locale:`
   #   only when it isn't the default, like every admin link). A preview viewer
   #   can read the record by definition (`PreviewController#readable?`).
-  # - Exit preview (plan D26): the record's public URL when it is live, since
-  #   that is then where a visitor would see it; otherwise there is no public
-  #   page to leave for, so it goes to the editor too.
+  # - Exit preview (plan D26, amended): the record's public URL in the previewed
+  #   language when it is live, since that is then where a visitor would see
+  #   it; otherwise there is no public page to leave for and Edit already is
+  #   the editor, so it goes to CS Studio's list instead: the pages landing for
+  #   a page, the posts list for a post (the language kept).
   #
   # The response is never cached (`Cache-Control: private, no-store`), and the
   # bar must not become part of any cached render: nothing here is memoised or
@@ -47,7 +49,12 @@ module Public
     end
 
     def exit_path
-      (record.live? && PublicSite::Urls.new.path_for(record, locale)) || editor_path
+      (record.live? && PublicSite::Urls.new.path_for(record, locale)) || studio_list_path
+    end
+
+    def studio_list_path
+      options = locale == Locales.default ? {} : { locale: locale }
+      record.is_a?(Post) ? helpers.admin_posts_path(**options) : helpers.admin_pages_path(**options)
     end
   end
 end

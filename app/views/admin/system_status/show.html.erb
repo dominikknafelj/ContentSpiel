@@ -12,7 +12,8 @@
       <h1 class="text-h1 text-ink">System status</h1>
       <p class="mt-1 text-meta"><%= passed %> of <%= @results.size %> checks passed · last run <%= Time.zone.now.strftime("%H:%M") %></p>
     </div>
-    <%= link_to "Run checks again", admin_system_status_path(**admin_url_options), class: setup_secondary_link_class %>
+    <%= link_to "Run checks again", admin_system_status_path(**admin_url_options), class: setup_secondary_link_class,
+          data: { turbo_prefetch: "false" } %>
   </div>
 
   <%= render "setup/system_check_results", results: @results, copyable: true %>

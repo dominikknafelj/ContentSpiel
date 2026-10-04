@@ -548,5 +548,9 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     # the new one doesn't, so the toast is the visible proof.)
     assert_text "Name saved.", wait: 10
     assert_equal "Saved Name", @owner.reload.name
+    # The answer re-renders the whole shell (`data-turbo-frame="_top"`), so the
+    # sidebar's account block follows, and the field shows what was saved.
+    assert_equal "Saved Name", find_field("Your name").value
+    assert_selector "span[title='Saved Name']", text: "Saved Name", wait: 5
   end
 end

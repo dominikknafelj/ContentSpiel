@@ -51,4 +51,20 @@ class Admin::SystemStatusAndPreviewSystemTest < ApplicationSystemTestCase
     # Its links are the first tab stops.
     assert_equal "Edit", page.evaluate_script("document.querySelector('a, button, input').textContent")
   end
+
+  # A phone: the status and language drop out, the title truncates, and Exit
+  # preview stays on screen and clickable.
+  test "at 360px wide Exit preview is inside the viewport and clickable, with a long title" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    Page.create!(parent: root, title: "A very long title for a page that is only a draft and has to be truncated", slug: "long", published_at: nil)
+    page.driver.resize(360, 700)
+
+    visit "/preview/long"
+
+    right = page.evaluate_script("Array.from(document.querySelectorAll('[role=region][aria-label=Preview] a')).find((a) => a.textContent === 'Exit preview').getBoundingClientRect().right")
+    assert_operator right, :<=, page.evaluate_script("document.documentElement.clientWidth")
+    click_link "Exit preview"
+    # The pages landing redirects to Home's editor for this viewer.
+    assert_match %r{\A/cs-studio/pages}, URI(current_url).path
+  end
 end
