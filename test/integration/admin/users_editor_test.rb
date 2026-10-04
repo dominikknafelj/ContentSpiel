@@ -428,4 +428,44 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert target.reload.authenticate("brand-new-password")
     assert_equal 0, target.sessions.count
   end
+
+  # --- Fix round 1 ---------------------------------------------------------------
+
+  test "a no-op owner PATCH by a non-owner is not a change, so the service has nothing to refuse" do
+    sign_in_manager
+    denied_before = denied_events_for(users(:reader)).count
+
+    patch "/cs-studio/users/#{users(:reader).id}/owner", params: { owner: "0" }
+
+    assert_response :see_other
+    assert_redirected_to "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_not users(:reader).reload.owner?
+    assert_not Audit::Event.exists?(action: "user.owner_changed")
+    assert_equal denied_before, denied_events_for(users(:reader)).count
+  end
+
+  test "a refusal for another reason re-renders the password disclosure open, with empty fields and nothing typed in the HTML" do
+    patch "/cs-studio/users/#{users(:two).id}", params: { user: { email_address: users(:one).email_address, password: "typed-password-1", password_confirmation: "typed-password-1" } }
+
+    assert_response :unprocessable_entity
+    assert_select "details.admin-set-password[open]"
+    assert_select "details.admin-set-password input[type=password]:not([value])", count: 2
+    assert_not_includes response.body, "typed-password-1"
+  end
+
+  test "a successful update stays on the editor with a clean footer; a create lands on the new user's editor; delete goes to the list" do
+    patch "/cs-studio/users/#{users(:two).id}", params: { user: { email_address: "two@example.com", name: "Tara" } }
+    assert_redirected_to "/cs-studio/users/#{users(:two).id}/edit"
+    follow_redirect!
+    assert_includes response.body, "User saved"
+
+    post "/cs-studio/users", params: { user: { email_address: "fresh@example.com", password: "password12345", password_confirmation: "password12345" } }
+    fresh = User.find_by!(email_address: "fresh@example.com")
+    assert_redirected_to "/cs-studio/users/#{fresh.id}/edit"
+    follow_redirect!
+    assert_includes response.body, "User created"
+
+    delete "/cs-studio/users/#{fresh.id}"
+    assert_redirected_to "/cs-studio/users"
+  end
 end

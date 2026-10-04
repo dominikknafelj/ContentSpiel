@@ -52,7 +52,8 @@
             (Users::Save), so the meter must not hold the submit back; the server still enforces the
             minimum on a typed one. %>
         <details class="admin-set-password" data-controller="admin--password-disclosure" data-action="toggle->admin--password-disclosure#toggled"
-                 <%= "open" if user.errors.include?(:password) || user.errors.include?(:password_confirmation) %>>
+                 <%# Open again when a password was posted, even after a refusal for another reason: the typed value is never rendered back, so the editor must see the empty fields and retype. %>
+                 <%= "open" if user.errors.include?(:password) || user.errors.include?(:password_confirmation) || params.dig(:user, :password).present? || params.dig(:user, :password_confirmation).present? %>>
           <summary class="inline-block cursor-pointer text-sm text-accent hover:text-accent-hover">Set a new password…</summary>
           <div class="mt-3 flex max-w-[420px] flex-col gap-4">
             <div>

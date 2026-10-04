@@ -42,3 +42,27 @@ class Admin::UsersScreen::DeleteZoneComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
   end
 end
+
+class Admin::UsersScreen::DeleteZonePreviewsTest < ViewComponent::TestCase
+  def preview(name)
+    with_request_url("/cs-studio/users/1/edit") { render_preview(name, from: Admin::UsersScreen::DeleteZoneComponentPreview) }
+  end
+
+  test "another_user preview names the user" do
+    preview(:another_user)
+    assert_selector "dialog", text: "Delete reader@example.com?", visible: :all
+    assert_selector "button:not([disabled])", text: "Delete user…"
+  end
+
+  test "own_account preview says it signs you out" do
+    preview(:own_account)
+    assert_selector "dialog", text: "Delete mara@example.com?", visible: :all
+    assert_selector "dialog", text: "deleting it signs you out", visible: :all
+  end
+
+  test "last_owner preview is disabled with the named reason" do
+    preview(:last_owner)
+    assert_selector "button[disabled]", text: "Delete user…"
+    assert_text "mara@example.com is the only owner, so they can't be deleted."
+  end
+end

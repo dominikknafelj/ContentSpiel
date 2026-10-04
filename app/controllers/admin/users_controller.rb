@@ -34,7 +34,7 @@ module Admin
       result = Users::Save.call(User.new, attributes: user_params)
 
       if result.ok?
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User created"
+        redirect_to edit_admin_user_path(result.record, **admin_url_options), status: :see_other, notice: "User created"
       else
         forbidden_or(result) do
           @user = result.record
@@ -51,7 +51,7 @@ module Admin
       result = Users::Save.call(@user, attributes: user_params)
 
       if result.ok?
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User updated"
+        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: "User saved"
       else
         forbidden_or(result) do
           @user = result.record
@@ -121,8 +121,8 @@ module Admin
     end
 
     # `group_ids` and `owner` pass straight through: `Users::Save` decides
-    # who may change them (a non-owner's form has no owner field at all,
-    # and a forged one is refused there).
+    # who may change them (no form has an owner field now -- owner rights are
+    # `PATCH users/:id/owner` -- and a non-owner's forged one is refused there).
     def user_params
       params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, :owner, group_ids: [])
     end

@@ -30,9 +30,11 @@ class Admin::UsersSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar button[type=submit]:not([disabled])", text: "Save user"
 
     press "Save user"
-    assert_current_path admin_users_path
-    assert_text "User updated"
+    assert_current_path edit_admin_user_path(@target)
+    assert_text "User saved"
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
     assert_equal [ access_control_groups(:read_only).id, editor.id ].sort, @target.reload.group_ids.sort
+    visit admin_users_path
     within(row(@target)) { assert_text "Editor" }
   end
 

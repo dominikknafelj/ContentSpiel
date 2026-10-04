@@ -308,8 +308,8 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     fill_in "Password", with: "a much Longer passw0rd"
     fill_in "Confirm password", with: "a much Longer passw0rd"
     press "Create user"
-    assert_current_path admin_users_path
-    assert_text "someone.new@example.com"
+    assert_text "User created"
+    assert_selector "h1", text: "someone.new@example.com"
     sleep 0.5
     page.execute_script("history.back()")
     assert_current_path new_admin_user_path

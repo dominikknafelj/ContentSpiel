@@ -36,8 +36,8 @@ module Admin
       def checked?(group) = selected_ids.include?(group.id)
       def input_id(group) = "user_group_ids_#{group.id}"
 
-      CARD = "grid cursor-pointer grid-cols-[minmax(0,1fr)_1rem] items-start gap-2.5 rounded-cs border px-3.5 py-3 text-ink".freeze
-      OPEN_CARD = "#{CARD} border-line bg-surface has-[:checked]:border-accent has-[:checked]:bg-accent-tint".freeze
+      CARD = "grid-cols-[minmax(0,1fr)_1rem] items-start gap-2.5 rounded-cs border px-3.5 py-3 text-ink".freeze
+      OPEN_CARD = "#{CARD} cursor-pointer border-line bg-surface has-[:checked]:border-accent has-[:checked]:bg-accent-tint".freeze
       LOCKED_CARD = "#{CARD} cursor-not-allowed border-line bg-sunken".freeze
 
       def card_class(group) = locked?(group) ? LOCKED_CARD : OPEN_CARD

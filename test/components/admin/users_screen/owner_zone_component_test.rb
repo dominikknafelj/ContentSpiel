@@ -49,3 +49,28 @@ class Admin::UsersScreen::OwnerZoneComponentTest < ViewComponent::TestCase
     assert_selector "[data-admin--pending-lock-target=hint][hidden]", visible: :all
   end
 end
+
+class Admin::UsersScreen::OwnerZonePreviewsTest < ViewComponent::TestCase
+  # The previews' own examples (unsaved users): each must show its named state with a real name.
+  def preview(name)
+    with_request_url("/cs-studio/users/1/edit") { render_preview(name, from: Admin::UsersScreen::OwnerZoneComponentPreview) }
+  end
+
+  test "non_owner preview: a named Make owner… dialog" do
+    preview(:non_owner)
+    assert_selector "button", text: "Make owner…"
+    assert_selector "dialog", text: "Make reader@example.com an owner?", visible: :all
+  end
+
+  test "owner preview: Remove owner rights… for a named owner" do
+    preview(:owner)
+    assert_selector "button:not([disabled])", text: "Remove owner rights…"
+    assert_selector "dialog", text: "Remove owner rights from mara@example.com?", visible: :all
+  end
+
+  test "last_owner preview: disabled with the named reason" do
+    preview(:last_owner)
+    assert_selector "button[disabled]", text: "Remove owner rights…"
+    assert_text "mara@example.com is the only owner, so their owner rights can't be removed."
+  end
+end
