@@ -15,7 +15,7 @@
 
   <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
-  <%= form_with url: admin_user_path(@user, **admin_url_options), method: :patch do %>
+  <%= form_with url: admin_user_path(@user, **admin_url_options), method: :patch, id: "user-form", data: save_bar_form_data do %>
     <div class="mb-4">
       <%= label_tag "user_name", "Name", class: setup_label_class %>
       <%= text_field_tag "user[name]", @user.name, id: "user_name", maxlength: 120, autocomplete: "name",
@@ -46,9 +46,6 @@
 
     <%= render "admin/users/access_fields", user: @user %>
 
-    <div class="flex gap-2">
-      <%= render Admin::ButtonComponent.new(label: "Save changes", variant: :primary, type: "submit") %>
-      <%= link_to "Cancel", admin_users_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-    </div>
+    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save changes") %>
   <% end %>
 </div>

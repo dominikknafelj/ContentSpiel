@@ -3,7 +3,7 @@
     an empty list still arrives as one. %>
 <%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
-<%= form_with url: url, method: method do %>
+<%= form_with url: url, method: method, id: "group-form", data: save_bar_form_data do %>
   <div class="mb-4 max-w-md">
     <%= label_tag "group_name", "Name", class: setup_label_class %>
     <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>
@@ -39,8 +39,5 @@
     <%= render Admin::PermissionMatrixComponent.new(grants: grants, stale: stale, locale: admin_locale) %>
   </div>
 
-  <div class="flex gap-2">
-    <%= render Admin::ButtonComponent.new(label: "Save group", variant: :primary, type: "submit") %>
-    <%= link_to "Cancel", admin_groups_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-  </div>
+  <%= render Admin::SaveBarComponent.new(form_id: "group-form", cancel_url: admin_groups_path(**admin_url_options), save_label: "Save group") %>
 <% end %>

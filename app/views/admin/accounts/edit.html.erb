@@ -12,16 +12,16 @@
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@errors)) %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
-  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, class: "mb-8" do %>
+  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8", data: save_bar_form_data do %>
     <div class="mb-4">
       <%= label_tag "name", "Your name", class: setup_label_class %>
       <%= text_field_tag "name", Current.user.name, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
     </div>
 
-    <%= render Admin::ButtonComponent.new(label: "Save name", variant: :primary, type: "submit") %>
+    <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Save name") %>
   <% end %>
 
-  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch do %>
+  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data do %>
     <div class="mb-4">
       <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
             autocomplete: "current-password", autofocus: true) %>
@@ -35,6 +35,6 @@
       <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password") %>
     </div>
 
-    <%= render Admin::ButtonComponent.new(label: "Change password", variant: :primary, type: "submit", data: { password_submit: true }) %>
+    <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) %>
   <% end %>
 </div>
