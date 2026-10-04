@@ -380,6 +380,28 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
   end
 
+  # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the
+  # viewer may read, and links to the posts list for the tag, which shows the same
+  # ones. The dialogs' number is the one place a trashed post is counted on
+  # purpose -- a delete or merge reaches it too (what `tag.merged` records) -- so
+  # the pair is pinned both ways: the column ignores it, the dialog does not.
+  test "the tags list's post count and its link leave out a trashed post, while the dialogs' count includes it" do
+    sign_in_as users(:one)
+    tag = Tag.create!(name: "shared")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+
+    get "/cs-studio/tags"
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
+      assert_select "a[href*='tag=shared']", text: "1 post"
+      assert_select "a", text: "2 posts", count: 0
+      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts. The posts themselves stay."
+    end
+
+    get "/cs-studio/posts", params: { tag: "shared" }
+    assert_select "tbody tr", text: /Kept post/
+    assert_select "tbody tr", text: /Gone post/, count: 0
+  end
+
   # The posts list's own filters, search, scope counts and pagination, and the
   # bulk endpoints (design pass round 2, Task 17): every one of them is kept
   # posts only, a trashed id is "not found", and Undo restores only trashed ones.

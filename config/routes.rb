@@ -160,8 +160,8 @@ Rails.application.routes.draw do
 
     # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
     # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
-    # an inline rename (`:update`) and a delete (`:destroy`) from the list
-    # itself; new tags are only ever created in passing, through a post's own
+    # an inline rename (`:update`), a delete (`:destroy`) and a merge into
+    # another tag (`merge`, `Tags::Merge`) from the list itself; new tags are only ever created in passing, through a post's own
     # `tag_names` (`Posts::Save`).
     # The post editor's tag chip input asks this for suggestions
     # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
@@ -169,7 +169,9 @@ Rails.application.routes.draw do
     # has no `show`, so the two paths can't collide).
     get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
 
-    resources :tags, only: %i[index update destroy]
+    resources :tags, only: %i[index update destroy] do
+      member { post :merge }
+    end
 
     # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
     # singleton's own autosaving form (title, tagline, logo, social links,

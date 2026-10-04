@@ -3,8 +3,9 @@ module Admin
   # its post count, each row its own autosaving rename form (the same
   # `AutosaveResponses` shape `PagesController`/`ContentBlocksController`
   # use, minus the locale switching neither a tag's name nor its post count
-  # has any use for -- a tag has no translated attributes) plus a delete
-  # gated behind `ConfirmDialogComponent`. There is no `:show`/`:new`/
+  # has any use for -- a tag has no translated attributes) plus a row menu
+  # (⋯) that opens the list's one Merge dialog and one Delete dialog
+  # (`admin--tag-dialogs` fills them from the row). There is no `:show`/`:new`/
   # `:create`: a tag has no editor screen of its own, and new tags are only
   # ever created in passing, through a post's `tag_names` (`Posts::Save`).
   class TagsController < BaseController
@@ -17,23 +18,29 @@ module Admin
     # `LOWER(tags.name)`, not the plain column: matches the case-insensitive
     # ordering an editor actually expects from a list of lowercase-stored
     # names, and the same comparison `BlockTypes::PostList` already makes
-    # when matching a tag by name. `LEFT JOIN` + `COUNT`, not `tag.posts.
-    # count` per row (an N+1 the same size as the list itself), and grouped
-    # by `tags.id` alone -- Postgres allows every other `tags.*` column in
-    # the `SELECT` list once the `GROUP BY` names the table's primary key
-    # (the "functional dependency" rule), so this needs no `MAX()`/`array_
-    # agg()` wrapper around the rest of the row.
+    # when matching a tag by name.
     #
-    # Kept posts only (`FILTER`): a post in the trash isn't one of the
-    # tag's posts as far as this list or the delete dialog's "Removes the
-    # tag from N posts" is concerned -- even though deleting the tag does
-    # take it off trashed posts too (a known interim state, docs/
-    # roadmap.md).
+    # Two numbers per tag, each one grouped query for the whole list (never
+    # one per row):
+    # - `@readable_counts`, the "Posts" column: KEPT posts the VIEWER may read
+    #   (`AccessControl.scope`, so a trashed post and one out of the viewer's
+    #   scope are not counted), because that column links to the posts list,
+    #   which is read-scoped the same way -- the number and the list it opens
+    #   must agree.
+    # - `@carrier_counts`, the dialogs' "N posts": every post carrying the tag,
+    #   trashed ones too, because a delete or a merge reaches all of them and
+    #   `tag.merged` records exactly that number. Neither count is computed for
+    #   a viewer who can't read posts at all (the views then show no figure --
+    #   for them a count would be a misleading zero, or leak how many posts
+    #   they can't see; `Admin::TagSuggestionsController` makes the same call).
     def index
-      @tags = Tag.left_joins(:posts)
-        .select("tags.*, COUNT(posts.id) FILTER (WHERE posts.trashed_at IS NULL) AS posts_count")
-        .group(:id)
-        .order(Arel.sql("LOWER(tags.name)"))
+      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a
+      @counts_visible = can?("posts.read")
+      ids = @tags.map(&:id)
+      return @readable_counts = @carrier_counts = {} unless @counts_visible && ids.any?
+
+      @readable_counts = admin_scope(Post.all).joins(:post_tags).where(post_tags: { tag_id: ids }).group("post_tags.tag_id").count
+      @carrier_counts = PostTag.where(tag_id: ids).group(:tag_id).count
     end
 
     # Inline rename (spec §5.3): PATCHes on blur/debounce like every other
@@ -57,11 +64,15 @@ module Admin
       render turbo_stream: streams, status: autosave_status(result)
     end
 
-    # Permanent (spec §7's "No trash" interim state) -- the row's own
-    # `ConfirmDialogComponent` already told the editor how many posts would
-    # lose the tag before this request was ever sent. `Tags::Destroy` (not a
-    # bare `tag.destroy`) is what re-syncs the same tag-filtered listings
-    # `update` above relies on `Tags::Rename` for.
+    # Permanent (spec §7's "No trash" interim state) -- the shared delete
+    # dialog already told the editor how many posts would lose the tag before
+    # this request was ever sent. `Tags::Destroy` (not a bare `tag.destroy`) is
+    # what re-syncs the same tag-filtered listings `update` above relies on
+    # `Tags::Rename` for.
+    #
+    # The answer removes the row and says so in a toast; the dialog it was
+    # confirmed in lives outside the row now (one for the whole list), so
+    # `admin--tag-dialogs` closes it when this submission succeeds.
     #
     # A refusal (a stale tab whose `tags.manage` was taken away) leaves the
     # row in place and answers 403, rather than removing a tag that still
@@ -71,7 +82,34 @@ module Admin
       result = Tags::Destroy.call(tag)
       return head(result.denied? ? :forbidden : :unprocessable_entity) unless result.ok?
 
-      render turbo_stream: turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag))
+      render turbo_stream: [
+        turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag)),
+        toast_stream("Deleted “#{tag.name}”")
+      ]
+    end
+
+    # Merge into another tag (`Tags::Merge`). The source is the row's tag
+    # (an id that no longer exists is the ordinary 404, never a 500); the
+    # target arrives by NAME, as the picker's suggestions (`tags/suggest`) are
+    # names, and a name that matches no tag any more is a plain refusal like the
+    # service's own (the same tag, none chosen, a tag deleted meanwhile). Every
+    # answer is a 303 back to the list with a toast, so a Turbo form submission
+    # renders it as a visit and the merged row is simply gone; a refusal for want
+    # of permission is the 403 page, as everywhere else.
+    def merge
+      source = Tag.find(params[:id])
+      name = params[:into].to_s.strip.downcase
+      into = Tag.find_by(name: name) if name.present?
+
+      result = Tags::Merge.call(source, into: into)
+      return forbidden!(result.errors.first) if result.denied?
+
+      if result.ok?
+        flash[:notice] = "Merged “#{source.name}” into “#{into.name}”"
+      else
+        flash[:alert] = name.present? && into.nil? ? Tags::Merge::GONE : result.errors.first
+      end
+      redirect_to admin_tags_path(**admin_url_options), status: :see_other
     end
 
     private
