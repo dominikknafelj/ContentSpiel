@@ -14,6 +14,7 @@ module Admin
   # moment a field loses focus.
   class PagesController < BaseController
     include AutosaveResponses
+    include Scheduling
     include MediaFields
 
     # Which of `params[:page]`'s keys are translated columns (`Pages::Save`'s
@@ -210,16 +211,21 @@ module Admin
     # so this is the one action here that can also *un*-schedule a page
     # back to a later date without first unpublishing it.
     def schedule
-      at = Time.zone.parse(params[:published_at].to_s)
+      editor = admin_page_path(@page, **admin_url_options)
 
-      if at.nil?
-        redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: "Choose a date and time"
-        return
+      if params[:remove] == "1"
+        # "Remove schedule" is only offered for a scheduled record; for any
+        # other it must not become an unpublish (a live record's
+        # `published_at` is in the past), so it changes nothing.
+        return redirect_to editor, status: :see_other unless @page.status == "scheduled"
+
+        return redirect_after Pages::Save.call(@page, attributes: { published_at: nil }), success: "Schedule removed"
       end
 
+      at, error = requested_schedule
+      return refuse_schedule(error, editor) if error
+
       redirect_after Pages::Save.call(@page, attributes: { published_at: at }), success: "Scheduled"
-    rescue ArgumentError
-      redirect_to admin_page_path(@page, **admin_url_options), status: :see_other, alert: "Choose a date and time"
     end
 
     private

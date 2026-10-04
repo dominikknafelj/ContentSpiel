@@ -21,17 +21,22 @@ module Admin
 
     renders_one :footer
 
-    def initialize(id:, title:, width: :confirm, destructive: false)
+    # `open_on_load:` marks a dialog the server wants open as soon as the page
+    # appears (a form dialog whose submission was refused, with the message
+    # inside it): `admin--dialog` opens it on connect and on every Turbo load
+    # and strips the attribute, so a Turbo cache restore never reopens it.
+    def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false)
       raise ArgumentError, "unknown dialog width #{width.inspect}" unless WIDTHS.key?(width)
 
       @id = id
       @title = title
       @width = width
       @destructive = destructive
+      @open_on_load = open_on_load
     end
 
     private
 
-    attr_reader :id, :title, :width, :destructive
+    attr_reader :id, :title, :width, :destructive, :open_on_load
   end
 end

@@ -8,14 +8,43 @@ import { Controller } from "@hotwired/stimulus"
 // else the first focusable -- the dialog's × -- so we move it to the first
 // form field when there is one.
 export default class extends Controller {
+  // A server-requested dialog (`data-admin--dialog-open-on-load`, a form
+  // dialog reopened with its error after a refused submit). The controller
+  // lives on <body>, which Turbo Drive keeps across visits, so `connect` only
+  // covers a full load; `turbo:load` covers every visit. Turbo's cache
+  // snapshots would otherwise carry the attribute along, so it is stripped
+  // the moment the dialog opens: Back never reopens it.
+  connect() {
+    this.openOnLoad = () => this.openRequested()
+    document.addEventListener("turbo:load", this.openOnLoad)
+    this.openRequested()
+  }
+
+  disconnect() {
+    document.removeEventListener("turbo:load", this.openOnLoad)
+  }
+
+  openRequested() {
+    document.querySelectorAll("dialog[data-admin--dialog-open-on-load]").forEach((dialog) => {
+      dialog.removeAttribute("data-admin--dialog-open-on-load")
+      if (dialog.open) return
+      dialog.showModal()
+      this.focusFirstField(dialog)
+    })
+  }
+
+  focusFirstField(dialog) {
+    if (dialog.querySelector("[autofocus]")) return
+    const field = dialog.querySelector(".admin-dialog__body :is(input:not([type=hidden]), select, textarea)")
+    if (field) field.focus()
+  }
+
   open(event) {
     const dialog = document.getElementById(event.params.id)
     if (!dialog || dialog.open) return
     event.preventDefault()
     dialog.showModal()
-    if (dialog.querySelector("[autofocus]")) return
-    const field = dialog.querySelector(".admin-dialog__body :is(input:not([type=hidden]), select, textarea)")
-    if (field) field.focus()
+    this.focusFirstField(dialog)
   }
 
   // `click` fires on the nearest common ancestor of the mousedown and

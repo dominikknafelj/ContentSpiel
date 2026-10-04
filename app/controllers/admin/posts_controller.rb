@@ -9,6 +9,7 @@ module Admin
   # to disambiguate against either).
   class PostsController < BaseController
     include AutosaveResponses
+    include Scheduling
 
     # `Posts::Save`'s own translated-column list, not a second hand-kept
     # copy -- same reasoning `Admin::ContentBlocksController::TRANSLATED_
@@ -163,16 +164,21 @@ module Admin
     end
 
     def schedule
-      at = Time.zone.parse(params[:published_at].to_s)
+      editor = admin_post_path(@post, **admin_url_options)
 
-      if at.nil?
-        redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: "Choose a date and time"
-        return
+      if params[:remove] == "1"
+        # "Remove schedule" is only offered for a scheduled record; for any
+        # other it must not become an unpublish (a live record's
+        # `published_at` is in the past), so it changes nothing.
+        return redirect_to editor, status: :see_other unless @post.status == "scheduled"
+
+        return redirect_after Posts::Save.call(@post, attributes: { published_at: nil }), success: "Schedule removed"
       end
 
+      at, error = requested_schedule
+      return refuse_schedule(error, editor) if error
+
       redirect_after Posts::Save.call(@post, attributes: { published_at: at }), success: "Scheduled"
-    rescue ArgumentError
-      redirect_to admin_post_path(@post, **admin_url_options), status: :see_other, alert: "Choose a date and time"
     end
 
     private

@@ -63,13 +63,15 @@ module Admin
 
       def unpublish_dialog_id = "unpublish-#{type}-#{record.id}"
 
-      # The Schedule dialog is the next task's. Until it exists the menu's
-      # "Schedule…" and the scheduled record's "Edit schedule" open the
-      # interim inline panel (`#schedule_panel_id`); the id is exposed now so
-      # the dialog can take it over without touching callers or tests.
-      def schedule_dialog_id = "schedule-#{type}-#{record.id}"
+      # The menu's "Schedule…" and a scheduled record's "Edit schedule" open
+      # the `ScheduleDialogComponent`, rendered after the header.
+      def schedule_dialog_id = ScheduleDialogComponent.dialog_id_for(record)
 
-      def schedule_panel_id = "schedule-panel-#{type}-#{record.id}"
+      # What the last refused `schedule` post left in the flash (the
+      # controller's own wording); read once, here, so the dialog reopens with
+      # it. Never `flash[:alert]`: that is the toast region's, and a form
+      # error is not a toast.
+      def schedule_error = helpers.flash[:schedule_error]
 
       # The record's own address, always shown while it has one (a draft page
       # has a would-be URL, so there is something to copy ahead of publishing;
@@ -133,10 +135,6 @@ module Admin
 
       def live_hint = "This #{type} is live. Changes appear on the site as soon as they’re saved."
 
-      def scheduled_at_input_value
-        (scheduled? ? record.published_at : Time.current + 1.day).strftime("%Y-%m-%dT%H:%M")
-      end
-
       # Whether the ⋯ menu has anything to hold (a viewer who can only read
       # gets no empty menu).
       def menu_items?
@@ -165,15 +163,9 @@ module Admin
 
       def unpublish_url = route("unpublish")
 
-      def schedule_url = route("schedule")
-
       def record_url = helpers.public_send("admin_#{type}_path", record, **url_options)
 
       def activity_url = helpers.admin_audit_events_path(subject_type: record.class.name, subject_id: record.id, **url_options)
-
-      # The `data:` of whatever opens the schedule UI -- the interim panel
-      # today, `dialog_trigger(schedule_dialog_id)` once the dialog exists.
-      def schedule_trigger_data = { action: "admin--disclosure#toggle" }
 
       # The missing / outdated language marks, from one `Translations::Status`
       # pass (one blocks query), read once per render.

@@ -12,6 +12,36 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
   end
 
+  test "a post: scheduling in the past is refused with the dialog's own message, a future time schedules, Remove schedule goes back to draft" do
+    post_record = create_post(title: "Later", published: false)
+    travel_to Time.zone.local(2026, 10, 4, 12, 0) do
+      post schedule_admin_post_path(post_record), params: { published_at: "2026-10-04T12:00" }
+      follow_redirect!
+      assert_select "dialog#schedule-post-#{post_record.id}[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
+      assert_select "#toasts .admin-toast", count: 0
+      assert_nil post_record.reload.published_at
+
+      post schedule_admin_post_path(post_record), params: { published_at: "" }
+      follow_redirect!
+      assert_select "dialog#schedule-post-#{post_record.id} [role=alert]", text: "Choose a date and time"
+
+      post schedule_admin_post_path(post_record), params: { published_at: "2026-10-06T09:00" }
+      assert_equal "scheduled", post_record.reload.status
+      get admin_post_path(post_record)
+      assert_select "dialog#schedule-post-#{post_record.id} button[name=remove]", text: "Remove schedule"
+
+      post schedule_admin_post_path(post_record), params: { remove: "1" }
+      assert_nil post_record.reload.published_at
+    end
+  end
+
+  test "a post's Schedule dialog names the site time zone" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    post_record = create_post(title: "Later", published: false)
+    get admin_post_path(post_record)
+    assert_select "dialog#schedule-post-#{post_record.id}", text: /Berlin time \(GMT\+[12]\), the site’s time zone\./
+  end
+
   test "the list filters by type, status and tag" do
     create_post(title: "Blog one", tags: [ "rails" ])
     create_post(title: "Resume one", content_type: "resume_entry")

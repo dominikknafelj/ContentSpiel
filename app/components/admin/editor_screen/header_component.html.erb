@@ -1,8 +1,7 @@
 <%# Structure and copy: handoff §4.1 / `Studio Pages.dc.html`, the default
-    ("no drafts") variant. `data-controller="admin--disclosure"` only serves the
-    interim schedule panel (see #schedule_dialog_id). %>
+    ("no drafts") variant. %>
 <%= tag.header class: "admin-editor-header sticky top-0 z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
-      data: { controller: "admin--disclosure", record_type: type, record_id: record.id } do %>
+      data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
     <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
       <% breadcrumb.each do |label, url| %>
@@ -29,7 +28,7 @@
       <% end %>
 
       <% if can_edit_schedule? %>
-        <%= render Admin::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: schedule_trigger_data) %>
+        <%= render Admin::ButtonComponent.new(label: "Edit schedule", variant: :secondary, type: "button", data: dialog_trigger(schedule_dialog_id)) %>
       <% end %>
 
       <% if menu_items? %>
@@ -39,7 +38,7 @@
             <% menu.with_item do %><%= link_to "Activity", activity_url %><% end %>
           <% end %>
           <% if can_schedule? %>
-            <% menu.with_item do %><%= tag.button "Schedule…", type: "button", data: schedule_trigger_data %><% end %>
+            <% menu.with_item do %><%= tag.button "Schedule…", type: "button", data: dialog_trigger(schedule_dialog_id) %><% end %>
           <% end %>
           <% if can_unpublish? %>
             <% menu.with_item do %><%= tag.button "Unpublish", type: "button", data: dialog_trigger(unpublish_dialog_id) %><% end %>
@@ -105,21 +104,13 @@
   <% if notice? %>
     <div class="pb-3 pt-3"><%= notice %></div>
   <% end %>
-
-  <%# Interim (see #schedule_dialog_id): the existing datetime form, same
-      action, field and behaviour, revealed by the menu's "Schedule…" or the
-      "Edit schedule" button; the next task replaces it with the dialog. %>
-  <% if can_schedule? || can_edit_schedule? %>
-    <%= tag.div id: schedule_panel_id, hidden: true, class: "admin-editor-header__schedule py-3", data: { "admin--disclosure-target": "panel" } do %>
-      <%= form_with url: schedule_url, method: :post, class: "flex w-max items-center gap-2", data: { turbo_frame: "_top" } do %>
-        <%= tag.input type: "datetime-local", name: "published_at", value: scheduled_at_input_value, aria: { label: "Publish at" }, class: setup_input_class %>
-        <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :secondary, type: "submit") %>
-      <% end %>
-    <% end %>
-  <% end %>
 <% end %>
 
 <%# Dialogs: siblings of the header (see the class comment). %>
+<% if can_schedule? || can_edit_schedule? %>
+  <%= render Admin::EditorScreen::ScheduleDialogComponent.new(record: record, url_options: url_options, error: schedule_error) %>
+<% end %>
+
 <% if can_unpublish? %>
   <%= render Admin::ConfirmDialogComponent.new(id: unpublish_dialog_id, title: "Unpublish this #{type}?", body: unpublish_dialog_body) do |dialog| %>
     <% dialog.with_confirm_action do %>

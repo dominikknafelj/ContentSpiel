@@ -47,12 +47,12 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{@page.id}/unpublish"
     assert_select "form[action=?][data-turbo-frame='_top'] input[name='_method'][value='delete']", "/cs-studio/pages/#{@page.id}"
 
-    # A draft: Publish, and the (interim) schedule form -- scheduling is for
+    # A draft: Publish, and the Schedule dialog's form -- scheduling is for
     # a draft only now; a live page is unpublished first.
     draft = create_page(title: "Draft", published: false)
     get "/cs-studio/pages/#{draft.id}"
     assert_select "form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/publish"
-    assert_select ".admin-editor-header__schedule form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/schedule"
+    assert_select "dialog#schedule-page-#{draft.id} form[action=?][data-turbo-frame='_top']", "/cs-studio/pages/#{draft.id}/schedule"
 
     get "/cs-studio/pages/new"
     assert_select "form[action='/cs-studio/pages'][data-turbo-frame='_top']"
@@ -89,6 +89,75 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     at = 2.days.from_now.change(sec: 0)
     post "/cs-studio/pages/#{draft.id}/schedule", params: { published_at: at.iso8601 }
     assert_equal "scheduled", draft.reload.status
+  end
+
+  test "scheduling in the past, or for right now, is refused with the dialog's own message" do
+    page = create_page(title: "Later", published: false)
+    travel_to Time.zone.local(2026, 10, 4, 12, 0) do
+      [ "2026-10-04T11:59", "2026-10-04T12:00" ].each do |value|
+        post schedule_admin_page_path(page), params: { published_at: value }
+        follow_redirect!
+        assert_select "dialog#schedule-page-#{page.id}[data-admin--dialog-open-on-load] [role=alert]", text: "Pick a time in the future."
+        # A form error is never a toast.
+        assert_select "#toasts .admin-toast", count: 0
+        assert_nil page.reload.published_at
+      end
+    end
+  end
+
+  test "junk and blank answer Choose a date and time; nothing is saved" do
+    page = create_page(title: "Later", published: false)
+    [ "", "soon", "2026-13-45T99:99" ].each do |value|
+      post schedule_admin_page_path(page), params: { published_at: value }
+      follow_redirect!
+      assert_select "dialog#schedule-page-#{page.id} [role=alert]", text: "Choose a date and time"
+      assert_select "#toasts .admin-toast", count: 0
+      assert_nil page.reload.published_at
+    end
+  end
+
+  test "the error shows once, not again on the next visit" do
+    page = create_page(title: "Later", published: false)
+    post schedule_admin_page_path(page), params: { published_at: "" }
+    follow_redirect!
+    get admin_page_path(page)
+    assert_select "dialog#schedule-page-#{page.id} [role=alert]", count: 0
+    assert_select "dialog#schedule-page-#{page.id}[data-admin--dialog-open-on-load]", count: 0
+  end
+
+  test "a time inside a daylight-saving gap is accepted the way the site zone resolves it" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    page = create_page(title: "Later", published: false)
+    travel_to Time.utc(2027, 3, 1) do
+      post schedule_admin_page_path(page), params: { published_at: "2027-03-28T02:30" } # 02:30 doesn't exist that night in Berlin
+      assert_response :see_other
+      assert_equal Time.use_zone("Berlin") { Time.zone.parse("2027-03-28T02:30") }, page.reload.published_at
+    end
+  end
+
+  test "a valid time schedules, in the site time zone, and Remove schedule goes back to draft" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    page = create_page(title: "Later", published: false)
+    travel_to Time.utc(2026, 10, 4, 10, 0) do
+      post schedule_admin_page_path(page), params: { published_at: "2026-10-06T09:00" }
+      assert_equal Time.utc(2026, 10, 6, 7, 0), page.reload.published_at
+      assert_equal "scheduled", page.status
+      post schedule_admin_page_path(page), params: { remove: "1" }
+      assert_nil page.reload.published_at
+      assert_equal "draft", page.status
+    end
+  end
+
+  test "the dialog names the site time zone and only offers Remove schedule when there is one" do
+    site_settings(:default).update!(time_zone: "Berlin")
+    page = create_page(title: "Later", published: false)
+    get admin_page_path(page)
+    assert_select "dialog#schedule-page-#{page.id}", text: /Berlin time \(GMT\+[12]\), the site’s time zone\./
+    assert_select "dialog#schedule-page-#{page.id} button", text: "Remove schedule", count: 0
+
+    Current.set(actor: users(:one)) { Pages::Save.call(page, attributes: { published_at: 3.days.from_now }) }
+    get admin_page_path(page)
+    assert_select "dialog#schedule-page-#{page.id} button[name=remove][value='1']", text: "Remove schedule"
   end
 
   # Deleting moves the page to the trash (`Trash::Move`), its subpages

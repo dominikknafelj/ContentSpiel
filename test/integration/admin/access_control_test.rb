@@ -396,7 +396,7 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "button, input[type=submit]", text: /Publish|Unpublish|Move to trash/, count: 0
-    assert_select ".admin-editor-header__schedule", count: 0
+    assert_select "dialog[id^=schedule-]", count: 0
     assert_select "#block-picker-end", count: 0
 
     sign_in_as(users(:two))

@@ -1,0 +1,20 @@
+<%= render Admin::DialogComponent.new(id: dialog_id, title: "Schedule publishing", width: :form_narrow, open_on_load: error.present?) do |dialog| %>
+  <%= form_with url: url, method: :post, id: form_id, data: { turbo_frame: "_top" }, html: { novalidate: true } do %>
+    <label for="<%= input_id %>" class="<%= setup_label_class %>">Date and time</label>
+    <%= tag.input type: "datetime-local", id: input_id, name: "published_at", value: input_value, min: min_value,
+          class: setup_input_class, aria: { invalid: (error ? "true" : nil), describedby: error_id } %>
+    <p id="<%= error_id %>" class="mt-2 text-[13px] text-dim"><%= zone_line %></p>
+    <% if error %>
+      <p role="alert" class="mt-2 text-[13px] text-danger-ink"><%= error %></p>
+    <% end %>
+  <% end %>
+  <% dialog.with_footer do %>
+    <% if scheduled? %>
+      <%= render Admin::ButtonComponent.new(label: "Remove schedule", variant: :ghost, type: "submit", name: "remove", value: "1", form: form_id, formnovalidate: true, class: "mr-auto") %>
+    <% end %>
+    <%= tag.form method: "dialog" do %>
+      <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+    <% end %>
+    <%= render Admin::ButtonComponent.new(label: "Schedule", variant: :primary, type: "submit", form: form_id) %>
+  <% end %>
+<% end %>

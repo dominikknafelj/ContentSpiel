@@ -46,6 +46,24 @@ class Admin::EditorScreen::HeaderComponentTest < ViewComponent::TestCase
     assert_selector ".admin-status-chip[data-status=scheduled]"
   end
 
+  test "Schedule… and Edit schedule open the Schedule dialog, rendered after the header" do
+    page_record = create_page(title: "About", published: false)
+    render_header(page_record)
+    assert_selector "[role=menu] button[data-action='admin--dialog#open'][data-admin--dialog-id-param='schedule-page-#{page_record.id}']", text: "Schedule…", visible: :all
+    assert_selector "dialog#schedule-page-#{page_record.id}", visible: :all
+
+    post = create_post(title: "Later", published: false)
+    as_owner { Posts::Save.call(post, attributes: { published_at: 3.days.from_now }) }
+    render_header(post.reload)
+    assert_selector "button[data-admin--dialog-id-param='schedule-post-#{post.id}']", text: "Edit schedule"
+    assert_selector "dialog#schedule-post-#{post.id} button", text: "Remove schedule", visible: :all
+  end
+
+  test "a live record has no Schedule dialog" do
+    render_header(create_page(title: "About", published: true))
+    assert_no_selector "dialog[id^=schedule-]", visible: :all
+  end
+
   test "the menu's last item is Move to trash, after a divider; the homepage has it disabled with the reason" do
     render_header(root_page)
     items = page.all("[role=menu] a, [role=menu] button", visible: :all).map { |i| i.text(:all).strip }
