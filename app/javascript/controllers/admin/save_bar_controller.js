@@ -507,17 +507,27 @@ export default class extends Controller {
   // - a radio group is one key (its name): flipping a radio is one change,
   //   not two;
   // - a checkbox is `name=value`, present only while ticked;
+  // - a tracked hidden input whose name ends in `[]` is `name=value` too,
+  //   present only while it holds a value: the members of a SET (a chip
+  //   input's chips, the scope editor's carried types), where order means
+  //   nothing. Keyed by position, removing the first of ten chips shifted the
+  //   other nine and read "10 unsaved changes", and removing a chip and adding
+  //   it back counted as a change. One chip removed is one change; removed and
+  //   re-added is none. The blank sentinel ahead of the chips (so an emptied
+  //   list still submits) holds no value and is no member;
   // - anything else is its name plus its POSITION among the controls of that
   //   name (`name#0`, `name#1`, ...). Rows of a list share one name
-  //   (`site_setting[social_links][][name]`); keyed by name alone they
-  //   collapsed into the last row's value, and an edit to an earlier row was
-  //   not a change at all. A row added, removed or moved shows up as the
-  //   positions whose value now differs.
+  //   (`site_setting[languages][][fallback]`, one select per language row);
+  //   keyed by name alone they collapsed into the last row's value, and an
+  //   edit to an earlier row was not a change at all. A row added, removed or
+  //   moved shows up as the positions whose value now differs.
   // A hidden input is skipped -- the CSRF token, a `_method`, a checkbox's
   // "0" twin are not the editor's doing -- unless it carries
   // `data-save-bar-track`: the real control behind a widget (a chip, the
   // order of sortable rows), whose script dispatches a bubbling `input` or
   // `change` on it when it sets the value.
+  // A control that goes from disabled to enabled-and-empty counts nothing
+  // (absent and "" are one value, see `changes`); no screen has one.
   snapshot() {
     const values = {}
     const positions = {}
@@ -532,6 +542,8 @@ export default class extends Controller {
         else values[field.name] ??= ""
       } else if (field.type === "checkbox") {
         if (field.checked) values[`${field.name}=${field.value}`] = "on"
+      } else if (field.type === "hidden" && field.name.endsWith("[]")) {
+        if (field.value !== "") values[`${field.name}=${field.value}`] = "on"
       } else {
         const position = positions[field.name] ?? 0
         positions[field.name] = position + 1

@@ -57,6 +57,27 @@ class Admin::GroupsMembersSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar", text: /No unsaved changes/i
   end
 
+  # The chips are a set: the footer counts members, not positions (final wave
+  # B, ledger C-M1). Keyed by position, removing the first of three read "3
+  # unsaved changes", and the same member added back at the end still "2".
+  test "removing the first of several members is one change, and adding them back at the end is none" do
+    members = [ users(:reader), users(:author), users(:two) ]
+    members.each { |user| AccessControl::Membership.create!(user: user, group: @group) }
+    visit edit_admin_group_path(@group)
+    await_admin_controllers
+    first = find_all("li[data-chip-value]").first["data-chip-value"]
+    email = User.find(first).email_address
+
+    find("li[data-chip-value='#{first}'] button[aria-label^='Remove']").click
+    assert_selector ".admin-save-bar", text: /\b1 unsaved change\b/i
+
+    member_search.send_keys(email.split("@").first + "@")
+    assert_selector "#group_member_ids-listbox [role=option]", text: email
+    member_search.send_keys(:down, :enter)
+    assert_equal first, find_all("li[data-chip-value]").last["data-chip-value"]
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+  end
+
   test "Delete group… opens the dialog naming the token; confirming returns to the list with the toast" do
     AccessControl::Membership.create!(user: users(:reader), group: @group)
     ApiToken.generate!(users(:reader), group: @group, name: "Deploy bot")
