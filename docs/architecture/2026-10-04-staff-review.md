@@ -4,7 +4,7 @@ Scope: all of `app/`, `config/`, `db/`, `lib/`, `test/` (structurally) and the d
 
 Not reviewed: the uncommitted round-3 work in the tree at the time (`save_bar_controller.js`, `save_bar_component.*`, `pending_lock_controller.js`, the admin layout edits).
 
-Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation), `L<n>` (before a first deploy) and `D<n>` (database structure and Postgres features, §8). Each carries a status:
+Findings are referenced as `S<n>` (defects, performance, weak guarantees), `M<n>` (modularisation), `L<n>` (before a first deploy), `D<n>` (database structure and Postgres features, §8) and `C<n>` (public-site caching, §9). Each carries a status:
 
 - **checked**: the lines named were read a second time by the reviewer who collated this document, and say what the finding says.
 - **reported**: found and traced by one reviewer, not read a second time. Treat as a strong lead, confirm before fixing.
@@ -271,7 +271,37 @@ Added after the first hand-off, from a full read of `db/schema.rb` against the q
 - `translation_states` and `media_usages` have unique keys matching how they are read and upserted.
 - The single-root rule is backed by a partial unique index.
 
-## 9. Checked and found sound
+## 9. Public-site caching
+
+Added after the first hand-off. The user's priority: caching for the public site matters now, caching for CS Studio does not. From the config and code; nothing measured.
+
+What exists: one application cache (the rich-text body render, `app/models/rich_text/document.rb:182`, see S7), Solid Cache in production (a hit is a database query), no fragment caching in any view, fingerprinted assets cached for a year, and a cookie-less public controller (the prerequisite for any shared cache).
+
+### C1. No shared cache can hold a page, although one is already deployed — checked
+- `app/controllers/pages_controller.rb:36`: `expires_in 0, public: true, must_revalidate: true`. Every visitor request reaches Puma's three threads and, at best, ends in a 304 that still costs S7's 15 queries and S8's preload.
+- The container starts through Thruster (`Dockerfile:77`, `CMD ["./bin/thrust", "./bin/rails", "server"]`), which has an HTTP cache. With `max-age=0` it stores nothing.
+- The preconditions hold: the public response is the same for every visitor (no cookies, no CSRF tag, the theme toggle is client-side), and `/preview` already answers `private, no-store` (`app/controllers/preview_controller.rb:16`).
+- Direction: a short shared lifetime, for example `s-maxage=60`, keeping the ETag. Trade-off: a publish or a scheduled go-live shows up to that long late. **This is the user's decision and is still open.** If publishes must be instant, S7's version row and C4 come first.
+- **Not checked:** which directives Thruster honours, and whether it can purge or serve stale while revalidating. Its cache is in memory, per container.
+
+### C2. Library images are served in Active Storage's redirect mode — checked (code), general knowledge (behaviour)
+- `app/models/media/asset.rb:162` (`rails_blob_path`) and `:224` (`rails_representation_path`). Each image is a request to Rails answered by a redirect to a short-lived URL, so a browser or CDN cannot keep it for long, and each costs two requests.
+- Direction: proxy mode (`rails_storage_proxy_path` and the proxy representation route), which gives stable URLs with long-lived cache headers. That is how Active Storage behaves in general; it was not tested in this app. Images are most of a page's requests, so once pages are cached this matters more than the HTML.
+
+### C3. 404s are never cached, and each can scan `posts`
+- See S11. A brief shared lifetime on the 404 response keeps bot traffic off the database.
+
+### C4. Purge on publish
+- Already in the roadmap as "Caching / CDN purge". It removes C1's staleness trade-off once a real CDN is in front. S7's narrow version row is what a purge would key on, and the path-change events from Phase 1 name the URLs.
+
+### C5. Deferred on purpose
+- Fragment or whole-page caching inside Rails: worth much less once the proxy holds pages. Revisit only if a miss is still slow after S7 and S8.
+- The rich-text body cache: a detail of the miss path. Keep it only if measuring shows it beats no cache.
+- CS Studio caching (S10, S13): not a priority now.
+
+Order: C1 (after the decision), S7 + S8 to make a miss cheap, C2, C3, then C4.
+
+## 10. Checked and found sound
 
 - Read scoping through `AccessControl.scope` on pages, posts, blocks, the tree, bulk actions, MCP get/update and preview (S24 is the one exception found).
 - Denials are recorded outside the service transaction; savepoints are used where a rescue would otherwise swallow a failure; no external call inside a transaction.
