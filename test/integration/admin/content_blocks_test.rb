@@ -37,58 +37,67 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
-  # Fix (final-fixes round, finding 10): the end-of-list picker (rendered
-  # once, statically, below the whole list) and a card's own trailing
-  # between-picker (`last: false` only) used to both end up showing at the
-  # tail after an append -- the newly-appended card kept the default
-  # `last: false` regardless of actually being last now, so it rendered its
-  # own redundant trailing picker right above the page's already-present
-  # end-of-list one -- and the card that *was* last lost nothing (it never
-  # had one to lose), but was left permanently missing the between-picker
-  # it should have gained the moment something followed it.
-  test "adding a block at the end gives the new card no trailing picker, and gives the previous last card one" do
+  # One "Add block" row at the end of the list (design pass round 2): the
+  # between-cards pickers are gone, so an append only streams the new card in
+  # before that row -- nothing about the previously-last card changes (its
+  # Move down is re-enabled client-side, `admin--blocks#refreshMoveState`).
+  test "adding a block appends its card to the list and replaces nothing else" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     post blocks_path, params: { block: { block_type: "rich_text" } }, as: :turbo_stream
     assert_response :success
 
     new_block = @page.content_blocks.order(:position).last
-    assert_not_includes response.body, "block-picker-after-#{new_block.id}"
-    assert_includes response.body, "block-picker-after-#{first.id}"
-    assert_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+    assert_select "turbo-stream[action='append'][target='content-blocks-list']", count: 1
+    assert_includes response.body, ActionView::RecordIdentifier.dom_id(new_block)
+    assert_not_includes response.body, "block-picker-after-"
+    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
   end
 
-  test "adding a block between two existing cards touches neither one's own picker" do
+  test "the new last card renders its Move down disabled, and Move up enabled when it is not first" do
+    @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    post blocks_path, params: { block: { block_type: "rich_text" } }, as: :turbo_stream
+    assert_response :success
+
+    card = Nokogiri::HTML5.fragment(response.body).at_css("turbo-stream[action='append'] template")
+    assert card.at_css("button[data-move='down'][disabled]"), "the last card cannot move down"
+    assert_nil card.at_css("button[data-move='up'][disabled]")
+  end
+
+  test "after_id is still honoured by create: the card lands right after that block" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
 
     post blocks_path, params: { block: { block_type: "rich_text" }, after_id: first.id }, as: :turbo_stream
     assert_response :success
 
-    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(first)}">)
+    added = (@page.content_blocks.reload.to_a - [ first, second ]).sole
+    assert_equal [ first, added, second ], @page.content_blocks.to_a
+    assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
     assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
   end
 
-  test "duplicating the last block gives the copy no trailing picker, and gives the source one" do
-    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
-
-    post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
-    assert_response :success
-
-    copy = @page.content_blocks.order(:position).last
-    assert_not_equal first.id, copy.id
-    assert_not_includes response.body, "block-picker-after-#{copy.id}"
-    assert_includes response.body, "block-picker-after-#{first.id}"
-  end
-
-  test "duplicating a block that isn't last doesn't touch the actual last card's picker" do
+  test "duplicating a block streams the copy in right after the source and replaces no other card" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
 
     post "#{blocks_path}/#{first.id}/duplicate", as: :turbo_stream
     assert_response :success
 
-    assert_not_includes response.body, %(<turbo-stream action="replace" target="#{ActionView::RecordIdentifier.dom_id(second)}">)
+    copy = (@page.content_blocks.reload.to_a - [ first, second ]).sole
+    assert_equal [ first, copy, second ], @page.content_blocks.to_a
+    assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
+    assert_not_includes response.body, %(<turbo-stream action="replace")
+  end
+
+  test "typed-setting errors name their field in words in the block's error slot" do
+    block = @page.content_blocks.create!(block_type: "post_list", position: 0)
+    prefix = Admin::BlockCardComponent.error_prefix(block)
+
+    patch "#{blocks_path}/#{block.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: block.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_select_in_stream "#{prefix}-limit-errors", /\A\s*!?\s*Limit must be greater than or equal to 1\s*\z/
   end
 
   test "reorder, duplicate and delete" do

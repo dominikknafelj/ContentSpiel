@@ -28,10 +28,17 @@ module Admin
   # when nothing matches exactly, and lets Enter or a comma commit the typed
   # text as a chip; without it only a suggestion can be chosen.
   #
+  # `single: true` is a one-value field (a post-list block's tag filter): the
+  # name is a plain scalar (`block[settings][tag]`, no `[]`) and the blank
+  # sentinel ahead of the one chip makes the chip win when there is one -- a
+  # repeated scalar name reads as its last occurrence -- and "" when there is
+  # none. Choosing a suggestion replaces the chip it finds (`admin--chip-input`'s
+  # `single` value) instead of adding a second.
+  #
   # In a view-only editor the surrounding `<fieldset disabled>` disables the
   # input and every remove button, so the whole component is inert.
   class ChipInputComponent < AdminComponent
-    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil)
+    def initialize(name:, id:, label:, search_url:, chips: [], create: false, noun: "tag", placeholder: nil, errors: [], hidden_note: nil, help: nil, single: false)
       @name = name
       @id = id
       @label = label
@@ -43,6 +50,7 @@ module Admin
       @errors = Array(errors)
       @hidden_note = hidden_note
       @help = help
+      @single = single
     end
 
     def listbox_id = "#{id}-listbox"
@@ -67,6 +75,6 @@ module Admin
 
     private
 
-    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help
+    attr_reader :name, :id, :label, :search_url, :chips, :create, :noun, :placeholder, :errors, :hidden_note, :help, :single
   end
 end

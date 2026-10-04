@@ -7,13 +7,20 @@ import { currentGeneration, enqueue, holdTurboRequest, syncBases } from "autosav
 // dragging a card, its "⋯" menu's Move up/down, or the keyboard path on its
 // handle (Space, arrows, Space). `card` targets are
 // `Admin::BlockCardComponent`'s own top-level wrapper -- one per block, in
-// document order -- and every between-cards "+ add block" picker lives
-// *nested inside* the card it follows (that component's own comment
-// explains why), so it's never itself a direct child of the `list` target
-// and Sortable never has to be told to skip it: the list's direct children
-// are exactly the cards, nothing else. (The list is its own target, not
-// `this.element`: the controller's element is the whole Blocks section,
-// whose direct children are the header, the list and the picker.)
+// document order -- and the list's direct children are exactly the cards,
+// nothing else (the one "Add block" row sits after the list, not in it), so
+// Sortable never has to be told to skip anything. (The list is its own
+// target, not `this.element`: the controller's element is the whole Blocks
+// section, whose direct children are the header, the list and the picker.)
+//
+// Each card's "⋯" menu has Move up and Move down; the first card's Move up
+// and the last card's Move down are disabled. `refreshMoveState` keeps that
+// right in the browser: it runs on connect, after every reorder this
+// controller sends, and whenever the list's children change (a drop, a
+// keyboard step, a card streamed in by Add block or Duplicate, one removed by
+// Delete, the whole list replaced by an Undo) -- the server renders the
+// right state for the cards it sends, but a streamed insertion or removal
+// touches no neighbour, so it can only be corrected here.
 //
 // Duplicate and Delete need no controller action of their own -- both are
 // plain `button_to`/`form_with` submissions, and Turbo Drive already
@@ -72,6 +79,9 @@ export default class extends Controller {
       if (event.detail.url?.pathname === new URL(this.reorderUrlValue, window.location.origin).pathname) this.addPageBase(event)
     }
     document.addEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.moveStateObserver = new MutationObserver(() => this.refreshMoveState())
+    this.moveStateObserver.observe(this.listTarget, { childList: true })
+    this.refreshMoveState()
     this.sortable = Sortable.create(this.listTarget, {
       handle: ".admin-block-card__handle",
       animation: 150,
@@ -118,35 +128,57 @@ export default class extends Controller {
   disconnect() {
     this.element.removeEventListener("turbo:before-fetch-request", this.addPageBase)
     document.removeEventListener("turbo:before-fetch-request", this.addPageBaseToUndo)
+    this.moveStateObserver?.disconnect()
     this.sortable?.destroy()
+  }
+
+  // Move up is disabled on the first card, Move down on the last. Only the
+  // attribute is touched, so it is idempotent and cheap to run on every
+  // child-list change.
+  refreshMoveState() {
+    const cards = this.cardTargets
+    cards.forEach((card, index) => {
+      const up = card.querySelector('[data-move="up"]')
+      const down = card.querySelector('[data-move="down"]')
+      if (up) up.disabled = index === 0
+      if (down) down.disabled = index === cards.length - 1
+    })
   }
 
   // Shows/hides one card's own field list -- purely client-side (spec §5.1
   // names no "remember this across a reload" requirement for it), so this
-  // never round-trips to the server the way a drag/move does.
+  // never round-trips to the server the way a drag/move does. The title
+  // button is the disclosure: `aria-expanded` follows.
   toggle(event) {
-    this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    const hidden = this.cardFor(event)?.querySelector("[data-block-body]")?.classList.toggle("hidden")
+    if (hidden !== undefined) event.currentTarget.setAttribute("aria-expanded", String(!hidden))
   }
 
   // "Move up/down (client-side move, then the same reorder request)" (this
   // task's own brief): swaps this card with its immediate neighbour in
-  // `cardTargets`' own order -- not raw DOM siblings, since a card's
-  // *own* nested trailing picker would otherwise come along as if it were
-  // itself another list item -- then fires the exact same request a drag's
-  // `onEnd` does.
+  // `cardTargets`' own order, then fires the exact same request a drag's
+  // `onEnd` does. A disabled item (first card's Move up, last card's Move
+  // down) never gets here; the index guards are a belt for a programmatic
+  // call. The menu has closed by the time the card moves, so focus goes to
+  // the card's handle rather than being lost with the DOM move.
   moveUp(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
-    if (index > 0) this.listTarget.insertBefore(card, this.cardTargets[index - 1])
-    this.reorder()
+    if (index <= 0) return
+    this.listTarget.insertBefore(card, this.cardTargets[index - 1])
+    this.moved(card)
   }
 
   moveDown(event) {
     const card = this.cardFor(event)
     const index = this.cardTargets.indexOf(card)
-    if (index >= 0 && index < this.cardTargets.length - 1) {
-      this.listTarget.insertBefore(this.cardTargets[index + 1], card)
-    }
+    if (index < 0 || index >= this.cardTargets.length - 1) return
+    this.listTarget.insertBefore(this.cardTargets[index + 1], card)
+    this.moved(card)
+  }
+
+  moved(card) {
+    this.focusHandle(card)
     this.reorder()
   }
 
@@ -156,6 +188,7 @@ export default class extends Controller {
   // it carries is the freshest one. The answer's page base is written into
   // the hidden field before the next request goes.
   async reorder() {
+    this.refreshMoveState()
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
     await enqueue(async (isCurrent) => {

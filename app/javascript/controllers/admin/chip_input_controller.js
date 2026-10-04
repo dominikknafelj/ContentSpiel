@@ -2,7 +2,9 @@ import { Controller } from "@hotwired/stimulus"
 
 // A multi-value input that shows each value as a removable chip, with
 // autocomplete (`Admin::ChipInputComponent`; its class comment has the form
-// contract). The post editor's tags and related posts both use it.
+// contract). The post editor's tags and related posts both use it, and a
+// post-list block's tag filter in its `single` form (one chip at most: a new
+// choice replaces the old one).
 //
 // What it owns: one hidden `<input name=...>` per chip inside the form (next
 // to the component's blank sentinel), the suggestion list under the text
@@ -36,7 +38,7 @@ const MAX_OPTIONS = 8
 
 export default class extends Controller {
   static targets = ["input", "list", "listbox", "status", "sentinel", "chipTemplate", "optionTemplate"]
-  static values = { searchUrl: String, name: String, create: Boolean, noun: String }
+  static values = { searchUrl: String, name: String, create: Boolean, noun: String, single: Boolean }
 
   connect() {
     this.items = []
@@ -295,6 +297,9 @@ export default class extends Controller {
     this.inputTarget.value = ""
     this.close()
     if (this.hasChip(item.value)) return this.announce(`${item.label} is already added.`)
+
+    // A one-value field (`single`) holds one chip: choosing another replaces it.
+    if (this.singleValue) this.chips.forEach((existing) => existing.remove())
 
     const chip = this.chipTemplateTarget.content.firstElementChild.cloneNode(true)
     chip.dataset.chipValue = item.value

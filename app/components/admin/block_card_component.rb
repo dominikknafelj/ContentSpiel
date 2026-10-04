@@ -20,14 +20,28 @@ module Admin
   # A block whose stored `block_type` isn't (or is no longer) registered --
   # a removed plugin, spec §8 -- has no `definition` to read a schema or
   # columns from: `unavailable?` switches the template to the minimal
-  # "Unavailable type" card instead, Delete its only action.
+  # "Unavailable type" card instead (danger border, one sentence, "Delete
+  # block…" its only action).
+  #
+  # The header (design pass round 2): drag handle, the type name -- a button
+  # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::MenuComponent`
+  # (Move up, Move down, Duplicate, a divider, "Delete block…"). `first:` and
+  # `last:` only decide whether Move up / Move down start disabled; the page
+  # view and the controller's list re-render work them out, and `admin
+  # --blocks#refreshMoveState` keeps them right in the browser after every
+  # move, add and delete (an insertion streams one card in and touches no
+  # other, so the neighbour's state can only be corrected there).
+  #
+  # A post-list block's Type, Tag and Limit share one row (`#settings_row?`),
+  # Tag being a one-value `Admin::ChipInputComponent` over the tag
+  # suggestions (no creating a tag from a filter).
   #
   # `editable:` is whether the user may change this page's blocks
   # (access-control design spec §5, `can_edit?` on the page -- blocks
   # follow their page's permissions). The page view works it out once and
   # hands it to every card; left nil, the card asks itself. A view-only
-  # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete), no
-  # "+" picker below it, and its form is disabled without `admin--autosave`.
+  # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete) and its
+  # form is disabled without `admin--autosave`.
   class BlockCardComponent < AdminComponent
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
@@ -35,12 +49,13 @@ module Admin
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
-    def initialize(page:, block:, locale:, url_options: {}, last: false, editable: nil)
+    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil)
       @editable = editable
       @page = page
       @block = block
       @locale = locale
       @url_options = url_options
+      @first = first
       @last = last
     end
 
@@ -53,6 +68,8 @@ module Admin
     def label = definition&.label || block.block_type
 
     def unavailable_label = "Unavailable type — #{block.block_type}"
+
+    def first? = @first
 
     def last? = @last
 
@@ -84,6 +101,37 @@ module Admin
     def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
 
     def delete_dialog_id = "delete-block-#{block.id}"
+
+    def body_id = "#{error_prefix}-body"
+
+    # The "⋯" menu's items: the panel already styles its buttons (width,
+    # padding, hover); a disabled one dims and drops the hover fill.
+    def menu_item_class = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+
+    # The row-shaped settings of a post list (handoff B22): its three
+    # settings side by side, in this order, whatever order the type declared
+    # them in. Only where the schema fields are inputs (not on a translation
+    # tab, where untranslated fields are listed read-only) and only for a
+    # type that lists posts -- its `content_type`, `tag` and `limit` are
+    # required by `BlockTypeDefinition#finalize!`.
+    SETTINGS_ROW = %w[content_type tag limit].freeze
+
+    def settings_row? = !unavailable? && definition.capability?(:lists_posts) && !translation_tab? && settings_row_fields.size == SETTINGS_ROW.size
+
+    def settings_row_fields = SETTINGS_ROW.filter_map { |name| schema_fields.find { |field| field.name == name } }
+
+    # Everything else in the schema, rendered one per line as before.
+    def other_schema_fields = settings_row? ? schema_fields - settings_row_fields : schema_fields
+
+    # Where the row's Tag chip input asks for suggestions: the same
+    # endpoint the post editor's tags use (it needs `posts.read`, which is
+    # what choosing a post-list filter is about anyway).
+    def tag_search_url = helpers.admin_tag_suggestions_path(**url_options)
+
+    def tag_chips(field)
+      tag = value_for(field).to_s
+      tag.present? ? [ { value: tag, label: tag } ] : []
+    end
 
     def field_id(name) = "#{error_prefix}-#{name}"
 

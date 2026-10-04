@@ -12,6 +12,14 @@ module Admin
       )
     end
 
+    # One value, no creating: a post-list block's tag filter.
+    def single_value
+      render Admin::ChipInputComponent.new(
+        name: "block[settings][tag]", id: "preview-single", label: "Tag", search_url: "/cs-studio/tags/suggest",
+        chips: [ { value: "news", label: "news" } ], single: true, placeholder: "Any"
+      )
+    end
+
     def empty
       render Admin::ChipInputComponent.new(
         name: "post[tag_names][]", id: "preview-empty", label: "Tags", search_url: "/cs-studio/tags/suggest", create: true, placeholder: "Add a tag…"

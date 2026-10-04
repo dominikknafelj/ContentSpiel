@@ -65,4 +65,19 @@ class Admin::ChipInputComponentTest < ViewComponent::TestCase
     assert_selector "#post-tag_names-errors p", text: "is too long"
     assert_text "+2 related posts you can’t open"
   end
+
+  test "a single-value input names a plain scalar, flags the controller and keeps the one chip's hidden input" do
+    render_chips(name: "block[settings][tag]", id: "block-1-tag", chips: [ { value: "news", label: "news" } ], single: true, create: false)
+
+    assert_selector "[data-controller='admin--chip-input'][data-admin--chip-input-single-value='true']"
+    assert_selector "input[type=hidden][name='block[settings][tag]']", count: 2, visible: :all
+    assert_selector "li[data-chip-value='news'] input[type=hidden][name='block[settings][tag]'][value='news']", visible: :all
+    assert_selector "[data-field-name='tag']"
+  end
+
+  test "is multi-value unless asked" do
+    render_chips
+
+    assert_selector "[data-admin--chip-input-single-value='false']"
+  end
 end

@@ -34,6 +34,116 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-block-card", text: "Rich text"
   end
 
+  test "the Add block row appends an Image block at the end, with Move down disabled on it and enabled on the one before" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    assert_selector "#{card_for(first)} button[data-move='down'][disabled]", visible: :all
+    within("#block-picker-end") { press "Image" }
+
+    assert_selector "#content-blocks-list > .admin-block-card", count: 2
+    added = @page.content_blocks.where.not(id: first.id).sole
+    assert_equal "image", added.block_type
+    assert_equal [ first.id, added.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
+    assert_selector "#{card_for(added)} button[data-move='down'][disabled]", visible: :all
+    assert_no_selector "#{card_for(first)} button[data-move='down'][disabled]", visible: :all
+    assert_no_selector "[id^='block-picker-after-']"
+  end
+
+  test "the card menu's Delete block… asks first, then removes the card" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    find("#{card_for(first)} button[aria-label='Block actions']").click
+    within(card_for(first)) { press "Delete block…" }
+    assert_text "Delete this block?"
+    assert_text "Blocks don’t go to the trash. This can’t be undone."
+    within("dialog[open]") { press "Delete block" }
+
+    assert_no_selector card_for(first)
+    assert_equal [ second ], @page.content_blocks.reload.to_a
+    # The remaining card is now the only one: neither move is possible.
+    assert_selector "#{card_for(second)} button[data-move='up'][disabled]", visible: :all
+    assert_selector "#{card_for(second)} button[data-move='down'][disabled]", visible: :all
+  end
+
+  test "the menu's Duplicate inserts the copy right below the source" do
+    first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    find("#{card_for(first)} button[aria-label='Block actions']").click
+    within(card_for(first)) { press "Duplicate" }
+
+    assert_selector "#content-blocks-list > .admin-block-card", count: 3
+    copy = (@page.content_blocks.reload.to_a - [ first, second ]).sole
+    assert_equal [ first, copy, second ], @page.content_blocks.to_a
+    assert_equal [ first.id, copy.id, second.id ], page.all("#content-blocks-list > [data-block-id]").map { |c| c["data-block-id"].to_i }
+  end
+
+  test "the type name collapses and expands the body, and says which" do
+    block = @page.content_blocks.create!(block_type: "post_list", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    title = "#{card_for(block)} button[aria-controls]"
+    assert_selector "#{title}[aria-expanded='true']"
+    find(title).click
+    assert_selector "#{title}[aria-expanded='false']"
+    assert_no_selector "#{card_for(block)} [data-block-body]", visible: :visible
+    find(title).click
+    assert_selector "#{card_for(block)} [data-block-body]"
+  end
+
+  test "a post list's tag is a single-value chip input: choosing replaces, removing clears, and both save" do
+    Current.set(actor: users(:one)) do
+      create_post(title: "One", tags: [ "news", "events" ])
+    end
+    block = @page.content_blocks.create!(block_type: "post_list", position: 0)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    within(card_for(block)) do
+      field = find("input[role=combobox]")
+      field.send_keys("new")
+      find("[role=option]", text: "news").click
+    end
+    assert_selector "#block-#{block.id}-save-status", text: /SAVED/, wait: 10
+    assert_equal "news", block.reload.settings["tag"]
+
+    within(card_for(block)) do
+      find("input[role=combobox]").send_keys("eve")
+      find("[role=option]", text: "events").click
+      assert_selector "li[data-chip-value]", count: 1
+      assert_selector "li[data-chip-value='events']"
+    end
+    assert_eventually { block.reload.settings["tag"] == "events" }
+
+    within(card_for(block)) { find("button[aria-label='Remove events']").click }
+    assert_eventually { block.reload.settings["tag"].to_s == "" }
+  end
+
+  test "an image block's alt override shows the library text as placeholder and Reset clears it" do
+    asset = create_media_asset
+    asset.update!(alt: "Library alt")
+    block = @page.content_blocks.create!(block_type: "image", position: 0, media_asset: asset)
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    alt = "#block-#{block.id}-alt"
+    assert_selector "#{alt}[placeholder='Library alt']"
+    find(alt).set("Mine")
+    find(alt).send_keys(:tab)
+    assert_eventually { block.reload.alt(locale: :en) == "Mine" }
+    within(card_for(block)) { press "Reset" }
+    assert_eventually { block.reload.alt(locale: :en).to_s == "" }
+    assert_equal "", find(alt).value
+  end
+
   test "dragging a block's handle reorders the list and persists" do
     first = @page.content_blocks.create!(block_type: "rich_text", position: 0)
     second = @page.content_blocks.create!(block_type: "post_list", position: 1)
@@ -141,6 +251,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   end
 
   private
+
+  def card_for(block) = "##{ActionView::RecordIdentifier.dom_id(block)}"
 
   def await_js(condition, timeout: 5)
     met = page.evaluate_async_script(<<~JS, condition, timeout * 1000)

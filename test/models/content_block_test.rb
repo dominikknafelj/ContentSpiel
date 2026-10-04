@@ -277,4 +277,13 @@ class ContentBlockTest < ActiveSupport::TestCase
       assert block.valid?, block.errors.full_messages.to_sentence
     end
   end
+
+  test "a typed setting's error names its field in words, never the dotted path" do
+    block = ContentBlock.new(owner: @page, block_type: "post_list", position: 0, settings: { "limit" => 0 })
+
+    assert_not block.valid?
+    assert_includes block.errors.full_messages, "Limit must be greater than or equal to 1"
+    assert_equal "Limit", ContentBlock.human_attribute_name("settings.limit")
+    assert_equal "Block type", ContentBlock.human_attribute_name("block_type")
+  end
 end

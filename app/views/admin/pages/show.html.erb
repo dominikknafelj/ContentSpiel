@@ -38,7 +38,7 @@
   <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
     <% blocks = @page.content_blocks.to_a %>
     <% blocks.each_with_index do |block, index| %>
-      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
     <% end %>
   </div>
 
