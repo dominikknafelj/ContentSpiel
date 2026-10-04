@@ -24,6 +24,21 @@ module Jump
       { title: "Change password", path: :admin_account_password_path, permission: nil }
     ].freeze
 
+    # The Settings group (spec §7, round 1 second review): destinations
+    # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
+    # id of the section on `admin_settings_path` (see
+    # `Admin::SettingsFormComponent`), nil for Languages, which has a screen of
+    # its own. Each needs the permission its section's own controller asks for,
+    # so a viewer is never offered a link that would 403. Sections (CS Studio's
+    # modules) used to share this group's label -- "Settings" listing
+    # Dashboard and Pages -- and are a group of their own now.
+    SETTINGS_DESTINATIONS = [
+      { title: "Settings › Site", path: :admin_settings_path, anchor: "settings-section-site", permission: "settings.manage" },
+      { title: "Settings › Publishing", path: :admin_settings_path, anchor: "settings-section-publishing", permission: "settings.manage" },
+      { title: "Settings › Languages", path: :admin_settings_languages_path, anchor: nil, permission: "languages.manage" },
+      { title: "Settings › AI translation", path: :admin_settings_path, anchor: "settings-section-ai", permission: "settings.manage" }
+    ].freeze
+
     def initialize(actor:, query:, modules:, url_options: {})
       @actor = actor
       @query = query.is_a?(String) ? query.strip.first(MAX_QUERY) : ""
@@ -34,7 +49,7 @@ module Jump
     def groups
       [
         group("Pages", page_rows), group("Posts", post_rows), group("Media", media_rows),
-        group("Settings", module_rows), group("Actions", action_rows)
+        group("Sections", module_rows), group("Settings", settings_rows), group("Actions", action_rows)
       ].compact
     end
 
@@ -85,6 +100,12 @@ module Jump
       modules.select { |entry| blank? || matches?(entry[:label]) }.map do |entry|
         { title: entry[:label], url: routes.public_send(entry[:path], **url_options) }
       end
+    end
+
+    def settings_rows
+      SETTINGS_DESTINATIONS.select { |dest| AccessControl.holds?(actor, dest[:permission], channel: :admin) }
+        .select { |dest| blank? || matches?(dest[:title]) }
+        .map { |dest| { title: dest[:title], url: routes.public_send(dest[:path], **url_options, anchor: dest[:anchor]) } }
     end
 
     def action_rows

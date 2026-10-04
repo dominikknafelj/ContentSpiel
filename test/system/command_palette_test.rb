@@ -74,4 +74,36 @@ class CommandPaletteTest < ApplicationSystemTestCase
     find("dialog#command-palette input").set("zzzqqq")
     assert_link "New post"
   end
+
+  test "Cmd+Enter opens the selected row in a new tab and leaves the palette where it is" do
+    post = create_post(title: "Newtab destination")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    page.execute_script("window.__opened = []; window.open = (...args) => { window.__opened.push(args); return null }")
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("Newtab dest")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: post.title
+    assert_selector "#jump-results [role=option][aria-selected=true] .admin-palette__enter", text: "↵"
+
+    input.send_keys([ :control, :enter ])
+    opened = page.evaluate_script("window.__opened")
+    assert_equal 1, opened.size
+    assert_match(%r{/cs-studio/posts/#{post.id}\b}, opened.first[0])
+    assert_equal [ "_blank", "noopener" ], opened.first[1..]
+    assert_selector "dialog#command-palette[open]"
+    assert_current_path admin_root_path
+  end
+
+  test "the palette shows the hint row, the Esc chip and a Settings group that holds no sections" do
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    find("body").send_keys([ :control, "k" ])
+    assert_selector "dialog#command-palette .admin-palette__hints", text: "NEW TAB"
+    assert_selector "dialog#command-palette kbd", text: /esc/i
+    assert_selector "#jump-results [role=group] [role=presentation]", text: /sections/i
+    within(find("#jump-results [role=group][aria-labelledby]", text: "Settings › Languages")) do
+      assert_no_text "Dashboard"
+    end
+  end
 end

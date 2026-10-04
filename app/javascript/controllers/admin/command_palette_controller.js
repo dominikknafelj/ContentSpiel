@@ -5,8 +5,10 @@ import { Controller } from "@hotwired/stimulus"
 // (Admin::Shell::CommandPaletteComponent); this controller sits on <body>.
 // Typing reloads the frame (debounced), the arrow keys move the selection
 // (`aria-selected` on the <li role=option>, mirrored for the focused input
-// as `aria-activedescendant`), Enter follows the selected link. Following a link is a `_top` Turbo visit, whose page replacement
-// closes the dialog (it is not part of the new body).
+// as `aria-activedescendant`), Enter follows the selected link and
+// ⌘/Ctrl+Enter opens it in a new tab (the dialog stays open, as in a browser's
+// own ⌘-click). Following a link is a `_top` Turbo visit, whose page
+// replacement closes the dialog (it is not part of the new body).
 export default class extends Controller {
   static values = { url: String }
 
@@ -88,6 +90,15 @@ export default class extends Controller {
     if (event.key === "Enter" && this.stale) { this.pendingEnter = true; return }
     const options = this.options
     if (options.length === 0) return
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      // Stale results: the selected row may be for a query the viewer has
+      // since changed, so do nothing rather than open the wrong thing (the
+      // plain Enter above waits for the response; a new-tab open doesn't).
+      if (this.stale) return
+      const href = options[this.index]?.href
+      if (href) window.open(href, "_blank", "noopener")
+      return
+    }
     if (event.key === "Enter") return options[this.index]?.click()
     if (this.stale) return
     this.select((this.index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length)
