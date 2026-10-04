@@ -35,16 +35,6 @@ module Admin
 
     def definition = post.definition
 
-    # A stored `content_type` that isn't (or is no longer) registered --
-    # e.g. a removed plugin's type -- still has to render *something* here
-    # rather than raising (global constraints: an unknown stored type never
-    # 500s), so this falls back to the bare stored string with a neutral
-    # colour instead of a label/swatch pulled from a definition that no
-    # longer exists.
-    def content_type_label = definition&.label || post.content_type
-
-    def content_type_color = definition&.color || "#94a3b8"
-
     # The canonical address (spec §5.2): a `post_list` block somewhere lists
     # this post, or it doesn't -- `nil` here means "nowhere yet", the same
     # contract `PublicSite::Urls#path_for` already uses for a page with no

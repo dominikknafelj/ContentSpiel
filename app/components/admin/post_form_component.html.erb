@@ -4,10 +4,7 @@
       <h1 class="truncate text-h1 text-ink"><%= Locales.read(post, :title, locale: locale) %></h1>
 
       <div class="mt-1 flex items-center gap-2 text-sm text-meta">
-        <span class="inline-flex items-center gap-1.5 rounded-cs border border-line-strong px-2 py-0.5">
-          <span class="h-2 w-2 rounded-full" style="background-color: <%= content_type_color %>" aria-hidden="true"></span>
-          <%= content_type_label %>
-        </span>
+        <%= render Admin::ContentTypeDotComponent.new(content_type: post.content_type) %>
       </div>
 
       <% if public_path.present? %>

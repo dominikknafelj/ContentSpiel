@@ -12,7 +12,7 @@ import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, f
 const SVG_NS = "http://www.w3.org/2000/svg"
 
 // Only used if a node somehow arrives without a colour at all.
-const FALLBACK_NODE_COLOR = "#9ca3af"
+const FALLBACK_NODE_COLOR = "var(--cs-meta)"
 
 // A pointerdown that moves less than this many total pixels before its
 // pointerup is a click, not a drag -- "click a node to open that post" and
@@ -187,7 +187,9 @@ export default class extends Controller {
 
     const circle = document.createElementNS(SVG_NS, "circle")
     circle.setAttribute("r", 8)
-    circle.setAttribute("fill", node.color || FALLBACK_NODE_COLOR)
+    // `style`, not the attribute: a custom property reference is CSS, and the
+    // fallback is a token so it follows the theme.
+    circle.style.fill = node.color || FALLBACK_NODE_COLOR
     group.appendChild(circle)
 
     // `textContent`, never markup -- a title is plain text whatever it
