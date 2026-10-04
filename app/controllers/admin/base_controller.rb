@@ -42,22 +42,30 @@ module Admin
     # say -- the Translations overview (translation helpers spec §4) only
     # makes sense with more than one language enabled, which is a runtime
     # site setting, not a right.
+    #
+    # `group:` is the sidebar section (design pass spec §4, handoff
+    # "StudioSidebar"): Content, People, System. The array's order is the
+    # sidebar's order within a group, and Dashboard stays first overall --
+    # `first_admin_module_path` falls back to `admin_modules.first`, which
+    # must keep landing on an always-open module.
+    MODULE_GROUPS = { content: "Content", people: "People", system: "System" }.freeze
+
     MODULES = [
-      { label: "Dashboard", icon: :dashboard, path: :admin_root_path, permission: nil },
-      { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read" },
-      { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read" },
-      { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage" },
-      { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload" },
+      { label: "Dashboard", icon: :dashboard, path: :admin_root_path, permission: nil, group: :content },
+      { label: "Pages", icon: :pages, path: :admin_pages_path, permission: "pages.read", group: :content },
+      { label: "Posts", icon: :posts, path: :admin_posts_path, permission: "posts.read", group: :content },
+      { label: "Media", icon: :media, path: :admin_media_path, permission: "media.upload", group: :content },
       { label: "Translations", icon: :translations, path: :admin_translations_path, permission: %w[pages.read posts.read],
-        if: -> { Locales.enabled.size > 1 } },
-      { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS },
-      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage" },
-      { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage" },
-      { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage" },
-      { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil },
-      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read" },
-      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view" },
-      { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view" }
+        if: -> { Locales.enabled.size > 1 }, group: :content },
+      { label: "Tags", icon: :tags, path: :admin_tags_path, permission: "tags.manage", group: :content },
+      { label: "Mind graph", icon: :graph, path: :admin_mind_graph_path, permission: "posts.read", group: :content },
+      { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS, group: :content },
+      { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage", group: :people },
+      { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage", group: :people },
+      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage", group: :system },
+      { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil, group: :system },
+      { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view", group: :system },
+      { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view", group: :system }
     ].freeze
 
     FORBIDDEN_MESSAGE = "You don't have permission to open this."
@@ -75,7 +83,28 @@ module Admin
     # always UTC until now.
     around_action :use_site_time_zone
 
-    helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules
+    helper_method :admin_locale, :admin_url_options, :root_page, :admin_modules, :trash_badge_count
+
+    # A record outside the viewer's scope and a record that doesn't exist
+    # answer identically (access-control design spec §3.3) -- now inside the
+    # Studio layout rather than the app's bare 404, so the way on (the
+    # sidebar) is still there. Signed-in requests only: authentication runs
+    # first, so a signed-out visitor is redirected to sign-in before any
+    # lookup can raise. Only an HTML request gets the page: an autosave's
+    # Turbo Stream or a JSON upload would take it for a body to render or
+    # parse, so those get a bare 404 (`head`), as before. A Turbo Frame
+    # request is HTML and gets the page too -- the layout supplies the
+    # `<turbo-frame id="content">` it expects.
+    rescue_from ActiveRecord::RecordNotFound do
+      # `symbol == :html`, not `format.html?`: Mime::Type#html? is true for
+      # any type whose string contains "html", Turbo Stream's
+      # "text/vnd.turbo-stream.html" included.
+      if request.format.symbol == :html
+        render "admin/errors/not_found", status: :not_found
+      else
+        head :not_found
+      end
+    end
 
     private
 
@@ -90,6 +119,18 @@ module Admin
       @admin_modules ||= MODULES.select do |entry|
         (entry[:permission].nil? || holds_any?(entry[:permission])) && (entry[:if].nil? || entry[:if].call)
       end
+    end
+
+    # The sidebar's Trash badge (design pass spec §4): how many trashed
+    # items *this viewer* could act on -- the same delete-right scopes the
+    # Trash screen lists with (page branch roots, posts, images;
+    # `Admin::TrashController.badge_count`), so the number matches what
+    # they'd see there. Three COUNTs per CS Studio page load, each on the
+    # indexed `trashed_at`; none at all when the viewer can't open Trash.
+    def trash_badge_count
+      return 0 unless admin_modules.any? { |entry| entry[:path] == :admin_trash_path }
+
+      @trash_badge_count ||= Admin::TrashController.badge_count(Current.actor)
     end
 
     def holds_any?(keys) = Array(keys).any? { |key| can?(key) }

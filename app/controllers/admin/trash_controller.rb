@@ -26,6 +26,44 @@ module Admin
     PER_PAGE = 50
     MODELS = { "page" => Page, "post" => Post, "media" => Media::Asset }.freeze
 
+    # Trashed items of `type` ("page"/"post"/"media") that `actor` may act
+    # on, as a relation -- the one place that rule lives, shared by this
+    # screen (`visible`, `roots`) and the sidebar's Trash badge
+    # (`BaseController#trash_badge_count`), so the badge can never count
+    # something the list wouldn't show. Pages and posts go through
+    # `AccessControl.scope(..., trashed: true)` on their *delete* right;
+    # images are `Trash::ItemPermissions`' rule as a relation:
+    # `media.manage` sees every trashed image, an uploader with
+    # `media.upload` only their own (both admin-area keys, so holding one
+    # anywhere is holding it).
+    def self.visible(type, actor)
+      case type
+      when "page" then AccessControl.scope(actor, "pages.delete", Page.all, trashed: true)
+      when "post" then AccessControl.scope(actor, "posts.delete", Post.all, trashed: true)
+      when "media" then visible_assets(actor)
+      end
+    end
+
+    def self.visible_assets(actor)
+      scope = Media::Asset.trashed
+      return scope if AccessControl.holds?(actor, "media.manage")
+      return scope.where(created_by_id: actor.id) if actor.is_a?(User) && AccessControl.holds?(actor, "media.upload")
+
+      scope.none
+    end
+    private_class_method :visible_assets
+
+    # What the screen lists and counts: `visible`, narrowed for pages to
+    # branch roots (`trash_root_id = id`) -- a branch member shows as "+N
+    # subpages" under its root, never as a row (or a count) of its own.
+    def self.roots(type, actor)
+      relation = visible(type, actor)
+      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
+    end
+
+    # The total the sidebar badge shows: one COUNT per type over `roots`.
+    def self.badge_count(actor) = MODELS.keys.sum { |type| roots(type, actor).count }
+
     before_action :require_trash_access
     before_action :set_item, only: %i[restore purge]
 
@@ -89,25 +127,7 @@ module Admin
       @item = visible(params[:type]).find(params[:id])
     end
 
-    def visible(type)
-      case type
-      when "page" then AccessControl.scope(Current.actor, "pages.delete", Page.all, trashed: true)
-      when "post" then AccessControl.scope(Current.actor, "posts.delete", Post.all, trashed: true)
-      when "media" then visible_assets
-      end
-    end
-
-    # `Trash::ItemPermissions`' image rule, as a relation: `media.manage`
-    # sees every trashed image, an uploader with `media.upload` only their
-    # own. (`media.manage`/`media.upload` are admin-area keys, so holding
-    # one anywhere is holding it.)
-    def visible_assets
-      scope = Media::Asset.trashed
-      return scope if can?("media.manage")
-      return scope.where(created_by_id: Current.user.id) if Current.user && can?("media.upload")
-
-      scope.none
-    end
+    def visible(type) = self.class.visible(type, Current.actor)
 
     def types = @type ? [ @type ] : MODELS.keys
 
@@ -131,10 +151,7 @@ module Admin
       sources.flatten.sort_by { |item| [ -item.trashed_at.to_r, -item.id ] }.drop(@pagination.offset).first(PER_PAGE)
     end
 
-    def roots(type)
-      relation = visible(type)
-      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
-    end
+    def roots(type) = self.class.roots(type, Current.actor)
 
     def listed(type)
       relation = roots(type).includes(:trashed_by)
