@@ -376,10 +376,12 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
     sign_in_as(users(:editor_branch))
 
-    patch "/cs-studio/groups/#{group.id}", params: { group: {
-      name: "Planted", member_ids: [ "" ],
-      grants: { "posts.edit" => { enabled: "1", content_types: [ "", "blog", "ghost" ] } }
-    } }
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/groups/#{group.id}", params: { group: {
+        name: "Planted", member_ids: [ "" ],
+        grants: { "posts.edit" => { enabled: "1", content_types: [ "", "blog", "ghost" ] } }
+      } }
+    end
 
     assert_response :forbidden
     assert_equal [ { "content_types" => [ "blog" ] } ], group.grants.reload.map(&:scope)

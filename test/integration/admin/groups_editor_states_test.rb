@@ -199,6 +199,32 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal before, grants_snapshot(group)
   end
 
+  # Fix round 2 of Task 10: the request the editor makes when "Own only" is unticked
+  # on a row that carries a removed type, without pressing Remove first -- the form as
+  # rendered, minus `own`. (While that row is a locked tick for this viewer the request
+  # can only be forged; either way the service decides.) `Groups::Save` judges a grant
+  # that changed with a removed type still on it raw, so the name the viewer can't
+  # hand out -- they hold {blog} -- refuses it.
+  test "Own only unticked on a row that carries a removed type, without Remove, is a 403 with one access.denied and nothing stored" do
+    group = locked_scenario_group
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
+
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset[disabled]", count: 0 # an editable form, not view-only
+    params = params_as_rendered
+    assert_equal "1", params["group"]["grants"]["posts.edit"].delete("own")
+    before = grants_snapshot(group)
+
+    assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        patch "/cs-studio/groups/#{group.id}", params: params
+      end
+    end
+
+    assert_response :forbidden
+    assert_equal before, grants_snapshot(group)
+  end
+
   test "the lock check costs no query per row: ticking every row asks nothing a few rows didn't, bar one lookup per page-scoped row" do
     section = as_owner { create_page(title: "Section") }
     manager = manager_user(grants: { "groups.manage" => {}, "posts.read" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "pages.read" => {}, "pages.edit" => {} })

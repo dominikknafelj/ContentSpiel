@@ -47,7 +47,13 @@ export default class extends Controller {
       const below = this.descendantNodes(node)
       const partial = !chosen && !implied && below.some((descendant) => descendant.dataset.chosen === "1")
 
-      const box = node.querySelector(":scope > div input[type=checkbox]")
+      // Every lookup stays inside the node's OWN row, its first `<div>`: the
+      // second is the children wrapper, and a bare `:scope > div ...` reaches
+      // through it into a descendant's row whenever this node has no such
+      // element itself (a context-only node has no box; a node that isn't a
+      // chosen root has no carried input) -- and would then set a descendant's
+      // control from this node's state.
+      const box = node.querySelector(":scope > div:first-child > label > input[type=checkbox]")
       if (box) {
         box.disabled = implied
         box.checked = chosen || implied
@@ -58,13 +64,13 @@ export default class extends Controller {
       // server renders it only for a chosen one): submitted exactly while it is
       // chosen AND implied, so the disabled box and it are never both submitted
       // and an untouched save keeps a redundant stored root.
-      const carried = node.querySelector(":scope > div input[type=hidden]")
+      const carried = node.querySelector(":scope > div:first-child > input[type=hidden]")
       if (carried) carried.disabled = !(chosen && implied)
 
-      const mark = node.querySelector(":scope > div [data-admin--branch-picker-target='mark']")
+      const mark = node.querySelector(":scope > div:first-child > span > [data-admin--branch-picker-target='mark']")
       if (mark) mark.textContent = implied || chosen ? "✓" : partial ? "–" : ""
 
-      const note = node.querySelector(":scope > div [data-admin--branch-picker-target='note']")
+      const note = node.querySelector(":scope > div:first-child > [data-admin--branch-picker-target='note']")
       if (note) note.textContent = implied ? "included" : partial ? "contains a chosen page" : chosen ? this.includes(below.length) : ""
     })
   }

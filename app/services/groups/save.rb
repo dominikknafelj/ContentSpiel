@@ -32,8 +32,10 @@ module Groups
   #
   # The editor submits the live values, plus -- carried, so an untouched save
   # changes nothing -- a content type that is no longer registered until the
-  # editor presses Remove on it (`#live`). A deleted page and a dead grant
-  # are still dropped by the next save.
+  # editor presses Remove on it. A grant posted exactly as stored but for those
+  # carried names is "unchanged" (`#live`); with anything else changed it is
+  # judged raw, names included. A deleted page and a dead grant are still
+  # dropped by the next save.
   class Save < ApplicationService
     def initialize(group = AccessControl::Group.new, attributes:, actor: Current.actor)
       @group = group
@@ -49,14 +51,17 @@ module Groups
       old_member_ids = @group.persisted? ? @group.memberships.pluck(:user_id).sort : []
       new_member_ids = @attributes.key?(:member_ids) ? User.where(id: Array(@attributes[:member_ids]).compact_blank).pluck(:id).sort : old_member_ids
 
-      refusal = removal_refusal(stored, desired, old_member_ids - new_member_ids)
+      # What the authorisation comparisons read; `desired` stays what is stored.
+      compared = desired && live(desired, stored)
+
+      refusal = removal_refusal(stored, compared, old_member_ids - new_member_ids)
       return refusal if refusal
 
       @group.assign_attributes(@attributes.slice(:name, :description))
       grants = (desired || []).map { |attrs| AccessControl::Grant.new(group: @group, **attrs) }
       return invalid(grants) unless @group.valid? & grants.all?(&:valid?)
 
-      refusal = escalation_refusal(stored, desired, new_member_ids - old_member_ids)
+      refusal = escalation_refusal(stored, compared, new_member_ids - old_member_ids)
       return refusal if refusal
 
       old_grants = grant_list(@group.persisted? ? @group.grants.to_a : [])
@@ -84,33 +89,81 @@ module Groups
       end.uniq.sort_by { |grant| [ grant[:permission], grant[:scope].to_json ] }
     end
 
-    # The desired grants with the content types the EDITOR CARRIES left out:
-    # a type that is no longer registered and that the STORED grant of the same
-    # permission already holds. That is a dead scope value the group has today,
-    # not part of what the grant means, and the editor submits it (a chip with
-    # Remove, a hidden input) so that a form saved as rendered changes nothing.
-    # Compared raw, every untouched save would look like a changed grant.
+    # The desired grants as the two authorisation comparisons below read them:
+    # each one raw, exactly as posted and as it would be stored -- EXCEPT a grant
+    # that is a stored live grant posted back with (some of) its own removed
+    # content types still on it, which is read as that stored grant, unchanged.
     #
-    # Nothing else is left out. Any other unregistered name -- one the stored
-    # grant doesn't hold -- stays in the compared scope and goes through
-    # `can_grant?` / `can_manage_group?` like any value: it is dormant only until
-    # a plugin registers a type of that name, and then it would grant on it.
-    # Only the *comparisons* use this; what is stored, and what the audit event
-    # lists, is the raw list, so pressing Remove (the value gone from the
-    # submission) is a real change.
-    def stored_grants = @stored_grants ||= (@group.persisted? ? @group.grants.to_a : [])
-
-    def live(grants, stored_grants)
-      registered = AccessControl::Permissions.content_type_choices
-      carried = stored_grants.group_by(&:permission).transform_values do |held|
-        held.flat_map(&:scope_content_types).uniq - registered
-      end
+    # Why there is an exception at all. A content type that is no longer
+    # registered matches nothing, so `LiveGrants` leaves it out of a stored
+    # grant's scope; but the editor CARRIES it (a warn chip with Remove, a hidden
+    # input; `LiveGrants::Entry#carried_attributes`) so that a form saved as
+    # rendered changes nothing. Compared raw, every such untouched save would be
+    # a changed grant -- a 403 for a non-owner who can't hand out that name, on
+    # a group they only meant to rename.
+    #
+    # Why it is this narrow (fix round 2). A removed name is dormant, not
+    # meaningless: the day a plugin registers a type of that name again the
+    # grant matches it. So a grant that carries one may only pass unchecked when
+    # NOTHING ELSE about it changed. A posted grant is read as a stored one only
+    # when all of this holds:
+    #
+    # - the stored grant is a live ENTRY (`LiveGrants#entries`) with removed types
+    #   of its own. A dead grant -- one whose every type is gone -- is never
+    #   rendered or submitted, so nothing of it is carried: reposting its name
+    #   is a new grant;
+    # - same permission;
+    # - the posted scope, minus that entry's OWN removed types, is exactly the
+    #   entry's live scope: the same live types, the same `own`, the same pages.
+    #   (Scopes are normalised -- sorted, unique -- so order and repeats don't
+    #   count; a name that only looks alike, "Retired" or " retired", is another
+    #   name and stays in.) What the subtraction took out is therefore a subset
+    #   of what that grant already holds as removed: the dormant right can only
+    #   stay or shrink, never appear, move or widen;
+    # - no other posted grant has already been read as that entry. One stored
+    #   grant stands for one posted grant, so its removed names can't be dealt
+    #   out over several.
+    #
+    # Everything else is compared and checked raw, as before the editor carried
+    # anything: `can_grant?` sees the removed name, and only an actor whose own
+    # grant covers it (an unscoped holder; an owner is never asked) passes. Fix
+    # round 1 stripped by permission and name alone, whatever else changed, and
+    # so let a non-owner untick "Own only" on `{blog, retired, own}`, add a live
+    # type beside the name, or move the name into another grant of the same
+    # permission -- each checked as if the name weren't there, each stored with
+    # it.
+    #
+    # The consequence, on purpose: a non-owner who couldn't hand out the removed
+    # name can change such a grant only AFTER pressing Remove on it. Posting the
+    # live scope without the name is the entry itself -- neither a removal nor
+    # an escalation here, though stored and audited as the change it is (those
+    # compare the raw lists). The editor's locked row (`Admin::
+    # PermissionMatrixComponent`: a carried scope the viewer fails `can_grant?`
+    # on is a greyed tick with no scope editor) is the UI's side of this rule;
+    # this is the side a request meets, forged or not, however the row is drawn.
+    #
+    # Members. The added-member check in `#escalation_refusal` reads the same
+    # list, so in a save that leaves such a grant untouched a new member is
+    # judged against its LIVE scope -- what `can_manage_group?` and a
+    # members-only save (no `grants:` at all) judge too, and what the editor
+    # posted before it carried anything. Adding or removing a member of a group
+    # that holds a removed type is therefore not blocked by the name; changing
+    # the grant in the same save is.
+    def live(grants, stored)
+      claimed = []
       grants.map do |grant|
         types = grant[:scope]["content_types"]
-        gone = carried.fetch(grant[:permission], [])
-        next grant if types.nil? || gone.empty?
+        next grant unless types
 
-        { permission: grant[:permission], scope: grant[:scope].merge("content_types" => types - gone) }
+        index = stored.entries.each_index.find do |i|
+          entry = stored.entries[i]
+          !claimed.include?(i) && entry.permission == grant[:permission] && entry.gone_types.intersect?(types) &&
+            entry.scope == grant[:scope].merge("content_types" => types - entry.gone_types)
+        end
+        next grant unless index
+
+        claimed << index
+        stored.entries[index].attributes
       end
     end
 
@@ -140,7 +193,7 @@ module Groups
     def removal_refusal(stored, desired, removed_member_ids)
       return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
 
-      removed_grants = desired ? stored.attributes - live(desired, stored_grants) : []
+      removed_grants = desired ? stored.attributes - desired : []
       return if removed_member_ids.empty? && removed_grants.empty?
       return if AccessControl.can_manage_group?(actor, @group)
 
@@ -155,7 +208,6 @@ module Groups
       return if actor.nil? || AccessControl.owner?(actor)
 
       unchanged = stored.attributes
-      desired = live(desired, stored_grants) if desired
       Array(desired).each do |grant|
         next if unchanged.include?(grant)
         return denied(grant[:permission], @group) unless AccessControl.can_grant?(actor, grant[:permission], grant[:scope])

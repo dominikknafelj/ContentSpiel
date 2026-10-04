@@ -309,6 +309,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
 
     assert result.denied?
     assert_empty group.grants.reload
+    assert_equal 1, Audit::Event.where(action: "access.denied").sum(:occurrences)
   end
 
   test "a stored retired type is carried, but an extra unregistered name beside it is refused; untouched still saves quietly" do
@@ -321,6 +322,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
     assert widened.denied?
     assert_equal [ { "content_types" => %w[blog retired] } ], group.grants.reload.map(&:scope)
+    assert_equal 1, Audit::Event.where(action: "access.denied").sum(:occurrences)
 
     assert_no_difference -> { Audit::Event.count } do
       untouched = as(users(:editor_branch)) do
@@ -340,7 +342,309 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal [ { "content_types" => %w[blog ghost] } ], group.grants.reload.map(&:scope)
   end
 
+  # --- Fix round 2: a carried name is ignored only in an otherwise UNCHANGED grant --
+  # Fix round 1 keyed the strip by permission and name alone, so a removed type
+  # the group already held rode along while the REST of the grant changed -- and
+  # the stripped form, not what would be stored, went to `can_grant?`. Each of
+  # A-D below returned ok that way, and each was refused before Task 10 (the raw
+  # scope went to `can_grant?`). The dormant right they widen ("retired" for
+  # every post rather than the user's own; "retired" on a grant that had none)
+  # becomes a real one the day a plugin registers that name again.
+
+  test "A: unticking Own only on a grant that carries a removed type is refused for a non-owner who can't grant that name" do
+    group = AccessControl::Group.create!(name: "A")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "A", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+    end
+  end
+
+  # `LiveGrants` files a grant whose every type is gone under `dead`; the editor
+  # never renders or submits it, so nothing of it is "carried".
+  test "B: a dead grant's removed type can't be revived inside a wider live grant" do
+    group = AccessControl::Group.create!(name: "B")
+    grant(group, "posts.edit", "content_types" => %w[retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "B", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+    end
+  end
+
+  test "C: a removed type can't be moved from the grant that holds it into another grant of the same permission" do
+    group = AccessControl::Group.create!(name: "C")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(group, "posts.edit", "content_types" => %w[now_update])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "C", grants: [
+        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
+        { permission: "posts.edit", scope: { content_types: %w[now_update retired] } }
+      ] })
+    end
+  end
+
+  # The same move when the actor could hand out both live scopes: only the raw
+  # scope of the grant that GAINED the name shows the widening.
+  test "C, for a manager who holds both live scopes: still refused" do
+    group = AccessControl::Group.create!(name: "C2")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(group, "posts.edit", "content_types" => %w[now_update])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog now_update])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "C2", grants: [
+        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
+        { permission: "posts.edit", scope: { content_types: %w[now_update retired] } }
+      ] })
+    end
+  end
+
+  test "D: a dead grant can't be reposted without its Own only" do
+    group = AccessControl::Group.create!(name: "D")
+    grant(group, "posts.edit", "content_types" => %w[retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "D", grants: [ { permission: "posts.edit", scope: { content_types: %w[retired] } } ] })
+    end
+  end
+
+  test "a removed type can't ride along while a live type is added or swapped" do
+    group = AccessControl::Group.create!(name: "Swap")
+    grant(group, "posts.edit", "content_types" => %w[blog retired])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog now_update])
+
+    [ %w[blog now_update retired], %w[now_update retired] ].each do |types|
+      assert_refused_unchanged(group) do
+        Groups::Save.call(group, attributes: { name: "Swap", grants: [ { permission: "posts.edit", scope: { content_types: types } } ] })
+      end
+    end
+  end
+
+  # One stored grant stands for one posted grant: two posted grants can't both
+  # be "the stored one, unchanged".
+  test "a stored grant with two removed types can't be split into two grants that each carry one" do
+    group = AccessControl::Group.create!(name: "Split")
+    grant(group, "posts.edit", "content_types" => %w[blog retired vanished], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Split", grants: [
+        { permission: "posts.edit", scope: { content_types: %w[blog retired], own: true } },
+        { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } }
+      ] })
+    end
+  end
+
+  test "a removed type one permission's grant holds can't be planted in another permission's grant" do
+    group = AccessControl::Group.create!(name: "Across")
+    grant(group, "posts.edit", "content_types" => %w[blog retired])
+    grant(group, "posts.publish", "content_types" => %w[blog])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    grant(@manager_group, "posts.publish", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Across", grants: [
+        { permission: "posts.edit", scope: { content_types: %w[blog retired] } },
+        { permission: "posts.publish", scope: { content_types: %w[blog retired] } }
+      ] })
+    end
+  end
+
+  # Stripped, the posted scope equals the OTHER stored grant's -- but that one
+  # never held the name, so it isn't "that grant, unchanged".
+  test "a removed type can't be attached to a sibling grant whose live scope the stripped form happens to equal" do
+    group = AccessControl::Group.create!(name: "Sibling")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(group, "posts.edit", "content_types" => %w[blog])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Sibling", grants: [
+        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
+        { permission: "posts.edit", scope: { content_types: %w[blog retired] } }
+      ] })
+    end
+  end
+
+  test "an ApiToken takes the same path: A is refused for a token too" do
+    token_group = AccessControl::Group.create!(name: "Token group")
+    grant(token_group, "groups.manage")
+    grant(token_group, "posts.edit", "content_types" => %w[blog])
+    token, = ApiToken.generate!(users(:one), group: token_group)
+    group = AccessControl::Group.create!(name: "A by token")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+
+    assert_refused_unchanged(group, actor: token, channel: :mcp) do
+      Groups::Save.call(group, attributes: { name: "A by token", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+    end
+
+    assert_no_difference -> { Audit::Event.count } do
+      untouched = as(token, channel: :mcp) do
+        Groups::Save.call(group, attributes: { name: "A by token", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired], own: true } } ] })
+      end
+      assert untouched.ok?, untouched.errors.inspect
+    end
+  end
+
+  test "a name that only looks like the carried one is not the carried one" do
+    group = AccessControl::Group.create!(name: "Variants")
+    grant(group, "posts.edit", "content_types" => %w[blog retired])
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    [ %w[blog retired Retired], [ "blog", "retired", " retired" ], [ "blog", "retired", [ "retired" ] ], %w[blog Retired] ].each do |types|
+      assert_refused_unchanged(group) do
+        Groups::Save.call(group, attributes: { name: "Variants", grants: [ { permission: "posts.edit", scope: { content_types: types } } ] })
+      end
+    end
+  end
+
+  test "the carried name posted twice, or in another order, is still the untouched grant" do
+    group = AccessControl::Group.create!(name: "Twice")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    before = raw_grants(group)
+
+    [ %w[blog retired retired], %w[retired blog] ].each do |types|
+      assert_no_difference -> { Audit::Event.count } do
+        result = as(users(:editor_branch)) do
+          Groups::Save.call(group, attributes: { name: "Twice", grants: [ { permission: "posts.edit", scope: { "own" => "1", "content_types" => types } } ] })
+        end
+        assert result.ok?, result.errors.inspect
+      end
+      assert_equal before, raw_grants(group)
+    end
+  end
+
+  test "an untouched save of a group whose grants carry removed types changes nothing for a non-owner: with own, without it, beside page ids" do
+    kept = as_owner { create_page(title: "Kept") }
+    group = AccessControl::Group.create!(name: "Untouched")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(group, "posts.publish", "content_types" => %w[blog retired])
+    grant(group, "posts.read", "content_types" => %w[retired]) # dead: never rendered, never submitted
+    grant(group, "pages.edit", "page_ids" => [ kept.id ])
+    before = raw_grants(group)
+    submitted = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes # what the editor renders
+
+    assert_equal [ %w[blog retired], %w[blog retired] ], submitted.filter_map { |g| g[:scope]["content_types"] }
+    # The manager holds none of these permissions: nothing here is theirs to hand out.
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Untouched", grants: submitted }) }
+      assert result.ok?, result.errors.inspect
+    end
+    # The dead grant is dropped, as on every save since before Task 10; the rest is as stored.
+    assert_equal before.reject { |_, scope| scope == { "content_types" => %w[retired] } }, raw_grants(group)
+  end
+
+  # Membership changes need the right to manage the group as it stands
+  # (`can_manage_group?`, live grants) and, for an added member, every resulting
+  # grant to be one the actor could hand out -- judged on the grants as the
+  # comparisons read them, so an untouched grant that carries a removed type
+  # counts as the stored live grant there too (as it did before the editor
+  # carried anything: it then posted the live scope alone).
+  test "adding or removing a member of a group that carries a removed type, grants as rendered: ok, one group.updated, no denial" do
+    group = AccessControl::Group.create!(name: "Members")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    before = raw_grants(group)
+    as_rendered = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes
+    assert_equal [ { permission: "posts.edit", scope: { "content_types" => %w[blog retired], "own" => true } } ], as_rendered
+
+    [ [ users(:reader).id ], [] ].each_with_index do |member_ids, index|
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+        result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Members", member_ids: member_ids, grants: as_rendered }) }
+        assert result.ok?, result.errors.inspect
+      end
+      assert_equal member_ids, group.reload.user_ids
+      assert_equal before, raw_grants(group)
+      # One `group.updated` per save (the second coalesces into the first's row), members only.
+      events = Audit::Event.where(action: "group.updated", subject_id: group.id)
+      assert_equal index + 1, events.sum(:occurrences)
+      assert_equal [ "member_ids" ], events.sole.field_changes.keys
+    end
+  end
+
+  # ...but not when the grant changed in the same save: then it is judged raw,
+  # for the grant and for the member it would be handed to.
+  test "adding a member while changing a grant that carries a removed type is refused" do
+    group = AccessControl::Group.create!(name: "Members and more")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Members and more", member_ids: [ users(:reader).id ],
+        grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+    end
+    assert_empty group.reload.user_ids
+  end
+
+  test "Remove on one of two carried types: that name gone, the other kept, no denial" do
+    group = AccessControl::Group.create!(name: "One of two")
+    grant(group, "posts.edit", "content_types" => %w[blog retired vanished], "own" => true)
+
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      result = as(users(:editor_branch)) do
+        Groups::Save.call(group, attributes: { name: "One of two", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } } ] })
+      end
+      assert result.ok?, result.errors.inspect
+    end
+    assert_equal [ { "content_types" => %w[blog vanished], "own" => true } ], group.grants.reload.map(&:scope)
+    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
+  end
+
+  test "Remove by a non-owner who holds nothing of the permission: stored without the name, one group.updated, no denial" do
+    group = AccessControl::Group.create!(name: "Removing")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      result = as(users(:editor_branch)) do
+        Groups::Save.call(group, attributes: { name: "Removing", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog], own: true } } ] })
+      end
+      assert result.ok?, result.errors.inspect
+    end
+    assert_equal [ { "content_types" => %w[blog], "own" => true } ], group.grants.reload.map(&:scope)
+    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
+  end
+
+  # Someone who could hand out the removed name anyway (an unscoped holder) may
+  # change the grant with the name still on it: the raw scope passes `can_grant?`.
+  test "a non-owner who holds the permission unscoped may change a grant that carries a removed type" do
+    group = AccessControl::Group.create!(name: "Unscoped holder")
+    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+    grant(@manager_group, "posts.edit")
+
+    result = as(users(:editor_branch)) do
+      Groups::Save.call(group, attributes: { name: "Unscoped holder", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog retired] } } ] })
+    end
+
+    assert result.ok?, result.errors.inspect
+    assert_equal [ { "content_types" => %w[blog retired] } ], group.grants.reload.map(&:scope)
+  end
+
   private
+
+  def raw_grants(group) = group.grants.reload.map { |g| [ g.permission, g.scope ] }.sort_by(&:to_json)
+
+  # The block's save is denied: the stored grants are exactly as they were,
+  # EXACTLY one `access.denied` is recorded (one row, counted once -- a second
+  # denial would coalesce into the row and show in `occurrences`), and no
+  # `group.updated`.
+  def assert_refused_unchanged(group, actor: users(:editor_branch), channel: :admin, &block)
+    before = group.grants.reload.order(:id).map { |g| [ g.id, g.permission, g.scope ] }
+    denials = Audit::Event.where(action: "access.denied")
+    occurrences_before = denials.sum(:occurrences)
+    updates_before = Audit::Event.where(action: "group.updated").count
+
+    result = as(actor, channel: channel, &block)
+
+    assert result.denied?, "expected a denial, got ok=#{result.ok?} errors=#{result.errors.inspect} stored=#{group.grants.reload.map(&:scope).inspect}"
+    assert_equal before, group.grants.reload.order(:id).map { |g| [ g.id, g.permission, g.scope ] }
+    assert_equal occurrences_before + 1, denials.sum(:occurrences), "exactly one access.denied"
+    assert_equal updates_before, Audit::Event.where(action: "group.updated").count
+  end
 
   def grant(group, permission, scope = {})
     AccessControl::Grant.create!(group: group, permission: permission, scope: scope)
