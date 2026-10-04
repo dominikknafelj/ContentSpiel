@@ -42,8 +42,11 @@
 //   header's breadcrumb, its menu's Activity link). Turbo fetches and RENDERS
 //   the frame first and only then proposes the promoted visit, so by
 //   `turbo:before-visit` the editor's forms are long gone -- their debounce
-//   timers cleared, a save's follow-up skipped. This one is held on
-//   `turbo:before-frame-render` (see the handler at the end of this file).
+//   timers cleared, a save's follow-up skipped. This one is held twice: its
+//   REQUEST (so the answer is not older than the saves it waited for -- the
+//   link may lead back to the same record) and its RENDER (for edits that
+//   land while the request is on its way). See "FRAME NAVIGATIONS" at the
+//   end of this file.
 // All of them wait on `drained()`: a promise that resolves when no task is
 // queued or in flight AND no autosave form has a debounced, queued, in-flight
 // or retrying save -- forms are asked to send what they hold (`flush()`) in a
@@ -112,12 +115,17 @@ import { Turbo } from "@hotwired/turbo-rails"
 const HOLD_LIMIT_MS = 30000
 const DRAIN_LIMIT_MS = 10000
 const STREAM_RENDER_LIMIT_MS = 1000
+const VISIT_NOTE_LIMIT_MS = 2000
 
 let tail = Promise.resolve()
 // See "WHAT A GENERATION IS".
 let frameRenders = 0
 const retired = new WeakSet()
 let queued = 0
+// Every write ever queued on this document, counted: lets a `#content` frame
+// navigation tell whether anything was written since its request went out
+// (see "FRAME NAVIGATIONS").
+let writes = 0
 const forms = new Set()
 
 // The page a controller was rendered on: read in `connect()`, handed back to
@@ -155,16 +163,27 @@ function within(promise, ms) {
 // the chain itself is raced against what is left of it, so a request that
 // does not answer cannot hold the caller past the deadline. Whatever is left
 // behind then still runs, in order, and finds `isCurrent()` false once the
-// page is gone. `drain` is this call's own token: a form uses it to send a
+// page is gone. `token` is this call's own: a form uses it to send a
 // retry that is waiting out its backoff at most ONCE per drain (see
 // `admin--autosave#flush`).
-export async function drained({ limit = DRAIN_LIMIT_MS } = {}) {
+//
+// It NEVER REJECTS (follow-up N3). Everything that waits on it holds something
+// of Turbo's -- a visit, a frame's request or render, a form submission -- and
+// lets it go in a `then`: a rejection would strand that for good, the editor
+// left on a page whose links and buttons do nothing. A form whose `flush`
+// throws is skipped (its edit is then only sent by its own timer); anything
+// else that throws ends the wait at once, reported as unclean.
+export function drained(options) {
+  return drain(options).catch(() => ({ clean: false, timedOut: false }))
+}
+
+async function drain({ limit = DRAIN_LIMIT_MS } = {}) {
   const deadline = Date.now() + limit
-  const drain = {}
+  const token = {}
   let timedOut = false
 
   for (;;) {
-    Array.from(forms).forEach((form) => form.flush(drain))
+    Array.from(forms).forEach((form) => { try { form.flush(token) } catch { /* see `drained` */ } })
     await within(tail, deadline - Date.now())
     await new Promise((resolve) => setTimeout(resolve, 25))
     if (idle()) break
@@ -180,6 +199,7 @@ export function acquire() {
   let release
   const released = new Promise((resolve) => { release = resolve })
   queued += 1
+  writes += 1
   const turn = tail.then(() => release)
   tail = tail.then(() => released).then(() => { queued -= 1 })
   return turn
@@ -220,25 +240,46 @@ export function syncBases(streamText, ids) {
 // `turbo:before-stream-render` as it connects -- all of them in that one
 // append -- and performs its action after the next repaint (`StreamElement
 // #render`, turbo-rails 2.0.23; a timer instead when the tab is hidden).
-// `applied(text)` resolves once as many of those events as the answer has
-// stream elements were seen since this was created, plus that repaint and
-// the task after it. Never longer than `STREAM_RENDER_LIMIT_MS` for the
-// events: an answer Turbo does not render after all (the form's page is
-// gone) must not hold the queue.
+// `applied(text)` resolves once every stream element OF THAT ANSWER has been
+// seen since this was created, plus that repaint and the task after it.
+//
+// "Of that answer" (follow-up N5): the event is heard on `document`, where
+// every stream on the page passes -- a translation suggestion arriving in the
+// same moment (`admin--translate` renders its own), a toast. Counting events
+// let a foreign stream stand in for the held answer's and release the slot
+// before the card was in the list. The held answer is rendered by Turbo, so
+// its elements cannot be tagged beforehand; they are recognised by their
+// markup instead: each stream seen is kept as its `outerHTML`, and the wait
+// ends when the answer's own streams (parsed from the same text, so the same
+// markup) are all among them, each matched once. Turbo may render before or
+// after this caller has read the body, hence the list rather than a count
+// from "now".
+//
+// Never longer than `STREAM_RENDER_LIMIT_MS`: an answer Turbo does not render
+// after all (the form's page is gone) must not hold the queue.
 function streamRenders() {
-  let seen = 0
+  const seen = []
   let check = () => {}
-  const count = () => { seen += 1; check() }
-  document.addEventListener("turbo:before-stream-render", count)
+  const note = (event) => { seen.push(event.target.outerHTML); check() }
+  document.addEventListener("turbo:before-stream-render", note)
 
   return {
-    stop: () => document.removeEventListener("turbo:before-stream-render", count),
+    stop: () => document.removeEventListener("turbo:before-stream-render", note),
     async applied(streamText) {
-      const expected = new DOMParser().parseFromString(streamText, "text/html").querySelectorAll("turbo-stream").length
-      if (expected === 0) return
+      const expected = Array.from(new DOMParser().parseFromString(streamText, "text/html").querySelectorAll("turbo-stream"), (stream) => stream.outerHTML)
+      if (expected.length === 0) return
 
       await within(new Promise((resolve) => {
-        check = () => { if (seen >= expected) resolve() }
+        check = () => {
+          const pool = seen.slice()
+          const all = expected.every((markup) => {
+            const index = pool.indexOf(markup)
+            if (index < 0) return false
+            pool.splice(index, 1)
+            return true
+          })
+          if (all) resolve()
+        }
         check()
       }), STREAM_RENDER_LIMIT_MS)
       await new Promise((resolve) => (document.visibilityState === "hidden" ? setTimeout(resolve, 0) : requestAnimationFrame(resolve)))
@@ -356,25 +397,38 @@ export function holdTurboRequest(event, { before = () => {}, baseIds = [] } = {}
 // Two visits are never held, because holding one means issuing it again with
 // `Turbo.visit(url)`, and each of them arrives WITH the answer Turbo already
 // fetched -- a second fetch of a page that is, or is about to be, on screen:
-// - the redirect that answers a Turbo form submission (`answeredVisit`, see
+// - the redirect that answers a Turbo form submission (`answered`, see
 //   "TURBO FORM SUBMISSIONS" below). The flash -- the "Moved to trash · Undo"
 //   toast, "Restored …" -- was spent on the first fetch;
-// - the visit a `#content` frame navigation is promoted to (`promotedVisit`,
-//   the frame's own URL, set as the frame is let render below). It replaces
+// - the visit a `#content` frame navigation is promoted to (`promoted`, the
+//   frame's own URL, noted as the frame is let render below). It replaces
 //   nothing: the frame has rendered. Held, the page a tree link had just
 //   loaded was loaded a second time, and the old page's answer drawn into it
 //   in between (review B, M1). Normally nothing is outstanding by then anyway
-//   -- the frame's render waited for the drain.
-// Both are the URL that visit will have, and both are spent on the next
-// `turbo:before-visit`, whichever visit it is: neither can excuse a later one.
+//   -- the frame's request and render waited for the drain.
+// Each note is the URL that visit will have. A note is spent on the next
+// `turbo:before-visit`, whichever visit it is, and EXPIRES after
+// `VISIT_NOTE_LIMIT_MS` (follow-up N2): Turbo proposes the visit within
+// moments of the event the note is taken at, and not every such event is
+// followed by one (a frame form re-rendered in place after a 422 is promoted
+// to nothing new; a redirected submission inside a frame may end in the
+// frame). A note left lying would excuse the editor's NEXT visit to exactly
+// that URL from the drain. No note is taken without a URL (a frame with no
+// `src`).
 let reentry = false
-let promotedVisit = null
-let answeredVisit = null
+const expectedVisits = { promoted: null, answered: null }
+const noteTimers = {}
 const absolute = (url) => { try { return new URL(url, document.baseURI).href } catch { return null } }
+function expectVisit(kind, url) {
+  clearTimeout(noteTimers[kind])
+  expectedVisits[kind] = url ? absolute(url) : null
+  if (expectedVisits[kind]) noteTimers[kind] = setTimeout(() => { expectedVisits[kind] = null }, VISIT_NOTE_LIMIT_MS)
+}
+
 document.addEventListener("turbo:before-visit", (event) => {
-  const expected = [ promotedVisit, answeredVisit ]
-  promotedVisit = null
-  answeredVisit = null
+  const expected = Object.values(expectedVisits).filter(Boolean)
+  expectVisit("promoted", null)
+  expectVisit("answered", null)
   if (expected.includes(absolute(event.detail.url))) return
   if (reentry || event.defaultPrevented || !busy()) return
 
@@ -390,33 +444,99 @@ document.addEventListener("turbo:before-visit", (event) => {
   })
 })
 
-// A frame navigation inside `#content` replaces the editor exactly as a visit
-// does (see "THE RULE"), but Turbo renders the frame BEFORE it proposes the
-// promoted visit, so the drain has to hang on the frame's render:
-// `turbo:before-frame-render` is cancelable and carries `resume` (turbo-rails
-// 2.0.23, `FrameController#allowsImmediateRender`). While the drain runs the
-// outgoing forms are still connected, so `flush()` sends debounced edits and a
-// save's follow-up goes out; the render then goes on whatever the outcome,
-// after `DRAIN_LIMIT_MS` at the latest. With nothing outstanding the render
-// is not touched. Either way the render is a page change (`frameRenders`):
-// counted just before it happens, so the outgoing forms' late answers draw
-// nothing into the editor that comes in.
+// FRAME NAVIGATIONS inside `#content` replace the editor exactly as a visit
+// does (see "THE RULE"), but Turbo fetches and renders the frame BEFORE it
+// proposes the promoted visit, so the drain cannot hang on
+// `turbo:before-visit`. It hangs on the frame's own two steps.
 //
-// Only `#content`: the lazily loaded dialog frames (New page / New post), the
-// ⌘K results and the media picker's library replace no editor.
+// 1. THE REQUEST (follow-up N1; the `window` listener further down, which
+//    holds a GET carrying `Turbo-Frame: content` like it holds a write). The
+//    link may lead back to the record that is open -- the open page's own row
+//    in the tree is such a link. Were only the render held, the GET would go
+//    out before the drain and answer with the record as it was BEFORE the
+//    saves the render then waits for: the saved text gone from the field,
+//    the old base in the form, the next edit a final 409. Held until
+//    `drained()`, the answer is fetched after everything outstanding was
+//    saved. While it waits the outgoing forms are connected, so `flush()`
+//    sends debounced edits and a save's follow-up goes out. A prefetch
+//    (`X-Sec-Purpose: prefetch`) is never held -- it replaces nothing -- and
+//    a prefetched answer Turbo was about to reuse for a held request is
+//    dropped: it was fetched on hover, before the drain. (The editors switch
+//    link prefetching off altogether, `turbo-prefetch` in their head, for the
+//    same reason on the visit path.)
+//
+// 2. THE RENDER (`turbo:before-frame-render`, cancelable, carries `resume`;
+//    turbo-rails 2.0.23, `FrameController#allowsImmediateRender`). Two jobs:
+//    - it is the page change (`frameRenders`), counted just before it
+//      happens, so the outgoing forms' late answers draw nothing into the
+//      editor that comes in; and the promoted visit's URL is noted;
+//    - an edit can still land while the request is on its way -- still being
+//      saved as the answer arrives, or saved already. Either way the answer
+//      in hand is STALE in the same way as above: fetched before that save.
+//      `writes` (every write queued, counted) is noted as the request goes
+//      out (`frameRequestedAt`); a different count here, or a busy queue,
+//      means stale. The render then waits for the drain, and the answer is
+//      not rendered: the frame's URL is fetched again
+//      (`fetchFrame`, a plain `fetch` with the same `Turbo-Frame` header)
+//      and its `<turbo-frame id="content">` rendered in the stale one's
+//      place (`event.detail.render` is wrapped at dispatch; Turbo takes the
+//      renderer from the event synchronously). An edit landing during THAT
+//      fetch gets one more round; after it a last drain, and the render goes
+//      on whatever the outcome -- like a visit, the editor is never trapped.
+//      If the second fetch fails or has no such frame (signed out, offline),
+//      the answer Turbo has is rendered after all. A flash the first answer
+//      relayed as a toast is not in the second: accepted, the edit matters
+//      more. The promoted visit still carries the first answer, but it
+//      renders nothing (`willRender: false`).
+//
+// With nothing outstanding neither step is touched. Only `#content`: the
+// lazily loaded dialog frames (New page / New post), the ⌘K results and the
+// media picker's library replace no editor.
+async function fetchFrame(frame) {
+  const url = frame.getAttribute("src")
+  if (!url) return null
+
+  try {
+    const response = await fetch(url, {
+      headers: { "Turbo-Frame": frame.id, Accept: "text/html, application/xhtml+xml" },
+      signal: AbortSignal.timeout(DRAIN_LIMIT_MS)
+    })
+    if (!response.ok) return null
+    return new DOMParser().parseFromString(await response.text(), "text/html").querySelector(`turbo-frame#${frame.id}`)
+  } catch {
+    return null
+  }
+}
+
+let frameRequestedAt = null
 document.addEventListener("turbo:before-frame-render", (event) => {
   const frame = event.target
   if (frame.id !== "content" || event.defaultPrevented) return
 
-  const render = () => {
+  const rendering = () => {
     frameRenders += 1
-    promotedVisit = absolute(frame.getAttribute("src"))
+    expectVisit("promoted", frame.getAttribute("src"))
   }
-  if (!busy()) return render()
+  let fetchedAt = frameRequestedAt
+  frameRequestedAt = null
+  const stale = () => busy() || (fetchedAt !== null && fetchedAt !== writes)
+  if (!stale()) return rendering()
 
   event.preventDefault()
-  drained().then(() => {
-    render()
+  let fresh = null
+  const render = event.detail.render
+  event.detail.render = (current, answered) => render(current, fresh || answered)
+
+  const settle = async () => {
+    for (let round = 0; round < 2 && stale(); round += 1) {
+      await drained()
+      fetchedAt = writes
+      fresh = (await fetchFrame(frame)) || fresh
+    }
+    if (busy()) await drained()
+  }
+  settle().catch(() => {}).then(() => {
+    rendering()
     event.detail.resume()
   })
 })
@@ -436,6 +556,8 @@ document.addEventListener("turbo:before-frame-render", (event) => {
 //    actions drain earlier still, at `submit` (`admin--queue-hold`), because
 //    they also refuse to run after an unclean drain; this half only catches
 //    what lands between their drain and their request.
+//    (The same listener holds a `#content` frame's GET: "FRAME NAVIGATIONS",
+//    step 1. Every other GET goes straight on.)
 //
 // 2. The visit its redirect ends in is not HELD. Turbo proposes that visit
 //    with the answer it already has (`Navigator
@@ -443,28 +565,46 @@ document.addEventListener("turbo:before-frame-render", (event) => {
 //    would be issued again and fetched a second time, the flash spent on the
 //    first. `turbo:submit-end` is dispatched BEFORE the visit is proposed
 //    (the navigator awaits the body first), so the redirect's final URL is
-//    noted there (`answeredVisit`) and that one visit let through. An edit
-//    that lands between the submission and its answer is the price: its save
+//    noted there (`answered`) and that one visit let through. An edit that
+//    lands between the submission and its answer is the price: its save
 //    belongs to the page being replaced (sent if it was already on its way,
 //    dropped if it was still inside its debounce).
 //    The note cannot stick: it is replaced by every submission's end, spent
-//    by the next `turbo:before-visit`, and dropped by the next render.
+//    by the next `turbo:before-visit`, dropped by the next render, and
+//    expires on its own (see `expectVisit`).
 window.addEventListener("turbo:before-fetch-request", (event) => {
-  if (event.defaultPrevented || !busy()) return
-  if (String(event.detail.fetchOptions?.method || "GET").toUpperCase() === "GET") return
+  if (event.defaultPrevented) return
+  const { fetchOptions } = event.detail
+  const headers = fetchOptions?.headers || {}
+  const get = String(fetchOptions?.method || "GET").toUpperCase() === "GET"
+  const frameGet = get && headers["Turbo-Frame"] === "content" && headers["X-Sec-Purpose"] !== "prefetch"
+  if (get && !frameGet) return
+
+  if (frameGet) {
+    // The answer has to be newer than every write so far. A prefetched one
+    // (Turbo's `LinkPrefetchObserver` hands it over on this same event) was
+    // fetched on hover: dropped wherever there is a form it could be older
+    // than.
+    if (forms.size > 0) delete event.detail.fetchRequest
+    frameRequestedAt = writes
+  }
+  if (!busy()) return
 
   event.preventDefault()
-  drained().then(() => event.detail.resume())
+  drained().then(() => {
+    if (frameGet) frameRequestedAt = writes
+    event.detail.resume()
+  })
 })
 
 document.addEventListener("turbo:submit-end", (event) => {
   const { success, fetchResponse } = event.detail
-  answeredVisit = success && fetchResponse?.redirected ? absolute(fetchResponse.location) : null
+  expectVisit("answered", success && fetchResponse?.redirected ? fetchResponse.location : null)
 })
 
 // See "WHAT A GENERATION IS": the body Turbo is about to replace is retired
 // now, a moment before the swap.
 document.addEventListener("turbo:before-render", () => {
   if (Turbo.navigator?.currentVisit?.willRender === true) retired.add(document.body)
-  answeredVisit = null
+  expectVisit("answered", null)
 })

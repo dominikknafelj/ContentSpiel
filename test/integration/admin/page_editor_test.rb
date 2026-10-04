@@ -19,17 +19,20 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
   # Ledger m1: a restored snapshot of an editor holds stale bases and unsent
   # text (see the view's own comment), so the editors opt out of Turbo's page
   # cache -- in a full page and in the frame answer a tree link gets alike.
-  test "the page and post editors are never restored from Turbo's page cache" do
+  test "the page and post editors are never restored from Turbo's page cache, and prefetch no links" do
     get "/cs-studio/pages/#{@page.id}"
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
     get "/cs-studio/pages/#{@page.id}", headers: { "Turbo-Frame" => "content" }
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    assert_select "head meta[name='turbo-prefetch'][content='false']", count: 1
     get "/cs-studio/posts/#{create_post(title: "Hello").id}"
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    assert_select "head meta[name='turbo-prefetch'][content='false']", count: 1
 
     # Lists keep the cache.
     get "/cs-studio/posts"
     assert_select "head meta[name='turbo-cache-control']", count: 0
+    assert_select "head meta[name='turbo-prefetch']", count: 0
   end
 
   test "autosaving settings answers with a saved status stream" do

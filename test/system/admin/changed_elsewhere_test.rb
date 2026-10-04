@@ -311,6 +311,68 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_eventually { @page.reload.subtitle == "Set like Use all" }
   end
 
+  # The link may lead back to the SAME record: the open page's own row in the
+  # tree is one (follow-up N1). Holding only the frame's RENDER let its GET go
+  # out before the drain: it answered with the page as it was before the
+  # save, the drain saved, and the stale answer was rendered -- the saved text
+  # gone from the field, the old base in the form, the next edit a final 409.
+  # The frame's request itself waits for the queue now.
+  test "a debounced edit survives a click on the open page's own row in the tree, and the editor keeps saving" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+
+    page.execute_script(<<~JS)
+      const field = document.getElementById("page-subtitle")
+      field.value = "Set like Use all"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      document.querySelector('li[data-page-id="#{@page.id}"] a').click()
+    JS
+
+    assert_eventually { @page.reload.subtitle == "Set like Use all" }
+    sleep 1 # the frame has been fetched and rendered again
+    await_admin_controllers
+    assert_field "Subtitle", with: "Set like Use all"
+
+    fill_in "Subtitle", with: "A second edit"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually { @page.reload.subtitle == "A second edit" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # ...and an edit that lands while that request is on its way: the answer
+  # was fetched before the save the render waited for, so it is fetched again
+  # rather than rendered.
+  test "an edit made while the open page's own row is loading is not replaced by the stale answer" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.fetch = async (url, options = {}) => {
+        const response = await originalFetch(url, options)
+        const frameGet = (options.method || "GET").toUpperCase() === "GET" && new Headers(options.headers || {}).get("Turbo-Frame") === "content" && !window.__delayed
+        if (frameGet) { window.__delayed = true; await new Promise((resolve) => setTimeout(resolve, 800)) }
+        return response
+      }
+      document.querySelector('li[data-page-id="#{@page.id}"] a').click()
+    JS
+    # The frame's GET has been answered by the server and is held up in the
+    # browser for 800 ms: an edit now is newer than what that answer holds.
+    sleep 0.3
+    fill_in "Subtitle", with: "Typed while the frame was loading"
+    page.execute_script("document.activeElement.blur()")
+
+    assert page.evaluate_script("window.__delayed === true"), "the frame's request was not held up"
+    assert_eventually { @page.reload.subtitle == "Typed while the frame was loading" }
+    sleep 1.5
+    await_admin_controllers
+    assert_field "Subtitle", with: "Typed while the frame was loading"
+
+    fill_in "Subtitle", with: "A second edit"
+    page.execute_script("document.activeElement.blur()")
+    assert_eventually { @page.reload.subtitle == "A second edit" }
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
   # A form belongs to the document it was rendered into, and that document is
   # replaced only when the body (or the `#content` frame's content) really is
   # (final fix wave 1). Turbo fires `turbo:before-render` a SECOND time, for a
@@ -410,6 +472,26 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     waited = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
     assert_operator waited, :>, 8, "the visit did not wait for the save at all"
     assert_operator waited, :<, 14
+  end
+
+  # The drain never rejects (follow-up N3): whatever waits on it holds a
+  # visit, a frame or a submission of Turbo's and lets it go afterwards. A
+  # form whose `flush` threw used to reject the drain, and the link the
+  # editor had clicked did nothing, for good.
+  test "a form whose flush throws does not strand the link that waited for the queue" do
+    visit "/cs-studio/pages/#{@page.id}"
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const form = document.getElementById("page-subtitle").closest("form")
+      window.Stimulus.getControllerForElementAndIdentifier(form, "admin--autosave").flush = () => { throw new Error("flush failed") }
+      const field = document.getElementById("page-subtitle")
+      field.value = "Sent by its own timer"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+      Array.from(document.querySelectorAll("a")).find((a) => a.textContent.trim() === "Dashboard").click()
+    JS
+
+    assert_current_path(/cs-studio\/?\z/, wait: 14)
+    assert_equal "Sent by its own timer", @page.reload.subtitle
   end
 
   # After a save was given up on, nothing is "about to be sent" any more, even
