@@ -93,4 +93,27 @@ class Admin::TreeComponentTest < ViewComponent::TestCase
       end
     end
   end
+
+  test "a live page shows no status chip; a draft does" do
+    live = create_page(title: "Live one")
+    draft = create_page(title: "Draft one", published: false)
+    render_tree
+    assert_no_selector "li[data-page-id='#{live.id}'] > div .admin-status-chip"
+    assert_selector "li[data-page-id='#{draft.id}'] > div .admin-status-chip", text: "Draft"
+  end
+
+  test "a page without children shows no child count" do
+    parent = create_page(title: "Parent")
+    create_page(title: "Child", parent: parent)
+    leaf = create_page(title: "Leaf")
+    render_tree
+    assert_no_selector "li[data-page-id='#{leaf.id}'] > div [data-child-count]"
+    assert_selector "li[data-page-id='#{parent.id}'] > div [data-child-count]", text: "1"
+  end
+
+  test "the full title is available as a tooltip when the row truncates" do
+    leaf = create_page(title: "A rather long page title that the narrow tree column will cut off")
+    render_tree
+    assert_selector "li[data-page-id='#{leaf.id}'] > div a[title='#{leaf.title}']"
+  end
 end

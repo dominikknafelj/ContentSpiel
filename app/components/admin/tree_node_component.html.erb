@@ -21,7 +21,8 @@
                 data-action="keydown->admin--tree#key focusout->admin--tree#blur">⠿</button>
       <% end %>
 
-      <%= link_to title, path, data: { turbo_frame: "content" },
+      <%# `title:` is the full name for a row the narrow column truncates. %>
+      <%= link_to title, path, title: title, data: { turbo_frame: "content" },
             aria: (selected? ? { current: "page" } : {}),
             class: "flex-1 truncate #{selected? ? "font-semibold text-ink" : "text-ink"}" %>
 
@@ -37,7 +38,9 @@
               class: "shrink-0 rounded-cs border border-warn bg-warn-tint px-1 font-cs-mono text-label text-warn-ink" %>
       <% end %>
 
-      <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+      <% if child_count.positive? %>
+        <span data-child-count class="shrink-0 font-cs-mono text-label text-meta"><%= child_count %></span>
+      <% end %>
 
       <% if can_add_child? %>
         <%= link_to "+", new_child_path, data: { turbo_frame: "content" },
