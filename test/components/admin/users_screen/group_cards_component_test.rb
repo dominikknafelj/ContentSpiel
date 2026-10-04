@@ -19,6 +19,7 @@ class Admin::UsersScreen::GroupCardsComponentTest < ViewComponent::TestCase
     assert_selector "label[data-group-card='#{access_control_groups(:editor).id}']", text: "Full, unscoped access to posts and pages, plus tags and media."
     assert_selector "label[data-group-card='#{access_control_groups(:editor).id}'] input[type=checkbox][name='user[group_ids][]'][checked]"
     assert_selector "label[data-group-card='#{access_control_groups(:editor).id}'][class*='has-[:checked]:bg-accent-tint']"
+    assert_selector "label[data-group-card='#{access_control_groups(:editor).id}'].grid"
     assert_no_selector "label[data-locked]"
     assert_no_text "You can't grant this group."
   end
