@@ -38,16 +38,39 @@ module Posts
   # (media library design spec §5.1). An image deleted between the body's
   # existence check and that write fails the save as "has an image that
   # doesn't exist" (`Media::Choosing#vanished_media_failure`), not a 500.
+  #
+  # `attributes:` is an allow-list (`ATTRIBUTES`), and any other key is an
+  # `ArgumentError` -- a programming error, raised before anything is
+  # checked or written (see `Pages::Save`, which has the same rule for the
+  # same reason). Everything not handled by name in `#assign` goes straight
+  # to `assign_attributes`, so `trashed_at` or `trashed_by_id` would trash
+  # or restore the post around `Trash::Move`/`Restore` and their delete
+  # right, on the strength of `posts.edit`. No caller passes them; this
+  # keeps the next one from doing it by accident, and raising rather than
+  # dropping the key is what makes such a caller find out. A translated
+  # attribute belongs in `translations:`.
   class Save < ApplicationService
     include Media::Choosing
 
     TRANSLATED = %i[title slug excerpt body].freeze
+    # Everything `attributes:` may carry. `content_type` and `author_id` are
+    # the two columns assigned as they are -- both scope-changing, and both
+    # re-checked in pass 2 (the class comment above; a new post without an
+    # `author_id` gets the actor's). `published`/`published_at` are the
+    # publish state (`#assign_publishing`), `fields` the content type's own
+    # typed fields in the default language (`Post#assign_fields`), and
+    # `tag_names`/`related_post_ids` the join rows (`#assign_tags`,
+    # `#assign_related_posts`).
+    ATTRIBUTES = %i[content_type author_id published published_at fields tag_names related_post_ids].freeze
     # The attributes a publish-only call may carry (`#publish_only?`).
     PUBLISH_STATE = %i[published published_at].freeze
 
     def initialize(post = Post.new, attributes: {}, translations: {}, actor: Current.actor)
       @post = post
       @attributes = attributes.to_h.symbolize_keys
+      unknown = @attributes.keys - ATTRIBUTES
+      raise ArgumentError, "Posts::Save doesn't take #{unknown.join(", ")} in attributes: (see ATTRIBUTES)" if unknown.any?
+
       @translations = translations.to_h
       @actor = actor
     end
