@@ -22,8 +22,8 @@
     <div class="flex flex-col items-end gap-1">
       <div class="flex flex-wrap items-center justify-end gap-2">
         <% if needs_parent? %>
-          <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center justify-end gap-2", data: { turbo_frame: "_top" } do %>
-            <%= hidden_field_tag :tab, tab, id: nil %>
+          <%= form_with url: restore_path, method: :post, class: "flex flex-wrap items-center justify-end gap-2", data: { turbo_frame: "_top", promotion_stand_in: true } do %>
+            <%= hidden_field_tag :tab, tab, id: nil, data: { hold_ignore: true } %>
             <%= label_tag parent_select_id, "Restore under", class: "text-sm text-meta" %>
             <%= select_tag :parent_id, options_for_select(parent_choices || []), id: parent_select_id, class: "#{setup_select_class} !w-auto max-w-56",
                   disabled: no_parent?, aria: { describedby: (no_parent_id if no_parent?) } %>
@@ -31,8 +31,8 @@
                   aria: { describedby: (no_parent_id if no_parent?) }) %>
           <% end %>
         <% else %>
-          <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top" } do %>
-            <%= hidden_field_tag :tab, tab, id: nil %>
+          <%= form_with url: restore_path, method: :post, data: { turbo_frame: "_top", promotion_stand_in: true } do %>
+            <%= hidden_field_tag :tab, tab, id: nil, data: { hold_ignore: true } %>
             <%= render Admin::ButtonComponent.new(label: "Restore", variant: :secondary, type: "submit") %>
           <% end %>
         <% end %>
@@ -53,8 +53,8 @@
       <% else %>
         <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: purge_dialog_id, title: purge_dialog_title, body: purge_dialog_body) do |dialog| %>
           <% dialog.with_confirm_action do %>
-            <%= form_with url: purge_path, method: :delete, data: { turbo_frame: "_top" } do %>
-              <%= hidden_field_tag :tab, tab, id: nil %>
+            <%= form_with url: purge_path, method: :delete, data: { turbo_frame: "_top", promotion_stand_in: true } do %>
+              <%= hidden_field_tag :tab, tab, id: nil, data: { hold_ignore: true } %>
               <%= render Admin::ButtonComponent.new(label: "Delete permanently", variant: :danger, type: "submit") %>
             <% end %>
           <% end %>
