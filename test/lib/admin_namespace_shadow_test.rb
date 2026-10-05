@@ -24,7 +24,7 @@ require "test_helper"
 # module.
 #
 # The names are DERIVED, not listed: everything at the top of `app/models`,
-# `app/services` and `app/queries` -- a directory is a namespace (`media/` ->
+# `app/services`, `app/queries`, `app/values` and `app/constraints` -- a directory is a namespace (`media/` ->
 # `Media`), a file a class or module (`page.rb` -> `Page`, `audit.rb` ->
 # `Audit`) -- so a new domain is guarded the day its directory appears. Each
 # is taken both as Zeitwerk inflects it (`ai` -> `AI`) and as a plain camelize
@@ -34,7 +34,7 @@ require "test_helper"
 # under `Admin`, and a bare reference from inside `Admin` still reaches the
 # top-level constant.
 class AdminNamespaceShadowTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/services app/queries].freeze
+  ROOTS = %w[app/models app/services app/queries app/values app/constraints].freeze
 
   # Not domain names:
   # - `concerns` is no namespace (Rails collapses it: `concerns/trashable.rb`
@@ -67,7 +67,7 @@ class AdminNamespaceShadowTest < ActiveSupport::TestCase
     names = self.class.domain_names
     # The four the retired guards named, plus the ones that were guarded by
     # convention only; if a rename drops one of these the derivation is broken.
-    %w[Media Trash Translations AI Ai Audit Dashboard Settings Groups Users ApiTokens Tags Locales Posts Pages AccessControl].each do |name|
+    %w[Media Trash Translations AI Ai Audit Dashboard Settings Groups Users ApiTokens Tags Locales Posts Pages AccessControl Pagination Theme LocaleRouteConstraint].each do |name|
       assert_includes names, name
     end
     assert_operator names.size, :>=, 40
