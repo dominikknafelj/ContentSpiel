@@ -19,19 +19,22 @@ class Admin::AuditLogSystemTest < ApplicationSystemTestCase
     assert_selector "#audit_event_#{@recent.id}"
     assert_selector "#audit_event_#{@old.id}"
 
-    select "Last 30 days", from: "Date"
+    # Each choice submits the filter form into the content frame, and the
+    # answer re-renders the toolbar itself: the next choice is only made once
+    # that navigation is over (`click_frame_link` waits for the promoted
+    # visit), or it lands on a select that is about to be replaced and is
+    # lost with it.
+    click_frame_link { select "Last 30 days", from: "Date" }
     assert_no_selector "#audit_event_#{@old.id}", wait: 5
     assert_selector "#audit_event_#{@recent.id}"
 
-    select "Custom…", from: "Date"
+    click_frame_link { select "Custom…", from: "Date" }
     assert_selector "input#from", wait: 5
     assert_selector "input#to"
 
-    select "Any time", from: "Date"
-    # The answer re-renders the toolbar: wait for it, or the next choice is
-    # made on a select that is about to be replaced (and is lost with it).
+    click_frame_link { select "Any time", from: "Date" }
     assert_selector "#audit_event_#{@old.id}", wait: 5
-    select "MCP", from: "Channel"
+    click_frame_link { select "MCP", from: "Channel" }
     assert_no_selector "#audit_event_#{@recent.id}", wait: 5
     assert_selector "#audit_event_#{@old.id}"
     assert_no_selector "input#from"
