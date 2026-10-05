@@ -1,8 +1,9 @@
 module AccessControl
   # A group's stored grants as they stand today (design spec §3.1/§3.3,
-  # Review Focus 3): what the group editor shows, and what `Groups::Save`
+  # Review Focus 3): what the group editor shows, what `Groups::Save`
   # compares a submitted grant list against to tell "new or changed"
-  # from "unchanged".
+  # from "unchanged", and what a group is judged by when someone hands it
+  # on (`#as_stored`).
   #
   # A grant goes stale when the world it points at changes under it -- its
   # branch root page is deleted, its content type is no longer registered,
@@ -28,6 +29,28 @@ module AccessControl
   #   the next save. The editor shows them unticked, with a note, and they
   #   disappear when the group is saved.
   #
+  # TWO KINDS OF STALE. A deleted page is gone for good: ids are never
+  # reused, so a deleted branch root can be dropped from a scope without
+  # changing what the grant will ever match. A removed content type is not
+  # like that. Its NAME is still stored, and the day a type of that name is
+  # registered again (a plugin reinstalled) the grant matches it, with its
+  # old meaning and with no save in between. The name is DORMANT, not gone.
+  # That is why the two readings below exist side by side:
+  #
+  # - `attributes` / `Entry#scope` -- what the grant reaches TODAY: removed
+  #   names left out. For "what did this save change" (`Groups::Save`).
+  # - `carried_attributes` -- the live entries with their removed names put
+  #   back: what the editor renders, and so submits.
+  # - `as_stored` -- every right the group holds or would hold again:
+  #   `carried_attributes`, plus each dead grant that is dead only because
+  #   its content types are unregistered (`Dead#dormant`), names included.
+  #   This is what `AccessControl.can_assign_group?` and `can_manage_group?`
+  #   and the added-member check in `Groups::Save` judge: whoever hands a
+  #   group on hands on its dormant names too, so they must be able to grant
+  #   them. A deleted page id is left out of all three readings; a grant that
+  #   can never match again (its every page deleted, an unregistered
+  #   permission, a scope key nobody understands) is in none of them.
+  #
   # Scopes come out normalized (`.normalize_scope`) so two spellings of
   # the same scope compare equal.
   class LiveGrants
@@ -49,7 +72,15 @@ module AccessControl
       # The removed values that are not content types, as notes.
       def removed_notes = removed.grep_v(/\Acontent type /)
     end
-    Dead = Data.define(:permission, :removed)
+
+    # `dormant`: the scope this grant would have again if its removed content
+    # types were registered -- the stored scope, names included, minus deleted
+    # pages -- or nil for a grant that can never match again (see "TWO KINDS OF
+    # STALE" above). The editor shows neither kind; only `#as_stored` tells
+    # them apart.
+    Dead = Data.define(:permission, :removed, :dormant) do
+      def dormant_attributes = dormant && { permission: permission, scope: dormant }
+    end
 
     # A scope as the grant stores it: string keys; `content_types` sorted,
     # unique strings; `page_ids` sorted, unique integers (a value that isn't
@@ -93,13 +124,19 @@ module AccessControl
     # types, carried (see `Entry#carried_attributes`).
     def carried_attributes = entries.map(&:carried_attributes)
 
+    # The group's grants as stored, for judging who may hand the group on:
+    # every live entry with its removed content types still on it, and every
+    # dead grant that a re-registered content type would bring back (see "TWO
+    # KINDS OF STALE" above). Costs nothing beyond `#initialize`.
+    def as_stored = carried_attributes + dead.filter_map(&:dormant_attributes)
+
     def entry_for(key) = entries.find { |entry| entry.permission == key }
     def dead_for(key) = dead.select { |grant| grant.permission == key }
 
     private
 
     def classify(grant)
-      return @dead << Dead.new(permission: grant.permission, removed: [ "the permission itself" ]) if grant.permission_definition.nil?
+      return @dead << Dead.new(permission: grant.permission, removed: [ "the permission itself" ], dormant: nil) if grant.permission_definition.nil?
 
       scope = self.class.normalize_scope(grant.scope)
       removed = []
@@ -114,19 +151,26 @@ module AccessControl
         alive &&= scope["content_types"].any?
       end
 
+      # Whether the grant could ever match again: everything but its content
+      # types must still stand. Decided before `alive` is read below, from the
+      # same checks.
+      revivable = true
+
       if scope.key?("page_ids")
         gone = scope["page_ids"].reject { |id| @existing_page_ids.include?(id) }
         removed += gone.map { "a page that no longer exists" }
         scope["page_ids"] -= gone
-        alive &&= scope["page_ids"].any?
+        revivable &&= scope["page_ids"].any?
       end
 
-      alive &&= (scope.keys - %w[content_types page_ids own]).empty?
+      revivable &&= (scope.keys - %w[content_types page_ids own]).empty?
+      alive &&= revivable
 
       if alive
         @entries << Entry.new(permission: grant.permission, scope: scope, removed: removed, gone_types: gone_types)
       else
-        @dead << Dead.new(permission: grant.permission, removed: removed)
+        dormant = scope.merge("content_types" => (scope["content_types"] + gone_types).sort) if revivable && gone_types.any?
+        @dead << Dead.new(permission: grant.permission, removed: removed, dormant: dormant)
       end
     end
   end

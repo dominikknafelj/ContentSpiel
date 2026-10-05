@@ -145,20 +145,22 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
   # --- Locked ticks -------------------------------------------------------------
 
-  test "a grant carrying a removed type the viewer's own grant doesn't name is editable, with its Remove chip and the hint; an untouched save changes nothing" do
+  # A removed content type's name is dormant, not gone, and a group is judged
+  # as stored (`AccessControl.can_manage_group?`): the row is editable -- with
+  # its Remove chip -- only for a viewer who could grant that name. Here the
+  # viewer's own grant names it.
+  test "a grant carrying a removed type the viewer's own grant names is editable, with its Remove chip; an untouched save changes nothing" do
     group = locked_scenario_group
-    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {}, "tags.manage" => {} }))
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => %w[blog retired_type] }, "posts.read" => {}, "tags.manage" => {} }))
 
     get "/cs-studio/groups/#{group.id}/edit"
     assert_response :success
 
-    # Judged on the LIVE scope (as `can_manage_group?` does): not locked, so the lawful Remove is there.
     assert_select "[data-locked]", count: 0
     assert_select "[data-permission='posts.edit']" do
       assert_select "input[type=checkbox][name='group[grants][posts.edit][enabled]'][checked]:not([disabled])"
       assert_select "button", text: "Edit scope"
       assert_select "[data-removed-type=retired_type] button", text: "Remove"
-      assert_select ".admin-removed-type-hint", text: "Remove this type before changing the row."
     end
     assert_select ".admin-locked-hint", count: 0
     assert_select "fieldset[disabled]", count: 0
@@ -178,18 +180,69 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal [ users(:reader) ], group.users.reload.to_a
   end
 
-  test "the removed-type hint is shown to a viewer who couldn't hand the name out, and not to an unscoped holder or an owner" do
+  test "a group storing a removed type is view-only for a viewer who could only grant the live one: the notice, a disabled fieldset, no footer, no delete zone" do
     group = locked_scenario_group
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {}, "tags.manage" => {} }))
 
-    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => {}, "posts.read" => {} }))
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "[data-removed-type=retired_type]"
-    assert_select ".admin-removed-type-hint", count: 0
+
+    assert_response :success
+    assert_select "p.admin-view-only-notice", text: "This group has permissions you can't hand out, so you can only view it."
+    assert_select "form#group-form fieldset.admin-view-only[disabled]" do
+      assert_select "[data-permission='posts.edit'] input[type=checkbox][name$='[enabled]'][checked]"
+      # The removed type is still there to be read.
+      assert_select "[data-permission='posts.edit'] [data-removed-type=retired_type]"
+    end
+    assert_select "[data-permission='posts.edit'] a[role=button]", text: "View scope"
+    assert_select "button", text: "Edit scope", count: 0
+    assert_select "[data-locked]", count: 0
+    assert_select ".admin-save-bar", count: 0
+    assert_select "form#group-form button[type=submit]", count: 0
+    assert_select ".admin-delete-zone", count: 0
+    page = Nokogiri::HTML(response.body)
+    enabled = page.css("form#group-form input[name], form#group-form select[name], form#group-form textarea[name], form#group-form button").reject { |field| field.ancestors("fieldset[disabled]").any? || field["type"] == "hidden" && field["name"] == "_method" }
+    assert_empty enabled.map { |field| field["name"] || field.text.strip }, "nothing in the form may be enabled, Remove included"
+  end
+
+  test "a group whose only grant for a permission names removed types alone is view-only for a viewer who couldn't grant them, editable for an owner" do
+    group = AccessControl::Group.create!(name: "Dormant only")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
+
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "p.admin-view-only-notice"
+    assert_select "form#group-form fieldset.admin-view-only[disabled]"
+    assert_select ".admin-save-bar", count: 0
 
     sign_in_as(users(:one))
     get "/cs-studio/groups/#{group.id}/edit"
-    assert_select "[data-removed-type=retired_type]"
-    assert_select ".admin-removed-type-hint", count: 0
+    assert_select "p.admin-view-only-notice", count: 0
+    assert_select "fieldset[disabled]", count: 0
+    assert_select ".admin-save-bar"
+  end
+
+  test "the Remove chip of a removed type is offered to an unscoped holder and to an owner, and pressing it is saved" do
+    group = locked_scenario_group
+
+    sign_in_as(users(:one))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset[disabled]", count: 0
+    assert_select "[data-removed-type=retired_type] button", text: "Remove"
+
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => {}, "posts.read" => {} }))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset[disabled]", count: 0
+    assert_select "[data-removed-type=retired_type] button", text: "Remove"
+
+    # What Remove does: the carried hidden input is disabled, so the name isn't posted.
+    params = params_as_rendered
+    params["group"]["grants"]["posts.edit"]["content_types"].delete("retired_type")
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      patch "/cs-studio/groups/#{group.id}", params: params
+    end
+    assert_response :see_other
+    assert_equal [ { "content_types" => [ "blog" ], "own" => true }, {} ], group.grants.reload.order(:id).map(&:scope)
   end
 
   test "a tick the viewer typed comes back ticked and editable after a refused save, never locked" do
@@ -248,18 +301,21 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
   # Fix round 2 of Task 10: the request the editor makes when "Own only" is unticked
   # on a row that carries a removed type, without pressing Remove first -- the form as
-  # rendered, minus `own`. (The row is editable for this viewer, with the hint; the
-  # service decides.) `Groups::Save` judges a grant
-  # that changed with a removed type still on it raw, so the name the viewer can't
-  # hand out -- they hold {blog} -- refuses it.
+  # rendered, minus `own`. For a viewer who holds {blog} the group is view-only, so
+  # the form as rendered is taken from an owner's editor and the request is a forged
+  # one; the service decides. `Groups::Save` judges a grant that changed with a
+  # removed type still on it raw, so the name the viewer can't hand out refuses it.
   test "Own only unticked on a row that carries a removed type, without Remove, is a 403 with one access.denied and nothing stored" do
     group = locked_scenario_group
-    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
-
+    sign_in_as(users(:one))
     get "/cs-studio/groups/#{group.id}/edit"
     assert_select "fieldset[disabled]", count: 0 # an editable form, not view-only
     params = params_as_rendered
     assert_equal "1", params["group"]["grants"]["posts.edit"].delete("own")
+
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset.admin-view-only[disabled]"
     before = grants_snapshot(group)
 
     assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
@@ -270,6 +326,26 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
     assert_equal before, grants_snapshot(group)
+  end
+
+  # The form as an owner sees it, posted by a viewer who could only grant "blog",
+  # with one more member: the member would be handed the removed name too.
+  test "a forged request adding a member to a group that stores a removed type, grants as rendered, is a 403 with one access.denied" do
+    group = locked_scenario_group
+    sign_in_as(users(:one))
+    get "/cs-studio/groups/#{group.id}/edit"
+    params = params_as_rendered
+    params["group"]["member_ids"] = [ "", users(:reader).id.to_s, users(:author).id.to_s ]
+
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] }, "posts.read" => {} }))
+    before = grants_snapshot(group)
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/groups/#{group.id}", params: params
+    end
+
+    assert_response :forbidden
+    assert_equal before, grants_snapshot(group)
+    assert_equal [ users(:reader) ], group.users.reload.to_a
   end
 
   # Final fix wave (Task 11): the two groups differ ONLY in how many unscoped

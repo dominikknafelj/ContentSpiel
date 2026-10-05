@@ -39,6 +39,13 @@ module AccessControl
     # a content type is chosen) -- never to authorize a write, which must
     # go through `allowed?` with the record. Owners, trusted code paths,
     # and the token intersection are decided exactly as in `allowed?`.
+    #
+    # "Under any scope" has one exception: a grant whose scope names content
+    # types of which none is registered reaches no record at all, so it
+    # doesn't count (`Scoping::Condition#dormant?`) -- its holder would
+    # otherwise be shown a Posts entry leading to an empty list and buttons
+    # that every service refuses. A deleted branch root is not looked up
+    # here: that would cost a query on every page of CS Studio.
     def holds?(actor, key, channel: Current.channel)
       Checker.new(actor, key, nil, channel, anywhere: true).allowed?
     end
@@ -174,31 +181,64 @@ module AccessControl
       end
     end
 
-    # Design spec §3.3 "Tokens" and Review Focus 1: a token's group must be
-    # one whose every grant the user could hand out themselves. Judged on
-    # the group's *live* grants (`LiveGrants`, fix round 1 M3): stale
-    # values -- a deleted branch root, an unregistered content type -- are
-    # left out first, and a grant that matches nothing any more (an
-    # unregistered permission, a scope whose every value is stale) is
-    # skipped. None of those can widen anyone's rights, so none may make a
-    # group unassignable (Review Focus 3: stale is never an error).
-    # `actor` is a `User` or an `ApiToken` (see `can_grant?`).
+    # Design spec §3.3 "Tokens" and Review Focus 1: may `actor` hand `group`
+    # on -- put a user into it, bind a token to it? Only if every grant of
+    # the group is one they could hand out themselves (`can_grant?`), judged
+    # on the grants AS STORED (`LiveGrants#as_stored`). `actor` is a `User`
+    # or an `ApiToken` (see `can_grant?`); an owner may assign any group.
+    #
+    # "As stored" is the whole rule, so, per kind of stale value (see
+    # `LiveGrants`, "TWO KINDS OF STALE"):
+    #
+    # - A content type that is no longer registered STAYS in the scope that
+    #   is judged. The name grants nothing today (`Scoping::Condition`), but
+    #   it is dormant, not gone: register a type of that name again and the
+    #   grant matches it at once, for every member and every token of the
+    #   group, with no save in between. Handing the group on hands that on.
+    #   So `{content_types: ["blog", "retired"]}` takes an actor whose own
+    #   grant covers both names (or names no types at all) -- holding "blog"
+    #   is not enough -- and the same goes for a grant whose every type is
+    #   removed (`{content_types: ["retired"]}`): dead today, a `LiveGrants`
+    #   "dead" grant that the editor doesn't even show, and still a right the
+    #   actor couldn't have granted. Judged with the names stripped, as "what
+    #   the group reaches today", a `{blog}` holder could put a user or a
+    #   token into such a group and so hand out, the day the type comes back,
+    #   a right they never held.
+    # - A deleted branch root is left out: page ids are never reused, so it
+    #   can't come back, and a grant all of whose roots are deleted is
+    #   skipped. Neither can widen anyone's rights, so neither may make a
+    #   group unassignable (Review Focus 3: stale is never an error).
+    # - A grant for a permission that is no longer registered is skipped:
+    #   there is no registered key to ask `can_grant?` about.
+    #
+    # Costs what `LiveGrants.new` costs (one query, only when a grant names
+    # pages) plus `can_grant?`'s closure-table query per pages grant: nothing
+    # per content type, removed or not. Callers that ask for many groups
+    # preload `grants` (`permitted_groups_for`, `Users::Manageability`).
     def can_assign_group?(actor, group)
       return true if owner?(actor)
 
-      LiveGrants.new(group.grants.to_a).entries.all? do |entry|
-        can_grant?(actor, entry.permission, entry.scope)
+      LiveGrants.new(group.grants.to_a).as_stored.all? do |grant|
+        can_grant?(actor, grant[:permission], grant[:scope])
       end
     end
 
     # May `actor` manage `group` *as it stands* (final fix wave, Important
     # 2) -- take members out of it, remove or narrow its grants, delete it,
     # or change the group memberships of a user in it? Only if every grant
-    # it holds is one they could hand out themselves (`can_assign_group?`
-    # on the stored group). Otherwise `groups.manage` or `users.manage`
+    # it holds is one they could hand out themselves: `can_assign_group?`,
+    # so on the grants as stored, a removed content type's dormant name
+    # included (see there). Otherwise `groups.manage` or `users.manage`
     # alone would let a non-owner strip Admin, or empty it, whatever they
-    # hold. Trusted code paths (nil actor on a trusted channel) may.
-    # One rule for `Users::Save`, `Groups::Save` and `Groups::Destroy`.
+    # hold. Trusted code paths (nil actor on a trusted channel) may; a nil
+    # actor on any other channel may not.
+    #
+    # One rule for `Users::Save`, `Users::Manageability`, `Groups::Save`
+    # and `Groups::Destroy`, and for what the group editor draws: a group
+    # for which this is false is view-only. A group that still stores a
+    # removed content type is therefore view-only for a manager who couldn't
+    # grant that name, until someone who could -- an owner, a holder whose
+    # own grant names no types or names that one -- presses Remove on it.
     def can_manage_group?(actor, group, channel: Current.channel)
       return trusted?(actor, channel) if actor.nil?
 

@@ -70,6 +70,84 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
   end
 
+  # A removed content type's name is dormant, not gone: a group that still
+  # stores one is judged as stored, so someone who could only grant "blog"
+  # can't put a user into it, take one out of it, or manage a user who is in it.
+  def manager_holding(posts_edit_scope)
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each { |key| AccessControl::Grant.create!(group: managers, permission: key, scope: {}) }
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: posts_edit_scope)
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    users(:editor_branch)
+  end
+
+  def group_carrying(scope)
+    AccessControl::Group.create!(name: "Carrying").tap { |group| AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: scope) }
+  end
+
+  [ %w[blog retired_type], %w[retired_type] ].each do |types|
+    test "a non-owner who could only grant blog can't add a user to a group storing #{types.inspect}: one access.denied" do
+      manager = manager_holding({ "content_types" => %w[blog] })
+      carrying = group_carrying({ "content_types" => types })
+
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id, carrying.id ] }) }
+        assert result.denied?
+        assert_equal [ "You don't have permission to add users to the Carrying group" ], result.errors
+      end
+      assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+      assert_empty Audit::Event.where(action: "user.updated")
+    end
+
+    test "a user who is in a group storing #{types.inspect} is outranked for a non-owner who could only grant blog" do
+      manager = manager_holding({ "content_types" => %w[blog] })
+      carrying = group_carrying({ "content_types" => types })
+      AccessControl::Membership.create!(user: users(:reader), group: carrying)
+
+      assert_equal :outranked, Users::Manageability.for(manager, users(:reader), channel: :admin)
+      [ { name: "Renamed" }, { group_ids: [ access_control_groups(:read_only).id ] } ].each do |attributes|
+        result = as(manager) { Users::Save.call(users(:reader), attributes: attributes) }
+        assert result.denied?, attributes.inspect
+      end
+      assert as(manager) { Users::Destroy.call(users(:reader)) }.denied?, "deleting them is managing them too"
+      assert_nil users(:reader).reload.name
+      assert_includes users(:reader).group_ids, carrying.id
+    end
+  end
+
+  test "an unscoped holder, a holder whose grant names the removed type, and an owner may add a user to such a group" do
+    carrying = group_carrying({ "content_types" => %w[blog retired_type] })
+    ids = [ access_control_groups(:read_only).id, carrying.id ].sort
+
+    manager = manager_holding({})
+    assert_equal :editable, Users::Manageability.for(manager, users(:reader), channel: :admin)
+    result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: ids }) }
+    assert result.ok?, result.errors.inspect
+    assert_equal ids, users(:reader).reload.group_ids.sort
+    assert_equal :editable, Users::Manageability.for(manager, users(:reader), channel: :admin)
+
+    AccessControl::Grant.find_by!(group: manager.groups.find_by!(name: "User managers"), permission: "posts.edit").update!(scope: { "content_types" => %w[blog retired_type] })
+    AccessControl::ActorGrants.reset!
+    result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id ] }) }
+    assert result.ok?, result.errors.inspect
+
+    result = as_owner { Users::Save.call(users(:reader), attributes: { group_ids: ids }) }
+    assert result.ok?, result.errors.inspect
+  end
+
+  test "a token's group bounds it for a removed type too, even an owner's" do
+    carrying = group_carrying({ "content_types" => %w[blog retired_type] })
+    token_group = AccessControl::Group.create!(name: "Token managers")
+    %w[users.manage posts.read pages.read].each { |key| AccessControl::Grant.create!(group: token_group, permission: key, scope: {}) }
+    AccessControl::Grant.create!(group: token_group, permission: "posts.edit", scope: { "content_types" => %w[blog] })
+    token, = ApiToken.generate!(users(:one), group: token_group)
+
+    result = as(token, channel: :mcp) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id, carrying.id ] }) }
+
+    assert result.denied?
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+  end
+
   test "only an owner may change owner" do
     result = as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "1" }) }
     assert result.denied?

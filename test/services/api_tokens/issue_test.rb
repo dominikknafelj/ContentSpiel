@@ -74,6 +74,57 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
     assert_equal 1, users(:one).api_tokens.count
   end
 
+  # A removed content type's name is dormant, not gone: a group that still
+  # stores one is judged as stored, so a token can't be bound to it by (or for)
+  # someone who couldn't grant that name.
+  def blog_holder(extra = [])
+    holders = AccessControl::Group.create!(name: "Blog holders")
+    AccessControl::Grant.create!(group: holders, permission: "posts.edit", scope: { "content_types" => %w[blog] })
+    extra.each { |key| AccessControl::Grant.create!(group: holders, permission: key, scope: {}) }
+    AccessControl::Membership.create!(user: users(:editor_branch), group: holders)
+    users(:editor_branch)
+  end
+
+  def group_carrying(types)
+    AccessControl::Group.create!(name: "Carrying").tap do |group|
+      AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => types })
+    end
+  end
+
+  [ %w[blog retired_type], %w[retired_type] ].each do |types|
+    test "a token can't be bound to a group storing #{types.inspect} by a user who could only grant blog" do
+      holder = blog_holder
+      carrying = group_carrying(types)
+
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        refused = as(holder) { ApiTokens::Issue.call(holder, group: carrying) }
+        assert refused.denied?
+        assert_equal [ "You don't have permission to give a token that group" ], refused.errors
+      end
+      assert_empty holder.api_tokens
+    end
+  end
+
+  test "issuing someone else's token for a group storing a removed type needs both the user and the actor to cover the name" do
+    carrying = group_carrying(%w[blog retired_type])
+    manager = blog_holder(%w[tokens.manage])
+    unscoped = AccessControl::Group.create!(name: "Unscoped editors")
+    AccessControl::Grant.create!(group: unscoped, permission: "posts.edit", scope: {})
+    AccessControl::Membership.create!(user: users(:reader), group: unscoped)
+
+    # The token's user could grant it (unscoped), the actor couldn't.
+    refused = as(manager) { ApiTokens::Issue.call(users(:reader), group: carrying) }
+    assert refused.denied?
+    # The actor could (an owner), the token's user couldn't.
+    refused = as_owner { ApiTokens::Issue.call(manager, group: carrying) }
+    assert refused.denied?
+    assert_empty ApiToken.where(group: carrying)
+
+    assert as(users(:reader)) { ApiTokens::Issue.call(users(:reader), group: carrying) }.ok?, "an unscoped holder's own token"
+    assert as_owner { ApiTokens::Issue.call(users(:one), group: carrying) }.ok?, "an owner's own token"
+    assert ApiTokens::Issue.call(manager, group: carrying, actor: nil).ok?, "a trusted code path chooses freely"
+  end
+
   test "no name picks the next free Token N, and the event records the name" do
     token, = ApiTokens::Issue.call(users(:one), group: access_control_groups(:read_only)).record
     assert_match(/\AToken \d+\z/, token.name)

@@ -118,6 +118,23 @@ class Admin::PermissionMatrixComponentTest < ViewComponent::TestCase
     assert_selector "[data-permission='posts.edit'][data-locked]"
   end
 
+  # The lock is judged on the scope as stored, a removed content type's name
+  # included -- the question `can_manage_group?` asks of the whole group, which
+  # is why the controller draws such a group view-only before any row is locked.
+  test "a stored row carrying a removed type locks for a viewer who couldn't grant the name, not for one who could" do
+    stored = [ { permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] } } ]
+
+    matrix_for(viewer_holding("posts.edit" => { "content_types" => [ "blog" ] }), stored, stored: stored)
+    assert_selector "[data-permission='posts.edit'][data-locked]"
+    assert_no_selector "[data-removed-type] button", text: "Remove", visible: :all
+
+    [ {}, { "content_types" => %w[blog retired_type] } ].each do |held|
+      matrix_for(viewer_holding("posts.edit" => held), stored, stored: stored)
+      assert_no_selector "[data-locked]"
+      assert_selector "[data-removed-type='retired_type'] button", text: "Remove", visible: :all
+    end
+  end
+
   test "an owner, no actor, and a view-only render lock nothing" do
     grants = [ { permission: "posts.delete", scope: {} }, { permission: "trash.empty", scope: {} } ]
 

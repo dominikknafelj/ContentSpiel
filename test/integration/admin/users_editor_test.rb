@@ -185,6 +185,57 @@ class Admin::UsersEditorTest < ActionDispatch::IntegrationTest
     assert_select "label[data-group-card='#{access_control_groups(:read_only).id}']:not([data-locked]) input:not([disabled])"
   end
 
+  # A removed content type's name is dormant, not gone: a group is judged as
+  # stored (`AccessControl.can_assign_group?`), so its card is offered only to a
+  # viewer who could grant that name.
+  test "a group that stores a removed content type the viewer couldn't grant is a locked card, and a forged tick is refused" do
+    managers = sign_in_manager
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    blog = AccessControl::Group.create!(name: "Blog editors")
+    AccessControl::Grant.create!(group: blog, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    carrying = AccessControl::Group.create!(name: "Carrying")
+    AccessControl::Grant.create!(group: carrying, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+    dormant = AccessControl::Group.create!(name: "Dormant")
+    AccessControl::Grant.create!(group: dormant, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+
+    assert_select "label[data-group-card='#{blog.id}']:not([data-locked]) input:not([disabled])"
+    [ carrying, dormant ].each do |group|
+      assert_select "label[data-group-card='#{group.id}'][data-locked]", text: /You can't grant this group\./
+      assert_select "label[data-group-card='#{group.id}'] input[type=checkbox][disabled]"
+    end
+
+    [ carrying, dormant ].each do |group|
+      assert_difference -> { denied_events_for(users(:reader)).count }, 1 do
+        patch "/cs-studio/users/#{users(:reader).id}", params: { user: { group_ids: [ "", access_control_groups(:read_only).id, group.id ] } }
+      end
+      assert_response :forbidden
+    end
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+  end
+
+  test "the group cards cost no query per group, whatever the groups store" do
+    managers = sign_in_manager
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    first = AccessControl::Group.create!(name: "Carrying 0")
+    AccessControl::Grant.create!(group: first, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    few = sql_during { get "/cs-studio/users/#{users(:reader).id}/edit" }
+
+    6.times do |index|
+      group = AccessControl::Group.create!(name: "Carrying #{index + 1}")
+      AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "blog", "retired_#{index}" ] })
+      AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => [ "retired_#{index}" ] })
+    end
+    many = sql_during { get "/cs-studio/users/#{users(:reader).id}/edit" }
+
+    assert_response :success
+    assert_select "label[data-group-card][data-locked]", minimum: 7
+    assert_equal few.size, many.size, "the cards must not query per group:\n#{(many - few).first(5).join("\n")}"
+  end
+
   test "the password is behind Set a new password…, closed and blank, and never rendered back" do
     get "/cs-studio/users/#{users(:two).id}/edit"
 

@@ -20,6 +20,13 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     AccessControl.allowed?(actor, key, record, channel: channel)
   end
 
+  def count_queries(&block)
+    count = 0
+    counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+    count
+  end
+
   # --- Owner and trusted actors ---------------------------------------
 
   test "an owner is allowed any key" do
@@ -401,20 +408,185 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert AccessControl.can_assign_group?(@author, access_control_groups(:read_only))
   end
 
-  # Fix round 1 (M3): judged on the live grants -- a grant whose only
-  # branch root was deleted, or scoped to a retired content type, matches
-  # nothing and doesn't make its group unassignable.
-  test "can_assign_group? ignores grants that went stale" do
+  # A deleted branch root is gone for good (ids aren't reused): the grant
+  # matches nothing and never will, so it doesn't make its group unassignable.
+  test "can_assign_group? ignores a grant whose branch root was deleted" do
     page = as_owner { create_page(title: "Doomed") }
     group = AccessControl::Group.create!(name: "Stale")
     AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
     AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ page.id ] })
-    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
     assert_not AccessControl.can_assign_group?(@reader, group)
 
     as_owner { delete_for_good(page) }
 
     assert AccessControl.can_assign_group?(@reader, group.reload)
+  end
+
+  # --- Removed content types are judged as stored -------------------------
+  # A content type that is no longer registered grants nothing today, but the
+  # name is dormant, not gone: it grants again the day a type of that name is
+  # registered. So whoever hands a group on -- a membership, a token -- must be
+  # able to grant every grant of it AS STORED, removed names included.
+
+  def holder_of(scope, user: @brancher)
+    grant!("posts.edit", scope)
+    AccessControl::ActorGrants.reset!
+    user
+  end
+
+  def group_holding(scope, name: "Carrying", permission: "posts.edit")
+    AccessControl::Group.create!(name: name).tap { |group| grant!(permission, scope, group: group) }
+  end
+
+  test "can_assign_group? and can_manage_group? judge a removed content type beside a live one as stored" do
+    carrying = group_holding({ "content_types" => %w[blog retired_type] })
+    blog_holder = holder_of({ "content_types" => %w[blog] })
+
+    assert_not AccessControl.can_assign_group?(blog_holder, carrying)
+    assert_not AccessControl.can_manage_group?(blog_holder, carrying, channel: :admin)
+    assert_not_includes AccessControl.permitted_groups_for(blog_holder), carrying
+    # The live part alone is theirs to hand out.
+    assert AccessControl.can_assign_group?(blog_holder, group_holding({ "content_types" => %w[blog] }, name: "Blog only"))
+  end
+
+  test "can_assign_group? and can_manage_group? judge a grant whose every content type is removed, too" do
+    dead = group_holding({ "content_types" => %w[retired_type] })
+    blog_holder = holder_of({ "content_types" => %w[blog] })
+
+    assert_empty AccessControl::LiveGrants.new(dead.grants.to_a).entries, "the grant is dead: it is no entry"
+    assert_not AccessControl.can_assign_group?(blog_holder, dead)
+    assert_not AccessControl.can_manage_group?(blog_holder, dead, channel: :admin)
+    # Someone who holds nothing of the permission couldn't grant it either.
+    assert_not AccessControl.can_assign_group?(@reader, dead)
+  end
+
+  test "a holder whose own grant names the removed type, an unscoped holder and an owner may hand such a group on" do
+    carrying = group_holding({ "content_types" => %w[blog retired_type] })
+    dead = group_holding({ "content_types" => %w[retired_type] }, name: "Dead")
+
+    namer = holder_of({ "content_types" => %w[blog retired_type] })
+    [ carrying, dead ].each do |group|
+      assert AccessControl.can_assign_group?(namer, group), group.name
+      assert AccessControl.can_manage_group?(namer, group, channel: :admin), group.name
+    end
+
+    @branch_group.grants.destroy_all
+    unscoped = holder_of({})
+    [ carrying, dead ].each { |group| assert AccessControl.can_assign_group?(unscoped, group), group.name }
+
+    [ carrying, dead ].each do |group|
+      assert AccessControl.can_assign_group?(@owner, group)
+      assert AccessControl.can_manage_group?(@owner, group, channel: :admin)
+    end
+  end
+
+  test "own beside a removed type: the holder needs both dimensions covered" do
+    carrying = group_holding({ "content_types" => %w[blog retired_type], "own" => true })
+
+    own_only = holder_of({ "own" => true })
+    assert AccessControl.can_assign_group?(own_only, carrying), "{own} covers any type list that is own"
+
+    @branch_group.grants.destroy_all
+    blog_own = holder_of({ "content_types" => %w[blog], "own" => true })
+    assert_not AccessControl.can_assign_group?(blog_own, carrying)
+  end
+
+  test "a token is judged on its group and its user for a removed type, never as an owner" do
+    carrying = group_holding({ "content_types" => %w[blog retired_type] })
+    blog_group = group_holding({ "content_types" => %w[blog] }, name: "Blog tokens")
+    unscoped_group = group_holding({}, name: "Unscoped tokens")
+    owners_narrow, = ApiToken.generate!(@owner, group: blog_group)
+    owners_wide, = ApiToken.generate!(@owner, group: unscoped_group)
+    blog_holder = holder_of({ "content_types" => %w[blog] })
+    holders_wide, = ApiToken.generate!(blog_holder, group: unscoped_group)
+
+    assert_not AccessControl.can_assign_group?(owners_narrow, carrying), "an owner's token is bounded by its group"
+    assert_not AccessControl.can_manage_group?(owners_narrow, carrying, channel: :mcp)
+    assert AccessControl.can_assign_group?(owners_wide, carrying)
+    assert_not AccessControl.can_assign_group?(holders_wide, carrying), "the token's user couldn't grant the name"
+  end
+
+  test "a nil actor manages such a group on a trusted channel only" do
+    carrying = group_holding({ "content_types" => %w[blog retired_type] })
+
+    assert AccessControl.can_manage_group?(nil, carrying, channel: :console)
+    assert AccessControl.can_manage_group?(nil, carrying, channel: :setup)
+    assert AccessControl.can_manage_group?(nil, carrying, channel: nil)
+    assert_not AccessControl.can_manage_group?(nil, carrying, channel: :admin)
+    assert_not AccessControl.can_manage_group?(nil, carrying, channel: :mcp)
+    assert_not AccessControl.can_assign_group?(nil, carrying)
+  end
+
+  test "a pages grant, a group with no grants and an unregistered permission are judged as before" do
+    branch_root = create_page(title: "Branch")
+    child = create_page(title: "Child", parent: branch_root)
+    grant!("pages.edit", { "page_ids" => [ branch_root.id ] })
+    below = group_holding({ "page_ids" => [ child.id ] }, name: "Below", permission: "pages.edit")
+    beside = group_holding({ "page_ids" => [ create_page(title: "Sibling").id ] }, name: "Beside", permission: "pages.edit")
+    empty = AccessControl::Group.create!(name: "Empty")
+    unregistered = group_holding({}, name: "Unregistered", permission: "posts.read")
+    unregistered.grants.sole.update_columns(permission: "gone/thing.edit")
+
+    assert AccessControl.can_assign_group?(@brancher, below)
+    assert_not AccessControl.can_assign_group?(@brancher, beside)
+    assert AccessControl.can_assign_group?(@reader, empty)
+    assert AccessControl.can_manage_group?(@reader, empty, channel: :admin)
+    assert AccessControl.can_assign_group?(@reader, unregistered.reload)
+  end
+
+  # `permitted_groups_for` and the user editor's group cards ask
+  # `can_assign_group?` once per group: judging the grants as stored adds no
+  # query per grant or per group.
+  test "judging stored grants costs no query per group or per removed name" do
+    holder_of({ "content_types" => %w[blog] })
+    group_holding({ "content_types" => %w[blog retired_type] }, name: "First")
+    AccessControl.permitted_groups_for(@brancher)
+    AccessControl::ActorGrants.reset!
+    few = count_queries { AccessControl.permitted_groups_for(@brancher) }
+
+    8.times do |index|
+      group_holding({ "content_types" => [ "blog", "retired_#{index}" ] }, name: "More #{index}")
+      group_holding({ "content_types" => [ "retired_#{index}" ] }, name: "Dead #{index}")
+    end
+    AccessControl::ActorGrants.reset!
+    many = count_queries { AccessControl.permitted_groups_for(@brancher) }
+
+    assert_equal few, many
+  end
+
+  # --- holds? and a grant that names only removed types -------------------
+
+  test "holds? is false for a grant whose named content types are all unregistered" do
+    grant!("posts.read", { "content_types" => %w[retired_type] })
+
+    assert_not AccessControl.holds?(@brancher, "posts.read", channel: :admin)
+  end
+
+  test "holds? still counts a grant with a live type beside a removed one, and a write grant for read only while it reaches something" do
+    grant!("posts.edit", { "content_types" => %w[retired_type] })
+    assert_not AccessControl.holds?(@brancher, "posts.edit", channel: :admin)
+    assert_not AccessControl.holds?(@brancher, "posts.read", channel: :admin), "a dormant write grant implies no read"
+
+    @branch_group.grants.destroy_all
+    grant!("posts.edit", { "content_types" => %w[blog retired_type], "own" => true })
+    AccessControl::ActorGrants.reset!
+    assert AccessControl.holds?(@brancher, "posts.edit", channel: :admin)
+    assert AccessControl.holds?(@brancher, "posts.read", channel: :admin)
+    assert AccessControl.holds?(@owner, "posts.read", channel: :admin)
+  end
+
+  test "holds? on a token is false when either side names only removed types" do
+    dormant_group = group_holding({ "content_types" => %w[retired_type] }, name: "Dormant tokens", permission: "posts.read")
+    owners_token, = ApiToken.generate!(@owner, group: dormant_group)
+    grant!("posts.read", { "content_types" => %w[retired_type] })
+    brancher_token, = ApiToken.generate!(@brancher, group: access_control_groups(:read_only))
+
+    assert_not AccessControl.holds?(owners_token, "posts.read", channel: :mcp)
+    assert_not AccessControl.holds?(brancher_token, "posts.read", channel: :mcp)
+
+    grant!("pages.read")
+    AccessControl::ActorGrants.reset!
+    assert AccessControl.holds?(brancher_token, "pages.read", channel: :mcp)
   end
 
   # Final fix wave (Minor 1): a token -- even an owner's -- is never an

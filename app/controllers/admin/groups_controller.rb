@@ -83,8 +83,9 @@ module Admin
     # What the editor screens share (round 3 Task 11):
     #
     # - `@view_only`: a stored group the viewer can't manage as it stands
-    #   (`AccessControl.can_manage_group?`: every live grant is one they could hand out
-    #   themselves) is read-only -- the whole form disabled, no footer, no delete zone.
+    #   (`AccessControl.can_manage_group?`: every grant it stores is one they could hand
+    #   out themselves, a removed content type's name included) is read-only -- the
+    #   whole form disabled, no footer, no delete zone.
     #   `Groups::Save`/`Groups::Destroy` ask the same question again and are the
     #   backstop for a forged request; this decides only what is drawn. A new group
     #   has nothing stored to be unable to manage.

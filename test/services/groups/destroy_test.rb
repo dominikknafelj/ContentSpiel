@@ -86,4 +86,28 @@ class Groups::DestroyTest < ActiveSupport::TestCase
     assert_not AccessControl::Group.exists?(readers.id)
     assert_equal 2, Audit::Event.where(action: "access.denied").count
   end
+
+  # A removed content type's name is dormant, not gone: the group is judged as
+  # stored, so deleting it takes someone who could grant that name.
+  [ %w[blog retired_type], %w[retired_type] ].each do |types|
+    test "a manager who could only grant blog can't delete a group storing #{types.inspect}; an unscoped holder can" do
+      managers = AccessControl::Group.create!(name: "Group managers")
+      AccessControl::Grant.create!(group: managers, permission: "groups.manage", scope: {})
+      held = AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: { "content_types" => %w[blog] })
+      AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+      carrying = AccessControl::Group.create!(name: "Carrying")
+      AccessControl::Grant.create!(group: carrying, permission: "posts.edit", scope: { "content_types" => types })
+
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        result = as(users(:editor_branch)) { Groups::Destroy.call(carrying) }
+        assert result.denied?
+      end
+      assert AccessControl::Group.exists?(carrying.id)
+
+      held.update!(scope: {})
+      AccessControl::ActorGrants.reset!
+      assert as(users(:editor_branch)) { Groups::Destroy.call(carrying) }.ok?
+      assert_not AccessControl::Group.exists?(carrying.id)
+    end
+  end
 end

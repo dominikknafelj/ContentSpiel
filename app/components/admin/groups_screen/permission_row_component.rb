@@ -57,8 +57,7 @@ module Admin
       # `kind`: :plain, :dim (the "All ..." default), :more ("+N") or :warn.
       Chip = Data.define(:label, :kind, :dot)
 
-      def initialize(permission:, scope: nil, tree: nil, open: false, form_name: "group[grants]", locked: false, view_only: false, removed_hint: false)
-        @removed_hint = removed_hint
+      def initialize(permission:, scope: nil, tree: nil, open: false, form_name: "group[grants]", locked: false, view_only: false)
         @permission = permission
         @locked = locked
         @view_only = view_only
@@ -102,7 +101,7 @@ module Admin
       def stored_page_ids = stored("page_ids").map(&:to_i)
 
       def editor
-        ScopeEditorComponent.new(permission: permission, scope: scope || {}, tree: tree, id: editor_id, open: open?, form_name: form_name, removed_hint: @removed_hint)
+        ScopeEditorComponent.new(permission: permission, scope: scope || {}, tree: tree, id: editor_id, open: open?, form_name: form_name)
       end
 
       def types_shown = permission.scopes.include?(:content_type)

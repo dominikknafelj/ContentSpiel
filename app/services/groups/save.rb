@@ -20,22 +20,27 @@ module Groups
   # - **Unchanged** grants are not re-checked. A non-owner may rename a
   #   group whatever it holds -- and a stale
   #   grant (a deleted branch root, an unregistered content type, Review
-  #   Focus 3) can never block a save, since "unchanged" is judged against
-  #   the grants as they stand today (`AccessControl::LiveGrants`), stale
-  #   values already taken out.
+  #   Focus 3) can never block a save that changes neither grants nor
+  #   members, since "unchanged" is judged against the grants as they stand
+  #   today (`AccessControl::LiveGrants`), stale values already taken out.
   # - Adding a **member** hands them every grant of the group, so each
   #   added member (the actor included -- "adding yourself to a group is a
-  #   widening") needs every resulting grant to pass the same check.
+  #   widening") needs every grant the group will hold after this save to
+  #   pass the same check -- AS STORED, a removed content type's name
+  #   included, changed in this save or not (`#escalation_refusal`).
   # - **Removing** a member or a grant (or narrowing a grant) needs the
   #   right to manage the group as it stands (`#removal_refusal`, final fix
-  #   wave): every grant it holds must be one the actor could hand out.
+  #   wave): every grant it holds must be one the actor could hand out,
+  #   again as stored (`AccessControl.can_manage_group?`).
   #
   # The editor submits the live values, plus -- carried, so an untouched save
   # changes nothing -- a content type that is no longer registered until the
   # editor presses Remove on it. A grant posted exactly as stored but for those
   # carried names is "unchanged" (`#live`); with anything else changed it is
   # judged raw, names included. A deleted page and a dead grant are still
-  # dropped by the next save.
+  # dropped by the next save. Membership is the one thing an unchanged grant
+  # is still judged for: a member added, or taken out, meets the grants as
+  # stored, carried names included.
   class Save < ApplicationService
     def initialize(group = AccessControl::Group.new, attributes:, actor: Current.actor)
       @group = group
@@ -64,7 +69,7 @@ module Groups
       grants = (desired || []).map { |attrs| AccessControl::Grant.new(group: @group, **attrs) }
       return invalid(grants) unless @group.valid? & grants.all?(&:valid?)
 
-      refusal = escalation_refusal(stored, compared, new_member_ids - old_member_ids)
+      refusal = escalation_refusal(stored, compared, desired, new_member_ids - old_member_ids)
       return refusal if refusal
 
       old_grants = grant_list(@group.persisted? ? @group.grants.to_a : [])
@@ -173,22 +178,24 @@ module Groups
     # permission -- each checked as if the name weren't there, each stored with
     # it.
     #
-    # The consequence, on purpose: a non-owner who couldn't hand out the removed
-    # name can change such a grant only AFTER pressing Remove on it. Posting the
-    # live scope without the name is the entry itself -- neither a removal nor
-    # an escalation here, though stored and audited as the change it is (those
-    # compare the raw lists). The editor's locked row (`Admin::
-    # PermissionMatrixComponent`: a carried scope the viewer fails `can_grant?`
-    # on is a greyed tick with no scope editor) is the UI's side of this rule;
-    # this is the side a request meets, forged or not, however the row is drawn.
+    # The consequence, on purpose: from a non-owner who couldn't hand out the
+    # removed name, such a grant is accepted posted back as it is (a rename of
+    # the group) or WITHOUT the name, and in no other shape. Posting the live
+    # scope without the name is the entry itself -- neither a removal nor an
+    # escalation here, though stored and audited as the change it is (those
+    # compare the raw lists): a dormant right can always be given up. The
+    # editor offers that viewer neither: a group that stores a name its viewer
+    # couldn't grant is one they can't manage as it stands (`AccessControl.
+    # can_manage_group?` reads the grants as stored), so the whole form is
+    # view-only for them, and Remove is pressed by an owner or by someone whose
+    # own grant covers the name. This is the side a request meets, forged or
+    # not, however the form is drawn.
     #
-    # Members. The added-member check in `#escalation_refusal` reads the same
-    # list, so in a save that leaves such a grant untouched a new member is
-    # judged against its LIVE scope -- what `can_manage_group?` and a
-    # members-only save (no `grants:` at all) judge too, and what the editor
-    # posted before it carried anything. Adding or removing a member of a group
-    # that holds a removed type is therefore not blocked by the name; changing
-    # the grant in the same save is.
+    # Members are NOT read through this list. Whether a save may add a member
+    # is judged on what the group will store (`#escalation_refusal`), carried
+    # names included: this method answers "did the grant change", and handing a
+    # grant to someone new is a different question, to which a dormant name is
+    # not nothing.
     def live(grants, stored)
       grants.map do |grant|
         types = grant[:scope]["content_types"]
@@ -222,9 +229,16 @@ module Groups
     # Important 2, `AccessControl.can_manage_group?`): otherwise
     # `groups.manage` alone would let a non-owner empty Admin, or strip
     # its grants, whatever they hold themselves. Judged on the stored
-    # group, before anything is assigned. Stale values and dead grants
-    # (`LiveGrants`) aren't counted as removals -- they match nothing, and
-    # the editor drops them on every save.
+    # group, before anything is assigned.
+    #
+    # WHETHER something is being taken away is read from the live grants
+    # (`desired` here is `#live`'s list): stale values and dead grants
+    # (`LiveGrants`) aren't counted as removals -- they match nothing today,
+    # and the editor drops a deleted page and a dead grant on every save; nor
+    # is a removed content type's name, so posting a grant without it (the
+    # editor's Remove) is not a removal. WHETHER THE ACTOR MAY, once something
+    # is, is `can_manage_group?`, which reads the grants as stored, removed
+    # names included.
     def removal_refusal(stored, desired, removed_member_ids)
       return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
 
@@ -239,18 +253,39 @@ module Groups
     # already let through by `authorize!`) are never refused; a token --
     # even an owner's -- is judged on its effective rights (final fix wave,
     # Minor 1: `AccessControl.can_grant?` takes the token itself).
-    def escalation_refusal(stored, desired, added_member_ids)
+    #
+    # Two questions, read from two lists on purpose:
+    #
+    # 1. Is each new or changed grant one the actor could hand out? `compared`
+    #    (`#live`) against the stored live grants: an untouched grant is not
+    #    re-checked, a changed one is checked raw.
+    # 2. With a member ADDED: is every grant the group will hold one the actor
+    #    could hand out? That member is handed all of them, whether this save
+    #    touched them or not, so the list is what the group will STORE, not
+    #    what changed -- `posted`, the grants exactly as submitted (a carried
+    #    removed content type still on them), or, when the save posts no grants
+    #    at all, the stored grants as `AccessControl.can_assign_group?` judges
+    #    them (`LiveGrants#as_stored`: carried names, and a dead grant that a
+    #    re-registered type would revive). A removed type's name is dormant,
+    #    not gone -- the day a type of that name is registered again it grants,
+    #    to this new member too -- so a manager who could only grant "blog"
+    #    can't add a member to a group storing `{blog, retired}`: the same
+    #    answer `Users::Save` gives for the same membership from the user's
+    #    side. A save that posts grants replaces the group's whole list, so a
+    #    dead grant (never rendered, never posted) is gone after it and is
+    #    rightly not in `posted`.
+    def escalation_refusal(stored, compared, posted, added_member_ids)
       return if actor.nil? || AccessControl.owner?(actor)
 
       unchanged = stored.attributes
-      Array(desired).each do |grant|
+      Array(compared).each do |grant|
         next if unchanged.include?(grant)
         return denied(grant[:permission], @group) unless AccessControl.can_grant?(actor, grant[:permission], grant[:scope])
       end
 
       return if added_member_ids.empty?
 
-      (desired || unchanged).each do |grant|
+      (posted || stored.as_stored).each do |grant|
         next if AccessControl.can_grant?(actor, grant[:permission], grant[:scope])
 
         label = AccessControl::Permissions.fetch(grant[:permission]).label.downcase
