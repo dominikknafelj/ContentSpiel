@@ -45,6 +45,7 @@ class ApiTokensLookupDigestMigrationTest < ActiveSupport::TestCase
     assert_equal "revoked:#{already}", ApiToken.find(already).lookup_digest
     assert_in_delta 3.days.ago.to_f, ApiToken.find(already).revoked_at.to_f, 5, "an already revoked token keeps its time"
     assert_includes out, "2 active API tokens revoked"
+    assert_empty Audit::Event.where(action: "token.revoked")
     assert_not_includes out, "Active one"
     assert_not_includes out, "$2a$"
   end
@@ -67,8 +68,11 @@ class ApiTokensLookupDigestMigrationTest < ActiveSupport::TestCase
 
   test "down restores token_digest and drops lookup_digest" do
     migrate_up
+    issued, = ApiToken.generate!(users(:one), name: "After up")
     ActiveRecord::Migration.suppress_messages { ApiTokensLookupDigest.new.migrate(:down) }
     ApiToken.reset_column_information
+
+    assert_not_nil ApiToken.find(issued.id).revoked_at
 
     assert_includes ApiToken.column_names, "token_digest"
     assert_not_includes ApiToken.column_names, "lookup_digest"

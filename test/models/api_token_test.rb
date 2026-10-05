@@ -21,31 +21,69 @@ class ApiTokenTest < ActiveSupport::TestCase
     assert_equal token, ApiToken.authenticate(raw)
   end
 
-  test "authenticate finds nothing for a blank or missing value" do
+  test "authenticate finds nothing for a blank or missing value, without a query" do
     ApiToken.generate!(@user)
 
-    assert_nil ApiToken.authenticate("")
-    assert_nil ApiToken.authenticate("   ")
-    assert_nil ApiToken.authenticate(nil)
+    assert_equal 0, count_queries {
+      assert_nil ApiToken.authenticate("")
+      assert_nil ApiToken.authenticate("   ")
+      assert_nil ApiToken.authenticate(nil)
+    }
   end
 
-  test "a revoked-by-migration placeholder digest can't be produced by any presented value" do
-    token, = ApiToken.generate!(@user)
-    token.update_columns(lookup_digest: "revoked:#{token.id}", revoked_at: Time.current)
-
-    assert_nil ApiToken.authenticate("revoked:#{token.id}")
+  test "authenticate does not raise on a string with invalid bytes" do
+    assert_nil ApiToken.authenticate("\xFF".dup.force_encoding("UTF-8"))
   end
 
-  test "authenticating costs one query however many active tokens there are" do
+  test "a token differing in its last character is refused" do
+    _, raw = ApiToken.generate!(@user)
+
+    assert_nil ApiToken.authenticate(raw[0..-2] + (raw[-1] == "0" ? "1" : "0"))
+  end
+
+  test "the migration's placeholder can never be a digest: a real digest is 64 hex characters" do
     token, raw = ApiToken.generate!(@user)
-    one = count_queries { assert_equal token, ApiToken.authenticate(raw) }
 
-    users = Array.new(30) { |i| User.create!(email_address: "bulk#{i}@example.com", password: "password12345") }
-    users.each { |user| ApiToken.generate!(user) }
-    many = count_queries { assert_equal token, ApiToken.authenticate(raw) }
+    assert_match(/\A\h{64}\z/, ApiToken.digest(raw))
+    assert_no_match(/\A\h{64}\z/, "revoked:#{token.id}")
+  end
 
-    assert_equal one, many
-    assert_equal 1, many
+  test "two tokens never share a digest, and the database refuses a second row with one" do
+    first, = ApiToken.generate!(@user)
+    second, = ApiToken.generate!(@user)
+    assert_not_equal first.lookup_digest, second.lookup_digest
+
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      ApiToken.new(user: @user, group: first.group, name: "Dup", lookup_digest: first.lookup_digest).save!(validate: false)
+    end
+  end
+
+  test "the lookup digest is masked when a token is inspected" do
+    assert_not_includes ApiToken.new(lookup_digest: "visible-value").inspect, "visible-value"
+  end
+
+  test "authenticating is one indexed equality lookup that loads one row, however many tokens exist" do
+    token, raw = ApiToken.generate!(@user)
+    sql = []
+    loaded = 0
+    queries = ->(*, payload) { sql << payload[:sql] unless %w[SCHEMA TRANSACTION].include?(payload[:name]) }
+    rows = ->(*, payload) { loaded += payload[:record_count] }
+    run = lambda do
+      sql.clear
+      loaded = 0
+      ActiveSupport::Notifications.subscribed(queries, "sql.active_record") do
+        ActiveSupport::Notifications.subscribed(rows, "instantiation.active_record") { assert_equal token, ApiToken.authenticate(raw) }
+      end
+    end
+
+    run.call
+    assert_equal [ 1, 1 ], [ sql.size, loaded ]
+    assert_match(/"lookup_digest" = \$1.*LIMIT/m, sql.first)
+
+    30.times { |i| ApiToken.generate!(User.create!(email_address: "bulk#{i}@example.com", password: "password12345")) }
+    run.call
+    assert_equal [ 1, 1 ], [ sql.size, loaded ]
+    assert_match(/"lookup_digest" = \$1.*LIMIT/m, sql.first)
   end
 
   test "authenticate returns nil for a wrong value" do

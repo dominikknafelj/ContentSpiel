@@ -88,7 +88,7 @@ class ApiToken < ApplicationRecord
   end
 
   def self.digest(raw_token)
-    OpenSSL::Digest::SHA256.hexdigest(raw_token.to_s)
+    OpenSSL::Digest::SHA256.hexdigest(raw_token.to_s.b)
   end
 
   # One indexed lookup on the digest of what was presented, however many
@@ -96,7 +96,10 @@ class ApiToken < ApplicationRecord
   # answer never rests on the database's comparison alone. Blank is nil
   # without a query.
   def self.authenticate(raw_token)
-    return if raw_token.to_s.strip.empty?
+    # Binary, so a string tagged UTF-8 but holding invalid bytes can neither
+    # raise in the blank check nor in the digest.
+    raw_token = raw_token.to_s.b
+    return if raw_token.strip.empty?
 
     wanted = digest(raw_token)
     candidate = active.find_by(lookup_digest: wanted)

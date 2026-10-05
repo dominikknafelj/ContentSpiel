@@ -8,9 +8,12 @@
 # `lookup_digest` is the placeholder "revoked:<id>", which no raw token can
 # hash to (a SHA-256 hex digest is 64 hex characters). Revoking only frees
 # names (the unique-name index covers active tokens), it can't clash. The
-# output says how many active tokens were revoked, by count only. `down`
-# restores the old column with an unusable value for every row: those tokens
-# stay revoked.
+# output says how many active tokens were revoked, by count only; the
+# revocations record no `token.revoked` audit events.
+#
+# Irreversible in effect: `down` restores the old column with an unusable
+# value for every row and revokes every token, so nothing revoked here comes
+# back, and a token issued after `up` is revoked by `down` too.
 class ApiTokensLookupDigest < ActiveRecord::Migration[8.1]
   def up
     add_column :api_tokens, :lookup_digest, :string
@@ -26,7 +29,7 @@ class ApiTokensLookupDigest < ActiveRecord::Migration[8.1]
     add_index :api_tokens, :lookup_digest, unique: true
     remove_column :api_tokens, :token_digest
 
-    say "#{revoked} active API tokens revoked: their digests can't be converted, create new tokens under AI assistant"
+    say "#{revoked} active API #{revoked == 1 ? "token" : "tokens"} revoked: their digests can't be converted, create new tokens under AI assistant"
   end
 
   def down
