@@ -35,7 +35,8 @@ module Users
   #   Review Focus 1), and every *removed* one a group they may manage as it
   #   stands (`AccessControl.can_manage_group?`, final fix wave).
   # - `owner` is owner-only (design spec §3.2); a value equal to the stored
-  #   one isn't a change (the form's hidden "0"). Demoting the last owner is
+  #   one, or an absent, nil or empty one, isn't a change. The only request that
+  #   passes it is `PATCH users/:id/owner` (`Admin::UsersController#owner`). Demoting the last owner is
   #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
   #   apart from any other change's `user.updated`.
   class Save < ApplicationService
@@ -82,8 +83,14 @@ module Users
 
     private
 
+    # Absent, nil and "" are no request about the flag (a blank form value, a
+    # caller that never meant to name it): `Boolean` casts "" to nil, which differs
+    # from either flag and would flip it. Not `blank?`, which is true for the real
+    # value `false`, a demotion.
     def owner_change?
-      @attributes.key?(:owner) && ActiveModel::Type::Boolean.new.cast(@attributes[:owner]) != @user.owner
+      return false if @attributes[:owner].nil? || @attributes[:owner] == ""
+
+      ActiveModel::Type::Boolean.new.cast(@attributes[:owner]) != @user.owner
     end
 
     # The existing groups among the submitted ids (unknown ids are

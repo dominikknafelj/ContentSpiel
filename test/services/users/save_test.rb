@@ -158,6 +158,29 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "0", email_address: "r@example.com" }) }.ok?
   end
 
+  test "an absent, nil or empty-string owner is no request at all; a real false demotes" do
+    other = User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
+
+    [ nil, "" ].each do |value|
+      result = as_owner { Users::Save.call(other, attributes: { owner: value, name: "Second #{value.inspect}" }) }
+
+      assert result.ok?, result.errors.to_sentence
+      assert other.reload.owner?
+    end
+    assert_not Audit::Event.exists?(action: "user.owner_changed")
+
+    assert as_owner { Users::Save.call(other, attributes: { owner: false }) }.ok?
+    assert_not other.reload.owner?
+    assert_equal 1, Audit::Event.where(action: "user.owner_changed", subject: other).count
+  end
+
+  test "a non-owner passing a nil or empty owner is not refused for it" do
+    [ nil, "" ].each do |value|
+      assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: value, name: "N" }) }.ok?
+    end
+    assert_not Audit::Event.exists?(action: "access.denied")
+  end
+
   test "an owner promotes a user, recorded as user.owner_changed" do
     result = as_owner { Users::Save.call(users(:reader), attributes: { owner: "1" }) }
 

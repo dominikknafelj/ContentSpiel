@@ -6,7 +6,7 @@ module Admin
   # access-control design spec §5), destroy (refused for the last owner,
   # `Users::Destroy` -> `User#ensure_not_last_owner`). A permission refusal
   # from `Users::Save` (a forged owner flag, a group the actor can't
-  # assign) is the 403 page. Invites stay on the
+  # assign) is the 403 page; the owner flag is not a field of these actions. Invites stay on the
   # roadmap (spec §6.1) -- there is no separate "invite" action here, only
   # `new`/`create` with a password set up front.
   #
@@ -134,11 +134,12 @@ module Admin
       @user = User.find(params[:id])
     end
 
-    # `group_ids` and `owner` pass straight through: `Users::Save` decides
-    # who may change them (no form has an owner field now -- owner rights are
-    # `PATCH users/:id/owner` -- and a non-owner's forged one is refused there).
+    # `group_ids` passes straight through: `Users::Save` decides who may change
+    # it. There is no `owner` here: the flag changes only through
+    # `PATCH users/:id/owner`, so a forged `user[owner]` is dropped as unpermitted
+    # and the rest of the save is an ordinary one.
     def user_params
-      params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, :owner, group_ids: [])
+      params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, group_ids: [])
     end
 
     # For the forms: every group, and whether the owner toggle is locked

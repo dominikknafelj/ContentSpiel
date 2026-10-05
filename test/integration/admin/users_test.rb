@@ -172,10 +172,13 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_select ".admin-owner-zone", count: 0
     assert_select "input[name='user[owner]']", count: 0
 
-    # A forged owner field in the ordinary form is refused outright (`Users::Save`), not ignored.
-    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address, owner: "1" } }
-    assert_response :forbidden
-    assert_not users(:reader).reload.owner?
+    # A forged owner field on the ordinary form is no part of it: the save is an ordinary one.
+    # The 403 for a non-owner is the owner endpoint's (`users_editor_test.rb`).
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: "renamed@example.com", owner: "1" } }
+    assert_response :redirect
+    assert_equal "renamed@example.com", users(:reader).reload.email_address
+    assert_not users(:reader).owner?
+    assert_not Audit::Event.exists?(action: "access.denied")
   end
 
   test "the owner zone and the delete zone are disabled for the last owner, with the reason; demoting them is refused" do
@@ -186,19 +189,19 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_select ".admin-delete-zone", text: /one@example.com is the only owner, so they can't be deleted\./
     assert_select "dialog#owner-user-#{users(:one).id}", count: 0
     assert_select "#user-form input[name='user[owner]']", count: 0
-
-    patch "/cs-studio/users/#{users(:one).id}", params: { user: { email_address: users(:one).email_address, owner: "0" } }
-    assert_response :unprocessable_entity
-    assert_includes response.body, "can&#39;t demote the last owner"
-    assert users(:one).reload.owner?
   end
 
-  test "an owner promotes another user" do
+  test "a forged user[owner] on the ordinary form from an owner changes nothing about the flag" do
     patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address, owner: "1" } }
 
     assert_response :redirect
-    assert users(:reader).reload.owner?
-    assert Audit::Event.exists?(action: "user.owner_changed", subject_type: "User", subject_id: users(:reader).id)
+    assert_not users(:reader).reload.owner?
+    assert_not Audit::Event.exists?(action: "user.owner_changed")
+
+    patch "/cs-studio/users/#{users(:one).id}", params: { user: { email_address: users(:one).email_address, owner: "0" } }
+
+    assert_response :redirect
+    assert users(:one).reload.owner?
   end
 
   # --- Fix round 1 (I1): only users whose rights are a subset of yours ------
@@ -248,6 +251,19 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
 
     assert_select "input[type=checkbox][name='user[group_ids][]'][value='#{access_control_groups(:admin).id}'][disabled]"
     assert_select "input[type=checkbox][name='user[group_ids][]'][value='#{access_control_groups(:read_only).id}']:not([disabled])"
+  end
+
+  test "an owner change through the owner endpoint leaves an open user form stale" do
+    user = users(:reader)
+    get "/cs-studio/users/#{user.id}/edit"
+    open_form_base = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+
+    patch "/cs-studio/users/#{user.id}/owner", params: { owner: "1" }
+    assert user.reload.owner?
+
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "From the old tab" }, base_updated_at: open_form_base }
+    assert_response :conflict
+    assert_not_equal "From the old tab", user.reload.name
   end
 
   test "a save on a stale base is refused with the banner, the typed values kept and nothing written" do
