@@ -6,7 +6,18 @@
     VIEW ONLY (`view_only`, a group the viewer can't manage as it stands; handoff
     C37): the notice, then the whole form inside `<fieldset disabled
     class="admin-view-only">` -- every control inert, nothing submittable -- and no
-    footer. `Groups::Save` refuses a forged PATCH all the same. %>
+    footer. `Groups::Save` refuses a forged PATCH that takes anything away or
+    hands anything on all the same -- a removed content type's name included,
+    which is one of the things that make a group view-only.
+
+    SAVE WITH NOTHING TOUCHED (`drops_dormant`). A grant that names only removed
+    content types is dead but dormant (`LiveGrants::Dead#dormant`): it is never
+    rendered ticked, so saving the form as it is removes it -- the one case where
+    a form saved as rendered changes something, and the only way to clear such a
+    grant (its row's note says so). For a viewer who may manage the group Save is
+    therefore enabled from the start (`always:`: no change is counted, the footer
+    shows no count, and leaving doesn't ask). %>
+<% drops_dormant = !view_only && stale.present? && stale.dead.any?(&:dormant) %>
 <div class="max-w-[1000px]">
 <%= render Admin::ErrorSummaryComponent.new(errors: group.errors, field_ids: { "name" => "group_name", "description" => "group_description" }) %>
 
@@ -14,7 +25,7 @@
   <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This group has permissions you can't hand out, so you can only view it.</p>
 <% end %>
 
-<%= form_with url: url, method: method, id: "group-form", data: (view_only ? {} : save_bar_form_data(dirty: group.errors.any?, always: group.new_record?)) do %>
+<%= form_with url: url, method: method, id: "group-form", data: (view_only ? {} : save_bar_form_data(dirty: group.errors.any?, always: group.new_record? || drops_dormant)) do %>
   <%= tag.fieldset disabled: view_only || nil, class: [ "min-w-0 border-0 p-0", ("admin-view-only" if view_only) ] do %>
     <div class="mb-4 max-w-md">
       <%= label_tag "group_name", "Name", class: setup_label_class %>

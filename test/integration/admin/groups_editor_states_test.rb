@@ -348,6 +348,101 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     assert_equal [ users(:reader) ], group.users.reload.to_a
   end
 
+  # The group is view-only for this viewer, and the service is the backstop:
+  # giving up a removed content type's name is a removal, so the request Remove
+  # would make -- forged here, the form offers them no Remove -- is refused.
+  test "a forged request dropping a removed type from a group the viewer can only view is a 403 with one access.denied and nothing stored" do
+    group = AccessControl::Group.create!(name: "G")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] } }))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset.admin-view-only[disabled]"
+    before = grants_snapshot(group)
+
+    assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        patch "/cs-studio/groups/#{group.id}", params: { group: { name: "G", member_ids: [ "" ],
+          grants: { "posts.edit" => { enabled: "1", content_types: [ "", "blog" ] } } } }
+      end
+    end
+
+    assert_response :forbidden
+    assert_equal before, grants_snapshot(group)
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset.admin-view-only[disabled]"
+  end
+
+  # The dead-grant variant: `posts.read {retired_type}` is never rendered ticked,
+  # so the form as an owner sees it doesn't post it -- saving it drops the grant.
+  test "the form as rendered, posted by a viewer who can only view a group with a dormant dead grant, is a 403 with one access.denied and nothing stored" do
+    group = dormant_dead_group
+    sign_in_as(users(:one))
+    get "/cs-studio/groups/#{group.id}/edit"
+    params = params_as_rendered
+    assert_nil params["group"]["grants"]["posts.read"]
+
+    sign_in_as(manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] } }))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset.admin-view-only[disabled]"
+    assert_select ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
+    before = grants_snapshot(group)
+
+    assert_no_difference -> { Audit::Event.where(action: "group.updated").count } do
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        patch "/cs-studio/groups/#{group.id}", params: params
+      end
+    end
+
+    assert_response :forbidden
+    assert_equal before, grants_snapshot(group)
+  end
+
+  # The way out of that state: a dormant dead grant has no chip and no tick, so
+  # the note names it and Save is enabled with nothing touched -- saving the form
+  # as rendered is what removes it.
+  test "an owner opens a group with a dormant dead grant: the note says how to clear it, Save is enabled untouched, saving drops the grant, and the manager's form is editable afterwards" do
+    group = dormant_dead_group
+    manager = manager_user(grants: { "groups.manage" => {}, "posts.edit" => { "content_types" => [ "blog" ] } })
+
+    sign_in_as(users(:one))
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "fieldset[disabled]", count: 0
+    assert_select ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it; until then only someone who could grant that type can manage this group."
+    assert_select "[data-permission='posts.read'] input[type=checkbox][name$='[enabled]'][checked]", count: 0
+    # Save is live from the start, without a counted change (so leaving doesn't ask).
+    assert_select "form#group-form[data-admin--save-bar-always-value=true][data-admin--save-bar-dirty-value=false]"
+
+    assert_difference -> { Audit::Event.where(action: "group.updated", subject_id: group.id).count }, 1 do
+      patch "/cs-studio/groups/#{group.id}", params: params_as_rendered
+    end
+    assert_response :see_other
+    assert_equal [ [ "posts.edit", { "content_types" => [ "blog" ] } ] ], group.grants.reload.map { |grant| [ grant.permission, grant.scope ] }
+
+    follow_redirect!
+    assert_select ".admin-stale-grant", count: 0
+    assert_select "form#group-form[data-admin--save-bar-always-value=false]"
+
+    sign_in_as(manager)
+    get "/cs-studio/groups/#{group.id}/edit"
+    assert_select "p.admin-view-only-notice", count: 0
+    assert_select "fieldset[disabled]", count: 0
+    assert_select ".admin-save-bar"
+  end
+
+  test "a group with nothing dormant keeps Save waiting for a change, and a dead grant that can never come back doesn't enable it" do
+    page = as_owner { create_page(title: "Doomed") }
+    group = AccessControl::Group.create!(name: "Plain")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+    AccessControl::Grant.create!(group: group, permission: "pages.edit", scope: { "page_ids" => [ page.id ] })
+    as_owner { delete_for_good(page) }
+    sign_in_as(users(:one))
+
+    get "/cs-studio/groups/#{group.id}/edit"
+
+    assert_select ".admin-stale-grant", text: /matched nothing\. It stays off unless you tick it again\./
+    assert_select "form#group-form[data-admin--save-bar-always-value=false]"
+  end
+
   # Final fix wave (Task 11): the two groups differ ONLY in how many unscoped
   # rows and toggles are ticked (one against seven), every one of them a grant
   # the viewer holds and so has to be checked for a lock. Exactly the same
@@ -569,6 +664,15 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
     AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type], "own" => true })
     AccessControl::Grant.create!(group: group, permission: "posts.read", scope: {})
     AccessControl::Membership.create!(user: users(:reader), group: group)
+    group
+  end
+
+  # posts.edit {blog} (the manager's own right) and the dead `posts.read {retired_type}`:
+  # dormant, so the group is one a {blog} holder can't manage.
+  def dormant_dead_group
+    group = AccessControl::Group.create!(name: "G")
+    AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => [ "retired_type" ] })
     group
   end
 

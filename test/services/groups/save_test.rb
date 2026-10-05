@@ -289,7 +289,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
 
   # --- Stale grants (Review Focus 3) --------------------------------------------
 
-  test "a stale grant never blocks saving, and its stale values are dropped" do
+  test "a stale grant never blocks saving as rendered: a deleted page is dropped, a removed content type stays" do
     page = as_owner { create_page(title: "Gone soon") }
     kept = as_owner { create_page(title: "Kept") }
     group = AccessControl::Group.create!(name: "Stale")
@@ -298,15 +298,18 @@ class Groups::SaveTest < ActiveSupport::TestCase
     grant(group, "pages.read", "page_ids" => [ page.id ])
     as_owner { delete_for_good(page) }
 
-    live = AccessControl::LiveGrants.new(group.grants.reload.to_a)
-    submitted = live.attributes
+    # The editor re-submits what it showed: the live values, and the removed
+    # content type it carries. The manager holds none of these permissions, but
+    # nothing is new and nothing that could come back is taken away: a deleted
+    # page is gone for good, so dropping it (and the grant that had only it) is
+    # no removal.
+    submitted = AccessControl::LiveGrants.new(group.grants.reload.to_a).carried_attributes
+    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
+      result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Stale", grants: submitted }) }
+      assert result.ok?, result.errors.inspect
+    end
 
-    # The editor re-submits what it showed: the live values only. The
-    # manager holds none of these permissions, but nothing is new.
-    result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Stale", grants: submitted }) }
-
-    assert result.ok?, result.errors.inspect
-    assert_equal [ [ "pages.edit", { "page_ids" => [ kept.id ] } ], [ "posts.edit", { "content_types" => [ "blog" ] } ] ],
+    assert_equal [ [ "pages.edit", { "page_ids" => [ kept.id ] } ], [ "posts.edit", { "content_types" => %w[blog retired_type] } ] ],
       group.grants.reload.order(:permission).map { |g| [ g.permission, g.scope ] }
   end
 
@@ -327,18 +330,33 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal [ { "content_types" => %w[blog retired_type], "own" => true } ], group.grants.reload.map(&:scope)
   end
 
-  test "dropping the carried removed type is the explicit change, and narrowing is not charged for it" do
+  # Giving up a removed content type's name is a removal: the name is dormant,
+  # not gone, so only someone who may manage the group as it stands -- who
+  # could grant that name -- may take it away. (The editor shows everyone else
+  # the group view-only; this is the request they could still forge.)
+  test "dropping the carried removed type is refused for a manager who couldn't grant the name: one access.denied, nothing stored" do
     group = AccessControl::Group.create!(name: "Dropping")
     grant(group, "posts.edit", "content_types" => %w[blog retired_type])
     grant(@manager_group, "posts.edit", "content_types" => %w[blog])
 
-    result = as(users(:editor_branch)) do
+    assert_refused_unchanged(group) do
       Groups::Save.call(group, attributes: { name: "Dropping", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog] } } ] })
     end
+    assert_equal "groups.manage", Audit::Event.where(action: "access.denied").order(:id).last.metadata["permission"]
+  end
 
-    assert result.ok?, result.errors.inspect
-    assert_equal [ { "content_types" => %w[blog] } ], group.grants.reload.map(&:scope)
-    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
+  test "dropping the carried removed type is the explicit change for an owner, an unscoped holder and a holder whose grant names the type" do
+    each_actor_who_could_grant("posts.edit", { "content_types" => %w[blog retired_type] }) do |actor, who|
+      group = AccessControl::Group.create!(name: "Dropping #{who}")
+      grant(group, "posts.edit", "content_types" => %w[blog retired_type])
+
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) } do
+        result = as(actor) { Groups::Save.call(group, attributes: { grants: [ { permission: "posts.edit", scope: { content_types: %w[blog] } } ] }) }
+        assert result.ok?, "#{who}: #{result.errors.inspect}"
+      end
+      assert_equal [ { "content_types" => %w[blog] } ], group.grants.reload.map(&:scope), who
+      assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count, who
+    end
   end
 
   test "a carried removed type does not let a non-owner widen a grant they can't hand out" do
@@ -585,7 +603,6 @@ class Groups::SaveTest < ActiveSupport::TestCase
     group = AccessControl::Group.create!(name: "Untouched")
     grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
     grant(group, "posts.publish", "content_types" => %w[blog retired])
-    grant(group, "posts.read", "content_types" => %w[retired]) # dead: never rendered, never submitted
     grant(group, "pages.edit", "page_ids" => [ kept.id ])
     before = raw_grants(group)
     submitted = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes # what the editor renders
@@ -596,8 +613,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
       result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { name: "Untouched", grants: submitted }) }
       assert result.ok?, result.errors.inspect
     end
-    # The dead grant is dropped, as on every save since before Task 10; the rest is as stored.
-    assert_equal before.reject { |_, scope| scope == { "content_types" => %w[retired] } }, raw_grants(group)
+    assert_equal before, raw_grants(group)
   end
 
   # Membership changes are judged on the grants AS STORED, removed content
@@ -655,10 +671,11 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
   end
 
-  # The form never renders a wholly dead grant, so a save of the form drops it:
-  # the member added in that same save is handed what the save stores, and the
-  # dormant name is not in it.
-  test "adding a member in a save that drops a dead grant hands them only what is stored afterwards" do
+  # The form never renders a wholly dead grant, so a save of the form drops it.
+  # When that grant is dead only because its content types are unregistered, it
+  # is dormant, and dropping it is a removal: refused for a manager who couldn't
+  # grant the name, with or without a member added in the same save.
+  test "a save of the form that drops a dormant dead grant is refused for a manager who couldn't grant its name, with or without a new member" do
     group = AccessControl::Group.create!(name: "Dead and live")
     grant(group, "posts.edit", "content_types" => %w[blog])
     grant(group, "posts.read", "content_types" => %w[retired])
@@ -666,12 +683,29 @@ class Groups::SaveTest < ActiveSupport::TestCase
     as_rendered = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes
     assert_equal [ { permission: "posts.edit", scope: { "content_types" => %w[blog] } } ], as_rendered
 
-    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
-      result = as(users(:editor_branch)) { Groups::Save.call(group, attributes: { member_ids: [ users(:reader).id ], grants: as_rendered }) }
-      assert result.ok?, result.errors.inspect
+    [ { grants: as_rendered }, { member_ids: [ users(:reader).id ], grants: as_rendered } ].each do |attributes|
+      assert_refused_unchanged(group) { Groups::Save.call(group, attributes: attributes) }
+      assert_empty group.reload.user_ids
     end
-    assert_equal [ users(:reader).id ], group.reload.user_ids
-    assert_equal [ [ "posts.edit", { "content_types" => %w[blog] } ] ], raw_grants(group)
+    # Without grants posted nothing is dropped: a rename is still theirs.
+    assert as(users(:editor_branch)) { Groups::Save.call(group, attributes: { description: "Renamed" }) }.ok?
+  end
+
+  test "an owner, an unscoped holder and a holder whose grant names the type drop a dormant dead grant by saving the form, and the member added gets only what is stored afterwards" do
+    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    each_actor_who_could_grant("posts.read", { "content_types" => %w[retired] }) do |actor, who|
+      group = AccessControl::Group.create!(name: "Dead and live #{who}")
+      grant(group, "posts.edit", "content_types" => %w[blog])
+      grant(group, "posts.read", "content_types" => %w[retired])
+      as_rendered = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes
+
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) } do
+        result = as(actor) { Groups::Save.call(group, attributes: { member_ids: [ users(:reader).id ], grants: as_rendered }) }
+        assert result.ok?, "#{who}: #{result.errors.inspect}"
+      end
+      assert_equal [ users(:reader).id ], group.reload.user_ids, who
+      assert_equal [ [ "posts.edit", { "content_types" => %w[blog] } ] ], raw_grants(group), who
+    end
   end
 
   test "a manager who could grant the removed name -- unscoped, or their own grant names it -- adds and removes members, grants as rendered: one group.updated, no denial" do
@@ -739,32 +773,47 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_empty group.reload.user_ids
   end
 
-  test "Remove on one of two carried types: that name gone, the other kept, no denial" do
+  test "Remove on one of two carried types is refused for a manager who couldn't grant the name; for those who could: that name gone, the other kept" do
+    posted = { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } }
     group = AccessControl::Group.create!(name: "One of two")
     grant(group, "posts.edit", "content_types" => %w[blog retired vanished], "own" => true)
 
-    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
-      result = as(users(:editor_branch)) do
-        Groups::Save.call(group, attributes: { name: "One of two", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } } ] })
+    assert_refused_unchanged(group) { Groups::Save.call(group, attributes: { name: "One of two", grants: [ posted ] }) }
+
+    each_actor_who_could_grant("posts.edit", { "content_types" => %w[blog retired vanished] }) do |actor, who|
+      group = AccessControl::Group.create!(name: "One of two #{who}")
+      grant(group, "posts.edit", "content_types" => %w[blog retired vanished], "own" => true)
+
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) } do
+        result = as(actor) { Groups::Save.call(group, attributes: { grants: [ posted ] }) }
+        assert result.ok?, "#{who}: #{result.errors.inspect}"
       end
-      assert result.ok?, result.errors.inspect
+      assert_equal [ { "content_types" => %w[blog vanished], "own" => true } ], group.grants.reload.map(&:scope), who
+      assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count, who
     end
-    assert_equal [ { "content_types" => %w[blog vanished], "own" => true } ], group.grants.reload.map(&:scope)
-    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
   end
 
-  test "Remove by a non-owner who holds nothing of the permission: stored without the name, one group.updated, no denial" do
+  test "Remove by a non-owner who holds nothing of the permission is refused: one access.denied, nothing stored" do
     group = AccessControl::Group.create!(name: "Removing")
     grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
 
-    assert_no_difference -> { Audit::Event.where(action: "access.denied").count } do
-      result = as(users(:editor_branch)) do
-        Groups::Save.call(group, attributes: { name: "Removing", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog], own: true } } ] })
-      end
-      assert result.ok?, result.errors.inspect
+    assert_refused_unchanged(group) do
+      Groups::Save.call(group, attributes: { name: "Removing", grants: [ { permission: "posts.edit", scope: { content_types: %w[blog], own: true } } ] })
     end
-    assert_equal [ { "content_types" => %w[blog], "own" => true } ], group.grants.reload.map(&:scope)
-    assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count
+  end
+
+  test "Remove by an owner, an unscoped holder and a holder whose grant names the type: stored without the name, one group.updated, no denial" do
+    each_actor_who_could_grant("posts.edit", { "content_types" => %w[blog retired] }) do |actor, who|
+      group = AccessControl::Group.create!(name: "Removing #{who}")
+      grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
+
+      assert_no_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) } do
+        result = as(actor) { Groups::Save.call(group, attributes: { grants: [ { permission: "posts.edit", scope: { content_types: %w[blog], own: true } } ] }) }
+        assert result.ok?, "#{who}: #{result.errors.inspect}"
+      end
+      assert_equal [ { "content_types" => %w[blog], "own" => true } ], group.grants.reload.map(&:scope), who
+      assert_equal 1, Audit::Event.where(action: "group.updated", subject_id: group.id).count, who
+    end
   end
 
   # Someone who could hand out the removed name anyway (an unscoped holder) may
@@ -785,6 +834,19 @@ class Groups::SaveTest < ActiveSupport::TestCase
   private
 
   def raw_grants(group) = group.grants.reload.map { |g| [ g.permission, g.scope ] }.sort_by(&:to_json)
+
+  # Yields each kind of actor who could grant `permission` with the scope
+  # `naming` (one that names a removed content type): an owner, a manager
+  # holding the permission unscoped, and a manager whose own grant is `naming`.
+  def each_actor_who_could_grant(permission, naming)
+    yield users(:one), "owner"
+    [ {}, naming ].each do |held|
+      @manager_group.grants.where(permission: permission).destroy_all
+      grant(@manager_group, permission, held)
+      AccessControl::ActorGrants.reset!
+      yield users(:editor_branch), "holding #{held.inspect}"
+    end
+  end
 
   # The block's save is denied: the stored grants are exactly as they were,
   # EXACTLY one `access.denied` is recorded (one row, counted once -- a second

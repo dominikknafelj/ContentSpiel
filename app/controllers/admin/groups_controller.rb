@@ -84,11 +84,13 @@ module Admin
     #
     # - `@view_only`: a stored group the viewer can't manage as it stands
     #   (`AccessControl.can_manage_group?`: every grant it stores is one they could hand
-    #   out themselves, a removed content type's name included) is read-only -- the
-    #   whole form disabled, no footer, no delete zone.
-    #   `Groups::Save`/`Groups::Destroy` ask the same question again and are the
-    #   backstop for a forged request; this decides only what is drawn. A new group
-    #   has nothing stored to be unable to manage.
+    #   out themselves, a removed content type's name included -- beside a live type, or
+    #   as all a dead grant has left) is read-only: the whole form disabled, no footer,
+    #   no delete zone. `Groups::Save`/`Groups::Destroy` ask the same question of the
+    #   same grants whenever a request takes something away (a member, a grant, a
+    #   removed name, the group) and are the backstop for a forged one; a request that
+    #   changes only the name or description, grants as stored, is still accepted. This
+    #   decides only what is drawn. A new group has nothing stored to be unable to manage.
     # - `@members`: the member chips, in one query (the posted list after a failed save).
     # - the delete zone's numbers: one count and one preloaded list of the ACTIVE tokens.
     def load_editor

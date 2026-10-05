@@ -22,8 +22,9 @@ module Admin
   # removed content type), or the submitted ones when a save failed. `stale` is
   # the group's `LiveGrants`, for the notes on what a save will still drop
   # (Review Focus 3) -- a deleted branch root, a grant that matches nothing any
-  # more (shown unticked; see `LiveGrants` for why it can't be shown ticked), an
-  # unregistered permission. A removed content type is no longer a note: it is a
+  # more (shown unticked; see `LiveGrants` for why it can't be shown ticked; one
+  # that names only removed content types says that saving removes it and who can
+  # manage the group until then, `#dormant_note`), an unregistered permission. A removed content type is no longer a note: it is a
   # chip with Remove inside the row (`ScopeEditorComponent`).
   #
   # `open_keys`: the rows whose scope editor starts open -- after a failed save,
@@ -111,10 +112,25 @@ module Admin
       entry = @stale.entry_for(permission.key)
       notes = entry ? entry.removed_notes.map { |value| "#{value.upcase_first}: removed when you save." } : []
       @stale.dead_for(permission.key).each do |dead|
-        what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
-        notes << "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
+        notes << (dead.dormant ? dormant_note(dead) : dead_note(dead))
       end
       notes
+    end
+
+    def dead_note(dead)
+      what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
+      "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
+    end
+
+    # A dead grant that a re-registered content type would bring back
+    # (`LiveGrants::Dead#dormant`) is still a right the group stores: it is what
+    # makes the group view-only for a manager who couldn't grant that type, with
+    # no chip to show for it (the row is unticked). So the note says what clears
+    # it. Saving the form does -- the grant is never posted -- which is why the
+    # form of such a group has Save enabled from the start (`admin/groups/_form`).
+    def dormant_note(dead)
+      names = Array(dead.dormant["content_types"]) - AccessControl::Permissions.content_type_choices
+      "Limited to a content type that no longer exists (#{names.join(", ")}). Saving removes it; until then only someone who could grant that type can manage this group."
     end
 
     # Stored grants whose permission key isn't registered any more -- no

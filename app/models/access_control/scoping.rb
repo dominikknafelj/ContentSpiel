@@ -68,7 +68,9 @@ module AccessControl
       # Does the scope name content types of which none is registered? Then
       # neither form of the predicate can match any record, whatever else the
       # scope says -- the one "matches nothing" that can be told without a
-      # record or a query, which is what `AccessControl.holds?` asks.
+      # record or a query, which is what `AccessControl.holds?` asks. True for
+      # a stored empty list as well, which is not dormant but empty for good:
+      # no name on it could ever be registered.
       def dormant? = @grant.scope.key?("content_types") && registered_types(@grant.scope["content_types"]).empty?
 
       # The same predicate, as `base` (a relation on the subject's model,

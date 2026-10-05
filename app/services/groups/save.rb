@@ -18,11 +18,11 @@ module Groups
   #   group they're a member of" in one rule: a change the actor's own
   #   grants already cover can't give them anything they don't have.
   # - **Unchanged** grants are not re-checked. A non-owner may rename a
-  #   group whatever it holds -- and a stale
-  #   grant (a deleted branch root, an unregistered content type, Review
-  #   Focus 3) can never block a save that changes neither grants nor
-  #   members, since "unchanged" is judged against the grants as they stand
-  #   today (`AccessControl::LiveGrants`), stale values already taken out.
+  #   group whatever it holds -- and a value that is gone for good (a
+  #   deleted branch root, Review Focus 3) can never block a save, since
+  #   "unchanged" is judged against the grants as they stand today
+  #   (`AccessControl::LiveGrants`), such values already taken out. A
+  #   removed content type's name is not gone for good, and is carried.
   # - Adding a **member** hands them every grant of the group, so each
   #   added member (the actor included -- "adding yourself to a group is a
   #   widening") needs every grant the group will hold after this save to
@@ -31,14 +31,18 @@ module Groups
   # - **Removing** a member or a grant (or narrowing a grant) needs the
   #   right to manage the group as it stands (`#removal_refusal`, final fix
   #   wave): every grant it holds must be one the actor could hand out,
-  #   again as stored (`AccessControl.can_manage_group?`).
+  #   again as stored (`AccessControl.can_manage_group?`). Giving up a
+  #   removed content type's name is a removal like any other, whether the
+  #   name sits beside a live type or is all a (dead) grant has left.
   #
   # The editor submits the live values, plus -- carried, so an untouched save
   # changes nothing -- a content type that is no longer registered until the
   # editor presses Remove on it. A grant posted exactly as stored but for those
   # carried names is "unchanged" (`#live`); with anything else changed it is
   # judged raw, names included. A deleted page and a dead grant are still
-  # dropped by the next save. Membership is the one thing an unchanged grant
+  # dropped by the next save of the form -- which, for a dead grant whose
+  # content types could be registered again, is a removal and takes someone
+  # who may manage the group. Membership is the one thing an unchanged grant
   # is still judged for: a member added, or taken out, meets the grants as
   # stored, carried names included.
   class Save < ApplicationService
@@ -62,7 +66,7 @@ module Groups
       # What the authorisation comparisons read; `desired` stays what is stored.
       compared = desired && live(desired, stored)
 
-      refusal = removal_refusal(stored, compared, old_member_ids - new_member_ids)
+      refusal = removal_refusal(stored, desired, old_member_ids - new_member_ids)
       return refusal if refusal
 
       @group.assign_attributes(@attributes.slice(:name, :description))
@@ -179,17 +183,17 @@ module Groups
     # it.
     #
     # The consequence, on purpose: from a non-owner who couldn't hand out the
-    # removed name, such a grant is accepted posted back as it is (a rename of
-    # the group) or WITHOUT the name, and in no other shape. Posting the live
-    # scope without the name is the entry itself -- neither a removal nor an
-    # escalation here, though stored and audited as the change it is (those
-    # compare the raw lists): a dormant right can always be given up. The
-    # editor offers that viewer neither: a group that stores a name its viewer
-    # couldn't grant is one they can't manage as it stands (`AccessControl.
-    # can_manage_group?` reads the grants as stored), so the whole form is
-    # view-only for them, and Remove is pressed by an owner or by someone whose
-    # own grant covers the name. This is the side a request meets, forged or
-    # not, however the form is drawn.
+    # removed name, such a grant is accepted in ONE shape only -- posted back
+    # exactly as it is (a rename of the group, a description). This method
+    # reads the live scope posted WITHOUT the name as the entry too, so the
+    # escalation check has nothing to say about it; but giving the name up is
+    # a removal, and `#removal_refusal`, which compares the stored grants with
+    # the posted ones raw, refuses it for anyone who couldn't manage the group
+    # as it stands. The editor agrees: a group that stores a name its viewer
+    # couldn't grant is view-only for them (`AccessControl.can_manage_group?`
+    # reads the grants as stored), and Remove is pressed by an owner or by
+    # someone whose own grant covers the name. This is the side a request
+    # meets, forged or not, however the form is drawn.
     #
     # Members are NOT read through this list. Whether a save may add a member
     # is judged on what the group will store (`#escalation_refusal`), carried
@@ -231,18 +235,26 @@ module Groups
     # its grants, whatever they hold themselves. Judged on the stored
     # group, before anything is assigned.
     #
-    # WHETHER something is being taken away is read from the live grants
-    # (`desired` here is `#live`'s list): stale values and dead grants
-    # (`LiveGrants`) aren't counted as removals -- they match nothing today,
-    # and the editor drops a deleted page and a dead grant on every save; nor
-    # is a removed content type's name, so posting a grant without it (the
-    # editor's Remove) is not a removal. WHETHER THE ACTOR MAY, once something
-    # is, is `can_manage_group?`, which reads the grants as stored, removed
-    # names included.
-    def removal_refusal(stored, desired, removed_member_ids)
+    # Both halves read the grants AS STORED (`LiveGrants#as_stored`), the same
+    # list `can_manage_group?` judges. WHETHER something is being taken away:
+    # a stored grant that is not in `posted` -- the grants exactly as
+    # submitted, not `#live`'s reading of them -- exactly as it stands. So a
+    # removed content type's name counts: posting `{blog}` for a stored
+    # `{blog, retired}` (the editor's Remove) takes the dormant name away, and
+    # posting the form of a group that holds a dead-but-dormant grant
+    # (`{retired}` alone, never rendered, so never posted) takes that grant
+    # away. Both are removals, and only someone who could grant the name may
+    # make them -- which is what makes the editor's view-only state for
+    # everyone else true of a forged request too. What still does not count,
+    # because it can never come back: a deleted page id (in neither list) and
+    # a grant that is dead for good. A form posted as rendered carries every
+    # removed name of a live grant, so it removes nothing unless the group
+    # holds a dormant dead grant; a save that posts no grants removes none.
+    # WHETHER THE ACTOR MAY, once something is: `can_manage_group?`.
+    def removal_refusal(stored, posted, removed_member_ids)
       return if @group.new_record? || actor.nil? || AccessControl.owner?(actor)
 
-      removed_grants = desired ? stored.attributes - desired : []
+      removed_grants = posted ? stored.as_stored - posted : []
       return if removed_member_ids.empty? && removed_grants.empty?
       return if AccessControl.can_manage_group?(actor, @group)
 
