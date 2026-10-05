@@ -227,6 +227,14 @@ module ServiceCalls
         subject: Current.site.reload, tables: [ SiteSetting, Translations::State, PublicPath ] }
     },
 
+    # A homepage with no block is what makes it ask for rights (the edit it
+    # needs for the welcome block); with a block it would ask for none.
+    "StarterContents::EnsureHome" => lambda {
+      root_page.content_blocks.delete_all
+      { call: -> { StarterContents::EnsureHome.call(locale: "en") }, subject: root_page,
+        tables: [ Page, ContentBlock, PublicPath, Media::Usage, Translations::State ] }
+    },
+
     "StarterContents::Add" => lambda {
       { call: -> { StarterContents::Add.call }, subject: nil,
         tables: [ Page, Post, ContentBlock, PublicPath, Media::Usage, Translations::State, Tag, PostTag ] }

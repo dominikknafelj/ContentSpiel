@@ -1,7 +1,7 @@
 require "test_helper"
 
-# "Create starter pages" on the Pages index (design spec §6.1): reuses
-# `StarterContent.create_pages_and_posts!` as-is, offered only while the
+# "Create starter pages" on the Pages index (design spec §6.1): runs
+# `StarterContents::Add`, offered only while the
 # starter sections don't exist yet, and refreshes the whole shell (the
 # tree lives outside the content frame) with a `_top` redirect.
 class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
@@ -64,7 +64,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
   # never a 500 or a half-built section.
   test "a creation failure rolls back and answers with an alert, not a 500" do
     home = root_page
-    with_singleton_override(StarterContent, :create_pages_and_posts!, ->(**) {
+    with_singleton_override(StarterContents::EnsureHome, :call, ->(**) {
       Pages::Save.call(attributes: { parent: home, published: true }, translations: { "en" => { title: "Half built" } })
       raise StarterContent::Error, "StarterContent: Slug has already been taken"
     }) do
@@ -82,7 +82,7 @@ class Admin::StarterContentsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/pages/#{root_page.id}"
     assert_select "button", text: "Create starter pages" # this tab still offers it
 
-    StarterContent.create_pages_and_posts!(locale: "en") # another tab finished first
+    StarterContents::Add.call(locale: "en") # another tab finished first
 
     assert_no_difference [ "Page.count", "Post.count" ] do
       post "/cs-studio/starter_contents"

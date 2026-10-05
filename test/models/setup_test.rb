@@ -49,22 +49,22 @@ class SetupTest < ActiveSupport::TestCase
     assert Setup.required?
   end
 
-  test "complete! creates the homepage and ends setup" do
+  test "complete! ends setup" do
     site_settings(:default).update!(setup_completed_at: nil)
 
     Setup.complete!
 
     assert_not Setup.required?
-    assert Page.exists?(parent_id: nil)
   end
 
   test "complete! is idempotent" do
     site_settings(:default).update!(setup_completed_at: nil)
     Setup.complete!
+    completed_at = site_settings(:default).reload.setup_completed_at
 
-    assert_no_difference "Page.count" do
-      Setup.complete!
-    end
+    Setup.complete!
+
+    assert_equal completed_at, site_settings(:default).reload.setup_completed_at
   end
 
   test "required? stops querying once setup is complete and resets when it is undone" do

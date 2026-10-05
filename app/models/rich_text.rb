@@ -63,4 +63,35 @@ module RichText
   end
 
   self.code_revision = resolve_code_revision
+
+  # Raised by `component_renderer` when nothing has set one.
+  class NoComponentRenderer < StandardError; end
+
+  # How a component becomes HTML. The `youtube` and `image` nodes are drawn by
+  # view components (`RichText::YoutubeComponent`, `RichText::ImageComponent`);
+  # the built-ins name the component and what it is given, and hand it to
+  # this callable -- `->(component) { html_string }` -- which is the one place
+  # that knows a view context is needed. This module is a model: it names no
+  # controller (`test/lib/dependency_direction_test.rb`), and so can still be
+  # used where there is no view, with a renderer of its own.
+  #
+  # The application's renderer (`ApplicationController.render(component,
+  # layout: false)`) is assigned in `config/initializers/rich_text.rb`, inside
+  # `to_prepare` like every registry, so a code reload in development
+  # replaces it instead of keeping a lambda that closes over a stale class.
+  # It must not change the output: the render cache key
+  # (`RichText::Document#to_html`) holds no renderer identity.
+  #
+  # Reading it before anything assigned one raises with the way out, rather
+  # than a `NoMethodError` on nil somewhere inside a node renderer.
+  class << self
+    attr_writer :component_renderer
+
+    def component_renderer
+      @component_renderer || raise(NoComponentRenderer,
+        "RichText.component_renderer is not set: config/initializers/rich_text.rb assigns it in to_prepare. " \
+        "Outside the app, assign a callable that takes a component and returns its HTML: " \
+        "RichText.component_renderer = ->(component) { ... }")
+    end
+  end
 end

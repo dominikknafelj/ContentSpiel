@@ -6,7 +6,7 @@ module Admin
   class JumpController < BaseController
     def show
       @query = params[:q].is_a?(String) ? params[:q] : ""
-      @groups = Jump::Search.new(actor: Current.actor, query: @query, modules: admin_modules, url_options: admin_url_options).groups
+      @groups = Jump::Search.new(actor: Current.actor, query: @query, modules: admin_modules).groups
       render layout: false
     end
   end

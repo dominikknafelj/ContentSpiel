@@ -88,7 +88,7 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
   end
 
   # Final fix wave (C, P23): the wizard takes the same locked, re-checked
-  # path as CS Studio (`StarterContent.add_once!`), and a failure is a form
+  # path as CS Studio (`StarterContents::Add`), and a failure is a form
   # error on the step, never a 500.
   test "adding starter content twice doesn't duplicate anything" do
     patch setup_step_path("starter_content")
@@ -100,7 +100,7 @@ class SetupOptionalStepsTest < ActionDispatch::IntegrationTest
   end
 
   test "a starter content failure is shown on the step instead of a 500" do
-    with_singleton_override(StarterContent, :create_pages_and_posts!, ->(**) { raise StarterContent::Error, "StarterContent: Slug has already been taken" }) do
+    with_singleton_override(StarterContents::EnsureHome, :call, ->(**) { raise StarterContent::Error, "StarterContent: Slug has already been taken" }) do
       patch setup_step_path("starter_content")
     end
 

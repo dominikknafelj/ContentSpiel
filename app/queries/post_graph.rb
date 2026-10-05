@@ -48,7 +48,12 @@ class PostGraph
   # `locale:` is the language titles are read in, through `Locales.read`'s
   # own fallback chain -- a post with no title in the editing language
   # still gets a label rather than a blank node.
-  def initialize(actor:, locale: Locales.default, url_for: ->(post) { Rails.application.routes.url_helpers.admin_post_path(post) })
+  #
+  # `url_for:` builds each node's editor URL and has no default: a query
+  # knows no routes (`test/lib/dependency_direction_test.rb`), so the caller
+  # -- the controller, with the request's own URL options -- says where a
+  # post opens.
+  def initialize(actor:, url_for:, locale: Locales.default)
     @actor = actor
     @locale = locale
     @url_for = url_for

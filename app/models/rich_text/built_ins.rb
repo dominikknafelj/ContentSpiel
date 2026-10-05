@@ -440,7 +440,7 @@ module RichText
       id = node.dig("attrs", "id")
       return "".html_safe unless id.is_a?(String) && id.match?(RichText::YOUTUBE_ID_PATTERN)
 
-      ApplicationController.render(RichText::YoutubeComponent.new(id: id), layout: false)
+      RichText.component_renderer.call(RichText::YoutubeComponent.new(id: id))
     end
 
     # A missing/deleted `Media::Asset` (`asset_id` present but `ctx.media_
@@ -464,7 +464,9 @@ module RichText
       asset = ctx.media_asset(attrs["asset_id"])
       return "".html_safe if asset.nil?
 
-      ApplicationController.render(RichText::ImageComponent.new(asset: asset, alt_override: attrs["alt"], caption_override: attrs["caption"], locale: ctx.locale), layout: false)
+      RichText.component_renderer.call(
+        RichText::ImageComponent.new(asset: asset, alt_override: attrs["alt"], caption_override: attrs["caption"], locale: ctx.locale)
+      )
     end
 
     def self.render_link(mark_data, content)

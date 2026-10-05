@@ -2,9 +2,8 @@ module Admin
   # "Create starter pages" (design spec §6.1, Task 9), the setup wizard's
   # optional starter-content step available again from the Pages module's
   # own index (`/pages`, dashboard spec Task 2 -- not CS Studio's home any
-  # more, which is now the dashboard) -- `StarterContent
-  # .create_pages_and_posts!` reused as-is, in the site's default language,
-  # exactly as the wizard's own step runs it.
+  # more, which is now the dashboard) -- `StarterContents::Add`, in the
+  # site's default language, exactly as the wizard's own step runs it.
   #
   # The Pages index only offers this while the starter sections are missing
   # (`StarterContent.added?`, the same check the wizard uses), but a stale
@@ -18,10 +17,9 @@ module Admin
   # a full-page visit brings it up to date.
   #
   # Two tabs clicking at once (fix round 1, m3) are handled by
-  # `StarterContent.add_once!` -- the same locked, re-checked path the setup
-  # wizard takes (final fix wave, P23) -- through `StarterContents::Add`,
-  # which checks permissions first and turns a failure into an alert
-  # instead of a 500.
+  # `StarterContents::Add` itself -- the same locked, re-checked path the
+  # setup wizard takes (final fix wave, P23) -- which checks permissions
+  # first and turns a failure into an alert instead of a 500.
   class StarterContentsController < BaseController
     def create
       result = StarterContents::Add.call

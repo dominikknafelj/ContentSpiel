@@ -13,6 +13,14 @@ module Jump
   # escapes `%`, `_` and `\`, so "%" searches for a percent sign rather than
   # matching everything. It is cut to MAX_QUERY characters first, so a
   # pasted novel is a short search, not an error.
+  #
+  # A row says where it goes as a ROUTE -- `[route name, arguments, params]`,
+  # `[:admin_page_path, [ page ], {}]` -- and never as a URL: a query knows no
+  # routes and none of the request's URL options (the editing locale), so the
+  # one view (`admin/jump/show`, through `Admin::JumpHelper#jump_row_path`)
+  # resolves it, against a fixed list of route names, with the options of its
+  # own request. The same hand-over `Audit::Sentence::Route` makes. An
+  # argument is a record or an id; a param is a query param or an `anchor`.
   class Search
     LIMIT = 5
     MAX_QUERY = 100
@@ -42,11 +50,10 @@ module Jump
       { title: "Settings › AI translation", path: :admin_settings_path, anchor: "ai", permission: "settings.manage" }
     ].freeze
 
-    def initialize(actor:, query:, modules:, url_options: {})
+    def initialize(actor:, query:, modules:)
       @actor = actor
       @query = query.is_a?(String) ? query.strip.first(MAX_QUERY) : ""
       @modules = modules
-      @url_options = url_options
     end
 
     def groups
@@ -58,12 +65,11 @@ module Jump
 
     private
 
-    attr_reader :actor, :query, :modules, :url_options
+    attr_reader :actor, :query, :modules
 
     def group(label, rows) = rows.empty? ? nil : { label: label, rows: rows.first(LIMIT) }
     def blank? = query.empty?
     def pattern = "%#{ActiveRecord::Base.sanitize_sql_like(query)}%"
-    def routes = Rails.application.routes.url_helpers
     def matches?(text) = text.to_s.downcase.include?(query.downcase)
 
     # `title` is a jsonb of { locale => text }. `jsonb_each_text` unnests it
@@ -79,14 +85,14 @@ module Jump
     def page_rows
       return [] if blank?
       titled(AccessControl.scope(actor, "pages.read", Page.all, channel: :admin)).map do |page|
-        { title: display_title(page), url: routes.admin_page_path(page, **url_options), status: page.status }
+        { title: display_title(page), route: [ :admin_page_path, [ page ], {} ], status: page.status }
       end
     end
 
     def post_rows
       return [] if blank?
       titled(AccessControl.scope(actor, "posts.read", Post.all, channel: :admin)).map do |post|
-        { title: display_title(post), url: routes.admin_post_path(post, **url_options), status: post.status, hint: post.content_type }
+        { title: display_title(post), route: [ :admin_post_path, [ post ], {} ], status: post.status, hint: post.content_type }
       end
     end
 
@@ -95,26 +101,26 @@ module Jump
     def media_rows
       return [] if blank? || !AccessControl.holds?(actor, "media.upload", channel: :admin)
       Media::Search.call(Media::Asset.kept, query).order(id: :desc).limit(LIMIT).map do |asset|
-        { title: asset.title.presence || "(untitled)", url: routes.admin_media_path(selected: asset.id, **url_options) }
+        { title: asset.title.presence || "(untitled)", route: [ :admin_media_path, [], { selected: asset.id } ] }
       end
     end
 
     def module_rows
       modules.select { |entry| blank? || matches?(entry[:label]) }.map do |entry|
-        { title: entry[:label], url: routes.public_send(entry[:path], **url_options) }
+        { title: entry[:label], route: [ entry[:path], [], {} ] }
       end
     end
 
     def settings_rows
       SETTINGS_DESTINATIONS.select { |dest| AccessControl.holds?(actor, dest[:permission], channel: :admin) }
         .select { |dest| blank? || matches?(dest[:title]) }
-        .map { |dest| { title: dest[:title], url: routes.public_send(dest[:path], **url_options, anchor: dest[:anchor]) } }
+        .map { |dest| { title: dest[:title], route: [ dest[:path], [], { anchor: dest[:anchor] } ] } }
     end
 
     def action_rows
       ACTIONS.select { |action| action[:permission].nil? || AccessControl.holds?(actor, action[:permission], channel: :admin) }
         .select { |action| blank? || matches?(action[:title]) }
-        .map { |action| { title: action[:title], url: routes.public_send(action[:path], **url_options), dialog: action[:dialog] }.compact }
+        .map { |action| { title: action[:title], route: [ action[:path], [], {} ], dialog: action[:dialog] }.compact }
     end
 
     def display_title(record) = Locales.read(record, :title, locale: Locales.default).presence || "(untitled)"

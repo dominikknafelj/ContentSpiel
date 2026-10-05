@@ -19,6 +19,17 @@ class Admin::JumpControllerTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label=Modules]", count: 0
   end
 
+  # The view resolves a row's route name against `Admin::JumpHelper::JUMP_ROUTES`
+  # and refuses any other: every route the query can produce must be on it.
+  test "every route a row can carry is on the helper's list" do
+    names = Jump::Search::ACTIONS.map { |action| action[:path] } +
+      Jump::Search::SETTINGS_DESTINATIONS.map { |destination| destination[:path] } +
+      Admin::BaseController::MODULES.map { |entry| entry[:path] } +
+      %i[admin_page_path admin_post_path admin_media_path]
+
+    assert_empty names.uniq - Admin::JumpHelper::JUMP_ROUTES
+  end
+
   test "a percent sign is literal text and finds no post" do
     sign_in_as users(:one)
     get admin_jump_path(q: "%")
