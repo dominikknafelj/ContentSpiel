@@ -1,12 +1,14 @@
 module Admin
   # The strings a script shows, handed over by the server (docs/reference/
   # i18n.md, "A string a script shows"). `data-messages="<%= messages_data(
-  # "admin.components", "save_status.saving", "save_bar.changes") %>"` on the
+  # "components.save_status.saving", "components.save_bar.changes") %>"` on the
   # element a controller lives on (or on <body>, for what every screen's
   # scripts share), and the controller reads it through
-  # `messages(element).t(key, { count, name })` from `i18n/messages.js`.
+  # `messages(element).t(key, { count, name })` from `i18n/messages.js`
+  # (which asks each `data-messages` ancestor in turn, then <body>).
   #
-  # `keys` are dotted paths below `scope`; each is looked up with `I18n.t(...,
+  # `keys` are dotted paths below `admin` -- always `admin`, the one convention
+  # for the server and the script alike; each is looked up with `I18n.t(...,
   # raise: true)` -- whatever the environment's missing-translation setting,
   # an unknown key is an error at render time, never a script that shows
   # "translation missing". A key that holds `one:`/`other:` (or whichever
@@ -33,11 +35,11 @@ module Admin
       layout.leave_dialog.body layout.leave_dialog.body_with_count
     ].freeze
 
-    def admin_script_messages = messages_data("admin", *SCRIPT_MESSAGES)
+    def admin_script_messages = messages_data(*SCRIPT_MESSAGES)
 
-    def messages_data(scope, *keys)
+    def messages_data(*keys)
       keys.flatten.each_with_object({ "@locale" => I18n.locale.to_s }) do |key, messages|
-        messages[key.to_s] = I18n.t("#{scope}.#{key}", raise: true).then { |value| value.is_a?(Hash) ? value.transform_keys(&:to_s) : value }
+        messages[key.to_s] = I18n.t("admin.#{key}", raise: true).then { |value| value.is_a?(Hash) ? value.transform_keys(&:to_s) : value }
       end.to_json
     end
   end

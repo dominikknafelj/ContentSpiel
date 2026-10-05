@@ -134,7 +134,7 @@ export default class extends Controller {
     const region = document.getElementById("toasts")
     if (!toast || !region) return
     toast.id = "toast-tag-delete"
-    toast.querySelector("span").textContent = messages(this.element).t("dialogs.delete_failed")
+    toast.querySelector("span").textContent = messages(this.element).t("tags.dialogs.delete_failed")
     document.getElementById(toast.id)?.remove()
     region.append(toast)
   }

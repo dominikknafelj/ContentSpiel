@@ -19,7 +19,7 @@ module Admin
     include Admin::DialogHelper
 
     include Admin::SiteNameHelper
-    # `messages_data(scope, *keys)`: the strings a component's script shows,
+    # `messages_data(*keys)`: the strings a component's script shows,
     # as the JSON of a `data-messages` attribute (see that helper).
     include Admin::MessagesHelper
 
@@ -40,10 +40,13 @@ module Admin
     # key: the view context's `t`, which marks a `_html` key safe and escapes
     # what is interpolated into it, pluralises on `count`, and raises on a
     # missing key where `config.i18n.raise_on_missing_translations` is on.
-    # (A sidecar `.yml` would take over a key under its own scope; none exists,
+    # The scope is the INSTANCE's class: a `t(".x")` written in a base class
+    # reads the subclass's scope, with no fallback to the ancestor's. A String
+    # or Symbol key starting with a dot is rescoped; an Array of keys, or any
+    # other key, is not. (A sidecar `.yml` would take over a key under its own scope; none exists,
     # and none should: one central file per scheme.)
     def translate(key = nil, **options)
-      return super unless key.is_a?(String) && key.start_with?(".")
+      return super unless (key.is_a?(String) || key.is_a?(Symbol)) && key.to_s.start_with?(".")
 
       super("admin.components.#{self.class.translation_scope}#{key}", **options)
     end

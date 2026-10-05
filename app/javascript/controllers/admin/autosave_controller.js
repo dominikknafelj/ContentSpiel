@@ -110,7 +110,7 @@ export default class extends Controller {
   // straight to the site: the status element says so with `data-live`
   // (`Admin::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
   // button (`setStatus` builds it), which is why its text stops at "· ".
-  text(key) { return messages(this.element).t(`components.save_status.${key}`) }
+  text(key) { return messages(this.element).t(key) }
 
   // Backoff after a failed attempt (spec §6.1/global constraints): 1s, 3s,
   // then 9s, then give up and show the offline state until the next edit.
@@ -242,7 +242,7 @@ export default class extends Controller {
   // everything that needs the controller's own state is done here, after.
   async attempt() {
     const status = document.getElementById(this.statusIdValue)
-    this.setStatus(status && status.hasAttribute("data-live") ? this.text("saving_live") : this.text("saving"))
+    this.setStatus(status && status.hasAttribute("data-live") ? this.text("components.save_status.saving_live") : this.text("components.save_status.saving"))
 
     const outcome = await enqueue((isCurrent) => this.send(isCurrent), { generation: this.generation })
 
@@ -271,7 +271,7 @@ export default class extends Controller {
         this.pending = false
         this.retryCount = 0
         this.busy = false
-        this.setStatus(this.text("signed_out"))
+        this.setStatus(this.text("components.save_status.signed_out"))
         return
       case "conflict":
         // 409: the server refused this save because the record changed since
@@ -454,7 +454,7 @@ export default class extends Controller {
     const delays = this.constructor.retryDelays
 
     if (this.retryCount >= delays.length) {
-      this.setStatus(this.text("offline"), { retry: true })
+      this.setStatus(this.text("components.save_status.offline"), { retry: true })
       this.failed = true
       // Given up: an edit typed during the backoff waits for Retry or the
       // next edit like everything else in the form, it is not "about to be
@@ -465,7 +465,7 @@ export default class extends Controller {
       return
     }
 
-    this.setStatus(this.text("retrying"))
+    this.setStatus(this.text("components.save_status.retrying"))
     const delay = delays[this.retryCount]
     this.retryCount += 1
     // `busy` stays true across the wait: an edit that lands mid-backoff
@@ -520,7 +520,7 @@ export default class extends Controller {
     const button = document.createElement("button")
     button.type = "button"
     button.className = "cursor-pointer underline hover:text-ink"
-    button.textContent = this.text("retry")
+    button.textContent = this.text("components.save_status.retry")
     button.addEventListener("click", () => this.saveNow())
     status.append(button)
   }

@@ -17,12 +17,6 @@ module Admin
       outdated: { classes: "border-warn text-warn-ink", glyph: "↻" }
     }.freeze
 
-    # The state as one lower-case word ("not translated"), for a caller that
-    # builds its own label around it (`TranslationScreen::MatrixComponent`).
-    # The chip's own labels are whole sentences with the language in them
-    # (`aria_label`), never this word glued on.
-    def self.state_word(state) = I18n.t("admin.components.translation_chip.state.#{state}", raise: true)
-
     def initialize(state:, locale:)
       @state = state.to_sym
       raise ArgumentError, "unknown translation state #{state.inspect}" unless STYLES.key?(@state)

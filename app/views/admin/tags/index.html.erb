@@ -98,7 +98,7 @@
       `admin--dialog:opening`, before it is shown. The URL templates carry a
       placeholder id the controller replaces. %>
   <div data-controller="admin--tag-dialogs"
-       data-messages="<%= messages_data("admin.tags", "dialogs.delete_failed") %>"
+       data-messages="<%= messages_data("tags.dialogs.delete_failed") %>"
        data-admin--tag-dialogs-merge-url-value="<%= merge_admin_tag_path("__ID__", **admin_url_options) %>"
        data-admin--tag-dialogs-delete-url-value="<%= admin_tag_path("__ID__", **admin_url_options) %>"
        data-action="admin--dialog:opening@document->admin--tag-dialogs#opened change->admin--tag-dialogs#targetChanged turbo:submit-end->admin--tag-dialogs#submitted">

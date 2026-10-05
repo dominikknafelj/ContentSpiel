@@ -5,37 +5,69 @@ require "ripper"
 # a user reads comes from a locale file through `t(".key")` (or, for a script,
 # `messages(element).t(key)`), so a translator finds it in one place and the
 # German UI is a matter of adding a file. `CONVERTED` lists the files that
-# have been converted; the guard holds each of them to the rule, and the list
+# have been converted; the guard holds each of them to the rules, and the list
 # grows with every screen the German UI sub-project converts. A listed path that
 # does not exist fails, so a rename can't drop a file out of the guard.
 #
 # THE RULES. "Copy" is anything a person reads: a text node, an attribute that
-# carries words, a string a component puts into its markup.
+# carries words, a string a component puts into its markup or a script into the
+# page.
 #
 # - ERB markup: no text node with a letter in it once the ERB tags are taken
-#   out (entities and glyphs such as "·", "→", "×", "⠿" are not letters), and
-#   no `aria-label`, `title`, `placeholder` or `alt` attribute -- nor the
-#   `value` of a button -- with a literal letter in it. `aria-label="<%= label
-#   %> suggestions"` has a literal word in it, so it fails.
-# - Ruby, in a component, a helper-ish file or the Ruby inside an ERB tag: no
-#   string literal that is copy. A literal is copy when its text (interpolations
-#   don't count) holds a capitalised word ("Cancel", "Couldn't save"), a word in
-#   capitals of three letters or more ("SAVING"), or two words ending in a
-#   sentence mark ("try again."). That one rule is also what keeps CSS out
-#   without a list of exceptions: a Tailwind class, a CSS constant, a `data`
-#   key, an id, a symbol and a `strftime` pattern are all lower-case tokens
-#   ("flex items-center gap-1.5", "admin--save-bar-target", "%-d %b"), and a
-#   class name written as `Admin::Foo` has a `::`. What it deliberately lets
-#   through: a lower-case sentence ("just now"), which a test or a review
-#   catches. Excluded: comments (the lexer never reports them), a line that
-#   starts `raise` (a message for a developer), and a line that ends in
-#   `# i18n-ok: <reason>`.
-# - JavaScript: no string literal that reads as a sentence, a capitalised word
-#   (with its apostrophe) and then a lower-case one ("Couldn't save the new order"), and none that ends in an ellipsis after a
-#   word. Comments and regular expressions are skipped by a small scanner.
+#   out (entities and glyphs such as "·", "→", "×", "⠿" are not letters). No
+#   literal letter in an attribute that carries words (`aria-label`, `title`,
+#   `placeholder`, `alt`, the `aria-*` ones that describe, and the `value` of a
+#   button); and every OTHER attribute value must not read as copy (`copy?`
+#   below), `data-*` included -- except a structural allow-list (`class`, `id`,
+#   `href`, `src`, `name`, `type`, `role`, `for`, `rel`, `method`, `action`,
+#   `style`, `data-controller`, `data-action`, `data-*-target`), whose values
+#   are identifiers by definition. `aria-label="<%= label %> suggestions"` has a
+#   literal word in it, so it fails.
+# - Ruby, in a component, a helper or the Ruby inside an ERB tag:
+#   (a) no string literal that is copy: its text (interpolations don't count)
+#   holds a capitalised word ("Cancel", "Couldn't save"), two or more capitals
+#   in a phrase ("NOT SAVED"), in a word with an ellipsis ("SAVING…") or
+#   alone as two letters ("OF"; a longer one alone is a keyword: "PATCH"), two or
+#   more words one of which is a stop word ("not translated", "things need
+#   fixing", "m ago"), or two words ending in a sentence mark. A Tailwind class,
+#   a `data` key, an id, a symbol and a `strftime` pattern are lower-case tokens
+#   with hyphens, dots or percent signs ("flex items-center gap-1.5",
+#   "admin--save-bar-target", "%-d %b"), which none of that matches. Exempt by
+#   rule, not by marker: `Admin::Foo` (a `::`), the name of a class that
+#   exists ("Page"), an HTTP header ("Content-Type"), a single word in capitals
+#   with no ellipsis ("PATCH", "UTC"), and a literal with SQL in it ("LOWER(",
+#   "ORDER BY", "LIKE", ") AS name").
+#   (b) no call to a method that makes English: `humanize titleize pluralize
+#   to_sentence time_ago_in_words distance_of_time_in_words number_to_human*
+#   strftime to_fs to_formatted_s` (use `I18n.l`, `t` with `count`).
+#   Excluded: comments (the lexer never reports them) and a line that starts
+#   `raise` (a message for a developer).
+# - JavaScript: (a) no string literal that reads as a sentence: a capitalised
+#   word (with its apostrophe) then a lower-case word, `${` or an opening quote
+#   ("Couldn't save", "Create ${x} “..."), an all-capitals phrase ("NOT
+#   SAVED"), or a word ending in an ellipsis. (b) On a line that writes into
+#   the page -- `textContent`, `innerText`, `.placeholder`, `.title =`,
+#   `announce(`, `confirm(`, `alert(`, `setAttribute("aria-label" | "title" |
+#   "placeholder", ...)` -- any string literal with a letter is an offence, a
+#   single word included, other than a message key (`components.x.y`), the
+#   attribute's own name, and a selector or name passed to `querySelector`,
+#   `getElementById`, `closest`, `dataset`-style calls. Comments and regular
+#   expressions are skipped by a small scanner; text inside `${...}` doesn't
+#   count.
 #
-# The rules are pinned against small samples at the foot of this file, as the
-# other guards here are.
+# THE ESCAPE HATCH, for the rare literal that is not copy but reads like it: a
+# comment on the same line, `# i18n-ok: <reason>` in Ruby, `// i18n-ok: <reason>`
+# in JavaScript, `<%# i18n-ok: <reason> %>` in ERB, with a reason of at least ten
+# characters. A bare marker does not count.
+#
+# BLIND SPOTS, on purpose, so a reviewer knows where this stops: a lower-case
+# single word or a lower-case phrase with no stop word in Ruby ("yesterday");
+# copy built from several literals; English that reaches the page through a
+# variable or a helper this list doesn't name; a JavaScript sink split over
+# several lines; a script that builds markup with `innerHTML`; copy in a
+# Ruby file that is not in `CONVERTED`.
+#
+# The rules are pinned against small samples at the foot of this file.
 class AdminI18nTest < ActiveSupport::TestCase
   CONVERTED = %w[
     app/views/layouts/admin.html.erb
@@ -90,21 +122,40 @@ class AdminI18nTest < ActiveSupport::TestCase
   ].freeze
 
   PLACEHOLDER = "".freeze
-  COPY_ATTRIBUTES = %w[aria-label title placeholder alt].freeze
+  # Attributes whose value is words, whatever they say.
+  COPY_ATTRIBUTES = %w[aria-label title placeholder alt aria-description aria-roledescription aria-placeholder aria-valuetext].freeze
+  # Attributes whose value is an identifier, a URL or a keyword by definition.
+  STRUCTURAL_ATTRIBUTES = %w[class id href src name type role for rel method action style data-controller data-action].freeze
 
   # A tag the HTML parser should not look inside for words.
   NOT_MARKUP = %w[script style].freeze
 
+  # Methods that make English out of a value.
+  ENGLISH_CALLS = /\A(?:humanize|titleize|pluralize|to_sentence|time_ago_in_words|distance_of_time_in_words|number_to_human\w*|strftime|to_fs|to_formatted_s)\z/
+
+  # Words that make a lower-case phrase read as English.
+  STOP_WORDS = %w[now ago not the is are to of your this that need needs changed since you and or in on for with from has have
+    was were be can no yet just all any more less new].freeze
+
+  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ORDER BY|JOIN|ASC|DESC)\b|\) AS [a-z_]+/
+  MARKER = /i18n-ok:\s*\S.{9,}/
+
   # --- ERB ------------------------------------------------------------------
 
-  # Splits a template into its Ruby (each `<% %>` tag's code, comments left
-  # out) and its markup (the tags replaced by a placeholder, so `<div class="a
-  # <%= b %>">` stays one tag). Returns [markup, [ruby, ...]].
+  # Splits a template into its Ruby and its markup. Returns [markup, code]
+  # where `code` is [[line, ruby], ...] for each `<% %>` tag (comments left
+  # out), and the markup has every tag replaced by a placeholder, so `<div
+  # class="a <%= b %>">` stays one tag. `ok_lines` are the lines that carry an
+  # `<%# i18n-ok: reason %>`.
   def split_erb(source)
-    source = source.gsub(/<%#.*?%>/m, "")
-    code = source.scan(/<%[-=]?(.*?)-?%>/m).flatten
-    [ source.gsub(/<%.*?%>/m, PLACEHOLDER).gsub(/<!--.*?-->/m, ""), code ]
+    code = []
+    source.scan(/<%(?!#)[-=]?(.*?)-?%>/m) { code << [ source[0...$~.begin(0)].count("\n") + 1, $1 ] }
+    ok_lines = source.lines.each_with_index.filter_map { |line, index| index + 1 if line.match?(/<%#\s*#{MARKER}.*?%>/) }
+    markup = source.gsub(/<%#.*?%>/m, "").gsub(/<%.*?%>/m, PLACEHOLDER).gsub(/<!--.*?-->/m, "")
+    [ markup, code, ok_lines ]
   end
+
+  def letters?(value) = value.delete(PLACEHOLDER).match?(/\p{L}/)
 
   def markup_offences(markup)
     fragment = Nokogiri::HTML5.fragment(markup)
@@ -115,14 +166,15 @@ class AdminI18nTest < ActiveSupport::TestCase
       "text: #{text.strip.inspect}" if text.match?(/\p{L}/)
     end
     fragment.xpath(".//*").each do |element|
-      COPY_ATTRIBUTES.each do |name|
-        value = element[name]
-        found << "#{name}=#{value.inspect}" if value && value.delete(PLACEHOLDER).match?(/\p{L}/)
-      end
-      next unless element.name == "button" || (element.name == "input" && %w[button submit].include?(element["type"]))
+      button = element.name == "button" || (element.name == "input" && %w[button submit].include?(element["type"]))
+      element.attribute_nodes.each do |attribute|
+        name = attribute.name
+        value = attribute.value.to_s
+        next if STRUCTURAL_ATTRIBUTES.include?(name) || name.match?(/\Adata-.*-target\z/)
 
-      value = element["value"]
-      found << "value=#{value.inspect}" if value && value.delete(PLACEHOLDER).match?(/\p{L}/)
+        words = COPY_ATTRIBUTES.include?(name) || (button && name == "value")
+        found << "#{name}=#{value.inspect}" if words ? letters?(value) : copy?(value.delete(PLACEHOLDER))
+      end
     end
     found
   end
@@ -131,28 +183,53 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   # Whether the text of one string literal is copy (see the rules at the top).
   def copy?(text)
-    return false if text.include?("::")
+    return false if text.include?("::") || text.match?(SQL)
+    return false if text.match?(/\A[A-Z][a-z]+(?:-[A-Z][a-z]+)+\z/) # an HTTP header
+    return false if text.match?(/\A[A-Z]\w*\z/) && text.safe_constantize # a class name
 
-    text.match?(/\b[A-Z][a-z]+\b/) || text.match?(/\b[A-Z]{3,}\b/) || text.match?(/\p{L}\s+\p{L}.*[.!?…]\z/)
+    words = text.split(/\s+/).reject(&:empty?)
+    prose = words.size >= 2 && words.all? { |word| word.match?(/\A[[:alpha:]'’]+[.,!?…:;]?\z/) }
+    text.match?(/\b[A-Z][a-z]+\b/) ||
+      (text.match?(/\b[A-Z]{2,}\b/) && (words.size >= 2 || text.match?(/…\z/))) ||
+      text.match?(/\A\s*[A-Z]{2}\s*\z/) ||
+      (prose && words.any? { |word| STOP_WORDS.include?(word.downcase.delete(".,!?…:;")) }) ||
+      text.match?(/\p{L}\s+\p{L}.*[.!?…]\z/)
   end
 
-  def ruby_offences(source)
+  # The offences in Ruby source. `first_line` is the line the source starts on
+  # in its file (for the Ruby of an ERB tag), `ok_lines` the lines of that file
+  # which carry an ERB marker.
+  def ruby_offences(source, first_line: 1, ok_lines: [])
     lines = source.lines
     Ripper.lex(source).filter_map do |(line, _column), type, text|
-      next unless type == :on_tstring_content && copy?(text)
+      reported = nil
+      if type == :on_tstring_content && copy?(text)
+        reported = text.strip.inspect
+      elsif type == :on_ident && text.match?(ENGLISH_CALLS)
+        reported = "call to #{text}"
+      end
+      next unless reported
 
       code = lines[line - 1].to_s
-      next if code.strip.start_with?("raise ") || code.match?(/#\s*i18n-ok:\s*\S/)
+      next if code.strip.start_with?("raise ") || code.match?(/#\s*#{MARKER}/) || ok_lines.include?(first_line + line - 1)
 
-      "#{line}: #{text.strip.inspect}"
+      "#{first_line + line - 1}: #{reported}"
     end
   end
 
   # --- JavaScript -----------------------------------------------------------
 
-  # The string literals of a script, each with its line, skipping comments and
-  # regular expression literals. A template literal is one literal (its
-  # `${...}` parts are inside it); good enough for a rule about words.
+  # What a script writes into the page on the line of a sink.
+  SINK = /textContent|innerText|\.placeholder\b|\.title\s*=[^=]|\bannounce\(|\bconfirm\(|\balert\(|setAttribute\(\s*["'](?:aria-label|title|placeholder)["']/
+  # A literal that names something rather than says it: the argument of a
+  # lookup, an attribute's own name.
+  NAMING_CALL = /(?:querySelector\w*|getElementById|closest|matches|getAttribute|hasAttribute|removeAttribute|toggleAttribute|createElement|addEventListener|CustomEvent|classList\.\w+|setAttribute)\(\s*\z/
+  MESSAGE_KEY = /\A[a-z_]+(?:\.(?:[a-z_]+|\$\{[^}]*\}))+\z/
+
+  # The string literals of a script, each as [line, text, before] with the 40
+  # characters of source before it, skipping comments and regular expression
+  # literals. A template literal is one literal (its `${...}` parts are inside
+  # it); good enough for a rule about words.
   def js_literals(source)
     literals = []
     i = 0
@@ -172,7 +249,7 @@ class AdminI18nTest < ActiveSupport::TestCase
         i += 1
         i += (source[i] == "\\" ? 2 : 1) until i >= source.length || source[i] == char
         text = source[(start + 1)...i]
-        literals << [ line, text ]
+        literals << [ line, text, source[[ start - 40, 0 ].max...start] ]
         line += text.count("\n")
         i += 1
         last = char
@@ -197,11 +274,20 @@ class AdminI18nTest < ActiveSupport::TestCase
   end
 
   def js_sentence?(text)
-    text.match?(/[A-Z][a-z]+['’]?[a-z]* [a-z]/) || text.match?(/\p{L}\s*…\z/)
+    text = text.gsub(/\$\{[^}]*\}/, "$")
+    text.match?(/[A-Z][a-z]+['’]?[a-z]* (?:[a-z]|\$|["'“‘])/) || text.match?(/\b[A-Z]{2,}(?: [A-Z]{2,})+\b/) || text.match?(/\p{L}\s*…\z/)
   end
 
   def js_offences(source)
-    js_literals(source).filter_map { |line, text| "#{line}: #{text.strip.inspect}" if js_sentence?(text) }
+    lines = source.lines
+    js_literals(source).filter_map do |line, text, before|
+      next if lines[line - 1].to_s.match?(/\/\/\s*#{MARKER}/)
+
+      stripped = text.gsub(/\$\{[^}]*\}/, "$")
+      sink = lines[line - 1].to_s.match?(SINK) && stripped.match?(/\p{L}/) &&
+        !before.match?(NAMING_CALL) && !text.match?(MESSAGE_KEY) && !%w[aria-label title placeholder].include?(text)
+      "#{line}: #{text.strip.inspect}" if sink || js_sentence?(text)
+    end
   end
 
   # --- The checks -----------------------------------------------------------
@@ -210,8 +296,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     source = File.read(Rails.root.join(path))
     case File.extname(path)
     when ".erb"
-      markup, code = split_erb(source)
-      markup_offences(markup) + code.flat_map { |ruby| ruby_offences(ruby) }
+      markup, code, ok_lines = split_erb(source)
+      markup_offences(markup) + code.flat_map { |line, ruby| ruby_offences(ruby, first_line: line, ok_lines: ok_lines) }
     when ".rb" then ruby_offences(source)
     when ".js" then js_offences(source)
     else flunk "#{path}: no rule for this kind of file"
@@ -230,9 +316,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_empty found, "Move these into config/locales/admin/ and read them with t(\".key\") (docs/reference/i18n.md):\n#{found.join("\n")}"
   end
 
-  test "every shared component an admin screen uses without owning its copy is listed or named here" do
-    # The ones that take their words from the caller are in CONVERTED and
-    # pass the rule; this pins that none of the sixteen was forgotten.
+  test "every shared component is listed" do
     sixteen = %w[button dialog confirm_dialog toast toast_region save_bar status_chip translation_chip language_tabs
       pagination time_ago empty_state error_summary chip_input menu save_status]
     sixteen.each do |name|
@@ -242,50 +326,89 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   # --- The rules, pinned ------------------------------------------------------
 
-  test "markup: a literal word in a text node or a copy attribute is an offence, a lookup is not" do
-    clean = ->(erb) { markup_offences(split_erb(erb).first) }
-
-    assert_empty clean.(%(<p class="a"><%= t(".x") %></p>))
-    assert_empty clean.(%(<span aria-hidden="true">×</span> · → ⠿ &nbsp; &amp;))
-    assert_empty clean.(%(<button aria-label="<%= t(".close") %>" title="<%= x %>">×</button>))
-    assert_empty clean.(%(<p data-action="click->a#b"><%# a comment with Words %></p>))
-    assert_empty clean.(%(<script>var s = "Some words"</script>))
-    assert_equal [ %(text: "Cancel") ], clean.(%(<button>Cancel</button>))
-    assert_equal [ %(text: "OF") ], clean.(%(<p><%= a %> OF <%= b %></p>))
-    assert_equal [ %(aria-label="Close") ], clean.(%(<button aria-label="Close"></button>))
-    assert_equal [ %(aria-label="<%= label %> suggestions") ].map { |s| s.gsub("<%= label %>", PLACEHOLDER) }, clean.(%(<ul aria-label="<%= label %> suggestions"></ul>))
-    assert_equal [ %(placeholder="Search") ], clean.(%(<input placeholder="Search">))
-    assert_equal [ %(value="Save") ], clean.(%(<input type="submit" value="Save">))
-    assert_equal [ %(alt="Logo") ], clean.(%(<img alt="Logo">))
-    assert_empty clean.(%(<input type="hidden" name="a" value="draft">))
+  def erb(source)
+    markup, code, ok_lines = split_erb(source)
+    markup_offences(markup) + code.flat_map { |line, ruby| ruby_offences(ruby, first_line: line, ok_lines: ok_lines) }
   end
 
-  test "Ruby: copy is a capitalised word, a word in capitals or a sentence, never a CSS token or a key" do
-    [ "Cancel", "Couldn't save", "Save or cancel your changes first.", "SAVING…", "NOT SAVED · ", "Remove #", "try again." ].each do |text|
+  test "markup: a literal word in a text node or a copy attribute is an offence, a lookup is not" do
+    assert_empty erb(%(<p class="a"><%= t(".x") %></p>))
+    assert_empty erb(%(<span aria-hidden="true">×</span> · → ⠿ &nbsp; &amp;))
+    assert_empty erb(%(<button aria-label="<%= t(".close") %>" title="<%= x %>">×</button>))
+    assert_empty erb(%(<p data-action="click->a#b"><%# a comment with Words %></p>))
+    assert_empty erb(%(<script>var s = "Some words"</script>))
+    assert_empty erb(%(<input type="hidden" name="a" value="draft" autocomplete="off" aria-live="polite" data-turbo-frame="_top">))
+    assert_empty erb(%(<div data-admin--x-target="Some Name" data-controller="admin--a" id="Some Id" class="Big Words">))
+    assert_equal [ %(text: "Cancel") ], erb(%(<button>Cancel</button>))
+    assert_equal [ %(text: "OF") ], erb(%(<p><%= a %> OF <%= b %></p>))
+    assert_equal [ %(aria-label="Close") ], erb(%(<button aria-label="Close"></button>))
+    assert_equal [ %(aria-label="#{PLACEHOLDER} suggestions") ], erb(%(<ul aria-label="<%= label %> suggestions"></ul>)).map { |o| o.sub("<%= label %>", PLACEHOLDER) }
+    assert_equal [ %(placeholder="Search") ], erb(%(<input placeholder="Search">))
+    assert_equal [ %(value="Save") ], erb(%(<input type="submit" value="Save">))
+    assert_equal [ %(alt="Logo") ], erb(%(<img alt="Logo">))
+    assert_equal [ %(data-message="Couldn’t save.") ], erb(%(<p data-message="Couldn’t save."></p>))
+    assert_equal [ %(aria-description="hint") ], erb(%(<p aria-description="hint"></p>))
+    assert_equal [ %(data-note="not translated") ], erb(%(<p data-note="not translated"></p>))
+  end
+
+  test "ERB: the Ruby inside a tag is held to the Ruby rules, and a marker on the line excuses it" do
+    assert_equal [ "1: \"Missing required fields\"" ], erb(%(<%= tag.span title: "Missing required fields" %>))
+    assert_equal [ "2: call to humanize" ], erb(%(<p>\n<%= status.humanize %></p>))
+    assert_empty erb(%(<%= status.humanize %><%# i18n-ok: a field name, translated with the attribute names later %>))
+    assert_equal [ "1: call to humanize" ], erb(%(<%= status.humanize %><%# i18n-ok: short %>))
+  end
+
+  test "Ruby: copy is a capitalised word, capitals, a stop-word phrase or a sentence, never a CSS token or a key" do
+    [ "Cancel", "Couldn't save", "Save or cancel your changes first.", "SAVING…", "NOT SAVED · ", "Remove #", "try again.", "OF", "m ago",
+      " things need fixing", "not translated", "just now", "changed since translation", "UP TO DATE" ].each do |text|
       assert copy?(text), "#{text.inspect} should count as copy"
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
-      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-" ].each do |text|
+      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC", "Page",
+      "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
   end
 
-  test "Ruby: the lexer skips comments, `raise` lines and an i18n-ok line" do
+  test "Ruby: English-making calls, the lexer's skips and the marker" do
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(label = "Cancel"\n))
+    assert_equal [ "1: call to humanize" ], ruby_offences(%(label = status.humanize\n))
+    assert_equal [ "1: call to strftime" ], ruby_offences(%(at.strftime("%H:%M")\n))
+    assert_equal [ "1: call to pluralize" ], ruby_offences(%(pluralize(n, "post")\n))
     assert_empty ruby_offences(%(# label = "Cancel"\n))
     assert_empty ruby_offences(%(raise ArgumentError, "Unknown thing"\n))
-    assert_empty ruby_offences(%(x = "Cancel" # i18n-ok: a product name\n))
+    assert_empty ruby_offences(%(x = "Cancel" # i18n-ok: a product name, never translated\n))
+    assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok: no\n)), "a reason under ten characters does not count"
+    assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok\n))
     assert_equal [ %(2: "Retry") ], ruby_offences(%(a = "ok"\nb = { class: "x", title: "Retry" }\n))
     assert_empty ruby_offences(%(t(".cancel", label: label)\ntag.span class: "a b", data: { "admin--x-target": "y" }\n))
+    assert_empty ruby_offences(%(Tag.where("LOWER(tags.name) LIKE ?", x).where(owner_type: "Page")\n))
+    assert_empty ruby_offences(%(headers["Content-Type"] = "x"; method = "PATCH"; zone = "UTC"\n))
   end
 
-  test "JavaScript: a sentence in a literal is an offence, a comment, a regexp or a key is not" do
+  test "JavaScript: a sentence or a word written into the page is an offence; a comment, a regexp, a key or a selector is not" do
     assert_equal [ %(1: "Couldn't save the new order") ], js_offences(%(const a = "Couldn't save the new order"\n))
     assert_equal [ %(1: "Search…") ], js_offences(%(x = 'Search…'\n))
     assert_equal [ %(1: "Added a tag") ], js_offences("x = `Added a tag`\n")
+    assert_equal [ %(1: "Create ${x} “${y}”") ], js_offences("x = `Create ${x} “${y}”`\n")
+    assert_equal [ %(1: "Create ${x}") ], js_offences("x = `Create ${x}`\n")
+    assert_equal [ %(1: "NOT SAVED") ], js_offences(%(x = "NOT SAVED"\n))
+    assert_equal [ %(1: "Retry") ], js_offences(%(button.textContent = "Retry"\n))
+    assert_equal [ %(1: "retry") ], js_offences(%(button.textContent = "retry"\n))
+    assert_equal [ %(1: "done") ], js_offences(%(this.announce("done")\n))
+    assert_equal [ %(1: "Dismiss") ], js_offences(%(el.setAttribute("aria-label", "Dismiss")\n))
+    assert_equal [ %(1: "Name") ], js_offences(%(input.placeholder = "Name"\n))
+    assert_equal [ %(1: "go") ], js_offences(%(if (confirm("go")) {}\n))
     assert_empty js_offences(%(// "Couldn't save the new order"\nconst a = "components.save_bar.blocked"\n))
     assert_empty js_offences(%(/* "Save or cancel" */ x.replace(/'Save or "cancel/g, "")\n))
     assert_empty js_offences(%(const total = a / b; const k = "admin--save-bar"\n))
     assert_empty js_offences(%(x.querySelector("[data-leave-count]").dataset.foo = "NOT"\n))
+    assert_empty js_offences(%(toast.querySelector("span").textContent = messages(el).t("components.toast.dropped")\n))
+    assert_empty js_offences(%(button.textContent = this.text("components.save_status.retry")\n))
+    assert_empty js_offences("note.textContent = ` ${this.text(\"a.b\")}`\n")
+    assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.chip_input.remove", { label }))\n))
+    assert_empty js_offences(%(headers["Content-Type"] = "x"; method: "PATCH"; zone = "UTC"\n))
+    assert_empty js_offences(%(status.textContent = "" // i18n-ok: emptying the line, not saying anything\n))
+    assert_equal [ %(1: "Retry") ], js_offences(%(button.textContent = "Retry" // i18n-ok: no\n))
   end
 end

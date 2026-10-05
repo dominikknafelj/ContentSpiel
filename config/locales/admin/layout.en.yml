@@ -1,0 +1,19 @@
+# The admin layout (`app/views/layouts/admin.html.erb`; docs/reference/i18n.md).
+# A layout's lazy lookup would read `layouts.admin.*`, outside the `admin`
+# tree, so the layout writes these keys out in full.
+en:
+  admin:
+    layout:
+      # The page title when a screen sets none.
+      title: "CS Studio"
+      leave_dialog:
+        title: "Leave without saving?"
+        # `admin--save-bar` writes the sentence as it opens the dialog:
+        # `body` where nothing is counted (a form the server re-rendered
+        # with errors), `body_with_count` otherwise.
+        body: "You have unsaved changes on this screen."
+        body_with_count:
+          one: "You have %{count} unsaved change on this screen."
+          other: "You have %{count} unsaved changes on this screen."
+        discard: "Discard changes"
+        keep_editing: "Keep editing"

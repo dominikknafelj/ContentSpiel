@@ -138,7 +138,7 @@ module Tags
       now = Time.current
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
       fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
-      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all  # i18n-ok: a class name
+      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all
     end
   end
 end

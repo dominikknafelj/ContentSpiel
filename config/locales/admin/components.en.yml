@@ -65,10 +65,6 @@ en:
           live: "Live"
 
       translation_chip:
-        state:
-          complete: "translated"
-          missing: "not translated"
-          outdated: "outdated"
         aria_label:
           complete: "%{language}: translated"
           missing: "%{language}: not translated"
@@ -77,6 +73,14 @@ en:
           complete: "Translated"
           missing: "Not translated"
           outdated: "%{language} changed since translation"
+
+      # `Admin::TranslationScreen::MatrixComponent` (a cell's link label).
+      translation_screen:
+        matrix:
+          cell_label:
+            complete: "%{title}: %{language}, translated"
+            missing: "%{title}: %{language}, not translated"
+            outdated: "%{title}: %{language}, outdated"
 
       language_tabs:
         nav_label: "Languages"
@@ -106,53 +110,35 @@ en:
           other: "%{count}d ago"
 
       error_summary:
+        # A field's name and the model's message, in the order a language wants.
+        sentence: "%{field} %{message}"
         heading:
           one: "%{count} thing needs fixing"
           other: "%{count} things need fixing"
 
       chip_input:
-        # What the chips are called, by the caller's `noun:` -- `one` where a
-        # sentence names one ("Create tag ..."), `other` where it names
-        # several ("No matching tags."). A new noun is a new entry here.
+        # The two sentences that name what the chips are, by the caller's
+        # `noun:`, each whole so a translator can inflect the noun in it. A new
+        # noun is a new entry here.
         nouns:
           tag:
-            one: "tag"
-            other: "tags"
+            no_matches: "No matching tags."
+            create: "Create tag “%{label}”"
           user:
-            one: "user"
-            other: "users"
+            no_matches: "No matching users."
+            create: "Create user “%{label}”"
           post:
-            one: "post"
-            other: "posts"
+            no_matches: "No matching posts."
+            create: "Create post “%{label}”"
         remove: "Remove %{label}"
         invalid: "(invalid)"
         untitled: "(untitled)"
         too_long: "(too long)"
         suggestions_label: "%{label} suggestions"
-        no_matches: "No matching %{noun}."
         results:
           one: "%{count} suggestion."
           other: "%{count} suggestions."
-        create: "Create %{noun} “%{label}”"
         search_failed: "Search failed — try again."
         already_added: "%{label} is already added."
         added: "Added %{label}."
         removed: "Removed %{label}."
-
-    # The admin layout (`app/views/layouts/admin.html.erb`). A layout's lazy
-    # lookup would read `layouts.admin.*`, outside the `admin` file tree, so the
-    # layout writes these keys out in full.
-    layout:
-      # The page title when a screen sets none.
-      title: "CS Studio"
-      leave_dialog:
-        title: "Leave without saving?"
-        # `admin--save-bar` writes the sentence as it opens the dialog:
-        # `body` where nothing is counted (a form the server re-rendered
-        # with errors), `body_with_count` otherwise.
-        body: "You have unsaved changes on this screen."
-        body_with_count:
-          one: "You have %{count} unsaved change on this screen."
-          other: "You have %{count} unsaved changes on this screen."
-        discard: "Discard changes"
-        keep_editing: "Keep editing"

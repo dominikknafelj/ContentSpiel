@@ -1,24 +1,24 @@
 require "test_helper"
 
 class Admin::MessagesHelperTest < ActiveSupport::TestCase
-  def messages(scope, *keys)
-    JSON.parse(Class.new { include Admin::MessagesHelper }.new.messages_data(scope, *keys))
+  def messages(*keys)
+    JSON.parse(Class.new { include Admin::MessagesHelper }.new.messages_data(*keys))
   end
 
   test "a string is sent as it is, with its placeholders" do
-    result = messages("admin.components.chip_input", "remove")
+    result = messages("components.chip_input.remove")
 
-    assert_equal "Remove %{label}", result["remove"]
+    assert_equal "Remove %{label}", result["components.chip_input.remove"]
   end
 
   test "a plural key is sent whole, count left in" do
-    result = messages("admin.components.save_bar", "changes")
+    result = messages("components.save_bar.changes")
 
-    assert_equal({ "one" => "%{count} unsaved change", "other" => "%{count} unsaved changes" }, result["changes"])
+    assert_equal({ "one" => "%{count} unsaved change", "other" => "%{count} unsaved changes" }, result["components.save_bar.changes"])
   end
 
-  test "a key may be a dotted path below the scope, and the locale rides along" do
-    result = messages("admin", "components.toast.dropped", "layout.leave_dialog.body")
+  test "every key is a dotted path below `admin`, and the locale rides along" do
+    result = messages("components.toast.dropped", "layout.leave_dialog.body")
 
     assert_equal "That didn't go through — the screen changed. Try again.", result["components.toast.dropped"]
     assert_equal "You have unsaved changes on this screen.", result["layout.leave_dialog.body"]
@@ -26,7 +26,7 @@ class Admin::MessagesHelperTest < ActiveSupport::TestCase
   end
 
   test "a missing key raises, whatever the environment's setting" do
-    assert_raises(I18n::MissingTranslationData) { messages("admin.components.save_bar", "no_such_key") }
+    assert_raises(I18n::MissingTranslationData) { messages("components.save_bar.no_such_key") }
   end
 
   test "the layout's shared set resolves, every key of it" do

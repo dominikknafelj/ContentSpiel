@@ -34,7 +34,7 @@ module Admin
     #   for them a count would be a misleading zero, or leak how many posts
     #   they can't see; `Admin::TagSuggestionsController` makes the same call).
     def index
-      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a  # i18n-ok: SQL
+      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a
       @counts_visible = can?("posts.read")
       ids = @tags.map(&:id)
       return @readable_counts = @carrier_counts = {} unless @counts_visible && ids.any?
@@ -103,7 +103,7 @@ module Admin
       # (`index`'s ordering, `BlockTypes::PostList`): names are stored
       # lowercase today, but one stored with a capital (an old row, a write
       # around the model) must still be found by the name the picker shows.
-      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?  # i18n-ok: SQL
+      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?
 
       result = Tags::Merge.call(source, into: into)
       return forbidden!(result.errors.first) if result.denied?

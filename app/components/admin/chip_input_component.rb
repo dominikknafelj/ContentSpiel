@@ -89,12 +89,14 @@ module Admin
     # What `admin--chip-input` says and writes into the page, by key
     # (`app/javascript/i18n/messages.js`): the same keys the server-rendered
     # chips above use, so a chip the script adds reads like one rendered here.
-    # The noun is the caller's `noun:` (a key under `nouns`).
+    # The noun is the caller's `noun:` (a key under `nouns`, each with the two
+    # whole sentences that name it).
     def messages
-      messages_data("admin.components", "chip_input.nouns.#{noun}", "chip_input.remove", "chip_input.untitled",
-        "chip_input.too_long", "chip_input.no_matches", "chip_input.results", "chip_input.create", "chip_input.search_failed",
-        "chip_input.already_added", "chip_input.added", "chip_input.removed", "status_chip.labels.draft",
-        "status_chip.labels.scheduled")
+      messages_data("components.chip_input.nouns.#{noun}.no_matches", "components.chip_input.nouns.#{noun}.create",
+        "components.chip_input.remove", "components.chip_input.untitled", "components.chip_input.too_long",
+        "components.chip_input.results", "components.chip_input.search_failed", "components.chip_input.already_added",
+        "components.chip_input.added", "components.chip_input.removed", "components.status_chip.labels.draft",
+        "components.status_chip.labels.scheduled")
     end
 
     # The `data:` a hidden input carries so the explicit-save footer counts it.

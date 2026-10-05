@@ -48,6 +48,12 @@ class Admin::AdminComponentTest < ViewComponent::TestCase
     assert_text "Plain x"
   end
 
+  test "a symbol key starting with a dot is rescoped too" do
+    render_inline Admin::I18nProbeComponent.new(:".plain", name: "Sym")
+
+    assert_text "Plain Sym"
+  end
+
   test "interpolation and pluralisation work" do
     render_inline Admin::I18nProbeComponent.new(".plain", name: "Dom")
     assert_text "Plain Dom"

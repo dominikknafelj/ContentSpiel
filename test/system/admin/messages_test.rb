@@ -25,6 +25,10 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     JS
   end
 
+  def create_tag_with_post
+    Current.set(actor: users(:one)) { create_post(title: "Tagged", tags: [ "gear" ]) }
+  end
+
   # A <p> carrying its own `data-messages`, as a component's root does.
   def add_messages_element(id, json)
     page.execute_script(<<~JS, id, json)
@@ -45,12 +49,43 @@ class Admin::MessagesTest < ApplicationSystemTestCase
       in_page(%(messages(document.body).t("layout.leave_dialog.body_with_count", { count: 1 })))["value"]
   end
 
-  test "an element reads the nearest data-messages and does not fall through to the page's for a key it lacks" do
+  test "an element asks each data-messages ancestor in turn, then the page's" do
     add_messages_element("near", { "@locale" => "en", "hello" => "Hi %{name}" }.to_json)
 
     assert_equal "Hi <Dom>", in_page(%(messages(document.querySelector("#near .inner")).t("hello", { name: "<Dom>" })))["value"]
-    assert_match(/no message "components.save_bar.blocked"/,
-      in_page(%(messages(document.querySelector("#near .inner")).t("components.save_bar.blocked")))["error"])
+    assert_equal "Save or cancel your changes first.",
+      in_page(%(messages(document.querySelector("#near .inner")).t("components.save_bar.blocked")))["value"], "a key only <body> has"
+  end
+
+  test "nested holders answer nearest first, and an inner one never hides an outer one's other keys" do
+    add_messages_element("outer", { "@locale" => "en", "a" => "outer a", "b" => "outer b" }.to_json)
+    page.execute_script(<<~JS)
+      const inner = document.createElement("div")
+      inner.id = "inner-holder"
+      inner.setAttribute("data-messages", JSON.stringify({ "@locale": "en", a: "inner a" }))
+      inner.innerHTML = "<i class='leaf'></i>"
+      document.getElementById("outer").append(inner)
+    JS
+
+    assert_equal [ "inner a", "outer b" ], in_page(%([ "a", "b" ].map((key) => messages(document.querySelector("#inner-holder .leaf")).t(key))))["value"]
+    assert_equal "Save or cancel your changes first.",
+      in_page(%(messages(document.querySelector("#inner-holder .leaf")).t("components.save_bar.blocked")))["value"]
+  end
+
+  test "the tag dialogs' root and an autosaving row both get the page's messages as well as their own" do
+    create_tag_with_post
+    visit admin_tags_path
+    await_admin_controllers
+    field = "#tag-#{Tag.first.id}-name"
+
+    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{field}")).t("components.save_status.saving")))["value"]
+    assert_equal "1 unsaved change", in_page(%(messages(document.querySelector("#{field}")).t("components.save_bar.changes", { count: 1 })))["value"]
+    root = "[data-controller='admin--tag-dialogs']"
+    assert_match(/wasn't deleted/, in_page(%(messages(document.querySelector("#{root}")).t("tags.dialogs.delete_failed")))["value"].to_s)
+    assert_equal "SAVING…", in_page(%(messages(document.querySelector("#{root}")).t("components.save_status.saving")))["value"], "the root's own data-messages does not hide <body>'s"
+
+    find(field).set("renamed")
+    assert_selector "#tag-#{Tag.first.id}-save-status", text: /SAVED( TO SITE)? \d{2}:\d{2}/, wait: 8
   end
 
   test "a missing key, a plural without a count and a placeholder without a value all throw" do
