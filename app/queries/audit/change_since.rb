@@ -48,7 +48,10 @@ module Audit
     end
 
     def self.events_for(record, since)
-      events = Audit::Event.where.not(action: Dashboard::Feed::NOT_A_CHANGE)
+      # A sign-in or sign-out is recorded with the user as its subject but changes
+      # nothing the form shows ("This user was changed by B just now" for B signing
+      # in after an admin put B in a group); no other subject type has such events.
+      events = Audit::Event.where.not(action: Dashboard::Feed::NOT_A_CHANGE).where.not("audit_events.action LIKE 'session.%'")
       events = events.where("audit_events.last_occurred_at > ?", since + SLACK) if since
       own = events.where(subject_type: record.class.base_class.name, subject_id: record.id)
       scope = if record.is_a?(::Page) || record.is_a?(::Post)
