@@ -22,8 +22,8 @@ module StarterContents
   # Permissions (access-control design spec §3.3): starter content is
   # pages, blocks and posts, each written through its own service
   # (`Pages::Save`, `ContentBlocks::Save`, `Posts::Save`), which authorize
-  # and audit themselves. Those checks run *inside* `add_once!`'s
-  # transaction, though, and a refusal there becomes a `StarterContent::
+  # and audit themselves. Those checks run *inside* this
+  # service's transaction, though, and a refusal there becomes a `StarterContent::
   # Error` that rolls the whole attempt back -- the `access.denied` it
   # recorded included. So every right the inner writes will need is
   # checked here first, up front, against the records they'll create: a

@@ -91,7 +91,11 @@ module Groups
         # The unique index on (group, permission) caught what no check could:
         # another save of this group wrote a grant for one of these permissions
         # between our reading the group and replacing its grants. The whole
-        # transaction is rolled back; the editor reloads and tries again.
+        # transaction is rolled back; the editor reloads and tries again. The
+        # same rescue answers the two other unique indexes a save can hit in a
+        # race -- (user, group) on the memberships and lower(name) on the groups
+        # -- for which "changed elsewhere" is the right advice too, if less exact
+        # for a name taken by another group in the same moment.
         return failure(@group, [ "This group was changed elsewhere. Reload and try again." ])
       end
       return failure(@group) unless saved

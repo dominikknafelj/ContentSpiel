@@ -97,11 +97,12 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
         JS
         sleep 5 # sleep: a reason long enough
         sleep 6 # no reason
-        sleep 7 # sleep: nine chr
+        sleep 7 # sleep: nine chrs
+        sleep 8 # sleep: ten chars!
       RUBY
       file.flush
       flagged = code_lines(file.path).select { |_, _, code| code.match?(SLEEP) }.map(&:first)
-      assert_equal [ 9, 10, 11 ], flagged
+      assert_equal [ 9, 10, 11, 12 ], flagged
       assert_equal [ 10, 11 ], flagged.reject { |n| File.readlines(file.path)[n - 1].match?(REASON) }
     end
   end

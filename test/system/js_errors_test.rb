@@ -47,7 +47,7 @@ class JsErrorsTest < ApplicationSystemTestCase
     JsErrorCollector.reset!
     JsErrorCollector.record(turbo_abort_details)
     JsErrorCollector.record(turbo_abort_details(url: "http://127.0.0.1:1/assets/application-0123abcd.js"))
-    JsErrorCollector.record(turbo_abort_details(url: "", frame_url: "http://127.0.0.1:1/assets/turbo.min-9fd88cd5.js").merge("url" => ""))
+    JsErrorCollector.record(turbo_abort_details(url: "", frame_url: "http://127.0.0.1:1/assets/turbo.min-9fd88cd5.js"))
     errors = JsErrorCollector.errors
     assert_equal 1, errors.size
     assert_match "AbortError", errors.first[:message]

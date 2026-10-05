@@ -88,7 +88,9 @@ module Users
     # Absent, nil and "" are no request about the flag (a blank form value, a
     # caller that never meant to name it): `Boolean` casts "" to nil, which differs
     # from either flag and would flip it. Not `blank?`, which is true for the real
-    # value `false`, a demotion.
+    # value `false`, a demotion. Any other string is cast as Rails casts a
+    # checkbox (anything but a "false"-like value is true), so the endpoint's
+    # own `0`/`1` check is what keeps junk out.
     def owner_change?
       return false if @attributes[:owner].nil? || @attributes[:owner] == ""
 

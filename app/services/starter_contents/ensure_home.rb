@@ -10,7 +10,7 @@ module StarterContents
   # service records no event of its own, and checks up front the rights those
   # two will ask for (`#checks`), so a refusal is one `access.denied` here
   # rather than an exception out of the middle of a transaction. Setup runs it
-  # as the trusted nil actor on `:setup`, or as the signed-in owner.
+  # as the signed-in owner (`SetupController#act_as_signed_in_user`).
   #
   # The input is fixed (see `StarterContent`), so a failed inner `Result`
   # means this code is broken, not that an editor typed something: it is
