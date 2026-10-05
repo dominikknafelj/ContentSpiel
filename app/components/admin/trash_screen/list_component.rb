@@ -179,8 +179,7 @@ module Admin
           else
             events = items.group_by { |item| item.class.name }
               .map { |type, list| Audit::Event.where(subject_type: type, subject_id: list.map(&:id), action: TRASHED_ACTIONS.fetch(type)) }.reduce(:or)
-            events.includes(:user).select("DISTINCT ON (audit_events.subject_type, audit_events.subject_id) audit_events.*")
-              .order(Arel.sql("audit_events.subject_type, audit_events.subject_id, audit_events.occurred_at DESC, audit_events.id DESC"))
+            events.includes(:user).newest_per_subject
               .index_by { |event| [ event.subject_type, event.subject_id ] }
           end
       end
@@ -189,7 +188,7 @@ module Admin
       # trashed descendant is its own root (`trash_root_id = id`) and has
       # a row of its own instead.
       def subpages_by_root
-        @subpages_by_root ||= Page.where(trash_root_id: pages.map(&:id)).where("pages.id <> pages.trash_root_id")
+        @subpages_by_root ||= Page.where(trash_root_id: pages.map(&:id)).trash_branch_members
           .order(:id).group_by(&:trash_root_id)
       end
 
@@ -197,7 +196,10 @@ module Admin
       # every descendant, branch member or trashed separately, the same set
       # `Trash::Purge` destroys -- off the closure table in one query.
       def descendant_counts
-        @descendant_counts ||= Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).where("generations > 0").group(:ancestor_id).count
+        @descendant_counts ||= begin
+          hierarchies = Page.hierarchy_class
+          hierarchies.where(ancestor_id: pages.map(&:id)).where(hierarchies.arel_table[:generations].gt(0)).group(:ancestor_id).count
+        end
       end
 
       # For each listed image something still uses: how many ITEMS use it (a

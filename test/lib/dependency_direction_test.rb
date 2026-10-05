@@ -1,15 +1,15 @@
 require "test_helper"
 require "ripper"
 
-# The direction of dependency (CLAUDE.md, "Dependency order"): models, queries
-# and services know nothing of components, controllers or the application's
+# The direction of dependency (CLAUDE.md, "Dependency order"): models, queries,
+# services, value objects and route constraints know nothing of components, controllers or the application's
 # routes. A screen is rebuilt far more often than a rule, and a model that
 # renders, or a query that builds a URL, has to be rewritten with every screen
 # that shows it -- and can't be used from MCP, a job or the console, where
 # there is no view.
 #
-# What this fails on, under `app/models`, `app/queries` and `app/services`
-# (comments stripped, so prose may mention any of these):
+# What this fails on, under `app/models`, `app/queries`, `app/services`,
+# `app/values` and `app/constraints` (comments stripped, so prose may mention any of these):
 #
 #   - a `...Component` constant
 #   - `ApplicationController` and `ActionController`
@@ -30,7 +30,7 @@ require "ripper"
 # Everything else that is allowed is in ALLOWED, with its reason, and an entry
 # that no longer matches anything fails the test, so the list can't rot.
 class DependencyDirectionTest < ActiveSupport::TestCase
-  ROOTS = %w[app/models app/queries app/services].freeze
+  ROOTS = %w[app/models app/queries app/services app/values app/constraints].freeze
 
   COMPONENT = /(?:\b[A-Z]\w*::)*\b[A-Z]\w*Component\b/
   PATTERNS = {

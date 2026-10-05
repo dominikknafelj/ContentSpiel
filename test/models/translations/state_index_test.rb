@@ -124,6 +124,25 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     assert_equal [ done ], Translations::StateIndex.joins(Page.kept.where.not(parent_id: nil), locale: "de", states: %w[complete]).to_a
   end
 
+  test "work_list keeps only what needs work, outdated first, then the most recently changed original" do
+    create_page(title: "Done", translations: { "de" => { title: "Fertig" }, "es" => { title: "Hecho" } })
+    missing_old = travel_to(3.days.ago) { create_page(title: "Missing, older") }
+    missing_new = travel_to(1.day.ago) { create_page(title: "Missing, newer") }
+    outdated = travel_to(5.days.ago) { create_page(title: "Outdated", translations: { "de" => { title: "Veraltet" }, "es" => { title: "Viejo" } }) }
+    travel_to(4.days.ago) { assert Pages::Save.call(outdated, translations: { "en" => { title: "Outdated, changed" } }).ok? }
+    pages = Page.kept.where.not(parent_id: nil).order(:id)
+
+    list = Translations::StateIndex.work_list(pages, locales: %w[de es]).to_a
+
+    assert_equal [ outdated, missing_new, missing_old ], list
+    assert_equal [ true, false, false ], list.map { |page| page[:has_outdated] }
+    assert_operator list.second[:original_changed_at], :>, list.third[:original_changed_at]
+    # It narrows the relation it is given, and asks only about the given languages.
+    assert_equal [ missing_new, missing_old ].map(&:id).sort, Translations::StateIndex.work_list(pages.where.not(id: outdated.id), locales: %w[es]).map(&:id).sort
+    assert_empty Translations::StateIndex.work_list(pages, locales: [])
+    assert_equal 1, count_queries { Translations::StateIndex.work_list(pages, locales: %w[de es]).limit(2).to_a }
+  end
+
   test "summary counts items, not fields" do
     create_page(title: "Done", translations: { "de" => { title: "Fertig" } })
     create_page(title: "Todo")

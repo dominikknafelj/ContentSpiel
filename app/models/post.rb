@@ -25,6 +25,7 @@ class Post < ApplicationRecord
   # (translation helpers spec §3.2), plus the content type's own
   # `translated: true` fields. Never `slug`: it's generated per language.
   include Translations::Tracker
+  include TitleSearch
   tracks_translations schema: :fields
 
   has_many :post_tags, dependent: :destroy

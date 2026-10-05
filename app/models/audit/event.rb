@@ -27,6 +27,22 @@ module Audit
     scope :for_subject, ->(record) { where(subject: record) }
     scope :by_user, ->(user) { where(user_id: user.id) }
 
+    # The events on either side of `event` in the log's own order
+    # (`last_occurred_at, id`, see `Audit::Filter.ordered`): a row comparison
+    # on the very pair `index_audit_events_on_recent` is ordered by, so the
+    # neighbour of an event is one indexed lookup. Neither scope orders.
+    scope :older_in_log_than, ->(event) { where("(audit_events.last_occurred_at, audit_events.id) < (?, ?)", event.last_occurred_at, event.id) }
+    scope :newer_in_log_than, ->(event) { where("(audit_events.last_occurred_at, audit_events.id) > (?, ?)", event.last_occurred_at, event.id) }
+
+    # Of the events in the relation, only the newest of each subject (by when
+    # it was recorded, `occurred_at`, then id) -- `DISTINCT ON`, so however
+    # many subjects are asked about it is one query. It selects and orders:
+    # put the conditions before it.
+    scope :newest_per_subject, -> {
+      select("DISTINCT ON (audit_events.subject_type, audit_events.subject_id) audit_events.*")
+        .order(Arel.sql("audit_events.subject_type, audit_events.subject_id, audit_events.occurred_at DESC, audit_events.id DESC"))
+    }
+
     before_update :only_coalescing_columns_changed
     before_destroy { throw :abort }
 

@@ -34,12 +34,12 @@ module Admin
     #   for them a count would be a misleading zero, or leak how many posts
     #   they can't see; `Admin::TagSuggestionsController` makes the same call).
     def index
-      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a
+      @tags = Tag.by_name.to_a
       @counts_visible = can?("posts.read")
       ids = @tags.map(&:id)
       return @readable_counts = @carrier_counts = {} unless @counts_visible && ids.any?
 
-      @readable_counts = admin_scope(Post.all).joins(:post_tags).where(post_tags: { tag_id: ids }).group("post_tags.tag_id").count
+      @readable_counts = Tag.posts_counts(admin_scope(Post.all), ids)
       @carrier_counts = PostTag.where(tag_id: ids).group(:tag_id).count
     end
 
@@ -98,12 +98,12 @@ module Admin
     # of permission is the 403 page, as everywhere else.
     def merge
       source = Tag.find(params[:id])
-      name = params[:into].to_s.strip.downcase
-      # By `LOWER(name)`, the comparison every other match on a tag name makes
-      # (`index`'s ordering, `BlockTypes::PostList`): names are stored
-      # lowercase today, but one stored with a capital (an old row, a write
-      # around the model) must still be found by the name the picker shows.
-      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?
+      name = params[:into].to_s.strip
+      # Case-insensitively (`Tag.named`), the comparison every other match on a
+      # tag name makes (`index`'s ordering, `BlockTypes::PostList`): names are
+      # stored lowercase today, but one stored with a capital (an old row, a
+      # write around the model) must still be found by the name the picker shows.
+      into = Tag.named(name).order(:id).first if name.present?
 
       result = Tags::Merge.call(source, into: into)
       return forbidden!(result.errors.first) if result.denied?

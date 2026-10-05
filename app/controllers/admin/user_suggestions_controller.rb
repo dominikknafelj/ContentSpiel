@@ -15,8 +15,8 @@ module Admin
   #   the editor itself and stays until removed -- this endpoint plays no part;
   # - each row is only `{ value: id, label: display name, hint: email }`.
   #
-  # The text is bound, never interpolated, and `sanitize_sql_like` keeps a typed
-  # `%` or `_` literal, as in `Admin::TagSuggestionsController`.
+  # The text is bound, never interpolated, and `User.name_or_email_containing`
+  # keeps a typed `%` or `_` literal, as in `Admin::TagSuggestionsController`.
   class UserSuggestionsController < BaseController
     LIMIT = 8
     MIN_QUERY_LENGTH = 2
@@ -53,13 +53,9 @@ module Admin
     def rows
       return [] if query.length < MIN_QUERY_LENGTH
 
-      pattern = User.sanitize_sql_like(query.downcase)
-      prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([
-        "(COALESCE(LOWER(users.name), '') LIKE :prefix OR LOWER(users.email_address) LIKE :prefix) DESC", { prefix: "#{pattern}%" }
-      ]))
       User.where(owner: false).where.not(id: excluded)
-        .where("LOWER(users.name) LIKE :any OR LOWER(users.email_address) LIKE :any", any: "%#{pattern}%")
-        .order(prefix_first, Arel.sql("LOWER(users.email_address) ASC"))
+        .name_or_email_containing(query)
+        .name_or_email_starting_first(query).by_email
         .limit(LIMIT)
         .map { |user| { value: user.id, label: user.display_name, hint: email_hint(user), chip_hint: email_hint(user) }.compact }
     end

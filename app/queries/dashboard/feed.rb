@@ -82,7 +82,7 @@ module Dashboard
     # Scheduled (spec §10.4 of the CMS spec: a future `published_at`),
     # soonest first.
     def scheduled_soonest_first(relation)
-      relation.where("#{relation.quoted_table_name}.published_at > ?", Time.current).reorder(published_at: :asc, id: :asc)
+      relation.scheduled.reorder(published_at: :asc, id: :asc)
     end
 
     # Each (already ordered) relation narrowed to my records -- a post I

@@ -189,7 +189,7 @@ module PublicSite
     # the adapter) is caught by the next sync that reaches its posts, or by
     # `rebuild!`.
     def sync_went_live(since:, now: Time.current)
-      sync_posts_listed_under(Page.kept.where("published_at > ? AND published_at <= ?", since, now).to_a)
+      sync_posts_listed_under(Page.kept.where(Page.arel_table[:published_at].gt(since)).where(published_at: ..now).to_a)
     end
 
     # Bumps the public content version whatever it finds: this is the repair

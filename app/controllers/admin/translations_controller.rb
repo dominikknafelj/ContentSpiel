@@ -207,8 +207,8 @@ module Admin
       relations
     end
 
-    def needs_work_sql(model, states: %w[missing outdated])
-      Translations::StateIndex.exists_in_any_locale_sql(model, states:, locales: @needed_in)
+    def needs_work_sql(model)
+      Translations::StateIndex.exists_in_any_locale_sql(model, states: %w[missing outdated], locales: @needed_in)
     end
 
     # The settings row, when the actor may manage settings and the title or
@@ -221,9 +221,9 @@ module Admin
       Item.new(type: "settings", record: site, states:) if @needed_in.any? { |locale| states[locale] != :complete }
     end
 
-    # This page's `Item`s. Each type's relation is ordered outdated-first then
-    # by when its ORIGINAL last changed, newest first (`StateIndex
-    # .original_changed_at_sql`: the stored per-field stamps, blocks rolled in,
+    # This page's `Item`s. Each type's relation is ordered (`StateIndex
+    # .work_list`) outdated-first then by when its ORIGINAL last changed,
+    # newest first (`StateIndex.original_changed_at_sql`: the stored per-field stamps, blocks rolled in,
     # never `updated_at`, which any save -- a translation-only one included --
     # moves), and cut to `offset + per_page` rows; the windows are
     # merged by the same key (ties: type order, then newest id) and sliced.
@@ -231,13 +231,7 @@ module Admin
       window = @pagination.offset + PER_PAGE
       type_order = relations.keys
       candidates = relations.flat_map do |type, relation|
-        table = relation.klass.quoted_table_name
-        outdated = needs_work_sql(relation.klass, states: %w[outdated])
-        changed = Translations::StateIndex.original_changed_at_sql(relation.klass)
-        relation.where(needs_work_sql(relation.klass))
-          .reorder(Arel.sql("#{outdated} DESC"), Arel.sql("#{changed} DESC"), Arel.sql("#{table}.id DESC"))
-          .select(Arel.sql("#{table}.*"), Arel.sql("#{outdated} AS has_outdated"), Arel.sql("#{changed} AS original_changed_at"))
-          .limit(window).map { |record| [ type, record ] }
+        Translations::StateIndex.work_list(relation, locales: @needed_in).limit(window).map { |record| [ type, record ] }
       end
       page = candidates.sort_by { |type, record| [ record[:has_outdated] ? 0 : 1, -record[:original_changed_at].to_r, type_order.index(type), -record.id ] }
         .slice(@pagination.offset, PER_PAGE) || []

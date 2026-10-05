@@ -9,6 +9,10 @@ module Publishable
 
   included do
     scope :published, -> { where(published_at: ..Time.current) }
+    # Waiting for its time: strictly later than now, so a draft (NULL) and a
+    # record going live this very instant are both left out -- `published`'s
+    # exact complement among the records that have a time at all.
+    scope :scheduled, -> { where(arel_table[:published_at].gt(Time.current)) }
 
     # The public content version (`PublicSite`, technical cleanup spec §4.8)
     # moves with every committed change to a record that is live before or

@@ -77,6 +77,7 @@ class Page < ApplicationRecord
   # (translation helpers spec §3.2). Never `slug`: it's generated per
   # language, not translated from the original's.
   include Translations::Tracker
+  include TitleSearch
   tracks_translations
 
   # A page's body is an ordered list of blocks; the renderer walks them in
@@ -116,6 +117,14 @@ class Page < ApplicationRecord
   # so purging the root itself doesn't get blocked by its own descendants'
   # bookkeeping column.
   belongs_to :trash_root, class_name: "Page", optional: true
+
+  # The two halves of a trashed branch (`Trash::Move`). A branch root is the
+  # page the editor picked: its `trash_root_id` is its own id. A branch member
+  # went with a root and names that root instead; a page with no
+  # `trash_root_id` at all is neither. Neither scope looks at `trashed_at`:
+  # the caller says `trashed` (or a read scope that does) beside it.
+  scope :trash_roots, -> { where(arel_table[:trash_root_id].eq(arel_table[:id])) }
+  scope :trash_branch_members, -> { where.not(trash_root_id: nil).where(arel_table[:trash_root_id].not_eq(arel_table[:id])) }
 
   # `validate: true`: an unknown value (a forged `page[page_type]`) is an
   # ordinary "is not included in the list" validation failure on the field,

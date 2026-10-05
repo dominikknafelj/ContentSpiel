@@ -86,6 +86,43 @@ class Audit::EventTest < ActiveSupport::TestCase
     assert_equal [ @newer ], Audit::Event.by_user(users(:two)).to_a
   end
 
+  # The log's order is (last_occurred_at, id); Older/Newer on the event page
+  # walk it with these two.
+  test "older_in_log_than and newer_in_log_than split the log around an event, ties broken by id" do
+    at = Time.zone.parse("2026-03-01 12:00:00")
+    make = ->(time) { Audit::Event.create!(action: "test.order", channel: "admin", occurred_at: time, last_occurred_at: time) }
+    before = make.(at - 1.minute)
+    tie_low, middle, tie_high = make.(at), make.(at), make.(at)
+    after = make.(at + 1.minute)
+    log = Audit::Event.where(action: "test.order")
+
+    assert_equal [ before, tie_low ].sort_by(&:id), log.older_in_log_than(middle).order(:id).to_a
+    assert_equal [ tie_high, after ].sort_by(&:id), log.newer_in_log_than(middle).order(:id).to_a
+    assert_not_includes log.older_in_log_than(middle).or(log.newer_in_log_than(middle)), middle
+    assert_empty log.older_in_log_than(before)
+    assert_empty log.newer_in_log_than(after)
+    # The neighbours, as the event page asks for them.
+    assert_equal tie_low.id, Audit::Filter.ordered(log.older_in_log_than(middle)).pick(:id)
+    assert_equal tie_high.id, log.newer_in_log_than(middle).order(last_occurred_at: :asc, id: :asc).pick(:id)
+  end
+
+  test "newest_per_subject keeps one event per subject: the latest recorded, the higher id on a tie" do
+    at = Time.zone.parse("2026-03-01 12:00:00")
+    make = ->(type, id, time) { Audit::Event.create!(action: "test.newest", channel: "admin", subject_type: type, subject_id: id, occurred_at: time, last_occurred_at: time) }
+    make.("Page", 1, at)
+    page_newest = make.("Page", 1, at + 1.hour)
+    make.("Page", 1, at - 1.hour)
+    make.("Post", 1, at)
+    post_newest = make.("Post", 1, at)
+    other_page = make.("Page", 2, at - 1.day)
+    make.("Page", 3, at) # left out by the relation's own condition below
+
+    newest = Audit::Event.where(action: "test.newest").where.not(subject_id: 3).newest_per_subject.to_a
+
+    assert_equal [ page_newest, other_page, post_newest ], newest
+    assert_empty Audit::Event.where(action: "test.none").newest_per_subject
+  end
+
   test "occurrences may be updated by the model and by raw SQL, like the coalescing columns" do
     @event.update!(occurrences: 3)
     assert_equal 3, @event.reload.occurrences

@@ -73,7 +73,7 @@ module Admin
     # the orphan state itself is a roadmap row.
     def self.roots(type, actor)
       relation = visible(type, actor)
-      type == "page" ? relation.where("pages.trash_root_id = pages.id") : relation
+      type == "page" ? relation.trash_roots : relation
     end
 
     # One COUNT per type over `roots`: the numbers on the screen's tabs.
@@ -220,7 +220,7 @@ module Admin
     def everything_counts
       roots = Trash.roots
       pages = roots[:pages].count
-      members = Page.trashed.where("pages.trash_root_id IS NOT NULL AND pages.trash_root_id <> pages.id").count
+      members = Page.trashed.trash_branch_members.count
       { pages:, subpages: members, posts: roots[:posts].count, images: roots[:assets].count }
     end
 

@@ -101,8 +101,7 @@ module Admin
     # comparison on the very pair `index_audit_events_on_recent` is ordered by.
     def neighbour(event, direction)
       older = direction == :older
-      scope = @filter.scope.where("(audit_events.last_occurred_at, audit_events.id) #{older ? "<" : ">"} (?, ?)", event.last_occurred_at, event.id)
-      scope = older ? Audit::Filter.ordered(scope) : scope.order(last_occurred_at: :asc, id: :asc)
+      scope = older ? Audit::Filter.ordered(@filter.scope.older_in_log_than(event)) : @filter.scope.newer_in_log_than(event).order(last_occurred_at: :asc, id: :asc)
       scope.pick(:id)
     end
 

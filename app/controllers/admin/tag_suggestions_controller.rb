@@ -47,7 +47,7 @@ module Admin
       []
     end
 
-    # `sanitize_sql_like` keeps a typed `%`/`_` literal. The count is a
+    # `Tag.name_containing` keeps a typed `%`/`_` literal. The count is a
     # correlated subquery over the readable posts, so the tag list itself
     # stays one query (no per-tag count).
     def counts? = can?("posts.read")
@@ -55,18 +55,15 @@ module Admin
     def count_hint(count) = t("admin.tags.post_count", count: count)
 
     def rows
-      pattern = Tag.sanitize_sql_like(query.downcase)
-      prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([ "(LOWER(tags.name) LIKE ?) DESC", "#{pattern}%" ]))
-      tags = Tag.where("LOWER(tags.name) LIKE ?", "%#{pattern}%").limit(LIMIT)
-      tags = tags.where.not("LOWER(tags.name) IN (?)", excluded) if excluded.any?
+      tags = Tag.name_containing(query).limit(LIMIT)
+      tags = tags.not_named(excluded) if excluded.any?
+      tags = tags.name_starting_first(query)
 
       # Without the right to read posts there is no count to show (and no need
       # to pay for the subquery): alphabetical within prefix-first.
-      return tags.order(prefix_first, Arel.sql("LOWER(tags.name) ASC")).map { |tag| { value: tag.name, label: tag.name } } unless counts?
+      return tags.by_name.map { |tag| { value: tag.name, label: tag.name } } unless counts?
 
-      counts = admin_scope(Post.all).joins(:post_tags).where("post_tags.tag_id = tags.id").select("COUNT(*)")
-      tags.select("tags.name", Arel.sql("(#{counts.to_sql}) AS posts_count"))
-        .order(prefix_first, Arel.sql("posts_count DESC"), Arel.sql("LOWER(tags.name) ASC"))
+      tags.select(:name).with_posts_count(admin_scope(Post.all)).most_used_first.by_name
         .map { |tag| { value: tag.name, label: tag.name, hint: count_hint(tag.posts_count) } }
     end
   end
