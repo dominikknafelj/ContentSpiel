@@ -747,6 +747,27 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_empty group.reload.user_ids
   end
 
+  test "a name saved with members or with grants keeps its column change in the one group.updated event" do
+    group = AccessControl::Group.create!(name: "Before")
+    before = group.updated_at
+
+    travel 1.minute do
+      assert as_owner { Groups::Save.call(group, attributes: { name: "Renamed", member_ids: [ users(:reader).id ] }) }.ok?
+    end
+    # Past the coalescing window, so the second save is an event of its own.
+    travel 20.minutes do
+      assert as_owner { Groups::Save.call(group, attributes: { name: "Renamed again", grants: [ { permission: "posts.read", scope: {} } ] }) }.ok?
+    end
+
+    events = Audit::Event.where(action: "group.updated", subject: group).order(:id)
+    assert_equal 2, events.count
+    assert_equal [ "Before", "Renamed" ], events.first.field_changes["name"]
+    assert events.first.field_changes.key?("member_ids")
+    assert_equal [ "Renamed", "Renamed again" ], events.last.field_changes["name"]
+    assert events.last.field_changes.key?("grants")
+    assert_operator group.reload.updated_at, :>, before
+  end
+
   test "a trusted code path and an owner add a member to a group that carries a removed type" do
     group = AccessControl::Group.create!(name: "Trusted")
     grant(group, "posts.edit", "content_types" => %w[blog retired])

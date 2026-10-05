@@ -74,8 +74,10 @@ module Users
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change
         sync_groups(old_group_ids, new_group_ids)
-        touch_what_the_forms_show((old_group_ids - new_group_ids) | (new_group_ids - old_group_ids))
+        # The changes are read before the touch: `touch` runs `changes_applied`,
+        # which leaves only `updated_at` in `saved_changes`.
         record_changes(old_group_ids, new_group_ids)
+        touch_what_the_forms_show((old_group_ids - new_group_ids) | (new_group_ids - old_group_ids))
         true
       end
       return failure(@user) unless saved

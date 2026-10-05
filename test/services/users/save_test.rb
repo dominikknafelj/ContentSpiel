@@ -256,6 +256,35 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal [ nil, "Grace Hopper" ], Audit::Event.order(:id).last.field_changes["name"]
   end
 
+  # `touch` (which moves `updated_at` for a membership change) runs
+  # `changes_applied`; the event must still carry the column changes.
+  test "a name, a password and groups saved together are all in the one user.updated event" do
+    user = users(:reader)
+    old_ids = user.group_ids.sort
+    added = access_control_groups(:author)
+    session = user.sessions.create!
+    before = user.updated_at
+    old_name = user.name
+
+    travel 1.minute do
+      result = as_owner do
+        Users::Save.call(user, attributes: { name: "New Name", password: "new-password-1", password_confirmation: "new-password-1",
+          group_ids: (old_ids + [ added.id ]).uniq })
+      end
+
+      assert result.ok?, result.errors.to_sentence
+    end
+
+    events = Audit::Event.where(action: "user.updated", subject: user)
+    assert_equal 1, events.count
+    changes = events.first.field_changes
+    assert_equal [ old_name, "New Name" ], changes["name"]
+    assert_equal [ nil, "password changed" ], changes["credentials"]
+    assert changes.key?("group_ids")
+    assert_not Session.exists?(session.id)
+    assert_operator user.reload.updated_at, :>, before
+  end
+
   # --- A password change ends that user's sessions ---------------------------
   #
   # Someone who changes a password does it because the old one is, or may

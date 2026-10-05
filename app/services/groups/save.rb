@@ -83,8 +83,10 @@ module Groups
           @group.save || raise(ActiveRecord::Rollback)
           replace_grants(grants) if desired && desired != old_grants
           sync_members(old_member_ids, new_member_ids)
-          touch_what_the_forms_show(grants_changed: desired && desired != old_grants, member_ids: (old_member_ids - new_member_ids) | (new_member_ids - old_member_ids))
+          # Read before the touch: `touch` runs `changes_applied`, which leaves only
+          # `updated_at` in `saved_changes`.
           record_changes(old_grants, desired, old_member_ids, new_member_ids)
+          touch_what_the_forms_show(grants_changed: desired && desired != old_grants, member_ids: (old_member_ids - new_member_ids) | (new_member_ids - old_member_ids))
           true
         end
       rescue ActiveRecord::RecordNotUnique
