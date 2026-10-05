@@ -51,7 +51,12 @@
 #
 # NOT COVERED, by design: a write made around the models and the services
 # (the console's `update_columns`, raw SQL, a restored backup). `bin/rails
-# public_site:bump_version` is for those.
+# public_site:bump_version` is for those. A restored backup needs more than
+# the bump: it REWINDS the counter, so the values that follow were already
+# used, and a render or an ETag made under one of them before the restore
+# would be served for the restored content. Clear the cache too
+# (`Rails.cache.clear`); a browser's or a CDN's stored ETag can still match
+# until the counter has passed the value it had before the restore.
 module PublicSite
   module_function
 

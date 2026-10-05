@@ -172,7 +172,7 @@ module Groups
     #   count; a name that only looks alike, "Retired" or " retired", is another
     #   name and stays in.) What the subtraction took out is therefore a subset
     #   of what that grant already holds as removed: the dormant right can only
-    #   stay or shrink, never appear, move or widen;
+    #   stay or shrink, never appear, move or widen.
     #
     # (A group holds one grant per permission and a request listing one twice
     # is refused up front, so each posted grant meets at most one stored entry
@@ -180,12 +180,11 @@ module Groups
     #
     # Everything else is compared and checked raw, as before the editor carried
     # anything: `can_grant?` sees the removed name, and only an actor whose own
-    # grant covers it (an unscoped holder; an owner is never asked) passes. Fix
-    # round 1 stripped by permission and name alone, whatever else changed, and
-    # so let a non-owner untick "Own only" on `{blog, retired, own}`, add a live
-    # type beside the name, or move the name into another grant of the same
-    # permission -- each checked as if the name weren't there, each stored with
-    # it.
+    # grant covers it (an unscoped holder; an owner is never asked) passes.
+    # Stripping by permission and name alone, whatever else changed, would let
+    # a non-owner untick "Own only" on `{blog, retired, own}` or add a live type
+    # beside the name -- each checked as if the name weren't there, each stored
+    # with it.
     #
     # The consequence, on purpose: from a non-owner who couldn't hand out the
     # removed name, such a grant is accepted in ONE shape only -- posted back
