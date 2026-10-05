@@ -11,6 +11,8 @@ module Users
   class UpdateProfile < ApplicationService
     include OwnerProtection
 
+    # authorize: none (the whole rule is "the actor is the user itself", checked in #call; AccessControl has no permission for it, and nobody else may, not even a users.manage holder)
+
     def initialize(user, name:, actor: Current.actor)
       @user = user
       @name = name
@@ -20,9 +22,10 @@ module Users
     def call
       unless actor.is_a?(User) && actor == @user
         # Always refused, even for a `users.manage` holder: that route is
-        # `Users::Save`. The check is still made, so the denial and the
-        # contract both go through the one authorization seam.
-        authorize!("users.manage", @user)
+        # `Users::Save`. No `authorize!` here: its answer would be discarded,
+        # and a call that cannot change the outcome only reads as a check.
+        # The denial is logged against `users.manage`, the permission the
+        # editor lacks for this route.
         return denied("users.manage", @user)
       end
 
