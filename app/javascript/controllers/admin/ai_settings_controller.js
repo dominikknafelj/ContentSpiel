@@ -26,10 +26,12 @@ import { Controller } from "@hotwired/stimulus"
 //    shows, and the footer's Save is disabled (`admin--save-bar`, "ONE FORM
 //    AFTER ANOTHER"). Chosen over counting it in the leave guard: the key is
 //    not a change of the Settings form, and its own Save or Cancel are right
-//    there. And they stay usable: while the entry holds text its input,
-//    Save key and Cancel are exempt from the pending lock
-//    (`admin--pending-lock`, "ONE EXEMPTION"), or a changed form and a typed
-//    key would lock each other. Remove and Test connection stay locked.
+//    there. And they stay usable (`admin--pending-lock`, "ONE EXEMPTION"), or
+//    a changed form and a typed key would lock each other: the INPUT for as
+//    long as the entry is open (`data-pending-lock-exempt`; emptied to type
+//    another key it must not be disabled under the caret), Save key while
+//    the entry holds text. Cancel is never a locked control. Remove, Replace
+//    and Test connection stay locked.
 //
 // 4. Focus. Cancel closes the entry under the focus, and a key write's answer
 //    replaces the whole key component: both would leave focus on <body>. It
@@ -108,9 +110,15 @@ export default class extends Controller {
   // again.
   holdKey() {
     if (this.hasEntryTarget && this.hasInputTarget) {
-      const holds = !this.entryTarget.hidden && this.inputTarget.value.trim() !== ""
+      const open = !this.entryTarget.hidden
+      const holds = open && this.inputTarget.value.trim() !== ""
       if (holds) this.entryTarget.setAttribute("data-save-bar-holds", KEY_HINT)
       else this.entryTarget.removeAttribute("data-save-bar-holds")
+      // The INPUT is never locked out while the entry is open, text or no
+      // text: emptying it to type another key (select all, delete) would
+      // otherwise disable the very field the caret is in. Only Save key
+      // depends on there being something to save.
+      this.inputTarget.toggleAttribute("data-pending-lock-exempt", open)
     }
     document.dispatchEvent(new CustomEvent("admin--save-bar:query"))
   }
@@ -118,6 +126,7 @@ export default class extends Controller {
   edit() {
     this.chipTarget.hidden = true
     this.entryTarget.hidden = false
+    this.holdKey()
     this.inputTarget.focus()
   }
 

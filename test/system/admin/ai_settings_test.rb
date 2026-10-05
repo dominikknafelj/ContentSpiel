@@ -157,6 +157,20 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # Test connection has nothing to do with the entry: still locked.
     assert_selector "button[disabled]", text: "Test connection"
 
+    # Emptied to type another key (select all, delete): the field under the
+    # caret stays usable for as long as the entry is open; only Save key waits
+    # for there being something to save (round 3, Minor 2).
+    # (By script, with the `input` event a real deletion fires: the driver's
+    # own way of clearing a field fires none.)
+    page.execute_script("const key = document.getElementById('settings-ai_api_key'); key.focus(); key.value = ''; key.dispatchEvent(new Event('input', { bubbles: true }))")
+    assert_selector "#settings-ai-key button[type=submit][disabled]", text: "Save key"
+    assert_selector "#settings-ai_api_key:not([disabled])"
+    assert_equal "settings-ai_api_key", page.evaluate_script("document.activeElement.id")
+    assert_selector "#settings-ai-key", text: "Save or cancel your changes first."
+    assert_selector "#{footer} button[type=submit]:not([disabled])", text: "Save"
+    fill_in "API key", with: KEY
+    assert_selector "#settings-ai-key button[type=submit]:not([disabled])", text: "Save key"
+
     click_on "Save key"
     assert_selector "#toasts .admin-toast", text: "API key saved"
     assert_equal KEY, site_settings(:default).reload.ai_api_key

@@ -49,6 +49,9 @@ import { Controller } from "@hotwired/stimulus"
 // action's answer keeps the form's fields (the key write answers with streams
 // and follows the carried-base rule). The holder announces every change of
 // its state with `admin--save-bar:query`, which brings a fresh `state` here.
+// A single control can also be exempt by itself (`data-pending-lock-exempt`):
+// the key's input for as long as its entry is open, text or none -- emptied
+// to retype, it must not be disabled under the caret.
 const HINT = "Save or cancel your changes first."
 const MARK = "data-pending-locked"
 const warned = new WeakSet()
@@ -92,7 +95,7 @@ export default class extends Controller {
   }
 
   // See "ONE EXEMPTION".
-  exempt(control) { return control.closest("[data-save-bar-holds]") !== null }
+  exempt(control) { return control.hasAttribute("data-pending-lock-exempt") || control.closest("[data-save-bar-holds]") !== null }
 
   besideHolder(hint) { return hint.parentElement?.querySelector("[data-save-bar-holds]") != null }
 
