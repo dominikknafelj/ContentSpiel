@@ -13,7 +13,11 @@ module Admin
   class GroupsController < BaseController
     include StaleForm
 
-    STALE_MESSAGE = "This group was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
+    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
+    # changed it and when where the audit log says, and the message is the whole
+    # banner where it doesn't.
+    STALE_LEAD = "This group was changed".freeze
+    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
 
     before_action -> { require_permission("groups.manage") }
     before_action :set_group, only: %i[edit update destroy]
@@ -46,8 +50,14 @@ module Admin
     # A stale form (`Admin::StaleForm`: the group's `updated_at`, which a save of
     # its grants or members moves too, and a member change from a user's editor)
     # is refused before the service runs; the typed values stay in the form.
+    #
+    # Not for a group the viewer can only view (`can_manage_group?` false, the
+    # editor's `@view_only`): nothing they send is a lost update, it is a forged
+    # write, and `Groups::Save` answers it -- 403 and one `access.denied` where
+    # it takes something away. A 409 first would record nothing and name who
+    # last changed a group they can't manage.
     def update
-      return refuse_stale if stale_form?(@group, params[:base_updated_at])
+      return refuse_stale if manageable? && stale_form?(@group, params[:base_updated_at])
 
       save(@group, :edit)
     end
@@ -78,8 +88,10 @@ module Admin
       @open_keys = []
       @member_ids = attributes[:member_ids].map(&:to_i)
       load_editor
-      render_stale(:edit)
+      render_stale(:edit, @group)
     end
+
+    def manageable? = AccessControl.can_manage_group?(Current.actor, @group)
 
     def save(group, template)
       attributes = group_attributes
@@ -109,7 +121,8 @@ module Admin
     #   no delete zone. `Groups::Save`/`Groups::Destroy` ask the same question of the
     #   same grants whenever a request takes something away (a member, a grant, a
     #   removed name, the group) and are the backstop for a forged one; a request that
-    #   changes only the name or description, grants as stored, is still accepted. This
+    #   changes only the name or description, grants as rendered (or, with a dormant
+    #   dead grant, not posted at all), is still accepted. This
     #   decides only what is drawn. A new group has nothing stored to be unable to manage.
     # - `@members`: the member chips, in one query (the posted list after a failed save).
     # - the delete zone's numbers: one count and one preloaded list of the ACTIVE tokens.

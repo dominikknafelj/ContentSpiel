@@ -489,13 +489,105 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_empty group.memberships
   end
 
-  test "a blank base is not stale" do
+  # The record IS stale here (changed after the form was fetched): only the
+  # missing base lets the save through. On a record nobody touched this would
+  # pass whatever the blank-base rule said.
+  test "a blank base is not stale, even on a group changed since the form was fetched" do
     sign_in_as(users(:one))
     group = AccessControl::Group.create!(name: "Shared")
+    form = params_as_rendered_for(group)
+    travel 1.minute
+    group.update!(description: "changed by somebody else")
+    assert_operator Time.iso8601(form["base_updated_at"]), :<, group.reload.updated_at
 
-    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered_for(group).merge("base_updated_at" => "")
+    patch "/cs-studio/groups/#{group.id}", params: form.merge("base_updated_at" => "")
 
     assert_response :see_other
+  end
+
+  test "the stale banner names who changed the group and when, from the audit log" do
+    group = AccessControl::Group.create!(name: "Shared", description: "before")
+    sign_in_as(users(:one))
+    form = params_as_rendered_for(group)
+
+    travel 2.minutes
+    sign_in_as(users(:two))
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered_for(group).deep_merge("group" => { "description" => "two was here" })
+    assert_response :see_other
+
+    travel 3.minutes
+    sign_in_as(users(:one))
+    patch "/cs-studio/groups/#{group.id}", params: form
+    assert_response :conflict
+    assert_select "[role=alert]", text: /This group was changed by two@example\.com\s+3m ago\.\s+Reload to see the latest — your changes are still in the form\./
+    assert_not_includes response.body, "changed elsewhere since"
+  end
+
+  test "the stale banner says so when the change was the viewer's own, in another tab" do
+    group = AccessControl::Group.create!(name: "Shared", description: "before")
+    sign_in_as(users(:one))
+    form = params_as_rendered_for(group)
+
+    travel 2.minutes
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered_for(group).deep_merge("group" => { "description" => "my other tab" })
+    assert_response :see_other
+
+    patch "/cs-studio/groups/#{group.id}", params: form
+    assert_response :conflict
+    assert_select "[role=alert]", text: /This group was changed in another tab or window\s+just now\.\s+Reload to see the latest/
+  end
+
+  # The group's `updated_at` moved, but the event is the USER's (`user.updated`):
+  # no event names the group, so nobody is named rather than the wrong person.
+  test "a member added on a user's form leaves the group's stale banner without a name" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Shared")
+    form = params_as_rendered_for(group)
+    travel 2.minutes
+    patch "/cs-studio/users/#{users(:author).id}", params: { user: { email_address: users(:author).email_address, group_ids: [ "", group.id.to_s ] } }
+    assert_response :see_other
+
+    patch "/cs-studio/groups/#{group.id}", params: form
+    assert_response :conflict
+    assert_includes response.body, STALE_GROUP
+  end
+
+  test "after a successful Save the redirect's form carries the new base, so a second Save is a 303 too" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Shared")
+    travel 1.minute
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered_for(group).deep_merge("group" => { "description" => "first" })
+    assert_response :see_other
+    follow_redirect!
+
+    travel 1.minute
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered.deep_merge("group" => { "description" => "second" })
+
+    assert_response :see_other
+    assert_equal "second", group.reload.description
+  end
+
+  # A group the viewer can only view (it holds a grant they couldn't hand out):
+  # the stale check stands back, so a forged write is answered by `Groups::Save`
+  # -- 403 and one `access.denied` -- and not by a 409 that names who changed
+  # the group and records nothing.
+  test "a forged write to a view-only group on a stale base gets the service's 403 and its access.denied, not the 409" do
+    group = AccessControl::Group.create!(name: "Out of reach")
+    AccessControl::Grant.create!(group: group, permission: "settings.manage", scope: {})
+    managers = AccessControl::Group.create!(name: "Group managers")
+    AccessControl::Grant.create!(group: managers, permission: "groups.manage", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    stale = group.updated_at.iso8601(6)
+    travel 1.minute
+    group.update!(description: "changed since")
+    sign_in_as(users(:editor_branch))
+
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/groups/#{group.id}", params: { group: { name: "Out of reach", member_ids: [ "" ], grants: {} }, base_updated_at: stale }
+    end
+
+    assert_response :forbidden
+    assert_equal [ "settings.manage" ], group.grants.reload.pluck(:permission)
   end
 
   test "a member added on a user's form makes the group's open editor stale, and the reverse" do

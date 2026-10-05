@@ -35,8 +35,10 @@ module Users
   #   Review Focus 1), and every *removed* one a group they may manage as it
   #   stands (`AccessControl.can_manage_group?`, final fix wave).
   # - `owner` is owner-only (design spec §3.2); a value equal to the stored
-  #   one, or an absent, nil or empty one, isn't a change. The only request that
-  #   passes it is `PATCH users/:id/owner` (`Admin::UsersController#owner`). Demoting the last owner is
+  #   one, or an absent, nil or empty one, isn't a change. The only CS Studio
+  #   request that passes it is `PATCH users/:id/owner`
+  #   (`Admin::UsersController#owner`); the setup wizard passes `owner: true`
+  #   for the founding owner it creates. Demoting the last owner is
   #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
   #   apart from any other change's `user.updated`.
   class Save < ApplicationService

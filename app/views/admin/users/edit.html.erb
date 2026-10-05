@@ -24,7 +24,7 @@
 
   <% if @stale_form %>
     <div class="mb-4">
-      <%= render "admin/shared/stale_banner", message: Admin::UsersController::STALE_MESSAGE, reload_path: edit_admin_user_path(@user, **admin_url_options) %>
+      <%= render "admin/shared/stale_banner", message: Admin::UsersController::STALE_MESSAGE, lead: Admin::UsersController::STALE_LEAD, change: @stale_change, reload_path: edit_admin_user_path(@user, **admin_url_options) %>
     </div>
   <% end %>
 

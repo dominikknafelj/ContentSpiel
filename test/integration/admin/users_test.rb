@@ -272,7 +272,9 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     stale = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
     assert stale.present?
 
-    Users::Save.call(user, attributes: { name: "Renamed elsewhere" }, actor: nil)
+    # Straight through the model: no audit event, so the banner names nobody.
+    travel 1.minute
+    user.update!(name: "Renamed elsewhere")
 
     assert_no_difference -> { Audit::Event.count } do
       patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name", email_address: "typed@example.com", group_ids: [ "", access_control_groups(:read_only).id.to_s ] }, base_updated_at: stale }
@@ -288,12 +290,106 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_not_equal "typed@example.com", user.email_address
   end
 
-  test "a blank base is not stale, and the form as rendered carries a base" do
+  # The record IS stale here (changed after the form was fetched): only the
+  # missing base lets the save through.
+  test "a blank base is not stale even on a user changed since, and the form as rendered carries a base" do
     user = users(:author)
     get "/cs-studio/users/#{user.id}/edit"
     assert_select "#user-form input[name=base_updated_at][value]"
+    base = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+    travel 1.minute
+    user.update!(name: "Renamed elsewhere")
+    assert_operator Time.iso8601(base), :<, user.reload.updated_at
 
     patch "/cs-studio/users/#{user.id}", params: { user: { email_address: user.email_address }, base_updated_at: "" }
     assert_response :see_other
+  end
+
+  test "the stale banner names who changed the user and when, from the audit log" do
+    user = users(:author)
+    stale = base_of(user)
+
+    travel 2.minutes
+    sign_in_as(users(:two))
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Renamed by two" }, base_updated_at: base_of(user) }
+    assert_response :see_other
+
+    travel 3.minutes
+    sign_in_as(users(:one))
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name" }, base_updated_at: stale }
+    assert_response :conflict
+    assert_select "[role=alert]", text: /This user was changed by two@example\.com\s+3m ago\.\s+Reload to see the latest — your changes are still in the form\./
+    assert_not_includes response.body, "changed elsewhere since"
+  end
+
+  test "the stale banner says so when the change was the viewer's own, in another tab" do
+    user = users(:author)
+    stale = base_of(user)
+
+    travel 2.minutes
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "My other tab" }, base_updated_at: stale }
+    assert_response :see_other
+
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Typed name" }, base_updated_at: stale }
+    assert_response :conflict
+    assert_select "[role=alert]", text: /This user was changed in another tab or window\s+just now\.\s+Reload to see the latest/
+  end
+
+  test "after a successful Save the redirect's form carries the new base, so a second Save is a 303 too" do
+    user = users(:author)
+    travel 1.minute
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "First" }, base_updated_at: base_of(user) }
+    assert_response :see_other
+    follow_redirect!
+    base = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+
+    travel 1.minute
+    patch "/cs-studio/users/#{user.id}", params: { user: { name: "Second" }, base_updated_at: base }
+
+    assert_response :see_other
+    assert_equal "Second", user.reload.name
+  end
+
+  # A user the viewer can only view (`Users::Manageability` is not `:editable`):
+  # the stale check stands back, so a forged write is answered by `Users::Save`
+  # -- 403 and one `access.denied` -- and not by a 409 that records nothing.
+  test "a forged write to an owner on a stale base gets the service's 403 and its access.denied, not the 409" do
+    owner = users(:one)
+    stale = owner.updated_at.iso8601(6)
+    travel 1.minute
+    owner.update!(name: "Changed since")
+    sign_in_as(users(:two))
+
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/users/#{owner.id}", params: { user: { name: "Forged" }, base_updated_at: stale }
+    end
+
+    assert_response :forbidden
+    assert_equal "Changed since", owner.reload.name
+  end
+
+  test "a forged write to an outranking user on a stale base gets the service's 403, not the 409" do
+    managers = AccessControl::Group.create!(name: "User managers")
+    AccessControl::Grant.create!(group: managers, permission: "users.manage", scope: {})
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    admin_member = users(:two)
+    stale = admin_member.updated_at.iso8601(6)
+    travel 1.minute
+    admin_member.update!(name: "Changed since")
+    sign_in_as(users(:editor_branch))
+
+    assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+      patch "/cs-studio/users/#{admin_member.id}", params: { user: { name: "Forged" }, base_updated_at: stale }
+    end
+
+    assert_response :forbidden
+    assert_equal "Changed since", admin_member.reload.name
+  end
+
+  private
+
+  def base_of(user)
+    get "/cs-studio/users/#{user.id}/edit"
+    Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
   end
 end

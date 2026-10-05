@@ -1,7 +1,18 @@
-<%# locals: message, reload_path -- the 409 banner of an explicit-save screen
-    (`Admin::StaleForm`). Reload is a way out like Cancel: it discards what is in
+<%# locals: message, lead, change, reload_path -- the 409 banner of an
+    explicit-save screen (`Admin::StaleForm`). `change` is who changed the record
+    since the form loaded (`Audit::ChangeSince`, nil when the audit log names
+    nobody): "<lead> by <name> <time ago>." for someone else, "<lead> in another
+    tab or window <time ago>." for the viewer's own, and the screen's plain
+    `message` otherwise. Reload is a way out like Cancel: it discards what is in
     the form on purpose, so the leave guard doesn't ask. %>
 <div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">
-  <%= message %>
+  <% if change %>
+    <%= lead %>
+    <% if change.own %>in another tab or window<% else %>by <%= render Admin::UserNameComponent.new(user: change.event.user, user_id: change.event.user_id) %><% end %>
+    <%= render Admin::TimeAgoComponent.new(time: change.event.last_occurred_at) %>.
+    <%= Admin::StaleForm::STALE_ADVICE %>
+  <% else %>
+    <%= message %>
+  <% end %>
   <%= link_to "Reload", reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
 </div>

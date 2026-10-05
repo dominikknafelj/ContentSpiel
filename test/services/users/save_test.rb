@@ -154,7 +154,8 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal [ "Only an owner can change who is an owner" ], result.errors
     assert_not users(:reader).reload.owner?
 
-    # An unchanged value (the form's hidden "0") isn't a change.
+    # An unchanged value isn't a change (no form sends one: the flag is posted
+    # only by `PATCH users/:id/owner`).
     assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "0", email_address: "r@example.com" }) }.ok?
   end
 

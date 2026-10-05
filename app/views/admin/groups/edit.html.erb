@@ -8,7 +8,7 @@
 
 <% if @stale_form %>
   <div class="mb-4 max-w-[1000px]">
-    <%= render "admin/shared/stale_banner", message: Admin::GroupsController::STALE_MESSAGE, reload_path: edit_admin_group_path(@group, **admin_url_options) %>
+    <%= render "admin/shared/stale_banner", message: Admin::GroupsController::STALE_MESSAGE, lead: Admin::GroupsController::STALE_LEAD, change: @stale_change, reload_path: edit_admin_group_path(@group, **admin_url_options) %>
   </div>
 <% end %>
 

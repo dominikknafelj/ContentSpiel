@@ -196,16 +196,21 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
 
   test "a Save on a form opened before another admin changed the group shows the banner, keeps the typed name, and Reload shows the other change" do
     group = AccessControl::Group.create!(name: "Shared", description: "before")
+    # The banner names a change only when its event lies more than
+    # `Audit::ChangeSince::SLACK` past the base the form loaded.
+    backdate(group, by: 1.minute)
     visit "/cs-studio/groups/#{group.id}/edit"
     await_admin_controllers
 
     # Another admin saves the same group while this form is open.
-    assert Groups::Save.call(group, attributes: { description: "changed by the other admin" }, actor: nil).ok?
+    Current.set(actor: users(:two), channel: :admin) do
+      assert Groups::Save.call(group, attributes: { description: "changed by the other admin" }).ok?
+    end
 
     fill_in "Name", with: "My rename"
     click_button "Save group"
 
-    assert_selector "[role=alert]", text: "This group was changed elsewhere since you opened this screen"
+    assert_selector "[role=alert]", text: "This group was changed by two@example.com just now. Reload to see the latest — your changes are still in the form."
     assert_field "Name", with: "My rename"
     assert_equal "Shared", group.reload.name
 

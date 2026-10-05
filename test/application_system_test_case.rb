@@ -324,7 +324,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # shares this process, so `travel_to` would move its clock, but the BROWSER's
   # clock does not move with it: a test that compares a time the browser made
   # with one the server made must not travel. The "Changed elsewhere" bar names
-  # only changes more than `ChangedElsewhereComponent::SLACK` past the base a
+  # only changes more than `Audit::ChangeSince::SLACK` past the base a
   # form loaded; a record backdated before the form loads puts the next change
   # on the far side of it without waiting a second for it.
   def backdate(record, by: 5.seconds)

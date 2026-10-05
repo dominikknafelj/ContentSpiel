@@ -663,8 +663,8 @@ class Groups::SaveTest < ActiveSupport::TestCase
       as_rendered = AccessControl::LiveGrants.new(group.grants.to_a).carried_attributes
 
       [ { member_ids: [] }, { member_ids: [], grants: as_rendered } ].each do |attributes|
-        # A wholly dead grant is never rendered: posting the form drops it, which
-        # is no removal by itself -- the member leaving is.
+        # A wholly dead grant is never rendered: posting the form drops it, and
+        # dropping a dormant name is a removal too, like the member leaving.
         assert_refused_unchanged(group) { Groups::Save.call(group, attributes: attributes) }
         assert_equal [ users(:reader).id ], group.reload.user_ids, "#{types.inspect} #{attributes.keys.inspect}"
       end

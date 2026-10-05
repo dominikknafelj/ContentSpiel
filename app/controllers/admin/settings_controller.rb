@@ -23,7 +23,11 @@ module Admin
     include FileParams
     include StaleForm
 
-    STALE_MESSAGE = "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
+    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
+    # changed it and when where the audit log says, and the message is the whole
+    # banner where it doesn't.
+    STALE_LEAD = "Settings were changed".freeze
+    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
 
     before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
     # The AI test is a `settings.manage` action; the module gate above would
@@ -73,7 +77,7 @@ module Admin
         @site_setting = site
         @submitted = permitted
         @tab_locale = admin_locale
-        return render_stale(:show)
+        return render_stale(:show, site)
       end
 
       attributes, translated = site_arguments(permitted)

@@ -35,7 +35,7 @@
 
   <div class="flex min-w-0 flex-col gap-5">
     <% if @stale_form %>
-      <%= render "admin/shared/stale_banner", message: Admin::SettingsController::STALE_MESSAGE, reload_path: admin_settings_path(**admin_url_options) %>
+      <%= render "admin/shared/stale_banner", message: Admin::SettingsController::STALE_MESSAGE, lead: Admin::SettingsController::STALE_LEAD, change: @stale_change, reload_path: admin_settings_path(**admin_url_options) %>
     <% end %>
     <%# Full messages, so "AI provider isn't an available provider" keeps the name
     the model gives its attribute instead of the humanized key ("Ai provider"). %>
