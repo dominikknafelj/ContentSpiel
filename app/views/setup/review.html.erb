@@ -9,6 +9,7 @@
        [ "Social links", @site_setting.social_links.keys.to_sentence.presence || "None", "site" ],
        [ "Default language", language_name(@site_setting.default_locale), "languages" ],
        [ "Home page", "Always created", nil ],
+       [ "MCP token", @mcp_token_name.present? ? "#{@mcp_token_name} (created)" : "Skipped", "mcp_token" ],
        [ "Starter content", @starter_added ? "Blog, Resume and Now pages, one sample post each" : "Skipped — Home page only", "starter_content" ]
      ] %>
   <% rows.each do |label, value, step| %>

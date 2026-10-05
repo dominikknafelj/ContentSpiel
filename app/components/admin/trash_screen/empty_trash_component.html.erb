@@ -1,0 +1,8 @@
+<%= render Admin::ButtonComponent.new(label: "Empty trash…", variant: :danger_text, type: "button", data: dialog_trigger(DIALOG_ID)) %>
+<%= render Admin::ConfirmDialogComponent.new(destructive: true, id: DIALOG_ID, title: "Empty the trash?", body: sentence) do |dialog| %>
+  <% dialog.with_confirm_action do %>
+    <%= form_with url: empty_path, method: :delete, data: { turbo_frame: "_top" } do %>
+      <%= render Admin::ButtonComponent.new(label: "Empty trash", variant: :danger, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>

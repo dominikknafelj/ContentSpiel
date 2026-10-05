@@ -34,6 +34,19 @@ module Admin
 
     def query = params[:q].to_s.strip.first(MAX_QUERY_LENGTH)
 
+    # Names the picker already holds (its chips, or the tag being merged), as a
+    # JSON array in `exclude`. Left out HERE, before the limit, so the picker
+    # still gets eight to show -- filtered in the browser after the limit, a
+    # post with eight tags was offered nothing. Anything but an array of
+    # strings is no exclusion; the list is capped.
+    MAX_EXCLUDED = 100
+    def excluded
+      list = JSON.parse(params[:exclude].to_s)
+      list.is_a?(Array) ? list.grep(String).first(MAX_EXCLUDED).map(&:downcase) : []
+    rescue JSON::ParserError
+      []
+    end
+
     # `sanitize_sql_like` keeps a typed `%`/`_` literal. The count is a
     # correlated subquery over the readable posts, so the tag list itself
     # stays one query (no per-tag count).
@@ -45,6 +58,7 @@ module Admin
       pattern = Tag.sanitize_sql_like(query.downcase)
       prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([ "(LOWER(tags.name) LIKE ?) DESC", "#{pattern}%" ]))
       tags = Tag.where("LOWER(tags.name) LIKE ?", "%#{pattern}%").limit(LIMIT)
+      tags = tags.where.not("LOWER(tags.name) IN (?)", excluded) if excluded.any?
 
       # Without the right to read posts there is no count to show (and no need
       # to pay for the subquery): alphabetical within prefix-first.

@@ -37,7 +37,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     find("#{card(@third)} .admin-block-card__handle").send_keys(:space, :up, :space)
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
-    assert_equal block_ids, blocks_on_screen
+    assert_order_eventually(block_ids) { blocks_on_screen }
     assert_equal block_ids, @alpha.content_blocks.reload.order(:position).ids
     assert_selector "#{card(@third)} button[data-move='down'][disabled]", visible: :all
     assert_no_selector "#toasts .admin-toast[data-kind=undo]"
@@ -45,7 +45,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     # Dropping again while it still fails replaces the toast, never stacks it.
     find("#{card(@first)} .admin-block-card__handle").send_keys(:space, :down, :space)
     assert_eventually { page.evaluate_script("window.__writes") == 2 }
-    assert_equal block_ids, blocks_on_screen
+    assert_order_eventually(block_ids) { blocks_on_screen }
     assert_selector "#toasts .admin-toast", text: FAILED, count: 1
   end
 
@@ -57,7 +57,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     within(card(@first)) { press "Move down" }
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
-    assert_equal block_ids, blocks_on_screen
+    assert_order_eventually(block_ids) { blocks_on_screen }
     assert_selector "#{card(@first)} button[data-move='up'][disabled]", visible: :all
     assert_no_text "Internal error"
   end
@@ -86,7 +86,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     mouse.up
 
     assert_selector "#toasts .admin-toast[role=alert]", text: SIGNED_OUT, wait: 10
-    assert_equal block_ids, blocks_on_screen
+    assert_order_eventually(block_ids) { blocks_on_screen }
     assert_no_selector "input[type=password]", visible: :all
     assert_no_selector "form[action$='/sign-in']", visible: :all
     assert_selector "header.admin-editor-header", count: 1
@@ -105,7 +105,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     within(card(@first)) { press "Move down" }
 
     assert_selector "#content-blocks-status", text: /COULDN.T SAVE/i, wait: 10
-    assert_equal block_ids, blocks_on_screen
+    assert_order_eventually(block_ids) { blocks_on_screen }
     assert_no_selector "#toast-order-error"
   end
 
@@ -118,7 +118,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     find("button[aria-label='Move Alpha']").send_keys(:space, :down, :space)
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
-    assert_equal %w[Alpha Beta Gamma], tree_order
+    assert_order_eventually(%w[Alpha Beta Gamma]) { tree_order }
     assert_equal %w[Alpha Beta Gamma], children_titles
     assert_no_selector "#tree [data-picked]"
   end
@@ -130,7 +130,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     find("button[aria-label='Move Beta']").send_keys(:space, :right, :space)
 
     assert_selector "#toasts .admin-toast[role=alert]", text: FAILED, wait: 10
-    assert_equal %w[Alpha Beta Gamma], tree_order
+    assert_order_eventually(%w[Alpha Beta Gamma]) { tree_order }
     assert_no_selector "ul[data-parent-id='#{@alpha.id}'] li[data-page-id='#{@beta.id}']"
     assert_equal root_page.id, @beta.reload.parent_id
   end
@@ -160,7 +160,7 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     mouse.up
 
     assert_selector "#toasts .admin-toast[role=alert]", text: SIGNED_OUT, wait: 10
-    assert_equal %w[Alpha Beta Gamma], tree_order
+    assert_order_eventually(%w[Alpha Beta Gamma]) { tree_order }
     assert_no_selector "input[type=password]", visible: :all
     assert_no_selector "form[action$='/sign-in']", visible: :all
     assert_selector "#tree", count: 1
@@ -193,6 +193,17 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
   def block_ids = [ @first.id, @second.id, @third.id ]
 
   def blocks_on_screen = page.all("#content-blocks-list > [data-block-id]").map { |card| card["data-block-id"].to_i }
+
+  # A card or row goes back where it was only once the refused answer has been
+  # judged -- a moment after the toast, and after the request was merely
+  # counted -- so the order on screen is waited for, never read once.
+  def assert_order_eventually(expected)
+    seen = nil
+    assert_eventually(message: -> { "the order never read #{expected.inspect} (last seen #{seen.inspect})" }) do
+      seen = yield
+      seen == expected
+    end
+  end
 
   def tree_order
     page.all("#tree .admin-tree-node__handle").map { |handle| handle["aria-label"].delete_prefix("Move ") }

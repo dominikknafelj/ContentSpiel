@@ -6,7 +6,6 @@ module ContentTypes
     def self.register
       ContentTypes.register :now_update do |t|
         t.label "Now update"
-        t.color "#f59e0b"
         t.list_component Posts::NowListComponent
         t.detail_component Posts::DetailComponent
 

@@ -248,4 +248,43 @@ class Audit::RecordTest < ActiveSupport::TestCase
     assert_equal({ "v" => 1 }, first.reload.snapshot)
     assert_equal [ "a", "b" ], first.field_changes["en title"]
   end
+
+  test "a token actor's name is written to actor_label, and survives the token being deleted" do
+    token, _raw = ApiToken.generate!(users(:two), name: "Claude desktop")
+    Current.actor = token
+    Current.channel = :mcp
+
+    event = Audit.record("post.created", subject: create_post(title: "Named"))
+    assert_equal "Claude desktop", event.actor_label
+    assert_equal "Claude desktop", event.via_label
+
+    ApiToken.where(id: token.id).delete_all
+    assert_equal "Claude desktop", event.reload.via_label
+  end
+
+  test "a user actor has no actor_label and no via_label" do
+    Current.actor = users(:one)
+    event = Audit.record("post.created", subject: create_post(title: "By a user"))
+    assert_nil event.actor_label
+    assert_nil event.via_label
+  end
+
+  test "a token event from before names reads an API token" do
+    assert_equal "an API token", Audit::Event.new(actor_type: "ApiToken", actor_id: 1, actor_label: nil).via_label
+  end
+
+  test "coalescing counts occurrences and leaves actor_label alone" do
+    token, _raw = ApiToken.generate!(users(:two), name: "Claude desktop")
+    Current.actor = token
+    post = create_post(title: "Edited")
+    first = Audit.record("post.updated", subject: post, field_changes: { "title" => [ "a", "b" ] })
+    assert_equal 1, first.occurrences
+
+    token.update_columns(name: "Renamed")
+    again = Audit.record("post.updated", subject: post, field_changes: { "title" => [ "b", "c" ] })
+
+    assert_equal first.id, again.id
+    assert_equal 2, again.reload.occurrences
+    assert_equal "Claude desktop", again.actor_label
+  end
 end

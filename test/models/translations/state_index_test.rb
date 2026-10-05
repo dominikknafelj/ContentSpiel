@@ -25,6 +25,40 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     result.record
   end
 
+  test "translated_record_count counts kept records that hold a stored translation, in one query" do
+    assert_equal 0, Translations::StateIndex.translated_record_count
+
+    translated = create_page(title: "About", translations: { "de" => { title: "Über" }, "es" => { title: "Acerca" } })
+    half = create_post(title: "Hello")
+    assert Posts::Save.call(half, translations: { "de" => { title: "Hallo" } }).ok?
+    create_page(title: "Untranslated")
+    # Two languages translated still count the page once.
+    assert_equal 2, Translations::StateIndex.translated_record_count
+    assert_equal 1, count_queries { ActiveRecord::Base.uncached { Translations::StateIndex.translated_record_count } }
+
+    assert Trash::Move.call(half).ok?
+    assert_equal 1, Translations::StateIndex.translated_record_count
+    assert translated
+  end
+
+  test "translated_record_count: an image without alt text is not counted, a block's translation counts its page once, the settings row counts" do
+    asset = Media::Upload.call(file: Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")).record
+    assert_equal "complete", state(asset, "de").state, "no alt in the original: nothing to translate, reads complete"
+    page = create_page(title: "Only blocks")
+    block = create_block(page, translations: { "en" => { body: rich_doc("Text") } })
+    assert_equal 0, Translations::StateIndex.translated_record_count
+
+    assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Text DE") }, "es" => { body: rich_doc("Texto") } }).ok?
+    assert_equal 1, Translations::StateIndex.translated_record_count
+
+    assert Settings::Save.call(translations: { "de" => { title: "Seite" } }).ok?
+    assert_equal 2, Translations::StateIndex.translated_record_count
+
+    assert Media::Save.call(asset, translations: { "en" => { alt: "A desk" } }).ok?
+    assert Media::Save.call(asset, translations: { "de" => { alt: "Ein Schreibtisch" } }).ok?
+    assert_equal 3, Translations::StateIndex.translated_record_count
+  end
+
   test "a new page is missing in every other language" do
     page = create_page(title: "About")
     assert_equal %w[missing missing], %w[de es].map { |l| state(page, l).state }

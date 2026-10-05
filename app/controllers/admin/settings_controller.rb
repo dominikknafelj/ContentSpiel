@@ -1,147 +1,193 @@
 module Admin
-  # The Settings module (cs-studio spec §6.1, Task 8): title, tagline, logo
-  # (the explicit-remove pattern, mirroring `Admin::PagesController`'s own
-  # hero image), social link rows (`SiteSetting#social_link_rows=`) and the
-  # default language (restricted to the site's own enabled languages, the
-  # same set `Admin::PageSettingsFormComponent`-style forms elsewhere never
-  # need to restrict since they read `Locales.enabled` directly, but this
-  # screen is the one place that value is itself being *set*).
+  # The Settings module (cs-studio spec §6.1; round 3, Task 5): one screen of
+  # cards -- Site, Languages, Publishing, AI translation -- and ONE form
+  # (`#settings-form`) with ONE save footer. Settings no longer autosaves
+  # (design pass spec §4, handoff B12): `PATCH /settings` is an ordinary form
+  # submission, answered by a 303 to the same screen with the toast "Settings
+  # saved" (decision D4), by the screen re-rendered at 422 with the error
+  # summary when the service refuses, or at 409 when the form's base is stale.
+  # It never answers a Turbo Stream.
   #
   # There's only ever one `SiteSetting` row (`SiteSetting#only_one_record_
-  # exists`); it's written through `Settings::Save`, like the setup
-  # wizard's site step -- which is where the permission check and the
-  # `settings.updated` event live (access-control design spec §3.4).
+  # exists`); every write goes through `Settings::Save`, which holds the
+  # permission checks and the `settings.updated` event.
+  #
+  # WHO OPENS IT (decision D9): either `settings.manage` or `languages.manage`
+  # (`MODULES`, and the gate below); each card and its nav link render only for
+  # the right that owns them (`Admin::SettingsScreen::NavComponent`). Nothing
+  # here is guarded per card by a `before_action`: the service enforces the
+  # same split, and what the form carries is built from what the viewer may
+  # manage, so a forged field outside their right reaches the service as a
+  # refusal and comes back as the 403.
   class SettingsController < BaseController
-    include AutosaveResponses
     include FileParams
 
-    ID_PREFIX = "settings"
+    STALE_MESSAGE = "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
 
-    # The module is `settings.manage` (access-control design spec §3.4);
-    # `Settings::Save` checks it again for every write.
-    before_action -> { require_permission("settings.manage") }
+    before_action -> { forbidden! unless holds_any?(%w[settings.manage languages.manage]) }
+    # The AI test is a `settings.manage` action; the module gate above would
+    # also let a languages-only viewer reach it.
+    before_action -> { require_permission("settings.manage") }, only: :test_ai_connection
 
     def show
       @site_setting = Current.site
     end
 
-    # The settings form's own autosave endpoint (spec §6.1), same shape as
-    # `Admin::PagesController#update`: every field in `params[:site_setting]`
-    # PATCHes here together, answered with the shared Turbo Stream response
-    # regardless of success.
+    # What this form may carry, deliberately short: the default language is
+    # NOT here (it is its own instant action behind a dialog,
+    # `Locales::MakeDefault`; the service still accepts `default_locale` for
+    # the setup wizard, so this list is what keeps a settings-only user from
+    # changing it from here), and neither is `locales`. The language ORDER and
+    # fallbacks are `languages` (rows of `code` and `fallback`; round 3, Task 6).
+    # Every enabled language's title and tagline arrive together,
+    # `translations[<code>][title|tagline]`.
     #
-    # The title and tagline (`Settings::Save::TRANSLATED`) are saved in the
-    # language being edited (`admin_locale`, the `?locale=` the form posts
-    # to), the same way `Admin::PagesController#update` saves a page title;
-    # every other field is one value for the whole site, resent and saved
-    # the same whichever language the form is showing.
+    # `Settings::Save` decides "this call has a site part" from what is PASSED,
+    # so the arguments are built from what was POSTED (only the languages and
+    # fields actually posted, never an empty hash), whoever the viewer is, and
+    # the service decides: a field outside the viewer's right -- site fields
+    # from a languages-only viewer, `languages` rows from a settings-only one --
+    # is REFUSED (a 403 and one `access.denied`, nothing written), never
+    # silently dropped. Neither viewer's own form carries such a field (the card
+    # isn't rendered for them), so their Save stays a one-part call: a
+    # languages-only viewer's form carries just the rows and a languages-only
+    # call needs only `languages.manage` and leaves the site row alone.
     def update
       site = Current.site
-      permitted = params.fetch(:site_setting, ActionController::Parameters.new)
-        .permit(*Settings::Save::TRANSLATED, :logo, :default_locale, :trash_retention_days, :time_zone,
-          :ai_provider, :ai_model, :ai_api_key, social_links: [ [ :name, :url ] ])
-
-      translated = permitted.slice(*Settings::Save::TRANSLATED).to_h
-      attributes = permitted.except(:social_links, *Settings::Save::TRANSLATED).to_h
-
-      # `drop_blank_file_params` (see its own doc comment, carried over from
-      # `Admin::PagesController#update`) keeps this same PATCH -- resent in
-      # full on *every* autosave, whichever field an editor actually
-      # touched -- from silently detaching an already-attached logo the
-      # moment a blank `logo` file input rides along with it. Removing one
-      # on purpose is the explicit `remove_logo` checkbox instead.
-      attributes = drop_blank_file_params(attributes, fields: %w[logo])
-      attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_logo))
-      logo_changing = attributes.key?("logo")
-      attributes["social_link_rows"] = permitted[:social_links] if permitted.key?(:social_links)
-      ai_key_touched = assign_ai_key(attributes)
-
-      result = Settings::Save.call(site, attributes: attributes, translations: { admin_locale => translated })
-      saved = result.ok?
-
-      streams = autosave_stream(
-        record: site,
-        result: result,
-        status_id: "#{ID_PREFIX}-save-status",
-        error_prefix: ID_PREFIX,
-        base_updated_at: params[:base_updated_at],
-        fields: { title: [ :title ], tagline: [ :tagline ], logo: [ :logo ], default_locale: [ :default_locale ],
-          trash_retention_days: [ :trash_retention_days ], time_zone: [ :time_zone ], social_links: [ :social_links ],
-          ai_provider: [ :ai_provider ], ai_model: [ :ai_model ], ai_api_key: [ :ai_api_key ] }
+      # A forged scalar (`site_setting=x`) is no form at all: read as an empty
+      # one (nothing posted, nothing saved) rather than a 500 from `permit`.
+      posted = params[:site_setting]
+      posted = ActionController::Parameters.new unless posted.is_a?(ActionController::Parameters)
+      permitted = posted.permit(
+        :logo, :remove_logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model, :language_order,
+        translations: Locales.enabled.index_with { Settings::Save::TRANSLATED },
+        social_links: [ :name, :url ],
+        # `language_order` is the one tracked field that makes a reorder a
+        # single change for the footer (`admin--sortable-rows`); the rows
+        # themselves are what is read.
+        languages: [ :code, :fallback ]
       )
 
-      streams << logo_field_stream(site) if saved && logo_changing
-      # Saved or not: either way the field must come back empty (a refused
-      # save mustn't leave a typed key sitting in the page), and the
-      # section says what's stored now.
-      streams << ai_key_field_stream(site) if ai_key_touched
-      # First, so the status and error streams after it land in the new form.
-      streams.unshift(form_stream(site)) if saved && site.saved_change_to_default_locale?
+      if stale?(site, params[:base_updated_at])
+        @site_setting = site
+        @submitted = permitted
+        @stale = true
+        @tab_locale = admin_locale
+        return render(:show, status: :conflict)
+      end
 
-      render turbo_stream: streams, status: autosave_status(result)
+      attributes, translated = site_arguments(permitted)
+      result = Settings::Save.call(site, attributes: attributes, translations: translated, languages: language_arguments(site, permitted))
+
+      if result.ok?
+        redirect_to admin_settings_path(**admin_url_options), status: :see_other, notice: "Settings saved"
+      else
+        forbidden_or(result) do
+          @site_setting = site
+          @submitted = permitted
+          @errors = site.errors.any? ? site.errors : result.errors
+          @tab_locale = tab_for_errors(site.errors)
+          render :show, status: :unprocessable_entity
+        end
+      end
     end
 
     # Test connection (translation helpers spec §6.2): one tiny request
     # with the *saved* provider, model and key (`AI.provider`, then the
-    # provider's own `#test_connection`), reported inline under the button.
-    # Writes nothing, so it's not a service; `settings.manage` is the
-    # controller-wide `before_action` above.
+    # provider's own `#test_connection`), reported inline under the button:
+    # "CONNECTED · 412 MS" with the provider call's elapsed time, measured here
+    # on the server, or the provider's own message. Neither carries the key.
+    # Writes nothing, so it's not a service. (The key's save and remove are
+    # `Admin::AiKeysController`.)
     def test_ai_connection
+      started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       AI.provider.test_connection
-      render turbo_stream: ai_test_result_stream(message: "Connection OK.", ok: true)
+      elapsed = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round
+      render turbo_stream: ai_test_result_stream(milliseconds: elapsed)
     rescue AI::Error => error
-      render turbo_stream: ai_test_result_stream(message: error.message, ok: false), status: :unprocessable_entity
+      render turbo_stream: ai_test_result_stream(message: error.message), status: :unprocessable_entity
     end
 
     private
 
-    # The API key's two rules (spec §6.2), applied to the attributes about
-    # to go to `Settings::Save`: a blank `ai_api_key` keeps the stored key
-    # (the field is always rendered empty, so blank means "not changing
-    # it"), and `remove_ai_key` clears it -- unless a new key was typed in
-    # the same submit, which wins, like a new logo over `remove_logo`.
-    # Returns whether this request touched the key at all.
-    def assign_ai_key(attributes)
-      attributes.delete("ai_api_key") if attributes["ai_api_key"].blank?
-      removing = ActiveModel::Type::Boolean.new.cast(params.dig(:site_setting, :remove_ai_key))
-      attributes["ai_api_key"] = nil if removing && !attributes.key?("ai_api_key")
+    # The form's own comparison, a few lines the same shape as the editors'
+    # (`AutosaveResponses#stale_base?`, which is private to autosave): the
+    # row as just loaded is newer than the base the form carried. Blank or
+    # unparseable is not stale -- non-JS and scripted clients never send one.
+    def stale?(site, base) = base_older_than?(site.updated_at, base)
 
-      attributes.key?("ai_api_key")
+    def base_older_than?(updated_at, base)
+      return false if base.blank?
+
+      Time.iso8601(base) < updated_at
+    rescue ArgumentError
+      false
     end
 
-    def ai_key_field_stream(site)
-      turbo_stream.replace("#{ID_PREFIX}-ai-key-section", partial: "admin/settings/ai_key_field", locals: { site_setting: site })
+    # `[attributes, translations]` for `Settings::Save` from the permitted
+    # params: the logo (a blank file input is dropped; the remove box detaches
+    # unless a new file came with it), the social link rows in the order the
+    # form numbered them, and only the languages/fields actually posted.
+    def site_arguments(permitted)
+      attributes = permitted.slice(:logo, :time_zone, :trash_retention_days, :ai_provider, :ai_model).to_h
+      attributes = drop_blank_file_params(attributes, fields: %w[logo])
+      attributes["logo"] = nil if !attributes.key?("logo") && ActiveModel::Type::Boolean.new.cast(permitted[:remove_logo])
+      attributes["social_link_rows"] = social_link_rows(permitted[:social_links]) if rows_posted?(permitted[:social_links])
+
+      translated = (permitted[:translations]&.to_h || {}).transform_values { |fields| fields.slice(*Settings::Save::TRANSLATED.map(&:to_s)) }.reject { |_, fields| fields.empty? }
+      [ attributes, translated ]
     end
 
-    def ai_test_result_stream(message:, ok:)
-      turbo_stream.replace("#{ID_PREFIX}-ai-test-result", partial: "admin/settings/ai_test_result", locals: { message: message, ok: ok })
+    # The complete ordered `[{ "code", "fallbacks" }]` for `Settings::Save`, or
+    # nil when no rows were posted (the language part is then not in the call).
+    # Rows arrive as `languages[][code]`/`languages[][fallback]` in row order.
+    #
+    # DECISION D7: the card's select stores ONE fallback, but a language may be
+    # stored with several. A row's stored list is rewritten only when the
+    # posted value differs from the stored FIRST entry -- the one the select
+    # showed -- so an untouched row keeps all of its fallbacks, and a row whose
+    # select was changed (to another language, or to "None") keeps only the
+    # new choice. A row posting no `fallback` at all (the default's select is
+    # disabled) is untouched too.
+    def language_arguments(site, permitted)
+      rows = permitted[:languages]
+      return nil unless rows.is_a?(Array)
+
+      rows = rows.grep(ActionController::Parameters).select { |row| row[:code].present? }
+      return nil if rows.empty?
+
+      rows.map do |row|
+        code = row[:code].to_s
+        stored = Array(site.locale_entry(code)&.dig("fallbacks")).map(&:to_s)
+        changed = row.key?(:fallback) && row[:fallback].to_s != stored.first.to_s
+        { "code" => code, "fallbacks" => changed ? [ row[:fallback].to_s ].reject(&:blank?) : stored }
+      end
     end
 
-    # A new default language changes what every translated field shows:
-    # which language is the original, the originals beside the inputs, the
-    # switcher's links and markers. The whole form is re-rendered, still in
-    # the language it was being edited in (`admin_locale`, which the form
-    # always posts).
-    def form_stream(site)
-      turbo_stream.replace(Admin::SettingsFormComponent::DOM_ID,
-        Admin::SettingsFormComponent.new(site_setting: site, locale: admin_locale))
+    # `social_links[0][name]`-style rows arrive as a hash keyed by row number
+    # (or, from a scripted client, a plain array); either way, row order.
+    # Rows are an array, or a hash keyed by row number; any other shape (a forged
+    # `social_links[name]=x`) is not rows at all, and leaves the stored links be.
+    def rows_posted?(rows)
+      rows.is_a?(Array) || (rows.respond_to?(:keys) && rows.keys.any? && rows.keys.all? { |key| key.to_s.match?(/\A\d+\z/) })
     end
 
-    def forbidden_status_id = action_name == "update" ? "#{ID_PREFIX}-save-status" : nil
+    def social_link_rows(rows)
+      rows = rows.respond_to?(:values) && !rows.is_a?(Array) ? rows.to_h.sort_by { |index, _| index.to_i }.map(&:last) : Array(rows)
+      # Only rows that are hashes: a forged `social_links[name]=x` is a hash of
+      # strings, not of rows.
+      rows.grep(Hash).map { |row| row.to_h.symbolize_keys }
+    end
 
-    # The logo section
-    # (preview + "Remove image" checkbox) is the one part of this form a
-    # plain autosave doesn't otherwise bring back in sync with what was
-    # actually saved.
-    def logo_field_stream(site)
-      section_id = "#{ID_PREFIX}-logo-section"
+    # The tab to show after a refusal: the language of the first error that
+    # belongs to a translated field (the title rule is the default language's),
+    # else the tab the editor was on (`locale`, kept current by `admin--settings-tabs`).
+    def tab_for_errors(errors)
+      errors.attribute_names.any? { |name| Settings::Save::TRANSLATED.include?(name) } ? Locales.default : admin_locale
+    end
 
-      turbo_stream.replace(section_id, partial: "admin/shared/image_upload_field", locals: {
-        section_id: section_id, name: "logo",
-        image_id: "#{ID_PREFIX}-logo", image_html_name: "site_setting[logo]", image_value: site.logo,
-        checkbox_id: "#{ID_PREFIX}-remove_logo", checkbox_html_name: "site_setting[remove_logo]",
-        show_checkbox: site.logo.attached?
-      })
+    def ai_test_result_stream(milliseconds: nil, message: nil)
+      turbo_stream.replace(Admin::SettingsScreen::AiTestResultComponent::ID, Admin::SettingsScreen::AiTestResultComponent.new(milliseconds: milliseconds, message: message))
     end
   end
 end

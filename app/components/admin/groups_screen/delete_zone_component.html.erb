@@ -1,0 +1,30 @@
+<% if group.built_in? %>
+  <p class="admin-delete-zone mt-6 max-w-[1000px] rounded-cs border border-line bg-sunken px-3 py-2.5 text-sm text-dim">A built-in group can be changed but not deleted.</p>
+<% else %>
+  <section class="admin-delete-zone mt-6 flex max-w-[1000px] flex-wrap items-center justify-between gap-3 rounded-cs border border-line px-3.5 py-3" aria-labelledby="delete-zone-title">
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <h2 id="delete-zone-title" class="text-base font-medium text-ink">Delete this group</h2>
+      <p class="text-sm text-dim"><%= members_effect %> <%= tokens_effect %></p>
+    </div>
+    <%= render Admin::ButtonComponent.new(label: "Delete group…", variant: :danger_text, size: :small, type: "button", data: dialog_trigger(dialog_id)) %>
+  </section>
+
+  <%# Outside the group form (forms don't nest), after it. %>
+  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete “#{group.name_was.presence || group.name}”?", body: dialog_body) do |dialog| %>
+    <% if token_count.positive? %>
+      <% dialog.with_details do %>
+        <ul class="admin-delete-group-tokens list-disc pl-5 text-sm">
+          <% shown_tokens.each do |token| %>
+            <li><%= token.name %> — <%= render Admin::UserNameComponent.new(user: token.user, user_id: token.user_id) %></li>
+          <% end %>
+        </ul>
+        <% if hidden_tokens.positive? %><p class="mt-1 text-sm text-dim">and <%= hidden_tokens %> more</p><% end %>
+      <% end %>
+    <% end %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: helpers.admin_group_path(group, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
+        <%= render Admin::ButtonComponent.new(label: "Delete group", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

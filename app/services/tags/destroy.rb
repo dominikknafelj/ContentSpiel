@@ -12,6 +12,8 @@ module Tags
   # `Tags::Rename` makes -- so this resyncs explicitly too, rather than
   # leaning on `PostTag`'s callback alone to happen to cover it.
   class Destroy < ApplicationService
+    include Tags::Listings
+
     def initialize(tag, actor: Current.actor)
       @tag = tag
       @actor = actor
@@ -25,7 +27,7 @@ module Tags
 
       content_types = affected_content_types
       destroyed = Tag.transaction do
-        touch_carrying_posts
+        touch_carrying_posts(@tag)
         record_event("tag.deleted", subject: @tag)
         @tag.destroy || raise(ActiveRecord::Rollback)
       end
@@ -37,32 +39,10 @@ module Tags
 
     private
 
-    # An open post form resends every tag chip on every autosave, so a post
-    # that carried this tag and is being edited right now would put the tag
-    # straight back (`Posts::Save#build_tag` creates a name it can't find).
-    # Touching the carrying posts moves their `updated_at`, so that form's
-    # next save is refused as "Changed elsewhere" (`refuse_stale_autosave`)
-    # -- the same protection `Posts::Save` gives another editor's tag-only
-    # change. `touch_all` skips callbacks and validations on purpose: only
-    # the stale-save base moves. Must run before the destroy, which removes
-    # the `post_tags` this reads.
-    def touch_carrying_posts
-      Post.where(id: @tag.post_tags.select(:post_id)).touch_all
-    end
-
     # Computed *before* the destroy: once `@tag` (and its `post_tags`) are
     # gone, there is nothing left to look this up from, and a listing
     # block's own `settings.tag` is a plain string unrelated to the tag row
     # being removed, so it isn't touched by the destroy either way.
-    def affected_content_types
-      name = @tag.name.to_s.downcase
-
-      matching = ContentBlock.listing.select do |block|
-        tag = block.settings_object&.tag.to_s.strip
-        tag.present? && tag.downcase == name
-      end
-
-      matching.map { |block| block.settings_object.content_type.presence }.uniq
-    end
+    def affected_content_types = super(@tag.name)
   end
 end

@@ -41,6 +41,6 @@ class Admin::TranslationLayoutGuardTest < ActionDispatch::IntegrationTest
   test "the media detail" do
     asset = create_media_asset
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand dunes" } }).ok?
-    assert_pairs_inside_containers "/cs-studio/media/#{asset.id}"
+    assert_pairs_inside_containers "/cs-studio/media?selected=#{asset.id}"
   end
 end

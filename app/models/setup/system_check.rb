@@ -6,9 +6,38 @@
 # failure.
 module Setup
   class SystemCheck
-    Result = Data.define(:label, :status, :message) do
+    # `command` is a console command the reader may copy (nil for most
+    # checks) and `docs` a link to read more (nil: nothing in the repo is
+    # linked yet). Both default to nil so a Result built with only the three
+    # original keywords still works.
+    Result = Data.define(:label, :status, :message, :command, :docs) do
+      def initialize(label:, status:, message:, command: nil, docs: nil) = super
+
       def ok? = status == :ok
     end
+
+    # Shown on the System status page to anyone who may view it, and copied
+    # to a clipboard: so it is this fixed string, a placeholder address and
+    # password, and nothing computed -- never a real address, secret, path
+    # or environment value.
+    #
+    # It goes through `Users::UpdatePassword` rather than `update!` on the
+    # model: the service audits the change and ends every session of that
+    # user (a password reset after a compromise must not leave the other party
+    # signed in). From `bin/rails runner` there is no actor or channel, which
+    # the checker trusts like the console, and no acting session to keep. `p`
+    # prints `true`/`false` so a refusal isn't silent -- and
+    # `MAIL_FALLBACK_MESSAGE`, shown above the command, says what each means.
+    #
+    # The password is typed twice (the service takes a confirmation), inside
+    # double quotes inside the shell's single quotes: a new password
+    # containing either kind of quote would end the string early. Rather than
+    # a more elaborate command, the message says so; everything stays one
+    # fixed string.
+    MAIL_FALLBACK_MESSAGE = "Password reset by email isn't configured. To set a password from the server instead, run this command with the account's email address, " \
+      "replacing “a new password” in both places with the new one (at least #{User::MINIMUM_PASSWORD_LENGTH} characters, with no quotes in it). " \
+      "It prints true when the password was changed, and false when it was refused (too short, or the two don't match).".freeze
+    MAIL_FALLBACK_COMMAND = %(bin/rails runner 'p Users::UpdatePassword.call(User.find_by!(email_address: "you@example.com"), password: "a new password", password_confirmation: "a new password").ok?').freeze
 
     # Talks to the storage service directly rather than through
     # ActiveStorage::Blob.create_and_upload!, which saves the blob row before
@@ -91,8 +120,7 @@ module Setup
         if configured
           ok("Outgoing mail", "Outgoing mail is configured.")
         else
-          warning("Outgoing mail", "Password reset by email isn't configured. To reset a password without email, " \
-            "run bin/rails console and User.find_by(email_address: \"you@example.com\").update!(password: \"new password\").")
+          warning("Outgoing mail", MAIL_FALLBACK_MESSAGE, command: MAIL_FALLBACK_COMMAND)
         end
       end
 
@@ -103,6 +131,6 @@ module Setup
       end
 
       def ok(label, message) = Result.new(label:, status: :ok, message:)
-      def warning(label, message) = Result.new(label:, status: :warning, message:)
+      def warning(label, message, command: nil) = Result.new(label:, status: :warning, message:, command:)
   end
 end

@@ -36,6 +36,24 @@ class Admin::TagSuggestionsTest < ActionDispatch::IntegrationTest
     assert_equal 8, suggest("tag").size
   end
 
+  # What the field already holds is left out BEFORE the limit, so there are
+  # still eight to show.
+  test "excluded names are left out before the limit, whatever their case; a junk exclude excludes nothing" do
+    12.times { |i| Tag.create!(name: "tag#{format('%02d', i)}") }
+    first_eight = suggest("tag").map { |row| row["value"] }
+
+    get "/cs-studio/tags/suggest", params: { q: "tag", exclude: first_eight.map(&:upcase).to_json }
+    rest = response.parsed_body.map { |row| row["value"] }
+    assert_equal 4, rest.size
+    assert_empty rest & first_eight
+
+    [ "not json", { a: 1 }.to_json, [ 1, nil, [ "tag00" ] ].to_json ].each do |junk|
+      get "/cs-studio/tags/suggest", params: { q: "tag", exclude: junk }
+      assert_response :ok
+      assert_equal 8, response.parsed_body.size
+    end
+  end
+
   test "% and _ are literal" do
     Tag.create!(name: "100%")
     Tag.create!(name: "a_b")

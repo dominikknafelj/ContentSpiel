@@ -51,7 +51,7 @@ module Admin
         case type
         when "page" then helpers.admin_page_path(record, locale:)
         when "post" then helpers.admin_post_path(record, locale:)
-        else helpers.admin_medium_path(record, locale:)
+        else helpers.admin_media_path(selected: record.id, locale:)
         end
       end
 

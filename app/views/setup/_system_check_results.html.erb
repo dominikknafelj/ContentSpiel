@@ -1,13 +1,11 @@
+<%# The check rows, shared by the setup wizard's step and CS Studio's System
+    status (handoff §10 item 14): warnings first, then OK, each group in the
+    checks' own order. `copyable` is false in the wizard, which loads no admin
+    JavaScript, so a Copy button there would do nothing
+    (`Admin::SystemCheckRowComponent`). %>
+<% copyable = local_assigns.fetch(:copyable, false) %>
 <ul class="mt-6 divide-y divide-line border-y border-line">
-  <% results.each do |result| %>
-    <li class="flex gap-4 py-3">
-      <span class="w-20 shrink-0 font-cs-mono text-label uppercase tracking-mono <%= result.ok? ? "text-ok-ink" : "text-warn-ink" %>">
-        <%= result.ok? ? "OK" : "Warning" %>
-      </span>
-      <div>
-        <p class="font-semibold"><%= result.label %></p>
-        <p class="text-dim"><%= result.message %></p>
-      </div>
-    </li>
+  <% results.sort_by.with_index { |result, index| [ result.ok? ? 1 : 0, index ] }.each do |result| %>
+    <%= render Admin::SystemCheckRowComponent.new(result: result, copyable: copyable) %>
   <% end %>
 </ul>

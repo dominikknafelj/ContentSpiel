@@ -1,0 +1,87 @@
+<%# The ids `site`, `languages`, ... sit on the card HEADINGS (the nav's and
+    ⌘K's anchors), so a jump lands on the title. The card itself is named by
+    its heading. %>
+<section id="settings-site-card" class="admin-settings-card rounded-cs border border-line bg-surface" aria-labelledby="site"
+         data-controller="admin--settings-tabs" data-action="click@document->admin--settings-tabs#reveal" data-admin--settings-tabs-current-value="<%= locale %>">
+  <%# Where Save (or a refused one) comes back to; `admin--settings-tabs` keeps it on the visible tab. %>
+  <%= hidden_field_tag :locale, locale, id: "settings-locale", data: { "admin--settings-tabs-target": "locale" } %>
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 pt-3.5">
+    <h2 id="site" class="pb-2 text-h2 text-ink">Site</h2>
+    <% if codes.size > 1 %>
+      <%= render Admin::LanguageTabsComponent.new(current: locale, missing: switcher_locales[:missing], outdated: switcher_locales[:outdated],
+            mode: :buttons, button_data: method(:tabs_data), panel_id: method(:panel_id)) %>
+    <% end %>
+  </div>
+
+  <%# `.admin-translation-form` is the container the reference card's
+      two-column pair keys its breakpoint on. %>
+  <div class="admin-translation-form flex flex-col gap-5 p-4">
+    <% codes.each do |code| %>
+      <%= tag.div id: panel_id(code), role: ("tabpanel" if codes.size > 1), hidden: !current?(code), class: "flex flex-col gap-4",
+            aria: ({ labelledby: "language-tab-#{code}" } if codes.size > 1),
+            data: { language_panel: code, "admin--settings-tabs-target": "panel" } do %>
+        <%# Suggest translations for N empty fields -- this language's. %>
+        <%= render Admin::TranslationScreen::TranslateAllComponent.new(record: site_setting, locale: code, editable: true) %>
+
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "title", label: "Title · translatable", id: field_id(code, "title"), html_name: html_name(code, "title"),
+              value: values.text(code, :title), original: original(code, :title), locale: code,
+              errors: (default?(code) ? errors_for(:title) : []), **translation(code, :title)
+            ) %>
+        <%= render Admin::Columns::PlainColumnComponent.new(
+              name: "tagline", label: "Tagline · translatable", id: field_id(code, "tagline"), html_name: html_name(code, "tagline"),
+              value: values.text(code, :tagline), original: original(code, :tagline), locale: code,
+              errors: (default?(code) ? errors_for(:tagline) : []), **translation(code, :tagline)
+            ) %>
+      <% end %>
+    <% end %>
+
+    <%# Logo: the stored one (or a NONE tile), the shared drop zone, and an
+        explicit remove box -- a blank file input never detaches it. %>
+    <div class="admin-column" data-field-name="logo">
+      <p class="<%= setup_label_class %> mb-1" id="settings-logo-label">Logo</p>
+      <div class="flex flex-wrap items-start gap-3.5">
+        <% logo = values.logo %>
+        <% if logo.attached? %>
+          <%= image_tag logo, alt: "Current logo", class: "size-11 shrink-0 rounded-cs border border-line bg-sunken object-contain" %>
+        <% else %>
+          <span class="grid size-11 shrink-0 place-items-center bg-sunken font-cs-mono text-[9px] text-meta">NONE</span>
+        <% end %>
+        <div class="min-w-0 flex-1">
+          <%= render Admin::FileDropComponent.new(name: "site_setting[logo]", id: "settings-logo", accept: "image/*", label: "Logo file",
+                hint: "PNG, JPEG, GIF or WebP. Without a logo the site title is shown.") %>
+          <% if logo.attached? %>
+            <label class="mt-2 inline-flex items-center gap-2 text-sm text-meta">
+              <%= render Admin::CheckboxComponent.new(name: "site_setting[remove_logo]", value: "1", id: "settings-remove_logo", checked: values.remove_logo?) %>
+              Remove logo
+            </label>
+          <% end %>
+        </div>
+      </div>
+      <%= helpers.render "admin/shared/field_errors", id: "settings-logo-errors", messages: errors_for(:logo) %>
+    </div>
+
+    <div class="admin-column max-w-sm" data-field-name="time_zone">
+      <%= label_tag "settings-time_zone", "Time zone", class: setup_label_class %>
+      <%= select_tag "site_setting[time_zone]", options_for_select(time_zone_options, values.time_zone), id: "settings-time_zone",
+            class: setup_select_class, aria: { describedby: "settings-time_zone-help" } %>
+      <p id="settings-time_zone-help" class="mt-1 text-xs text-meta">Used for scheduled publishing.</p>
+      <%= helpers.render "admin/shared/field_errors", id: "settings-time_zone-errors", messages: errors_for(:time_zone) %>
+    </div>
+
+    <fieldset class="admin-column" id="settings-social-links" data-field-name="social_links" data-controller="admin--repeat-rows"
+              data-admin--repeat-rows-next-value="<%= values.social_rows.size %>">
+      <legend class="<%= setup_label_class %> mb-1">Social links</legend>
+      <div class="flex flex-col gap-2" data-admin--repeat-rows-target="list">
+        <% values.social_rows.each_with_index do |(name, url), index| %>
+          <%= render "admin/settings/social_link_row", index: index, name: name, url: url %>
+        <% end %>
+      </div>
+      <template id="settings-social-link-template" data-admin--repeat-rows-target="template">
+        <%= render "admin/settings/social_link_row", index: TEMPLATE_INDEX, name: "", url: "" %>
+      </template>
+      <button type="button" class="mt-2 cursor-pointer text-sm text-accent hover:text-accent-hover" data-action="admin--repeat-rows#add">+ Add link</button>
+      <%= helpers.render "admin/shared/field_errors", id: "settings-social_links-errors", messages: errors_for(:social_links) %>
+    </fieldset>
+  </div>
+</section>

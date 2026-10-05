@@ -52,3 +52,7 @@ en:
               format: "%{message}"
               blank: "Password can't be blank"
               too_long: "Password is too long (maximum is %{count} characters)"
+            # "Change password": a wrong current password reads the same
+            # under its field and in the summary, with no attribute prefix.
+            current_password:
+              format: "%{message}"

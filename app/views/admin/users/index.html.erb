@@ -1,50 +1,10 @@
-<%# The Users module (cs-studio spec §6.1, Task 8): every user, new/edit and
-    a delete gated behind `Admin::ConfirmDialogComponent` -- refused for the
-    last user (`User#ensure_not_last_owner`, surfaced as a flash alert since
-    this list has no per-row error slot of its own the way an autosaving
-    form does). %>
+<%# The Users module (cs-studio spec §6.1; round 3 Task 12, handoff `Studio Users`): every
+    user as a row that opens their editor, with their groups and last sign-in
+    (`Users::LastSignIn`, one grouped query). Delete lives in the editor. %>
 <% content_for :title, "Users" %>
-<div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
   <h1 class="text-h1 text-ink">Users</h1>
-  <%= link_to "+ New user", new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
+  <%= link_to "New user", new_admin_user_path(**admin_url_options), data: { turbo_frame: "content" }, class: setup_primary_button_class %>
 </div>
 
-
-<table class="admin-users-table w-full border-collapse text-sm">
-  <thead>
-    <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
-      <th class="py-2 pr-4">User</th>
-      <th class="py-2 pr-4">Groups</th>
-      <th class="py-2"><span class="sr-only">Actions</span></th>
-    </tr>
-  </thead>
-  <tbody>
-    <% @users.each do |user| %>
-      <% dialog_id = "delete-user-#{user.id}" %>
-      <tr id="<%= dom_id(user) %>" class="border-b border-line align-top">
-        <td class="py-2 pr-4 text-ink">
-          <%= render Admin::UserNameComponent.new(user: user) %>
-          <% if user.name.present? %><span class="block text-sm text-meta"><%= user.email_address %></span><% end %>
-          <% if user == Current.user %><span class="text-meta">(you)</span><% end %>
-          <% if user.owner? %><span class="ml-1 rounded-cs border border-line px-1.5 font-cs-mono text-label uppercase tracking-mono text-meta">Owner</span><% end %>
-        </td>
-        <td class="py-2 pr-4 text-ink"><%= user.groups.map(&:name).sort.join(", ").presence || "—" %></td>
-        <td class="py-2 text-right">
-          <%= link_to "Edit", edit_admin_user_path(user, **admin_url_options), data: { turbo_frame: "content" }, class: setup_secondary_link_class %>
-
-          <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger_text, type: "button",
-                data: dialog_trigger(dialog_id)) %>
-
-          <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete this user?",
-                body: (user == Current.user ? "This is your own account — deleting it signs you out." : "This can't be undone.")) do |dialog| %>
-            <% dialog.with_confirm_action do %>
-              <%= form_with url: admin_user_path(user, **admin_url_options), method: :delete, data: { turbo_frame: "_top" } do %>
-                <%= render Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit") %>
-              <% end %>
-            <% end %>
-          <% end %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+<%= render Admin::UsersScreen::ListComponent.new(users: @users, last_sign_ins: @last_sign_ins, current_user: Current.user) %>

@@ -22,33 +22,18 @@ module Users
   module OwnerProtection
     private
 
-    def owner_protected? = @user.persisted? && @user.owner? && !actor_owner?
+    # The predicates live in `Users::Manageability` (round 3 Task 12), which the
+    # user editor asks too, so what the screen shows and what these services
+    # refuse can't drift. They are read at call time with the service's own
+    # actor and `Current.channel`, as they always were.
+    def owner_protected? = Manageability.owner_protected?(actor, @user)
 
-    # An owner, or a trusted code path (nil actor on `:setup`/`:console`/
-    # `:system`). Never an API token, not even an owner's (final fix wave,
-    # Minor 1): a token acts within its group, so an owner's token with
-    # `users.manage` can't flip owner flags or edit an owner's account.
-    def actor_owner?
-      return AccessControl.trusted?(actor, Current.channel) if actor.nil?
+    # An owner, or a trusted code path; never an API token (see Manageability).
+    def actor_owner? = Manageability.actor_owner?(actor)
 
-      AccessControl.owner?(actor)
-    end
-
-    # Fix round 1 (I1), the same idea one level down: a non-owner may only
-    # manage users whose rights are a subset of their own -- every group
-    # the target belongs to must be one the actor may manage as it stands
-    # (`AccessControl.can_manage_group?`, which a token answers on its
-    # effective rights). Otherwise `users.manage` alone would let them
-    # reset an Admin member's password or email, sign in as them, and hold
-    # every right Admin has. Owners (and trusted code paths) are
-    # unaffected; acting on yourself is never "outranked".
-    def outranked?
-      return false if @user.new_record? || actor_owner? || actor.nil? || @user == actor_user
-
-      AccessControl::Group.includes(:grants).where(id: @user.memberships.select(:group_id)).any? do |group|
-        !AccessControl.can_manage_group?(actor, group)
-      end
-    end
+    # A non-owner may only manage users whose groups they could manage as they
+    # stand (fix round 1, I1); see Manageability#outranked?.
+    def outranked? = Manageability.outranked?(actor, @user)
 
     def owner_only_denial
       denied("users.manage", @user, message: "You don't have permission to change an owner's account")

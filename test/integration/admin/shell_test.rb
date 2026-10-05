@@ -122,4 +122,37 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     post "/cs-studio/sign-in", params: { email_address: users(:one).email_address, password: "password" }
     assert_redirected_to "/cs-studio"
   end
+
+  # Round 3, Task 1 (decision D24): the one Leave dialog every explicit-save
+  # screen shares. Keep editing is the primary button and takes the focus, and
+  # closes the dialog without any script (a `method="dialog"` submit); Discard
+  # changes is the button `admin--save-bar` wires up.
+  test "the layout carries the Leave dialog with Keep editing first in focus" do
+    sign_in_as(users(:one))
+    get "/cs-studio/users"
+    assert_select "dialog#leave-dialog", count: 1 do
+      assert_select "h2", "Leave without saving?"
+      assert_select "p[data-leave-count]", "You have unsaved changes on this screen."
+      assert_select "form[method=dialog] button[type=submit][autofocus]", text: "Keep editing"
+      assert_select "button[type=button][data-leave-confirm]", text: "Discard changes"
+      assert_select "button", text: "Stay", count: 0
+      assert_select "button", text: "Leave", count: 0
+    end
+  end
+
+  # A screen with an explicit-save form is never restored from Turbo's page
+  # cache (`Admin::SaveBarHelper`): once per screen however many forms it has,
+  # in a full page and in a frame answer alike; a list keeps the cache.
+  test "explicit-save screens opt out of Turbo's page cache, once" do
+    sign_in_as(users(:one))
+    get "/cs-studio/users/#{users(:two).id}/edit"
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    get "/cs-studio/users/#{users(:two).id}/edit", headers: { "Turbo-Frame" => "content" }
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    get "/cs-studio/account/password"
+    assert_select "form[data-controller~='admin--save-bar']", count: 2
+    assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
+    get "/cs-studio/users"
+    assert_select "head meta[name='turbo-cache-control']", count: 0
+  end
 end

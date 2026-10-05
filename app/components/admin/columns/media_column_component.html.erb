@@ -18,6 +18,12 @@
           data: { "admin--media-field-target": "remove", action: "admin--media-field#remove" }) %>
   </div>
 
+  <%# Without `media.upload` there is no picker (it is not even on the page), so the
+      field says why Choose is missing rather than looking broken. %>
+  <% unless can_choose? %>
+    <p class="mt-1 text-sm text-meta">You can't choose images.</p>
+  <% end %>
+
   <div id="<%= errors_id %>" class="mt-1 text-sm text-danger-ink" aria-live="polite">
     <% errors.each do |message| %>
       <p><%= message %></p>

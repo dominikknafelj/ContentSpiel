@@ -147,7 +147,8 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     Trash::Move.call(gone)
     refused = Trash::Restore.call(parent.reload, parent: gone.reload)
     assert_not refused.ok?
-    assert_equal [ Trash::Restore::UNKNOWN_PARENT ], refused.errors
+    # The words themselves, once: every other test compares against the constant.
+    assert_equal [ "Choose a parent page that still exists" ], refused.errors
     assert parent.reload.trashed?
   end
 

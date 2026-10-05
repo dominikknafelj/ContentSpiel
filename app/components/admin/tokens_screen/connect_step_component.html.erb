@@ -1,0 +1,24 @@
+<section class="rounded-cs border border-line bg-surface p-4">
+  <h2 class="text-h2 text-ink">2 · Add it to your assistant</h2>
+  <p class="mt-1 text-meta">Point your assistant at this URL and send the token as a bearer token<%= " (this configuration already holds the token above)" if secret? %>.</p>
+
+  <div class="mt-3">
+    <p class="<%= setup_label_class %>">MCP URL</p>
+    <div class="mt-1 flex flex-wrap items-center gap-2">
+      <code id="mcp-url" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken px-3 py-2 font-cs-mono text-ink"><%= mcp_url %></code>
+      <%= render Admin::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the MCP URL" }, data: copy_data("mcp-url")) %>
+    </div>
+  </div>
+
+  <div class="mt-4">
+    <p class="<%= setup_label_class %>">Client configuration</p>
+    <div class="mt-1 flex flex-wrap items-start gap-2">
+      <pre id="<%= secret? ? "api-token-config" : "mcp-client-config" %>" class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono text-sm"
+        <%= tag.attributes(data: config_data) %>><%= config %></pre>
+      <%= render Admin::ButtonComponent.new(label: "Copy", variant: :secondary, aria: { label: "Copy the client configuration" },
+            data: copy_data(secret? ? "api-token-config" : "mcp-client-config")) %>
+    </div>
+  </div>
+
+  <p data-admin--token-reveal-target="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
+</section>

@@ -30,17 +30,16 @@ module Jump
 
     # The Settings group (spec §7, round 1 second review): destinations
     # *inside* the Settings screen, shown as "Settings › X". `anchor` is the
-    # id of the section on `admin_settings_path` (see
-    # `Admin::SettingsFormComponent`), nil for Languages, which has a screen of
-    # its own. Each needs the permission its section's own controller asks for,
+    # id of the section on `admin_settings_path` (`site`, `languages`, `publishing`, `ai`; see
+    # `Admin::SettingsScreen::NavComponent`). Each needs the right that owns its card on that one screen,
     # so a viewer is never offered a link that would 403. Sections (CS Studio's
     # modules) used to share this group's label -- "Settings" listing
     # Dashboard and Pages -- and are a group of their own now.
     SETTINGS_DESTINATIONS = [
-      { title: "Settings › Site", path: :admin_settings_path, anchor: "settings-section-site", permission: "settings.manage" },
-      { title: "Settings › Publishing", path: :admin_settings_path, anchor: "settings-section-publishing", permission: "settings.manage" },
-      { title: "Settings › Languages", path: :admin_settings_languages_path, anchor: nil, permission: "languages.manage" },
-      { title: "Settings › AI translation", path: :admin_settings_path, anchor: "settings-section-ai", permission: "settings.manage" }
+      { title: "Settings › Site", path: :admin_settings_path, anchor: "site", permission: "settings.manage" },
+      { title: "Settings › Publishing", path: :admin_settings_path, anchor: "publishing", permission: "settings.manage" },
+      { title: "Settings › Languages", path: :admin_settings_path, anchor: "languages", permission: "languages.manage" },
+      { title: "Settings › AI translation", path: :admin_settings_path, anchor: "ai", permission: "settings.manage" }
     ].freeze
 
     def initialize(actor:, query:, modules:, url_options: {})
@@ -96,7 +95,7 @@ module Jump
     def media_rows
       return [] if blank? || !AccessControl.holds?(actor, "media.upload", channel: :admin)
       Media::Search.call(Media::Asset.kept, query).order(id: :desc).limit(LIMIT).map do |asset|
-        { title: asset.title.presence || "(untitled)", url: routes.admin_medium_path(asset, **url_options) }
+        { title: asset.title.presence || "(untitled)", url: routes.admin_media_path(selected: asset.id, **url_options) }
       end
     end
 

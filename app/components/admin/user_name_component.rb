@@ -5,6 +5,10 @@ module Admin
   # gone (`audit_events` has no FK on it), and no user at all (a trusted nil
   # actor).
   class UserNameComponent < AdminComponent
+    # The two names for nobody in particular: a user who existed, and no user.
+    DELETED_USER = "a deleted user".freeze
+    NOBODY = "System".freeze
+
     def initialize(user:, user_id: nil)
       @user = user
       @user_id = user_id
@@ -15,7 +19,7 @@ module Admin
     def label
       return @user.display_name if @user
 
-      @user_id ? "a deleted user" : "System"
+      @user_id ? DELETED_USER : NOBODY
     end
   end
 end

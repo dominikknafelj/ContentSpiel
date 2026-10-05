@@ -19,5 +19,11 @@ module Admin
     def with_outdated_translations
       render Admin::LanguageTabsComponent.new(current: "en", missing: [ "es" ], outdated: [ "de" ], url: ->(code) { "?locale=#{code}" })
     end
+
+    # Settings' Site card: every language's fields are on the page, the tabs
+    # only switch between them.
+    def buttons_mode
+      render Admin::LanguageTabsComponent.new(current: "en", mode: :buttons, missing: [ "es" ], outdated: [ "de" ])
+    end
   end
 end

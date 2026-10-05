@@ -1,0 +1,56 @@
+<%# Rendered open: with scripts off every scope control is on the page. `admin--permission-matrix` closes each editor
+    that isn't `data-open` when it connects (and shows the row's "Edit scope"). %>
+<div id="<%= id %>" class="admin-scope-editor flex flex-col gap-3 border-t border-line bg-paper py-3.5 pr-4 pl-12" data-scope-editor
+     data-open="<%= open? %>" data-action="change->admin--permission-matrix#scopeChanged keydown.esc->admin--permission-matrix#closeFromKey">
+  <% if types_shown %>
+    <fieldset class="flex flex-col gap-2">
+      <legend class="mb-2 font-cs-mono text-label uppercase tracking-mono text-meta">Content types · none ticked = all</legend>
+      <div class="flex flex-wrap gap-2">
+        <% registered_types.each do |name| %>
+          <% box_id = field_id("type", name.parameterize) %>
+          <label for="<%= box_id %>" class="flex items-center gap-2 rounded-cs border border-line-strong bg-surface px-2.5 py-1.5 text-sm text-ink">
+            <%= render Admin::CheckboxComponent.new(name: field_name("content_types") + "[]", value: name, checked: chosen_types.include?(name), id: box_id,
+                  data: { chip_label: content_type_label(name), chip_dot: dot_class(name) }) %>
+            <% if dot_class(name) %><span aria-hidden="true" class="h-[7px] w-[7px] shrink-0 rounded-full <%= dot_class(name) %>"></span><% end %>
+            <%= content_type_label(name) %>
+          </label>
+        <% end %>
+        <% removed_types.each do |name| %>
+          <span class="admin-removed-type flex items-center gap-2 rounded-cs border border-warn bg-warn-tint px-2.5 py-1.5 text-sm text-warn-ink" data-removed-type="<%= name %>">
+            <span aria-hidden="true">!</span> <%= name %> · this type no longer exists
+            <%# Carried until Remove: a form saved as rendered keeps it. Tracked, so Remove is a change the footer counts. %>
+            <%= hidden_field_tag field_name("content_types") + "[]", name, id: nil, data: { save_bar_track: true } %>
+            <button type="button" class="font-medium text-accent hover:text-accent-hover" data-action="click->admin--permission-matrix#removeType">Remove</button>
+          </span>
+        <% end %>
+      </div>
+      <% if @removed_hint && removed_types.any? %>
+        <p class="admin-removed-type-hint text-sm text-warn-ink">Remove this type before changing the row.</p>
+      <% end %>
+    </fieldset>
+  <% end %>
+
+  <% if own_shown %>
+    <label for="<%= field_id("own") %>" class="flex items-center gap-2.5 text-sm text-ink">
+      <%= check_box_tag field_name("own"), "1", scope["own"] == true, id: field_id("own"), class: "cs-toggle", role: "switch", data: { chip_own: true } %>
+      Own only <span class="text-meta">· Only posts the user wrote.</span>
+    </label>
+  <% end %>
+
+  <% if branch_shown %>
+    <div class="flex flex-col gap-2">
+      <span class="font-cs-mono text-label uppercase tracking-mono text-meta">Page branches · ticking a page includes everything under it · none = all</span>
+      <div class="admin-branch-picker max-w-[520px] rounded-cs border border-line bg-surface p-1.5" data-controller="admin--branch-picker">
+        <%= branch_list(tree.roots) %>
+        <% kept_page_ids.each do |page_id| %>
+          <%# A stored root the viewer can't open: carried, with no title and no place in the tree. %>
+          <%= hidden_field_tag field_name("page_ids") + "[]", page_id, id: nil, data: { admin__branch_picker_target: "kept" } %>
+          <p class="px-2 py-1 text-sm text-dim">A page you can't open (kept)</p>
+        <% end %>
+      </div>
+      <% if kept_page_ids.any? %>
+        <p class="admin-unreadable-branches text-sm text-warn-ink">Some of these branches are pages you can't open. Only someone who can open them can change this permission.</p>
+      <% end %>
+    </div>
+  <% end %>
+</div>

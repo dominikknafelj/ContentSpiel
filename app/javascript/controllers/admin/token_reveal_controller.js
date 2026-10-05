@@ -1,7 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
-// The one-time API token reveal (`admin/api_tokens/create`, design spec
-// §6.1). Two jobs:
+// The AI assistant page's Copy buttons and the one-time token reveal
+// (`admin/api_tokens/create`, design spec §6.1). Two jobs:
 //
 // - Copy: `navigator.clipboard` where it exists and is allowed (a secure
 //   context -- https or localhost). Where it isn't (plain http on a LAN
@@ -32,10 +32,10 @@ export default class extends Controller {
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable")
       await navigator.clipboard.writeText(source.textContent.trim())
-      this.say("Copied")
+      this.say("Copied", event.currentTarget)
     } catch (error) {
       this.select(source)
-      this.say("Couldn't copy automatically — the text is selected, press Ctrl+C (⌘C on a Mac).")
+      this.say("Couldn't copy automatically — the text is selected, press Ctrl+C (⌘C on a Mac).", event.currentTarget)
     }
   }
 
@@ -47,7 +47,14 @@ export default class extends Controller {
     selection.addRange(range)
   }
 
-  say(message) {
-    if (this.hasStatusTarget) this.statusTarget.textContent = message
+  // The AI assistant page has a Copy button in each of its steps (the token,
+  // the URL, the configuration) and a status line in each: the message goes
+  // to the line in the section the pressed button sits in, else to the first.
+  say(message, button) {
+    if (!this.hasStatusTarget) return
+    const section = button?.closest("section")
+    const status = (section && this.statusTargets.find((target) => section.contains(target))) || this.statusTarget
+    this.statusTargets.forEach((target) => { target.textContent = "" })
+    status.textContent = message
   }
 }

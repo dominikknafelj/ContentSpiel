@@ -37,7 +37,7 @@ module Audit
     # which is the version basis, not a diff. `translation_original_changed_at`
     # is the same kind of bookkeeping (a per-field time derived from the
     # original's own listed change).
-    IGNORED_CHANGES = %w[created_at updated_at translation_sources translation_original_changed_at].freeze
+    IGNORED_CHANGES = %w[created_at updated_at translation_sources translation_original_changed_at ai_api_key_saved_at].freeze
 
     FILTER_MASK = Object.new.freeze
     private_constant :FILTER_MASK
@@ -109,7 +109,7 @@ module Audit
       when AccessControl::Group, Tag then record.name
       when ContentBlock then "#{record.block_type.to_s.humanize} block ##{record.id}"
       when Media::Asset then record.title.presence || "Image ##{record.id}"
-      when ApiToken then "API token ##{record.id}"
+      when ApiToken then record.name.presence || "API token ##{record.id}"
       when SiteSetting then "Site settings"
       else "#{record.model_name.human} ##{record.id}"
       end
@@ -164,7 +164,7 @@ module Audit
           "grants" => record.grants.order(:permission, :id).map { |grant| { "permission" => grant.permission, "scope" => grant.scope } }
         }
       when ApiToken
-        { "id" => record.id, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
+        { "id" => record.id, "name" => record.name, "user_id" => record.user_id, "group_id" => record.group_id, "revoked_at" => record.revoked_at }
       when Media::Asset
         # Named fields, not `attributes` (media library design spec §5.1):
         # the title and every locale's alt/caption default (the raw jsonb

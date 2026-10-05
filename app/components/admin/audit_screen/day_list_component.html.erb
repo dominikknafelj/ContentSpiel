@@ -1,0 +1,10 @@
+<% days.each do |day| %>
+  <section class="mb-4" aria-labelledby="audit-day-<%= day.entries.first.first.id %>">
+    <h2 id="audit-day-<%= day.entries.first.first.id %>" class="py-2 font-cs-mono text-label uppercase tracking-mono text-meta"><%= day.label %></h2>
+    <ul class="m-0 list-none rounded-cs border border-line bg-surface p-0">
+      <% day.entries.each do |event, sentence| %>
+        <%= render Admin::AuditScreen::RowComponent.new(event: event, sentence: sentence, event_path: path_for(event)) %>
+      <% end %>
+    </ul>
+  </section>
+<% end %>

@@ -6,7 +6,7 @@
 #
 # Subclassed per registry (`BlockTypeDefinition`, `ContentTypeDefinition`,
 # `FieldGroupDefinition`) to add the handful of fields specific to that kind
-# of type (a rendering component, starter content, a mind-graph colour, ...)
+# of type (a rendering component, starter content, a colour slot, ...)
 # via `dsl_attribute`.
 module ContentModel
   class Definition
@@ -37,9 +37,9 @@ module ContentModel
     end
 
     # Defines a method that both sets and reads one value: called with an
-    # argument during registration (`t.color "#…"`), with none to read it
+    # argument during registration (`t.label "Event"`), with none to read it
     # back (a rendering loop calling `definition.component`). Collapses what
-    # would otherwise be a `label`/`component`/`color`/`list_component`/
+    # would otherwise be a `label`/`component`/`list_component`/
     # `detail_component`-shaped method on every subclass into one macro.
     def self.dsl_attribute(name)
       ivar = :"@#{name}"

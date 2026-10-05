@@ -74,7 +74,6 @@ module TestTypes
 
     ContentTypes.register "test/event" do |t|
       t.label "Event"
-      t.color "#f59e0b"
       t.list_component Posts::BlogListComponent
       t.detail_component Posts::DetailComponent
       t.field :venue, :string

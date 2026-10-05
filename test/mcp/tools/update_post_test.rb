@@ -53,7 +53,6 @@ class Mcp::Tools::UpdatePostTest < ActiveSupport::TestCase
     with_test_types do
       ContentTypes.register "test/required_company" do |t|
         t.label "Required company"
-        t.color "#f59e0b"
         t.list_component Posts::BlogListComponent
         t.detail_component Posts::DetailComponent
         t.field :company, :string, required: true

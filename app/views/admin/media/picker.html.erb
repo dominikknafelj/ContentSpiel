@@ -1,32 +1,16 @@
-<%# `Media::PickerComponent`'s Library tab (media library design spec §6,
-    Task 8): `Admin::MediaController#index` with `picker=1`, rendered
-    without a layout into the picker's own `<turbo-frame>` -- the search
-    form and the page links below stay inside that frame (Turbo
-    scopes a frame's own forms and links to it), so searching and paging
-    never navigate the editor underneath the modal. `picker` rides along in
-    the form (hidden field) and in the pagination links (`list_params`,
-    which names it among the keys to keep), so every later request comes back here,
-    not to the full Media module page. %>
-<turbo-frame id="media-picker-library">
-  <%= form_with url: admin_media_path(**admin_url_options), method: :get, class: "mb-4 flex flex-wrap items-end gap-3" do %>
-    <%= hidden_field_tag :picker, "1", id: nil %>
-    <% if admin_locale != Locales.default %>
-      <%= hidden_field_tag :locale, admin_locale, id: nil %>
-    <% end %>
-
-    <div>
-      <%= label_tag "media-picker-q", "Search images", class: setup_label_class %>
-      <%= search_field_tag :q, params[:q], id: "media-picker-q", placeholder: "Title, alt text or filename", class: setup_input_class %>
-    </div>
-
-    <div>
-      <%= label_tag "media-picker-filter", "Show", class: setup_label_class %>
-      <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-            id: "media-picker-filter", class: setup_select_class %>
-    </div>
-
-    <%= render Admin::ButtonComponent.new(label: "Search", variant: :secondary, type: "submit") %>
-  <% end %>
+<%# `Media::PickerComponent`'s grid (round 3, Task 9): `Admin::MediaController#index`
+    with `picker=1`, rendered without a layout into the picker's own
+    `<turbo-frame id="media-picker-grid">` -- the toolbar's form and the page links
+    below stay inside that frame (Turbo scopes a frame's own forms and links to it),
+    so searching, choosing a segment and paging never navigate the editor underneath
+    the modal, and the dialog never closes or jumps. `picker` rides along in the
+    toolbar's form (hidden field) and in the pagination links (`list_params`, which
+    names it among the keys to keep), so every later request comes back here, not to
+    the full Media module page. The toolbar is the Media screen's own
+    (`Admin::MediaLibrary::ToolbarComponent`, `picker: true`), the tiles the grid's
+    (`pick: true`). %>
+<turbo-frame id="media-picker-grid">
+  <%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], url_options: admin_url_options, picker: true) %>
 
   <% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :picker).merge("page" => page)) } %>
   <% if @pagination.out_of_range? %>

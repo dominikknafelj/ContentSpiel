@@ -1,0 +1,21 @@
+<ul class="admin-mind-graph-legend m-0 flex list-none flex-wrap items-center gap-x-5 gap-y-1.5 p-0 text-sm text-dim" aria-label="Legend">
+  <% type_names.each do |name| %>
+    <li data-legend-type="<%= name %>"><%= render Admin::ContentTypeDotComponent.new(content_type: name) %></li>
+  <% end %>
+  <li class="inline-flex items-center gap-1.5" data-legend="tag">
+    <svg class="mg-key mg-tag" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><rect x="1" y="1" width="8" height="8"/></svg>
+    Tag
+  </li>
+  <li class="inline-flex items-center gap-1.5" data-legend="hollow">
+    <svg class="mg-key" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><circle class="mg-key-hollow" cx="6" cy="6" r="4"/></svg>
+    Draft or scheduled
+  </li>
+  <li class="inline-flex items-center gap-1.5" data-legend="related">
+    <svg class="mg-key" width="22" height="8" viewBox="0 0 22 8" aria-hidden="true"><line class="mg-edge mg-edge-related" x1="0" y1="4" x2="22" y2="4"/></svg>
+    Related post
+  </li>
+  <li class="inline-flex items-center gap-1.5" data-legend="tag-edge">
+    <svg class="mg-key" width="22" height="8" viewBox="0 0 22 8" aria-hidden="true"><line class="mg-edge mg-edge-tag" x1="0" y1="4" x2="22" y2="4"/></svg>
+    Shares a tag
+  </li>
+</ul>

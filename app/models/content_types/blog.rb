@@ -5,7 +5,6 @@ module ContentTypes
     def self.register
       ContentTypes.register :blog do |t|
         t.label "Blog"
-        t.color "#3b82f6"
         t.list_component Posts::BlogListComponent
         t.detail_component Posts::DetailComponent
 

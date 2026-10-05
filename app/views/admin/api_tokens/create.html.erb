@@ -4,47 +4,19 @@
     This is a whole document (the create form posts with
     `data-turbo="false"`, fix round 1), so its `<head>` can carry
     `turbo-cache-control: no-cache` from the very first byte: Turbo never
-    snapshots this page, so leaving it (Done, or any link) and coming Back
-    refetches the list instead of restoring the reveal. A frame-rendered
-    reveal couldn't guarantee that -- Turbo's promoted frame visit caches
-    snapshots (and fires `turbo:before-cache`) on its own schedule, which
-    either kept the reveal in the cache or, with `data-turbo-temporary`,
-    removed it from the live page right after it rendered.
+    snapshots this page, so leaving it (any link) and coming Back refetches
+    the list instead of restoring the reveal. A frame-rendered reveal
+    couldn't guarantee that -- Turbo's promoted frame visit caches snapshots
+    (and fires `turbo:before-cache`) on its own schedule, which either kept
+    the reveal in the cache or, with `data-turbo-temporary`, removed it from
+    the live page right after it rendered.
     `admin--token-reveal` does the copying (Clipboard API, falling back to
     selecting the text) and blanks the token on `pagehide` for the
-    browser's own back/forward cache. %>
+    browser's own back/forward cache. Round 3 draws it as the AI assistant
+    page itself (the warn box in step 1, the token in step 2's configuration),
+    listing the new token in the table beneath. %>
 <% content_for :title, "AI assistant" %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
-<div data-controller="admin--token-reveal" class="flex flex-col gap-4">
-  <div>
-    <h1 class="text-h1 text-ink">Your new token</h1>
-    <p role="status" class="mt-1 text-warn-ink">Copy it now — it's only shown once. If you lose it, revoke it and create a new one.</p>
-  </div>
-
-  <div class="rounded-cs border border-line bg-surface p-4">
-    <p class="<%= setup_label_class %>">Token</p>
-    <div class="mt-1 flex flex-wrap items-start gap-2">
-      <pre id="api-token-value" data-admin--token-reveal-target="secret"
-        class="min-w-0 flex-1 overflow-x-auto rounded-cs border border-line bg-sunken p-3 font-cs-mono"><%= @raw_token %></pre>
-      <%= render Admin::ButtonComponent.new(label: "Copy token", variant: :secondary, type: "button",
-            data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-value" }) %>
-    </div>
-
-    <div class="mt-4">
-      <%= render "admin/api_tokens/connection", token: @raw_token, config_id: "api-token-config",
-            config_data: { "admin--token-reveal-target": "secret" } %>
-      <div class="mt-2">
-        <%= render Admin::ButtonComponent.new(label: "Copy configuration", variant: :secondary, type: "button",
-              data: { action: "admin--token-reveal#copy", "admin--token-reveal-source-param": "api-token-config" }) %>
-      </div>
-    </div>
-
-    <p data-admin--token-reveal-target="status" role="status" aria-live="polite" class="mt-2 min-h-[1.25rem] text-sm text-meta"></p>
-  </div>
-
-  <div>
-    <%= link_to "Done", admin_api_tokens_path(**admin_url_options), class: setup_primary_button_class %>
-  </div>
-</div>
+<%= render "admin/api_tokens/screen", raw_token: @raw_token %>

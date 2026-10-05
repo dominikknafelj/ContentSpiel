@@ -94,6 +94,14 @@ class AuditEventsTest < ActiveSupport::TestCase
     assert_equal [ "old", "new" ], Audit::Event.find_by!(action: "tag.renamed").field_changes["name"]
   end
 
+  test "tags: merged is recorded on the target, naming the tag that went" do
+    into = Tag.create!(name: "kept")
+    Tags::Merge.call(Tag.create!(name: "gone"), into: into)
+
+    assert_equal %w[tag.merged], actions_for(into)
+    assert_equal({ "merged" => "gone", "posts" => 0 }, Audit::Event.find_by!(action: "tag.merged").metadata)
+  end
+
   test "languages: enabled, configured, disabled" do
     Locales::Enable.call("fr")
     Locales::Configure.call(Current.site.reload.locale_codes.reverse.map { |code| { "code" => code } })

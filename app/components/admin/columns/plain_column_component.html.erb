@@ -7,7 +7,7 @@
       input, the per-field Translate button and the suggestion box under it. The error slot
       stays a DIRECT child of `.admin-column` (below the pair) -- the invalid border follows it. %>
   <% field_side = capture do %>
-    <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= name.to_s.humanize %></label>
+    <label class="<%= setup_label_class %> mb-1" for="<%= id %>"><%= label_text %></label>
 
     <%# With a soft counter, the controller wraps the input and its counter only (never the label or the
         translation pieces below), so the translate slot and suggestion box keep their own wrappers. %>

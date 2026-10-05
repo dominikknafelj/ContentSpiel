@@ -75,6 +75,14 @@
 }
 
 :root {
+  /* The preview bar (Public::PreviewBarComponent): an inverted ink bar that
+     looks the same in light and dark, so these two are declared here once and
+     deliberately NOT repeated in the [data-theme="dark"] block above. Paper on
+     near-black is about 17:1, well past the 4.5:1 a 13px label needs. This
+     file is the only place the two literals live: the design-rules test
+     forbids raw colours in app/views/layouts and the bar's own template. */
+  --th-preview-bg: #141417;
+  --th-preview-ink: #f5f4f0;
   --th-font: "Archivo", system-ui, sans-serif;
   --th-mono: "IBM Plex Mono", ui-monospace, monospace;
   --th-t-display: clamp(34px, 5vw, 60px);

@@ -14,9 +14,6 @@ module Admin
     # component (`Admin::TreeNodeComponent#path`, `Admin::LanguageTabsComponent`,
     # ...) that threads it through for its own links.
     class SidebarComponent < Admin::AdminComponent
-      # How many group names the role line spells out before "+N".
-      ROLE_LINE_GROUPS = 2
-
       def initialize(modules:, user:, current_path:, url_options:, trash_count: 0)
         @modules = modules
         @user = user
@@ -25,17 +22,8 @@ module Admin
         @trash_count = trash_count
       end
 
-      # "Owner", or up to two group names then "+N", or "No groups" -- what
-      # the account block says this user is, in one short mono line.
-      def role_line
-        return "Owner" if user.owner?
-
-        names = user.groups.map(&:name)
-        return "No groups" if names.empty?
-
-        line = names.first(ROLE_LINE_GROUPS).join(", ")
-        names.size > ROLE_LINE_GROUPS ? "#{line} +#{names.size - ROLE_LINE_GROUPS}" : line
-      end
+      # What the account block says this user is (`AccountIdentityComponent`).
+      def role_line = Admin::Shell::AccountIdentityComponent.new(user: user).role_line
 
       private
 

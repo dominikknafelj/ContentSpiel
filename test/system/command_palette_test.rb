@@ -88,6 +88,31 @@ class CommandPaletteTest < ApplicationSystemTestCase
     assert_current_path admin_root_path
   end
 
+  # The moment between the matching answer being drawn and `loaded` running
+  # (`turbo:frame-render`, then `turbo:frame-load`): the rows are right, none
+  # is selected yet. Enter is pressed exactly there.
+  test "Enter pressed after the answer is drawn but before it is selected still follows the first row" do
+    create_post(title: "Alpha stale target")
+    beta = create_post(title: "Beta fresh target")
+    sign_in_via_form users(:one)
+    await_admin_controllers
+    find("body").send_keys([ :control, "k" ])
+    input = find("dialog#command-palette input")
+    input.set("Alpha")
+    assert_selector "#jump-results [role=option][aria-selected=true]", text: "Alpha stale target"
+    page.execute_script(<<~JS)
+      const frame = document.querySelector("#command-palette turbo-frame")
+      const press = () => {
+        if (frame.querySelector("[data-query]")?.dataset.query !== "Beta") return
+        frame.removeEventListener("turbo:frame-render", press)
+        document.querySelector("#command-palette input").dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }))
+      }
+      frame.addEventListener("turbo:frame-render", press)
+    JS
+    input.set("Beta")
+    assert_selector "h1", text: beta.title
+  end
+
   test "an empty result offers New post" do
     sign_in_via_form users(:one)
     await_admin_controllers

@@ -11,7 +11,14 @@ gem "puma", ">= 5.0"
 # Use JavaScript with ESM import maps [https://github.com/rails/importmap-rails]
 gem "importmap-rails"
 # Hotwire's SPA-like page accelerator [https://turbo.hotwired.dev]
-gem "turbo-rails"
+# Pinned to an exact version: CS Studio's save footer
+# (app/javascript/controllers/admin/save_bar_controller.js) and write queue
+# (app/javascript/autosave/queue.js) rely on Turbo internals -- its history
+# bookkeeping and popstate listener, the current visit, the order its events
+# come in. An upgrade is a deliberate change: bump the pin, then rerun their
+# system tests (test/system/save_bar_test.rb, test/system/admin/autosave_test.rb,
+# changed_elsewhere_test.rb, blocks_test.rb) before anything else.
+gem "turbo-rails", "2.0.23"
 # Hotwire's modest JavaScript framework [https://stimulus.hotwired.dev]
 gem "stimulus-rails"
 # Use Tailwind CSS [https://github.com/rails/tailwindcss-rails]
@@ -49,7 +56,7 @@ gem "thruster", require: false
 #
 # image_processing 2.x no longer bundles a backend gem -- Rails' default
 # variant processor is vips, so that backend has to be declared explicitly.
-gem "image_processing", "~> 2.1"
+gem "image_processing", "~> 2.2"
 gem "ruby-vips", "~> 2.2"
 
 group :development, :test do
@@ -109,8 +116,11 @@ gem "sitemap_generator", "~> 7.1"
 # used in dev/test to a real backend later is an env var
 # (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
 gem "opentelemetry-sdk", "~> 1.13"
-gem "opentelemetry-exporter-otlp", "~> 0.36"
+
 gem "opentelemetry-instrumentation-all", "~> 0.97"
+
+gem "opentelemetry-exporter-otlp", "~> 0.37"
+
 
 # The official Ruby SDK for MCP servers (design spec section 10) --
 # [https://github.com/modelcontextprotocol/ruby-sdk].

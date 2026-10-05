@@ -72,7 +72,7 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_select "a[data-turbo-frame='_top']", text: "Activity"
     # The footer's Save is server-rendered enabled (only the controller ever
     # disables it), so the form can be submitted without JavaScript too.
-    assert_select "#user-form .admin-save-bar button[type=submit]:not([disabled])", text: "Save"
+    assert_select "#user-form .admin-save-bar button[type=submit]:not([disabled])", text: "Save user"
     assert_select "#user-form noscript", count: 0
   end
 
@@ -162,23 +162,30 @@ class Admin::UsersTest < ActionDispatch::IntegrationTest
     assert_select "#" + ActionView::RecordIdentifier.dom_id(users(:reader)), text: /Read only/
   end
 
-  test "an owner sees the owner toggle; a non-owner neither sees nor changes it" do
+  test "an owner sees the owner zone; a non-owner neither sees it nor changes the flag" do
     get "/cs-studio/users/#{users(:reader).id}/edit"
-    assert_select "input[type=checkbox][name='user[owner]']"
+    assert_select ".admin-owner-zone button", text: "Make owner…"
+    assert_select "#user-form input[name='user[owner]']", count: 0
 
     sign_in_as(users(:two))
     get "/cs-studio/users/#{users(:reader).id}/edit"
+    assert_select ".admin-owner-zone", count: 0
     assert_select "input[name='user[owner]']", count: 0
 
+    # A forged owner field in the ordinary form is refused outright (`Users::Save`), not ignored.
     patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address, owner: "1" } }
     assert_response :forbidden
     assert_not users(:reader).reload.owner?
   end
 
-  test "the toggle is disabled for the last owner, and demoting them is refused" do
+  test "the owner zone and the delete zone are disabled for the last owner, with the reason; demoting them is refused" do
     get "/cs-studio/users/#{users(:one).id}/edit"
-    assert_select "input[type=checkbox][name='user[owner]'][disabled][checked]"
-    assert_select "input[type=hidden][name='user[owner]']", count: 0
+    assert_select ".admin-owner-zone button[disabled]", text: "Remove owner rights…"
+    assert_select ".admin-owner-zone", text: /one@example.com is the only owner, so their owner rights can't be removed\./
+    assert_select ".admin-delete-zone button[disabled]", text: "Delete user…"
+    assert_select ".admin-delete-zone", text: /one@example.com is the only owner, so they can't be deleted\./
+    assert_select "dialog#owner-user-#{users(:one).id}", count: 0
+    assert_select "#user-form input[name='user[owner]']", count: 0
 
     patch "/cs-studio/users/#{users(:one).id}", params: { user: { email_address: users(:one).email_address, owner: "0" } }
     assert_response :unprocessable_entity
