@@ -26,9 +26,18 @@ module Tags
   class Merge < ApplicationService
     include Tags::Listings
 
-    SAME_TAG = "Choose a different tag to merge into.".freeze
-    MISSING_TAG = "Choose a tag to merge into.".freeze
-    GONE = "That tag no longer exists.".freeze
+    # The three refusals, read from `admin.tags.merge` in
+    # `config/locales/admin/tags.en.yml` at the moment they are asked for, not at
+    # load, so a locale switched afterwards is the one they come in. They are
+    # constants to every caller (`Tags::Merge::GONE`, `result.errors ==
+    # [ Tags::Merge::MISSING_TAG ]`) but resolved here by `const_missing`, which
+    # never defines the constant, so the lookup runs on every reference.
+    MESSAGE_KEYS = { SAME_TAG: "same_tag", MISSING_TAG: "missing_tag", GONE: "gone" }.freeze
+
+    def self.const_missing(name)
+      key = MESSAGE_KEYS[name]
+      key ? I18n.t("admin.tags.merge.#{key}", raise: true) : super
+    end
 
     def initialize(source, into:, actor: Current.actor)
       @source = source
@@ -129,7 +138,7 @@ module Tags
       now = Time.current
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
       fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
-      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all
+      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all  # i18n-ok: a class name
     end
   end
 end

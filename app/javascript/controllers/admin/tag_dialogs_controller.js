@@ -1,11 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
 
 // The Tags list's two dialogs, Merge and Delete (`app/views/admin/tags/index.html.erb`).
 // There is ONE of each in the page, not one per row: a row's menu item opens
 // the dialog with `data: dialog_trigger(id)` and carries that row's facts as
 // `data-tag-*` attributes (the id, the name, the already-worded title and
-// sentence -- `Admin::TagsHelper` writes them, so the copy is tested in Ruby).
+// sentence -- `Admin::TagsHelper` chooses them from the locale file, so the copy is tested in Ruby).
 // `admin--dialog#open` announces the opening (`admin--dialog:opening`, on
 // `document`, before the dialog is shown) with the trigger; this controller
 // reads the trigger and fills the dialog, the way `admin--new-record` does for
@@ -35,10 +36,16 @@ import { Turbo } from "@hotwired/turbo-rails"
 // them, and the dialog asked to delete "old" beside a row that says "new". So
 // the name comes from the row's input as it stands, and the title, the
 // sentence and the picker's exclusion are re-worded with it (the name appears
-// in them in “curly quotes”, as `Admin::TagsHelper` wrote it).
+// in them in “curly quotes”, as the locale file wrote it).
 //
 // Everything reaches the DOM through `textContent` and attributes: a tag name
 // is whatever an editor typed, never markup.
+// The quotes the tag's name sits in inside the locale file's sentences
+// (`admin.tags.dialogs.*`, config/locales/admin/tags.en.yml). They are what
+// tells the name from the same letters inside a word; a language that quotes
+// differently changes them there and here together.
+const QUOTES = ["“", "”"]
+
 export default class extends Controller {
   static targets = ["mergeForm", "mergeText", "mergeButton", "deleteForm", "deleteText"]
   static values = { mergeUrl: String, deleteUrl: String }
@@ -82,7 +89,10 @@ export default class extends Controller {
   }
 
   reword(text, data, name) {
-    return name === data.tagName ? text : text.split(`“${data.tagName}”`).join(`“${name}”`)
+    if (name === data.tagName) return text
+
+    const [open, close] = QUOTES
+    return text.split(`${open}${data.tagName}${close}`).join(`${open}${name}${close}`)
   }
 
   // Enabled once the picker holds a tag: its chips' hidden inputs carry the
@@ -124,7 +134,7 @@ export default class extends Controller {
     const region = document.getElementById("toasts")
     if (!toast || !region) return
     toast.id = "toast-tag-delete"
-    toast.querySelector("span").textContent = "The tag wasn't deleted. Reload the list and try again."
+    toast.querySelector("span").textContent = messages(this.element).t("dialogs.delete_failed")
     document.getElementById(toast.id)?.remove()
     region.append(toast)
   }

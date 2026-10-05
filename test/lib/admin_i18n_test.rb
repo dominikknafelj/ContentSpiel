@@ -77,6 +77,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/autosave_controller.js
     app/javascript/autosave/order_request.js
     app/javascript/autosave/queue.js
+    app/views/admin/tags/index.html.erb
+    app/controllers/admin/tags_controller.rb
+    app/controllers/admin/tag_suggestions_controller.rb
+    app/helpers/admin/tags_helper.rb
+    app/services/tags/merge.rb
+    app/javascript/controllers/admin/tag_dialogs_controller.js
   ].freeze
 
   PLACEHOLDER = "".freeze

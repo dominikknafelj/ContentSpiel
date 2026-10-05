@@ -52,21 +52,21 @@ module Admin
     # stays one query (no per-tag count).
     def counts? = can?("posts.read")
 
-    def count_hint(count) = "#{count} #{'post'.pluralize(count)}"
+    def count_hint(count) = t("admin.tags.post_count", count: count)
 
     def rows
       pattern = Tag.sanitize_sql_like(query.downcase)
-      prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([ "(LOWER(tags.name) LIKE ?) DESC", "#{pattern}%" ]))
-      tags = Tag.where("LOWER(tags.name) LIKE ?", "%#{pattern}%").limit(LIMIT)
-      tags = tags.where.not("LOWER(tags.name) IN (?)", excluded) if excluded.any?
+      prefix_first = Arel.sql(ActiveRecord::Base.sanitize_sql_array([ "(LOWER(tags.name) LIKE ?) DESC", "#{pattern}%" ]))  # i18n-ok: SQL
+      tags = Tag.where("LOWER(tags.name) LIKE ?", "%#{pattern}%").limit(LIMIT)  # i18n-ok: SQL
+      tags = tags.where.not("LOWER(tags.name) IN (?)", excluded) if excluded.any?  # i18n-ok: SQL
 
       # Without the right to read posts there is no count to show (and no need
       # to pay for the subquery): alphabetical within prefix-first.
-      return tags.order(prefix_first, Arel.sql("LOWER(tags.name) ASC")).map { |tag| { value: tag.name, label: tag.name } } unless counts?
+      return tags.order(prefix_first, Arel.sql("LOWER(tags.name) ASC")).map { |tag| { value: tag.name, label: tag.name } } unless counts?  # i18n-ok: SQL
 
-      counts = admin_scope(Post.all).joins(:post_tags).where("post_tags.tag_id = tags.id").select("COUNT(*)")
+      counts = admin_scope(Post.all).joins(:post_tags).where("post_tags.tag_id = tags.id").select("COUNT(*)")  # i18n-ok: SQL
       tags.select("tags.name", Arel.sql("(#{counts.to_sql}) AS posts_count"))
-        .order(prefix_first, Arel.sql("posts_count DESC"), Arel.sql("LOWER(tags.name) ASC"))
+        .order(prefix_first, Arel.sql("posts_count DESC"), Arel.sql("LOWER(tags.name) ASC"))  # i18n-ok: SQL
         .map { |tag| { value: tag.name, label: tag.name, hint: count_hint(tag.posts_count) } }
     end
   end

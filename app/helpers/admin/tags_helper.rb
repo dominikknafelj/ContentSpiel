@@ -20,40 +20,31 @@ module Admin
   # the two, and how many of each, would tell a scoped viewer how many posts
   # they can't see carry the tag. When the two agree, the plain sentence stays.
   module TagsHelper
-    HIDDEN_MANY = "including ones in the trash or that you can't open".freeze
-    HIDDEN_ONE = "which is in the trash or one you can't open".freeze
+    def tag_merge_title(tag) = t("admin.tags.dialogs.merge.title", name: tag.name)
 
-    def tag_merge_title(tag) = "Merge “#{tag.name}” into…"
+    def tag_delete_title(tag) = t("admin.tags.dialogs.delete.title", name: tag.name)
 
-    def tag_delete_title(tag) = "Delete “#{tag.name}”?"
+    def tag_merge_text(tag, count, readable = count) = tag_dialog_text("merge", count, readable, name: tag.name)
 
-    def tag_merge_text(tag, count, readable = count)
-      lead = if count.nil? then "Its posts get"
-      elsif count.zero? then return "No posts use it, so nothing moves. “#{tag.name}” is deleted. This can't be undone."
-      else
-        hidden = tag_hidden_posts_clause(count, readable)
-        "Its #{pluralize(count, 'post')}#{", #{hidden}," if hidden} #{count == 1 ? 'gets' : 'get'}"
-      end
-      "#{lead} the chosen tag and “#{tag.name}” is deleted. This can't be undone."
-    end
-
-    def tag_delete_text(count, readable = count)
-      return "It is removed from every post that uses it. The posts themselves stay." if count.nil?
-      return "No posts use it." if count.zero?
-
-      hidden = tag_hidden_posts_clause(count, readable)
-      "It is removed from #{pluralize(count, 'post')}#{", #{hidden}" if hidden}. The posts themselves stay."
-    end
-
-    # The clause explaining a dialog number larger than the column's, or nil
-    # when they agree.
-    def tag_hidden_posts_clause(count, readable)
-      return nil unless count > readable.to_i
-
-      count == 1 ? HIDDEN_ONE : HIDDEN_MANY
-    end
+    def tag_delete_text(count, readable = count) = tag_dialog_text("delete", count, readable)
 
     # "3 posts", "1 post".
-    def tag_posts_label(count) = pluralize(count, "post")
+    def tag_posts_label(count) = t("admin.tags.post_count", count: count)
+
+    private
+
+    # Chooses which whole sentence of `admin.tags.dialogs.<dialog>` says it
+    # (`config/locales/admin/tags.en.yml` holds every one of them, in its
+    # singular and plural form): none for a viewer who may not read posts, none
+    # for a tag nothing uses, the plain count, or -- when the action reaches more
+    # posts than `readable` -- the count with where the others are.
+    def tag_dialog_text(dialog, count, readable, **interpolation)
+      scope = "admin.tags.dialogs.#{dialog}"
+      return t("#{scope}.uncounted", **interpolation) if count.nil?
+      return t("#{scope}.none", **interpolation) if count.zero?
+
+      shape = count > readable.to_i ? "partly_hidden" : "visible"
+      t("#{scope}.#{shape}", count: count, **interpolation)
+    end
   end
 end

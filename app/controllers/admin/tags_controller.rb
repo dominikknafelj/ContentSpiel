@@ -34,7 +34,7 @@ module Admin
     #   for them a count would be a misleading zero, or leak how many posts
     #   they can't see; `Admin::TagSuggestionsController` makes the same call).
     def index
-      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a
+      @tags = Tag.order(Arel.sql("LOWER(tags.name)")).to_a  # i18n-ok: SQL
       @counts_visible = can?("posts.read")
       ids = @tags.map(&:id)
       return @readable_counts = @carrier_counts = {} unless @counts_visible && ids.any?
@@ -84,7 +84,7 @@ module Admin
 
       render turbo_stream: [
         turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag)),
-        toast_stream("Deleted “#{tag.name}”")
+        toast_stream(t("admin.tags.toasts.deleted", name: tag.name))
       ]
     end
 
@@ -103,13 +103,13 @@ module Admin
       # (`index`'s ordering, `BlockTypes::PostList`): names are stored
       # lowercase today, but one stored with a capital (an old row, a write
       # around the model) must still be found by the name the picker shows.
-      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?
+      into = Tag.where("LOWER(name) = ?", name).order(:id).first if name.present?  # i18n-ok: SQL
 
       result = Tags::Merge.call(source, into: into)
       return forbidden!(result.errors.first) if result.denied?
 
       if result.ok?
-        flash[:notice] = "Merged “#{source.name}” into “#{into.name}”"
+        flash[:notice] = t("admin.tags.toasts.merged", source: source.name, into: into.name)
       else
         flash[:alert] = name.present? && into.nil? ? Tags::Merge::GONE : result.errors.first
       end
