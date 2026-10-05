@@ -48,7 +48,8 @@ module ContentBlocks
         # Updated column) sees the edit. `touch` runs no validations and no
         # save callbacks -- so not `Page#sync_public_paths` or closure_tree's
         # hierarchy rebuild, which a block edit can't affect -- only
-        # `after_touch`/commit callbacks, of which `Page`/`Post` have none.
+        # `after_touch`/commit callbacks: a live owner's `after_commit`
+        # moves the public content version (`Publishable`).
         @block.owner.touch
         # The touch comes BEFORE the state refresh: it takes the owner's row
         # lock, so a second editor's block save on the same page waits here

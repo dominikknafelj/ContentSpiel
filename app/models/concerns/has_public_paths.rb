@@ -45,7 +45,7 @@ module HasPublicPaths
   extend ActiveSupport::Concern
 
   included do
-    has_many :public_paths, as: :record, dependent: :delete_all
+    has_many :public_paths, as: :record, dependent: :delete_all # version: none (the destroyed record's own after_commit bumps when it was live)
     validate :public_paths_are_available
 
     # The columns this model's URLs are built from, set by `url_inputs_are`.

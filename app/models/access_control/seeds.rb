@@ -120,7 +120,7 @@ module AccessControl
         ApiToken.where(group_id: nil).update_all(group_id: admin.id)
 
         first_owner = User.where(owner: true).order(:id).first
-        Post.where(author_id: nil).update_all(author_id: first_owner.id) if first_owner
+        Post.where(author_id: nil).update_all(author_id: first_owner.id) if first_owner # version: none (the public site shows no author)
       end
 
       private

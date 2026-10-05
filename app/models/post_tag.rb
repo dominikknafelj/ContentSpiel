@@ -19,6 +19,14 @@ class PostTag < ApplicationRecord
   # disappear.
   after_commit :sync_post_paths, on: [ :create, :destroy ]
 
+  # A live post gaining or losing a tag changes what it prints and which
+  # listings show it, so the join row moves the public content version
+  # (`PublicSite`, technical cleanup spec §4.8); a draft's tags move nothing.
+  # A tag taken off through the association runs no callback here either:
+  # `Posts::Save` then touches the post, and the post's own `after_commit`
+  # bumps.
+  after_commit :bump_public_version_when_post_live, on: [ :create, :destroy ]
+
   private
 
   # `post` is nil here when this row was destroyed as part of the post
@@ -27,5 +35,10 @@ class PostTag < ApplicationRecord
   # the lazily-loaded association finds nothing left to sync.
   def sync_post_paths
     PublicSite::Paths.sync(post) if post
+  end
+
+  # No post (it was destroyed with this row): its own `after_commit` decides.
+  def bump_public_version_when_post_live
+    PublicSite.bump_version! if post&.live?
   end
 end

@@ -76,6 +76,11 @@ module Media
       asset.file.analyze
       metadata = asset.file.blob.metadata || {}
       asset.update_columns(width: metadata["width"], height: metadata["height"])
+      # Written around the callbacks, and after the asset's own
+      # `after_commit` has bumped for the upload: the dimensions are in the
+      # `<img>` a page renders (`width`, `height`, the original as a `srcset`
+      # candidate), so they move the public content version themselves.
+      PublicSite.bump_version!
     rescue StandardError => e
       Rails.logger.warn("[media] Media::Asset##{asset.id} analysis failed: #{e.class}: #{e.message}")
     end

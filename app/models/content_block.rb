@@ -90,6 +90,14 @@ class ContentBlock < ApplicationRecord
   after_save :sync_listed_post_paths
   after_destroy :sync_listed_post_paths
 
+  # A block of a live page is published output, so every committed change to
+  # one moves the public content version (`PublicSite`, technical cleanup
+  # spec §4.8); a draft's blocks move nothing. The services also `touch` the
+  # owner, whose own `after_commit` asks the same question -- this is for a
+  # block written without them (a console save, a page destroyed with its
+  # blocks).
+  after_commit :bump_public_version_when_owner_live
+
   # Blocks whose type has the `lists_posts` capability (open-types spec §6) --
   # what `PublicSite::Paths`, the resolver's permalink fallback and
   # `PublicPageRendering#assign_record` all mean by "the listing blocks" now
@@ -168,6 +176,16 @@ class ContentBlock < ApplicationRecord
   end
 
   private
+
+  # "Live" is the owner's own publication (`Publishable#live?`), as it stands
+  # now: nothing moves a block from one owner to another, and a block write
+  # doesn't change its owner's publication. An owner that isn't `Publishable`,
+  # or is gone (destroyed in the same transaction, where its own
+  # `after_commit` has the say for a page or post), counts as live: the doubt
+  # is a bump.
+  def bump_public_version_when_owner_live
+    PublicSite.bump_version! unless owner.respond_to?(:live?) && !owner.live?
+  end
 
   # `object.assign(settings)` (not just building `settings_object` and
   # reading `untranslated_hash` off it) is what makes this actually replace

@@ -50,6 +50,10 @@ module Locales
         next false unless site.save
 
         PublicPath.where(locale: @code).delete_all
+        # Every address in that language is gone, deleted around the
+        # callbacks: the public content version moves (deferred to the
+        # commit; the settings row's own `after_commit` bumps as well).
+        PublicSite.bump_version!
         # Which languages are targets changed, so every stored translation
         # state (`translation_states`) is recomputed. Synchronous and
         # proportional to the site's size; fine while sites are small, and

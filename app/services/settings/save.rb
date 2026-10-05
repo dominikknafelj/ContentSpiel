@@ -197,7 +197,7 @@ module Settings
       return nil if !before && @new_ai_key.nil?
 
       now = Time.current
-      @site.update_columns(ai_api_key: @new_ai_key, ai_api_key_saved_at: (now if @new_ai_key), updated_at: now)
+      @site.update_columns(ai_api_key: @new_ai_key, ai_api_key_saved_at: (now if @new_ai_key), updated_at: now) # version: none (the AI key is on no public page)
       [ before, @new_ai_key.present? ].map { |set| set ? "set" : "not set" }
     end
 

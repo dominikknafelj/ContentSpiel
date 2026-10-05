@@ -255,8 +255,16 @@ class SiteSetting < ApplicationRecord
   # Setup's latch whether setup is done. Resetting after commit (not after
   # save) so a rolled-back change never leaves them pointing at data that no
   # longer exists.
+  #
+  # And every committed change to the row moves the public content version
+  # (`PublicSite`, technical cleanup spec §4.8): the title, tagline, social
+  # links, enabled languages and the default language are on every public
+  # page, and the logo's attachment touches this row. Not told apart from the
+  # fields no page shows (the retention period, the AI provider): a Settings
+  # save is rare, and a bump too many only costs cache.
   def reset_cached_state
     Current.site = nil
     Setup.reset!
+    PublicSite.bump_version!
   end
 end

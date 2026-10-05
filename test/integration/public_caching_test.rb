@@ -81,6 +81,71 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Older"
   end
 
+  # --- The content version (technical cleanup spec §4.8) -----------------------
+
+  # The point of a version that moves only on published changes: an editor
+  # autosaving a draft no longer throws away every visitor's cached page.
+  test "a draft's edits leave the etag alone, a live record's change it" do
+    live = create_post(title: "Live")
+    draft = create_post(title: "Draft", published: false)
+    draft_page = create_page(title: "Draft page", published: false)
+    get "/"
+    etag = response.headers["ETag"]
+
+    assert Posts::Save.call(draft, translations: { "en" => { title: "Draft, edited", body: rich_doc("Text") } }).ok?
+    assert Pages::Save.call(draft_page, translations: { "en" => { title: "Draft page, edited" } }).ok?
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: draft_page), attributes: { block_type: "rich_text" }).ok?
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    assert Posts::Save.call(live, translations: { "en" => { title: "Live, edited" } }).ok?
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+  end
+
+  test "etag changes when a block of the page is reordered" do
+    first = ContentBlocks::Save.call(ContentBlock.new(owner: @root), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("First") } }).record
+    second = ContentBlocks::Save.call(ContentBlock.new(owner: @root), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("Second") } }).record
+    get "/"
+    etag = response.headers["ETag"]
+
+    assert ContentBlocks::Reorder.call(@root, [ second.id, first.id ]).ok?
+
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_operator response.body.index("Second"), :<, response.body.index("First")
+  end
+
+  # Three queries for the version, once, however many rich-text bodies the
+  # page renders (each reads it for its cache key).
+  test "a rendered page reads the content version in three queries" do
+    3.times do |index|
+      assert ContentBlocks::Save.call(ContentBlock.new(owner: @root), attributes: { block_type: "rich_text" }, translations: { "en" => { body: rich_doc("Body #{index}") } }).ok?
+    end
+
+    statements = capture_sql { get "/" }
+
+    assert_response :success
+    assert_equal 1, statements.grep(/FROM "public_site_versions"/).size, statements.join("\n")
+    assert_equal 2, statements.grep(/MAX\("(pages|posts)"."published_at"\)/).size, statements.join("\n")
+  end
+
+  # S8: a conditional GET that still matches loads neither the blocks nor
+  # their images; only a response that is rendered does.
+  test "a 304 loads no blocks, images or variants" do
+    asset = create_media_asset
+    assert ContentBlocks::Save.call(ContentBlock.new(owner: @root), attributes: { block_type: "image", media_asset_id: asset.id }).ok?
+    loads = /FROM "(content_blocks|media_assets|active_storage_\w+)"/
+
+    rendered = capture_sql { get "/" }
+    assert_response :success
+    assert_not_empty rendered.grep(loads)
+
+    not_modified = capture_sql { get "/", headers: { "If-None-Match" => response.headers["ETag"] } }
+    assert_response :not_modified
+    assert_empty not_modified.grep(loads), not_modified.join("\n")
+  end
+
   test "unknown paths render the theme 404" do
     get "/nope"
     assert_response :not_found

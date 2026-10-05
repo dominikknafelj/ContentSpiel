@@ -151,6 +151,15 @@ class Media::Asset < ApplicationRecord
   # autosave, and a failed save whenever the stored file was unreachable.
   before_save :cache_metadata_from_file, if: :file_changing?
 
+  # Every committed change to a library image moves the public content
+  # version (`PublicSite`, technical cleanup spec §4.8): an upload, its
+  # title, alt or caption, the trash and a purge -- and a `touch`, which is
+  # what replacing the attached file does. Used or not: a rendered page bakes
+  # in the image's URL, alt, caption and dimensions, and whether a *live*
+  # page shows this image is a lookup across heroes, image blocks and
+  # rich-text bodies, which costs more than the bump it would save.
+  after_commit { PublicSite.bump_version! }
+
   # The public URL an `image` node's `html` render (`RichText::BuiltIns`)
   # points an `<img>` at -- `rails_blob_path`, not `rails_blob_url`: this is
   # embedded inside a page's own HTML, which already carries its own host,

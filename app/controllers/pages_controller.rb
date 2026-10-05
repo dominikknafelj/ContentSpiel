@@ -33,8 +33,17 @@ class PagesController < PublicController
       # `public, max-age=0, must-revalidate`: a CDN or browser may cache it,
       # but must always revalidate against the ETag rather than serving a
       # stale copy for up to `max-age` seconds.
+      #
+      # The ETag is the resolved record and the site's content version
+      # (`PublicSite`, three queries). The blocks, their images and the
+      # images' variants are loaded only past it, for a response that is
+      # actually rendered: a conditional GET that still matches costs the
+      # resolver's lookup and the version, nothing else.
       expires_in 0, public: true, must_revalidate: true
-      render :show if stale?(etag: [ result.record, PublicSite.current_content_version ], public: true)
+      if stale?(etag: [ result.record, PublicSite.current_content_version ], public: true)
+        preload_page_images(@page)
+        render :show
+      end
     when :redirect
       redirect_to result.location, status: result.http_status
     else

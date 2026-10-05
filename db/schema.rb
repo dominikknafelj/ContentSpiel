@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_150100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -127,6 +127,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
     t.bigint "media_asset_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.index ["block_type"], name: "index_content_blocks_on_block_type"
     t.index ["media_asset_id"], name: "index_content_blocks_on_media_asset_id"
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
   end
@@ -199,9 +200,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
     t.index "((parent_id IS NULL))", name: "index_pages_on_single_root", unique: true, where: "(parent_id IS NULL)"
     t.index ["hero_media_asset_id"], name: "index_pages_on_hero_media_asset_id"
     t.index ["parent_id"], name: "index_pages_on_parent_id"
+    t.index ["published_at"], name: "index_pages_on_published_at"
     t.index ["trash_root_id"], name: "index_pages_on_trash_root_id"
     t.index ["trashed_at"], name: "index_pages_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_pages_on_trashed_by_id"
+    t.index ["updated_at"], name: "index_pages_on_updated_at"
   end
 
   create_table "post_relations", force: :cascade do |t|
@@ -242,8 +245,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
     t.jsonb "translation_original_changed_at", default: {}, null: false
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["content_type"], name: "index_posts_on_content_type"
+    t.index ["published_at"], name: "index_posts_on_published_at"
     t.index ["trashed_at"], name: "index_posts_on_trashed_at"
     t.index ["trashed_by_id"], name: "index_posts_on_trashed_by_id"
+    t.index ["updated_at"], name: "index_posts_on_updated_at"
   end
 
   create_table "public_paths", force: :cascade do |t|
@@ -257,6 +262,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
     t.index ["locale", "path"], name: "index_public_paths_on_locale_and_path", unique: true
     t.index ["record_type", "record_id", "locale"], name: "index_public_paths_one_current_per_record_locale", unique: true, where: "current"
     t.index ["record_type", "record_id"], name: "index_public_paths_on_record_type_and_record_id"
+  end
+
+  create_table "public_site_versions", force: :cascade do |t|
+    t.bigint "counter", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "sessions", force: :cascade do |t|

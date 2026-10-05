@@ -196,6 +196,54 @@ class RichText::HtmlRendererTest < ActiveSupport::TestCase
     end
   end
 
+  # A preview shows what the content version doesn't cover: a link to a
+  # draft is a link there, at the draft's current address, and a draft's
+  # slug moves no version (technical cleanup spec §4.8). So a preview render
+  # is never served from the cache -- with a real store, or the suite's
+  # null store would hide it.
+  test "a preview render is never cached: a draft's new address shows at once" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    begin
+      draft = create_page(title: "Draft Target", published: false)
+      link = { "type" => "internalLink", "attrs" => { "type" => "page", "id" => draft.id } }
+      document = RichText::Document.new("type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text("go", link) ] } ])
+      preview = -> { Current.reset; document.to_html(locale: "en", urls: PublicSite::Urls.new(preview: true)) }
+      assert_includes preview.call, %(href="/preview/draft-target")
+
+      version = PublicSite.content_version
+      assert Pages::Save.call(draft, translations: { "en" => { slug: "renamed" } }).ok?
+      assert_equal version, PublicSite.content_version, "a draft's slug moves no version, which is why the cache can't be trusted here"
+
+      assert_includes preview.call, %(href="/preview/renamed")
+    ensure
+      Rails.cache = original_cache
+    end
+  end
+
+  # The public render of the same document is cached, and stays correct: a
+  # link to a draft is plain text there whatever its address, and publishing
+  # the target moves the version.
+  test "a public render is cached, and a target going live retires it" do
+    original_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    begin
+      draft = create_page(title: "Draft Target", published: false)
+      link = { "type" => "internalLink", "attrs" => { "type" => "page", "id" => draft.id } }
+      document = RichText::Document.new("type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ text("go", link) ] } ])
+      public_html = -> { Current.reset; document.to_html(locale: "en", urls: PublicSite::Urls.new) }
+      assert_not_includes public_html.call, "<a"
+
+      assert Pages::Save.call(draft, attributes: { published: true }).ok?
+
+      assert_includes public_html.call, %(href="/draft-target")
+    ensure
+      Rails.cache = original_cache
+    end
+  end
+
   # Final fix wave (C): the HTML also depends on code -- a renderer or
   # component markup change must not keep serving the old HTML out of Solid
   # Cache after a deploy. `RichText.code_revision` (the deploy's revision)

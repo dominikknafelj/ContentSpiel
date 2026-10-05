@@ -659,8 +659,13 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
   # linking to (or showing) what just left the site, or keep leaving out
   # what just came back. Called directly, with `Current` reset between
   # steps, since `current_content_version` is memoised per request.
+  #
+  # The post is live (`create_post`'s default): the version moves only when
+  # published output can have changed, and a draft's trip to the trash can't
+  # change any (`test/models/public_site/version_test.rb` has both).
   test "moving, restoring and purging each change the content version" do
     post = create_post(title: "Versioned")
+    assert post.live?
     versions = [ fresh_content_version ]
 
     travel(1.second) { as_owner { assert Trash::Move.call(post).ok? } }

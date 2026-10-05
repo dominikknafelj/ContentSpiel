@@ -29,6 +29,7 @@ class PreviewController < ApplicationController
       return render("pages/not_found", status: :not_found) if @post && !readable?(@page)
 
       @preview_record = @post || @page
+      preload_page_images(@page)
       render "pages/show"
     when :redirect
       redirect_to result.location, status: :found

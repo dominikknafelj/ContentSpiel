@@ -17,9 +17,6 @@ module Tags
   #   neither -- usage rows record images, translation states record
   #   translated fields, and neither the tag name (untranslated) nor a block's
   #   `tag` setting (an untranslated `:string` field) is one.
-  # - No `PublicSite.content_version` call: it is derived from the newest
-  #   `updated_at` of posts, blocks, pages and the paths table, all of which
-  #   this moves when a listing could change (the render cache is keyed on it).
   # - No de-duplication of blocks: a page that had a block for `source` and one
   #   for `into` now has two blocks that list the same posts. That is what the
   #   editor built; merging tags is not an instruction to edit the page.
@@ -86,6 +83,11 @@ module Tags
         repoint_blocks(blocks, source, into)
         PostTag.where(tag_id: source.id).delete_all
         source.destroy!
+        # Join rows and block settings were written around the callbacks
+        # (`insert_all`, `delete_all`, `update_columns`, `touch_all`), so no
+        # post's or page's `after_commit` speaks for them: the merge moves
+        # the public content version itself, deferred to the commit.
+        PublicSite.bump_version!
 
         record_event("tag.merged", subject: into, metadata: { "merged" => source.name, "posts" => carrier_ids.size })
         into

@@ -87,7 +87,15 @@ module Trash
     def trash_descendants
       ids = @record.descendants.kept.pluck(:id)
       Page.where(id: ids).update_all(trashed_at: now, trashed_by_id: actor_user&.id, trash_root_id: @record.id, updated_at: now)
+      bump_public_version_for(ids)
       ids
+    end
+
+    # The members were flagged around the callbacks, so their own
+    # `after_commit` never runs: a live one among them moves the public
+    # content version here (the root's save bumps for the root itself).
+    def bump_public_version_for(ids)
+      PublicSite.bump_version! if ids.any? && Page.where(id: ids).published.exists?
     end
 
     def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)

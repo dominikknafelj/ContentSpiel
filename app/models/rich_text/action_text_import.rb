@@ -33,9 +33,10 @@
 # - **Reports.** Per-model counts, every unmapped fragment
 #   (`RichText::HtmlImport`), every blank result, and every failure.
 #
-# Writes go straight to the column with `jsonb_set` (plus `updated_at`, so
-# `PublicSite.content_version` -- and with it every cached page and
-# rendered body -- moves on), bypassing model callbacks and validations
+# Writes go straight to the column with `jsonb_set` (plus `updated_at`, and
+# a `PublicSite.bump_version!`, so the content version -- and with it every
+# cached page and rendered body -- moves on), bypassing model callbacks and
+# validations
 # (spec §5: "bypassing callbacks except path sync, which bodies don't
 # affect"). The document is checked with `#validate` first instead, which is
 # exactly the body validation `HasRichTextBody` would have run. Each written
@@ -155,6 +156,9 @@ module RichText
         "body = jsonb_set(COALESCE(body, '{}'::jsonb), ARRAY[?]::text[], ?::jsonb), updated_at = ?",
         locale, JSON.generate(document.to_h), Time.current
       ])
+      # A body written around the callbacks: whether its post or its block's
+      # page is live is not asked, the import is a one-off.
+      PublicSite.bump_version!
     end
 
     def fail_row(stats, label, message)

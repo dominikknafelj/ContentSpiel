@@ -45,6 +45,11 @@ module Locales
             record.update_columns(slug: record.read_attribute(:slug)) if record.changed?
           end
         end
+        # Slugs written around the callbacks, and a language every public
+        # page now offers: the public content version moves whatever the
+        # syncs below find to write (the settings row's own `after_commit`
+        # bumps as well).
+        PublicSite.bump_version!
 
         # A full sync, not `rebuild!`: `rebuild!` truncates `public_paths`
         # first (spec §5.4), which threw away every redirect row -- the old

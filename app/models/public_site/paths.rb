@@ -188,9 +188,13 @@ module PublicSite
       sync_posts_listed_under(Page.kept.where("published_at > ? AND published_at <= ?", since, now).to_a)
     end
 
+    # Bumps the public content version whatever it finds: this is the repair
+    # for a table suspected wrong, so what the site served from it is suspect
+    # too.
     def rebuild!
       PublicPath.transaction do
         PublicPath.delete_all
+        PublicSite.bump_version!
         root = Page.find_by(parent_id: nil)
         sync_subtree(root) if root
         sync_posts(nil)
@@ -440,6 +444,21 @@ module PublicSite
     # work and a risk of failing a save that was never actually invalid.
     # `insert_all!`, with the bang: a path that did turn out to be taken is
     # an exception, not a row silently left out.
+    #
+    # The table has no model callbacks, so this is also where a changed
+    # address moves the public content version (`PublicSite.bump_version!`,
+    # deferred to the commit): when a row of a *live* record was written --
+    # `Publishable#live?`, its own publication time, whatever its ancestors
+    # or the trash say. The rows of a draft or a scheduled record move
+    # nothing, because nothing published reads them: the resolver answers 404
+    # for the record, a listing leaves it out, the navigation and the sitemap
+    # skip it, and an internal link to it renders as plain text
+    # (`RichText::BuiltIns.render_internal_link`). Preview does read them, and
+    # is never served from the render cache for that reason
+    # (`RichText::Document#to_html`). A record that stops or starts being
+    # live in the same save is bumped by its own `after_commit`, and one that
+    # goes live by the clock by `PublicSite.content_version`'s publication
+    # times.
     def write_all(desired, stored: nil, held: nil)
       records = desired.keys
       return if records.empty?
@@ -448,6 +467,7 @@ module PublicSite
       changes = changes_between(desired, stored)
       return if changes.empty?
 
+      PublicSite.bump_version! if changes.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
       type = records.first.class.polymorphic_name
       PublicPath.transaction do
         held ||= held_by_others(changes)
