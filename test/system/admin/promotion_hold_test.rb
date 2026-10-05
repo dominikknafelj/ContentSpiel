@@ -33,7 +33,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   end
 
   test "Restore pressed while the tab's frame is still being fetched is sent once, after the visit, and its answer rendered" do
-    slow_frame_fetches(600)
+    hold_frame_fetches
     count_writes
     # In one script: the press lands on the list that is still showing, with
     # the frame's request on its way.
@@ -43,17 +43,19 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       button.click()
       button.click()
     JS
-    assert_equal 0, page.evaluate_script("window.__writes"), "the held submission was sent during the frame fetch"
+    assert_equal 0, writes, "the held submission was sent during the frame fetch"
+    release_frame
 
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
     assert_no_selector "#trash-page-#{@page.id}"
-    assert_equal 1, page.evaluate_script("window.__writes")
+    assert_equal 1, writes
+    assert_no_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again."
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages"
     assert_not @page.reload.trashed?
   end
 
   test "a form whose screen the navigation replaced, with no counterpart on the new one, is dropped unsent" do
-    slow_frame_fetches(400)
+    hold_frame_fetches
     count_writes
     # The Posts tab has no row for the page.
     page.execute_script(<<~JS, @page.id)
@@ -61,10 +63,14 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       Array.from(document.querySelectorAll(`#trash-page-${arguments[0]} button`)).find((b) => b.textContent.trim() === "Restore").click()
     JS
 
+    release_frame
+    await_turbo_load
+
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Posts"
     assert_selector "#trash-post-#{@post.id}"
-    sleep 0.7
-    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_equal 0, writes
+    # The button had shown it was taken: the editor is told it wasn't sent.
+    assert_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again.", count: 1
     assert_no_selector "[role=status]", text: "Restored"
     assert @page.reload.trashed?
   end
@@ -72,13 +78,14 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   test "a dialog's Cancel during a frame fetch closes at once" do
     within("#trash-page-#{@page.id}") { press "Delete now…" }
     assert_selector "dialog[open]"
-    slow_frame_fetches(1500)
+    hold_frame_fetches
     page.execute_script("document.querySelector(\"nav[aria-label='Filter by type'] a[href*='type=page']\").click()")
 
-    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    # The frame is still on its way (the test has not let it go): Cancel
+    # closes all the same.
     within("dialog[open]") { press "Cancel" }
-    assert_no_selector "dialog[open]", wait: 1
-    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 1.2, "Cancel waited for the frame"
+    assert_no_selector "dialog[open]", wait: 2
+    release_frame
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages", wait: 5
     assert @page.reload.trashed?
   end
@@ -86,7 +93,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   # Sign out is a real navigation (`data-turbo="false"`), which no Turbo
   # visit can stop: it is never held, and signs out at once.
   test "Sign out pressed during a frame fetch signs out" do
-    slow_frame_fetches(600)
+    hold_frame_fetches
     page.execute_script(<<~JS)
       document.querySelector("nav[aria-label='Filter by type'] a[href*='type=page']").click()
       Array.from(document.querySelectorAll("button")).find((b) => b.textContent.trim() === "Sign out").click()
@@ -133,7 +140,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     about = Current.set(actor: users(:one)) { create_page(title: "About") }
     visit "/cs-studio/pages/#{about.id}"
     await_admin_controllers
-    slow_frame_fetches(600)
+    hold_frame_fetches
     page.execute_script(<<~JS, about.id)
       document.querySelector(`li[data-page-id='${arguments[0]}'] a[href*='/pages/${arguments[0]}']`).click()
       const button = Array.from(document.querySelectorAll(".admin-block-picker button")).find((b) => b.textContent.trim() === "Image")
@@ -141,8 +148,10 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       window.__pickerHeld = button.form.hasAttribute("aria-busy") || button.disabled
     JS
 
+    # Sent at once, with the frame still on its way.
     assert_eventually(message: "no block was added") { about.content_blocks.reload.count >= 1 }
-    sleep 1.2
+    release_frame
+    await_turbo_load
     assert_equal [ "image" ], about.content_blocks.reload.pluck(:block_type)
     assert_equal false, page.evaluate_script("window.__pickerHeld")
     assert_selector ".admin-block-card", count: 1, wait: 5
@@ -158,7 +167,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     find("#select-post-#{draft.id}").execute_script("this.click()")
     within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
     assert_selector "dialog#bulk-trash-dialog[open]"
-    slow_frame_fetches(500)
+    hold_frame_fetches
     count_writes
     page.execute_script(<<~JS)
       const link = document.createElement("a")
@@ -169,16 +178,19 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       Array.from(document.querySelectorAll("dialog#bulk-trash-dialog button")).find((b) => b.textContent.trim() === "Move to trash").click()
     JS
 
+    release_frame
+    await_turbo_load
+
     assert_current_path(/again=1/, wait: 5)
     assert_selector "tr#post_#{draft.id}"
-    sleep 0.8
-    assert_equal 0, page.evaluate_script("window.__writes"), "a form was submitted in the dropped one's place"
+    assert_equal 0, writes, "a form was submitted in the dropped one's place"
+    assert_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again.", count: 1
     assert_not draft.reload.trashed?
     assert_not draft.live?
   end
 
   test "an ambiguous stand-in is dropped: two forms with the same action and payload, nothing sent" do
-    slow_frame_fetches(400)
+    hold_frame_fetches
     count_writes
     page.execute_script(<<~JS, @page.id)
       document.addEventListener("turbo:frame-render", () => {
@@ -189,9 +201,12 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       Array.from(document.querySelectorAll(`#trash-page-${arguments[0]} button`)).find((b) => b.textContent.trim() === "Restore").click()
     JS
 
+    release_frame
+    await_turbo_load
+
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages"
-    sleep 0.8
-    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_equal 0, writes
+    assert_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again.", count: 1
     assert @page.reload.trashed?
   end
 
@@ -199,7 +214,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   test "Delete pressed in a confirm dialog during a frame fetch and then cancelled deletes nothing" do
     within("#trash-page-#{@page.id}") { press "Delete now…" }
     assert_selector "dialog[open]"
-    slow_frame_fetches(800)
+    hold_frame_fetches
     count_writes
     page.execute_script(<<~JS)
       document.querySelector("nav[aria-label='Filter by type'] a[href*='type=page']").click()
@@ -208,13 +223,16 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
       window.__busyWhileHeld = confirm.disabled && confirm.getAttribute("aria-busy") === "true" && confirm.querySelector(".admin-spinner") !== null
     JS
     within("dialog[open]") { press "Cancel" }
-    assert_no_selector "dialog[open]", wait: 1
+    assert_no_selector "dialog[open]", wait: 2
+    release_frame
+    await_turbo_load
 
     assert_selector "nav[aria-label='Filter by type'] a[aria-current=page]", text: "Pages", wait: 5
-    sleep 0.8
-    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_equal 0, writes
     assert Page.exists?(@page.id)
     assert_selector "#trash-page-#{@page.id}"
+    # Taken back by the editor: nothing to be told about.
+    assert_no_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again."
     # N4: the press was visibly taken while it waited.
     assert_equal true, page.evaluate_script("window.__busyWhileHeld")
   end
@@ -222,66 +240,76 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   test "Delete pressed in a confirm dialog during a frame fetch and left alone deletes once" do
     within("#trash-page-#{@page.id}") { press "Delete now…" }
     assert_selector "dialog[open]"
-    slow_frame_fetches(600)
+    hold_frame_fetches
     count_writes
     page.execute_script(<<~JS)
       document.querySelector("nav[aria-label='Filter by type'] a[href*='type=page']").click()
       Array.from(document.querySelectorAll("dialog[open] button")).find((b) => b.textContent.trim() === "Delete permanently").click()
     JS
+    assert_equal 0, writes
+    release_frame
 
+    # The record first, then the screen: the row is also absent for an instant
+    # while the frame swaps it, before the held delete has even been sent --
+    # asserting "no row" first passed there and then found no write yet.
+    assert_eventually(wait: 10, message: "the confirmed delete was never sent") { !Page.exists?(@page.id) }
     assert_no_selector "#trash-page-#{@page.id}", wait: 10
-    assert_equal 1, page.evaluate_script("window.__writes")
-    assert_not Page.exists?(@page.id)
+    assert_equal 1, writes
+    assert_no_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again."
   end
 
   # The two early ends of the fetch window.
   test "a frame fetch that fails releases what was held" do
+    hold_frame_fetches(outcome: "fail")
     count_writes
-    page.execute_script(<<~JS)
-      const real = window.fetch
-      window.fetch = (url, options = {}) => {
-        const headers = new Headers(options.headers || {})
-        if (headers.get("Turbo-Frame") === "content" && (options.method || "GET").toUpperCase() === "GET") {
-          return new Promise((resolve, reject) => setTimeout(() => reject(new TypeError("Failed to fetch")), 400))
-        }
-        return real(url, options)
-      }
-    JS
     page.execute_script(<<~JS, @page.id)
       document.querySelector("nav[aria-label='Filter by type'] a[href*='type=post']").click()
       Array.from(document.querySelectorAll(`#trash-page-${arguments[0]} button`)).find((b) => b.textContent.trim() === "Restore").click()
     JS
-    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_equal 0, writes
+    release_frame
 
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
-    assert_equal 1, page.evaluate_script("window.__writes")
+    assert_equal 1, writes
     assert_not @page.reload.trashed?
   end
 
   test "a frame answer without the frame releases what was held" do
+    hold_frame_fetches(outcome: "no_frame")
     count_writes
-    page.execute_script(<<~JS)
-      const real = window.fetch
-      window.fetch = async (url, options = {}) => {
-        const headers = new Headers(options.headers || {})
-        if (headers.get("Turbo-Frame") === "content" && (options.method || "GET").toUpperCase() === "GET") {
-          await new Promise((resolve) => setTimeout(resolve, 400))
-          const response = new Response("<html><head></head><body><p>No frame here</p></body></html>", { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } })
-          Object.defineProperty(response, "url", { value: String(url) })
-          return response
-        }
-        return real(url, options)
-      }
-    JS
     page.execute_script(<<~JS, @page.id)
       document.querySelector("nav[aria-label='Filter by type'] a[href*='type=post']").click()
       Array.from(document.querySelectorAll(`#trash-page-${arguments[0]} button`)).find((b) => b.textContent.trim() === "Restore").click()
     JS
-    assert_equal 0, page.evaluate_script("window.__writes")
+    assert_equal 0, writes
+    release_frame
 
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
-    assert_equal 1, page.evaluate_script("window.__writes")
+    assert_equal 1, writes
     assert_not @page.reload.trashed?
+  end
+
+  # Round 3: a non-opted `_top` form inside `#content` whose screen is
+  # replaced while it is held is dropped -- and says so.
+  test "Publish pressed while the editor's own row reloads is dropped with a toast, and nothing is published" do
+    draft = Current.set(actor: users(:one)) { create_page(title: "Draft page", published: false) }
+    visit "/cs-studio/pages/#{draft.id}"
+    await_admin_controllers
+    hold_frame_fetches
+    count_writes
+    page.execute_script(<<~JS, draft.id)
+      document.querySelector(`li[data-page-id='${arguments[0]}'] a[href*='/pages/${arguments[0]}']`).click()
+      Array.from(document.querySelectorAll(".admin-editor-header button")).find((b) => b.textContent.trim() === "Publish").click()
+    JS
+    assert_no_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again."
+    release_frame
+    await_turbo_load
+
+    assert_selector "#toasts [role=alert]", text: "That didn't go through — the screen changed. Try again.", count: 1
+    assert_equal 0, writes
+    assert_not draft.reload.live?
+    # The new header's button is a working one.
+    assert_selector ".admin-editor-header button:not([disabled])", text: "Publish"
   end
 
   # `admin--queue-hold` drains first and submits again itself: with both
@@ -314,7 +342,8 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     JS
 
     assert_eventually(wait: 12, message: "the page was never published") { draft.reload.live? }
-    sleep 0.8
+    # The redirect's page has arrived: nothing more can be sent from the old one.
+    assert_selector ".admin-editor-header", text: /live|View on site/i, wait: 10
     assert_equal true, page.evaluate_script("window.__publishHeld")
     assert_equal 1, page.evaluate_script("window.__publishes")
     assert_equal "Typed just before publishing", draft.reload.subtitle
@@ -322,17 +351,41 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
 
   private
 
-  # Every `#content` frame GET answers `ms` late.
-  def slow_frame_fetches(ms)
-    page.execute_script(<<~JS, ms)
+  # Every `#content` frame GET waits until the test lets it go
+  # (`release_frame`), so nothing a test asserts in between races a timer.
+  # Then it is answered for real, or fails ("fail"), or is answered with a
+  # document that has no such frame ("no_frame").
+  def hold_frame_fetches(outcome: "answer")
+    page.execute_script(<<~JS, outcome)
       const real = window.fetch
+      const outcome = arguments[0]
+      window.__frameGate = new Promise((resolve) => { window.__releaseFrame = resolve })
+      window.__loads = 0
+      document.addEventListener("turbo:load", () => { window.__loads += 1 })
       window.fetch = async (url, options = {}) => {
         const headers = new Headers(options.headers || {})
-        if (headers.get("Turbo-Frame") === "content" && (options.method || "GET").toUpperCase() === "GET") await new Promise((resolve) => setTimeout(resolve, arguments[0]))
+        if (headers.get("Turbo-Frame") !== "content" || (options.method || "GET").toUpperCase() !== "GET") return real(url, options)
+        await window.__frameGate
+        if (outcome === "fail") throw new TypeError("Failed to fetch")
+        if (outcome === "no_frame") {
+          const response = new Response("<html><head></head><body><p>No frame here</p></body></html>", { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } })
+          Object.defineProperty(response, "url", { value: String(url) })
+          return response
+        }
         return real(url, options)
       }
     JS
   end
+
+  def release_frame = page.execute_script("window.__releaseFrame()")
+
+  # The promoted visit is over; the hold has released or dropped what it held
+  # (its own `turbo:load` listener was added first and has run).
+  def await_turbo_load
+    assert_eventually(message: "the promoted visit never finished (no turbo:load)") { page.evaluate_script("window.__loads > 0") }
+  end
+
+  def writes = page.evaluate_script("window.__writes")
 
   def count_writes
     page.execute_script(<<~JS)

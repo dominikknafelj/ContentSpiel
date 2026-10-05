@@ -667,8 +667,8 @@ document.addEventListener("turbo:submit-end", (event) => {
 // aborts its fetch): every form Turbo's SESSION submits rather than a frame --
 // one carrying `data-turbo-frame="_top"` or sitting outside every frame (the
 // Trash's Restore and Delete, the media panel's Move to trash, the tags'
-// Merge, the editor header's actions, "Still correct", Sign out, every Undo
-// toast). Its POST has reached the server by then; only the ANSWER is thrown
+// Merge, the editor header's actions, "Still correct", every Undo toast; not
+// Sign out, which is `data-turbo="false"` and no submission of Turbo's). Its POST has reached the server by then; only the ANSWER is thrown
 // away -- the redirect, the toast. The write is done and the screen does not
 // show it: the row is still there, and pressing again is a 404.
 // The window is the whole frame fetch (click a tab, then Restore on the old
@@ -721,7 +721,9 @@ document.addEventListener("turbo:submit-end", (event) => {
 //   different action of the same form;
 // - a form that is NO LONGER CONNECTED belonged to the content the navigation
 //   replaced, and is DROPPED: nothing was sent, as if the press had come a
-//   moment later, on a screen where that button no longer is.
+//   moment later, on a screen where that button no longer is. The editor is
+//   told (`droppedToast`, also when `requestSubmit` threw): the button had
+//   shown it was taken.
 //   One exception, opted into by the form with `data-promotion-stand-in` --
 //   only the Trash rows' Restore, "Restore under" and Delete forms, where the
 //   tab just opened shows the same row: the form in the new content with the
@@ -770,6 +772,7 @@ const isFrame = (element) => element?.localName === "turbo-frame"
 
 // The frame a form's answer is rendered into, or null when the session's
 // navigator submits it. See "WHAT IS HELD"; turbo-rails 2.0.23.
+// (`data-turbo-frame="_parent"` is not modelled; CS Studio has none.)
 function frameFor(form, submitter) {
   const named = submitter?.getAttribute("data-turbo-frame") ?? form.getAttribute("data-turbo-frame")
   const own = form.closest("turbo-frame")
@@ -788,6 +791,8 @@ const navigatorLevel = (form, submitter) => frameFor(form, submitter) === null
 
 // See "AT RELEASE". What the form would send, as text: the order of the
 // controls is the render's and the same in two renders of one form.
+// (A `<select multiple>` is compared by its first chosen value only -- its
+// `value`; no form that opts in has one.)
 const payload = (form) => Array.from(form.elements)
   .filter((field) => field.name && !field.disabled && field.name !== "authenticity_token" && !("holdIgnore" in field.dataset))
   .filter((field) => ![ "submit", "button", "reset", "file" ].includes(field.type) && (![ "checkbox", "radio" ].includes(field.type) || field.checked))
@@ -838,15 +843,35 @@ function promotionEnds() {
   const { held, timer } = promotion
   promotion = null
   clearTimeout(timer)
+  let dropped = false
   held.forEach((entry, form) => {
     letGo(form, entry)
     try {
-      if (form.isConnected) form.requestSubmit(entry.submitter || undefined)
-      else standInFor(form, entry)?.requestSubmit()
+      const target = form.isConnected ? form : standInFor(form, entry)
+      if (target) target.requestSubmit(target === form ? entry.submitter || undefined : undefined)
+      else dropped = true
     } catch {
       // Dropped: see "AT RELEASE".
+      dropped = true
     }
   })
+  if (dropped) droppedToast()
+}
+
+// A press that was taken (the button showed its spinner) and then not sent
+// must not end in silence. One error toast however many were dropped, in the
+// server's own markup (`#toast-error-template` in the layout, as
+// `orderErrorToast` clones it); errors never auto-hide. Not for a press the
+// editor took back by closing its dialog: that entry is gone before release.
+const DROPPED_MESSAGE = "That didn't go through — the screen changed. Try again."
+function droppedToast() {
+  const toast = document.getElementById("toast-error-template")?.content.firstElementChild?.cloneNode(true)
+  const region = document.getElementById("toasts")
+  if (!toast || !region) return
+  toast.id = "toast-promotion-dropped"
+  toast.querySelector("span").textContent = DROPPED_MESSAGE
+  document.getElementById(toast.id)?.remove()
+  region.append(toast)
 }
 
 window.addEventListener("submit", (event) => {
