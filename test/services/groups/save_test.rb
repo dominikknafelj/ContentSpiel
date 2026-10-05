@@ -54,6 +54,18 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
   end
 
+  test "two identical entries for one permission are refused as listed twice" do
+    group = AccessControl::Group.create!(name: "Identical")
+
+    result = as_owner do
+      Groups::Save.call(group, attributes: { name: "Identical", grants: [ { permission: "posts.read", scope: {} }, { permission: "posts.read", scope: {} } ] })
+    end
+
+    assert_not result.ok?
+    assert_includes result.errors, "Read posts is listed twice."
+    assert_empty group.grants.reload
+  end
+
   test "a request that lists one permission twice for a new group creates nothing" do
     assert_no_difference [ -> { AccessControl::Group.count }, -> { AccessControl::Grant.count }, -> { Audit::Event.count } ] do
       result = as_owner do
@@ -73,12 +85,16 @@ class Groups::SaveTest < ActiveSupport::TestCase
     group = AccessControl::Group.create!(name: "Race")
     grant(group, "posts.read")
     original = AccessControl::Grant.instance_method(:save!)
+    group_audit = -> { Audit::Event.count }
     AccessControl::Grant.define_method(:save!) do |*args|
       AccessControl::Grant.insert_all!([ { group_id: group_id, permission: permission, scope: {}, created_at: Time.current, updated_at: Time.current } ])
       original.bind_call(self, *args)
     end
 
-    result = as_owner { Groups::Save.call(group, attributes: { name: "Renamed", grants: [ { permission: "posts.edit", scope: {} } ] }) }
+    result = nil
+    assert_no_difference group_audit do
+      result = as_owner { Groups::Save.call(group, attributes: { name: "Renamed", grants: [ { permission: "posts.edit", scope: {} } ] }) }
+    end
 
     assert_not result.ok?
     assert_not result.denied?
@@ -86,7 +102,7 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal "Race", group.reload.name
     assert_equal [ "posts.read" ], group.grants.pluck(:permission)
   ensure
-    AccessControl::Grant.define_method(:save!, original)
+    AccessControl::Grant.remove_method(:save!)
   end
 
   test "editing records group.updated with the grant and member changes" do

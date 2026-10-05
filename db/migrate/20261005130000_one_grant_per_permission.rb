@@ -7,22 +7,26 @@
 # permission twice before it gets that far.
 #
 # Existing duplicates are merged into the lowest-id row of each (group,
-# permission), pairwise when there are three or more. The merge must keep what
-# the pair granted: it may say "a little more" (and then says so in the output),
-# never "less".
+# permission), pairwise when there are three or more. The merge may say "a
+# little more" than the pair did (and then says so in the output), never "less".
+# One rule:
 #
-#   - either grant unscoped                  -> unscoped (it already covered everything);
-#   - one scope covers the other (every key it sets is set in the other, with a
-#     list that contains the other's and `own` only where the other has it)
-#                                            -> the covering one, exactly the OR;
-#   - both scoped on the same keys           -> the union of each list, `own` kept.
-#     Exactly the OR while at most one list differs; with two or more differing
-#     lists (content types AND pages) the union of each also admits the crossed
-#     combinations, so it is reported;
-#   - scoped on different keys (by content type in one, by `own` in the other)
-#                                            -> no single scope expresses the OR, so
-#                                               the wider reading is kept: unscoped,
-#                                               reported by group and permission.
+#   - a scope with an empty list matches nothing (a dead grant), so the other
+#     scope wins outright;
+#   - otherwise keep only the keys BOTH scopes set: the lists of a kept list key
+#     are united, `own` is kept only when both have it, any other key only when
+#     both hold the same value.
+#
+# That yields unscoped for an unscoped partner and for scopes on different keys
+# (by content type in one, by `own` in the other), the covering scope when one
+# covers the other, and the union of the lists for the same keys. The result is
+# the exact OR (the least scope that contains both) when one scope covers the
+# other, or when the keys are equal and at most one list differs. In every
+# other case it admits more than the pair did, and the migration prints both
+# original scopes and the result with the group and permission: that line is the
+# only record of the widening, which `down` does not undo. The fold is
+# order-independent: key intersection and list union are associative and
+# commutative, and a dead scope is the identity.
 #
 # Plain Ruby over the raw rows, deliberately no application model or registry:
 # a content type that is no longer registered stays in its list untouched (a
@@ -68,40 +72,30 @@ class OneGrantPerPermission < ActiveRecord::Migration[8.1]
   private
 
   def merge(one, other, group_name, permission)
-    return {} if one.empty? || other.empty?
-    return one if covers?(one, other)
-    return other if covers?(other, one)
+    return other if dead?(one)
+    return one if dead?(other)
 
-    if one.keys.sort != other.keys.sort
-      say "Group #{group_name.inspect}, #{permission}: grants scoped by different keys, widened to unscoped"
-      return {}
+    merged = normalize(one.slice(*(one.keys & other.keys)).each_with_object({}) do |(key, value), result|
+      if LIST_KEYS.include?(key) then result[key] = value | other[key]
+      elsif value == other[key] then result[key] = value
+      end
+    end)
+    unless merged == one || merged == other || (one.keys.sort == other.keys.sort && LIST_KEYS.count { |key| one[key] != other[key] } <= 1)
+      say "Group #{group_name.inspect}, #{permission}: #{one.to_json} + #{other.to_json} -> #{merged.to_json} (admits more than the two grants did)"
     end
-
-    differing = LIST_KEYS.count { |key| one.key?(key) && one[key] != other[key] }
-    if differing > 1
-      say "Group #{group_name.inspect}, #{permission}: grants differ in more than one list, merged as the union of each list (admits more combinations than the pair did)"
-    end
-    normalize(one.merge(other) { |key, a, b| LIST_KEYS.include?(key) ? a | b : a })
+    merged
   end
 
-  # `wide` grants everything `narrow` does: every restriction it sets, `narrow`
-  # sets too and at least as tightly.
-  def covers?(wide, narrow)
-    wide.all? do |key, value|
-      next false unless narrow.key?(key)
-
-      LIST_KEYS.include?(key) ? (narrow[key] - value).empty? : true
-    end
-  end
+  def dead?(scope) = LIST_KEYS.any? { |key| scope[key] == [] }
 
   def normalize(scope)
-    scope.each_with_object({}) do |(key, value), result|
+    scope.sort_by { |key, _| key }.each_with_object({}) do |(key, value), result|
       case key
       when "content_types" then result[key] = Array(value).map(&:to_s).uniq.sort
       when "page_ids"
         ids = Array(value).map { |id| id.to_s.match?(/\A\d+\z/) ? id.to_i : id }.uniq
         result[key] = ids.all?(Integer) ? ids.sort : ids
-      when "own" then result[key] = true if value == true || value.to_s == "true"
+      when "own" then result[key] = true if ActiveModel::Type::Boolean.new.cast(value)
       else result[key] = value
       end
     end

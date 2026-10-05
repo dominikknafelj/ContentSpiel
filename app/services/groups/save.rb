@@ -102,8 +102,8 @@ module Groups
     # malformed input, not a right the actor lacks: it is answered as a
     # validation failure BEFORE any authorisation comparison -- nothing is
     # written, and neither `group.updated` nor `access.denied` is recorded.
-    # Judged on the list as posted, before `normalize_grants` collapses
-    # identical entries, so "listed twice" means what it says. There is no
+    # Judged on the list as posted, so two identical entries are "listed
+    # twice" too (`normalize_grants` keeps both, in a stable order). There is no
     # model validation on `Grant` for it: this service builds and validates the
     # new grants while the old rows still exist, so such a validation would
     # reject every re-save.
@@ -127,7 +127,7 @@ module Groups
       Array(grants).map do |grant|
         grant = grant.to_h.symbolize_keys
         { permission: grant[:permission].to_s, scope: AccessControl::LiveGrants.normalize_scope(grant[:scope] || {}) }
-      end.uniq.sort_by { |grant| [ grant[:permission], grant[:scope].to_json ] }
+      end.sort_by { |grant| [ grant[:permission], grant[:scope].to_json ] }
     end
 
     # The desired grants as the two authorisation comparisons below read them:
