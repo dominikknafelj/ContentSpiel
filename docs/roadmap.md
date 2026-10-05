@@ -271,6 +271,7 @@ Small follow-up fixes to `app/javascript/autosave/queue.js` and its neighbours; 
 - A group that stores a removed content type's name is view-only for a manager who couldn't grant that type, until an owner or someone whose own grant covers the name removes it. The locked tick ("You can't grant this") is unreachable from stored data and kept only as a defensive rendering.
 - Issuing or revoking a token moves no group's `updated_at`, so a group form opened before it isn't stale, though the group's delete dialog names its tokens.
 - The stale banner names nobody when a group was changed from a user's editor or a user from a group's: the audit event is the other record's.
+- The Settings save checks for a stale base before the service, so a viewer posting a field outside their right (a languages-only holder posting site fields) gets the 409 rather than the service's 403 and its `access.denied`; the group and user editors stand back for such a write. Deciding "outside their right" in the controller would copy `Settings::Save`'s split of the site and language parts.
 
 ### Public URLs and the content version
 
