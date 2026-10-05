@@ -51,7 +51,7 @@ module BlockTypes
       # whitespace.
       tag = settings.tag.to_s.strip
       if tag.present?
-        scope = scope.where(id: PostTag.joins(:tag).where("LOWER(tags.name) = ?", tag.downcase).select(:post_id))
+        scope = scope.where(id: PostTag.joins(:tag).merge(Tag.named(tag)).select(:post_id))
       end
 
       scope

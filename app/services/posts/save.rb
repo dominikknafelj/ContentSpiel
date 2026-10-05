@@ -388,7 +388,7 @@ module Posts
     end
 
     def find_tag(name)
-      Tag.where("LOWER(name) = ?", name.downcase).first || Tag.where("LOWER(name) = ?", name.squish.downcase).first
+      Tag.named(name).first || Tag.named(name.squish).first
     end
 
     def build_tag(name)
