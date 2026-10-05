@@ -286,4 +286,19 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_not result.ok?
     assert Session.exists?(session.id)
   end
+
+  test "changing only the groups moves the user's updated_at and each gained or lost group's" do
+    user = users(:author)
+    gained = access_control_groups(:read_only)
+    lost = access_control_groups(:author)
+    [ user, gained, lost, access_control_groups(:editor) ].each { |record| record.update_columns(updated_at: 1.hour.ago) }
+
+    result = Users::Save.call(user, attributes: { group_ids: [ gained.id ] }, actor: nil)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_operator user.reload.updated_at, :>, 30.minutes.ago
+    assert_operator gained.reload.updated_at, :>, 30.minutes.ago
+    assert_operator lost.reload.updated_at, :>, 30.minutes.ago
+    assert_operator access_control_groups(:editor).reload.updated_at, :<, 30.minutes.ago, "a group that is neither gained nor lost stays put"
+  end
 end

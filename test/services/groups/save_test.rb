@@ -940,4 +940,38 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
     assert within.ok?, within.errors.inspect
   end
+
+  # --- What an open editor shows moves its `updated_at` (the stale-save base) ---
+
+  test "changing only the grants, or only the members, moves the group's updated_at; the members' own move too" do
+    group = AccessControl::Group.create!(name: "Touched", description: "x")
+    AccessControl::Membership.create!(user: users(:author), group: group)
+    grant(group, "posts.read")
+    stamp = ->(*records) { records.each { |record| record.update_columns(updated_at: 1.hour.ago) } }
+    stamp.call(group, users(:author), users(:reader))
+
+    result = as_owner { Groups::Save.call(group, attributes: { grants: [ { permission: "posts.read", scope: {} }, { permission: "pages.read", scope: {} } ] }) }
+    assert result.ok?, result.errors.inspect
+    assert_operator group.reload.updated_at, :>, 30.minutes.ago, "grants only"
+    assert_operator users(:author).reload.updated_at, :<, 30.minutes.ago, "grants don't touch members"
+
+    stamp.call(group)
+    result = as_owner { Groups::Save.call(group, attributes: { member_ids: [ users(:reader).id ] }) }
+    assert result.ok?, result.errors.inspect
+    assert_operator group.reload.updated_at, :>, 30.minutes.ago, "members only"
+    assert_operator users(:reader).reload.updated_at, :>, 30.minutes.ago, "member added"
+    assert_operator users(:author).reload.updated_at, :>, 30.minutes.ago, "member removed"
+  end
+
+  test "a save that changes nothing moves nobody's updated_at" do
+    group = AccessControl::Group.create!(name: "Still")
+    AccessControl::Membership.create!(user: users(:author), group: group)
+    [ group, users(:author) ].each { |record| record.update_columns(updated_at: 1.hour.ago) }
+
+    result = as_owner { Groups::Save.call(group, attributes: { member_ids: [ users(:author).id ] }) }
+
+    assert result.ok?
+    assert_operator group.reload.updated_at, :<, 30.minutes.ago
+    assert_operator users(:author).reload.updated_at, :<, 30.minutes.ago
+  end
 end

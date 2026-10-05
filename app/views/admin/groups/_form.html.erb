@@ -25,8 +25,14 @@
   <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This group has permissions you can't hand out, so you can only view it.</p>
 <% end %>
 
-<%= form_with url: url, method: method, id: "group-form", data: (view_only ? {} : save_bar_form_data(dirty: group.errors.any?, always: group.new_record? || drops_dormant)) do %>
+<%= form_with url: url, method: method, id: "group-form", data: (view_only ? {} : save_bar_form_data(dirty: group.errors.any? || @stale_form.present?, always: group.new_record? || drops_dormant)) do %>
   <%= tag.fieldset disabled: view_only || nil, class: [ "min-w-0 border-0 p-0", ("admin-view-only" if view_only) ] do %>
+    <%# The stale-save base (`Admin::StaleForm`): inside the fieldset, so a read-only
+        form submits none; after a refusal the posted (stale) base stays, so the next
+        Save is refused too until Reload. %>
+    <% if group.persisted? %>
+      <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "group-base-updated-at", value: params[:base_updated_at].presence || group.updated_at.iso8601(6) } %>
+    <% end %>
     <div class="mb-4 max-w-md">
       <%= label_tag "group_name", "Name", class: setup_label_class %>
       <%# A built-in group's name is fixed (`AccessControl::Group#built_in_name_unchanged`). %>

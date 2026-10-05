@@ -193,4 +193,26 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     assert_selector "#{carried}:disabled", visible: :all
     assert_selector "#grant-pages-edit-page-#{@team.id}:enabled:checked"
   end
+
+  test "a Save on a form opened before another admin changed the group shows the banner, keeps the typed name, and Reload shows the other change" do
+    group = AccessControl::Group.create!(name: "Shared", description: "before")
+    visit "/cs-studio/groups/#{group.id}/edit"
+    await_admin_controllers
+
+    # Another admin saves the same group while this form is open.
+    assert Groups::Save.call(group, attributes: { description: "changed by the other admin" }, actor: nil).ok?
+
+    fill_in "Name", with: "My rename"
+    click_button "Save group"
+
+    assert_selector "[role=alert]", text: "This group was changed elsewhere since you opened this screen"
+    assert_field "Name", with: "My rename"
+    assert_equal "Shared", group.reload.name
+
+    click_link "Reload"
+
+    assert_field "Description", with: "changed by the other admin"
+    assert_field "Name", with: "Shared"
+    assert_no_selector "[role=alert]", text: "changed elsewhere"
+  end
 end

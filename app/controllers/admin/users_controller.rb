@@ -15,6 +15,10 @@ module Admin
   # save (an autosaving form's whole point elsewhere) must never touch
   # silently -- an edit here is a deliberate "Save changes" submit.
   class UsersController < BaseController
+    include StaleForm
+
+    STALE_MESSAGE = "This user was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
+
     # The whole module is `users.manage` (access-control design spec §3.3
     # "Users"); `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
@@ -47,7 +51,17 @@ module Admin
       @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
     end
 
+    # A stale form (`Admin::StaleForm`: the user's `updated_at`, which a group
+    # change from a group's editor moves too) is refused before the service runs;
+    # the typed name, email and ticked groups stay in the form (a typed password
+    # never comes back, by design).
     def update
+      if stale_form?(@user, params[:base_updated_at])
+        @user.assign_attributes(user_params.slice(:name, :email_address))
+        @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+        return render_stale(:edit)
+      end
+
       result = Users::Save.call(@user, attributes: user_params)
 
       if result.ok?

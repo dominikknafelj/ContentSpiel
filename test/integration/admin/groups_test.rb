@@ -457,4 +457,73 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
   end
 
   def dom_id(record) = ActionView::RecordIdentifier.dom_id(record)
+
+  # -- stale saves (Admin::StaleForm) ------------------------------------------
+
+  STALE_GROUP = "This group was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
+
+  test "a save on a stale base is refused with the banner, the typed values kept, nothing written and no audit event" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Shared", description: "before")
+    get "/cs-studio/groups/#{group.id}/edit"
+    form = params_as_rendered
+    stale = form["base_updated_at"]
+    assert stale.present?
+
+    group.update!(description: "changed by somebody else")
+
+    assert_no_difference -> { Audit::Event.count } do
+      patch "/cs-studio/groups/#{group.id}", params: form.deep_merge("group" => { "name" => "Typed name", "member_ids" => [ "", users(:author).id.to_s ] })
+    end
+
+    assert_response :conflict
+    assert_includes response.body, STALE_GROUP
+    assert_select "[role=alert] a", text: "Reload"
+    assert_select "#group_name[value=?]", "Typed name"
+    assert_select "input[name='group[member_ids][]'][value='#{users(:author).id}']"
+    assert_select "input[name=base_updated_at][value=?]", stale
+    assert_select "#group-form[data-admin--save-bar-dirty-value=true]", 1, "the typed values count as unsaved"
+    group.reload
+    assert_equal "Shared", group.name
+    assert_equal "changed by somebody else", group.description
+    assert_empty group.memberships
+  end
+
+  test "a blank base is not stale" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Shared")
+
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered_for(group).merge("base_updated_at" => "")
+
+    assert_response :see_other
+  end
+
+  test "a member added on a user's form makes the group's open editor stale, and the reverse" do
+    sign_in_as(users(:one))
+    group = AccessControl::Group.create!(name: "Shared")
+    get "/cs-studio/groups/#{group.id}/edit"
+    group_form = params_as_rendered
+    get "/cs-studio/users/#{users(:author).id}/edit"
+    user_base = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+
+    patch "/cs-studio/users/#{users(:author).id}", params: { user: { email_address: users(:author).email_address, group_ids: [ "", group.id.to_s ] }, base_updated_at: user_base }
+    assert_response :see_other
+
+    patch "/cs-studio/groups/#{group.id}", params: group_form
+    assert_response :conflict
+
+    get "/cs-studio/users/#{users(:reader).id}/edit"
+    reader_base = Nokogiri::HTML(response.body).at_css("input[name=base_updated_at]")["value"]
+    get "/cs-studio/groups/#{group.id}/edit"
+    patch "/cs-studio/groups/#{group.id}", params: params_as_rendered.deep_merge("group" => { "member_ids" => [ "", users(:author).id.to_s, users(:reader).id.to_s ] })
+    assert_response :see_other
+
+    patch "/cs-studio/users/#{users(:reader).id}", params: { user: { email_address: users(:reader).email_address }, base_updated_at: reader_base }
+    assert_response :conflict
+  end
+
+  def params_as_rendered_for(group)
+    get "/cs-studio/groups/#{group.id}/edit"
+    params_as_rendered
+  end
 end

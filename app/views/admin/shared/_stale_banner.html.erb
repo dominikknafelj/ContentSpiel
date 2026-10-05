@@ -1,0 +1,7 @@
+<%# locals: message, reload_path -- the 409 banner of an explicit-save screen
+    (`Admin::StaleForm`). Reload is a way out like Cancel: it discards what is in
+    the form on purpose, so the leave guard doesn't ask. %>
+<div role="alert" class="rounded-cs border border-warn bg-warn-tint px-4 py-3 text-sm text-ink">
+  <%= message %>
+  <%= link_to "Reload", reload_path, class: "ml-2 font-semibold underline", data: { turbo_frame: "content", save_bar_cancel: true } %>
+</div>

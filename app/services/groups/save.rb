@@ -83,6 +83,7 @@ module Groups
           @group.save || raise(ActiveRecord::Rollback)
           replace_grants(grants) if desired && desired != old_grants
           sync_members(old_member_ids, new_member_ids)
+          touch_what_the_forms_show(grants_changed: desired && desired != old_grants, member_ids: (old_member_ids - new_member_ids) | (new_member_ids - old_member_ids))
           record_changes(old_grants, desired, old_member_ids, new_member_ids)
           true
         end
@@ -309,6 +310,19 @@ module Groups
     # Replaced wholesale: a grant has no identity worth keeping beyond its
     # key and scope, and `destroy` (not `delete_all`) runs `Grant`'s
     # `after_commit`, which drops every actor's memoised grants.
+    # The stale-save base of the group form (`Admin::StaleForm`) is this group's
+    # `updated_at`, which a save moves only when a column of the group itself
+    # changed -- not for new grants or members, which are other rows. And the
+    # other side of a membership is a user form (it lists the user's groups): a
+    # member added or removed here makes an open edit of that user stale too.
+    # `touch_all` runs no callbacks, which nothing here needs.
+    def touch_what_the_forms_show(grants_changed:, member_ids:)
+      return unless grants_changed || member_ids.any?
+
+      @group.touch unless @group.previously_new_record?
+      User.where(id: member_ids).touch_all if member_ids.any?
+    end
+
     def replace_grants(grants)
       @group.grants.destroy_all
       grants.each(&:save!)

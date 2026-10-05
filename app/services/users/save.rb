@@ -71,6 +71,7 @@ module Users
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change
         sync_groups(old_group_ids, new_group_ids)
+        touch_what_the_forms_show((old_group_ids - new_group_ids) | (new_group_ids - old_group_ids))
         record_changes(old_group_ids, new_group_ids)
         true
       end
@@ -124,6 +125,18 @@ module Users
     # `user.created`; otherwise `user.owner_changed` for the owner flag and
     # `user.updated` for everything else (group ids included), each only
     # when there's something to say.
+    # The stale-save base of the user form (`Admin::StaleForm`) is this user's
+    # `updated_at`, which a save moves only when a column of the user itself
+    # changed, not for a membership. And the other side of a membership is a
+    # group form (it lists the group's members): a group gained or lost here
+    # makes an open edit of that group stale too. `touch_all` runs no callbacks.
+    def touch_what_the_forms_show(changed_group_ids)
+      return if changed_group_ids.empty?
+
+      @user.touch unless @user.previously_new_record?
+      AccessControl::Group.where(id: changed_group_ids).touch_all
+    end
+
     def record_changes(old_group_ids, new_group_ids)
       changes = user_field_changes(@user)
       changes["group_ids"] = [ old_group_ids, new_group_ids ] if old_group_ids != new_group_ids

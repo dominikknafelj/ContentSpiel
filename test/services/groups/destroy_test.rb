@@ -110,4 +110,15 @@ class Groups::DestroyTest < ActiveSupport::TestCase
       assert_not AccessControl::Group.exists?(carrying.id)
     end
   end
+
+  test "deleting a group moves its former members' updated_at" do
+    group = AccessControl::Group.create!(name: "Going")
+    AccessControl::Membership.create!(user: users(:author), group: group)
+    [ users(:author), users(:reader) ].each { |user| user.update_columns(updated_at: 1.hour.ago) }
+
+    assert Groups::Destroy.call(group, actor: nil).ok?
+
+    assert_operator users(:author).reload.updated_at, :>, 30.minutes.ago
+    assert_operator users(:reader).reload.updated_at, :<, 30.minutes.ago
+  end
 end

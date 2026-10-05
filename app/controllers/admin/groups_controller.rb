@@ -11,6 +11,10 @@ module Admin
   # like the Users module: a half-ticked permission matrix must never be
   # saved on its own.
   class GroupsController < BaseController
+    include StaleForm
+
+    STALE_MESSAGE = "This group was changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
+
     before_action -> { require_permission("groups.manage") }
     before_action :set_group, only: %i[edit update destroy]
 
@@ -39,7 +43,12 @@ module Admin
       load_editor
     end
 
+    # A stale form (`Admin::StaleForm`: the group's `updated_at`, which a save of
+    # its grants or members moves too, and a member change from a user's editor)
+    # is refused before the service runs; the typed values stay in the form.
     def update
+      return refuse_stale if stale_form?(@group, params[:base_updated_at])
+
       save(@group, :edit)
     end
 
@@ -59,6 +68,17 @@ module Admin
 
     def set_group
       @group = AccessControl::Group.find(params[:id])
+    end
+
+    def refuse_stale
+      attributes = group_attributes
+      @group.assign_attributes(attributes.slice(:name, :description))
+      @grants = attributes[:grants]
+      @stale = AccessControl::LiveGrants.new(@group.grants.to_a)
+      @open_keys = []
+      @member_ids = attributes[:member_ids].map(&:to_i)
+      load_editor
+      render_stale(:edit)
     end
 
     def save(group, template)

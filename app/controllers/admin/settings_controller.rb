@@ -21,6 +21,7 @@ module Admin
   # refusal and comes back as the 403.
   class SettingsController < BaseController
     include FileParams
+    include StaleForm
 
     STALE_MESSAGE = "Settings were changed elsewhere since you opened this screen. Reload to see the latest — your changes are still in the form.".freeze
 
@@ -68,12 +69,11 @@ module Admin
         languages: [ :code, :fallback ]
       )
 
-      if stale?(site, params[:base_updated_at])
+      if stale_form?(site, params[:base_updated_at])
         @site_setting = site
         @submitted = permitted
-        @stale = true
         @tab_locale = admin_locale
-        return render(:show, status: :conflict)
+        return render_stale(:show)
       end
 
       attributes, translated = site_arguments(permitted)
@@ -109,20 +109,6 @@ module Admin
     end
 
     private
-
-    # The form's own comparison, a few lines the same shape as the editors'
-    # (`AutosaveResponses#stale_base?`, which is private to autosave): the
-    # row as just loaded is newer than the base the form carried. Blank or
-    # unparseable is not stale -- non-JS and scripted clients never send one.
-    def stale?(site, base) = base_older_than?(site.updated_at, base)
-
-    def base_older_than?(updated_at, base)
-      return false if base.blank?
-
-      Time.iso8601(base) < updated_at
-    rescue ArgumentError
-      false
-    end
 
     # `[attributes, translations]` for `Settings::Save` from the permitted
     # params: the logo (a blank file input is dropped; the remove box detaches

@@ -35,6 +35,10 @@ module Groups
       return denied("groups.manage", @group) unless AccessControl.can_manage_group?(actor, @group)
       return built_in_refusal if @group.built_in?
 
+      # A former member's open edit form lists this group, so it goes stale
+      # with the group (`Admin::StaleForm`).
+      member_ids = @group.memberships.pluck(:user_id)
+
       destroyed = AccessControl::Group.transaction do
         @group.api_tokens.active.find_each do |token|
           ApiTokens::Revoke.call(token, actor: actor, deleting_group: @group).ok? || raise(ActiveRecord::Rollback)
@@ -43,6 +47,8 @@ module Groups
 
         record_event("group.deleted", subject: @group)
         @group.destroy || raise(ActiveRecord::Rollback)
+        User.where(id: member_ids).touch_all
+        true
       end
       return failure(@group) unless destroyed
 
