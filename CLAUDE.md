@@ -47,7 +47,7 @@ This file keeps the rules a change can break without anything failing loudly, an
 
 ### Reference index
 
-- Before changing the page tree, `public_paths`, the public router or the sitemap (`app/models/page.rb`, `app/models/public_site/`, `app/controllers/pages_controller.rb`, `config/routes.rb`, `config/sitemap.rb`), read `docs/reference/page-tree-and-routing.md`.
+- Before changing the page tree, `public_paths`, the public router or the sitemap (`app/models/page.rb`, `app/models/public_site/` (its content version is in `docs/reference/rich-text.md`), `app/controllers/pages_controller.rb`, `config/routes.rb`, `config/sitemap.rb`), read `docs/reference/page-tree-and-routing.md`.
 - Before changing content blocks, post content types or the block cards in the editor (`app/models/content_block.rb`, `app/models/content_types/`, `app/models/block_types/`), read `docs/reference/content-blocks-and-types.md`.
 - Before changing CS Studio's shell, dashboard, audit log screen, ⌘K, system status, preview bar or mind graph (`app/controllers/admin/`, `app/components/admin/shell/`, `app/queries/dashboard/`, `app/queries/jump/`, `app/models/audit/sentence.rb`), read `docs/reference/cs-studio-shell-and-dashboard.md`.
 - Before changing a shared admin component, a dialog, a toast, a form control, the theme or the Tags screen (`app/components/admin/`, `app/views/admin/`, `app/javascript/controllers/`), read `docs/reference/design-system.md`.
@@ -56,7 +56,7 @@ This file keeps the rules a change can break without anything failing loudly, an
 - Before changing Settings, the Languages card or the AI translation card (`app/controllers/admin/settings_controller.rb`, `app/services/settings/`, `app/services/locales/`), read `docs/reference/settings-languages-ai.md`.
 - Before changing users, groups, the permission matrix or API tokens in CS Studio (`app/services/users/`, `app/services/groups/`, `app/services/api_tokens/`, `app/components/admin/users_screen/`, `groups_screen/`, `tokens_screen/`), read `docs/reference/users-groups-tokens.md`.
 - Before changing authentication, a permission, a grant, a service's authorization or the audit log (`app/models/access_control/`, `app/models/audit/`, `app/services/application_service.rb`, `app/models/api_token.rb`), read `docs/reference/access-control-and-audit.md`.
-- Before changing rich text, its renderer, its Markdown form, the vendored editor or the public render cache and content version (`app/models/rich_text/`, `config/importmap.rb`, `app/models/public_site.rb`), read `docs/reference/rich-text.md`.
+- Before changing rich text, its renderer, its Markdown form, the vendored editor or the public render cache and content version (`app/models/rich_text/`, `app/mcp/`, `config/importmap.rb`, `app/models/public_site.rb`), read `docs/reference/rich-text.md`.
 - Before changing the media library, its uploads, usages, variants or picker (`app/models/media/`, `app/services/media/`, `app/components/admin/media_library/`, `app/components/media/`), read `docs/reference/media.md`.
 - Before changing the trash, restoring, purging or retention (`app/services/trash/`, `app/models/concerns/trashable.rb`, `app/jobs/trash/`), read `docs/reference/trash.md`.
 - Before changing translation tracking and status, the Translations matrix, AI translation or the encryption keys (`app/models/translations/`, `app/models/ai/`, `app/services/ai/`), read `docs/reference/translations.md`.
@@ -82,24 +82,32 @@ Each rule names the test that guards it where there is one; the reference file i
 - Every autosave, block reorder, block form and tree move of a CS Studio screen is sent through `app/javascript/autosave/queue.js`, never from a hand-built request beside it, and an autosave carries the record's `base_updated_at` so a stale one is refused with a 409 and nothing is written.
 - Content screens autosave; configuration screens (Settings, Groups, Users, Change password) save explicitly through `Admin::SaveBarComponent`.
 - Choosing a library image for a hero or an image block goes through `Media::Choosing`, and the database's own foreign key is what keeps an image in use from being deleted.
+- Editing an already-published record needs `publish`, not just `edit`, because autosave writes the live record; a save that changes only the publish state needs only `publish` (`Posts::Save` / `Pages::Save#publish_only?`).
+- `Pages::Save` and `Posts::Save` take only the keys in their `ATTRIBUTES` lists; moving and trashing belong to `Pages::Move` and `Trash::Move`.
+- A new `ApplicationService` needs its entry in `EXPECTED_SERVICES` and a factory in `test/support/service_calls.rb` (`test/services/service_behaviour_contract_test.rb`).
+- A password changes only through `Users::UpdatePassword` or `Users::Save`, never `update!` on the model: they end the user's sessions and audit the change.
+- Rich text is written through `#assign_body`, never the raw Mobility accessor.
+- The foreign keys to library images stay NO ACTION, never `on_delete: :restrict`: Postgres 18 reports SQLSTATE 23001, which Rails doesn't map to `ActiveRecord::InvalidForeignKey`, so every rescue would miss it (`MediaForeignKeysNoAction`).
+- `turbo-rails` is pinned in the `Gemfile`; an upgrade means re-reading `app/javascript/autosave/` and the header of `app/javascript/controllers/admin/save_bar_controller.js` against the new Turbo source.
+- An audit event's old-to-new values are `field_changes`, never `changes` (`ActiveRecord::Dirty` owns that name), and the log is append-only in Postgres too: the trigger `db/triggers/audit_events_append_only.sql` is reapplied after every schema load.
 
 ### Pitfalls
 
-Each of these sits at the end of a description in `docs/reference/` and is repeated here because the mistake it names is easy to make.
+Each of these ends a description in `docs/reference/` and is repeated here because the mistake it names is easy to make.
 
-- **Public URLs** (`docs/reference/page-tree-and-routing.md`):
-Read the extensive comments in `page.rb`, `public_site/paths.rb` and `tree_ranking.rb` before changing any of this -- the two-pages-one-URL and nil-position footguns they guard against are non-obvious and previously shipped as bugs (see commit `da80c58`).
-- **Public routing** (same file):
-Read the routes.rb comments before touching `format: false` or the locale constraint; there's a documented history of a 500-vs-404 regression here.
-- **The write queue** (`docs/reference/save-rule-and-write-queue.md`):
-The queue assumes Turbo's morphing page refresh stays off.
-- **Import-map pins** (`docs/reference/rich-text.md`):
-Re-pinning Tiptap (`bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link ...`) writes the new pins without that option — re-add `preload: "admin"` afterwards (`test/integration/public_javascript_test.rb` catches a miss).
-- **AI requests** (`docs/reference/translations.md`):
-Keep the timeout, the cap and the proxy setting in step when changing any of them.
-- **Active Record encryption keys** (same file):
-Setting only some of the env vars therefore mixes two key sets, so keep all three in the same place.
-Once keys are set, keep them: losing them makes the stored AI key unreadable, and the fix is to remove it and enter it again.
+- **Public URLs** (`docs/reference/page-tree-and-routing.md`; the comments in `page.rb`, `public_site/paths.rb` and `tree_ranking.rb` hold the two-pages-one-URL and nil-position footguns):
+  Read the extensive comments in `page.rb`, `public_site/paths.rb` and `tree_ranking.rb` before changing any of this -- the two-pages-one-URL and nil-position footguns they guard against are non-obvious and previously shipped as bugs (see commit `da80c58`).
+- **Public routing** (same file; `config/routes.rb` carries the history of the 500-vs-404 regression):
+  Read the routes.rb comments before touching `format: false` or the locale constraint; there's a documented history of a 500-vs-404 regression here.
+- **The write queue** (`docs/reference/save-rule-and-write-queue.md`; every write of an autosave screen is serialised on this assumption):
+  The queue assumes Turbo's morphing page refresh stays off.
+- **Import-map pins** (`docs/reference/rich-text.md`; the option to re-add after re-pinning is `preload: "admin"`, which keeps the editor off public pages):
+  Re-pinning Tiptap (`bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link ...`) writes the new pins without that option — re-add `preload: "admin"` afterwards (`test/integration/public_javascript_test.rb` catches a miss).
+- **AI requests** (`docs/reference/translations.md`; the three that must agree are the provider's 25 s timeout, `AI::Translate::MAX_FIELDS` / `MAX_CHARACTERS`, and `proxy.response_timeout: 75` in `config/deploy.yml`):
+  Keep the timeout, the cap and the proxy setting in step when changing any of them.
+- **Active Record encryption keys** (same file; an env var that is set wins over the credentials for that key alone, so the keys must not be split between the two):
+  Setting only some of the env vars therefore mixes two key sets, so keep all three in the same place.
+  Once keys are set, keep them: losing them makes the stored AI key unreadable, and the fix is to remove it and enter it again.
 
 ### i18n / Mobility
 
