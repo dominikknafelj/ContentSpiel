@@ -14,8 +14,9 @@ module Posts
   # - at most `Posts::Bulk::MAX_IDS` distinct ids (`ArgumentError`), integers
   #   deduplicated as in `Posts::Bulk.normalize_ids`.
   #
-  # audit: none (each post's own Trash::Restore authorizes it and records its event)
   class BulkRestore < ApplicationService
+    # authorize: none (the ids load through AccessControl.scope; each post's own Trash::Restore authorizes it)
+    # audit: none (each post's own Trash::Restore records its event; a refusal is its access.denied, an unreadable id is not found and leaves no trace)
     Result = Data.define(:restored, :refused, :failed, :not_found, :reasons)
 
     def initialize(ids:, actor: Current.actor)

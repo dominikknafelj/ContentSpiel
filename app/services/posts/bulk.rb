@@ -28,8 +28,6 @@ module Posts
   # error (`ArgumentError`; the controller answers 422), as is an unknown
   # action. A duplicated id counts once.
   #
-  # audit: none (each post's own service authorizes it and records its event)
-  #
   # Publish never changes what it shouldn't: an already-live post is left as
   # it is (`already_live`, not counted as published) and a *scheduled* post
   # (a future `published_at`) is skipped (`skipped_scheduled`) -- "publish"
@@ -39,6 +37,8 @@ module Posts
   # the post but not do this to it), `failed` (the service said no for any
   # other reason, or raised; `reasons` has the message per post id).
   class Bulk < ApplicationService
+    # authorize: none (the ids load through AccessControl.scope; each post's own service -- Posts::Save or Trash::Move -- authorizes it)
+    # audit: none (each post's own service records its event; a refusal is that service's access.denied, an unreadable id is not found and leaves no trace)
     ACTIONS = %w[publish trash].freeze
     MAX_IDS = 200
 
