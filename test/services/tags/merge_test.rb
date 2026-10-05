@@ -308,7 +308,7 @@ class Tags::MergeTest < ActiveSupport::TestCase
       result = as_owner { Tags::Merge.call(source, into: junk) }
 
       assert_not result.ok?
-      assert_equal [ Tags::Merge::MISSING_TAG ], result.errors
+      assert_equal [ Tags::Merge.missing_tag ], result.errors
     end
     assert Tag.exists?(source.id)
     assert_not Audit::Event.exists?(action: "tag.merged")

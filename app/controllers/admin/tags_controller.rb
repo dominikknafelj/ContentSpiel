@@ -111,7 +111,7 @@ module Admin
       if result.ok?
         flash[:notice] = t("admin.tags.toasts.merged", source: source.name, into: into.name)
       else
-        flash[:alert] = name.present? && into.nil? ? Tags::Merge::GONE : result.errors.first
+        flash[:alert] = name.present? && into.nil? ? Tags::Merge.gone : result.errors.first
       end
       redirect_to admin_tags_path(**admin_url_options), status: :see_other
     end

@@ -25,16 +25,17 @@ module Tags
 
     # The three refusals, read from `admin.tags.merge` in
     # `config/locales/admin/tags.en.yml` at the moment they are asked for, not at
-    # load, so a locale switched afterwards is the one they come in. They are
-    # constants to every caller (`Tags::Merge::GONE`, `result.errors ==
-    # [ Tags::Merge::MISSING_TAG ]`) but resolved here by `const_missing`, which
-    # never defines the constant, so the lookup runs on every reference.
-    MESSAGE_KEYS = { SAME_TAG: "same_tag", MISSING_TAG: "missing_tag", GONE: "gone" }.freeze
+    # load, so a locale switched afterwards is the one they come in. Plain class
+    # methods (`Tags::Merge.gone`, `result.errors == [ Tags::Merge.missing_tag ]`):
+    # a caller compares with them or shows them, and a missing key raises
+    # `I18n::MissingTranslationData` rather than render a "translation missing"
+    # sentence into a toast.
+    def self.same_tag = message("same_tag")
+    def self.missing_tag = message("missing_tag")
+    def self.gone = message("gone")
 
-    def self.const_missing(name)
-      key = MESSAGE_KEYS[name]
-      key ? I18n.t("admin.tags.merge.#{key}", raise: true) : super
-    end
+    def self.message(key) = I18n.t("admin.tags.merge.#{key}", raise: true)
+    private_class_method :message
 
     def initialize(source, into:, actor: Current.actor)
       @source = source
@@ -49,8 +50,8 @@ module Tags
       return denied("tags.manage", @source) unless authorize!("tags.manage", @source)
       # Not a tag at all -- nil from a name that matched nothing, or whatever a
       # caller outside CS Studio handed over -- is "none chosen", a plain failure.
-      return failure(@source, [ MISSING_TAG ]) unless @into.is_a?(Tag)
-      return failure(@source, [ SAME_TAG ]) if @into.id == @source.id
+      return failure(@source, [ self.class.missing_tag ]) unless @into.is_a?(Tag)
+      return failure(@source, [ self.class.same_tag ]) if @into.id == @source.id
 
       problem = nil
       content_types = []
@@ -63,7 +64,7 @@ module Tags
         locked = Tag.where(id: [ @source.id, @into.id ]).order(:id).lock.index_by(&:id)
         source, into = locked[@source.id], locked[@into.id]
         if source.nil? || into.nil?
-          problem = GONE
+          problem = self.class.gone
           raise ActiveRecord::Rollback
         end
 

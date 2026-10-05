@@ -33,7 +33,8 @@ require "ripper"
 #   a `data` key, an id, a symbol and a `strftime` pattern are lower-case tokens
 #   with hyphens, dots or percent signs ("flex items-center gap-1.5",
 #   "admin--save-bar-target", "%-d %b"), which none of that matches. Exempt by
-#   rule, not by marker: `Admin::Foo` (a `::`), an HTTP header ("Content-Type"), a single word in capitals
+#   rule, not by marker: `Admin::Foo` (a `::`), an HTTP header (an `X-` one, or a name in
+#   `STANDARD_HEADERS`: "Content-Type"; "Read-Only" is a label), a single word in capitals
 #   with no ellipsis ("PATCH", "UTC"), and a literal with SQL in it ("LOWER(",
 #   "ORDER BY", "ILIKE", "IS NULL", "EXISTS", "->>", ") AS name"). A class name
 #   is NOT exempt ("Posts", "Settings", "Media" are namespaces here and also the
@@ -143,7 +144,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     was were be can no yet just all any more less new].freeze
 
   SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL)\b|\) AS [a-z_]+|->>/
-  HEADER = /\A[A-Z][a-z]*(?:-[A-Z][a-z]+)+\z/
+  # An HTTP header name: any `X-` header, or one of the standard names listed.
+  # NOT "any hyphenated Title-Case token": that shape is also a label
+  # ("Read-Only", "Sign-In", "Up-To-Date"), which is copy -- on a JavaScript
+  # sink line too. A header this list lacks fails the guard until it is added.
+  STANDARD_HEADERS = %w[Content-Type Turbo-Frame].freeze
+  HEADER = /\A(?:X(?:-[A-Z][A-Za-z]*)+|#{Regexp.union(STANDARD_HEADERS).source})\z/
   MARKER = /i18n-ok:\s*\S.{9,}/
 
   # --- ERB ------------------------------------------------------------------
@@ -365,12 +371,13 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   test "Ruby: copy is a capitalised word, capitals, a stop-word phrase or a sentence, never a CSS token or a key" do
     [ "Cancel", "Couldn't save", "Save or cancel your changes first.", "SAVING…", "NOT SAVED · ", "Remove #", "try again.", "OF", "m ago",
-      " things need fixing", "not translated", "just now", "changed since translation", "UP TO DATE", "Posts", "Settings", "Media", "Trash", "Tags" ].each do |text|
+      " things need fixing", "not translated", "just now", "changed since translation", "UP TO DATE", "Posts", "Settings", "Media", "Trash", "Tags",
+      "Read-Only", "Sign-In", "Up-To-Date" ].each do |text|
       assert copy?(text), "#{text.inspect} should count as copy"
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
       "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
-      "X-Page-Base-Updated-At", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
+      "X-Page-Base-Updated-At", "X-CSRF-Token", "Turbo-Frame", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
   end
@@ -418,5 +425,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_empty js_offences(%(headers["X-Page-Base-Updated-At"] = base; el.textContent = "\\u00b7\\u2192"\n))
     assert_empty js_offences(%(status.textContent = "" // i18n-ok: emptying the line, not saying anything\n))
     assert_equal [ %(1: "Retry") ], js_offences(%(button.textContent = "Retry" // i18n-ok: no\n))
+    assert_equal [ %(1: "Read-Only") ], js_offences(%(badge.textContent = "Read-Only"\n)), "a hyphenated label is copy, not a header"
+    assert_equal [ %(1: "Sign-In") ], js_offences(%(el.setAttribute("aria-label", "Sign-In")\n))
+    assert_empty js_offences(%(el.textContent = response.headers.get("Turbo-Frame") || headers["X-CSRF-Token"]\n))
   end
 end
