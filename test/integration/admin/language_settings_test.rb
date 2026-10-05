@@ -48,7 +48,9 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
 
     # The default's select is disabled and reads "None (default)"; it can't be turned off.
     assert_select "#language-en select[disabled] option[selected][value='']", text: "None (default)"
-    assert_select "#language-en button", text: "Turn off…", count: 0
+    # The default's row has only the inert spacer copy of the button (it keeps the columns in line).
+    assert_select "#language-en button:not([disabled])", text: "Turn off…", count: 0
+    assert_select "#language-en button[data-admin--dialog-id-param^='language-off-dialog']", count: 0
     assert_select "#language-de button[data-admin--dialog-id-param='language-off-dialog-de']", text: "Turn off…"
   end
 

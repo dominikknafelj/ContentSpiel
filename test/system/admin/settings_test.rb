@@ -394,4 +394,19 @@ class Admin::SettingsSystemTest < ApplicationSystemTestCase
     assert_language_order %w[de en es]
     assert_selector footer, text: /\b1 unsaved change\b/i
   end
+
+  # The default's row has no Turn off button; an unseen copy holds its place,
+  # so the tag and the fallback select start where the other rows' do.
+  test "the language rows line up: the default's tag and select start where the other rows' button and select do" do
+    visit admin_settings_path(anchor: "languages")
+    await_admin_controllers
+
+    lefts = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card select[id$=-fallback]')).map((select) => select.getBoundingClientRect().left)")
+    assert_operator lefts.size, :>=, 2
+    assert_operator lefts.max - lefts.min, :<, 1, "the fallback selects start at #{lefts.inspect}"
+
+    tag = page.evaluate_script("document.querySelector('#settings-languages-card [data-default-tag]').getBoundingClientRect().left")
+    button = page.evaluate_script("Array.from(document.querySelectorAll('#settings-languages-card button')).find((b) => b.textContent.trim() === 'Make default').getBoundingClientRect().left")
+    assert_in_delta button, tag, 1
+  end
 end

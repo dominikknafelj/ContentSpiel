@@ -26,7 +26,11 @@ class Admin::SettingsScreen::LanguagesCardComponentTest < ViewComponent::TestCas
     assert_selector "#language-en-fallback option[selected][value=de]"
     assert_selector "#language-de-fallback[disabled]"
     assert_selector "button[aria-label='Move English']"
-    assert_selector "button", text: "Turn off…", count: 2
+    assert_selector "button[data-admin--pending-lock-target=control]", text: "Turn off…", count: 2
+    # The default's row holds the button's place with an unseen, inert copy,
+    # so its tag and select line up with the rows that have the real one.
+    assert_selector "#language-de span.invisible[aria-hidden=true] button[disabled][tabindex='-1']:not([data-action])", text: "Turn off…", count: 1
+    assert_no_selector "#language-en span.invisible"
   end
 
   test "a stored list of several fallbacks shows the first" do

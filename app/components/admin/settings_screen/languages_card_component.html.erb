@@ -51,8 +51,14 @@
                 id: "language-#{code}-fallback", disabled: default?(code), class: "#{setup_select_class} !mt-0 !w-auto" %>
         </div>
 
+        <%# The default can't be turned off. Its row keeps the button's place
+            with the button itself, unseen and inert, rather than a guessed
+            width: a spacer that is a few pixels off shifts the default's
+            tag and select out of line with the rows below. %>
         <% if default?(code) %>
-          <span class="w-24"></span>
+          <span class="invisible" aria-hidden="true" data-turn-off-spacer>
+            <%= render Admin::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, disabled: true, tabindex: -1) %>
+          </span>
         <% else %>
           <%= render Admin::ButtonComponent.new(label: "Turn off…", variant: :secondary, size: :small, aria: { label: "Turn off #{name(code)}" },
                 data: dialog_trigger(self.class.off_dialog_id(code)).merge("admin--pending-lock-target": "control")) %>
