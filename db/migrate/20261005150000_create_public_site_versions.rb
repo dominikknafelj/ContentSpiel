@@ -4,9 +4,10 @@
 # on `site_settings`, because that row's `updated_at` is the Settings form's
 # stale-check base and must not move with every published edit.
 #
-# The row is inserted here so a migrated database starts with one; a database
-# built from `db/schema.rb` (a test database, `db:schema:load`) has none, and
-# `PublicSite::Version` reads that as 0 and creates the row at the first bump.
+# The row (id 1, `PublicSite::Version::ROW_ID`) is inserted here so a
+# migrated database starts with one; a database built from `db/schema.rb` (a
+# test database, `db:schema:load`) has none, and `PublicSite::Version` reads
+# that as 0 and creates the row at the first bump.
 class CreatePublicSiteVersions < ActiveRecord::Migration[8.1]
   def up
     create_table :public_site_versions do |t|
@@ -14,7 +15,7 @@ class CreatePublicSiteVersions < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    execute "INSERT INTO public_site_versions (counter, created_at, updated_at) VALUES (0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+    execute "INSERT INTO public_site_versions (id, counter, created_at, updated_at) VALUES (1, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
   end
 
   def down

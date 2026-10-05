@@ -1,32 +1,31 @@
 # The stored half of the public site's content version (technical cleanup
 # spec §4.8): one row, one counter. `PublicSite.bump_version!` is the only
-# caller of `increment!`, and `PublicSite.content_version` the only reader a
+# caller of `bump!`, and `PublicSite.content_version` the only reader a
 # request needs; see `app/models/public_site.rb` for what moves it and why.
 #
-# A database built from `db/schema.rb` rather than by the migration (every
-# test database) has no row. That reads as 0, and the first increment
-# creates the row.
+# The row is the one with `ROW_ID`. A database built from `db/schema.rb`
+# rather than by the migration (every test database, `db:schema:load`) has
+# no row: that reads as 0, and the first bump creates it.
 module PublicSite
   class Version < ApplicationRecord
     self.table_name = "public_site_versions"
 
+    ROW_ID = 1
+
     # One query.
     def self.current
-      order(:id).pick(:counter) || 0
+      where(id: ROW_ID).pick(:counter) || 0
     end
 
-    # `counter = counter + 1` in the database, never read-then-write in Ruby:
-    # two writers committing at once both count, each waiting for the other's
-    # row lock for the length of one single-row statement.
-    #
-    # With no row to update, one is created already counted. Two processes
-    # doing that at the same moment could each insert one; `current` and this
-    # `UPDATE` then keep using whichever has the lowest id, so the counter
-    # still only ever goes up.
-    def self.increment!
-      now = Time.current
-      bumped = where(id: order(:id).limit(1).select(:id)).update_all([ "counter = counter + 1, updated_at = ?", now ]) # version: none (this is the bump)
-      create!(counter: 1) if bumped.zero?
+    # One statement, with no "is there a row" branch in Ruby: `INSERT ...
+    # ON CONFLICT (id) DO UPDATE SET counter = counter + 1`. The database
+    # counts, so two writers committing at once both count -- each waits for
+    # the other's row lock for the length of this statement -- and that
+    # holds for the very first bumps too: of two inserts racing for the
+    # missing row, the loser's becomes the update.
+    def self.bump!
+      upsert({ id: ROW_ID, counter: 1 }, unique_by: :id,
+        on_duplicate: Arel.sql("counter = public_site_versions.counter + 1, updated_at = excluded.updated_at"))
     end
   end
 end

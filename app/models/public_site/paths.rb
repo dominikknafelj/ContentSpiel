@@ -447,7 +447,8 @@ module PublicSite
     #
     # The table has no model callbacks, so this is also where a changed
     # address moves the public content version (`PublicSite.bump_version!`,
-    # deferred to the commit): when a row of a *live* record was written --
+    # called inside the transaction below and so deferred to its commit):
+    # when a row of a *live* record was written --
     # `Publishable#live?`, its own publication time, whatever its ancestors
     # or the trash say. The rows of a draft or a scheduled record move
     # nothing, because nothing published reads them: the resolver answers 404
@@ -467,9 +468,15 @@ module PublicSite
       changes = changes_between(desired, stored)
       return if changes.empty?
 
-      PublicSite.bump_version! if changes.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
       type = records.first.class.polymorphic_name
       PublicPath.transaction do
+        # Inside the transaction, so the bump waits for *this* commit even
+        # when the caller has none open (a tag service's sync after its own
+        # commit, `PostTag`'s `after_commit`, `SyncWentLiveJob`). Called
+        # ahead of it, the counter would move at once and the rows commit
+        # afterwards: a request in between would render the old addresses
+        # under the new version, and nothing would bump again.
+        PublicSite.bump_version! if changes.any? { |change| !change.record.respond_to?(:live?) || change.record.live? }
         held ||= held_by_others(changes)
         given = Set.new
         moved, rest = changes.partition { |change| change.to && !held.key?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }

@@ -146,6 +146,87 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_empty not_modified.grep(loads), not_modified.join("\n")
   end
 
+  # --- What else the ETag holds (fix round 1) ----------------------------------
+
+  # The version moves only with published content, so the deployed revision
+  # is in the ETag itself: a deploy that changed a component, the layout or
+  # the stylesheet must not be answered 304.
+  test "a new code revision answers 200 where the same one answers 304" do
+    original = RichText.code_revision
+    get "/"
+    etag = response.headers["ETag"]
+
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    RichText.code_revision = "#{original}-next"
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_not_equal etag, response.headers["ETag"]
+  ensure
+    RichText.code_revision = original
+  end
+
+  # The settings row is in the ETag by itself, not only through the bump its
+  # commit makes: written here around the callbacks, so no bump runs.
+  test "a changed settings row answers 200 even without a bump" do
+    get "/"
+    etag = response.headers["ETag"]
+    version = PublicSite.content_version
+
+    travel 1.minute
+    SiteSetting.instance.update_columns(title: { "en" => "Renamed" }, updated_at: Time.current)
+    Current.reset
+    assert_equal version, PublicSite.content_version
+
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_includes response.body, "Renamed"
+  end
+
+  # The footer prints the year.
+  test "the same page answers 304 later in the year and 200 in the next" do
+    travel_to Time.utc(2030, 6, 1, 12)
+    get "/"
+    etag = response.headers["ETag"]
+
+    travel_to Time.utc(2030, 12, 31, 23, 59)
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+
+    travel_to Time.utc(2031, 1, 1, 0, 1)
+    get "/", headers: { "If-None-Match" => etag }
+    assert_response :success
+    assert_includes response.body, "© 2031"
+  end
+
+  # The version is read before what it stands for: the settings row, the
+  # resolver's lookup and the record. On a language-prefixed URL the route
+  # constraint has loaded the settings row before any controller code; it is
+  # read again after the version.
+  test "a request reads the content version before the settings row and the record" do
+    with_locales(%w[en de], default: "en")
+    assert Pages::Save.call(@root, translations: { "de" => { title: "Start" } }).ok?
+    order = lambda do |statements|
+      at = ->(pattern) { statements.each_index.select { |i| statements[i].match?(pattern) } }
+      { version: at.call(/FROM "public_site_versions"/), site: at.call(/\ASELECT "site_settings"\.\* FROM "site_settings"/), paths: at.call(/FROM "public_paths"/) }
+    end
+
+    Current.reset
+    plain = order.call(capture_sql { get "/" })
+    assert_response :success
+    assert_operator plain[:version].first, :<, plain[:site].first, "an unprefixed URL: nothing loads the settings row before the version"
+    assert_operator plain[:version].first, :<, plain[:paths].first
+    assert_equal 1, plain[:site].size
+
+    Current.reset
+    prefixed = order.call(capture_sql { get "/de" })
+    assert_response :success
+    assert_operator prefixed[:version].first, :<, prefixed[:site].last, "a prefixed URL: the settings row is read again after the version"
+    assert_operator prefixed[:version].first, :<, prefixed[:paths].first
+    assert_equal 2, prefixed[:site].size
+  end
+
   test "unknown paths render the theme 404" do
     get "/nope"
     assert_response :not_found

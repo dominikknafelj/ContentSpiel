@@ -19,6 +19,22 @@ class PagesController < PublicController
   # old default takes effect on the very next request, not after a deploy.
   before_action :redirect_default_locale_prefix
 
+  # The content version is read before anything it stands for: ahead of the
+  # resolver, the record and the settings row. A write that commits while
+  # this request runs is then seen as new content under the old version -- a
+  # render cached under a key the bump is about to retire, harmless -- and
+  # never as old content under the new version, which would stay cached
+  # until some later published change.
+  #
+  # Prepended, so it runs before every other callback here. The settings row
+  # can still have been loaded earlier: the locale-prefixed route's
+  # constraint (`LocaleRouteConstraint`) asks which languages are enabled
+  # before any controller code runs. That copy is dropped, so the row this
+  # response is rendered from is read after the version too -- one more
+  # query on a prefixed URL, none on an unprefixed one, where nothing has
+  # loaded it yet.
+  prepend_before_action :read_content_version_first
+
   def show
     result = PublicSite::Resolver.new(scope: :published, urls: public_urls).call(locale: effective_locale, path: requested_path)
 
@@ -34,13 +50,26 @@ class PagesController < PublicController
       # but must always revalidate against the ETag rather than serving a
       # stale copy for up to `max-age` seconds.
       #
-      # The ETag is the resolved record and the site's content version
-      # (`PublicSite`, three queries). The blocks, their images and the
-      # images' variants are loaded only past it, for a response that is
-      # actually rendered: a conditional GET that still matches costs the
-      # resolver's lookup and the version, nothing else.
+      # The ETag is everything the response is built from that Rails' own
+      # template digest (of `pages/show` alone) doesn't cover:
+      # - the resolved record and the site's content version (`PublicSite`,
+      #   three queries, already read by `read_content_version_first`);
+      # - the settings row, which every page prints (title, tagline, footer),
+      #   so the ETag is right even in the instant between a settings commit
+      #   and its bump;
+      # - `RichText.code_revision`, the deployed revision: the version moves
+      #   only with published content, so without it a deploy that changed a
+      #   component, the layout or the stylesheet's digest would keep being
+      #   answered 304 until somebody published something;
+      # - the year, which the footer prints: a 304 on 1 January would
+      #   otherwise confirm last year's copyright line.
+      #
+      # The blocks, their images and the images' variants are loaded only
+      # past it, for a response that is actually rendered: a conditional GET
+      # that still matches costs the resolver's lookup, the version and the
+      # settings row, nothing else.
       expires_in 0, public: true, must_revalidate: true
-      if stale?(etag: [ result.record, PublicSite.current_content_version ], public: true)
+      if stale?(etag: [ result.record, PublicSite.current_content_version, Current.site, RichText.code_revision, Time.current.year ], public: true)
         preload_page_images(@page)
         render :show
       end
@@ -52,6 +81,11 @@ class PagesController < PublicController
   end
 
   private
+
+  def read_content_version_first
+    PublicSite.current_content_version
+    Current.site = nil
+  end
 
   def redirect_default_locale_prefix
     return unless public_urls.redundant_prefix?(params[:locale])

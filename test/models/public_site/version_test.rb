@@ -240,6 +240,21 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_stays("a draft's block, destroyed directly") { draft.destroy! }
   end
 
+  # `Posts::Bulk` writes nothing itself: each post goes through `Posts::Save`
+  # or `Trash::Move`, whose model callbacks bump.
+  test "a bulk publish and a bulk trash move, and neither does for drafts that stay drafts" do
+    drafts = Array.new(2) { |index| create_post(title: "Draft #{index}", published: false) }
+    untouched = create_post(title: "Stays a draft", published: false)
+
+    as_owner do
+      assert_stays("a bulk trash of a draft") { Posts::Bulk.call(action: "trash", ids: [ untouched.id ]) }
+      assert_moves("a bulk publish") { Posts::Bulk.call(action: "publish", ids: drafts.map(&:id)) }
+      assert drafts.all? { |post| post.reload.live? }
+      assert_moves("a bulk trash of live posts") { Posts::Bulk.call(action: "trash", ids: drafts.map(&:id)) }
+      assert drafts.all? { |post| post.reload.trashed? }
+    end
+  end
+
   test "a live post's tags move" do
     post = create_post(title: "Live", tags: [ "one" ])
 
@@ -262,6 +277,88 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_equal "/journal/hello", post.full_path("en")
   end
 
+  # The statements that change `public_paths`, and the one that moves the
+  # counter, by their place in `statements`.
+  def path_writes(statements) = statements.each_index.select { |i| statements[i].match?(/\A(INSERT INTO|UPDATE|DELETE FROM) "public_paths"/) }
+  def counter_writes(statements) = statements.each_index.select { |i| statements[i].match?(/\AINSERT INTO "public_site_versions"/) }
+
+  # The order that matters when the caller has no transaction open: the rows
+  # first, the counter after their commit. The other way round, a request in
+  # between renders the old addresses under the new version and nothing
+  # bumps again.
+  #
+  # "No transaction open" is what production sees here, although the test
+  # itself runs inside the suite's wrapping transaction: that one is not
+  # joinable, `ActiveRecord.after_all_transactions_commit` does not count
+  # it (asserted below), and so a bump called outside `write_all`'s own
+  # transaction runs at once in this test exactly as it would in production.
+  test "a sync called with no transaction open writes the rows before it moves the counter" do
+    listing = create_page(title: "Blog")
+    block_on(listing, block_type: "post_list", settings: { "content_type" => "blog" })
+    post = create_post(title: "Hello")
+    post.update_columns(slug: { "en" => "renamed" }) # around the callbacks, so the sync below is the only writer of its address
+    assert_empty ActiveRecord.all_open_transactions, "the case needs no joinable transaction open"
+
+    before = counter
+    statements = capture_sql { PublicSite::Paths.sync(post.reload) }
+
+    assert_equal "/blog/renamed", post.full_path("en")
+    assert_equal before + 1, counter
+    assert_not_empty path_writes(statements)
+    assert_equal 1, counter_writes(statements).size, statements.join("\n")
+    assert_operator counter_writes(statements).first, :>, path_writes(statements).last, statements.join("\n")
+  end
+
+  # The same order for the callers that sync after their own commit.
+  test "a tag service's sync after its commit moves a live post, rows before the counter" do
+    post = tagged_post_with_listing("old")
+    assert_equal "/listing-old/tagged-old", post.full_path("en")
+    other = create_page(title: "Everything")
+    block_on(other, block_type: "post_list", settings: { "content_type" => "blog" })
+
+    before = counter
+    statements = capture_sql { ok(Tags::Rename.call(tag_named("old"), name: "new")) }
+
+    assert_equal "/everything/tagged-old", post.full_path("en"), "the tag-filtered listing lost the post to the unfiltered one"
+    assert_operator counter, :>, before
+    assert_operator counter_writes(statements).last, :>, path_writes(statements).last, statements.join("\n")
+  end
+
+  test "a join row's sync after its commit moves a live post" do
+    post = create_post(title: "Hello")
+    listing = create_page(title: "Tagged")
+    block_on(listing, block_type: "post_list", settings: { "content_type" => "blog", "tag" => "news" })
+    tag = Tag.create!(name: "news")
+    assert_nil post.full_path("en")
+
+    statements = capture_sql { post.tags << tag }
+
+    assert_equal "/tagged/hello", post.full_path("en")
+    assert_operator counter_writes(statements).last, :>, path_writes(statements).last, statements.join("\n")
+  end
+
+  # A scheduled listing page whose time has come: the sweep moves the live
+  # posts it lists, and that is a write.
+  test "the went-live sweep moving a live post moves" do
+    listing = create_page(title: "Journal", published: false)
+    block_on(listing, block_type: "post_list", settings: { "content_type" => "blog" })
+    fallback = create_page(title: "Archive")
+    post = create_post(title: "Hello")
+    ok(Pages::Save.call(listing, attributes: { published_at: 1.hour.from_now }))
+    # The live listing wins while the other is only scheduled.
+    block_on(fallback, block_type: "post_list", settings: { "content_type" => "blog" })
+    assert_equal "/archive/hello", post.full_path("en")
+
+    travel_to 2.hours.from_now do
+      before = counter
+      statements = capture_sql { PublicSite::Paths.sync_went_live(since: 1.day.ago) }
+
+      assert_equal "/journal/hello", post.full_path("en")
+      assert_operator counter, :>, before
+      assert_operator counter_writes(statements).last, :>, path_writes(statements).last, statements.join("\n")
+    end
+  end
+
   test "a sync that finds nothing to write stays, and a rebuild moves" do
     page = create_page(title: "Live")
 
@@ -280,6 +377,15 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_moves("restoring an image") { ok(Trash::Restore.call(asset.reload)) }
     ok(Trash::Move.call(asset.reload))
     assert_moves("purging an image") { ok(Trash::Purge.call(asset.reload)) }
+  end
+
+  test "an image's file replaced moves" do
+    asset = create_media_asset
+
+    assert_moves do
+      asset.file.attach(io: File.open(file_fixture("wide.png")), filename: "wide.png", content_type: "image/png")
+      assert asset.save
+    end
   end
 
   # `Trash::Restore` brings a page's trashed images back with `update_all`,
@@ -314,6 +420,15 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
   test "saving the settings moves" do
     assert_moves("the site title") { ok(Settings::Save.call(Current.site, translations: { "en" => { title: "Renamed" } })) }
     assert_moves("the time zone") { ok(Settings::Save.call(Current.site, attributes: { time_zone: "Berlin" })) }
+  end
+
+  # The logo is an attachment: no column of the settings row changes, and
+  # the attachment touches the row.
+  test "a logo attached to the settings, and taken off, moves" do
+    site = Current.site
+
+    assert_moves("a logo attached") { site.logo.attach(io: File.open(file_fixture("tiny.png")), filename: "logo.png", content_type: "image/png") }
+    assert_moves("a logo removed") { SiteSetting.instance.logo.purge }
   end
 
   test "enabling, disabling and changing the default language each move" do
@@ -417,15 +532,19 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_equal before + 1, counter
   end
 
-  test "a database with no version row reads 0 and the first bump creates the row" do
+  test "a database with no version row reads 0, and two bumps from there give 2 in one row" do
     PublicSite::Version.delete_all
     assert_equal 0, counter
 
-    PublicSite.bump_version!
-    PublicSite.bump_version!
+    statements = capture_sql do
+      PublicSite.bump_version!
+      PublicSite.bump_version!
+    end
 
     assert_equal 2, counter
-    assert_equal 1, PublicSite::Version.count
+    assert_equal [ PublicSite::Version::ROW_ID ], PublicSite::Version.pluck(:id)
+    assert_equal 2, statements.size, "one statement a bump, row or no row:\n#{statements.join("\n")}"
+    assert statements.all? { |sql| sql.match?(/\AINSERT INTO "public_site_versions" .* ON CONFLICT \("id"\) DO UPDATE SET counter = public_site_versions.counter \+ 1/) }, statements.join("\n")
   end
 
   # No write happens when a scheduled record's time comes: the two
@@ -486,9 +605,11 @@ class PublicSite::VersionConcurrencyTest < ActiveSupport::TestCase
     @rows.each { |id, counter| PublicSite::Version.create!(id: id, counter: counter) }
   end
 
-  test "bumps from several threads at once all count" do
-    PublicSite.bump_version!
-    before = PublicSite::Version.current
+  # From no row at all: the first bumps race for the insert, and the loser's
+  # becomes the update.
+  test "bumps from several threads at once all count, the first ones included" do
+    PublicSite::Version.delete_all
+    before = 0
 
     threads = Array.new(4) do
       Thread.new do

@@ -11,9 +11,13 @@ require "ripper"
 # callbacks --
 #
 #   update_all  update_columns  update_column  touch_all  insert_all(!)
-#   upsert_all  delete_all (also as `dependent: :delete_all`)
-#   update_counters  increment_counter  decrement_counter
-#   connection.execute / connection.exec_...
+#   upsert_all  delete_all (also as `dependent: :delete_all`)  delete_by
+#   insert(!)  upsert  record.delete  Model.delete(id)
+#   update_counters  increment_counter  decrement_counter  increment!
+#   decrement!
+#   connection.execute / exec_... / update / delete / insert, and
+#   `.execute(` / `.exec_...(` on any receiver (a `with_connection` block's
+#   variable)
 #
 # -- must be one of:
 #
@@ -42,10 +46,20 @@ class VersionBumpTest < ActiveSupport::TestCase
   EXTENSIONS = %w[rb rake].freeze
 
   WRITE = /
-    \b(?:update_all|update_columns|update_column|touch_all|insert_all!?|upsert_all|delete_all|
+    \b(?:update_all|update_columns|update_column|touch_all|insert_all!?|upsert_all|delete_all|delete_by|
        update_counters|increment_counter|decrement_counter)(?![\w?])
     |
-    \bconnection\.(?:execute|exec_\w+)\b
+    \b(?:insert|upsert)!?\(              # one row, around the callbacks -- and Array#insert, which gets a mark
+    |
+    \.(?:increment|decrement)!
+    |
+    \b[A-Z][\w:]*\.delete\(             # Model.delete(id)
+    |
+    \.delete(?![\w(?!])                 # record.delete: no argument, where Hash, Array and String#delete take one
+    |
+    \.(?:execute|exec_\w+)\(            # raw SQL, on `connection` or on a block's variable
+    |
+    \bconnection\.(?:execute|exec_\w+|update|delete|insert)\b
   /x
 
   BUMP = /\bPublicSite\.bump_version!/
@@ -66,6 +80,7 @@ class VersionBumpTest < ActiveSupport::TestCase
   # Files that write only tables no public page reads, where the receiver is
   # a scope held in a variable or continued from the line above.
   FILES = {
+    "app/models/public_site/version.rb" => "the counter's own row: this write is the bump",
     "app/models/translations/state_index.rb" => "writes only translation_states (`State`), which CS Studio's lists read and no public page does"
   }.freeze
 
@@ -172,6 +187,43 @@ class VersionBumpTest < ActiveSupport::TestCase
     end
     assert_equal 1, offences_in("has_many :public_paths, dependent: :delete_all\n").size
     assert_equal 1, offences_in(%(Page.connection.execute("UPDATE pages SET position = 0")\n)).size
+  end
+
+  test "single-row writes around the callbacks are caught" do
+    [
+      "PublicPath.delete_by(locale: code)",
+      "PublicPath.insert({ path: path })",
+      "PublicPath.insert!({ path: path })",
+      "PublicPath.upsert({ path: path }, unique_by: :id)",
+      "upsert({ id: 1 })",
+      "page.delete",
+      "page&.delete",
+      "Page.delete(id)",
+      "Media::Asset.delete(ids)",
+      "page.increment!(:position)",
+      "page.decrement!(:position)",
+      "Page.update_counters(id, position: 1)"
+    ].each { |line| assert_equal 1, offences_in("#{line}\n").size, line }
+  end
+
+  test "raw SQL is caught on the connection and on a block's variable" do
+    [
+      %(Page.connection.update("UPDATE pages SET position = 0")),
+      %(Page.connection.delete("DELETE FROM public_paths")),
+      %(Page.connection.insert("INSERT INTO public_paths DEFAULT VALUES")),
+      %(Page.connection.exec_update("UPDATE pages SET position = 0")),
+      %(Page.with_connection { |c| c.execute("UPDATE pages SET position = 0") }),
+      %(Page.with_connection { |c| c.exec_delete("DELETE FROM public_paths") })
+    ].each { |line| assert_equal 1, offences_in("#{line}\n").size, line }
+  end
+
+  test "a delete that takes an argument on a variable is a Hash, Array or String's, not a write" do
+    assert_empty offences_in(<<~RUBY)
+      settings.delete("tag")
+      names.delete(name)
+      value.delete!("-")
+      link_to "Remove", path, data: { turbo_method: :delete }
+    RUBY
   end
 
   test "a bump anywhere in the file's code lets its writes through; one in a comment does not" do

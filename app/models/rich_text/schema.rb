@@ -258,8 +258,11 @@ module RichText
 
         type = (kind == :node ? RichText::NodeType : RichText::MarkType).new(name)
         block&.call(type)
-        @version = nil
         registry[name] = type
+        # After the type is in: cleared first, a `version` read from another
+        # thread in between would memoise the schema without it.
+        @version = nil
+        type
       end
 
       # The content model (`group`/`content` on a node, `excludes` on a

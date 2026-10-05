@@ -28,7 +28,7 @@ class CreatePublicSiteVersionsMigrationTest < ActiveSupport::TestCase
   test "up creates the table with its one row, at 0, and the first bump counts from there" do
     migrate_up
 
-    assert_equal [ 0 ], PublicSite::Version.pluck(:counter)
+    assert_equal [ [ PublicSite::Version::ROW_ID, 0 ] ], PublicSite::Version.pluck(:id, :counter)
     assert_equal 0, PublicSite::Version.current
 
     PublicSite.bump_version!

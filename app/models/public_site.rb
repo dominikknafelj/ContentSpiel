@@ -79,18 +79,30 @@ module PublicSite
 
   # Moves the counter: one atomic `UPDATE ... SET counter = counter + 1`.
   #
-  # After the commit, never inside the transaction, wherever it is called
-  # from. A model's `after_commit` has no transaction open and bumps at
-  # once; a service calling this next to an `update_all`, or a sync running
-  # inside another record's `after_save`, is deferred until every open
-  # transaction has committed (`ActiveRecord.after_all_transactions_commit`,
-  # the same deferral `PublicSite::Paths.announce` uses). So:
+  # After the commit of whatever transaction is open *when it is called*
+  # (`ActiveRecord.after_all_transactions_commit`, the same deferral
+  # `PublicSite::Paths.announce` uses); with none open it bumps at once. A
+  # model's `after_commit` has none open; a service calling this next to an
+  # `update_all`, or a sync running inside another record's `after_save`,
+  # is deferred. So:
   # - a rolled-back write bumps nothing;
   # - the counter row is never locked for the length of a save, and two
   #   saves can't deadlock on it;
-  # - a reader can't see the new counter before the rows it stands for: a
-  #   page rendered in the instant between the commit and the bump is cached
-  #   under the old version, which the bump then retires.
+  # - a reader can't see the new counter before the rows it stands for --
+  #   PROVIDED the caller bumps from inside the transaction that writes
+  #   them, or after it has committed. A bump called with no transaction
+  #   open and *followed* by the write moves the counter first: a page
+  #   rendered in between is cached under the new version with the old
+  #   rows, and nothing bumps again. So every explicit call sits inside its
+  #   write's transaction (`PublicSite::Paths.write_all` opens its own for
+  #   that reason). The other order is harmless: a page rendered between a
+  #   commit and its bump is cached under the old version, which the bump
+  #   then retires.
+  #
+  # A bump can still be lost one way: an `after_commit` callback that raises
+  # stops the callbacks queued behind it, a deferred bump among them, after
+  # the data has committed. `bin/rails public_site:bump_version` is the
+  # remedy.
   #
   # One bump per call, not one per transaction: a branch purge bumps once
   # per live page. Each is a single-row update; de-duplicating them would
@@ -98,7 +110,7 @@ module PublicSite
   # one failure this must not have.
   def bump_version!
     ActiveRecord.after_all_transactions_commit do
-      PublicSite::Version.increment!
+      PublicSite::Version.bump!
       Current.content_version = nil
     end
     nil

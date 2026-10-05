@@ -70,7 +70,7 @@ module Page::TreeRanking
     # them (`PublicSite::Paths.canonical_page`), ignores trashed pages, and a
     # restored page rejoins at the position `Trash::Restore` gives it.
     others = self.class.kept.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
-    ordered = others.insert(requested.clamp(0, others.size), self)
+    ordered = others.insert(requested.clamp(0, others.size), self) # version: none (Array#insert, no SQL)
 
     # No `PublicSite.bump_version!` for the siblings, although their rows are
     # written around the callbacks (here, and by closure_tree's own
