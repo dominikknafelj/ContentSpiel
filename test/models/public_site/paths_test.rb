@@ -242,6 +242,47 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal "/blog/team", current(post)
   end
 
+  # A page that yields has no address, so nothing hangs off it: its
+  # descendants must not be written under the address it did not get, which
+  # is another record's URL space ("no URL yet, never borrow one").
+  test "a page that yields inside a subtree sync leaves its descendants without an address there" do
+    team = Page.create!(parent: @root, title: "Team", published_at: 1.day.ago)
+    Page.create!(parent: team, title: "Alice", published_at: 1.day.ago)
+    old = Page.create!(parent: @root, title: "Team old", published_at: 1.day.ago)
+    bob = Page.create!(parent: old, title: "Bob", published_at: 1.day.ago)
+    Mobility.with_locale(:de) { old.update!(slug: "mannschaft") }
+    Mobility.with_locale(:de) { old.update!(slug: "team-alt") }
+    assert PublicPath.redirects.exists?(record: old, locale: "de", path: "/mannschaft")
+
+    # Around the callbacks and the validation, as `Locales::Enable` fills slugs.
+    old.update_columns(slug: old.read_attribute(:slug).merge("de" => "team"))
+    PublicSite::Paths.sync_subtree(@root.reload)
+
+    assert_equal "/team", current(team, "de")
+    assert_nil current(old, "de"), "the page that didn't ask yields"
+    assert_nil current(bob, "de"), "and its child is not put under the other page's address"
+    assert_not PublicPath.exists?(locale: "de", path: "/team/bob")
+    assert PublicPath.redirects.exists?(record: old, locale: "de", path: "/mannschaft"), "the yielder keeps its redirects"
+    assert_equal "/team-old/bob", current(bob, "en"), "other languages are untouched"
+  end
+
+  test "turning on a language in which two siblings get the same slug gives the second one's branch no address" do
+    site_settings(:default).update!(locales: [ { "code" => "en" } ], default_locale: "en")
+    PublicSite::Paths.rebuild!
+    first = Page.create!(parent: @root, title: "Team", published_at: 1.day.ago)
+    second = Page.create!(parent: @root, title: "Team", slug: "team-old", published_at: 1.day.ago)
+    bob = Page.create!(parent: second, title: "Bob", published_at: 1.day.ago)
+    assert_equal [ "/team", "/team-old/bob" ], [ current(first), current(bob) ]
+
+    as_owner { assert Locales::Enable.call("de").ok? }
+
+    assert_equal "team", second.reload.slug_de, "both were filled from the same title"
+    assert_equal "/team", current(first, "de")
+    assert_nil current(second, "de")
+    assert_nil current(bob, "de")
+    assert_empty PublicPath.where(locale: "de").where("path LIKE '/team/%'")
+  end
+
   # An address one record of a sync is leaving is free for another record of
   # the same sync: who holds what is judged on where the rows end up, not on
   # the order the records happen to be taken in.
@@ -417,6 +458,12 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   #
   # Current rows only: a redirect is history (the address a record used to
   # have), which a rebuild from the records alone cannot know and deletes.
+  #
+  # `rebuild!` is a partial oracle: it asks no condition, but it works the
+  # paths out and inserts the rows with the same code the incremental sync
+  # uses, so a mistake in that shared code shows on both sides and cancels
+  # out. What anchors the derivation itself are the literal addresses
+  # asserted along the way (and the tests above that pin single rules).
   def live_rows
     PublicPath.current.order(:record_type, :record_id, :locale, :path).pluck(:record_type, :record_id, :locale, :path)
   end
@@ -507,6 +554,8 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
       ok! Pages::Move.call(section.reload, parent: about.reload, position: 0)
       assert_equal "/about/section/sub", current(sub)
+      moved_from = PublicPath.find_by(locale: "en", path: "/section/sub")
+      assert_equal [ false, sub ], [ moved_from&.current, moved_from&.record ], "the address the branch left redirects to where it went"
       assert_parity "moving a branch under another parent"
 
       # First under Team, first under History: the parent is all that changes.
@@ -532,6 +581,12 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! Pages::Save.call(writing.reload, attributes: { published: true })
       assert_equal "/writing/blog/hello", current(hello)
       assert_parity "republishing a parent"
+
+      ok! Pages::Save.call(journal.reload, attributes: { published_at: 1.week.from_now })
+      assert_equal "scheduled", journal.reload.status
+      assert_parity "scheduling a listing page"
+      ok! Pages::Save.call(journal.reload, attributes: { published: true })
+      assert_parity "publishing it now"
 
       ok! Pages::Save.call(drafts.reload, attributes: { published: true })
       assert_equal "/drafts/job", current(job), "once live, the typed listing is the more specific one"
@@ -562,6 +617,12 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       assert_parity "restoring a page under a new parent"
       ok! Trash::Restore.call(about.reload)
       assert_parity "restoring the rest of the branch"
+
+      ok! Trash::Move.call(history.reload)
+      service_page("History", parent: about.reload)
+      ok! Trash::Restore.call(history.reload)
+      assert_equal "/about/history-2", current(history), "its slug was taken in the meantime"
+      assert_parity "restoring a page whose slug was taken meanwhile"
 
       ok! Trash::Move.call(hello.reload)
       assert_nil current(hello)
@@ -610,6 +671,9 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
         translations: { "en" => { body: rich_doc("Text") } })
       ok! ContentBlocks::Save.call(body, translations: { "en" => { body: rich_doc("Changed") } })
       assert_parity "writing a text block"
+
+      ok! ContentBlocks::Reorder.call(news.reload, news.content_blocks.pluck(:id).reverse)
+      assert_parity "reordering a page's blocks"
 
       # -- tags ----------------------------------------------------------------
       ok! Tags::Rename.call(Tag.find_by!(name: "old"), name: "vintage")
@@ -694,5 +758,68 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
 
     assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
     assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
+  end
+
+  # -- going live by the clock ---------------------------------------------------
+  #
+  # A scheduled page becomes live when its time passes, and nothing is
+  # written at that moment: `sync_went_live` is what moves the posts.
+  def scheduled_listing_ahead_of_blog
+    fresh = listing(@root, "Fresh", "blog", published_at: 1.hour.from_now)
+    listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post), "a scheduled page is not live yet"
+    [ fresh, post ]
+  end
+
+  def writes_to_public_paths(sql) = sql.grep(/\A\s*(INSERT INTO|UPDATE|DELETE FROM) "public_paths"/i)
+
+  test "posts move to a listing page that went live by the clock only when the sweep runs" do
+    _, post = scheduled_listing_ahead_of_blog
+
+    travel 2.hours
+    assert_equal "/blog/hello", current(post), "time passing writes nothing"
+
+    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+
+    assert_equal "/fresh/hello", current(post)
+    old = PublicPath.find_by(locale: "en", path: "/blog/hello")
+    assert_equal [ false, post ], [ old.current, old.record ], "the old address is a redirect"
+
+    sql = capture_sql { PublicSite::Paths.sync_went_live(since: 24.hours.ago) }
+    assert_empty writes_to_public_paths(sql), "a second run wrote:\n#{sql.map { |statement| statement.first(160) }.join("\n")}"
+  end
+
+  test "a page that went live before the window is not swept" do
+    _, post = scheduled_listing_ahead_of_blog
+
+    travel 3.days
+    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "a trashed page that went live is ignored by the sweep" do
+    fresh, post = scheduled_listing_ahead_of_blog
+    fresh.update_columns(trashed_at: Time.current)
+
+    travel 2.hours
+    sql = capture_sql { PublicSite::Paths.sync_went_live(since: 24.hours.ago) }
+
+    assert_empty sql.grep(/"posts"|"public_paths"/), "nothing went live, so nothing is synced"
+    assert_equal "/blog/hello", current(post)
+  end
+
+  test "a page below one that went live is covered: its listing's posts move too" do
+    section = Page.create!(parent: @root, title: "Section", published_at: 1.hour.from_now)
+    listing(section, "Fresh", "blog")
+    listing(@root, "Blog", "blog")
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    assert_equal "/blog/hello", current(post), "a listing under a scheduled parent has no live chain"
+
+    travel 2.hours
+    PublicSite::Paths.sync_went_live(since: 24.hours.ago)
+
+    assert_equal "/section/fresh/hello", current(post)
   end
 end

@@ -42,10 +42,24 @@ module PublicSite
     # A page and everything below it, in a number of statements that doesn't
     # depend on how many pages that is: the pages below in one query, their
     # stored rows (and the parent's, which the top page hangs off) in another,
-    # every path worked out in memory top-down -- each page from the path
-    # just computed for its parent, never from that parent's stored row,
-    # which is about to be replaced -- and then only the rows that differ
-    # written, a set at a time (`write_all`).
+    # every path worked out in memory top-down, one lookup of the addresses
+    # other records hold, and then only the rows that differ written, a set at
+    # a time (`write_all`).
+    #
+    # Each page's path is built from the path its parent will actually *hold*
+    # when this call is done -- never from the parent's stored row, which is
+    # about to be replaced, and never from a path the parent wants but won't
+    # get. That takes two passes: the first works every path out as if every
+    # page got the one it wants, which is what says which addresses to ask
+    # `held_by_others` about; the second (`settle`) goes top-down again and
+    # hands a page's children only the paths that page keeps -- not nil, not
+    # another record's live address, not already given to an earlier page of
+    # the pass. A page that has to yield keeps the path it wanted in what
+    # `write_all` is handed (so it is treated as a yield and keeps its
+    # redirects), and everything below it comes out nil: a page under one
+    # without an address has none ("no URL yet, never borrow one", see
+    # `page_path`), which is what keeps a yielder's children from being
+    # written inside the URL space of the record that holds the address.
     #
     # The pages below are found by `parent_id`, not through `children` or the
     # closure table: an association loaded earlier in the request would still
@@ -76,12 +90,36 @@ module PublicSite
       pages = [ page ]
       pages.each { |parent| pages.concat(below.fetch(parent.id, [])) }
 
-      stored = current_rows("Page", [ page.parent_id, *pages.map(&:id) ].compact)
-      above = stored.filter_map { |(_, id, locale), (_, path)| [ locale, path ] if id == page.parent_id }.to_h
-      paths = { page.parent_id => above }
-      desired = pages.index_with { |member| paths[member.id] = page_paths(member, paths.fetch(member.parent_id, {})) }
+      PublicPath.transaction do
+        stored = current_rows("Page", [ page.parent_id, *pages.map(&:id) ].compact)
+        above = stored.filter_map { |(_, id, locale), (_, path)| [ locale, path ] if id == page.parent_id }.to_h
 
-      write_all(desired, stored: stored)
+        wanted = settle(pages, { page.parent_id => above })
+        held = held_by_others(changes_between(wanted, stored))
+        write_all(settle(pages, { page.parent_id => above }, held: held), stored: stored, held: held)
+      end
+    end
+
+    # `{ page => { locale => path } }` for `pages` (top-down: every page
+    # after its parent), each from the paths its parent keeps; `kept` starts
+    # as `{ parent id => { locale => path } }` for what the top page hangs
+    # off. Without `held` every page keeps what it wants. With it (`{ [locale,
+    # path] => [record type, record id] }`, the live addresses of other
+    # records) a page keeps a path only when nobody else holds it and no
+    # earlier page of the pass was given it, and its children are built from
+    # what it keeps.
+    def settle(pages, kept, held: nil)
+      given = Set.new
+      pages.index_with do |page|
+        paths = page_paths(page, kept.fetch(page.parent_id, {}))
+        kept[page.id] = paths.each_with_object({}) do |(locale, path), keeps|
+          next if path.nil?
+          next if held && (held.fetch([ locale.to_s, path ], [ "Page", page.id ]) != [ "Page", page.id ] || !given.add?([ locale.to_s, path ]))
+
+          keeps[locale.to_s] = path
+        end
+        paths
+      end
     end
 
     # Every post, or every post of one content type, re-derives its canonical
@@ -107,6 +145,47 @@ module PublicSite
     def sync_posts(content_type)
       scope = content_type ? Post.where(content_type: content_type) : Post.all
       scope.includes(:tags).find_in_batches { |posts| write_all(post_paths(posts)) }
+    end
+
+    # `sync_posts` for every content type the listing blocks on `pages` and on
+    # everything below them list: what has to be re-derived when something
+    # about those pages changed that `canonical_page` ranks listing pages by
+    # (their place in the tree, a live chain, the trash) -- the posts those
+    # blocks list may have a new canonical page, here or elsewhere. Only
+    # those: the order and publication of every page *outside* these
+    # subtrees is as it was, so a post none of their blocks list keeps the
+    # winner it had. A block with no content type lists every type, so one
+    # such block means every post.
+    def sync_posts_listed_under(pages)
+      return if pages.empty?
+
+      subtree_ids = Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).select(:descendant_id)
+      types = ContentBlock.listing.where(owner_type: Page.polymorphic_name, owner_id: subtree_ids).map { |block| block.settings_object.content_type }
+      types.include?(nil) ? sync_posts(nil) : types.uniq.each { |type| sync_posts(type) }
+    end
+
+    # The sweep for the one input no write announces: time. A scheduled page
+    # becomes live (`Publishable#live?`) when `published_at` passes, and no
+    # row is written at that moment -- but a live chain is the first thing
+    # `canonical_page` ranks listing pages by, so the posts listed on that
+    # page, or on any page below it, may belong under it from then on. This
+    # re-derives them for every kept page that went live in `(since, now]`.
+    #
+    # Only the posts: a page's own path is its ancestors' slugs and its own
+    # (`page_path`), whatever its publication, so there is no `sync_subtree`
+    # to run here. A page that became live through a save (Publish) had its
+    # posts synced by that save; sweeping it again finds nothing to change.
+    #
+    # Idempotent and unmarked: nothing records that a page was swept, the
+    # caller's window simply overlaps the previous run's
+    # (`PublicSite::SyncWentLiveJob` looks a day back every five minutes),
+    # and a run with nothing to move reads and writes no row of
+    # `public_paths` beyond the comparison. A page that went live before
+    # `since` with no run in between (the job only runs where Solid Queue is
+    # the adapter) is caught by the next sync that reaches its posts, or by
+    # `rebuild!`.
+    def sync_went_live(since:, now: Time.current)
+      sync_posts_listed_under(Page.kept.where("published_at > ? AND published_at <= ?", since, now).to_a)
     end
 
     def rebuild!
@@ -205,14 +284,16 @@ module PublicSite
     #
     #    "Live" is `Publishable#live?`, so a *scheduled* page counts as
     #    unpublished until its time comes -- and nothing writes a row at that
-    #    moment, so posts don't move onto a scheduled listing page when it
-    #    goes live, only at the next sync that reaches them (a save of that
-    #    page or an ancestor that changes one of its URL inputs, a write to a
-    #    listing block, a save of the post that changes one of its own, or
-    #    `rebuild!`). Until then they stay
-    #    at the published listing they already had, which keeps serving them;
-    #    the ETag already changes at go-live (`PublicSite.content_version`), so
-    #    the page itself isn't served stale.
+    #    moment, so posts don't move onto a scheduled listing page the instant
+    #    it goes live: `sync_went_live` moves them, run every five minutes by
+    #    `PublicSite::SyncWentLiveJob` where Solid Queue is the adapter
+    #    (production), and elsewhere the next sync that reaches them does (a
+    #    save of that page or an ancestor that changes one of its URL inputs,
+    #    a write to a listing block, a save of the post that changes one of
+    #    its own, or `rebuild!`). Until then they stay at the published
+    #    listing they already had, which keeps serving them; the ETag already
+    #    changes at go-live (`PublicSite.content_version`), so the page itself
+    #    isn't served stale.
     #
     # 2. specificity -- a block naming the post's content type beats an
     #    unfiltered one, then a block whose tag the post carries beats one
@@ -330,9 +411,10 @@ module PublicSite
 
     # Brings the current rows of `desired` (`{ record => { locale => path or
     # nil } }`, the records all of one class) to those paths, writing only
-    # what differs from `stored` (their rows as `current_rows` reads them,
-    # read here when the caller hasn't already), in a number of statements
-    # that doesn't depend on how many records or rows there are.
+    # what differs from `stored` (their rows as `current_rows` reads them)
+    # and yielding to `held` (see `held_by_others`) -- both read here when
+    # the caller hasn't already -- in a number of statements that doesn't
+    # depend on how many records or rows there are.
     #
     # For each record and locale whose path changed:
     # - the old current row stays behind as a redirect;
@@ -349,8 +431,8 @@ module PublicSite
     # that go are deleted and outgoing rows demoted before anything is
     # inserted (one current row per record and locale), and a demoted row is
     # a redirect by the time redirects on the new paths are dropped -- so a
-    # record may take the address another record of the same call has just
-    # left (one address per locale, redirects included).
+    # record may take the address another record of this same call (one
+    # batch) has just left (one address per locale, redirects included).
     #
     # `update_all`, `delete_all` and `insert_all!`, never a model save: this
     # runs from inside another record's `after_save`, and re-entering
@@ -358,24 +440,19 @@ module PublicSite
     # work and a risk of failing a save that was never actually invalid.
     # `insert_all!`, with the bang: a path that did turn out to be taken is
     # an exception, not a row silently left out.
-    def write_all(desired, stored: nil)
+    def write_all(desired, stored: nil, held: nil)
       records = desired.keys
       return if records.empty?
 
-      type = records.first.class.polymorphic_name
-      stored ||= current_rows(type, records.filter_map(&:id))
-      changes = desired.flat_map do |record, paths|
-        paths.filter_map do |locale, path|
-          row_id, from = stored[[ type, record.id, locale.to_s ]]
-          Change.new(record, locale.to_s, row_id, from, path) unless from == path
-        end
-      end
+      stored ||= current_rows(records.first.class.polymorphic_name, records.filter_map(&:id))
+      changes = changes_between(desired, stored)
       return if changes.empty?
 
+      type = records.first.class.polymorphic_name
       PublicPath.transaction do
-        held = held_by_others(changes)
+        held ||= held_by_others(changes)
         given = Set.new
-        moved, rest = changes.partition { |change| change.to && !held.include?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }
+        moved, rest = changes.partition { |change| change.to && !held.key?([ change.locale, change.to ]) && given.add?([ change.locale, change.to ]) }
         gone, yielding = rest.partition { |change| change.to.nil? }
         yielding.each { |change| yield_to_holder(change) }
 
@@ -397,10 +474,23 @@ module PublicSite
       end
     end
 
-    # The `[locale, path]` pairs among the wanted paths that are some *other*
-    # record's live address and will still be after this call -- a current
-    # row that one of these changes is itself moving away, or deleting, holds
-    # nothing any more.
+    # What differs: one `Change` per record and locale whose path in
+    # `desired` is not the one its current row in `stored` holds, in the
+    # order of `desired`.
+    def changes_between(desired, stored)
+      desired.flat_map do |record, paths|
+        type = record.class.polymorphic_name
+        paths.filter_map do |locale, path|
+          row_id, from = stored[[ type, record.id, locale.to_s ]]
+          Change.new(record, locale.to_s, row_id, from, path) unless from == path
+        end
+      end
+    end
+
+    # `{ [locale, path] => [record type, record id] }` for the wanted paths
+    # that are some *other* record's live address and will still be after
+    # this call -- a current row that one of these changes is itself moving
+    # away, or deleting, holds nothing any more. One query.
     #
     # The record's own save never gets this far with such a path --
     # `HasPublicPaths#public_paths_are_available` turns it into a validation
@@ -414,12 +504,14 @@ module PublicSite
     # onto /blog/team, which the page holds.
     def held_by_others(changes)
       wanted = changes.filter_map(&:to).uniq
-      return Set.new if wanted.empty?
+      return {} if wanted.empty?
 
       leaving = changes.filter_map(&:row_id).to_set
       pairs = changes.filter_map { |change| [ change.locale, change.to ] if change.to }.to_set
-      PublicPath.current.where(path: wanted).pluck(:id, :locale, :path)
-        .filter_map { |row_id, locale, path| [ locale, path ] if !leaving.include?(row_id) && pairs.include?([ locale, path ]) }.to_set
+      PublicPath.current.where(path: wanted).pluck(:id, :locale, :path, :record_type, :record_id)
+        .each_with_object({}) do |(row_id, locale, path, type, id), held|
+          held[[ locale, path ]] = [ type, id ] if !leaving.include?(row_id) && pairs.include?([ locale, path ])
+        end
     end
 
     # The record that did not ask for this sync goes without a URL in this
@@ -431,11 +523,18 @@ module PublicSite
     # claim that old address as a redirect *to* a record with no address. Its
     # existing redirect rows are kept; they resolve to a 404 while it has no
     # current row (`Resolver#from_row` finds no target) and start 301ing
-    # again once a later sync gives it one -- after the clash is removed, the
-    # next sync that reaches the record does (a save of it that changes one
-    # of its URL inputs, any of the triggers above, or `rebuild!`; a save
-    # that changes none does not look). Logged, since nothing on screen says
-    # why the record vanished from that address.
+    # again once a later sync gives it one.
+    #
+    # An interim state, known and accepted: once the clash is gone, nothing
+    # looks again on the yielder's behalf. It gets its address back at the
+    # next sync that reaches it -- a save of it that changes one of its URL
+    # inputs, any of the triggers above -- or from `bin/rails
+    # public_paths:rebuild`, which is the fix when a record is found without
+    # an address; a save that changes no input (most autosaves) does not
+    # look. The other side of the same condition: the yielder's editor is not
+    # told of the clash on every autosave either, since the availability
+    # validation is skipped for a save that changes no input. Logged, since
+    # nothing on screen says why the record vanished from that address.
     def yield_to_holder(change)
       record = change.record
       Rails.logger.warn("[public_paths] #{record.class.polymorphic_name}##{record.id} gets no #{change.locale} URL: " \

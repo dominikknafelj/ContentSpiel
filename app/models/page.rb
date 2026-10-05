@@ -236,26 +236,15 @@ class Page < ApplicationRecord
   # publication and tree order -- not just this page's own path -- are what
   # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
   #
-  # Scoped to this subtree's own post_list blocks, for every kind of save
-  # that gets here -- a slug, publish state, a move, a reorder or the trash
-  # alike. Those are the only
-  # candidates whose rank could have changed: a move or reorder shifts this
-  # subtree relative to every other page, but leaves the relative order (and
-  # publication) of all the pages *outside* it exactly as it was, so a post
-  # none of this subtree's blocks list keeps the same winner. The posts they
-  # *do* list are re-derived from scratch against every candidate in the
-  # tree, which covers both "moved ahead of another listing, now canonical"
-  # and "moved behind it, gave the posts back".
-  #
-  # (There used to be a `saved_change_to_parent_id? || saved_change_to_position?`
-  # branch here resyncing every post for moves. It never ran: closure_tree's
-  # own `after_save` reloads the record, clearing those dirty flags before
-  # this callback reads them -- and the subtree-scoped resync already covers
-  # moves, per the above.)
+  # Scoped to this subtree's own post_list blocks
+  # (`PublicSite::Paths.sync_posts_listed_under`, which says why that is
+  # enough), for every kind of save that gets here -- a slug, publish state,
+  # a move, a reorder or the trash alike. The posts they list are re-derived
+  # from scratch against every candidate in the tree, which covers both
+  # "moved ahead of another listing, now canonical" and "moved behind it,
+  # gave the posts back".
   def resync_listed_posts
-    blocks = ContentBlock.listing.where(owner: self_and_descendants)
-    types = blocks.map { |block| block.settings_object.content_type }
-    types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
+    PublicSite::Paths.sync_posts_listed_under([ self ])
   end
 
   # Checked per enabled locale, the same granularity

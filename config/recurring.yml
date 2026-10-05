@@ -17,15 +17,27 @@ production:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  public_paths_sync_went_live:
+    class: PublicSite::SyncWentLiveJob
+    queue: default
+    schedule: every 5 minutes
 
 development:
   trash_purge_expired:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  public_paths_sync_went_live:
+    class: PublicSite::SyncWentLiveJob
+    queue: default
+    schedule: every 5 minutes
 
 test:
   trash_purge_expired:
     class: Trash::PurgeExpiredJob
     queue: default
     schedule: every day at 3am
+  public_paths_sync_went_live:
+    class: PublicSite::SyncWentLiveJob
+    queue: default
+    schedule: every 5 minutes

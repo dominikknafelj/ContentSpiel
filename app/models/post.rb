@@ -97,7 +97,6 @@ class Post < ApplicationRecord
   #   path, keeps a draft off the site), kept as an input so that nothing
   #   about publication has to be re-argued here when that changes.
   #
-  #
   # And its tags, which are no column of this row: a tag-filtered listing
   # block lists a post by the tags it carries, so a tag gained or lost can
   # move the post to another listing page. `has_many :through` writes the
