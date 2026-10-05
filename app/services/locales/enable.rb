@@ -18,13 +18,23 @@ module Locales
       # `languages.manage` (access-control design spec §3.1): an admin area,
       # with no per-record scope.
       return denied("languages.manage", site) unless authorize!("languages.manage", site)
-      return success(site) if site.locale_codes.include?(@code)
-
-      entry = { "code" => @code }
-      entry["fallbacks"] = @fallbacks if @fallbacks.any?
-      site.locales = site.locales + [ entry ]
-
+      already_enabled = false
       SiteSetting.transaction do
+        # The one settings row is locked (and so re-read) before the language
+        # list is read: `Current.site` is a copy loaded earlier in the request,
+        # and a language change made since then (another editor, another
+        # request) would otherwise be overwritten by this copy's list. The
+        # lock is held until commit, including the synchronous
+        # `StateIndex.rebuild_all` below; accepted while sites are small.
+        site.lock!
+        if site.locale_codes.include?(@code)
+          already_enabled = true
+          next
+        end
+
+        entry = { "code" => @code }
+        entry["fallbacks"] = @fallbacks if @fallbacks.any?
+        site.locales = site.locales + [ entry ]
         raise ActiveRecord::Rollback unless site.save
 
         changes = Audit::Snapshot.field_changes_for(site)
@@ -57,6 +67,7 @@ module Locales
         record_event("language.enabled", subject: site, field_changes: changes, metadata: { "code" => @code })
       end
 
+      return success(site) if already_enabled
       return failure(site) if site.errors.any?
 
       success(site)

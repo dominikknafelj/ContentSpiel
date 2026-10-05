@@ -77,13 +77,38 @@ module Settings
         return denied("languages.manage", @site)
       end
 
-      if site_part?
-        assign
-        logo_changing = @site.attachment_changes.key?("logo")
-      end
-
+      needed_languages = languages_part?
+      late_refusal = nil
       language_errors = []
       saved = SiteSetting.transaction do
+        # The settings row is the one row this service read-modify-writes, so it
+        # is locked FIRST (`lock!` re-reads it and raises on a record with
+        # unsaved changes, hence before `assign`): what is assigned, compared
+        # (`languages_part?`, `Configure#apply`'s "exactly the enabled
+        # languages") and saved is the stored row, never the copy loaded
+        # earlier in the request, so a language or settings change made
+        # meanwhile is not overwritten. `Locales::Enable`/`Disable`/
+        # `MakeDefault`/`Configure` take the same lock first, and nothing takes
+        # another lock before it. Held until commit, including the synchronous
+        # `rebuild_all` below; accepted while sites are small. (The controller's
+        # stale-form check runs before the service and is not atomic with this
+        # save: it is what tells an editor "reload"; this lock is what keeps the
+        # row consistent.)
+        @site.lock!
+
+        # The rights were checked against the copy the caller passed; the
+        # stored default may differ from it, which can turn a plain site save
+        # into a default-language change that needs `languages.manage`.
+        if !needed_languages && languages_part? && !authorize!("languages.manage", @site)
+          late_refusal = "languages.manage"
+          next false
+        end
+
+        if site_part?
+          assign
+          logo_changing = @site.attachment_changes.key?("logo")
+        end
+
         # A languages-only call never ASSIGNS a site field: saving the row
         # here first would normalise columns and record a `settings.updated`
         # for an actor who may not hold `settings.manage`. The row is still
@@ -123,6 +148,7 @@ module Settings
         end
         true
       end
+      return denied(late_refusal, @site) if late_refusal
       if language_errors.any?
         # The site part (if any) was saved and then rolled back with the
         # refused language part, and `Configure#apply` left its entries

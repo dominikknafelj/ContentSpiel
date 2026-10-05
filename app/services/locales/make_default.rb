@@ -27,21 +27,38 @@ module Locales
       site = Current.site
       return denied("languages.manage", site) unless authorize!("languages.manage", site)
 
-      # Asking for what is already true is a no-op success, like `Enable`.
-      return success(site) if site.default_locale.to_s == @code
-      return failure(site, "Choose an enabled language") if @code.blank?
-      return failure(site, "#{@code} isn't an enabled language") unless site.locale_codes.include?(@code)
-
-      site.default_locale = @code
-      # The new default has nothing to fall back to: the default IS the last
-      # resort of every chain (`Locales.fallback_chain`), and the card shows its
-      # select as a disabled "None (default)", so no screen could clear fallbacks
-      # it was stored with while the chain would still apply them. Cleared here,
-      # in the same save (and so in the event's field changes). Nobody else's
-      # fallbacks change, and the OLD default keeps whatever it had: it is an
-      # ordinary language now and its select shows its first entry.
-      site.locales = site.locales.map { |entry| entry["code"] == @code ? entry.except("fallbacks") : entry }
+      outcome = nil
       saved = SiteSetting.transaction do
+        # Locked and re-read before anything is decided or assigned: the checks
+        # below and the new `locales` are computed from the stored row, not from
+        # the `Current.site` copy loaded earlier in the request. Held until
+        # commit, including the synchronous `rebuild_all` (accepted while sites
+        # are small).
+        site.lock!
+
+        # Asking for what is already true is a no-op success, like `Enable`.
+        if site.default_locale.to_s == @code
+          outcome = :unchanged
+          next false
+        end
+        if @code.blank?
+          outcome = "Choose an enabled language"
+          next false
+        end
+        unless site.locale_codes.include?(@code)
+          outcome = "#{@code} isn't an enabled language"
+          next false
+        end
+
+        site.default_locale = @code
+        # The new default has nothing to fall back to: the default IS the last
+        # resort of every chain (`Locales.fallback_chain`), and the card shows its
+        # select as a disabled "None (default)", so no screen could clear fallbacks
+        # it was stored with while the chain would still apply them. Cleared here,
+        # in the same save (and so in the event's field changes). Nobody else's
+        # fallbacks change, and the OLD default keeps whatever it had: it is an
+        # ordinary language now and its select shows its first entry.
+        site.locales = site.locales.map { |entry| entry["code"] == @code ? entry.except("fallbacks") : entry }
         site.save || raise(ActiveRecord::Rollback)
 
         Translations::StateIndex.rebuild_all
@@ -49,6 +66,8 @@ module Locales
           field_changes: Audit::Snapshot.field_changes_for(site), metadata: { "code" => @code })
         true
       end
+      return success(site) if outcome == :unchanged
+      return failure(site, outcome) if outcome
       unless saved
         # The model object is `Current.site`, shared for the rest of the
         # request: take the messages, then reload, which drops the default and the carried

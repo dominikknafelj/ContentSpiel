@@ -308,4 +308,40 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert result.denied?
     assert_equal %w[de en es], Current.site.reload.locale_codes
   end
+
+  test "a stale language order is refused, not written over a language enabled meanwhile" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    result = as_owner { Settings::Save.call(stale, languages: [ { "code" => "es" }, { "code" => "en" }, { "code" => "de" } ]) }
+
+    assert_not result.ok?
+    assert_includes result.errors.join, "must list exactly the enabled languages"
+    assert_equal %w[en de es fr], SiteSetting.find(stale.id).locale_codes
+  end
+
+  test "a site save takes its row lock before assigning, and a stale copy's other fields survive" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    result = as_owner { Settings::Save.call(stale, translations: { "en" => { title: "Locked title" } }) }
+
+    assert result.ok?, result.errors.inspect
+    fresh = SiteSetting.find(stale.id)
+    assert_equal "Locked title", fresh.title(locale: "en")
+    assert_equal %w[en de es fr], fresh.locale_codes, "the languages the stale copy didn't know of are kept"
+  end
+
+  test "the services lock the settings row before reading it" do
+    statements = []
+    subscriber = ActiveSupport::Notifications.subscribe("sql.active_record") { |*, payload| statements << payload[:sql] }
+    begin
+      as_owner { Settings::Save.call(Current.site, translations: { "en" => { title: "T" } }) }
+      as_owner { Locales::Enable.call("fr") }
+    ensure
+      ActiveSupport::Notifications.unsubscribe(subscriber)
+    end
+
+    assert_equal 2, statements.count { |sql| sql.include?("FROM \"site_settings\"") && sql.include?("FOR UPDATE") }
+  end
 end

@@ -18,22 +18,35 @@ module Locales
       # with no per-record scope.
       return denied("languages.manage", site) unless authorize!("languages.manage", site)
 
-      # The default language is always the address every unprefixed public
-      # URL resolves in (SiteSetting#default_locale_is_enabled requires it to
-      # stay enabled) -- disabling it would leave the site with no language
-      # to serve at its own root, so this is a rule check rather than
-      # something the model's own validation could catch after the fact.
-      return failure(site, "The default language can't be disabled") if @code == default
-
-      # An unknown or already-disabled code is a no-op success, not an
-      # error: the caller asked for a state ("fr is off") that's already
-      # true, so there's nothing to roll back and nothing to report.
-      return success(site) unless site.locale_codes.include?(@code)
-
-      entries = site.locales.reject { |entry| entry["code"].to_s == @code }
-      site.locales = entries.map { |entry| without_fallback(entry) }
-
+      default_refused = false
+      already_off = false
       saved = SiteSetting.transaction do
+        # Locked and re-read before the list is read, so a language change made
+        # since `Current.site` was loaded isn't overwritten; held until commit,
+        # including the synchronous `rebuild_all` below (accepted while sites
+        # are small).
+        site.lock!
+
+        # The default language is always the address every unprefixed public
+        # URL resolves in (SiteSetting#default_locale_is_enabled requires it to
+        # stay enabled) -- disabling it would leave the site with no language
+        # to serve at its own root, so this is a rule check rather than
+        # something the model's own validation could catch after the fact.
+        if @code == default
+          default_refused = true
+          next false
+        end
+
+        # An unknown or already-disabled code is a no-op success, not an
+        # error: the caller asked for a state ("fr is off") that's already
+        # true, so there's nothing to roll back and nothing to report.
+        unless site.locale_codes.include?(@code)
+          already_off = true
+          next false
+        end
+
+        entries = site.locales.reject { |entry| entry["code"].to_s == @code }
+        site.locales = entries.map { |entry| without_fallback(entry) }
         next false unless site.save
 
         PublicPath.where(locale: @code).delete_all
@@ -46,6 +59,8 @@ module Locales
         true
       end
 
+      return failure(site, "The default language can't be disabled") if default_refused
+      return success(site) if already_off
       return failure(site) unless saved
 
       success(site)

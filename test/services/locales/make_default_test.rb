@@ -110,4 +110,20 @@ class Locales::MakeDefaultTest < ActiveSupport::TestCase
     assert_nil site.read_attribute(:title)["de"]
     assert_not site.changed?, site.changes.inspect
   end
+
+  test "making a language the default keeps a language another change enabled meanwhile" do
+    # A stored fallback on the new default makes the stale copy's list differ
+    # from the stored one, so its whole `locales` is written.
+    site_settings(:default).update!(locales: [ { "code" => "en" }, { "code" => "de", "fallbacks" => [ "en" ] }, { "code" => "es" } ])
+    stale = SiteSetting.find(site_settings(:default).id)
+    other = SiteSetting.find(stale.id)
+    other.update!(locales: other.locales + [ { "code" => "fr" } ])
+
+    Current.site = stale
+    assert as_owner { Locales::MakeDefault.call("de") }.ok?
+
+    fresh = SiteSetting.find(stale.id)
+    assert_equal "de", fresh.default_locale
+    assert_equal %w[en de es fr], fresh.locale_codes
+  end
 end

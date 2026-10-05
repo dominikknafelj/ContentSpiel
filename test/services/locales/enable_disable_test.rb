@@ -35,6 +35,42 @@ class Locales::EnableDisableTest < ActiveSupport::TestCase
     assert @about.full_path("fr").present?
   end
 
+  # The services read `Current.site`, a copy loaded earlier in the request: a
+  # language change made through another copy since then must not be lost
+  # (the row is locked and re-read before the new list is computed).
+  test "enabling a language keeps a language another change enabled meanwhile" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    other = SiteSetting.find(stale.id)
+    other.update!(locales: other.locales + [ { "code" => "fr" } ])
+
+    Current.site = stale
+    assert Locales::Enable.call("it", actor: nil).ok?
+
+    assert_equal %w[en de es fr it], SiteSetting.find(stale.id).locale_codes
+  end
+
+  test "disabling a language keeps a language another change enabled meanwhile" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    other = SiteSetting.find(stale.id)
+    other.update!(locales: other.locales + [ { "code" => "fr" } ])
+
+    Current.site = stale
+    assert Locales::Disable.call("es", actor: nil).ok?
+
+    assert_equal %w[en de fr], SiteSetting.find(stale.id).locale_codes
+  end
+
+  test "enabling a language another change already enabled is a no-op success" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    Current.site = stale
+    assert Locales::Enable.call("fr", actor: nil).ok?
+
+    assert_equal %w[en de es fr], SiteSetting.find(stale.id).locale_codes
+    assert_not Audit::Event.exists?(action: "language.enabled")
+  end
+
   test "the default language can't be disabled and unknown codes fail" do
     assert_not Locales::Disable.call(Locales.default, actor: nil).ok?
     assert_not Locales::Enable.call("xx", actor: nil).ok?
