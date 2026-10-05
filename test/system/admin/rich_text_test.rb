@@ -347,7 +347,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       end
       refute_selector ".admin-rich-text-popover"
     end
-    sleep 0.6
+    assert_writes_settled # the typed text's own save has gone out and been answered: whatever it saved is on the record now
     assert_empty text_nodes(@post.reload.body_document(locale: :en)).flat_map { |node| Array(node["marks"]) }
 
     { "example.com" => "example.com", "/about" => "/about", "#top" => "#top", "mailto:a@b.c" => "mailto:a@b.c" }.each do |typed, saved|
@@ -398,7 +398,10 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     page.execute_script(<<~JS)
       const original = window.fetch
       window.fetch = (url, options) => {
-        if (String(url).includes("link_targets") && String(url).includes("q=alp")) return new Promise((resolve) => setTimeout(() => resolve(original(url, { ...options, signal: undefined })), 1200))
+        if (String(url).includes("link_targets") && String(url).includes("q=alp")) {
+          window.__alpAsked = true
+          return new Promise((resolve) => setTimeout(() => resolve(original(url, { ...options, signal: undefined }).then((response) => { window.__alpDelivered = true; return response })), 1200))
+        }
         return original(url, options)
       }
     JS
@@ -406,10 +409,11 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     press "Link"
     within(".admin-rich-text-popover") do
       fill_in "URL or search", with: "alp"
-      sleep 0.4
+      await_js "window.__alpAsked === true" # the first query is out, and held for 1.2 s
       fill_in "URL or search", with: "bet"
       assert_selector "[role=option]", text: "Beta"
-      sleep 1.6
+      await_js "window.__alpDelivered === true" # the slow answer for "alp" has now reached the search
+      await_frames
       assert_selector "[role=option]", text: "Beta"
       assert_no_selector "[role=option]", text: "Alpha"
     end
@@ -438,7 +442,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     find(".ProseMirror figure.admin-rich-text-image").click
     within("dialog#rich-text-image-dialog[open]") { press "Save" }
     refute_selector "dialog[open]"
-    sleep 1.5
+    assert_writes_settled # an autosave the dialog's Save started has been sent and answered
     assert_equal updated_at, @post.reload.updated_at
 
     find(".ProseMirror figure.admin-rich-text-image").click
@@ -871,7 +875,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     editor.click
     press "Link"
     assert_selector ".admin-rich-text-popover"
-    sleep 1.5
+    assert_writes_settled # a save the focus or the popover queued has been sent and answered
 
     assert_equal stored, find("input[name='post[body]']", visible: false).value
     assert_equal 0, page.evaluate_script("window.__patches")
@@ -965,13 +969,10 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
   def saved_post_document(timeout: 6, &condition) = saved_document(@post, timeout: timeout, &condition)
 
   def saved_document(record, timeout: 6, &condition)
-    deadline = Time.current + timeout
     document = nil
-    loop do
+    assert_eventually(wait: timeout, message: -> { "the saved document never matched: #{document.to_h.to_json}" }) do
       document = record.reload.body_document(locale: :en)
-      break if condition.call(document)
-      flunk "the saved document never matched: #{document.to_h.to_json}" if Time.current > deadline
-      sleep 0.1
+      condition.call(document)
     end
     assert_empty document.validate, "the editor saved a document the server schema rejects"
     document

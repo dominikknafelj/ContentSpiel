@@ -266,7 +266,7 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
     mouse.down
     mouse.move(x: 5, y: 5)
     mouse.up
-    sleep 0.3
+    await_frames # the backdrop's click handler has run by now
     assert_selector "dialog[open]"
 
     within("dialog[open]") { find("button[aria-label=Close]").click }
@@ -425,17 +425,5 @@ class Admin::MediaPickerSystemTest < ApplicationSystemTestCase
       click_on "Use image"
     end
     refute_selector "dialog[open]"
-  end
-
-  # Polls the database rather than the save-status line: a hidden input's
-  # debounced autosave shows "Saved" too, but only the record proves the
-  # right value landed.
-  def assert_eventually(timeout: 5)
-    deadline = Time.current + timeout
-    until yield
-      raise Minitest::Assertion, "condition never became true" if Time.current > deadline
-
-      sleep 0.1
-    end
   end
 end

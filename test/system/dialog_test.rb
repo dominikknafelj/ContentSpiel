@@ -55,7 +55,7 @@ class DialogSystemTest < ApplicationSystemTestCase
     page.driver.browser.mouse.down
     page.driver.browser.mouse.move(x: outside[0], y: outside[1])
     page.driver.browser.mouse.up
-    sleep 0.3
+    await_frames # the backdrop's click handler has run by now: the dialog is open because it was left alone
     assert_selector "dialog[open]"
 
     page.driver.browser.mouse.click(x: outside[0], y: outside[1])

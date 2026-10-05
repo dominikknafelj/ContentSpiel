@@ -115,7 +115,7 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     JS
 
     assert_selector "#content-blocks-list > .admin-block-card", count: 3, wait: 10
-    assert_eventually(timeout: 10) { page.evaluate_script("window.__statuses.length") == 2 }
+    assert_eventually(wait: 10) { page.evaluate_script("window.__statuses.length") == 2 }
     added = @page.content_blocks.where.not(id: [ first.id, second.id ]).sole
     assert_equal [ 201, 200 ], page.evaluate_script("window.__statuses"), "the reorder was refused"
     assert_equal [ second.id, first.id, added.id ], @page.content_blocks.reload.order(:position).ids
@@ -150,11 +150,11 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     await_js "typeof window.__releaseSave === 'function'"
     find("[data-block-id='#{first.id}'] button[aria-label='Block actions']").click
     find("[data-block-id='#{first.id}'] [data-move='down']").click
-    sleep 0.5
+    await_frames # the click has been handled: the move is queued behind the held save, or it would have been sent by now
     assert_equal [ "PATCH" ], page.evaluate_script("window.__writes"), "the move was sent before the save it queued behind finished"
 
     page.execute_script("window.__releaseSave()")
-    assert_eventually(timeout: 10) { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
+    assert_eventually(wait: 10) { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
     assert_equal "Typed before the move", first.reload.caption
     assert_equal [ "PATCH", "PATCH" ], page.evaluate_script("window.__writes")
   end
@@ -213,10 +213,10 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     find("[data-block-id='#{second.id}'] button[aria-label='Block actions']").click
     find("[data-block-id='#{second.id}'] [data-move='up']").click
     assert_eventually { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
-    sleep 1.5 # past the debounce a restarted save would wait out
+    sleep 1.1 # sleep: the autosave debounce is 1 s; the card is paused by the 409, so not settled, and nothing marks the expiry of a timer that must not run
     fill_in id: "block-#{second.id}-caption", with: "My caption, edited again"
     page.execute_script("document.activeElement.blur()")
-    sleep 0.5
+    await_frames # the blur's save, if the paused card still sent one, goes out on the focusout itself
 
     assert_equal 1, page.evaluate_script("window.__blockPatches"), "a paused card sent again after it was moved"
     assert_equal "The other editor's caption", second.reload.caption
@@ -408,26 +408,6 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
   private
 
   def card_for(block) = "##{ActionView::RecordIdentifier.dom_id(block)}"
-
-  def await_js(condition, timeout: 5)
-    met = page.evaluate_async_script(<<~JS, condition, timeout * 1000)
-      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
-      const deadline = Date.now() + timeout
-      const poll = () => {
-        if (Function(`return (${condition})`)()) return done(true)
-        if (Date.now() > deadline) return done(false)
-        setTimeout(poll, 50)
-      }
-      poll()
-    JS
-    assert met, "timed out waiting for: #{condition}"
-  end
-
-  def assert_eventually(timeout: 5)
-    deadline = Time.current + timeout
-    sleep 0.05 until yield || Time.current > deadline
-    assert yield, "condition never became true"
-  end
 
   # Task 12's b4: a post list's Limit is a 72px column; its error slot hangs
   # from the column's right edge and runs leftwards instead of wrapping word by

@@ -8,41 +8,28 @@ require "application_system_test_case"
 # editor (`admin--rich-text#applySuggestion`) -- plus the outdated note,
 # the Translations overview and the translated site tagline.
 #
-# The AI provider is a stub registered for these tests as `test/stub` (the
-# app server runs in this process, so it sees the same registry) and never
-# reaches the network: it answers `"[de] " + text`, and raises for any
-# request containing "boom" -- how a provider error during a bulk
-# translation is staged. Teardown re-runs the `to_prepare` registrations,
-# which reset the provider registry (and, after `with_test_types`, the
-# block types) to their built-ins.
+# The AI provider is `GatedProvider` (test/support/gated_provider.rb),
+# registered for these tests as `test/gated` (the app server runs in this
+# process, so it sees the same registry), and never reaches the network: it
+# answers `"[de] " + text`, and raises for any request containing "boom" --
+# how a provider error during a bulk translation is staged. A test that needs
+# a request in flight holds the gate (`GatedProvider.hold!`) and releases it
+# when the page has shown what it should show meanwhile. Teardown re-runs the
+# `to_prepare` registrations, which reset the provider registry (and, after
+# `with_test_types`, the block types) to their built-ins.
 class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   include TestTypes
 
-  class StubProvider
-    # Seconds to wait before answering: how a slow provider is staged (Cancel
-    # while a request is out).
-    cattr_accessor :delay, default: 0
-
-    def initialize(api_key:, model:); end
-
-    def translate(texts:, from:, to:, format:)
-      sleep delay if delay.positive?
-      raise AI::Error, "The AI provider is unavailable." if texts.any? { |text| text.to_s.downcase.include?("boom") }
-
-      texts.map { |text| "[#{to}] #{text}" }
-    end
-  end
-
   setup do
-    StubProvider.delay = 0
     site_settings(:default).update!(setup_completed_at: Time.current)
     with_locales(%w[en de es], default: "en")
-    AI::Providers.register("test/stub", StubProvider)
-    site_settings(:default).update!(ai_provider: "test/stub", ai_api_key: "sk-test")
+    GatedProvider.install!
+    site_settings(:default).update!(ai_provider: GatedProvider::NAME, ai_api_key: "sk-test")
     sign_in_via_form(users(:one))
   end
 
-  teardown { Rails.application.reloader.prepare! }
+  # Releases a request a failed test left waiting, so no server thread outlives it, and resets the registry.
+  teardown { GatedProvider.uninstall! }
 
   def paragraph(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }
 
@@ -58,6 +45,35 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   def assert_suggestion(box_id, text)
     assert_selector "##{box_id} textarea[data-translate-suggestion-text]", visible: true
     assert_equal text, find("##{box_id} textarea[data-translate-suggestion-text]").value
+  end
+
+  # The request is in a server thread, held at the provider's gate.
+  def await_provider_request
+    assert_eventually(message: "the suggestion request never reached the provider") { GatedProvider.waiting == 1 }
+  end
+
+  # Releases the gate and waits until the provider has answered the request
+  # that was cancelled or left behind -- the end of the window in which a late
+  # answer could land -- and until the page has run what that answer set going.
+  def await_late_answer
+    GatedProvider.release
+    assert_eventually(message: "the held request never finished at the provider") { GatedProvider.served == 1 }
+    await_frames
+  end
+
+  # Counts the suggestion requests that have ended in this page, answered or
+  # failed (`window.__suggestionRequestsEnded`), for a request that is not
+  # aborted -- the timed-out box's own, whose late answer the page ignores.
+  def track_suggestion_requests
+    page.execute_script(<<~JS)
+      window.__suggestionRequestsEnded = 0
+      const originalFetch = window.fetch
+      window.fetch = (url, options = {}) => {
+        const request = originalFetch(url, options)
+        if (String(url.url || url).includes("translations/suggest")) request.then(() => {}, () => {}).finally(() => { window.__suggestionRequestsEnded += 1 })
+        return request
+      }
+    JS
   end
 
   def slot(field) = "[data-translate-slot='#{field}']"
@@ -97,9 +113,9 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_no_selector "#{slot("title")} #translation-suggestion-post-title"
 
     suggestion.fill_in with: "Edited by hand"
-    # Past the autosave debounce (1 s): had the textarea's input or focusout
-    # reached the form, a save would have run by now.
-    sleep 1.5
+    # Had the textarea's input or focusout reached the form, a save would be
+    # waiting out its debounce: the queue is settled once it has run.
+    assert_writes_settled
     assert_no_selector "#post-save-status", text: /SAVED|SAVING/, wait: 0
     assert_nil post.reload.title(locale: "de", fallback: false), "editing a suggestion is not editing the field"
     assert_equal "", find_field(id: "post-title").value
@@ -225,7 +241,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
   test "the header counts the empty fields, shows a pending box per field, then the ready line; an edited suggestion is what Use all applies" do
     post = post_with_excerpt
-    StubProvider.delay = 1.5
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
@@ -235,6 +251,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_text "Suggesting 1 of 2 fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]", text: /\d+s/
     assert_selector "#translation-suggestion-post-excerpt [data-translation-pending]"
+    GatedProvider.release
     assert_text "2 suggestions ready", wait: 8
     assert_no_selector "[data-translation-pending]"
     assert_suggestion "translation-suggestion-post-title", "[de] Hello"
@@ -272,7 +289,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-translation-suggestion]"
     assert_no_text "suggestions ready"
     assert_button "Suggest translations for 2 empty fields"
-    sleep 1.5
+    assert_writes_settled
     assert_no_selector "#post-save-status", text: /SAVED|SAVING/, wait: 0
     post.reload
     assert_nil post.title(locale: "de", fallback: false)
@@ -281,35 +298,37 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
   test "Cancel in the header removes the pending boxes, and the late answer never appears" do
     post = post_with_excerpt
-    StubProvider.delay = 2
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+    await_provider_request # the request has reached the provider: its answer is a late one
 
     within("[data-admin--translate-target='running']") { click_on "Cancel" }
 
     assert_no_selector "[data-translation-pending]"
     assert_button "Suggest translations for 2 empty fields"
-    sleep 3
+    await_late_answer
     assert_no_selector "[data-translation-suggestion]"
     assert_nil post.reload.title(locale: "de", fallback: false)
   end
 
   test "Cancel on one pending box stops that request only" do
     post = post_with_excerpt
-    StubProvider.delay = 2
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     press_within slot("title"), "Translate"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+    await_provider_request # the request has reached the provider: its answer is a late one
 
     press_within "#translation-suggestion-post-title [data-translation-pending]", "Cancel"
 
     assert_no_selector "[data-translation-pending]"
-    sleep 3
+    await_late_answer
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
     assert_nil post.reload.title(locale: "de", fallback: false)
   end
@@ -324,20 +343,22 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
   test "a request that takes too long turns into the timeout box; its late answer is ignored; Try again asks anew" do
     post = post_with_excerpt
-    StubProvider.delay = 2.5
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     shorten_pending_timeout(1)
+    track_suggestion_requests
     press_within slot("title"), "Translate"
 
     assert_selector "#translation-suggestion-post-title", text: "No suggestion after 25 seconds.", wait: 4
-    # The server answers after 2.5 s: the box must stay as it is.
-    sleep 3
+    # The provider answers now, after the box timed out: the box must stay as it is.
+    GatedProvider.release
+    await_js "window.__suggestionRequestsEnded === 1" # the answer has reached the page
+    await_frames
     assert_selector "#translation-suggestion-post-title", text: "No suggestion after 25 seconds."
     assert_no_selector "#translation-suggestion-post-title [data-translation-suggestion]"
 
-    StubProvider.delay = 0
     press_within "#translation-suggestion-post-title", "Try again"
 
     assert_suggestion "translation-suggestion-post-title", "[de] Hello"
@@ -346,17 +367,18 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
   test "switching language mid-run drops the request: nothing lands on the new page" do
     post = post_with_excerpt
-    StubProvider.delay = 2
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
+    await_provider_request # the request has reached the provider: its answer is a late one
 
     click_on "Español"
     assert_current_path(/locale=es/)
     await_admin_controllers
-    sleep 3
+    await_late_answer
     assert_no_selector "[data-translation-suggestion]"
     assert_no_selector "[data-translation-pending]"
     assert_equal "", find_field(id: "post-title").value
@@ -365,12 +387,13 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
   test "the header announces progress and readiness in one live region, and focus follows Use and Discard" do
     post = post_with_excerpt
-    StubProvider.delay = 1
+    GatedProvider.hold!
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
     press "Suggest translations for 2 empty fields"
     assert_selector "[role='status'][aria-live='polite'][data-admin--translate-target='status']", text: /Suggesting 1 of 2 fields/, visible: :all
+    GatedProvider.release
     assert_selector "[data-admin--translate-target='status']", text: "2 suggestions ready", visible: :all, wait: 8
 
     # Focus inside the box moves to the field after Use, to Translate-ish after Discard.

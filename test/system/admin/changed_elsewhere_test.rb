@@ -5,6 +5,11 @@ require "application_system_test_case"
 # page, the editor's text stays in the field, the form stops sending, and
 # Reload discards the text for the newer version. System-level because the
 # pause ("no further request") and Reload are only observable in a browser.
+#
+# The clicks inside this file's `execute_script` strings are deliberate: they
+# land in the same tick as the preceding edit or the request the test holds,
+# which a native click (`press`) cannot do -- it is a separate CDP round trip,
+# by which time the debounce, the queue or Turbo has moved on. They are what the test is about, not a shortcut.
 class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -13,13 +18,13 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   end
 
   test "a stale autosave is refused, explained and final; Reload shows the newer version" do
+    # Someone else saves the page behind this browser's back. The bar only names changes more than a second past the
+    # base (an event is written a few milliseconds after the save whose `updated_at` became the base), so the page
+    # the form loads is five seconds old.
+    backdate(@page, by: 5.seconds)
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
-    # Someone else saves the page behind this browser's back. (The bar only
-    # names changes more than a second past the base: an event is written a
-    # few milliseconds after the save whose `updated_at` became the base.)
-    sleep 1.2
     as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     # Count what this browser sends: "final" is a claim about the CLIENT (the
@@ -41,10 +46,9 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     assert_equal "The other editor's text", @page.reload.subtitle
     assert_equal "My text", find_field("Subtitle").value
 
-    # Final: more typing sends nothing (past the 1000ms debounce, plus a
-    # margin -- an absence needs the wait itself).
+    # Final: more typing sends nothing (past the 1000ms debounce).
     fill_in "Subtitle", with: "My text, edited again"
-    sleep 2
+    sleep 1.1 # sleep: the autosave debounce is 1 s; the form is paused by the 409, so not settled, and nothing marks the expiry of a timer that must not send
     assert_equal 1, page.evaluate_script("window.__patches"), "the paused form sent another request"
     assert_equal "The other editor's text", @page.reload.subtitle
     assert_equal "My text, edited again", find_field("Subtitle").value
@@ -176,7 +180,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
 
     assert_eventually { draft.reload.published_at.present? }
     assert_eventually { page.evaluate_script("window.__renders > 0 && window.__inFlight === 0") }
-    sleep 0.5 # a stream answer is drawn on the next frame
+    await_frames # a stream answer is drawn on the next frame
     assert_equal "Typed just before Publish", draft.subtitle
     assert_equal "A caption", block.reload.caption
     assert_not_includes page.evaluate_script("window.__statuses"), 409, "a save was refused as stale"
@@ -258,11 +262,13 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     fill_in "Subtitle", with: "first"
     page.execute_script("document.activeElement.blur()") # the save for "first" goes out, and is slow
     fill_in "Subtitle", with: "second, typed while that save is in flight"
+    watch_frame_load
     find("li[data-page-id='#{other.id}'] a", text: "Other").click
 
     assert_field "Title", with: "Other", wait: 15
     assert_eventually(wait: 10) { @page.reload.subtitle == "second, typed while that save is in flight" }
-    sleep 1 # a second fetch of the page would have gone out by now
+    await_frame_load(wait: 15) # the promoted visit is over: a second fetch of the page would have gone out before it
+    await_frames
     assert_equal 1, page.evaluate_script("window.__gets").count("/cs-studio/pages/#{other.id}"), "the tree link's page was fetched more than once"
     assert_no_text "CHANGED ELSEWHERE"
 
@@ -271,6 +277,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     fill_in "Subtitle", with: "Typed on the next page"
     assert_eventually { other.reload.subtitle == "Typed on the next page" }
     assert_no_text "CHANGED ELSEWHERE"
+    assert_equal 1, page.evaluate_script("window.__gets").count("/cs-studio/pages/#{other.id}"), "the tree link's page was fetched again later"
   end
 
   # Scenario B: a value written by code with focus outside the form ("Use
@@ -321,6 +328,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
 
+    watch_frame_load
     page.execute_script(<<~JS)
       const field = document.getElementById("page-subtitle")
       field.value = "Set like Use all"
@@ -329,7 +337,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
     JS
 
     assert_eventually { @page.reload.subtitle == "Set like Use all" }
-    sleep 1 # the frame has been fetched and rendered again
+    await_frame_load # the frame has been fetched and rendered again
     await_admin_controllers
     assert_field "Subtitle", with: "Set like Use all"
 
@@ -345,6 +353,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
   test "an edit made while the open page's own row is loading is not replaced by the stale answer" do
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
+    watch_frame_load
     page.execute_script(<<~JS)
       const originalFetch = window.fetch
       window.fetch = async (url, options = {}) => {
@@ -356,14 +365,15 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
       document.querySelector('li[data-page-id="#{@page.id}"] a').click()
     JS
     # The frame's GET has been answered by the server and is held up in the
-    # browser for 800 ms: an edit now is newer than what that answer holds.
-    sleep 0.3
+    # browser for 800 ms (`__delayed` is set between the two): an edit now is
+    # newer than what that answer holds.
+    await_js "window.__delayed === true"
     fill_in "Subtitle", with: "Typed while the frame was loading"
     page.execute_script("document.activeElement.blur()")
 
     assert page.evaluate_script("window.__delayed === true"), "the frame's request was not held up"
     assert_eventually { @page.reload.subtitle == "Typed while the frame was loading" }
-    sleep 1.5
+    await_frame_load # the frame is fetched again after the save, and rendered
     await_admin_controllers
     assert_field "Subtitle", with: "Typed while the frame was loading"
 
@@ -440,7 +450,7 @@ class Admin::ChangedElsewhereSystemTest < ApplicationSystemTestCase
 
     assert_field "Title", with: "About"
     assert_eventually { page.evaluate_script("window.__statuses.includes(409) && window.__inFlight === 0") }
-    sleep 0.5 # a stream answer is drawn on the next frame
+    await_frames # a stream answer is drawn on the next frame
     assert_no_text "CHANGED ELSEWHERE"
     assert_no_selector "#changed-elsewhere"
     # Nor its "Saving…" line (ledger m4): written as the save was queued,

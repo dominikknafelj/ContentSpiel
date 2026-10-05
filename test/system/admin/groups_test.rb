@@ -75,22 +75,15 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
   # from the record sidesteps that: it can only be right once the save this
   # step is actually waiting on has landed.
   def assert_speakers_eventually(post_record, names)
-    deadline = Time.current + 5.seconds
-
-    loop do
-      current = post_record.reload.fields.group(:speakers).map(&:name)
-      break if current == names
-      # The raw column and the registry state are in the message because
-      # this assertion once failed intermittently with `got []` while the
-      # server log showed the speakers saved -- the message alone couldn't
-      # tell a save that never landed from a `test/speaker` group type that
-      # had dropped out of `FieldGroups` mid-test.
-      if Time.current > deadline
-        raise Minitest::Assertion, "expected speakers to become #{names.inspect}, got #{current.inspect} " \
-          "(metadata: #{post_record.metadata.inspect}, field groups: #{FieldGroups.names.inspect})"
-      end
-
-      sleep 0.1
+    # The raw column and the registry state are in the message because
+    # this assertion once failed intermittently with `got []` while the
+    # server log showed the speakers saved -- the message alone couldn't
+    # tell a save that never landed from a `test/speaker` group type that
+    # had dropped out of `FieldGroups` mid-test.
+    message = lambda do
+      "expected speakers to become #{names.inspect}, got #{post_record.reload.fields.group(:speakers).map(&:name).inspect} " \
+        "(metadata: #{post_record.metadata.inspect}, field groups: #{FieldGroups.names.inspect})"
     end
+    assert_eventually(wait: 5, message: message) { post_record.reload.fields.group(:speakers).map(&:name) == names }
   end
 end

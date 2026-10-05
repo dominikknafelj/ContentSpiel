@@ -7,6 +7,11 @@ require "application_system_test_case"
 # its answer (the redirect, the toast) dropped. From the frame's GET going out
 # until the promoted visit has completed, a non-GET submission is therefore
 # held and submitted afterwards.
+#
+# The clicks inside this file's `execute_script` strings are deliberate: they
+# land in the same tick as the preceding edit or the held request, which a native click (`press`) cannot do --
+# it is a separate CDP round trip, by which time the debounce, the queue or
+# Turbo has moved on. They are what the test is about, not a shortcut.
 class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)

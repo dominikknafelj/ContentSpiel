@@ -1,6 +1,7 @@
 require "test_helper"
 require "capybara/cuprite"
 require_relative "support/js_error_collector"
+require_relative "support/gated_provider"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Cuprite drives headless Chrome over the DevTools protocol (via Ferrum),
@@ -175,9 +176,21 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # there; `test/system/admin/promotion_hold_test.rb` presses without this
   # wait on purpose, and must keep doing so.
   def click_frame_link(locator = nil, **options)
-    page.execute_script("window.__frameLinkLoaded = false; document.addEventListener('turbo:load', () => { window.__frameLinkLoaded = true }, { once: true })")
+    watch_frame_load
     block_given? ? yield : click_link(locator, **options)
-    assert_eventually(message: "the visit the frame navigation is promoted to never finished (no turbo:load)") { page.evaluate_script("window.__frameLinkLoaded === true") }
+    await_frame_load
+  end
+
+  # The two halves of `click_frame_link`, for a test that has to do something
+  # between the click and the end of the navigation (edit while the frame's
+  # request is out): `watch_frame_load` BEFORE the click, `await_frame_load`
+  # after whatever the test does in between.
+  def watch_frame_load
+    page.execute_script("window.__frameLinkLoaded = false; document.addEventListener('turbo:load', () => { window.__frameLinkLoaded = true }, { once: true })")
+  end
+
+  def await_frame_load(wait: 8)
+    assert_eventually(wait: wait, message: "the visit the frame navigation is promoted to never finished (no turbo:load)") { page.evaluate_script("window.__frameLinkLoaded === true") }
   end
 
   # A rich-text editor's Insert menu item (Page link, Image, YouTube,
@@ -188,6 +201,120 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   def press_insert(label, within: "[role=toolbar]")
     find("#{within} button[aria-haspopup=menu]", match: :first).click
     find("#{within} [role=menu] button", text: label, match: :first).click
+  end
+
+  # Polls a condition (a record in the database, a flag in the page read
+  # through `evaluate_script`) until it holds, `wait` seconds at most. The ONE
+  # copy: a condition has no event to wait on from here, so it is asked again
+  # every 0.1 s. `message` is a String, or a callable evaluated only when the
+  # wait fails (a diagnostic that reads the record).
+  def assert_eventually(wait: 8, message: "condition never became true")
+    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+    until yield
+      flunk(message.respond_to?(:call) ? message.call : message) if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+      sleep 0.1 # sleep: the polling interval of this wait; a condition on the database or the page has no event to listen for
+    end
+    assert true
+  end
+
+  # Waits, in the browser (polling every 20 ms, like `await_admin_controllers`),
+  # until `condition` -- a JS expression -- is true; fails after `wait`
+  # seconds instead of hanging. The ONE copy.
+  def await_js(condition, wait: 5)
+    met = page.evaluate_async_script(<<~JS, condition, wait * 1000)
+      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
+      const deadline = Date.now() + timeout
+      const poll = () => {
+        if (Function(`return (${condition})`)()) return done(true)
+        if (Date.now() > deadline) return done(false)
+        setTimeout(poll, 20)
+      }
+      poll()
+    JS
+    assert met, "timed out waiting for: #{condition}"
+  end
+
+  # Waits until the write queue (`autosave/queue.js`) says the screen is
+  # `settled()`: nothing queued, debounced, in flight or waiting to retry, and
+  # no autosave form paused by a 409 or failed. It is the end of the window of
+  # a test that claims "no save was sent": a save the page was ever going to
+  # send has been sent AND answered by the time this returns, so a counter or a
+  # record read after it can't pass merely because it was read too early.
+  #
+  # `import("autosave/queue")` resolves to the module instance the page itself
+  # uses (the importmap pins one URL for the specifier), so this reads the live
+  # queue's state and not a second copy's. A screen with no registered autosave
+  # form is trivially settled -- nothing there can be waiting to send -- so a
+  # test about a form that is paused or failed (not settled by definition)
+  # can't use this, and a test about a page that has no autosave form has
+  # nothing for it to wait on.
+  def assert_writes_settled(wait: 8)
+    settled = page.evaluate_async_script(<<~JS, wait * 1000)
+      const [timeout, done] = [arguments[0], arguments[arguments.length - 1]]
+      import("autosave/queue").then((queue) => {
+        const deadline = Date.now() + timeout
+        const poll = () => {
+          if (queue.settled()) return done(true)
+          if (Date.now() > deadline) return done(false)
+          setTimeout(poll, 20)
+        }
+        poll()
+      }, (error) => done(String(error)))
+    JS
+    assert_equal true, settled, "the write queue never settled: #{settled.inspect}"
+  end
+
+  # Returns after the page has run what an event just set going: three
+  # animation frames and then a task. An event handler that does its work
+  # synchronously, in a microtask, in a task it queues or on the next frame
+  # (Stimulus disconnecting on a mutation, a stream answer being drawn, a
+  # dialog's `close`) has done it by then, so an assertion that something did
+  # NOT happen, made after this, has had the chance to fail. It does not wait
+  # out a TIMER (a debounce, a retry delay): those are waited out by the write
+  # queue (`assert_writes_settled`) or, where nothing marks their end, by a
+  # sleep that names the timer.
+  def await_frames
+    page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => done(true), 0))))
+    JS
+  end
+
+  # Presses the mouse at (from_x, from_y) and walks it down to `to_y` in six
+  # steps, for a SortableJS drag (the page tree, the block list). SortableJS
+  # only looks at what is under the pointer on its own 50 ms timer, so a pointer
+  # that jumps is never seen on the way; each step rests for longer than a tick.
+  # The caller asserts what it expects mid-drag, calls `await_drag_slot` and
+  # releases with `mouse.up`. Returns the mouse.
+  def drag_pointer(from_x, from_y, to_y)
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from_x, y: from_y)
+    mouse.down
+    6.times do |step|
+      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
+      sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer rests one tick plus margin per step
+    end
+    mouse
+  end
+
+  # Waits until SortableJS has put the dashed slot (`ghost`, a selector) at the
+  # end of the list `at: :last` or the start `at: :first`: that is where a
+  # release would drop, and what the 50 ms sampling above takes a moment to
+  # reach after the last move.
+  def await_drag_slot(ghost, at:)
+    edge = at == :first ? "previousElementSibling" : "nextElementSibling"
+    await_js "(() => { const slot = document.querySelector(#{ghost.to_json}); return !!slot && slot.#{edge} === null })()"
+  end
+
+  # Puts a record's `updated_at` in the past, without a callback. The server
+  # shares this process, so `travel_to` would move its clock, but the BROWSER's
+  # clock does not move with it: a test that compares a time the browser made
+  # with one the server made must not travel. The "Changed elsewhere" bar names
+  # only changes more than `ChangedElsewhereComponent::SLACK` past the base a
+  # form loaded; a record backdated before the form loads puts the next change
+  # on the far side of it without waiting a second for it.
+  def backdate(record, by: 5.seconds)
+    record.update_columns(updated_at: record.updated_at - by)
   end
 
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered
@@ -202,17 +329,6 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # page through CDP rather than through a WebDriver input queue, so there
   # is no separate "accepting native input" state to wait for (Selenium
   # needed an `await_native_input` handshake here, which is what flaked).
-  # Polls a condition on the database (a save the browser sends on its own
-  # timer) until it holds, `wait` seconds at most.
-  def assert_eventually(wait: 8, message: "condition never became true")
-    deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
-    until yield
-      flunk message if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
-      sleep 0.1
-    end
-    assert true
-  end
-
   def await_admin_controllers
     page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]

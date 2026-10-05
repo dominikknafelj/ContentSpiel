@@ -256,7 +256,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
       document.addEventListener("turbo:visit", () => { window.restorationStarted = true })
       window.dispatchEvent(new PopStateEvent("popstate", { state: history.state }))
     JS
-    sleep 0.5
+    await_frames # the popstate listeners have run; a restoration visit would have started `turbo:visit` by now
     assert_no_selector "dialog#leave-dialog[open]"
     assert_nil page.evaluate_script("window.restorationStarted")
     assert_selector "#user-form[data-same-form=yes]"
@@ -365,7 +365,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     find("#jump-nowhere").click
     find("#jump-broken").click
-    sleep 0.3
+    await_frames
     assert_no_selector "dialog#leave-dialog[open]"
     assert_selector "#user-form[data-same-form=yes]"
     assert_equal "Typed before the jumps", find_field("Name").value

@@ -169,34 +169,9 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
   private
 
-  # See this test's own comment for why the status line's text alone isn't
-  # a trustworthy signal that the *second* save (specifically) has landed.
-  # Waits (in the browser, polling every 20ms) until `condition` -- a JS
-  # expression -- is true, the same handshake `await_admin_controllers`
-  # uses; fails after `timeout` seconds instead of hanging.
-  def await_js(condition, timeout: 5)
-    met = page.evaluate_async_script(<<~JS, condition, timeout * 1000)
-      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
-      const deadline = Date.now() + timeout
-      const poll = () => {
-        if (Function(`return (${condition})`)()) return done(true)
-        if (Date.now() > deadline) return done(false)
-        setTimeout(poll, 20)
-      }
-      poll()
-    JS
-    assert met, "timed out waiting for #{condition}"
-  end
-
   def assert_page_title_eventually(title)
-    deadline = Time.current + 5.seconds
-
-    loop do
-      current = @page.reload.title(locale: :en)
-      break if current == title
-      raise Minitest::Assertion, "expected the page title to become #{title.inspect}, got #{current.inspect}" if Time.current > deadline
-
-      sleep 0.1
+    assert_eventually(wait: 5, message: -> { "expected the page title to become #{title.inspect}, got #{@page.reload.title(locale: :en).inspect}" }) do
+      @page.reload.title(locale: :en) == title
     end
   end
 
@@ -227,7 +202,7 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
 
     assert_selector "#page-save-status", text: "Not saved — you don't have permission to change this", wait: 5
     assert_selector "#toasts .admin-toast[data-kind='error']", text: "You don't have permission to make this change."
-    sleep 1.5 # the first retry would have gone out after one second
+    sleep 1.1 # sleep: the first retry would go out after `retryDelays[0]` = 1 s; the form is refused, so not settled, and nothing marks that delay's expiry
     assert_equal 1, page.evaluate_script("window.__patches"), "a refused save was retried"
     assert_no_selector "#page-save-status", text: "RETRYING"
     assert_nil @page.reload.subtitle
@@ -265,9 +240,11 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     assert_selector "form[data-controller~='admin--autosave'] input[type=file][name='page[probe]']", visible: :all
 
     page.execute_script("document.getElementById(#{subtitle.to_json}).focus()")
-    sleep 0.05 # `lastModified` has millisecond precision
+    # `lastModified` has millisecond precision: the blur must read the file a millisecond later than the focus did.
+    read_at = page.evaluate_script("Date.now()")
+    await_js "Date.now() > #{read_at}"
     page.execute_script("document.activeElement.blur()")
-    sleep 0.5 # nothing to wait FOR: the claim is that no request goes out
+    assert_writes_settled # a save the blur queued has been sent and answered by now; the claim is that none was
     assert_equal 0, page.evaluate_script("window.__patches"), "a save was sent though nothing had changed"
 
     # And the probe is live: the same form does send once something is typed.
@@ -286,6 +263,10 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
   # refused as "Changed elsewhere" against one's own save. With
   # `turbo-cache-control: no-cache` Forward fetches the editor afresh.
   test "an editor left with Back while an edit was unsent is fetched afresh by Forward, and keeps saving" do
+    # The base the editor loads is past the "changed elsewhere" bar's one-second tolerance
+    # (`ChangedElsewhereComponent::SLACK`) of the save below, so a refusal would be named, not shrugged off as the
+    # form's own save.
+    backdate(@page, by: 5.seconds)
     visit admin_root_path
     await_admin_controllers
     find("nav[aria-label='Modules'] a", text: "Posts").click
@@ -298,7 +279,6 @@ class Admin::AutosaveSystemTest < ApplicationSystemTestCase
     page.go_back
     assert_current_path(/cs-studio\/posts/, wait: 10)
     assert_eventually { @page.reload.subtitle == "Typed, then Back" }
-    sleep 1.1 # past the "changed elsewhere" bar's own one-second tolerance
 
     page.go_forward
     assert_field "Subtitle", with: "Typed, then Back", wait: 10

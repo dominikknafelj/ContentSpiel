@@ -73,18 +73,12 @@ class TreeSystemTest < ApplicationSystemTestCase
     _, gamma_y = centre.call("Move Gamma")
     to_y = gamma_y + 8
 
-    mouse = page.driver.browser.mouse
-    mouse.move(x: from_x, y: from_y)
-    mouse.down
-    6.times do |step|
-      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
-      sleep 0.08
-    end
+    mouse = drag_pointer(from_x, from_y, to_y)
 
     # Mid-drag: the lifted clone hangs off <body>, the dashed slot is in the tree.
     assert_selector "body > .admin-drag-fallback", text: "Alpha"
     assert_selector "#tree li.admin-drag-ghost"
-    sleep 0.2
+    await_drag_slot "#tree li.admin-drag-ghost", at: :last
     mouse.up
 
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /Moved .Alpha./, wait: 10

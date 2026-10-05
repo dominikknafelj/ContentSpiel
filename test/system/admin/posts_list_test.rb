@@ -134,7 +134,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
       window.__controllers = root.getAttribute("data-controller")
       root.setAttribute("data-controller", "")
     JS
-    sleep 0.3 # Stimulus disconnects on the mutation, a task later
+    await_frames # Stimulus disconnects on the mutation, a task later
     page.execute_script("window.__root.setAttribute('data-controller', window.__controllers)")
     assert_selector "[data-admin--bulk-select-target=bar]", text: "1 selected"
     assert_equal "", find(status, visible: :all).text(:all)

@@ -43,9 +43,10 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
   end
 
   test "an editor paused by Changed elsewhere asks: its text exists only in the page" do
+    # The other editor's change lands more than the bar's one-second tolerance past the base the form loads.
+    backdate(@page, by: 5.seconds)
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    sleep 1.2
     as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     fill_in "Subtitle", with: "My text"

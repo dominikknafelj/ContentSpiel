@@ -202,7 +202,7 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     page.execute_script("window.__pending['ab']()")
     assert_selector "#post-tag_names-listbox [role=option]", text: "answer-ab"
     page.execute_script("window.__pending['a']()")
-    sleep 0.2 # the late answer has been delivered; it must have changed nothing
+    await_frames # the late answer has been delivered and its handlers run; it must have changed nothing
     assert_selector "#post-tag_names-listbox [role=option]", text: "answer-ab"
     texts = all("#post-tag_names-listbox [role=option]").map { |option| option.text.sub(/\s*1 post\z/, "") }
     assert_equal [ "answer-ab", "Create tag “ab”" ], texts
@@ -218,7 +218,7 @@ class Admin::ChipInputSystemTest < ApplicationSystemTestCase
     assert_eventually { page.evaluate_script("window.__release !== null") }
     tag_field.send_keys(:escape)
     page.execute_script("window.__release()")
-    sleep 0.2
+    await_frames # the late answer has been delivered and its handlers run
     assert_selector "#post-tag_names[aria-expanded='false']"
   end
 

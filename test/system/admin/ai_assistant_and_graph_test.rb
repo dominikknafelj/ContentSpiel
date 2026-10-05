@@ -67,7 +67,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
 
     find("[data-controller~='admin--chip-input'] button[aria-label='Remove Satellite']").click
     assert_no_selector "[data-controller~='admin--chip-input'] li", text: "Satellite"
-    wait_until { post_record.post_relations.reload.empty? }
+    assert_eventually { post_record.post_relations.reload.empty? }
   end
 
   test "the mind graph draws every post and a click opens its editor" do
@@ -144,7 +144,7 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
 
     # Shrinking the window moves the box; the nodes must follow it in.
     page.current_window.resize_to(700, 800)
-    wait_until(timeout: 10) do
+    assert_eventually(wait: 10, message: "the nodes never followed the box in") do
       resized = page.evaluate_script(inside_box)
       resized["outside"].zero? && resized["labelsOutside"].zero?
     end
@@ -286,21 +286,12 @@ class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
   def click_graph_node(post)
     selector = "svg[data-admin--mind-graph-target=svg] g[data-post-id='#{post.id}']"
     read = -> { page.evaluate_script("document.querySelector(#{selector.to_json}).getAttribute('transform')").to_s.scan(/-?[\d.]+/).map(&:to_f) }
-    wait_until(timeout: 10) do
+    assert_eventually(wait: 10, message: "the graph node never held still") do
       before = read.call
-      sleep 0.2
+      sleep 0.2 # sleep: the two readings of the node's position are 0.2 s apart by definition; "held still" is a comparison over that span
       after = read.call
       before.any? && before.size == after.size && before.zip(after).all? { |a, b| (a - b).abs < 0.5 }
     end
     find(selector).click
-  end
-
-  def wait_until(timeout: 5)
-    deadline = Time.current + timeout
-    until yield
-      raise "condition not met within #{timeout}s" if Time.current > deadline
-
-      sleep 0.05
-    end
   end
 end
