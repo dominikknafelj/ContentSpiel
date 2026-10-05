@@ -1,5 +1,6 @@
 require "test_helper"
 require "capybara/cuprite"
+require_relative "support/js_error_collector"
 
 class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Cuprite drives headless Chrome over the DevTools protocol (via Ferrum),
@@ -9,13 +10,15 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # page on CI -- one unrelated system test per run, never locally -- and a
   # handshake that waited for native input couldn't make them arrive.
   #
-  # `js_errors: false`: with `true`, any uncaught exception or unhandled
-  # rejection in the page fails the test, and Turbo itself produces a
-  # harmless one -- a `<turbo-frame>` disconnected mid-load (e.g. by a
-  # back-navigation's snapshot render) cancels its fetch and the resulting
-  # `AbortError` escapes Turbo unhandled. That flaked the API-token test's
-  # `go_back` about every other run. Tests assert on what the page shows and
-  # saves instead, which is where a broken controller shows up anyway.
+  # `js_errors: false`: with `true`, Ferrum raises the page's uncaught
+  # exceptions into the test thread with `Thread.main.raise`, at whatever line
+  # it happens to be on, with no way to exempt one. `JsErrorCollector`
+  # (prepended onto `Ferrum::Page` below) listens for the same CDP event
+  # instead and records the errors; `teardown` fails the test that caused
+  # them, naming each. The one error the application can't prevent -- Turbo's
+  # `AbortError` from a `<turbo-frame>` disconnected mid-load, which flaked the
+  # API-token test's `go_back` -- is listed with its reason in
+  # `JsErrorCollector::IGNORED`.
   # `no-sandbox` because GitHub's runners (and most containers) can't give
   # Chrome its user-namespace sandbox.
   driven_by :cuprite, screen_size: [ 1400, 1400 ], options: {
@@ -66,6 +69,33 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     end
   end
   Capybara::Cuprite::Node.prepend(StaleNodeAtOnce)
+  Ferrum::Page.prepend(JsErrorCollector)
+
+  # The collector is process-wide (a test process runs one browser at a time),
+  # so it is emptied before each test; the page is a fresh one per test, so a
+  # late event from the previous test's page is a stale one at worst.
+  setup { JsErrorCollector.reset! }
+
+  # For a test that provokes a JavaScript error on purpose (a request made to
+  # fail, a response Turbo refuses): waits for an error whose message matches
+  # and takes it out of the collector, so `teardown` doesn't fail the test for
+  # it. The test fails if the error never comes.
+  def expect_js_error(pattern)
+    assert_eventually(message: "no JavaScript error matching #{pattern.inspect} reached the page") { JsErrorCollector.consume(pattern) }
+  end
+
+  # Fails a test that otherwise passed because its page raised an error. A test
+  # that failed on its own keeps its own failure (`passed?`), which is the one
+  # worth reading.
+  teardown do
+    errors = JsErrorCollector.errors
+    JsErrorCollector.reset!
+    if errors.any? && passed?
+      flunk "JavaScript errors on the page:\n" + errors.map { |e|
+        "  #{e[:message]} (#{e[:url]})#{" at #{e[:frame]}" if e[:frame]}"
+      }.join("\n")
+    end
+  end
 
   # Signs in through the real sign-in form (cs-studio spec §3/§9). `Session
   # TestHelper#sign_in_as` -- what every integration test uses -- only ever

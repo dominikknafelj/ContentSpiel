@@ -272,6 +272,9 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
     assert_equal 1, writes
     assert_not @page.reload.trashed?
+    # Turbo rethrows the failed fetch of the frame navigation, unhandled; that
+    # is the failure this test provokes.
+    expect_js_error(/TypeError: Failed to fetch/)
   end
 
   test "a frame answer without the frame releases what was held" do
@@ -287,6 +290,9 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
     assert_equal 1, writes
     assert_not @page.reload.trashed?
+    # Turbo throws on an answer without the frame it asked for; that is the
+    # answer this test provokes.
+    expect_js_error(/did not contain the expected <turbo-frame id="content">/)
   end
 
   # Round 3: a non-opted `_top` form inside `#content` whose screen is
