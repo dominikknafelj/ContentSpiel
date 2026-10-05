@@ -154,6 +154,29 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     assert_selector "#{row} [data-chips] .admin-scope-chip:nth-of-type(2)", text: "! retired_type · type removed", exact_text: true
   end
 
+  # A grant that names only removed content types has no tick and no chip; saving
+  # the form is what removes it, so Save is live with nothing touched -- and the
+  # footer doesn't say "No unsaved changes" beside an enabled button.
+  test "a group with a dormant dead grant: Save is enabled untouched, the footer shows no count, and saving removes the grant" do
+    group = AccessControl::Group.create!(name: "Dormant")
+    group.grants.create!(permission: "posts.edit", scope: { "content_types" => %w[blog] })
+    group.grants.create!(permission: "posts.read", scope: { "content_types" => %w[retired_type] })
+
+    visit edit_admin_group_path(group)
+    await_admin_controllers
+    assert_selector ".admin-stale-grant", text: "Limited to a content type that no longer exists (retired_type). Saving removes it;"
+    assert_button "Save group", disabled: false
+    assert_no_selector ".admin-save-bar", text: /unsaved/i
+
+    click_button "Save group"
+
+    assert_selector "#toasts", text: "Group saved"
+    assert_no_selector ".admin-stale-grant"
+    assert_selector ".admin-save-bar", text: /No unsaved changes/i
+    assert_button "Save group", disabled: true
+    assert_equal %w[posts.edit], group.grants.reload.map(&:permission)
+  end
+
   test "a redundant stored root survives untouched, and the carried input steps aside when its ancestor is unticked" do
     group = AccessControl::Group.create!(name: "Redundant")
     group.grants.create!(permission: "pages.edit", scope: { "page_ids" => [ @about.id, @team.id ].sort })
@@ -169,5 +192,32 @@ class Admin::GroupsEditorSystemTest < ApplicationSystemTestCase
     within("#{row} [data-scope-editor]") { uncheck "About" }
     assert_selector "#{carried}:disabled", visible: :all
     assert_selector "#grant-pages-edit-page-#{@team.id}:enabled:checked"
+  end
+
+  test "a Save on a form opened before another admin changed the group shows the banner, keeps the typed name, and Reload shows the other change" do
+    group = AccessControl::Group.create!(name: "Shared", description: "before")
+    # The banner names a change only when its event lies more than
+    # `Audit::ChangeSince::SLACK` past the base the form loaded.
+    backdate(group, by: 1.minute)
+    visit "/cs-studio/groups/#{group.id}/edit"
+    await_admin_controllers
+
+    # Another admin saves the same group while this form is open.
+    Current.set(actor: users(:two), channel: :admin) do
+      assert Groups::Save.call(group, attributes: { description: "changed by the other admin" }).ok?
+    end
+
+    fill_in "Name", with: "My rename"
+    click_button "Save group"
+
+    assert_selector "[role=alert]", text: "This group was changed by two@example.com just now. Reload to see the latest — your changes are still in the form."
+    assert_field "Name", with: "My rename"
+    assert_equal "Shared", group.reload.name
+
+    click_link "Reload"
+
+    assert_field "Description", with: "changed by the other admin"
+    assert_field "Name", with: "Shared"
+    assert_no_selector "[role=alert]", text: "changed elsewhere"
   end
 end

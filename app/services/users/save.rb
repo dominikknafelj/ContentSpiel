@@ -35,7 +35,10 @@ module Users
   #   Review Focus 1), and every *removed* one a group they may manage as it
   #   stands (`AccessControl.can_manage_group?`, final fix wave).
   # - `owner` is owner-only (design spec §3.2); a value equal to the stored
-  #   one isn't a change (the form's hidden "0"). Demoting the last owner is
+  #   one, or an absent, nil or empty one, isn't a change. The only CS Studio
+  #   request that passes it is `PATCH users/:id/owner`
+  #   (`Admin::UsersController#owner`); the setup wizard passes `owner: true`
+  #   for the founding owner it creates. Demoting the last owner is
   #   refused by `User`'s own validation. Recorded as `user.owner_changed`,
   #   apart from any other change's `user.updated`.
   class Save < ApplicationService
@@ -71,7 +74,10 @@ module Users
         @user.save || raise(ActiveRecord::Rollback)
         end_sessions_after_password_change
         sync_groups(old_group_ids, new_group_ids)
+        # The changes are read before the touch: `touch` runs `changes_applied`,
+        # which leaves only `updated_at` in `saved_changes`.
         record_changes(old_group_ids, new_group_ids)
+        touch_what_the_forms_show((old_group_ids - new_group_ids) | (new_group_ids - old_group_ids))
         true
       end
       return failure(@user) unless saved
@@ -81,8 +87,16 @@ module Users
 
     private
 
+    # Absent, nil and "" are no request about the flag (a blank form value, a
+    # caller that never meant to name it): `Boolean` casts "" to nil, which differs
+    # from either flag and would flip it. Not `blank?`, which is true for the real
+    # value `false`, a demotion. Any other string is cast as Rails casts a
+    # checkbox (anything but a "false"-like value is true), so the endpoint's
+    # own `0`/`1` check is what keeps junk out.
     def owner_change?
-      @attributes.key?(:owner) && ActiveModel::Type::Boolean.new.cast(@attributes[:owner]) != @user.owner
+      return false if @attributes[:owner].nil? || @attributes[:owner] == ""
+
+      ActiveModel::Type::Boolean.new.cast(@attributes[:owner]) != @user.owner
     end
 
     # The existing groups among the submitted ids (unknown ids are
@@ -124,6 +138,18 @@ module Users
     # `user.created`; otherwise `user.owner_changed` for the owner flag and
     # `user.updated` for everything else (group ids included), each only
     # when there's something to say.
+    # The stale-save base of the user form (`Admin::StaleForm`) is this user's
+    # `updated_at`, which a save moves only when a column of the user itself
+    # changed, not for a membership. And the other side of a membership is a
+    # group form (it lists the group's members): a group gained or lost here
+    # makes an open edit of that group stale too. `touch_all` runs no callbacks.
+    def touch_what_the_forms_show(changed_group_ids)
+      return if changed_group_ids.empty?
+
+      @user.touch unless @user.previously_new_record?
+      AccessControl::Group.where(id: changed_group_ids).touch_all
+    end
+
     def record_changes(old_group_ids, new_group_ids)
       changes = user_field_changes(@user)
       changes["group_ids"] = [ old_group_ids, new_group_ids ] if old_group_ids != new_group_ids

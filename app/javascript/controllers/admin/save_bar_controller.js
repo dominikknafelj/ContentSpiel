@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { targetWithinThePage } from "controllers/admin/fragment_links_controller"
+import { messages } from "i18n/messages"
 
 // The explicit-save pattern for configuration screens (design pass spec §4,
 // handoff §9 B12): the form's footer (Save, Cancel) is always there, counts
@@ -132,7 +133,7 @@ const mustAsk = () => !shared.leaving && guarded().length > 0
 // password manager fills a field) made the guard cancel it and ask "Leave
 // without saving?" about the very screen that had just opened -- and re-arm
 // an open dialog's Discard with a visit to the page already showing.
-// As the write queue does for the same visit (`autosave/queue.js`,
+// As the write queue does for the same visit (`autosave/frame_hold.js`,
 // `expectVisit`), the frame's URL is noted as `#content` renders and the next
 // `turbo:before-visit` to exactly that URL is let through. The note is spent
 // by the next visit whichever it is, and expires: not every frame render is
@@ -267,9 +268,10 @@ function openLeaveDialog(proceed) {
   // A form the server re-rendered with errors is unsaved with nothing counted
   // (`dirty`): no number to name.
   if (body) {
+    const text = messages(dialog)
     body.textContent = count === 0
-      ? "You have unsaved changes on this screen."
-      : `You have ${count === 1 ? "1 unsaved change" : `${count} unsaved changes`} on this screen.`
+      ? text.t("layout.leave_dialog.body")
+      : text.t("layout.leave_dialog.body_with_count", { count })
   }
   // A listener, not `onclick =`, and `once`: opening the dialog repeatedly
   // (Keep editing, then click another link) must not stack handlers that
@@ -348,7 +350,8 @@ function measureBars() {
 // open and filled in while the main Save re-renders the screen): the element
 // holding it carries `data-save-bar-holds="<sentence>"` while it does, and
 // asks for a new look with `admin--save-bar:query`.
-const BLOCKED_HINT = "Save or cancel your changes first."
+// The sentence itself is `admin.components.save_bar.blocked`, read from the
+// page's messages (`i18n/messages.js`); `admin--pending-lock` shows the same.
 
 export default class extends Controller {
   static targets = ["bar", "count", "save", "blocked"]
@@ -401,9 +404,10 @@ export default class extends Controller {
     if (this.hasSaveTarget && !("passwordSubmit" in this.saveTarget.dataset)) {
       this.saveTarget.disabled = this.blocked || !(this.unsaved || this.alwaysValue)
     }
+    const text = messages(this.element)
     this.countTarget.textContent = count > 0
-      ? (count === 1 ? "1 unsaved change" : `${count} unsaved changes`)
-      : (this.unsaved ? "Unsaved changes" : (this.alwaysValue ? "" : "No unsaved changes"))
+      ? text.t("components.save_bar.changes", { count })
+      : (this.unsaved ? text.t("components.save_bar.unsaved") : (this.alwaysValue ? "" : text.t("components.save_bar.no_changes")))
     announce()
   }
 
@@ -411,7 +415,7 @@ export default class extends Controller {
   // blocks this form's Save.
   get blockedBy() {
     const ids = this.afterValue.split(/\s+/).filter(Boolean)
-    if ([...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)) return BLOCKED_HINT
+    if ([...instances].some((instance) => instance !== this && ids.includes(instance.element.id) && instance.unsaved)) return messages(this.element).t("components.save_bar.blocked")
     // Something typed beside the form that is no field of it and that its
     // Save would throw away: whoever holds it says so, in its own words.
     return document.querySelector("[data-save-bar-holds]")?.getAttribute("data-save-bar-holds") || ""

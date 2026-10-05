@@ -17,8 +17,6 @@ module Admin
       outdated: { classes: "border-warn text-warn-ink", glyph: "↻" }
     }.freeze
 
-    ARIA_STATES = { complete: "translated", missing: "not translated", outdated: "outdated" }.freeze
-
     def initialize(state:, locale:)
       @state = state.to_sym
       raise ArgumentError, "unknown translation state #{state.inspect}" unless STYLES.key?(@state)
@@ -31,18 +29,14 @@ module Admin
       tag.span(safe_join([ @locale, style[:glyph] ].compact, " "),
         class: "admin-translation-chip inline-flex items-center gap-0.5 rounded-cs border px-1 font-cs-mono text-[10px] uppercase #{style[:classes]}",
         role: "img", title: tooltip,
-        aria: { label: "#{::Locales.name(@locale, native: true)}: #{ARIA_STATES.fetch(@state)}" },
+        aria: { label: t(".aria_label.#{@state}", language: ::Locales.name(@locale, native: true)) },
         data: { locale: @locale, translation_state: @state })
     end
 
     # Outdated names the source language, so the hover says what to compare
     # against; the aria-label stays the short state word.
     def tooltip
-      case @state
-      when :complete then "Translated"
-      when :missing then "Not translated"
-      when :outdated then "#{::Locales.name(::Translations.primary_locale, native: true)} changed since translation"
-      end
+      t(".tooltip.#{@state}", language: ::Locales.name(::Translations.primary_locale, native: true))
     end
   end
 end

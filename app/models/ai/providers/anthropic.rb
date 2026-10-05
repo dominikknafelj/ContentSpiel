@@ -35,8 +35,8 @@ module AI
       # Document#to_markdown`, spec §6.3): what must survive the round trip
       # back through `RichText::Document.from_markdown` unchanged -- the
       # structure, the `::youtube{…}`/`::image{…}` directive lines and the
-      # `cs:page/42`/`cs:post/7` internal link targets (see "Rich text" in
-      # CLAUDE.md).
+      # `cs:page/42`/`cs:post/7` internal link targets (see
+      # docs/reference/rich-text.md).
       MARKDOWN_RULES = <<~RULES.freeze
 
         The texts are Markdown. Keep the Markdown structure exactly: headings, lists, quotes, emphasis, code and line breaks. Never translate code. Keep every line that starts with :: (a directive such as ::youtube{id="…"} or ::image{asset="42" alt="…"}) exactly as it is. Keep every link target unchanged, including internal targets such as cs:page/42 and cs:post/7; translate only the link text.

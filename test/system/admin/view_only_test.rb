@@ -60,8 +60,9 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     JS
 
     # Past the 1000ms autosave debounce: a queued save would have fired by
-    # now. Asserting an absence needs the wait itself.
-    sleep 1.5
+    # now. The page has no autosave form, so the write queue has nothing that
+    # could report the debounce as over; asserting an absence needs the wait itself.
+    sleep 1.1 # sleep: the autosave debounce is 1 s; a view-only page has no registered form, so nothing marks the expiry of a timer that must not exist
 
     assert_equal 0, page.evaluate_script("window.__writes")
     assert_no_text "typed"
@@ -75,8 +76,8 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
 
-    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
-    sleep 0.5
+    find(".ProseMirror figure.admin-rich-text-image").click
+    await_frames # a click handler that opened the dialog has run by now
     assert_no_selector "dialog[open]"
   end
 

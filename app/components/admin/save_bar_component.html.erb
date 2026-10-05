@@ -11,7 +11,7 @@
     it as the way to discard, so it leaves without "Leave without saving?". %>
 <div data-admin--save-bar-target="bar" class="admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3">
   <%= render Admin::ButtonComponent.new(label: save_label, variant: :primary, type: "submit", form: form_id, data: save_data.merge("admin--save-bar-target": "save")) %>
-  <%= link_to "Cancel", cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
+  <%= link_to t(".cancel"), cancel_url, data: { turbo_frame: "content", save_bar_cancel: true }, class: setup_secondary_link_class %>
   <span data-admin--save-bar-target="count" aria-live="polite" class="text-[13px] text-dim"></span>
   <%# Shown while another form on the screen has to be saved first
       (`save_bar_form_data(after:)`); the controller writes the sentence. %>

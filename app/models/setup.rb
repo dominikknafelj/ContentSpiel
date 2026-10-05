@@ -19,13 +19,12 @@ module Setup
     @completed = nil
   end
 
-  # Finishing the wizard: the homepage always exists afterwards, and setup
-  # stops being required. Safe to call twice.
+  # Finishing the wizard: setup stops being required. Safe to call twice.
+  # The homepage that must exist by then is not made here -- a model calls no
+  # service: the caller runs `StarterContents::EnsureHome` first, in the same
+  # transaction (`SetupController#update_review`).
   def self.complete!
-    SiteSetting.transaction do
-      setting = Current.site
-      StarterContent.ensure_home!(locale: setting.default_locale)
-      setting.update!(setup_completed_at: Time.current) if setting.setup_completed_at.nil?
-    end
+    setting = Current.site
+    setting.update!(setup_completed_at: Time.current) if setting.setup_completed_at.nil?
   end
 end

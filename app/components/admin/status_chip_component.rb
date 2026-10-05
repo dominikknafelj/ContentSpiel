@@ -29,14 +29,14 @@ module Admin
 
     def render? = !(hide_live && status == "live")
 
-    def label = status.humanize
+    def label = t(".labels.#{status}")
 
     def dot_class = DOT_CLASSES.fetch(status)
 
     def title
       return nil unless status == "scheduled" && at.present?
 
-      at.strftime("%-d %b %Y, %H:%M")
+      I18n.l(at, format: :"admin.datetime")
     end
 
     private

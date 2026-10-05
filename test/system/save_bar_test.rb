@@ -256,7 +256,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
       document.addEventListener("turbo:visit", () => { window.restorationStarted = true })
       window.dispatchEvent(new PopStateEvent("popstate", { state: history.state }))
     JS
-    sleep 0.5
+    await_frames # the popstate listeners have run; a restoration visit would have started `turbo:visit` by now
     assert_no_selector "dialog#leave-dialog[open]"
     assert_nil page.evaluate_script("window.restorationStarted")
     assert_selector "#user-form[data-same-form=yes]"
@@ -363,9 +363,13 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     page.driver.browser.keyboard.type(:Enter)
     assert_eventually(message: "focus never reached the field") { page.evaluate_script("document.activeElement.id") == "user_email_address" }
 
-    find("#jump-nowhere").click
-    find("#jump-broken").click
-    sleep 0.3
+    # A `#content` frame navigation (the wrong behaviour) starts with this event, within microtasks of the click.
+    page.execute_script('document.addEventListener("turbo:before-fetch-request", () => { window.__fetched = true })')
+    [ "#jump-nowhere", "#jump-broken" ].each do |link|
+      find(link).click
+      await_frames
+      assert_nil page.evaluate_script("window.__fetched"), "#{link}, a link to a missing or malformed fragment, fetched something"
+    end
     assert_no_selector "dialog#leave-dialog[open]"
     assert_selector "#user-form[data-same-form=yes]"
     assert_equal "Typed before the jumps", find_field("Name").value

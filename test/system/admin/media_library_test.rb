@@ -185,7 +185,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     dispatch_file_drag("dragover", "tiny.png")
     assert_no_selector "[data-admin--media-drop-target=overlay]", visible: :visible
     dispatch_file_drop("tiny.png")
-    sleep 0.5
+    await_frames # the drop handler has run: no tile was made, no upload started
     assert_no_selector "li[data-upload-tile]"
     assert_equal 1, Media::Asset.count
 
@@ -312,7 +312,7 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/media?selected=#{asset.id}"
     await_admin_controllers
     assert_selector "#media-panel"
-    sleep 0.3
+    await_frames # a focus move into the panel would be made by `connect()` or the frame's load, both done by now
     assert_not_equal "media-panel", active_element_id, "a plain page load must not move focus into the panel"
 
     visit "/cs-studio/media"
@@ -453,15 +453,8 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
   # only reading the field back off the record proves it landed with
   # *this* value, in *this* locale.
   def assert_alt_eventually(asset, locale, value)
-    deadline = Time.current + 5.seconds
-
-    loop do
-      current = asset.reload.alt(locale: locale)
-      break if current == value
-
-      raise Minitest::Assertion, "expected alt(locale: #{locale}) to become #{value.inspect}, got #{current.inspect}" if Time.current > deadline
-
-      sleep 0.1
+    assert_eventually(wait: 5, message: -> { "expected alt(locale: #{locale}) to become #{value.inspect}, got #{asset.reload.alt(locale: locale).inspect}" }) do
+      asset.reload.alt(locale: locale) == value
     end
   end
 end

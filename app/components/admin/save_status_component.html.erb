@@ -5,4 +5,4 @@
     functional on the JS-built copy `autosave_controller.js` writes for
     the offline state (it binds its own listener); it is here for the same
     markup in previews and tests. %>
-<%= tag.p id: id, role: "status", class: css_class, data: { live: live ? "" : nil } do %><%= text %><% if retry_button? %><button type="button" data-action="admin--autosave#saveNow" class="cursor-pointer underline hover:text-ink">Retry</button><% end %><% end %>
+<%= tag.p id: id, role: "status", class: css_class, data: { live: live ? "" : nil } do %><%= text %><% if retry_button? %><button type="button" data-action="admin--autosave#saveNow" class="cursor-pointer underline hover:text-ink"><%= t(".retry") %></button><% end %><% end %>

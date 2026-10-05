@@ -28,12 +28,29 @@ class Page < ApplicationRecord
   # below is what actually reports the refusal, in this app's wording.
   has_closure_tree order: "position", numeric_order: true, dependent: :restrict_with_error
 
-  # HasPublicPaths only adds the `public_paths` association, `full_path`, and
-  # a validation -- no callback of its own, so this include's own position
-  # isn't load-bearing the way `after_save :sync_public_paths` below is. It
-  # sits here, right after the tree is set up, because the paths it computes
-  # are built from the ancestor chain `has_closure_tree` provides.
+  # HasPublicPaths adds the `public_paths` association, `full_path`, a
+  # validation and one `before_save` that only reads the pending changes
+  # (`remember_url_inputs_change`), so this include's own position isn't
+  # load-bearing the way `after_save :sync_public_paths` below is. It sits
+  # here, right after the tree is set up, because the paths it computes are
+  # built from the ancestor chain `has_closure_tree` provides.
   include HasPublicPaths
+
+  # What a page's URLs, and the URLs of the posts its subtree lists, are
+  # built from (see `HasPublicPaths` for everything that is synced by
+  # another writer instead):
+  # - `slug`, in every language: the page's own segment, and so a prefix of
+  #   every descendant's path;
+  # - `parent_id`: the path it hangs off;
+  # - `trashed_at`: a trashed page has no URL, nor has anything below it;
+  # - `position` and `published_at`: no part of a page's own path, but what
+  #   `PublicSite::Paths.canonical_page` ranks listing pages by (tree order
+  #   and a live chain), so they decide which page the posts listed in this
+  #   subtree live under. `position` as *requested*: the question is asked
+  #   before the row is written, so the renumbering `Page::TreeRanking` does
+  #   afterwards plays no part in it.
+  # `trash_root_id` and `trashed_by_id` are bookkeeping no path reads.
+  url_inputs_are :slug, :parent_id, :position, :published_at, :trashed_at
 
   # Model-specific concern for the "move to rank N" logic (spec §3), included
   # here -- right after `has_closure_tree` -- so its `after_save
@@ -168,12 +185,14 @@ class Page < ApplicationRecord
   # `after_save` -- which is what creates and rebuilds the hierarchy rows
   # `PublicSite::Paths.sync_subtree` reads back to assemble the path.
   #
-  # Runs on every save rather than only when the slug or the parent changed:
-  # `slug` is a Mobility jsonb attribute, so `saved_change_to_slug?` reports on
-  # the whole translation hash and Mobility offers no per-locale equivalent to
-  # narrow it with. The cost of being unconditional is a hierarchy query on a
-  # save that touched neither; the cost of guessing wrong is a page silently
-  # unreachable at its own URL.
+  # Only for a save that changed one of the page's URL inputs
+  # (`url_inputs_are` above; a new page always). That is asked in a
+  # `before_save` and not here with `saved_change_to_...?`: closure_tree's
+  # `after_save` has reloaded the record by now, which clears those flags.
+  # `slug` is compared as its whole translation hash, so a slug changed in
+  # any one language counts. Everything else -- a title, the hero, the SEO
+  # fields -- can't have changed a URL, and syncing for it re-derived every
+  # descendant and every listed post inside each autosave's transaction.
   after_save :sync_public_paths
 
   # `AccessControl.preload_branches` leaves a snapshot of this page's
@@ -203,6 +222,8 @@ class Page < ApplicationRecord
   end
 
   def sync_public_paths
+    return unless url_inputs_changed_by_save?
+
     PublicSite::Paths.sync_subtree(self)
     resync_listed_posts
   end
@@ -215,25 +236,15 @@ class Page < ApplicationRecord
   # publication and tree order -- not just this page's own path -- are what
   # `PublicSite::Paths.canonical_page` ranks candidates by (spec §5.3).
   #
-  # Scoped to this subtree's own post_list blocks, for every kind of save --
-  # content, publish state, a move or a reorder alike. Those are the only
-  # candidates whose rank could have changed: a move or reorder shifts this
-  # subtree relative to every other page, but leaves the relative order (and
-  # publication) of all the pages *outside* it exactly as it was, so a post
-  # none of this subtree's blocks list keeps the same winner. The posts they
-  # *do* list are re-derived from scratch against every candidate in the
-  # tree, which covers both "moved ahead of another listing, now canonical"
-  # and "moved behind it, gave the posts back".
-  #
-  # (There used to be a `saved_change_to_parent_id? || saved_change_to_position?`
-  # branch here resyncing every post for moves. It never ran: closure_tree's
-  # own `after_save` reloads the record, clearing those dirty flags before
-  # this callback reads them -- and the subtree-scoped resync already covers
-  # moves, per the above.)
+  # Scoped to this subtree's own post_list blocks
+  # (`PublicSite::Paths.sync_posts_listed_under`, which says why that is
+  # enough), for every kind of save that gets here -- a slug, publish state,
+  # a move, a reorder or the trash alike. The posts they list are re-derived
+  # from scratch against every candidate in the tree, which covers both
+  # "moved ahead of another listing, now canonical" and "moved behind it,
+  # gave the posts back".
   def resync_listed_posts
-    blocks = ContentBlock.listing.where(owner: self_and_descendants)
-    types = blocks.map { |block| block.settings_object.content_type }
-    types.include?(nil) ? PublicSite::Paths.sync_posts(nil) : types.uniq.each { |type| PublicSite::Paths.sync_posts(type) }
+    PublicSite::Paths.sync_posts_listed_under([ self ])
   end
 
   # Checked per enabled locale, the same granularity

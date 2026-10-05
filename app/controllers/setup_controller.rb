@@ -260,7 +260,7 @@ class SetupController < ApplicationController
       render :mcp_token_created
     end
 
-    # `StarterContents::Add` (`StarterContent.add_once!`, final fix wave,
+    # `StarterContents::Add` (locked and idempotent, final fix wave,
     # P23): the same locked, re-checked path CS Studio's "Create starter
     # pages" takes, so a double submit can't race itself into a
     # duplicate-slug 500. A failure is shown on this step (422), like any
@@ -276,8 +276,14 @@ class SetupController < ApplicationController
       end
     end
 
+    # The homepage always exists when setup is over, so "/" is never a 404 on
+    # a new site (`StarterContents::EnsureHome`, run as the signed-in owner);
+    # it and the marker that ends setup commit together.
     def update_review
-      Setup.complete!
+      SiteSetting.transaction do
+        StarterContent.raise!(StarterContents::EnsureHome.call(locale: Current.site.default_locale))
+        Setup.complete!
+      end
       # CS Studio is where every sign-in lands now (cs-studio spec §3) --
       # finishing setup is no exception, even though the admin who just
       # walked through this wizard is already signed in from `update_admin`

@@ -28,10 +28,16 @@ module Users
       return owner_only_denial if owner_protected?
       return denied("users.manage", @user) if outranked?
 
+      # A group the user leaves shows its members, so an open edit of it goes
+      # stale with the deletion (`Admin::StaleForm`).
+      group_ids = @user.memberships.pluck(:group_id)
+
       destroyed = User.transaction do
         revoke_tokens || raise(ActiveRecord::Rollback)
         record_event("user.deleted", subject: @user)
         @user.destroy || raise(ActiveRecord::Rollback)
+        AccessControl::Group.where(id: group_ids).touch_all
+        true
       end
 
       return failure(@user) unless destroyed

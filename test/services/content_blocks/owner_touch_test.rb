@@ -5,9 +5,14 @@ require "test_helper"
 # orders by it) -- through `touch`, which runs no save callbacks, so the
 # page's own path/hierarchy rebuild (`Page#sync_public_paths`, closure_tree's
 # `after_save`) never runs for a block edit.
+#
+# The page is live: the touch is also what moves the public content version
+# for a block edit (`Publishable#bump_public_version_when_live`), and that
+# version moves only for published output. A draft's block edit touches its
+# page all the same and moves no version (the last test).
 class ContentBlocks::OwnerTouchTest < ActiveSupport::TestCase
   setup do
-    @page = create_page(title: "Owner", published: false)
+    @page = create_page(title: "Owner")
     @block = ContentBlocks::Save.call(@page.content_blocks.new, attributes: { block_type: "rich_text" }).record
     travel 1.minute
   end
@@ -44,6 +49,19 @@ class ContentBlocks::OwnerTouchTest < ActiveSupport::TestCase
 
     assert result.denied?
     assert_equal before, @page.reload.updated_at
+  end
+
+  test "a draft page's block edit touches the page and leaves the public content version alone" do
+    page = create_page(title: "Draft owner", published: false)
+    block = ContentBlocks::Save.call(page.content_blocks.new, attributes: { block_type: "rich_text" }).record
+    travel 1.minute
+    before = page.reload.updated_at
+    version = PublicSite.content_version
+
+    assert ContentBlocks::Save.call(block, translations: { Locales.default => { body: rich_doc("Edited") } }).ok?
+
+    assert_operator page.reload.updated_at, :>, before
+    assert_equal version, PublicSite.content_version
   end
 
   private

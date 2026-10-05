@@ -21,18 +21,22 @@ module Admin
   # belongs to `base`; otherwise prefixed.
   class ErrorSummaryComponent < AdminComponent
     def initialize(errors:, field_ids: {})
-      @entries = normalize(errors)
+      @pairs = normalize(errors)
       @field_ids = field_ids.transform_keys(&:to_s)
     end
 
-    def render? = @entries.any?
+    def render? = @pairs.any?
 
     private
 
-    attr_reader :entries, :field_ids
+    attr_reader :field_ids
+
+    # [field, sentence] per error. Built at render time, not in `initialize`:
+    # a sentence may ask `t`, which nothing can before the component renders.
+    def entries = @entries ||= @pairs.map { |field, message| [ field, sentence_for(field, message) ] }
 
     def heading
-      entries.size == 1 ? "1 thing needs fixing" : "#{entries.size} things need fixing"
+      t(".heading", count: entries.size)
     end
 
     def normalize(errors)
@@ -42,14 +46,14 @@ module Admin
         when Hash then errors.flat_map { |field, messages| Array(messages).map { |message| [ field.to_s, message ] } }
         else Array(errors).map { |message| [ "base", message ] }
         end
-      pairs.map { |field, message| [ field, sentence_for(field, message.to_s) ] }
+      pairs.map { |field, message| [ field, message.to_s ] }
     end
 
     def sentence_for(field, message)
       return message if field == "base" || message.end_with?(".")
 
-      name = field.humanize
-      message.downcase.start_with?(name.downcase) ? message : "#{name} #{message}"
+      name = field.humanize # i18n-ok: the field's English name is out of scope until attribute names are translated (docs/reference/i18n.md)
+      message.downcase.start_with?(name.downcase) ? message : t(".sentence", field: name, message: message)
     end
   end
 end

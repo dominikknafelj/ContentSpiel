@@ -30,7 +30,7 @@ module Admin
     # mcp_token`): a redirect would need the raw token to survive into a
     # second request, i.e. to sit in the flash or the session (both a
     # cookie), and it must never be stored anywhere -- `ApiToken` keeps only
-    # its bcrypt digest. Nothing logs it either: it's generated here, not
+    # its SHA-256 lookup digest. Nothing logs it either: it's generated here, not
     # submitted (so it's in no request parameter for `filter_parameters` to
     # even have to catch), and Rails never logs a response body.
     #

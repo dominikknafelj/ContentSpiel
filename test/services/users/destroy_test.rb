@@ -53,4 +53,15 @@ class Users::DestroyTest < ActiveSupport::TestCase
     assert_nil token.reload.revoked_at
     assert_not Audit::Event.exists?(action: "token.revoked")
   end
+
+  test "deleting a user moves the updated_at of the groups it leaves" do
+    user = users(:author)
+    group = access_control_groups(:author)
+    [ group, access_control_groups(:editor) ].each { |record| record.update_columns(updated_at: 1.hour.ago) }
+
+    assert Users::Destroy.call(user, actor: nil).ok?
+
+    assert_operator group.reload.updated_at, :>, 30.minutes.ago
+    assert_operator access_control_groups(:editor).reload.updated_at, :<, 30.minutes.ago
+  end
 end

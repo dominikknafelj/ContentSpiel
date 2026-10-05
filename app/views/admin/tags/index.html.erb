@@ -9,22 +9,22 @@
     `data-tag-*` attributes, which `admin--tag-dialogs` copies into it. There is
     nothing here to switch a `?locale=` for, since a tag's name is a plain,
     untranslated column. %>
-<h1 class="mb-2 text-h1 text-ink">Tags</h1>
-<p class="mb-4 text-meta">Tags are created when you add them to a post. Click a name to rename it.</p>
+<h1 class="mb-2 text-h1 text-ink"><%= t(".title") %></h1>
+<p class="mb-4 text-meta"><%= t(".intro") %></p>
 
 <% if @tags.empty? %>
   <div class="rounded-cs border border-line bg-surface">
-    <%= render Admin::EmptyStateComponent.new(title: "No tags yet", description: "Tags appear here once a post uses one.") %>
+    <%= render Admin::EmptyStateComponent.new(title: t(".empty.title"), description: t(".empty.description")) %>
   </div>
 <% else %>
   <div class="rounded-cs border border-line bg-surface">
     <table class="admin-tags-table admin-card-table w-full border-collapse text-sm">
       <thead>
         <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
-          <th class="py-2 pr-4">Name</th>
-          <th class="py-2 pr-4">Posts</th>
-          <th class="py-2 pr-4"><span class="sr-only">Save status</span></th>
-          <th class="py-2"><span class="sr-only">Actions</span></th>
+          <th class="py-2 pr-4"><%= t(".columns.name") %></th>
+          <th class="py-2 pr-4"><%= t(".columns.posts") %></th>
+          <th class="py-2 pr-4"><span class="sr-only"><%= t(".columns.save_status") %></span></th>
+          <th class="py-2"><span class="sr-only"><%= t(".columns.actions") %></span></th>
         </tr>
       </thead>
       <tbody>
@@ -50,7 +50,7 @@
                       locals: { id: "tag-#{row.id}-base-updated-at", value: row.updated_at.iso8601(6) } %>
                 <%# Named per row: fifty inputs all called "Name" tell a screen
                     reader's list of fields nothing. %>
-                <%= label_tag "tag-#{row.id}-name", "Name of #{row.name}", class: "sr-only" %>
+                <%= label_tag "tag-#{row.id}-name", t(".name_label", name: row.name), class: "sr-only" %>
                 <%= text_field_tag "tag[name]", row.name, id: "tag-#{row.id}-name", maxlength: Tag::MAX_NAME_LENGTH, autocomplete: "off",
                       class: "block w-full rounded-cs border border-transparent bg-transparent px-2 py-1 text-ink hover:border-line-strong focus:border-accent focus:bg-surface focus:outline-2 focus:outline-accent" %>
                 <div id="tag-<%= row.id %>-name-errors" class="mt-1 text-sm text-danger-ink"></div>
@@ -62,16 +62,16 @@
                 <%= link_to tag_posts_label(@readable_counts.fetch(row.id, 0)), admin_posts_path(tag: row.name, **admin_url_options),
                       class: "text-accent underline-offset-2 hover:text-accent-hover hover:underline", data: { turbo_frame: "_top" } %>
               <% else %>
-                <span class="text-dim" aria-label="Not shown: you can't read posts">—</span>
+                <span class="text-dim" aria-label="<%= t(".no_count") %>">—</span>
               <% end %>
             </td>
 
             <td class="py-1.5 pr-4"><%= render Admin::SaveStatusComponent.new(id: "tag-#{row.id}-save-status", state: :idle) %></td>
 
             <td class="py-1.5 text-right">
-              <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Actions for #{row.name}", close_on_select: true) do |menu| %>
+              <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions_label", name: row.name), close_on_select: true) do |menu| %>
                 <% menu.with_item do %>
-                  <%= content_tag(:button, "Merge into…", type: "button",
+                  <%= content_tag(:button, t(".merge_item"), type: "button",
                         data: dialog_trigger("merge-tag-dialog").merge(
                           tag_id: row.id, tag_merge_title: tag_merge_title(row), tag_merge_text: tag_merge_text(row, carriers, readable),
                           tag_name: row.name)) %>
@@ -80,7 +80,7 @@
                 <% menu.with_item do %>
                   <%# Not red: a destructive trigger outside a dialog is quiet in a row; the
                       red is the dialog's own confirm button. %>
-                  <%= content_tag(:button, "Delete tag…", type: "button",
+                  <%= content_tag(:button, t(".delete_item"), type: "button",
                         data: dialog_trigger("delete-tag-dialog").merge(
                           tag_id: row.id, tag_delete_title: tag_delete_title(row), tag_delete_text: tag_delete_text(carriers, readable),
                           tag_name: row.name)) %>
@@ -98,38 +98,39 @@
       `admin--dialog:opening`, before it is shown. The URL templates carry a
       placeholder id the controller replaces. %>
   <div data-controller="admin--tag-dialogs"
+       data-messages="<%= messages_data("tags.dialogs.delete_failed") %>"
        data-admin--tag-dialogs-merge-url-value="<%= merge_admin_tag_path("__ID__", **admin_url_options) %>"
        data-admin--tag-dialogs-delete-url-value="<%= admin_tag_path("__ID__", **admin_url_options) %>"
        data-action="admin--dialog:opening@document->admin--tag-dialogs#opened change->admin--tag-dialogs#targetChanged turbo:submit-end->admin--tag-dialogs#submitted">
 
-    <%= render Admin::DialogComponent.new(id: "merge-tag-dialog", title: "Merge tag", width: :form_narrow) do |dialog| %>
+    <%= render Admin::DialogComponent.new(id: "merge-tag-dialog", title: t(".merge_dialog.title"), width: :form_narrow) do |dialog| %>
       <%# `data-turbo-frame="_top"`: the answer is a redirect with a toast, shown by a full visit. %>
       <%= form_with url: "#", method: :post, id: "merge-tag-form", data: { turbo_frame: "_top", "admin--tag-dialogs-target": "mergeForm", controller: "admin--busy" } do %>
         <%# The picker: one value, no "create new" path, the merged tag itself never offered
             (`admin--tag-dialogs` sets `exclude` per opening; `Tags::Merge` refuses it again
             on the server). Its controls live in this dialog's own form, so they feed no
             row's autosave. %>
-        <%= render Admin::ChipInputComponent.new(name: "into", id: "merge-tag-into", label: "Merge into", search_url: admin_tag_suggestions_path,
-              single: true, create: false, noun: "tag", placeholder: "Find a tag…", lowercase: true) %>
+        <%= render Admin::ChipInputComponent.new(name: "into", id: "merge-tag-into", label: t(".merge_dialog.picker_label"), search_url: admin_tag_suggestions_path,
+              single: true, create: false, noun: "tag", placeholder: t(".merge_dialog.picker_placeholder"), lowercase: true) %>
         <p class="text-ink" data-admin--tag-dialogs-target="mergeText"></p>
       <% end %>
       <% dialog.with_footer do %>
         <%= tag.form method: "dialog" do %>
-          <%= render Admin::ButtonComponent.new(label: "Cancel", variant: :ghost, type: "submit") %>
+          <%= render Admin::ButtonComponent.new(label: t(".merge_dialog.cancel"), variant: :ghost, type: "submit") %>
         <% end %>
         <%# Disabled until a target is chosen (`admin--tag-dialogs#targetChanged`). %>
-        <%= render Admin::ButtonComponent.new(label: "Merge tags", variant: :primary, type: "submit", form: "merge-tag-form", disabled: true,
-              data: { "admin--tag-dialogs-target": "mergeButton", busy_label: "Merging…" }) %>
+        <%= render Admin::ButtonComponent.new(label: t(".merge_dialog.submit"), variant: :primary, type: "submit", form: "merge-tag-form", disabled: true,
+              data: { "admin--tag-dialogs-target": "mergeButton", busy_label: t(".merge_dialog.busy") }) %>
       <% end %>
     <% end %>
 
-    <%= render Admin::ConfirmDialogComponent.new(id: "delete-tag-dialog", title: "Delete tag?", destructive: true) do |dialog| %>
+    <%= render Admin::ConfirmDialogComponent.new(id: "delete-tag-dialog", title: t(".delete_dialog.title"), destructive: true) do |dialog| %>
       <% dialog.with_details do %>
         <p data-admin--tag-dialogs-target="deleteText"></p>
       <% end %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: "#", method: :delete, id: "delete-tag-form", data: { "admin--tag-dialogs-target": "deleteForm" } do %>
-          <%= render Admin::ButtonComponent.new(label: "Delete tag", variant: :danger, type: "submit") %>
+          <%= render Admin::ButtonComponent.new(label: t(".delete_dialog.submit"), variant: :danger, type: "submit") %>
         <% end %>
       <% end %>
     <% end %>

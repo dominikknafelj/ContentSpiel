@@ -94,6 +94,16 @@ module ActiveSupport
 
     def as_owner(&block) = as(users(:one), &block)
 
+    # Every SQL statement the block runs, in order -- for a test that says
+    # "this write doesn't touch that table" or "this costs the same at any
+    # size". Schema lookups are left out (they depend on what is cached).
+    def capture_sql
+      statements = []
+      callback = ->(*, payload) { statements << payload[:sql] unless payload[:name] == "SCHEMA" }
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { yield }
+      statements
+    end
+
     # Replaces a singleton method (a module function, a class method) for
     # the block's duration, then restores it -- for forcing a failure out of
     # a collaborator the code under test calls.

@@ -362,7 +362,7 @@ module Admin
       ordered = @page.content_blocks.reload.order(:position).pluck(:id)
       ordered.delete(block.id)
       index = ordered.index(after_id.to_i)
-      ordered.insert(index ? index + 1 : ordered.length, block.id)
+      ordered.insert(index ? index + 1 : ordered.length, block.id) # version: none (Array#insert, no SQL)
       ContentBlocks::Reorder.call(@page, ordered)
     end
 

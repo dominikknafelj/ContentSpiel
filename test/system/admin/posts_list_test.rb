@@ -16,7 +16,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
 
   # A scripted click, like `press`: the checkbox is a real input, this only
   # sidesteps headless Chrome's intermittent dropped native clicks.
-  def tick(post) = find("#select-post-#{post.id}").execute_script("this.click()")
+  def tick(post) = find("#select-post-#{post.id}").click
 
   test "select two drafts, Publish them, and both lose their Draft chip" do
     visit admin_posts_path
@@ -43,9 +43,9 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
   test "the header checkbox selects every row on the page and clears them again" do
     visit admin_posts_path
     await_admin_controllers
-    find("#posts-select-all").execute_script("this.click()")
+    find("#posts-select-all").click
     assert_selector "[data-admin--bulk-select-target=bar]", text: "3 selected"
-    find("#posts-select-all").execute_script("this.click()")
+    find("#posts-select-all").click
     assert_no_selector "[data-admin--bulk-select-target=bar]", visible: :visible
 
     tick(@first)
@@ -134,7 +134,7 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
       window.__controllers = root.getAttribute("data-controller")
       root.setAttribute("data-controller", "")
     JS
-    sleep 0.3 # Stimulus disconnects on the mutation, a task later
+    await_frames # Stimulus disconnects on the mutation, a task later
     page.execute_script("window.__root.setAttribute('data-controller', window.__controllers)")
     assert_selector "[data-admin--bulk-select-target=bar]", text: "1 selected"
     assert_equal "", find(status, visible: :all).text(:all)

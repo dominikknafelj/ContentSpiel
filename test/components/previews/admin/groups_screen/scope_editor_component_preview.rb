@@ -5,7 +5,7 @@ module Admin
     # be looked at without the row around them (Lookbook's layout has no
     # `admin--permission-matrix`, so Remove and Done do nothing here):
     # - posts: content types and "Own only", with a removed content type as its
-    #   warn chip -- and the hint a viewer who couldn't grant that name gets;
+    #   warn chip;
     # - pages, three levels deep: the chosen page ticked, everything under it a
     #   greyed tick, every ancestor a dash ("contains a chosen page");
     # - a root that is chosen AND under another chosen root (a stored state the
@@ -16,10 +16,6 @@ module Admin
     class ScopeEditorComponentPreview < ViewComponent::Preview
       def posts_with_a_removed_type
         render editor("posts.edit", scope: { "content_types" => %w[blog retired_type], "own" => true })
-      end
-
-      def posts_with_a_removed_type_and_the_hint
-        render editor("posts.edit", scope: { "content_types" => %w[blog retired_type] }, removed_hint: true)
       end
 
       def pages_partial_over_several_levels

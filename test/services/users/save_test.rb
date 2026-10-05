@@ -70,14 +70,116 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
   end
 
+  # A removed content type's name is dormant, not gone: a group that still
+  # stores one is judged as stored, so someone who could only grant "blog"
+  # can't put a user into it, take one out of it, or manage a user who is in it.
+  def manager_holding(posts_edit_scope)
+    managers = AccessControl::Group.create!(name: "User managers")
+    %w[users.manage posts.read pages.read].each { |key| AccessControl::Grant.create!(group: managers, permission: key, scope: {}) }
+    AccessControl::Grant.create!(group: managers, permission: "posts.edit", scope: posts_edit_scope)
+    AccessControl::Membership.create!(user: users(:editor_branch), group: managers)
+    users(:editor_branch)
+  end
+
+  def group_carrying(scope)
+    AccessControl::Group.create!(name: "Carrying").tap { |group| AccessControl::Grant.create!(group: group, permission: "posts.edit", scope: scope) }
+  end
+
+  [ %w[blog retired_type], %w[retired_type] ].each do |types|
+    test "a non-owner who could only grant blog can't add a user to a group storing #{types.inspect}: one access.denied" do
+      manager = manager_holding({ "content_types" => %w[blog] })
+      carrying = group_carrying({ "content_types" => types })
+
+      assert_difference -> { Audit::Event.where(action: "access.denied").sum(:occurrences) }, 1 do
+        result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id, carrying.id ] }) }
+        assert result.denied?
+        assert_equal [ "You don't have permission to add users to the Carrying group" ], result.errors
+      end
+      assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+      assert_empty Audit::Event.where(action: "user.updated")
+    end
+
+    test "a user who is in a group storing #{types.inspect} is outranked for a non-owner who could only grant blog" do
+      manager = manager_holding({ "content_types" => %w[blog] })
+      carrying = group_carrying({ "content_types" => types })
+      AccessControl::Membership.create!(user: users(:reader), group: carrying)
+
+      assert_equal :outranked, Users::Manageability.for(manager, users(:reader), channel: :admin)
+      [ { name: "Renamed" }, { group_ids: [ access_control_groups(:read_only).id ] } ].each do |attributes|
+        result = as(manager) { Users::Save.call(users(:reader), attributes: attributes) }
+        assert result.denied?, attributes.inspect
+      end
+      assert as(manager) { Users::Destroy.call(users(:reader)) }.denied?, "deleting them is managing them too"
+      assert_nil users(:reader).reload.name
+      assert_includes users(:reader).group_ids, carrying.id
+    end
+  end
+
+  test "an unscoped holder, a holder whose grant names the removed type, and an owner may add a user to such a group" do
+    carrying = group_carrying({ "content_types" => %w[blog retired_type] })
+    ids = [ access_control_groups(:read_only).id, carrying.id ].sort
+
+    manager = manager_holding({})
+    assert_equal :editable, Users::Manageability.for(manager, users(:reader), channel: :admin)
+    result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: ids }) }
+    assert result.ok?, result.errors.inspect
+    assert_equal ids, users(:reader).reload.group_ids.sort
+    assert_equal :editable, Users::Manageability.for(manager, users(:reader), channel: :admin)
+
+    AccessControl::Grant.find_by!(group: manager.groups.find_by!(name: "User managers"), permission: "posts.edit").update!(scope: { "content_types" => %w[blog retired_type] })
+    AccessControl::ActorGrants.reset!
+    result = as(manager) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id ] }) }
+    assert result.ok?, result.errors.inspect
+
+    result = as_owner { Users::Save.call(users(:reader), attributes: { group_ids: ids }) }
+    assert result.ok?, result.errors.inspect
+  end
+
+  test "a token's group bounds it for a removed type too, even an owner's" do
+    carrying = group_carrying({ "content_types" => %w[blog retired_type] })
+    token_group = AccessControl::Group.create!(name: "Token managers")
+    %w[users.manage posts.read pages.read].each { |key| AccessControl::Grant.create!(group: token_group, permission: key, scope: {}) }
+    AccessControl::Grant.create!(group: token_group, permission: "posts.edit", scope: { "content_types" => %w[blog] })
+    token, = ApiToken.generate!(users(:one), group: token_group)
+
+    result = as(token, channel: :mcp) { Users::Save.call(users(:reader), attributes: { group_ids: [ access_control_groups(:read_only).id, carrying.id ] }) }
+
+    assert result.denied?
+    assert_equal [ access_control_groups(:read_only).id ], users(:reader).reload.group_ids
+  end
+
   test "only an owner may change owner" do
     result = as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "1" }) }
     assert result.denied?
     assert_equal [ "Only an owner can change who is an owner" ], result.errors
     assert_not users(:reader).reload.owner?
 
-    # An unchanged value (the form's hidden "0") isn't a change.
+    # An unchanged value isn't a change (no form sends one: the flag is posted
+    # only by `PATCH users/:id/owner`).
     assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: "0", email_address: "r@example.com" }) }.ok?
+  end
+
+  test "an absent, nil or empty-string owner is no request at all; a real false demotes" do
+    other = User.create!(email_address: "owner2@example.com", password: "password12345", owner: true)
+
+    [ nil, "" ].each do |value|
+      result = as_owner { Users::Save.call(other, attributes: { owner: value, name: "Second #{value.inspect}" }) }
+
+      assert result.ok?, result.errors.to_sentence
+      assert other.reload.owner?
+    end
+    assert_not Audit::Event.exists?(action: "user.owner_changed")
+
+    assert as_owner { Users::Save.call(other, attributes: { owner: false }) }.ok?
+    assert_not other.reload.owner?
+    assert_equal 1, Audit::Event.where(action: "user.owner_changed", subject: other).count
+  end
+
+  test "a non-owner passing a nil or empty owner is not refused for it" do
+    [ nil, "" ].each do |value|
+      assert as(users(:two)) { Users::Save.call(users(:reader), attributes: { owner: value, name: "N" }) }.ok?
+    end
+    assert_not Audit::Event.exists?(action: "access.denied")
   end
 
   test "an owner promotes a user, recorded as user.owner_changed" do
@@ -154,6 +256,35 @@ class Users::SaveTest < ActiveSupport::TestCase
     assert_equal [ nil, "Grace Hopper" ], Audit::Event.order(:id).last.field_changes["name"]
   end
 
+  # `touch` (which moves `updated_at` for a membership change) runs
+  # `changes_applied`; the event must still carry the column changes.
+  test "a name, a password and groups saved together are all in the one user.updated event" do
+    user = users(:reader)
+    old_ids = user.group_ids.sort
+    added = access_control_groups(:author)
+    session = user.sessions.create!
+    before = user.updated_at
+    old_name = user.name
+
+    travel 1.minute do
+      result = as_owner do
+        Users::Save.call(user, attributes: { name: "New Name", password: "new-password-1", password_confirmation: "new-password-1",
+          group_ids: (old_ids + [ added.id ]).uniq })
+      end
+
+      assert result.ok?, result.errors.to_sentence
+    end
+
+    events = Audit::Event.where(action: "user.updated", subject: user)
+    assert_equal 1, events.count
+    changes = events.first.field_changes
+    assert_equal [ old_name, "New Name" ], changes["name"]
+    assert_equal [ nil, "password changed" ], changes["credentials"]
+    assert changes.key?("group_ids")
+    assert_not Session.exists?(session.id)
+    assert_operator user.reload.updated_at, :>, before
+  end
+
   # --- A password change ends that user's sessions ---------------------------
   #
   # Someone who changes a password does it because the old one is, or may
@@ -207,5 +338,20 @@ class Users::SaveTest < ActiveSupport::TestCase
 
     assert_not result.ok?
     assert Session.exists?(session.id)
+  end
+
+  test "changing only the groups moves the user's updated_at and each gained or lost group's" do
+    user = users(:author)
+    gained = access_control_groups(:read_only)
+    lost = access_control_groups(:author)
+    [ user, gained, lost, access_control_groups(:editor) ].each { |record| record.update_columns(updated_at: 1.hour.ago) }
+
+    result = Users::Save.call(user, attributes: { group_ids: [ gained.id ] }, actor: nil)
+
+    assert result.ok?, result.errors.to_sentence
+    assert_operator user.reload.updated_at, :>, 30.minutes.ago
+    assert_operator gained.reload.updated_at, :>, 30.minutes.ago
+    assert_operator lost.reload.updated_at, :>, 30.minutes.ago
+    assert_operator access_control_groups(:editor).reload.updated_at, :<, 30.minutes.ago, "a group that is neither gained nor lost stays put"
   end
 end

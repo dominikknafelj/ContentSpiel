@@ -58,7 +58,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     page_record.reload
 
     assert_selector "[data-original-for='title'] details[open]"
-    find("[data-original-for='title'] summary").execute_script("this.click()")
+    find("[data-original-for='title'] summary").click
     assert_no_selector "[data-original-for='title'] details[open]"
   ensure
     page.driver.resize(1400, 1400)
@@ -72,7 +72,7 @@ class Admin::TranslationLayoutSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/pages/#{page_record.id}?locale=de"
     await_admin_controllers
 
-    find("[data-original-for='title'] summary").execute_script("this.click()")
+    find("[data-original-for='title'] summary").click
     assert_no_selector "[data-original-for='title'] details[open]"
     assert_no_selector "[data-original-for='title'] p", text: "About"
 

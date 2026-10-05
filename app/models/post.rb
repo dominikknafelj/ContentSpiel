@@ -28,7 +28,10 @@ class Post < ApplicationRecord
   tracks_translations schema: :fields
 
   has_many :post_tags, dependent: :destroy
-  has_many :tags, through: :post_tags
+  # The callbacks note that the set of tags changed, for the URL sync below:
+  # a tag is one of the things a post's URL is built from, and no column of
+  # this row says that one came or went.
+  has_many :tags, through: :post_tags, after_add: :note_tags_changed, after_remove: :note_tags_changed
 
   has_many :post_relations, dependent: :destroy
   has_many :related_posts, through: :post_relations
@@ -84,17 +87,40 @@ class Post < ApplicationRecord
   # slug (spec §5.4) -- the same duty `Page#sync_public_paths` performs for
   # pages, just without a subtree to cascade into: a post has no descendants
   # of its own, so `PublicSite::Paths.sync` (not `sync_subtree`) is enough.
-  # Unconditional for the same reason `Page`'s callback is: `slug` is a
-  # Mobility jsonb attribute, so there's no per-locale `saved_change_to?` to
-  # narrow this with, and guessing wrong leaves a post unreachable at its own
-  # URL.
+  # Only for a save that changed one of the post's URL inputs (a new post
+  # always; see `HasPublicPaths`):
+  # - `slug`, in every language: its own segment;
+  # - `content_type`: which listing blocks list it at all, and whether it
+  #   has a URL (an unregistered type has none);
+  # - `trashed_at`: a trashed post has no URL;
+  # - `published_at`: no part of the path today (the resolver, not the
+  #   path, keeps a draft off the site), kept as an input so that nothing
+  #   about publication has to be re-argued here when that changes.
   #
-  # A tag gained or lost through `post.tags << tag`/`tag.destroy` doesn't
-  # touch this row at all -- `has_many :through` writes `PostTag` directly --
-  # so `PostTag`'s own `after_commit` callback is what re-syncs a post whose
-  # *tag-filtered* canonical page depends on a change this callback never
-  # sees.
-  after_save { PublicSite::Paths.sync(self) }
+  # And its tags, which are no column of this row: a tag-filtered listing
+  # block lists a post by the tags it carries, so a tag gained or lost can
+  # move the post to another listing page. `has_many :through` writes the
+  # join rows directly and at once, and takes them away with a plain
+  # `DELETE` that runs no `PostTag` callback -- so `post.tags = [...]`
+  # (`Posts::Save#assign_tags`) dropping a tag is seen by nothing but the
+  # association's own `after_remove`, which is why the association notes
+  # every change (`note_tags_changed`) and the save that follows counts it
+  # as a changed input. A tag *added* is also synced by `PostTag`'s own
+  # `after_commit`, with or without a save of the post; a tag removed
+  # through the association with no save of the post afterwards is synced
+  # by nothing until the next sync that reaches the post.
+  url_inputs_are :slug, :content_type, :published_at, :trashed_at
+  after_save :sync_public_paths
+
+  # The columns, and the ids of the tags the post carries (a query unless
+  # the association is loaded; nothing on a save path reads this).
+  def url_inputs
+    super.merge("tag_ids" => tag_ids.sort.freeze).freeze
+  end
+
+  def url_inputs_changed?
+    super || @tags_changed == true
+  end
 
   def all_related_posts
     forward_ids = PostRelation.where(post_id: id).select(:related_post_id)
@@ -142,6 +168,17 @@ class Post < ApplicationRecord
   end
 
   private
+
+  def note_tags_changed(_tag)
+    @tags_changed = true
+  end
+
+  def sync_public_paths
+    return unless url_inputs_changed_by_save?
+
+    PublicSite::Paths.sync(self)
+    @tags_changed = false
+  end
 
   # Raw jsonb hash, not the Mobility reader: see the comment above
   # `validate :title_present_in_any_locale`.

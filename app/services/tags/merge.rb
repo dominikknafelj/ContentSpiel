@@ -17,18 +17,25 @@ module Tags
   #   neither -- usage rows record images, translation states record
   #   translated fields, and neither the tag name (untranslated) nor a block's
   #   `tag` setting (an untranslated `:string` field) is one.
-  # - No `PublicSite.content_version` call: it is derived from the newest
-  #   `updated_at` of posts, blocks, pages and the paths table, all of which
-  #   this moves when a listing could change (the render cache is keyed on it).
   # - No de-duplication of blocks: a page that had a block for `source` and one
   #   for `into` now has two blocks that list the same posts. That is what the
   #   editor built; merging tags is not an instruction to edit the page.
   class Merge < ApplicationService
     include Tags::Listings
 
-    SAME_TAG = "Choose a different tag to merge into.".freeze
-    MISSING_TAG = "Choose a tag to merge into.".freeze
-    GONE = "That tag no longer exists.".freeze
+    # The three refusals, read from `admin.tags.merge` in
+    # `config/locales/admin/tags.en.yml` at the moment they are asked for, not at
+    # load, so a locale switched afterwards is the one they come in. Plain class
+    # methods (`Tags::Merge.gone`, `result.errors == [ Tags::Merge.missing_tag ]`):
+    # a caller compares with them or shows them, and a missing key raises
+    # `I18n::MissingTranslationData` rather than render a "translation missing"
+    # sentence into a toast.
+    def self.same_tag = message("same_tag")
+    def self.missing_tag = message("missing_tag")
+    def self.gone = message("gone")
+
+    def self.message(key) = I18n.t("admin.tags.merge.#{key}", raise: true)
+    private_class_method :message
 
     def initialize(source, into:, actor: Current.actor)
       @source = source
@@ -43,8 +50,8 @@ module Tags
       return denied("tags.manage", @source) unless authorize!("tags.manage", @source)
       # Not a tag at all -- nil from a name that matched nothing, or whatever a
       # caller outside CS Studio handed over -- is "none chosen", a plain failure.
-      return failure(@source, [ MISSING_TAG ]) unless @into.is_a?(Tag)
-      return failure(@source, [ SAME_TAG ]) if @into.id == @source.id
+      return failure(@source, [ self.class.missing_tag ]) unless @into.is_a?(Tag)
+      return failure(@source, [ self.class.same_tag ]) if @into.id == @source.id
 
       problem = nil
       content_types = []
@@ -57,7 +64,7 @@ module Tags
         locked = Tag.where(id: [ @source.id, @into.id ]).order(:id).lock.index_by(&:id)
         source, into = locked[@source.id], locked[@into.id]
         if source.nil? || into.nil?
-          problem = GONE
+          problem = self.class.gone
           raise ActiveRecord::Rollback
         end
 
@@ -77,6 +84,11 @@ module Tags
         repoint_blocks(blocks, source, into)
         PostTag.where(tag_id: source.id).delete_all
         source.destroy!
+        # Join rows and block settings were written around the callbacks
+        # (`insert_all`, `delete_all`, `update_columns`, `touch_all`), so no
+        # post's or page's `after_commit` speaks for them: the merge moves
+        # the public content version itself, deferred to the commit.
+        PublicSite.bump_version!
 
         record_event("tag.merged", subject: into, metadata: { "merged" => source.name, "posts" => carrier_ids.size })
         into
@@ -129,7 +141,7 @@ module Tags
       now = Time.current
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
       fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
-      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all
+      Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all # i18n-ok: a class name compared with owner_type
     end
   end
 end

@@ -1,6 +1,12 @@
 class ApiToken < ApplicationRecord
-  has_secure_password :token, validations: false
-
+  # The raw token is 256 random bits shown once and never stored. What is
+  # stored is `lookup_digest`, its SHA-256 hex digest (unique index), so a
+  # presented token is found by one indexed equality instead of a bcrypt
+  # compare against every active token. A fast digest is enough because the
+  # input is random, not a chosen password. Rows from before the digest
+  # existed hold "revoked:<id>", which no value can hash to. The digest is a
+  # credential-equivalent for lookup purposes: it is on
+  # `Audit::Snapshot::NEVER_STORED`, never rendered and never logged.
   # Bound to the admin it authenticates as for MCP purposes (design spec
   # section 10 revisited): v1 shipped one global token with no user at all.
   # An MCP client holding this token inherits that user's full authoring
@@ -40,7 +46,7 @@ class ApiToken < ApplicationRecord
       # A savepoint, so losing the unique-index race (below) doesn't poison
       # an enclosing Postgres transaction and the retry can still run.
       token = transaction(requires_new: true) do
-        create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, token: raw_token)
+        create!(user: user, group: group, name: name.nil? ? next_default_name(user) : name, lookup_digest: digest(raw_token))
       end
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => error
       # Only a generated name is retried, and only when the NAME is what
@@ -81,8 +87,23 @@ class ApiToken < ApplicationRecord
     "Token #{number + 1}"
   end
 
+  def self.digest(raw_token)
+    OpenSSL::Digest::SHA256.hexdigest(raw_token.to_s.b)
+  end
+
+  # One indexed lookup on the digest of what was presented, however many
+  # tokens exist; the digests are then compared again in constant time so the
+  # answer never rests on the database's comparison alone. Blank is nil
+  # without a query.
   def self.authenticate(raw_token)
-    active.find { |candidate| candidate.authenticate_token(raw_token) }
+    # Binary, so a string tagged UTF-8 but holding invalid bytes can neither
+    # raise in the blank check nor in the digest.
+    raw_token = raw_token.to_s.b
+    return if raw_token.strip.empty?
+
+    wanted = digest(raw_token)
+    candidate = active.find_by(lookup_digest: wanted)
+    candidate if candidate && ActiveSupport::SecurityUtils.secure_compare(candidate.lookup_digest, wanted)
   end
 
   def self.active

@@ -34,14 +34,16 @@ module ContentBlocks
       # that needs a callback to react to a position change, and no reason to
       # re-run validations on rows nobody actually edited.
       ContentBlock.transaction do
-        @ordered_ids.each_with_index { |id, index| blocks[id].update_columns(position: index) }
+        @ordered_ids.each_with_index { |id, index| blocks[id].update_columns(position: index) } # version: none (a changed order touches the page below, and a live page's after_commit bumps)
 
         # The owner is the subject: the order is a property of the page or
         # post, and its snapshot lists the block ids in their new order. An
         # order resubmitted unchanged isn't an event.
         unless before == @ordered_ids
           # Same owner bump as `ContentBlocks::Save` (final fix wave, I3);
-          # an unchanged order is no edit, so it's no bump either.
+          # an unchanged order is no edit, so it's no bump either. The
+          # touch is also what moves the public content version for a live
+          # page (`Publishable#bump_public_version_when_live`).
           @page.touch
           record_event("block.reordered", subject: @page, field_changes: { "content_block_ids" => [ before, @ordered_ids ] })
         end

@@ -5,5 +5,5 @@
   <% if action %>
     <%= button_to action[:label], action[:url], method: action_method, form: { class: "inline", data: { turbo_frame: "_top" } }, class: "cursor-pointer font-semibold underline" %>
   <% end %>
-  <button type="button" aria-label="Dismiss" data-action="admin--toast#dismiss" class="cursor-pointer text-lg leading-none opacity-70 after:content-['×'] hover:opacity-100"></button>
+  <button type="button" aria-label="<%= t(".dismiss") %>" data-action="admin--toast#dismiss" class="cursor-pointer text-lg leading-none opacity-70 after:content-['×'] hover:opacity-100"></button>
 <% end %>

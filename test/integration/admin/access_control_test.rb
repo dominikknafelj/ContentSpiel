@@ -59,6 +59,29 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     assert_equal [ "Dashboard", "Pages", "Translations", "AI assistant" ], sidebar_labels
   end
 
+  # `AccessControl.holds?` doesn't count a grant whose named content types are
+  # all unregistered: it reaches no post, so its holder gets no Posts entry
+  # (and the module's own gate answers 403) instead of an entry leading to an
+  # empty list. A live type beside the removed one brings both back.
+  test "a posts.read grant naming only removed content types gives no Posts entry and a 403 at /posts; a live type beside it brings both back" do
+    grant = AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "posts.read", scope: { "content_types" => [ "retired_type" ] })
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/api_tokens"
+    assert_not_includes sidebar_labels, "Posts"
+    assert_not_includes sidebar_labels, "Mind graph"
+    get "/cs-studio/posts"
+    assert_response :forbidden
+    assert_select "nav[aria-label='Modules']"
+    assert_select "h1", text: "No access"
+
+    grant.update!(scope: { "content_types" => %w[blog retired_type] })
+    get "/cs-studio/api_tokens"
+    assert_includes sidebar_labels, "Posts"
+    get "/cs-studio/posts"
+    assert_response :success
+  end
+
   # --- Area access -------------------------------------------------------------
 
   test "an author opening an admin area gets the 403 page in the CS Studio layout" do

@@ -21,8 +21,13 @@
 <% selected_group_ids = params.dig(:user, :group_ids)&.compact_blank&.map(&:to_i) || user.group_ids %>
 <% field_ids = { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" } %>
 
-<%= form_with url: url, method: method, id: "user-form", data: (read_only ? {} : save_bar_form_data(dirty: user.errors.any?, always: user.new_record?)) do %>
+<%= form_with url: url, method: method, id: "user-form", data: (read_only ? {} : save_bar_form_data(dirty: user.errors.any? || @stale_form.present?, always: user.new_record?)) do %>
   <%= tag.fieldset disabled: read_only || nil, class: [ "min-w-0 border-0 p-0", ("admin-view-only" if read_only) ] do %>
+    <%# The stale-save base (`Admin::StaleForm`); after a refusal the posted (stale)
+        base stays, so the next Save is refused too until Reload. %>
+    <% if user.persisted? %>
+      <%= render partial: "admin/shared/base_updated_at_field", locals: { id: "user-base-updated-at", value: params[:base_updated_at].presence || user.updated_at.iso8601(6) } %>
+    <% end %>
     <section class="flex flex-col gap-4 rounded-cs border border-line bg-surface p-[18px]">
       <div class="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-3.5">
         <div>

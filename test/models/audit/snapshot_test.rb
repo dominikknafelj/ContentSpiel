@@ -76,7 +76,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
 
     assert_no_secrets changes
     assert_not_includes changes.to_json, raw
-    assert_not_includes changes.to_json, token.token_digest
+    assert_not_includes changes.to_json, token.lookup_digest
   end
 
   test "a password change leaves no digest in field changes" do
@@ -166,7 +166,7 @@ class Audit::SnapshotTest < ActiveSupport::TestCase
 
   def assert_no_secrets(hash)
     json = hash.to_json
-    %w[password_digest token_digest password token].each do |key|
+    %w[password_digest token_digest lookup_digest password token].each do |key|
       assert_not hash.key?(key), "#{key} leaked into #{json}"
     end
     assert_no_match(/\$2a\$/, json, "a bcrypt digest leaked")

@@ -111,9 +111,9 @@ class Admin::LanguageSettingsTest < ActionDispatch::IntegrationTest
   # Final fix wave (S-M4): the "(N items)" count is a scan of every page, post
   # and image, so it runs only for a render that shows it -- a `languages.manage`
   # holder's, with a language to make the default -- and once, however many
-  # dialogs there are. (Not cached: the only key that moves with every stored
-  # translation is `PublicSite.content_version`, which is fifteen aggregate
-  # scans of its own, more than the one query it would save.)
+  # dialogs there are. (Not cached: no key moves with every stored
+  # translation -- `PublicSite.content_version` moves only when published
+  # output can have changed, and a draft's translation is counted here too.)
   test "the item count is queried once when a default dialog renders, and not at all otherwise" do
     counts = lambda do |&request|
       seen = 0

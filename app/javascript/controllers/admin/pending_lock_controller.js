@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { messages } from "i18n/messages"
 
 // Instant actions wait for pending changes (design pass round 3, decision
 // D10). An explicit-save screen also has actions that happen at once -- Add
@@ -52,7 +53,6 @@ import { Controller } from "@hotwired/stimulus"
 // A single control can also be exempt by itself (`data-pending-lock-exempt`):
 // the key's input for as long as its entry is open, text or none -- emptied
 // to retype, it must not be disabled under the caret.
-const HINT = "Save or cancel your changes first."
 const MARK = "data-pending-locked"
 const warned = new WeakSet()
 
@@ -90,9 +90,13 @@ export default class extends Controller {
   // covers them).
   hintTargetConnected(hint) {
     if (this.locked === undefined) return
-    if (!hint.textContent.trim()) hint.textContent = HINT
+    if (!hint.textContent.trim()) hint.textContent = this.hintText
     hint.hidden = !this.locked || this.besideHolder(hint)
   }
+
+  // `admin.components.save_bar.blocked`, the sentence the footer's own
+  // blocked line shows (read from the page's messages).
+  get hintText() { return messages(this.element).t("components.save_bar.blocked") }
 
   // See "ONE EXEMPTION".
   exempt(control) { return control.hasAttribute("data-pending-lock-exempt") || control.closest("[data-save-bar-holds]") !== null }
@@ -103,7 +107,7 @@ export default class extends Controller {
     this.locked = locked
     this.controlTargets.forEach((control) => (locked && !this.exempt(control) ? this.lock(control) : this.unlock(control)))
     this.hintTargets.forEach((hint) => {
-      if (!hint.textContent.trim()) hint.textContent = HINT
+      if (!hint.textContent.trim()) hint.textContent = this.hintText
       hint.hidden = !locked || this.besideHolder(hint)
     })
   }

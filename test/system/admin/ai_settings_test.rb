@@ -3,40 +3,21 @@ require "application_system_test_case"
 # Translation helpers spec §6.2, in a real browser: the API key is saved by
 # its own button (not the settings form's autosave), comes back as "API
 # key: set" with an empty field, and Test connection answers inline. The
-# provider is a stub registered for this test -- the app server runs in
-# this process, so it sees the same registry -- and never reaches the
-# network.
+# provider is `GatedProvider` (test/support/gated_provider.rb) registered
+# for this test -- the app server runs in this process, so it sees the same
+# registry -- and never reaches the network; a test that needs a request in
+# flight holds its gate and releases it.
 class Admin::AISettingsSystemTest < ApplicationSystemTestCase
-  KEY = "sk-ant-system-test-key".freeze
-
-  class StubProvider
-    def initialize(api_key:, model:)
-      @api_key = api_key
-    end
-
-    # Held open for as long as a test asks (`StubProvider.delay`), the cheapest honest way to keep a request in flight.
-    class << self
-      attr_accessor :delay
-    end
-
-    def test_connection
-      sleep(self.class.delay.to_f)
-      raise AI::Error, "The AI provider refused the API key." unless @api_key == KEY
-
-      true
-    end
-  end
+  KEY = GatedProvider::VALID_KEY
 
   setup do
-    AI::Providers.register("test/stub", StubProvider)
-    site_settings(:default).update!(setup_completed_at: Time.current, ai_provider: "test/stub")
+    GatedProvider.install!
+    site_settings(:default).update!(setup_completed_at: Time.current, ai_provider: GatedProvider::NAME)
     sign_in_via_form(users(:one))
   end
 
-  teardown do
-    StubProvider.delay = nil
-    Rails.application.reloader.prepare!
-  end
+  # Releases a request a failed test left waiting, so no server thread outlives it, and resets the registry.
+  teardown { GatedProvider.uninstall! }
 
   def footer = ".admin-save-bar"
 
@@ -192,7 +173,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     site_settings(:default).update!(ai_api_key: KEY)
     visit "/cs-studio/settings"
     await_admin_controllers
-    StubProvider.delay = 1.0
+    GatedProvider.hold!
 
     click_on "Test connection"
     assert_selector "button[disabled]", text: "Testing…"
@@ -200,6 +181,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     fill_in "API key", with: KEY
     click_on "Save key"
     assert_selector "#toasts .admin-toast", text: "API key saved"
+    GatedProvider.release
 
     assert_selector "button:not([disabled])", text: "Test connection", wait: 5
     assert_no_selector "button", text: "Testing…"
@@ -216,7 +198,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
 
   test "the test stays disabled for the whole flight, even when Model is edited and reverted during it" do
     site_settings(:default).update!(ai_api_key: KEY)
-    StubProvider.delay = 1.5
+    GatedProvider.hold!
     visit "/cs-studio/settings"
     await_admin_controllers
 
@@ -226,6 +208,7 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     fill_in "Model", with: ""
     # Back in line with the saved values, but the request is still out: no second provider call.
     assert_selector "button[form='settings-ai-test-form'][disabled]"
+    GatedProvider.release
     assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
     assert_no_selector "button[form='settings-ai-test-form'][disabled]"
 
@@ -234,8 +217,10 @@ class Admin::AISettingsSystemTest < ApplicationSystemTestCase
     # answer has landed: the slot is emptied first, and the button is looked at only once it is no longer busy.
     page.execute_script("document.getElementById('settings-ai-test-result').replaceChildren()")
     assert_no_selector "#settings-ai-test-result", text: /CONNECTED/
+    GatedProvider.hold!
     click_on "Test connection"
     fill_in "Model", with: "claude-opus-5"
+    GatedProvider.release
     assert_selector "#settings-ai-test-result", text: /CONNECTED/, wait: 10
     assert_no_selector "button", text: "Testing…"
     assert_selector "button[form='settings-ai-test-form'][disabled]"

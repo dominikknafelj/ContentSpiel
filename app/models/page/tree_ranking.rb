@@ -70,10 +70,21 @@ module Page::TreeRanking
     # them (`PublicSite::Paths.canonical_page`), ignores trashed pages, and a
     # restored page rejoins at the position `Trash::Restore` gives it.
     others = self.class.kept.where(parent_id: parent_id).where.not(id: id).order(:position, :id).to_a
-    ordered = others.insert(requested.clamp(0, others.size), self)
+    ordered = others.insert(requested.clamp(0, others.size), self) # version: none (Array#insert, no SQL)
 
+    # No `PublicSite.bump_version!` for the siblings, although their rows are
+    # written around the callbacks (here, and by closure_tree's own
+    # renumbering before this runs) and sibling order is published output
+    # (the navigation, and the tree order `canonical_page` ranks listing
+    # pages by): placing one page changes its rank and nobody else's
+    # *relative* order, and readers compare positions, never read the
+    # numbers. So what a visitor can see changes only with this page -- whose
+    # own `after_commit` bumps when it is live -- or through a post that
+    # moved to another listing page, which is a `public_paths` write and
+    # bumps there. A draft placed among live siblings changes nothing on the
+    # site.
     ordered.each_with_index do |page, index|
-      page.update_columns(position: index) unless page.position == index
+      page.update_columns(position: index) unless page.position == index # version: none (see above: only this page's rank changes, and its own save bumps when it is live)
     end
   end
 end

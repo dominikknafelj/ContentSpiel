@@ -36,12 +36,10 @@ module AccessControl
     # plugin's posts keep their `content_type`), and its type then equals
     # the gone name on the grant, so `{content_types: ["retired"]}` -- or
     # `["blog", "retired"]` -- still reached every leftover `retired` post.
-    # That mattered because everything that decides who may hand a grant out
-    # (`can_assign_group?`, `can_manage_group?`, `Groups::Save`) judges a
-    # group by its LIVE entries: a `{blog}` holder could put a user or a
-    # token into a group holding a gone name. Now the name is dormant in
-    # fact: it grants nothing until a type of that name is registered again
-    # (and then at once, with its old meaning). A scope that NAMED types of
+    # So the name is dormant in fact: it grants nothing until a type of that
+    # name is registered again (and then at once, with its old meaning --
+    # which is why whoever hands a group on is judged on the names it still
+    # stores, `AccessControl.can_assign_group?`). A scope that NAMED types of
     # which none is registered is still a scope -- it matches nothing; only
     # a scope with no `content_types` key at all means "every type".
     class Condition
@@ -66,6 +64,14 @@ module AccessControl
           end
         end
       end
+
+      # Does the scope name content types of which none is registered? Then
+      # neither form of the predicate can match any record, whatever else the
+      # scope says -- the one "matches nothing" that can be told without a
+      # record or a query, which is what `AccessControl.holds?` asks. True for
+      # a stored empty list as well, which is not dormant but empty for good:
+      # no name on it could ever be registered.
+      def dormant? = @grant.scope.key?("content_types") && registered_types(@grant.scope["content_types"]).empty?
 
       # The same predicate, as `base` (a relation on the subject's model,
       # without the caller's own conditions) narrowed by one `where` per

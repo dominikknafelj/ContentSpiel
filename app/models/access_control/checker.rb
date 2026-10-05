@@ -67,8 +67,10 @@ module AccessControl
 
     # `anywhere: true` is `AccessControl.holds?`: "does the actor hold
     # this key under any scope at all?" -- no record, every grant for the
-    # key counts whatever its scope. Without it, a subject key must come
-    # with the record it's about (see `#check_subject!`).
+    # key counts whatever its scope, bar one that names only content types
+    # that are no longer registered (`#grant_matches?`). Without it, a
+    # subject key must come with the record it's about (see
+    # `#check_subject!`).
     def initialize(actor, key, record, channel, anywhere: false)
       @actor = actor
       @permission = Permissions.fetch(key)
@@ -121,14 +123,19 @@ module AccessControl
     # empty list, a stale page id or a content type that's no longer
     # registered all simply match nothing, never raise.
     #
-    # `holds?` (`@anywhere`) ignores the scope: any grant for the key
-    # counts. A nil record otherwise only reaches here for an admin-area
-    # key, whose grants carry no scope, so `matches?` on an empty scope is
-    # true without ever touching the record.
+    # `holds?` (`@anywhere`) has no record to match a scope against, so any
+    # grant for the key counts -- except one that can't match any record
+    # whatever it is: a scope naming content types of which none is
+    # registered (`Scoping::Condition#dormant?`; no query). A nil record
+    # otherwise only reaches here for an admin-area key, whose grants carry
+    # no scope, so `matches?` on an empty scope is true without ever
+    # touching the record.
     def grant_matches?(grant, user_id)
-      return true if @anywhere || @record.nil?
+      condition = Scoping::Condition.new(grant, user_id, @permission)
+      return !condition.dormant? if @anywhere
+      return true if @record.nil?
 
-      Scoping::Condition.new(grant, user_id, @permission).matches?(@record, -> { branch_ids })
+      condition.matches?(@record, -> { branch_ids })
     end
 
     # `pages.create` is checked against the branch the new page will join

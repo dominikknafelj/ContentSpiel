@@ -308,4 +308,78 @@ class Settings::SaveTest < ActiveSupport::TestCase
     assert result.denied?
     assert_equal %w[de en es], Current.site.reload.locale_codes
   end
+
+  test "a stale language order is refused, not written over a language enabled meanwhile" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    result = as_owner { Settings::Save.call(stale, languages: [ { "code" => "es" }, { "code" => "en" }, { "code" => "de" } ]) }
+
+    assert_not result.ok?
+    assert_includes result.errors.join, "must list exactly the enabled languages"
+    assert_equal %w[en de es fr], SiteSetting.find(stale.id).locale_codes
+  end
+
+  # The rights are first checked against the copy the caller passed; the row
+  # is then locked and re-read, and its stored default may differ from the
+  # copy's. Resending the copy's default is then a default-language change.
+  test "a default that changed behind the passed copy needs languages.manage after the lock" do
+    grant_to_branch_editors("settings.manage")
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update_columns(default_locale: "de")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(stale, attributes: { default_locale: "en", time_zone: "Europe/Berlin" }) }
+
+    assert result.denied?
+    fresh = SiteSetting.find(stale.id)
+    assert_equal "de", fresh.default_locale
+    assert_not_equal "Europe/Berlin", fresh.time_zone
+    assert_equal 1, Audit::Event.where(action: "access.denied").count
+    assert_equal "languages.manage", Audit::Event.find_by!(action: "access.denied").metadata["permission"]
+    assert_not Audit::Event.exists?(action: "settings.updated")
+  end
+
+  test "an actor holding both rights may resend a default that changed behind the passed copy" do
+    grant_to_branch_editors("settings.manage", "languages.manage")
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update_columns(default_locale: "de")
+
+    result = as(users(:editor_branch)) { Settings::Save.call(stale, attributes: { default_locale: "en" }) }
+
+    assert result.ok?, result.errors.inspect
+    assert_equal "en", SiteSetting.find(stale.id).default_locale
+  end
+
+  test "a site save locks the settings row before it writes, even when the copy was stale" do
+    stale = SiteSetting.find(site_settings(:default).id)
+    SiteSetting.find(stale.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    statements = capture_sql { as_owner { Settings::Save.call(stale, translations: { "en" => { title: "Locked title" } }) } }
+
+    lock = statements.index { |sql| sql.include?("FROM \"site_settings\"") && sql.include?("FOR UPDATE") }
+    write = statements.index { |sql| sql.start_with?("UPDATE \"site_settings\"") }
+    assert lock, "the row is locked"
+    assert write, "the row is written"
+    assert_operator lock, :<, write
+    assert_equal %w[en de es fr], SiteSetting.find(stale.id).locale_codes
+  end
+
+  test "every service locks the settings row exactly once" do
+    site_settings(:default).update!(locales: [ { "code" => "en" }, { "code" => "de" }, { "code" => "es" } ])
+    calls = {
+      "Settings::Save" => -> { Settings::Save.call(Current.site, translations: { "en" => { title: "T" } }) },
+      "Settings::Save with languages:" => -> { Settings::Save.call(Current.site, translations: { "en" => { title: "U" } }, languages: reorder("de", "en", "es")) },
+      "Locales::Enable" => -> { Locales::Enable.call("fr") },
+      "Locales::Disable" => -> { Locales::Disable.call("es") },
+      "Locales::MakeDefault" => -> { Locales::MakeDefault.call("de") },
+      "Locales::Configure" => -> { Locales::Configure.call([ { code: "en" }, { code: "de" }, { code: "fr" } ]) }
+    }
+
+    calls.each do |name, call|
+      Current.site = nil
+      statements = capture_sql { as_owner { call.call } }
+      locks = statements.count { |sql| sql.include?("FROM \"site_settings\"") && sql.include?("FOR UPDATE") }
+      assert_equal 1, locks, "#{name} locks the settings row once"
+    end
+  end
 end

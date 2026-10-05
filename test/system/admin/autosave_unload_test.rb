@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Closing the tab, or reloading it, on an autosave screen (`autosave/queue.js`,
+# Closing the tab, or reloading it, on an autosave screen (`autosave/queue_core.js`,
 # "THE UNLOAD GUARD"): the browser asks first exactly when leaving would lose
 # something -- an edit not yet sent or not yet answered, or text a refused save
 # left only in the page -- and never on a screen that has nothing to lose.
@@ -43,9 +43,10 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
   end
 
   test "an editor paused by Changed elsewhere asks: its text exists only in the page" do
+    # The other editor's change lands more than the bar's one-second tolerance past the base the form loads.
+    backdate(@page, by: 5.seconds)
     visit "/cs-studio/pages/#{@page.id}"
     await_admin_controllers
-    sleep 1.2
     as(users(:two), channel: :admin) { Pages::Save.call(@page, translations: { "en" => { subtitle: "The other editor's text" } }) }
 
     fill_in "Subtitle", with: "My text"
@@ -76,8 +77,14 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     # The Trash screen has no autosave form at all: the guard is not even
     # listening there (it is removed with the last form). Reached by a Turbo
     # visit, so this is the same document the unsaved form was in.
+    #
+    # Wait for the Trash screen itself, not for the word "Trash": the sidebar
+    # link on the editor already says it, and the visit is held until the
+    # write queue has given up on the failed form (`drained()`), so for that
+    # long this is still the editor, which rightly asks.
     within(".admin-shell__sidebar") { click_link "Trash" }
-    assert_text "Trash"
+    assert_current_path %r{/cs-studio/trash}
+    assert_no_selector "form[data-controller~='admin--autosave']"
     assert_not asks_before_unload?, "a screen with no autosave form asked before unloading"
   end
 

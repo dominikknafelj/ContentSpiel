@@ -80,8 +80,8 @@ class CommandPaletteTest < ApplicationSystemTestCase
     input.set("Beta")
     input.send_keys([ :control, :enter ])
     assert_selector "#jump-results [role=option][aria-selected=true]", text: beta.title
-    opened = nil
-    Timeout.timeout(5) { sleep 0.05 until (opened = page.evaluate_script("window.__opened")).any? }
+    await_js "window.__opened.length > 0"
+    opened = page.evaluate_script("window.__opened")
     assert_equal 1, opened.size
     assert_match(%r{/cs-studio/posts/#{beta.id}\b}, opened.first[0])
     assert_equal [ "_blank", "noopener" ], opened.first[1..]
@@ -165,7 +165,7 @@ class CommandPaletteTest < ApplicationSystemTestCase
     find("#tree a", text: "+ New page").click
     assert_selector "dialog#new-page-dialog[open]"
     find("dialog#new-page-dialog").send_keys([ :control, "k" ])
-    sleep 0.3
+    await_frames
     assert_no_selector "dialog#command-palette[open]"
     assert_selector "dialog#new-page-dialog[open]"
 

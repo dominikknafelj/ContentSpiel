@@ -265,7 +265,7 @@ Rails.application.routes.draw do
     resources :audit_events, only: %i[index show]
 
     # "Create starter pages" on the Pages home (design spec §6.1, Task 9):
-    # one POST, `StarterContent.create_pages_and_posts!`, idempotent.
+    # one POST, `StarterContents::Add`, idempotent.
     resources :starter_contents, only: :create
 
     # The dashboard is CS Studio's home (dashboard spec §3-§4, Task 2):

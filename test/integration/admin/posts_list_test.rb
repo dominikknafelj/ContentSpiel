@@ -402,10 +402,13 @@ class Admin::PostsListTest < ActionDispatch::IntegrationTest
     2.times { |i| create_post(title: "Blog #{i}", tags: [ "a", "b" ]) }
     create_post(title: "Resume", content_type: "resume_entry")
     scoped = User.create!(email_address: "scoped-counts@example.com", password: "a long enough password")
-    group = AccessControl::Group.create!(name: "Blog readers")
-    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => %w[blog] })
-    AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "own" => false, "content_types" => %w[blog] })
-    AccessControl::Membership.create!(group: group, user: scoped)
+    # A post two grants both match is counted once: the grants sit in two groups
+    # (a group holds one grant per permission).
+    [ "Blog readers", "Blog readers too" ].each do |name|
+      group = AccessControl::Group.create!(name: name)
+      AccessControl::Grant.create!(group: group, permission: "posts.read", scope: { "content_types" => %w[blog] })
+      AccessControl::Membership.create!(group: group, user: scoped)
+    end
     sign_in_as(scoped)
     get "/cs-studio/posts"
     assert_select "label[for=posts-scope-all] span.font-cs-mono", text: "2"

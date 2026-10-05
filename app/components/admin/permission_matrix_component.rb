@@ -22,8 +22,9 @@ module Admin
   # removed content type), or the submitted ones when a save failed. `stale` is
   # the group's `LiveGrants`, for the notes on what a save will still drop
   # (Review Focus 3) -- a deleted branch root, a grant that matches nothing any
-  # more (shown unticked; see `LiveGrants` for why it can't be shown ticked), an
-  # unregistered permission. A removed content type is no longer a note: it is a
+  # more (shown unticked; see `LiveGrants` for why it can't be shown ticked; one
+  # that names only removed content types says that saving removes it and who can
+  # manage the group until then, `#dormant_note`), an unregistered permission. A removed content type is no longer a note: it is a
   # chip with Remove inside the row (`ScopeEditorComponent`).
   #
   # `open_keys`: the rows whose scope editor starts open -- after a failed save,
@@ -36,28 +37,27 @@ module Admin
   #
   # LOCKED TICKS (round 3 Task 11, D15) are DEFENSIVE. A grant the group already
   # STORES that the viewer couldn't hand out themselves (`AccessControl.can_grant?`
-  # false on its live scope) would be drawn locked: greyed, "You can't grant this",
-  # no scope editor, carried by hidden inputs holding the whole scope as stored
-  # (`PermissionRowComponent`), so a form saved as rendered changes nothing. But a
-  # stored group with such a grant is one the viewer can't manage at all
-  # (`can_manage_group?` asks the same question), so it is drawn read-only instead
-  # and no stored state is expected to reach the lock; it stays for any state that
-  # rule doesn't foresee. It is asked only for a non-owner, once per ticked
-  # permission, and ONLY while the row's scope still equals what is stored
-  # (`stored:`, the carried scopes): a typed tick -- one on a new group, or one the
-  # editor changed, coming back after a refused save (422) -- is never locked, it
-  # comes back ticked and editable, since a lock there would make the next Save a
-  # guaranteed refusal. The check costs at most one closure-table query for a pages
-  # row, never one per page in the tree or per member. `Groups::Save` decides every
-  # write; this is only what the form shows and carries.
+  # false on its scope as stored, a removed content type's name included) would be
+  # drawn locked: greyed, "You can't grant this", no scope editor, carried by hidden
+  # inputs holding the whole scope as stored (`PermissionRowComponent`), so a form
+  # saved as rendered changes nothing. But a stored group with such a grant is one
+  # the viewer can't manage at all (`can_manage_group?` asks the same question of
+  # the same scopes), so it is drawn read-only instead and no stored state is
+  # expected to reach the lock; it stays for any state that rule doesn't foresee. It
+  # is asked only for a non-owner, once per ticked permission, and ONLY while the
+  # row's scope still equals what is stored (`stored:`, the carried scopes): a typed
+  # tick -- one on a new group, or one the editor changed, coming back after a
+  # refused save (422) -- is never locked, it comes back ticked and editable, since
+  # a lock there would make the next Save a guaranteed refusal. The check costs at
+  # most one closure-table query for a pages row, never one per page in the tree or
+  # per member. `Groups::Save` decides every write; this is only what the form shows
+  # and carries.
   #
-  # REMOVED TYPE HINT. A grant carrying a content type that no longer exists is
-  # editable, with its Remove chip, even when the viewer's own grant doesn't name
-  # that type (the lock is judged on the live scope, as `can_manage_group?` does).
-  # But then the carried scope as a whole is not one the viewer could hand out, and
-  # `Groups::Save` refuses any change to that row that doesn't also press Remove (a
-  # 403). For that viewer the chip says so: "Remove this type before changing the
-  # row." Not shown to an owner or to a viewer whose own grant covers the name.
+  # A REMOVED CONTENT TYPE (a warn chip with Remove, `ScopeEditorComponent`) is
+  # therefore only ever editable for a viewer who could grant that name: an owner,
+  # or someone whose own grant for the permission names no types or names that one.
+  # For anyone else the group is view-only -- the name is dormant, not gone, and
+  # `can_manage_group?` judges the grants as stored.
   # `view_only:` is a group the viewer can't manage at all: no locks (the whole form
   # is disabled anyway) and the rows' scope toggle becomes a link that survives the
   # disabled fieldset.
@@ -88,7 +88,7 @@ module Admin
 
     def row_for(permission)
       GroupsScreen::PermissionRowComponent.new(permission: permission, scope: @grants[permission.key], tree: permission.scopes.include?(:branch) ? tree : nil,
-        open: @open_keys.include?(permission.key), form_name: form_name, locked: locked?(permission), view_only: @view_only, removed_hint: removed_hint?(permission))
+        open: @open_keys.include?(permission.key), form_name: form_name, locked: locked?(permission), view_only: @view_only)
     end
 
     # See "LOCKED TICKS" above. Memoised per key: the rows and the footnote ask.
@@ -97,27 +97,7 @@ module Admin
       return false if @view_only || Current.actor.nil? || !@grants.key?(permission.key) || AccessControl.owner?(Current.actor)
       return false unless @stored[permission.key] == AccessControl::LiveGrants.normalize_scope(@grants[permission.key])
 
-      @locked.fetch(permission.key) { @locked[permission.key] = !AccessControl.can_grant?(Current.actor, permission.key, live_scope(@grants[permission.key])) }
-    end
-
-    # The scope without the content types that no longer exist (none left: no
-    # restriction, as the editor reads it) -- what `can_manage_group?` judges.
-    def live_scope(scope)
-      types = Array(scope["content_types"])
-      return scope if types.empty?
-
-      live = types & AccessControl::Permissions.content_type_choices
-      live.empty? ? scope.except("content_types") : scope.merge("content_types" => live)
-    end
-
-    # "Remove this type before changing the row." -- see "REMOVED TYPE HINT".
-    def removed_hint?(permission)
-      return false if @view_only || Current.actor.nil? || AccessControl.owner?(Current.actor) || !@grants.key?(permission.key)
-
-      scope = @grants[permission.key]
-      return false if (Array(scope["content_types"]) - AccessControl::Permissions.content_type_choices).empty?
-
-      !AccessControl.can_grant?(Current.actor, permission.key, scope)
+      @locked.fetch(permission.key) { @locked[permission.key] = !AccessControl.can_grant?(Current.actor, permission.key, @stored[permission.key]) }
     end
 
     def any_locked? = AccessControl::Permissions.all.any? { |permission| locked?(permission) }
@@ -132,10 +112,25 @@ module Admin
       entry = @stale.entry_for(permission.key)
       notes = entry ? entry.removed_notes.map { |value| "#{value.upcase_first}: removed when you save." } : []
       @stale.dead_for(permission.key).each do |dead|
-        what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
-        notes << "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
+        notes << (dead.dormant ? dormant_note(dead) : dead_note(dead))
       end
       notes
+    end
+
+    def dead_note(dead)
+      what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
+      "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
+    end
+
+    # A dead grant that a re-registered content type would bring back
+    # (`LiveGrants::Dead#dormant`) is still a right the group stores: it is what
+    # makes the group view-only for a manager who couldn't grant that type, with
+    # no chip to show for it (the row is unticked). So the note says what clears
+    # it. Saving the form does -- the grant is never posted -- which is why the
+    # form of such a group has Save enabled from the start (`admin/groups/_form`).
+    def dormant_note(dead)
+      names = Array(dead.dormant["content_types"]) - AccessControl::Permissions.content_type_choices
+      "Limited to a content type that no longer exists (#{names.join(", ")}). Saving removes it; until then only someone who could grant that type can manage this group."
     end
 
     # Stored grants whose permission key isn't registered any more -- no

@@ -24,7 +24,7 @@ import { drained, settled } from "autosave/queue"
 // The visit the action's redirect ends in is not held by the queue's own
 // `turbo:before-visit` handler, should an edit have landed in the meantime:
 // that holds for every Turbo form submission and is the queue's business
-// (`autosave/queue.js`, "TURBO FORM SUBMISSIONS"), which also holds the
+// (`autosave/frame_hold.js`, "TURBO FORM SUBMISSIONS"), which also holds the
 // request itself once more if something became outstanding between this
 // controller's drain and the request going out.
 //

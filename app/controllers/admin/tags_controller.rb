@@ -84,7 +84,7 @@ module Admin
 
       render turbo_stream: [
         turbo_stream.remove(ActionView::RecordIdentifier.dom_id(tag)),
-        toast_stream("Deleted “#{tag.name}”")
+        toast_stream(t("admin.tags.toasts.deleted", name: tag.name))
       ]
     end
 
@@ -109,9 +109,9 @@ module Admin
       return forbidden!(result.errors.first) if result.denied?
 
       if result.ok?
-        flash[:notice] = "Merged “#{source.name}” into “#{into.name}”"
+        flash[:notice] = t("admin.tags.toasts.merged", source: source.name, into: into.name)
       else
-        flash[:alert] = name.present? && into.nil? ? Tags::Merge::GONE : result.errors.first
+        flash[:alert] = name.present? && into.nil? ? Tags::Merge.gone : result.errors.first
       end
       redirect_to admin_tags_path(**admin_url_options), status: :see_other
     end

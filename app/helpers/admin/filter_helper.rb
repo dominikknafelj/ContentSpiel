@@ -21,14 +21,6 @@ module Admin
       { url: url, method: :get, class: "mb-4 flex flex-wrap items-end gap-3", data: data }
     end
 
-    # "Clear", shown only while one of the form's own params is set -- the
-    # editing `locale` is never a filter.
-    def filter_clear_link(path, keys)
-      return unless keys.any? { |key| params[key].present? }
-
-      link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" }
-    end
-
     def filters_active?(keys) = keys.any? { |key| params[key].present? }
 
     # "type blog, status draft, title “zzz”" -- the active filters named for a

@@ -1,20 +1,29 @@
 module Admin
   # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
-  # edit/update (email, and a password only when one was typed --
-  # `Users::Save`'s own doc comment explains why a blank password field
-  # means "leave it alone"; groups and, for owners, the Owner toggle --
-  # access-control design spec §5), destroy (refused for the last owner,
-  # `Users::Destroy` -> `User#ensure_not_last_owner`). A permission refusal
-  # from `Users::Save` (a forged owner flag, a group the actor can't
-  # assign) is the 403 page. Invites stay on the
-  # roadmap (spec §6.1) -- there is no separate "invite" action here, only
-  # `new`/`create` with a password set up front.
+  # edit/update (name, email, the groups, and a password only when one was
+  # typed -- `Users::Save`'s own doc comment explains why a blank password
+  # field means "leave it alone"), owner (the "Make owner…" / "Remove owner
+  # rights…" action, the only request that changes the owner flag), destroy
+  # (refused for the last owner, `Users::Destroy` ->
+  # `User#ensure_not_last_owner`). A permission refusal from `Users::Save` (a
+  # group the actor can't assign, an owner or an outranking user changed by
+  # someone who may not) is the 403 page. Invites stay on the roadmap (spec
+  # §6.1) -- there is no separate "invite" action here, only `new`/`create`
+  # with a password set up front.
   #
   # Plain redirect-with-flash throughout, not autosave: a user's email and
   # password are exactly the kind of field an accidental keystroke-triggered
   # save (an autosaving form's whole point elsewhere) must never touch
   # silently -- an edit here is a deliberate "Save changes" submit.
   class UsersController < BaseController
+    include StaleForm
+
+    # The stale banner (`admin/shared/_stale_banner`): the lead goes on to name who
+    # changed it and when where the audit log says, and the message is the whole
+    # banner where it doesn't.
+    STALE_LEAD = "This user was changed".freeze
+    STALE_MESSAGE = "#{STALE_LEAD} elsewhere since you opened this screen. #{StaleForm::STALE_ADVICE}".freeze
+
     # The whole module is `users.manage` (access-control design spec §3.3
     # "Users"); `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
@@ -47,7 +56,22 @@ module Admin
       @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
     end
 
+    # A stale form (`Admin::StaleForm`: the user's `updated_at`, which a group
+    # change from a group's editor moves too) is refused before the service runs;
+    # the typed name, email and ticked groups stay in the form (a typed password
+    # never comes back, by design).
+    #
+    # Not for a user the viewer can only view (`Users::Manageability` anything
+    # but `:editable`): what they send is a forged write, and `Users::Save`
+    # answers it with its 403 and one `access.denied`. A 409 first would record
+    # nothing.
     def update
+      if manageability(@user) == :editable && stale_form?(@user, params[:base_updated_at])
+        @user.assign_attributes(user_params.slice(:name, :email_address))
+        @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
+        return render_stale(:edit, @user)
+      end
+
       result = Users::Save.call(@user, attributes: user_params)
 
       if result.ok?
@@ -120,11 +144,12 @@ module Admin
       @user = User.find(params[:id])
     end
 
-    # `group_ids` and `owner` pass straight through: `Users::Save` decides
-    # who may change them (no form has an owner field now -- owner rights are
-    # `PATCH users/:id/owner` -- and a non-owner's forged one is refused there).
+    # `group_ids` passes straight through: `Users::Save` decides who may change
+    # it. There is no `owner` here: the flag changes only through
+    # `PATCH users/:id/owner`, so a forged `user[owner]` is dropped as unpermitted
+    # and the rest of the save is an ordinary one.
     def user_params
-      params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, :owner, group_ids: [])
+      params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, group_ids: [])
     end
 
     # For the forms: every group, and whether the owner toggle is locked

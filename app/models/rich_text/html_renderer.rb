@@ -13,17 +13,12 @@
 # that builds its own `RenderContext` without going through the jsonb-
 # column path a `Document` normally comes from.
 #
-# Components (`RichText::YoutubeComponent`, `RichText::ImageComponent`)
-# render through `ApplicationController.render(component, layout: false)`
-# rather than `ViewComponent::Base#render_in` -- this class isn't a
-# controller action or a component itself, so it has no view context of
-# its own to hand `render_in`, and building one by hand (an
-# `ActionView::Base` instance with a real lookup context) is exactly what
-# `ActionController::Renderer` (mixed into every controller, including
-# `ApplicationController`) already does for you. `ApplicationController
-# .render` is the same mechanism `ComponentPreviewsController`'s own request
-# cycle uses under the hood; this just invokes it directly instead of
-# through a dispatched request.
+# Components (`RichText::YoutubeComponent`, `RichText::ImageComponent`) are
+# drawn by `RichText.component_renderer`, a callable the application assigns
+# (`config/initializers/rich_text.rb`): this class isn't a controller action
+# or a component itself, so it has no view context of its own, and a model
+# naming a controller to get one is the dependency direction
+# `test/lib/dependency_direction_test.rb` forbids.
 #
 # Tag construction goes through `ActionController::Base.helpers` -- a
 # memoized helper proxy that already mixes in `ActionView::Helpers

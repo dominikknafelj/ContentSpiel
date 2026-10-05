@@ -53,6 +53,11 @@ module Tags
     # rows are removed, which is what it reads.
     def touch_carrying_posts(tag)
       Post.where(id: tag.post_tags.select(:post_id)).touch_all
+      # `touch_all` runs no `after_commit` on the posts, and what follows it
+      # (a rename, a delete, a merge) changes what they print and which
+      # listings show them: the public content version moves, whether or not
+      # a carrier is live.
+      PublicSite.bump_version!
     end
   end
 end

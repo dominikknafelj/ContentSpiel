@@ -364,6 +364,21 @@ class Admin::SettingsTest < ActionDispatch::IntegrationTest
     assert_equal 30, @site.trash_retention_days
   end
 
+  # The same save a moment later: its event lies past the base (and past
+  # `Audit::ChangeSince::SLACK`), so the banner names it -- here as the viewer's
+  # own, since one user holds both "tabs".
+  test "the stale banner names the change from the audit log" do
+    stale = base
+    travel 2.minutes
+    save translations(en: { title: "First" })
+    assert_response :see_other
+
+    patch "/cs-studio/settings", params: { site_setting: translations(en: { title: "Second" }), base_updated_at: stale }
+
+    assert_response :conflict
+    assert_select "[role=alert]", text: /Settings were changed in another tab or window\s+just now\.\s+Reload to see the latest — your changes are still in the form\./
+  end
+
   # -- the key's instant action and the form's base (I2) ------------------------
 
   def save_key(carried_base, key = "sk-ant-new-key")

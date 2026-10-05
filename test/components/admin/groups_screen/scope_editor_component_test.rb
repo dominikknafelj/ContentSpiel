@@ -62,16 +62,6 @@ class Admin::GroupsScreen::ScopeEditorComponentTest < ViewComponent::TestCase
     assert_selector "[data-removed-type='retired_type'] button[type=button][data-action='click->admin--permission-matrix#removeType']", text: "Remove"
     # It is no box: nothing offers the gone type as a choice.
     assert_no_selector "input[type=checkbox][value='retired_type']"
-    # Without the flag there is no hint (the viewer could grant the name).
-    assert_no_selector ".admin-removed-type-hint"
-  end
-
-  test "the hint shows only for a viewer who couldn't grant the removed type, and only while one is carried" do
-    editor("posts.edit", scope: { "content_types" => %w[blog retired_type] }, removed_hint: true)
-    assert_selector "p.admin-removed-type-hint", text: "Remove this type before changing the row."
-
-    editor("posts.edit", scope: { "content_types" => %w[blog] }, removed_hint: true)
-    assert_no_selector ".admin-removed-type-hint"
   end
 
   test "pages, three levels deep: the chosen page is ticked, everything below it a disabled tick, every ancestor partial" do

@@ -46,4 +46,16 @@ class Locales::ConfigureTest < ActiveSupport::TestCase
     assert_includes result.errors.join, "exactly the enabled languages"
     assert_equal %w[en de es], @site.reload.locale_codes
   end
+
+  test "a stale order is refused when another change enabled a language meanwhile" do
+    stale = SiteSetting.find(@site.id)
+    SiteSetting.find(@site.id).update!(locales: stale.locales + [ { "code" => "fr" } ])
+
+    Current.site = stale
+    result = Locales::Configure.call([ { code: "es" }, { code: "en" }, { code: "de" } ], actor: nil)
+
+    assert_not result.ok?
+    assert_includes result.errors.join, "exactly the enabled languages"
+    assert_equal %w[en de es fr], SiteSetting.find(@site.id).locale_codes
+  end
 end

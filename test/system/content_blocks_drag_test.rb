@@ -69,19 +69,13 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
     assert_operator from_y, :<, page.evaluate_script("window.innerHeight"), "the dragged handle is on screen"
     assert_operator to_y, :>, 0, "and so is where it is going"
 
-    mouse = page.driver.browser.mouse
-    mouse.move(x: from_x, y: from_y)
-    mouse.down
-    6.times do |step|
-      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
-      sleep 0.08
-    end
+    mouse = drag_pointer(from_x, from_y, to_y)
 
     assert_selector "body > .admin-drag-fallback"
     assert_no_selector "body > .admin-drag-fallback[id], body > .admin-drag-fallback [id]", visible: :all
     assert_no_selector "body > .admin-drag-fallback [data-controller], body > .admin-drag-fallback[data-admin--blocks-target]", visible: :all
     assert_selector "#content-blocks-list > [data-block-id]", count: 3
-    sleep 0.2
+    await_drag_slot "#content-blocks-list > .admin-drag-ghost", at: :first
     mouse.up
 
     assert_selector "#toasts .admin-toast[data-kind=undo]", text: /order changed/i, wait: 10

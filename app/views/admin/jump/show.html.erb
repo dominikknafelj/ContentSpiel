@@ -26,7 +26,7 @@
             <%# A row with a `dialog` (New page, New post) closes the palette and opens that
                 dialog; its `href` stays for a viewer without JavaScript. %>
             <% data = row[:dialog] ? { turbo_frame: "_top", action: "admin--command-palette#close admin--dialog#open", "admin--dialog-id-param": row[:dialog] } : { turbo_frame: "_top" } %>
-            <%= link_to row[:url], data: data, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
+            <%= link_to jump_row_path(row[:route]), data: data, class: "flex items-center gap-3 px-4 py-2 text-sm text-ink hover:bg-sunken" do %>
               <span class="min-w-0 flex-1 truncate"><%= row[:title] %></span>
               <% if row[:hint] %><%= render Admin::ContentTypeDotComponent.new(content_type: row[:hint]) %><% end %>
               <%# Right-hand end: a non-Live status, then -- on the selected row

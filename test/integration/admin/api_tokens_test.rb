@@ -42,7 +42,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
       assert_select "button", text: "Revoke…", count: 0
       assert_select "[class~='opacity-60']" # dimmed, still listed
     end
-    assert_not_includes response.body, active.token_digest
+    assert_not_includes response.body, active.lookup_digest
   end
 
   test "the page is a numbered flow: create a token, add it to your assistant, the tokens table" do
@@ -95,7 +95,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_equal users(:one), token.user
     assert_equal access_control_groups(:read_only), token.group
     assert_equal "claude-desktop", token.name
-    assert token.authenticate_token(raw)
+    assert_equal token, ApiToken.authenticate(raw)
     assert_select "[role=status]", text: /Copy this token now\. It won't be shown again\./
     assert_select "button", text: "Copy token"
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it
@@ -260,6 +260,35 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     options = css_select("select[name=group_id] option").map { |option| option.text.strip }
     assert_equal [ "Author", "Read only" ], options
     assert_select "select[name=group_id] option[selected]", text: "Read only"
+  end
+
+  # A removed content type's name is dormant, not gone: a group is judged as
+  # stored, so it isn't offered to (or accepted from) someone who couldn't
+  # grant that name.
+  test "a group that stores a removed content type is not offered to a user who could only grant the live one, and a forged group_id is refused" do
+    holders = AccessControl::Group.create!(name: "Blog holders")
+    AccessControl::Grant.create!(group: holders, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    AccessControl::Membership.create!(user: users(:editor_branch), group: holders)
+    blog = AccessControl::Group.create!(name: "Blog tokens")
+    AccessControl::Grant.create!(group: blog, permission: "posts.edit", scope: { "content_types" => [ "blog" ] })
+    carrying = AccessControl::Group.create!(name: "Carrying")
+    AccessControl::Grant.create!(group: carrying, permission: "posts.edit", scope: { "content_types" => %w[blog retired_type] })
+    dormant = AccessControl::Group.create!(name: "Dormant")
+    AccessControl::Grant.create!(group: dormant, permission: "posts.edit", scope: { "content_types" => [ "retired_type" ] })
+    sign_in_as(users(:editor_branch))
+
+    get "/cs-studio/api_tokens"
+    options = css_select("select[name=group_id] option").map { |option| option.text.strip }
+    assert_includes options, "Blog tokens"
+    assert_not_includes options, "Carrying"
+    assert_not_includes options, "Dormant"
+
+    [ carrying, dormant ].each do |group|
+      assert_no_difference -> { ApiToken.count } do
+        post "/cs-studio/api_tokens", params: { name: "forged #{group.name}", group_id: group.id }
+      end
+      assert_response :forbidden
+    end
   end
 
   test "an author forging group_id = Admin is refused" do

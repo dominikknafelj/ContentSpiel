@@ -221,6 +221,7 @@ module RichText
       def reset!
         @nodes = {}
         @marks = {}
+        @version = nil
       end
 
       # A digest of every registered name plus its attribute *specs*
@@ -233,8 +234,14 @@ module RichText
       # the HTML render cache key (design spec §3.3) -- it needs to change
       # whenever a type's rendering-relevant shape changes, not on every
       # boot.
+      #
+      # Kept until the registry changes (`register`, `reset!`): every
+      # `Document#to_html` reads it for its cache key, cache hit or not, and
+      # it is a JSON dump and a SHA of the whole schema. A type's shape is
+      # set inside its registration block, before it enters the registry, so
+      # nothing changes it behind the memo.
       def version
-        Digest::SHA256.hexdigest(JSON.generate(
+        @version ||= Digest::SHA256.hexdigest(JSON.generate(
           "nodes" => signature_for(nodes),
           "marks" => signature_for(marks)
         ))
@@ -252,6 +259,10 @@ module RichText
         type = (kind == :node ? RichText::NodeType : RichText::MarkType).new(name)
         block&.call(type)
         registry[name] = type
+        # After the type is in: cleared first, a `version` read from another
+        # thread in between would memoise the schema without it.
+        @version = nil
+        type
       end
 
       # The content model (`group`/`content` on a node, `excludes` on a

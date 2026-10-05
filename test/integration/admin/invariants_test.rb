@@ -62,7 +62,7 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
     assert_difference -> { ApiToken.count }, 1 do
       post "/cs-studio/api_tokens", params: {
         name: "forged-params",
-        api_token: { user_id: users(:two).id, token_digest: "hand-typed", revoked_at: "" },
+        api_token: { user_id: users(:two).id, lookup_digest: "hand-typed", revoked_at: "" },
         group_id: access_control_groups(:admin).id
       }
     end
@@ -70,7 +70,7 @@ class Admin::InvariantsTest < ActionDispatch::IntegrationTest
     assert_response :success
     token = ApiToken.order(:id).last
     assert_equal users(:one), token.user, "a token must always belong to whoever created it, never a submitted user_id"
-    assert_not_equal "hand-typed", token.token_digest
+    assert_not_equal "hand-typed", token.lookup_digest
 
     assert_nil other_token.reload.revoked_at, "issuing a token for one user must not touch another user's tokens"
     assert_equal other_token, ApiToken.authenticate(other_raw)

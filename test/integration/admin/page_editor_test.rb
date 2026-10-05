@@ -86,7 +86,7 @@ class Admin::PageEditorTest < ActionDispatch::IntegrationTest
     # own `<%= text %>` -- unmodified, Task 2 -- gets from ERB) -- so this
     # matches either spelling rather than only the literal `'` the brief's
     # own snippet has.
-    assert_match(/Couldn.*?t save — 1 problem/, response.body.gsub("problems", "problem"))
+    assert_match(/Couldn.*?t save — 1 problem(?!s)/, response.body)
     # Same HTML-entity-escaped apostrophe as above.
     assert_match(/can.*?t be blank/, response.body)
   end

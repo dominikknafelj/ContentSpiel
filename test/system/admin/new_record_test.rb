@@ -199,7 +199,11 @@ class Admin::NewRecordSystemTest < ApplicationSystemTestCase
     assert_equal "Offline attempt", find("#new-page-title").value
     assert_button "Create page", disabled: false
     assert_no_selector "[data-admin--new-record-target=failure]", visible: :visible
+    # Turbo rethrows the failed submission's fetch, unhandled, after the
+    # controller has shown its message; that is the failure this test provokes.
+    expect_js_error(/TypeError: offline/, times: 2)
   end
+
   private
 
   # A row's "+" is drawn only while the pointer is over the row (or the link

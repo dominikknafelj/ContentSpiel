@@ -4,8 +4,8 @@ module Admin
     # token authenticates as), Group, Created, Last used (the IP on a second
     # line, "Never" before the first request), Status (Active / Revoked) and
     # Revoke… behind a confirm dialog. A revoked token stays listed, dimmed,
-    # with no action. No part of the token is shown: only its bcrypt digest is
-    # stored, and nothing else of it exists to mask.
+    # with no action. No part of the token is shown: only its SHA-256 lookup digest
+    # is stored, and nothing else of it exists to mask.
     #
     # `tokens` arrives already narrowed to what the viewer may see (their own,
     # or everyone's with `tokens.manage`) and ordered, with `user` and `group`

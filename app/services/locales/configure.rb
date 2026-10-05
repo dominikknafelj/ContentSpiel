@@ -31,6 +31,9 @@ module Locales
 
       errors = []
       SiteSetting.transaction do
+        # Locked and re-read first: the list below is compared with the
+        # stored languages, not with the `Current.site` copy loaded earlier.
+        site.lock!
         errors = apply(site)
         raise ActiveRecord::Rollback if errors.any?
       end
@@ -48,6 +51,8 @@ module Locales
     # `languages.manage` itself and answers a refusal as an error WITHOUT
     # recording an `access.denied` -- the caller has already authorized (and
     # answers a denial itself, as the one event), so this never fires there.
+    # The caller holds the settings row's lock (`site.lock!`, which re-reads
+    # it) before calling this, so `site.locales` is the stored list.
     # Still records `language.configured`, and only when
     # something changed. Returns the errors, empty on success.
     def apply(site)

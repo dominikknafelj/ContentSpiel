@@ -52,7 +52,7 @@ module Admin
     # stays one query (no per-tag count).
     def counts? = can?("posts.read")
 
-    def count_hint(count) = "#{count} #{'post'.pluralize(count)}"
+    def count_hint(count) = t("admin.tags.post_count", count: count)
 
     def rows
       pattern = Tag.sanitize_sql_like(query.downcase)

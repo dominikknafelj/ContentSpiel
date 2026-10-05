@@ -74,15 +74,9 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     from_x, from_y = centre.call("#{card(@third)} .admin-block-card__handle")
     _, first_y = centre.call("#{card(@first)} .admin-block-card__handle")
     to_y = first_y - 4
-    mouse = page.driver.browser.mouse
-    mouse.move(x: from_x, y: from_y)
-    mouse.down
-    6.times do |step|
-      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
-      sleep 0.08
-    end
+    mouse = drag_pointer(from_x, from_y, to_y)
     assert_selector "body > .admin-drag-fallback"
-    sleep 0.2
+    await_drag_slot "#content-blocks-list > .admin-drag-ghost", at: :first
     mouse.up
 
     assert_selector "#toasts .admin-toast[role=alert]", text: SIGNED_OUT, wait: 10
@@ -148,15 +142,9 @@ class Admin::UnsavedOrderSystemTest < ApplicationSystemTestCase
     from_x, from_y = centre.call("Move Alpha")
     _, gamma_y = centre.call("Move Gamma")
     to_y = gamma_y + 8
-    mouse = page.driver.browser.mouse
-    mouse.move(x: from_x, y: from_y)
-    mouse.down
-    6.times do |step|
-      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
-      sleep 0.08
-    end
+    mouse = drag_pointer(from_x, from_y, to_y)
     assert_selector "#tree li.admin-drag-ghost"
-    sleep 0.2
+    await_drag_slot "#tree li.admin-drag-ghost", at: :last
     mouse.up
 
     assert_selector "#toasts .admin-toast[role=alert]", text: SIGNED_OUT, wait: 10

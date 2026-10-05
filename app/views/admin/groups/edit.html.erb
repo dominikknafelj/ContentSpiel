@@ -6,6 +6,12 @@
 <% content_for :title, @group.name_was.presence || "Group" %>
 <h1 class="mb-4 text-h1 text-ink"><%= @group.name_was.presence || @group.name %></h1>
 
+<% if @stale_form %>
+  <div class="mb-4 max-w-[1000px]">
+    <%= render "admin/shared/stale_banner", message: Admin::GroupsController::STALE_MESSAGE, lead: Admin::GroupsController::STALE_LEAD, change: @stale_change, reload_path: edit_admin_group_path(@group, **admin_url_options) %>
+  </div>
+<% end %>
+
 <%= render "admin/groups/form", group: @group, grants: @grants, stale: @stale, members: @members, view_only: @view_only,
       url: admin_group_path(@group, **admin_url_options), method: :patch %>
 

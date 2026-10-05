@@ -44,8 +44,7 @@ class Admin::TreeSystemTest < ApplicationSystemTestCase
     # deadline passes. Asserting straight after the selector raced the
     # PATCH and failed intermittently on slower CI runners.
     assert_selector "ul[data-parent-id='#{@beta.id}'] li[data-page-id='#{@alpha.id}']"
-    deadline = Capybara.default_max_wait_time.seconds.from_now + 8.seconds
-    sleep 0.05 until @alpha.reload.parent == @beta || Time.current > deadline
+    assert_eventually(wait: Capybara.default_max_wait_time + 8) { @alpha.reload.parent == @beta }
     assert_equal @beta, @alpha.reload.parent
   end
 

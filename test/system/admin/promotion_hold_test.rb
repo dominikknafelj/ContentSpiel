@@ -1,12 +1,17 @@
 require "application_system_test_case"
 
-# The promotion hold (`app/javascript/autosave/queue.js`, "THE PROMOTION
+# The promotion hold (`app/javascript/autosave/promotion_hold.js`, "THE PROMOTION
 # HOLD"). A link into `#content` is a frame navigation that Turbo promotes to
 # a page visit once the frame has rendered, and that visit's start stops any
 # form submission Turbo's session is running: the POST is done on the server,
 # its answer (the redirect, the toast) dropped. From the frame's GET going out
 # until the promoted visit has completed, a non-GET submission is therefore
 # held and submitted afterwards.
+#
+# The clicks inside this file's `execute_script` strings are deliberate: they
+# land in the same tick as the preceding edit or the held request, which a native click (`press`) cannot do --
+# it is a separate CDP round trip, by which time the debounce, the queue or
+# Turbo has moved on. They are what the test is about, not a shortcut.
 class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -164,7 +169,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     draft = Current.set(actor: users(:one)) { create_post(title: "A draft", published: false) }
     visit admin_posts_path
     await_admin_controllers
-    find("#select-post-#{draft.id}").execute_script("this.click()")
+    find("#select-post-#{draft.id}").click
     within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
     assert_selector "dialog#bulk-trash-dialog[open]"
     hold_frame_fetches
@@ -272,6 +277,9 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
     assert_equal 1, writes
     assert_not @page.reload.trashed?
+    # Turbo rethrows the failed fetch of the frame navigation, unhandled; that
+    # is the failure this test provokes.
+    expect_js_error(/TypeError: Failed to fetch/, times: 2)
   end
 
   test "a frame answer without the frame releases what was held" do
@@ -287,6 +295,9 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_selector "[role=status]", text: "Restored “Section”", wait: 10
     assert_equal 1, writes
     assert_not @page.reload.trashed?
+    # Turbo throws on an answer without the frame it asked for; that is the
+    # answer this test provokes.
+    expect_js_error(/did not contain the expected <turbo-frame id="content">/)
   end
 
   # Round 3: a non-opted `_top` form inside `#content` whose screen is

@@ -32,6 +32,11 @@ pin_all_from "app/javascript/autosave", under: "autosave", preload: "admin"
 # the rich-text link search share.
 pin_all_from "app/javascript/search", under: "search", preload: "admin"
 
+# The strings a script shows, read from the server's `data-messages`
+# (`Admin::MessagesHelper`; docs/reference/i18n.md). Only CS Studio's
+# controllers import it today.
+pin_all_from "app/javascript/i18n", under: "i18n", preload: "admin"
+
 # The upload queue the Media screen's drop zone and the media picker share:
 # files go up one at a time as progress tiles at the start of a grid.
 pin_all_from "app/javascript/media", under: "media", preload: "admin"

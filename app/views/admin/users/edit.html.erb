@@ -22,6 +22,12 @@
     <% if @last_sign_in %>Last signed in <%= render Admin::TimeAgoComponent.new(time: @last_sign_in) %>.<% else %>Never signed in.<% end %>
   </p>
 
+  <% if @stale_form %>
+    <div class="mb-4">
+      <%= render "admin/shared/stale_banner", message: Admin::UsersController::STALE_MESSAGE, lead: Admin::UsersController::STALE_LEAD, change: @stale_change, reload_path: edit_admin_user_path(@user, **admin_url_options) %>
+    </div>
+  <% end %>
+
   <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
   <% case state %>

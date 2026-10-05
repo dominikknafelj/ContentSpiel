@@ -1,0 +1,86 @@
+# The Tags screen (docs/reference/i18n.md): `admin.tags.index` is the view's
+# own lazy-lookup scope (`app/views/admin/tags/index.html.erb`), `dialogs` the
+# sentences `Admin::TagsHelper` chooses between for the Merge and Delete
+# dialogs, `toasts` what `Admin::TagsController` answers with, `merge` the
+# refusals `Tags::Merge` returns, and `post_count` the "N posts" the Posts
+# column and the tag chips' suggestions share.
+#
+# THE NAME IN THE DIALOG SENTENCES stays in “curly quotes”, literally:
+# `admin--tag-dialogs` finds the live tag name inside the finished sentence by
+# those quotes and swaps it after an inline rename. A language that quotes
+# differently (German „Name“) changes the quotes here and in that controller's
+# one `QUOTES` pair together.
+#
+# Each shape of a sentence is a whole sentence of its own, never one glued from
+# clauses, so a translator can reorder it: `visible` is a count the viewer can
+# see in the list's own column, `partly_hidden` a count that is larger than
+# that column (posts in the trash, or ones the viewer can't open), and
+# `uncounted` the wording for a viewer who may not read posts at all, who is
+# told no number.
+en:
+  admin:
+    tags:
+      post_count:
+        one: "%{count} post"
+        other: "%{count} posts"
+
+      index:
+        title: "Tags"
+        intro: "Tags are created when you add them to a post. Click a name to rename it."
+        empty:
+          title: "No tags yet"
+          description: "Tags appear here once a post uses one."
+        columns:
+          name: "Name"
+          posts: "Posts"
+          save_status: "Save status"
+          actions: "Actions"
+        name_label: "Name of %{name}"
+        no_count: "Not shown: you can't read posts"
+        actions_label: "Actions for %{name}"
+        merge_item: "Merge into…"
+        delete_item: "Delete tag…"
+        merge_dialog:
+          title: "Merge tag"
+          picker_label: "Merge into"
+          picker_placeholder: "Find a tag…"
+          cancel: "Cancel"
+          submit: "Merge tags"
+          busy: "Merging…"
+        delete_dialog:
+          title: "Delete tag?"
+          submit: "Delete tag"
+
+      dialogs:
+        # Said by `admin--tag-dialogs` when the delete answer is a refusal.
+        delete_failed: "The tag wasn't deleted. Reload the list and try again."
+        merge:
+          title: "Merge “%{name}” into…"
+          uncounted: "Its posts get the chosen tag and “%{name}” is deleted. This can't be undone."
+          none: "No posts use it, so nothing moves. “%{name}” is deleted. This can't be undone."
+          visible:
+            one: "Its %{count} post gets the chosen tag and “%{name}” is deleted. This can't be undone."
+            other: "Its %{count} posts get the chosen tag and “%{name}” is deleted. This can't be undone."
+          partly_hidden:
+            one: "Its %{count} post, which is in the trash or one you can't open, gets the chosen tag and “%{name}” is deleted. This can't be undone."
+            other: "Its %{count} posts, including ones in the trash or that you can't open, get the chosen tag and “%{name}” is deleted. This can't be undone."
+        delete:
+          title: "Delete “%{name}”?"
+          uncounted: "It is removed from every post that uses it. The posts themselves stay."
+          none: "No posts use it."
+          visible:
+            one: "It is removed from %{count} post. The posts themselves stay."
+            other: "It is removed from %{count} posts. The posts themselves stay."
+          partly_hidden:
+            one: "It is removed from %{count} post, which is in the trash or one you can't open. The posts themselves stay."
+            other: "It is removed from %{count} posts, including ones in the trash or that you can't open. The posts themselves stay."
+
+      toasts:
+        deleted: "Deleted “%{name}”"
+        merged: "Merged “%{source}” into “%{into}”"
+
+      # `Tags::Merge`'s refusals, shown as toasts.
+      merge:
+        same_tag: "Choose a different tag to merge into."
+        missing_tag: "Choose a tag to merge into."
+        gone: "That tag no longer exists."

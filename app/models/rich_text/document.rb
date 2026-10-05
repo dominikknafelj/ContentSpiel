@@ -172,12 +172,22 @@ module RichText
     # nothing once the asset is gone. Without it, Solid Cache would keep
     # serving the first render of each of those forever.
     #
+    # A preview render is never cached. The content version moves only when
+    # *published* output can have changed (technical cleanup spec §4.8), and
+    # a preview shows more than that: a link to a draft is a link there, at
+    # the draft's current address, and neither a draft's slug nor its trip to
+    # the trash moves the version. Keyed on it, a preview would keep an old
+    # href until some published change; rendered every time, it is what the
+    # editor just saved. Only signed-in editors pay for it (`/preview` and
+    # CS Studio's own reference renders).
+    #
     # `RichText.code_revision` (final fix wave, C) covers the last input:
     # the code itself. `Schema.version` only changes when a type's
     # *attributes* do; a changed `html` block or component template doesn't
     # touch it, and Solid Cache outlives a deploy.
     def to_html(locale: I18n.locale, urls: PublicSite::Urls.new)
       context = RichText::RenderContext.new(locale: locale, urls: urls, document: self)
+      return RichText::HtmlRenderer.new(context).render(self) if context.preview
 
       Rails.cache.fetch([ "rich_text", digest, RichText::Schema.version, locale, context.preview, context.content_version, RichText.code_revision ]) do
         RichText::HtmlRenderer.new(context).render(self)
@@ -221,10 +231,17 @@ module RichText
     # `AAAA`-vs-`BBBB` documents 24 levels deep). So this can't recurse
     # (Ruby method calls, unlike this loop's Array, share one bounded C
     # stack) and can't skip content at any depth -- see `#write_canonical`.
+    #
+    # Computed once per instance: a document is a value over the hash it was
+    # built from (`#initialize` takes its own stringified copy, and nothing
+    # writes into `#to_h` afterwards), and one render asks for the digest on
+    # a cache hit and a miss alike.
     def digest
-      sha = Digest::SHA256.new
-      write_canonical(@hash, sha)
-      sha.hexdigest
+      @digest ||= begin
+        sha = Digest::SHA256.new
+        write_canonical(@hash, sha)
+        sha.hexdigest
+      end
     end
 
     # Walks the document against `RichText::Schema` and returns every
