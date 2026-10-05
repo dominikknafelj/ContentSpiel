@@ -33,6 +33,7 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | Translation helpers: outdated tracking, status everywhere, the Translations matrix, translated site title and tagline, AI translation suggestions | `2026-10-02-translation-helpers-design.md` |
 | CS Studio design pass, three rounds (PRs #35–#37, #45): tokens and theme, shared components, the shell and ⌘K; the editors, side-by-side translation, the dashboard and posts list; Settings, Media, Groups, Users, Tags, Trash, the audit log, System status, the preview bar, the Mind graph | `2026-10-03-cs-studio-design-pass-design.md` (§12 lists where round 3 departs from it) |
 | Five staff-review bugs (S1–S5) | PR #39 and design pass round 3 |
+| Technical cleanup: system tests that fail on JavaScript errors, click natively and wait without fixed sleeps; a behavioural service contract and a dependency-direction guard; the admin i18n key scheme; `queue.js` and `CLAUDE.md` split; one grant per permission, dormant names judged as stored, stale checks on the group and user forms, the owner flag through one endpoint, API tokens found by an indexed digest, language changes under a row lock; URLs synced only when they can have changed; a content version that moves only on published changes | `2026-10-05-technical-cleanup-design.md` (§10 lists the rulings made while building) |
 
 ## Next, in order
 
@@ -48,7 +49,7 @@ Agreed 2026-10-04. Each is its own sub-project with a spec and one PR.
    - Not here: the contact form (see "Forms"), editor-defined types (see "Custom content types"). Needs designs for each block's editor card and public rendering.
 3. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
 4. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
-5. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the i18n key scheme for the admin, decided at the start of this sub-project. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
+5. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the admin. The key scheme exists (`docs/reference/i18n.md`), and the shared components, the admin layout and the Tags screen are converted and guarded (`test/lib/admin_i18n_test.rb`); every other screen is still inline English, so this sub-project converts them, adds the German file and decides how CS Studio picks its own UI language. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
 
 ## Before the first deploy
 
@@ -59,24 +60,17 @@ Everything here is Must. Three sub-projects; none is scheduled against the list 
 | Item | Ref |
 |---|---|
 | Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | L1–L4 |
-| API token lookup by an indexed SHA-256 digest. Today MCP auth does one bcrypt comparison per active token, and tokens accumulate, so authenticating gets linearly slower and costs an unauthenticated caller the same | S9 |
-| Lost updates on the group and user forms: neither carries a stale check and each replaces whole lists (grants, members, a user's groups), so of two admins saving the same record the second silently undoes the first. `base_updated_at` and a 409 as Settings has; `replace_grants`, `sync_members` and `sync_groups` must touch the record | Round 3 final review |
-| Access control, dormant grant names: `can_assign_group?`, `can_manage_group?` and `Groups::Save`'s member loop judge a group's live grants only. A removed content type's name grants nothing while the type is unregistered, but it can be handed on with a membership or a token by someone who couldn't grant it, and it revives if a type of that name is registered again. Judge the carried scope instead | Round 3, Tasks 10–12 |
-| Access control, grants per permission: no unique index on `access_control_grants (group_id, permission)` while the group editor shows one grant per key, so a group holding two loses one on a save from the screen; `Groups::Save#live` matches greedily and can refuse a harmless shrink in that state | Round 3, Task 10 |
-| Owner flag: `:owner` is still permitted in the ordinary user params (a second door beside `PATCH users/:id/owner`, owners only), and `Users::Save#owner_change?` reads a blank value as a flip | Round 3, Task 12 |
-| Guarantees by behaviour, not grep: a behavioural service contract test, and the remaining permitted-attribute slices | S19, S21, S24 |
-| `site_settings.locales` is read, changed and written without a row lock: two language changes at once can lose one. `lock!` the row in `Locales::Enable`, `Disable`, `MakeDefault`, `Configure` and `Settings::Save` | Round 3 final review |
+| `Settings::Save` assigns the attributes it is handed; give it an allow-list as `Pages::Save` and `Posts::Save` have | S21 |
+| Access control, unregistered permission keys: `can_assign_group?`, `can_manage_group?` and `Groups::Save`'s added-member check skip a grant whose permission is no longer registered (a removed plugin's key). It grants nothing meanwhile, but someone who never held it can hand it on with a membership or a token, and it revives if the key is registered again. Judge it as stored, as a removed content type's name is | Technical cleanup §10 |
 
 ### Performance and caching
 
-In this order; each step needs the one before.
+In this order; each step needs the one before. The two steps they build on shipped with the technical cleanup: URLs are synced only when they can have changed, and the content version is one counter row that moves only on published changes.
 
 | Step | Ref |
 |---|---|
-| 1. Stop recomputing URLs on every page save: sync `public_paths` only when slug, parent, position, publication or trash state changed, set-based, from the services rather than `after_save` | S6, M2 |
-| 2. A content version that moves only on changes to published output (one version row), instead of 14 aggregate queries per public request that any draft autosave invalidates; preload after `stale?` | S7, S8 |
-| 3. A whole-page cache inside Rails keyed on the version row, path and language, so every publishing change takes effect at once | C1 |
-| 4. A "Clear cache" button: site-wide under System (its own permission, audited) and "Clear this page's cache" in the editor's ⋯ menu, for what the services can't see (a console change, a restored backup, a stuck CDN) | C6 |
+| 1. A whole-page cache inside Rails keyed on the version row, path and language, so every publishing change takes effect at once. Revisit here whether URL and version maintenance move from the models' callbacks into the services | C1, M2 |
+| 2. A "Clear cache" button: site-wide under System (its own permission, audited) and "Clear this page's cache" in the editor's ⋯ menu, for what the services can't see (a console change, a restored backup, a stuck CDN) | C6 |
 
 Then, Should: caching as a per-instance setting under Settings (the shared lifetime sent to proxies and CDNs, default 0; a CDN provider with encrypted credentials from a registry like `AI::Providers`, purged from a job after each version bump) (C7); a cache lifetime per page for static pages, as presets in the page settings (C8); library images served in Active Storage proxy mode with long-lived headers (C2); 404s cached briefly, and purge on publish once a CDN exists (C3, C4). Could: fragment and admin-side caching, deliberately deferred until measuring shows a need (C5).
 
@@ -202,7 +196,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
 | MCP `list_posts` paginated, without rendering bodies | Should | S12 |
 | Lazy-load Tiptap instead of evaluating it on every admin page | Should | S13 |
-| Indexes the queries need: `updated_at` / `published_at` on posts and pages, one GIN index on the slug jsonb, `content_blocks.block_type` | Should | D1–D3 |
+| One GIN index on the slug jsonb (slugs and titles are queried inside jsonb with no index) | Should | D2 |
 | The audit log pages by `offset` over `last_occurred_at`, which moves when an event coalesces, so a row can repeat or be skipped between pages: keyset paging on `(last_occurred_at, id)` | Should | Round 3 |
 | The dashboard feed's event query grows with the readable set (hashed subplans, a `work_mem` cliff on a very large site); dashboard drafts without the per-row audit join | Could | S17, round 2 |
 | `StateIndex.rebuild_all` runs synchronously on a language change, proportional to the site; `translated_record_count` runs on every Settings render for a `languages.manage` holder | Could | Round 2, round 3 |
@@ -220,25 +214,23 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | A schedule set in the same save as other fields is recorded inside `*.updated`, so the log says "edited", not "scheduled" | Could | Round 3 |
 | `ContentModel::FieldSet#assign` drops an unparseable date or integer for any caller but the post editor: a block's settings silently lose the value | Could | Round 2 |
 | Social links are a jsonb hash, so their row order isn't kept and two rows with one label collapse; a scripted client posting them as an array clears the stored links | Could | Round 3 |
-| Smaller defects: `AccessControl.holds?` counts a grant whose content types are all unregistered; `Tags::Merge` racing a `Posts::Save` that inserts the same tag answers "image doesn't exist"; unbounded titles in single-record flashes; forged param shapes that 500; a translate timeout that doesn't abort; two ways to enable a language; Duplicate across two transactions; a plugin's starter sample with a key outside the Save allow-lists raises | Could | S26–S32, round 3, PR #39 |
+| Smaller defects: `Tags::Merge` racing a `Posts::Save` that inserts the same tag answers "image doesn't exist"; unbounded titles in single-record flashes; forged param shapes that 500; a translate timeout that doesn't abort; two ways to enable a language; Duplicate across two transactions; a plugin's starter sample with a key outside the Save allow-lists raises | Could | S26–S32, round 3, PR #39 |
 
 ### Structure
 
 | Item | Priority | Ref |
 |---|---|---|
-| Fix the remaining dependency inversions (a model calling `ApplicationController.render`, a model calling services, models and queries using route helpers), then a guard test. The direction is written down in `CLAUDE.md` ("Dependency order") | Should | M1 |
 | One shared `fetchStream` helper, and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
 | One segmented-control component (drawn by hand on four screens) | Could | Round 3 |
-| Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
+| Split `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
 | Remove leftovers: the ActionText import path, unused Action Mailbox and Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
-| `CLAUDE.md` is about 127 KB and loaded into every session: move the per-screen descriptions to `docs/` and keep rules and pitfalls | Could | Round 3 final review |
 
 ### Tests
 
 | Item | Priority | Ref |
 |---|---|---|
-| System tests fail on JavaScript errors and click natively; a Tiptap schema drift test; tests for the Turbo internals `queue.js` relies on (`turbo-rails` is pinned to 2.0.23) | Should | S22, S23, S25 |
-| Fixed sleeps in system tests (a stubbed provider delay, wall-clock windows) are load-sensitive; replace them with flags the stubs set | Should | Round 2 |
+| A Tiptap schema drift test; tests for the Turbo internals the write queue relies on (`turbo-rails` is pinned to 2.0.23) | Should | S23, S25 |
+| Two-connection race tests for the settings row lock (`Settings::Save`, `Locales::Enable` / `Disable` / `MakeDefault` / `Configure`): today the tests prove where the lock is taken and what is read after it, not two writers meeting | Could | Technical cleanup §10 |
 | The system suite flakes at 12 parallel workers on a laptop (run it with `PARALLEL_WORKERS=6`): a leaner browser fixture, or CI-sized runners | Could | Round 2 |
 | Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
 
@@ -276,7 +268,20 @@ Small follow-up fixes to `app/javascript/autosave/queue.js` and its neighbours; 
 
 - The leave guard doesn't ask about a GET form submitted into `#content` or a script setting the frame's `src` (no explicit-save screen has either), and Back to an entry from before a full page load gets only the browser's own prompt.
 - A refused Settings save can't put a chosen logo file back.
-- A non-owner who couldn't grant a carried removed content type must press Remove before changing that group row in any other way, else the save is a 403. The locked tick ("You can't grant this") is unreachable from stored data and kept only as a defensive rendering.
+- A group that stores a removed content type's name is view-only for a manager who couldn't grant that type, until an owner or someone whose own grant covers the name removes it. The locked tick ("You can't grant this") is unreachable from stored data and kept only as a defensive rendering.
+- Issuing or revoking a token moves no group's `updated_at`, so a group form opened before it isn't stale, though the group's delete dialog names its tokens.
+- The stale banner names nobody when a group was changed from a user's editor or a user from a group's: the audit event is the other record's.
+
+### Public URLs and the content version
+
+Left by the technical cleanup (spec §10). The caching sub-project ("Performance and caching" above) revisits how URLs and the version are maintained, and is where these are picked up.
+
+- A record that had to yield its address to another has no URL in that language, and neither have the descendants of a page that yielded. An unrelated save no longer tries again and the editor is told nothing; only a save that changes a URL input, a listing block write or `bin/rails public_paths:rebuild` syncs it. Rare: it needs a slug clash that validation normally refuses. The same rebuild is needed after a content type is registered again, for the posts that lost their URLs with it.
+- `PublicSite::Paths.rebuild!` lets a page win a clash between a page and a post, where the incremental sync lets the current holder keep the address, so a rebuild can move an address between the two.
+- The go-live sweep (`PublicSite::SyncWentLiveJob`, every five minutes) re-reads the listed posts for 24 hours after any publish, and logs a yielded post's warning on each run. It writes `public_paths` in the background without a lock, so it can meet an editor's save on the unique index and one of the two fails (the same race two concurrent saves have).
+- A restored backup rewinds the version counter to values already used: `bin/rails public_site:bump_version` is not enough, the cache must be cleared too, and a browser's or CDN's stored ETag can match again until the counter has passed its old value. The bump task should jump past it. A database whose version row was recreated with an id above 1 needs the stray rows deleted and the cache cleared.
+- An `after_commit` callback that raises stops the callbacks queued behind it, a deferred version bump among them; the data is committed and the old pages stay cached until the next bump or `bin/rails public_site:bump_version`.
+- Without `KAMAL_VERSION` or a `REVISION` file, `RichText.code_revision` is random per boot, so two processes of one release build different cache keys and ETags.
 
 ### Media
 
