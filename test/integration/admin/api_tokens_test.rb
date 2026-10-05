@@ -42,7 +42,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
       assert_select "button", text: "Revoke…", count: 0
       assert_select "[class~='opacity-60']" # dimmed, still listed
     end
-    assert_not_includes response.body, active.token_digest
+    assert_not_includes response.body, active.lookup_digest
   end
 
   test "the page is a numbered flow: create a token, add it to your assistant, the tokens table" do
@@ -95,7 +95,7 @@ class Admin::ApiTokensTest < ActionDispatch::IntegrationTest
     assert_equal users(:one), token.user
     assert_equal access_control_groups(:read_only), token.group
     assert_equal "claude-desktop", token.name
-    assert token.authenticate_token(raw)
+    assert_equal token, ApiToken.authenticate(raw)
     assert_select "[role=status]", text: /Copy this token now\. It won't be shown again\./
     assert_select "button", text: "Copy token"
     assert_select "pre", text: /#{raw}/ # the client config snippet carries it

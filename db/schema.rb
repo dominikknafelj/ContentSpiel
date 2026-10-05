@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_05_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_05_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -76,13 +76,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_130000) do
     t.datetime "last_used_at"
     t.string "last_used_ip"
     t.datetime "revoked_at"
-    t.string "token_digest", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.bigint "group_id", null: false
     t.string "name", null: false
+    t.string "lookup_digest", null: false
     t.index "user_id, lower((name)::text)", name: "index_api_tokens_on_user_and_lower_name_active", unique: true, where: "(revoked_at IS NULL)"
     t.index ["group_id"], name: "index_api_tokens_on_group_id"
+    t.index ["lookup_digest"], name: "index_api_tokens_on_lookup_digest", unique: true
     t.index ["user_id"], name: "index_api_tokens_on_user_id"
   end
 

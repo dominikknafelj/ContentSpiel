@@ -13,8 +13,8 @@ class AddNameToApiTokensMigrationTest < ActiveSupport::TestCase
     ApiToken.reset_column_information
 
     group = access_control_groups(:admin)
-    rows = [ users(:one), users(:one), users(:two), users(:one) ].map do |user|
-      { user_id: user.id, group_id: group.id, token_digest: "digest", created_at: Time.current, updated_at: Time.current }
+    rows = [ users(:one), users(:one), users(:two), users(:one) ].each_with_index.map do |user, index|
+      { user_id: user.id, group_id: group.id, lookup_digest: "digest-#{index}", created_at: Time.current, updated_at: Time.current }
     end
     ids = ApiToken.insert_all(rows, returning: %w[id]).rows.flatten
 

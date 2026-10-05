@@ -136,7 +136,8 @@ class AuditEventsTest < ActiveSupport::TestCase
     Audit::Event.where(subject: token).find_each do |event|
       json = event.attributes.to_json
       assert_not_includes json, raw
-      assert_not_includes json, token.token_digest
+      assert_not_includes json, token.lookup_digest
+      assert_not_includes json, "lookup_digest"
       assert_not_includes json, "token_digest"
     end
   end

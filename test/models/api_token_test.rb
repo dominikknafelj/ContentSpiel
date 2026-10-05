@@ -11,13 +11,41 @@ class ApiTokenTest < ActiveSupport::TestCase
     assert token.persisted?
     assert_equal @user, token.user
     assert_not_nil raw
-    assert_not_equal raw, token.token_digest
+    assert_not_equal raw, token.lookup_digest
+    assert_equal ApiToken.digest(raw), token.lookup_digest
   end
 
   test "authenticate finds the token matching the raw value" do
     token, raw = ApiToken.generate!(@user)
 
     assert_equal token, ApiToken.authenticate(raw)
+  end
+
+  test "authenticate finds nothing for a blank or missing value" do
+    ApiToken.generate!(@user)
+
+    assert_nil ApiToken.authenticate("")
+    assert_nil ApiToken.authenticate("   ")
+    assert_nil ApiToken.authenticate(nil)
+  end
+
+  test "a revoked-by-migration placeholder digest can't be produced by any presented value" do
+    token, = ApiToken.generate!(@user)
+    token.update_columns(lookup_digest: "revoked:#{token.id}", revoked_at: Time.current)
+
+    assert_nil ApiToken.authenticate("revoked:#{token.id}")
+  end
+
+  test "authenticating costs one query however many active tokens there are" do
+    token, raw = ApiToken.generate!(@user)
+    one = count_queries { assert_equal token, ApiToken.authenticate(raw) }
+
+    users = Array.new(30) { |i| User.create!(email_address: "bulk#{i}@example.com", password: "password12345") }
+    users.each { |user| ApiToken.generate!(user) }
+    many = count_queries { assert_equal token, ApiToken.authenticate(raw) }
+
+    assert_equal one, many
+    assert_equal 1, many
   end
 
   test "authenticate returns nil for a wrong value" do
@@ -47,7 +75,7 @@ class ApiTokenTest < ActiveSupport::TestCase
   end
 
   test "a token requires a user" do
-    token = ApiToken.new(token_digest: "x")
+    token = ApiToken.new(lookup_digest: "x")
 
     assert_not token.valid?
     assert_includes token.errors[:user], "must exist"
@@ -100,14 +128,14 @@ class ApiTokenTest < ActiveSupport::TestCase
     ApiToken.generate!(@user, name: "Claude")
     group = access_control_groups(:admin)
     assert_raises(ActiveRecord::RecordNotUnique) do
-      ApiToken.new(user: @user, group:, name: "CLAUDE", token_digest: "x").save!(validate: false)
+      ApiToken.new(user: @user, group:, name: "CLAUDE", lookup_digest: "x1").save!(validate: false)
     end
   end
 
   test "the index lets a name be used again once the first token is revoked" do
     first, = ApiToken.generate!(@user, name: "Claude")
     first.revoke!
-    ApiToken.new(user: @user, group: first.group, name: "Claude", token_digest: "x").save!(validate: false)
+    ApiToken.new(user: @user, group: first.group, name: "Claude", lookup_digest: "x2").save!(validate: false)
     assert_equal 2, ApiToken.where(user: @user, name: "Claude").count
   end
 
@@ -146,5 +174,14 @@ class ApiTokenTest < ActiveSupport::TestCase
   ensure
     ApiToken.singleton_class.send(:remove_method, :next_default_name)
     ApiToken.define_singleton_method(:next_default_name, original)
+  end
+
+  private
+
+  def count_queries(&block)
+    count = 0
+    counter = ->(*, payload) { count += 1 unless %w[SCHEMA TRANSACTION].include?(payload[:name]) || payload[:cached] }
+    ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
+    count
   end
 end

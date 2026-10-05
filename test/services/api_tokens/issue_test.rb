@@ -158,7 +158,7 @@ class ApiTokens::IssueTest < ActiveSupport::TestCase
     # Forces the race: after the service's own pre-check has passed, a
     # duplicate active token appears (validation skipped) just before its write.
     ApiToken.define_singleton_method(:generate!) do |user, **options|
-      ApiToken.new(user:, group: options[:group], name: options[:name], token_digest: "x").save!(validate: false)
+      ApiToken.new(user:, group: options[:group], name: options[:name], lookup_digest: "forced-duplicate").save!(validate: false)
       original.call(user, **options)
     end
 

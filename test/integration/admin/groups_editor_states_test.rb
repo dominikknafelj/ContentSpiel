@@ -600,8 +600,8 @@ class Admin::GroupsEditorStatesTest < ActionDispatch::IntegrationTest
       assert_select "button[type=submit]", text: "Delete group"
     end
     assert_not_includes response.body, raw
-    assert token.token_digest.present?
-    assert_not response.body.include?(token.token_digest), "the token's digest is in the page"
+    assert token.lookup_digest.present?
+    assert_not response.body.include?(token.lookup_digest), "the token's digest is in the page"
     assert_select "form#group-form dialog", count: 0
     assert_select "form#group-form form", count: 0
 
