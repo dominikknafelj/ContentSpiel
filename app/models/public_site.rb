@@ -77,7 +77,9 @@ module PublicSite
     Current.content_version ||= content_version
   end
 
-  # Moves the counter: one atomic `UPDATE ... SET counter = counter + 1`.
+  # Moves the counter: one atomic statement, `INSERT ... ON CONFLICT (id) DO
+  # UPDATE SET counter = counter + 1` (`PublicSite::Version.bump!`), so the
+  # first bump of a database without the row counts like every later one.
   #
   # After the commit of whatever transaction is open *when it is called*
   # (`ActiveRecord.after_all_transactions_commit`, the same deferral

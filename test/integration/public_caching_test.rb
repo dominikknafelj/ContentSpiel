@@ -201,9 +201,10 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
   end
 
   # The version is read before what it stands for: the settings row, the
-  # resolver's lookup and the record. On a language-prefixed URL the route
-  # constraint has loaded the settings row before any controller code; it is
-  # read again after the version.
+  # resolver's lookup and the record. On every URL but `/` the locale route's
+  # constraint has loaded the settings row before any controller code -- for
+  # `/de`, and for `/about` too, whose first segment the router offers to that
+  # route first; it is read again after the version.
   test "a request reads the content version before the settings row and the record" do
     with_locales(%w[en de], default: "en")
     assert Pages::Save.call(@root, translations: { "de" => { title: "Start" } }).ok?
@@ -215,7 +216,7 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     Current.reset
     plain = order.call(capture_sql { get "/" })
     assert_response :success
-    assert_operator plain[:version].first, :<, plain[:site].first, "an unprefixed URL: nothing loads the settings row before the version"
+    assert_operator plain[:version].first, :<, plain[:site].first, "the homepage: nothing loads the settings row before the version"
     assert_operator plain[:version].first, :<, plain[:paths].first
     assert_equal 1, plain[:site].size
 
@@ -225,6 +226,15 @@ class PublicCachingTest < ActionDispatch::IntegrationTest
     assert_operator prefixed[:version].first, :<, prefixed[:site].last, "a prefixed URL: the settings row is read again after the version"
     assert_operator prefixed[:version].first, :<, prefixed[:paths].first
     assert_equal 2, prefixed[:site].size
+
+    Page.create!(parent: @root, title: "About", published_at: 1.day.ago)
+    Current.reset
+    unprefixed = order.call(capture_sql { get "/about" })
+    assert_response :success
+    assert_operator unprefixed[:site].first, :<, unprefixed[:version].first, "an unprefixed URL below the homepage: the locale constraint asked first"
+    assert_operator unprefixed[:version].first, :<, unprefixed[:site].last, "and the settings row is read again after the version"
+    assert_operator unprefixed[:version].first, :<, unprefixed[:paths].first
+    assert_equal 2, unprefixed[:site].size
   end
 
   test "unknown paths render the theme 404" do

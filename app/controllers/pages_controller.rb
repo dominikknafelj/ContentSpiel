@@ -29,10 +29,12 @@ class PagesController < PublicController
   # Prepended, so it runs before every other callback here. The settings row
   # can still have been loaded earlier: the locale-prefixed route's
   # constraint (`LocaleRouteConstraint`) asks which languages are enabled
-  # before any controller code runs. That copy is dropped, so the row this
-  # response is rendered from is read after the version too -- one more
-  # query on a prefixed URL, none on an unprefixed one, where nothing has
-  # loaded it yet.
+  # before any controller code runs -- for every URL with a first segment,
+  # since the router tries that route first and only the constraint says
+  # that "about" in `/about` is no language. That copy is dropped, so the
+  # row this response is rendered from is read after the version too: one
+  # more query on every URL but `/`, the one address the prefixed route
+  # can't match and so the one where nothing has loaded the row yet.
   prepend_before_action :read_content_version_first
 
   def show

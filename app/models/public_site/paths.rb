@@ -51,8 +51,12 @@ module PublicSite
     # about to be replaced, and never from a path the parent wants but won't
     # get. That takes two passes: the first works every path out as if every
     # page got the one it wants, which is what says which addresses to ask
-    # `held_by_others` about; the second (`settle`) goes top-down again and
-    # hands a page's children only the paths that page keeps -- not nil, not
+    # `held_by_others` about -- so `held` is computed for that optimistic set,
+    # which can name an address a page stops wanting once its parent yields:
+    # too cautious at worst, never too permissive, since every address the
+    # second pass can hand out was asked about; the second (`settle`) goes
+    # top-down again and hands a page's children only the paths that page
+    # keeps -- not nil, not
     # another record's live address, not already given to an earlier page of
     # the pass. A page that has to yield keeps the path it wanted in what
     # `write_all` is handed (so it is treated as a yield and keeps its

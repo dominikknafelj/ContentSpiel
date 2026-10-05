@@ -247,7 +247,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
   # is another record's URL space ("no URL yet, never borrow one").
   test "a page that yields inside a subtree sync leaves its descendants without an address there" do
     team = Page.create!(parent: @root, title: "Team", published_at: 1.day.ago)
-    Page.create!(parent: team, title: "Alice", published_at: 1.day.ago)
+    alice = Page.create!(parent: team, title: "Alice", published_at: 1.day.ago)
     old = Page.create!(parent: @root, title: "Team old", published_at: 1.day.ago)
     bob = Page.create!(parent: old, title: "Bob", published_at: 1.day.ago)
     Mobility.with_locale(:de) { old.update!(slug: "mannschaft") }
@@ -259,6 +259,7 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     PublicSite::Paths.sync_subtree(@root.reload)
 
     assert_equal "/team", current(team, "de")
+    assert_equal "/team/alice", current(alice, "de"), "the holder's own child keeps its unchanged row: it is not taken for a clash"
     assert_nil current(old, "de"), "the page that didn't ask yields"
     assert_nil current(bob, "de"), "and its child is not put under the other page's address"
     assert_not PublicPath.exists?(locale: "de", path: "/team/bob")

@@ -38,6 +38,17 @@ require "ripper"
 # The lists can't rot: a `# version: none` on a line with no such write, and
 # a RECEIVERS or FILES entry that excuses nothing, both fail.
 #
+# What it does not see (the lexer reads lines, not receivers' types):
+# - `update`, `delete` or `insert` on a connection held in a block variable
+#   (`with_connection { |c| c.update(sql) }`): only `connection.` spells
+#   those three, since every model has an `update` and a Hash a `delete`;
+# - `execute` or an `exec_...` called without parentheses (`c.execute sql`);
+# - `record.delete()` with empty parentheses, which reads as the
+#   collection kind of `delete(`;
+# - raw SQL on a line whose statement starts with a RECEIVERS constant
+#   (`User.connection.execute("UPDATE pages ...")`): the receiver excuses
+#   the line whatever table the SQL names.
+#
 # A tripwire, not a proof, like `service_contract_test.rb`: a file passes by
 # bumping anywhere in it. Whether each path bumps when it should is
 # `test/models/public_site/version_test.rb`.
