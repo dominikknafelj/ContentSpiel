@@ -1,230 +1,328 @@
 # ContentSpiel roadmap
 
-Living document (started 2026-09-26). ContentSpiel is a **generic, self-hosted CMS** that non-technical editors enjoy using and developers can extend without forking. Priorities: **Must** (needed before we'd call it a usable generic CMS), **Should**, **Could**. Refactors are judged against this list: they must open the seams these items need and never make one more expensive.
+Living document (started 2026-09-26, consolidated 2026-10-05). ContentSpiel is a **generic, self-hosted CMS** that non-technical editors enjoy using and developers can extend without forking. Priorities: **Must** (needed before we'd call it a usable generic CMS), **Should**, **Could**. Refactors are judged against this list: they must open the seams these items need and never make one more expensive.
 
-Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), code-structure review (`docs/architecture/2026-09-26-code-structure-review.md`, findings referenced as `#N`, sections as `§N`), product decisions from the 2026-09-26 sessions.
+How to read it: **Next** is the agreed order of sub-projects. **Before the first deploy** is everything that must be true before a real site runs on this. **Product backlog (Phase 3)** and **Technical health** are grouped by topic, not ordered. **Known gaps** lists what was knowingly shipped incomplete, each under the item that closes it. What is done is one line under **Shipped**; the history is in git and in the specs.
+
+Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), code-structure review (`docs/architecture/2026-09-26-code-structure-review.md`, findings `#N`, sections `§N`), staff review (`docs/architecture/2026-10-04-staff-review.md`, findings `S`, `M`, `L`, `D`, `C`, `O` plus a number), and the specs under `docs/superpowers/specs/`.
 
 ## Decisions already made
 
 | Decision | Detail |
 |---|---|
-| Replace Avo with our own admin | Rails + Hotwire, product design tokens (`--cs-*`), Claude Design backend screens. Avo stays mounted only during the switch. Forking Avo rejected (LGPL-3.0; wanted features are closed add-ons). |
-| Admin layout | TYPO3-style three columns: **modules \| page tree \| content**. |
-| Rich text | **Tiptap**: store a Tiptap/ProseMirror JSON document per locale (replacing ActionText/Trix HTML), render HTML server-side, Markdown view for AI/MCP (custom nodes as directives). Node types come from a registry (plugin seam). Markdown as storage rejected. |
-| Independent CSS | Product UI and public theme are separate Tailwind builds with separate tokens (`--cs-*` vs `--th-*`); the demo look is only the default public theme. |
-| One branch per round of work | Bugfixes and features of a round ship together; no production exists yet. |
+| Our own admin, not Avo | Rails + Hotwire, product design tokens (`--cs-*`). Avo is removed. |
+| Admin layout | Three columns: modules, page tree, content. |
+| Rich text | Tiptap: one Tiptap/ProseMirror JSON document per locale, rendered to HTML on the server, Markdown for AI and MCP (custom nodes as directives). Node types come from a registry (the plugin seam). |
+| Independent CSS | Product UI and public theme are separate Tailwind builds with separate tokens (`--cs-*` and `--th-*`); the demo look is only the default public theme. |
+| One PR per body of work | Bugfixes and features of a round ship together; no production exists yet. |
+| Live edits go live | CS Studio autosaves straight to the record; drafts of live records wait for versioning (see "Versioning"). |
 
-## Phase 0 — in flight: `editor-experience` branch
+## Shipped
 
-Public demo theme with independent stylesheets (spec §9); per-locale slugs, tag filter, publish status + signed-in preview, resume fields, alt texts (spec §10.1–10.4, model side). Added from the structure review: MCP re-publish keeps `published_at` (#24), iframe scrubber + CSP `frame-src` (#37), slugs filled from the default locale for untitled locales (#2). The Avo-specific parts of spec §10 were dropped and move to Phase 2.
+| What | Spec |
+|---|---|
+| Foundations: locale model (supported and enabled languages), `PublicSite::Urls`, `PublicSite::Resolver`, stored `public_paths` with redirects, the service layer, test helpers, canonical post URLs and posts in the sitemap | `2026-09-26-foundations-design.md` |
+| Setup wizard | `2026-09-26-setup-wizard-design.md` |
+| Open types: string `content_type` / `block_type` with registries | `2026-09-27-open-types-design.md` |
+| CS Studio: shell, page tree, inline block editor, Draft / Scheduled / Live with preview, typed fields per content type, "Connect an AI assistant" | `2026-09-27-cs-studio-design.md` |
+| Tiptap editor with JSON storage, the ActionText migration, Avo removed | `2026-09-27-tiptap-and-avo-removal-design.md` |
+| Access control (groups, scoped grants, owners) and the append-only audit log | `2026-09-28-access-control-and-audit-design.md` |
+| Media library (`Media::Asset`, alt text, reuse, responsive variants) | `2026-09-29-media-library-design.md` |
+| Trash: pages with their branch, posts and library images; Undo; retention job | `2026-09-29-trash-design.md` |
+| Dashboard and the site time zone | `2026-09-30-dashboard-design.md` |
+| Translation helpers: outdated tracking, status everywhere, the Translations matrix, translated site title and tagline, AI translation suggestions | `2026-10-02-translation-helpers-design.md` |
+| CS Studio design pass, three rounds (PRs #35–#37, #45): tokens and theme, shared components, the shell and ⌘K; the editors, side-by-side translation, the dashboard and posts list; Settings, Media, Groups, Users, Tags, Trash, the audit log, System status, the preview bar, the Mind graph | `2026-10-03-cs-studio-design-pass-design.md` (§12 lists where round 3 departs from it) |
+| Five staff-review bugs (S1–S5) | PR #39 and design pass round 3 |
 
-## Phase 1 — foundations (refactor before the own admin)
+## Next, in order
 
-| Item | Why (roadmap it unblocks) | Priority | Ref |
-|---|---|---|---|
-| Locale model decision: supported vs enabled locales, how slugs/indexes scale | Runtime languages, admin i18n; decides admin form shape | Must | #44, #17 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| `PublicUrls` (one URL builder, absolute URLs) + `Current.site` | SEO/hreflang, feeds, API, navigation, CDN purge, "view on site" | Must | #27, #51, #12, §4.1, §4.7 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| `PublicSite::Resolver` (published vs preview scope) + cookie-less public controller | Preview, workflow, caching/CDN, GDPR | Must | #19, #48, §4.2 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| Path-change events + automatic redirects | SEO redirects, CDN purge, content quality | Must | #45 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| Open types: string `content_type`/`block_type` + registries | Custom content types, plugin API, reusable content | Must | #50, #6, #47, §8 — done (sub-project 2, spec `2026-09-27-open-types-design.md`) |
-| Canonical post URL + posts in the sitemap | SEO, feeds | Should | #8 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| Service layer: `Posts::Save`, `Pages::Save/Move/Destroy`, `ContentBlocks::Save/Reorder`, `ApiToken.issue!` | The single write path roles, audit, versioning, webhooks, search and plugins attach to; MCP switches first | Must | §4.3–4.6, #25 — done (sub-project 1, spec `2026-09-26-foundations-design.md`) |
-| Test helpers for content setup | Makes everything after cheaper | Should | #39, #41 — done (sub-project 1, spec `2026-09-26-foundations-design.md`, `test/support/content_helper.rb`) |
+Agreed 2026-10-04. Each is its own sub-project with a spec and one PR.
 
-## Phase 2 — own admin (replaces Avo)
+1. **Mind graph on a canvas** (Should). Render the graph on a 2D canvas instead of SVG: D3's force simulation stays, and no new dependency unless WebGL proves necessary. Zoom and pan, with labels that fade in by zoom level, hubs first. Then a local graph (a post's or tag's neighbourhood to depth 1–2, filtered on the server) and a cap with a message on the global view; `PostGraph` selects only the columns it needs.
+   - Constraints: colours come from the theme tokens, read from CSS custom properties (no literals in JS); status and type cues stay non-colour-only; the keyboard and screen-reader path is kept through a parallel list of links, since canvas nodes can't take focus; "everything fits inside the box" becomes "the initial view fits everything".
+   - Closes: no cap on posts, overlapping labels, every node one size, and a retired type's ring differing from a 7–12 type's ring by colour alone. Lazy-loading d3-force (S13) belongs here too.
+2. **Block and type catalogue** (Should). A demo site can only show layouts the block types allow. Today: 3 block types (rich text, image, post list), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's.
+   - Block candidates: hero or banner, columns or grid, gallery, call to action, quote or testimonial, video or embed, accordion or FAQ, teaser cards linking to pages, and a sitemap block (a human-readable list of the published tree in the visitor's language).
+   - Content types: event, person or team member, project or case study; decide whether resume entry and now update stay defaults or move to an optional "personal site" starter set.
+   - Page types: contact, legal, redirect or link page, and a sitemap page (a standard page carrying the sitemap block).
+   - Not here: the contact form (see "Forms"), editor-defined types (see "Custom content types"). Needs designs for each block's editor card and public rendering.
+3. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
+4. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
+5. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the i18n key scheme for the admin, decided at the start of this sub-project. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
 
-| Item | Priority | Notes |
-|---|---|---|
-| Three-column shell: modules \| page tree \| content | Must | Tree: drag reorder, status per node, add child, open page — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Tiptap editor + JSON storage + ActionText migration | Must | Markdown view for MCP; node registry — done (sub-project 4, spec `2026-09-27-tiptap-and-avo-removal-design.md`) |
-| Inline block editor (type-specific fields, add/reorder/delete, alt text, post-list inputs) | Must | Design from dropped plan Tasks 12–13 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Draft / Scheduled / Live, Publish now / Unpublish, preview & "View on site" / "Edit this page" | Must | Dropped Task 11 design; preview from Phase 0 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Typed fields per content type (resume fields), type-dependent forms | Must | Dropped Tasks 9–10; generated from the type registry — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Dashboard (drafts, scheduled, recent, quick create) | Should | Dropped Task 14 — done (sub-project 6c, spec `2026-09-30-dashboard-design.md`) |
-| "Connect an AI assistant" (token shown once, MCP URL + config, revoke) | Must | Dropped Task 15 — done (sub-project 3, spec `2026-09-27-cs-studio-design.md`) |
-| Translation helpers (source hint, status per locale) | Should | Dropped Task 16 — done (spec `2026-10-02-translation-helpers-design.md`): outdated tracking with "Mark as up to date", status in lists and the page tree, a Translations overview, translatable site title and tagline, AI translation suggestions |
-| Roles & permissions (owner/admin/editor/author), in-house policy layer, enforced in services for admin and MCP; design for user **groups** from the start (approval chains in Phase 3 assign steps to groups) | Must | §7.1 — done (sub-project 5, spec `2026-09-28-access-control-and-audit-design.md`) |
-| Audit log (`audit_events`, append-only, written by services, also emits plugin hooks) | Must | §7.2 — done (sub-project 5) |
-| Trash / soft delete + restore | Must | #43 — done (sub-project 6b, spec `2026-09-29-trash-design.md`): pages (with their branch), posts and library images; Trash screen, Undo, retention job |
-| Media library (`Media::Asset`, alt text, reuse, responsive variants) | Must | #46 — done (sub-project 6a, spec `2026-09-29-media-library-design.md`) |
-| CS Studio design pass (admin polish): new shell, shared components, every screen rebuilt to the v3 design handoff, in three rounds | Must | Done (round 3's PR pending) — spec `2026-10-03-cs-studio-design-pass-design.md` (its §12 lists where round 3 departs from it); handoff in `docs/design/cs-studio-handoff-v3/`. Round 1 (foundations and bugs: tokens and theme, the shared components, the new shell, ⌘K, sign-in and setup, eight bug fixes) is done (PR pending). Round 2 (editors with the header, Schedule dialog, view-only and the refused stale save; side-by-side translation with the word diff and suggestions; blocks; rich-text dialogs; the page tree and `/pages`; the New dialogs; the dashboard and its activity feed; the posts list with bulk actions; the translations matrix; the stored `translation_states`) is done (PR pending). Round 3 (Settings as one form with Languages and the AI key, Media with the side panel, drop upload and the picker on the grid, Groups and Users, named tokens and the AI assistant flow, Tags with Merge, Trash, the audit log and its event page, System status, Change password, the preview bar, the Mind graph's colours, tag nodes, legend and filter) is done (PR pending). What the visual check against the mocks left over is the row "Design details left from the round-3 visual check" under Known interim states |
-| Mind graph on a canvas | Should | **Right after the design pass, its own sub-project** (decided 2026-10-04; nothing of it is built). Render the graph on a 2D canvas instead of SVG — D3's force simulation stays, no new dependency unless WebGL proves necessary — with zoom and pan and labels that fade in by zoom level (hubs first); then a local graph (a post's or tag's neighbourhood to depth 1–2, filtered on the server) and a cap with a message on the global view; `PostGraph` selects only the columns it needs. Constraints: colours still come from the theme tokens (read from CSS custom properties, no literals in JS); status and type cues stay non-colour-only; the keyboard and screen-reader path is kept through a parallel list of links, since canvas nodes aren't focusable; round 1's "everything fits inside the box" becomes "the initial view fits everything" |
-| Block and type catalogue: more built-in block types, and a review of the built-in content and page types | Should | **After the design pass, before the demo content** (agreed 2026-10-04) — a demo site can only show layouts the block types allow. Today: 3 block types (rich text, image, post list), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's. Candidates — blocks: hero/banner, columns or grid, gallery, call to action, quote/testimonial, video/embed as its own block, accordion/FAQ, teaser cards linking to pages, and a sitemap block (a human-readable list of the published page tree, in the visitor's language, for a "Sitemap" page; the XML `sitemap.xml` already exists via `rake sitemap:create`, and generating it automatically stays with the SEO row below). Content types: event, person/team member, project/case study; decide whether resume entry and now update stay defaults or move into an optional "personal site" starter set. Page types: contact, legal (see Legal/GDPR below), redirect/link page, and a sitemap page (a standard page carrying the sitemap block, offered in the starter set). Contact form stays with "Forms with submissions"; editor-defined types stay with "Custom content types & fields defined in the admin". Needs its own spec (and designs from Claude Design for each block's editor card and public rendering) |
-| Demo content in the setup wizard, plus a debug and performance data set | Should | **After the block and type catalogue** (asked for 2026-10-04). The wizard's optional starter-content step gains a "Demo site" choice; a second, much larger set with advanced data, varied layouts and images serves debugging, performance checks and exposing design issues an almost empty site hides. Not a `db:seed` script. Open question from the first brainstorm: who may pick the large set (developers only, everyone, or behind an environment setting). Assumed so far: built through the save services, with generated or bundled images. Needs its own spec |
-| Invites (one-time set-password link without mail) | Should | `Users::Invite`; after the design pass, which only renames the button to "New user" |
-| Admin UI in German (admin i18n) | Should | #49. The i18n key scheme is decided at the start of this sub-project (public-site strings on `/de/` and `/es/` first). Known English-only spots that build sentences in Ruby: `Audit::Sentence` (the audit log's and the dashboard's sentences) and `Post.human_attribute_name` / `ContentBlock.human_attribute_name` |
-| Port Avo-only invariants, then remove Avo | Must | #40 — done (sub-project 4) |
+## Before the first deploy
 
-## Phase 3 — after the admin MVP
+Everything here is Must. Three sub-projects; none is scheduled against the list above yet.
 
-| Item | Priority | Notes |
-|---|---|---|
-| Versioning: revisions + restore (in-house snapshots, pending revisions) | Must | §7.3. Audit snapshots keep each `translation_sources` entry's digest, time and language but not its source text, so a restore from a snapshot can't reproduce the word diff's "before" for a translation |
-| SEO: hreflang, OG image, noindex, snippet preview, auto sitemap | Must | Built on `PublicUrls` |
-| Custom content types & fields defined in the admin | Should | Registry with DB-backed definitions |
-| Navigation / menu management | Should | `Navigation.for` (#52) |
-| Plugin API v1 (Rails engines, registries, event hooks, routes hook, MCP tool registry, versioned API) | Should | §8 |
-| Publishing workflow: review/approval, draft comments, edit lock, scheduled unpublish | Should | Pending revisions + policies |
-| Release management: bundle changes to several pages/posts into a release, preview the whole site with the release applied, shareable preview links (no account needed), schedule/publish a release atomically | Should | Needs pending revisions (versioning) + `PublicSite::Resolver` preview scope; releases are sets of pending revisions |
-| Approval chains for releases: steps where specific user groups must approve (e.g. editor submits → Legal approves → Publishers publish); the chains themselves are **defined in the admin by authorized groups** (a permission of its own), not hard-coded; approvals/rejections recorded in the audit log | Should | Needs user **groups** in the permission model (not only fixed roles) + releases + audit log |
-| Security basics: 2FA, password policy, session list/revoke, login history | Should | Login history = audit events |
-| Legal / GDPR: imprint & privacy pages, consent hook, user export/delete | Should | Cookie-less public site first (Phase 1) |
-| RSS / Atom feeds | Should | Cheap once URLs are canonical |
-| Site search + admin global search (Postgres FTS) | Should | Fed by service events; the design pass adds a ⌘K "Jump to…" palette that matches titles only, not this |
-| Reusable content: global snippets, page templates, block presets | Could | Needs block owner (#47) |
-| Forms with submissions and spam protection | Could | Routes hook before catch-alls |
-| Headless read API + webhooks on publish | Could | Generalised serializers + events |
-| Caching / CDN purge | Could | Needs cookie-less public controller |
-| Import / export / backups | Could | Revision snapshot = export format |
-| Content quality checks (broken links, required alt) | Could | Event subscribers / job |
-| Runtime-configurable languages (define N in setup, add later) | Should | Locale decision in Phase 1 |
-| Workspace in CS Studio: a place to work on pages together, with reference material | Could | Asked for 2026-10-04, deliberately placed further down. A workspace gathers what a piece of work needs: links to internal resources (pages, posts, images), uploaded documents (briefs, source texts, PDFs), the people working on it, and an AI assistant that can read those references while helping with the relevant pages. Builds on: media library for documents (see "video and document files"), comments and edit locks from the publishing workflow, versioning with pending revisions (so drafts can be worked on without going live), `AI::Providers`, and access control groups. Needs its own brainstorm and spec; open questions include whether a workspace is per page, per project or free-form, and what the AI may write without a human pressing Use |
-| In-admin AI assistant (translate, excerpts, alt text, summarise) | Could | Partially done: translate only (translation helpers spec `2026-10-02-translation-helpers-design.md` §6 — provider registry, encrypted key in Settings, `ai.translate`, suggestions the editor applies with Use, `ai.translated` audit events). Excerpts, alt text and summaries are still open (row below) |
-| AI for excerpts, alt text and summaries | Could | Out of scope for translation helpers, spec `2026-10-02-translation-helpers-design.md` §9; `AI::Providers` and the suggestion box (`Admin::TranslationScreen::SuggestionComponent`) are the seams |
-| A monthly AI budget (spend cap per site) | Could | Same spec §9; `ai.translated` events already record `characters` per request |
-| More built-in AI providers (an OpenAI-compatible one) | Could | Same spec §9; `AI::Providers.register` takes plugin providers today |
-| Background whole-site translation (translate everything missing in a language as a job) | Could | Same spec §9; today "Suggest translations for N empty fields" works per editor screen, and nothing is saved without Use |
-| Translation memory and glossary | Could | Same spec §9 |
-| A side-by-side translate mode (original and translation in two full columns) | Could | Same spec §9 — done in round 2 of the CS Studio design pass (PR pending): the original beside each field, stacking below 880px of the form |
-| A language dropdown on the public site | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
-| Share images (Open Graph image per page and post) | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
-| A "sample" marker on starter content | Could | Left out of the CS Studio design pass, spec `2026-10-03-cs-studio-design-pass-design.md` §10 |
-| AI tools over MCP | Could | Same spec §9; deliberately not planned — MCP clients are already AIs and can translate through `update_post` themselves |
-| Shared workspaces: people collaborate on content and assets (drafts, media, notes) in a shared space, with an optional AI agent helping produce the output; a workspace's work can flow into a release | Could | Builds on groups/permissions, media library, releases, AI assistant; agent edits go through services + audit log |
-| Media library: video and document files, not only images | Could | Out of scope for sub-project 6a, spec `2026-09-29-media-library-design.md` §8 |
-| Media library: cropping and a focal point | Could | Same spec §8 |
-| Media library: folders and tags for organizing assets | Could | Same spec §8 |
-| Media library: automatic cleanup of unused assets | Could | Can now build on the trash (e.g. move long-unused images to the trash and let the retention job purge them); today cleanup is manual only, by design — an editor moves an unused asset to the trash by hand, or runs `bin/rails media:orphans` for orphaned blobs (same spec §8; trash spec §10) |
-| Media library: uploads through MCP | Could | MCP is read-only over the library today (`list_media_tool`/`get_media_tool`); same spec §8 |
-| Move the site logo into the media library | Could | Needs SVG sanitising the library doesn't have (SVG stays refused everywhere else); the logo stays its own separate `SiteSetting` attachment until then (same spec §8) |
-| Trash for single content blocks, tags, groups, users and API tokens (deleting one is still permanent) | Could | Out of scope for the trash, spec `2026-09-29-trash-design.md` §10; `Trashable` + `Trash::` services are the seam |
-| MCP trash tools (list, restore, purge; MCP can't delete anything today) | Could | Same trash spec §10; the services already take a token actor |
-| 410 Gone for trashed (or purged) URLs instead of 404 | Could | Same trash spec §10; a trashed record's `public_paths` rows are deleted, so this needs a tombstone of its own |
-| Per-user time zones (today: one site-wide zone in Settings) | Could | Out of scope for the dashboard, spec `2026-09-30-dashboard-design.md` §8 |
-| Dashboard customisation and widgets (today: the three cards, the activity feed and the quick-create row are fixed) | Could | Same spec §8 |
-| Dashboard statistics and counts | Could | Same spec §8 |
-| An audit-event feed on the dashboard (today: "Recently updated" shows the records themselves, newest `updated_at` first, not individual audit events) | Could | Same spec §8 — done in round 2 of the CS Studio design pass (PR pending, spec `2026-10-03-cs-studio-design-pass-design.md` §5.6): `Dashboard::Activity`, a content-only feed |
-| Inline page quick create (today: quick create's title + type form is posts-only; "New page" opens the existing new-page flow) | Could | Same spec §8 — done in round 2 of the CS Studio design pass (PR pending): "Page" in quick create opens the New page dialog |
-| Public site dates in the site time zone (today: `ThemeHelper#post_date` on the public site and `/preview` still renders in UTC — only CS Studio and MCP run inside `Time.use_zone`) | Could | Needs the rich-text/page render cache to vary on the zone (a zone change must invalidate cached renders); dashboard spec §5 kept the public site unchanged |
+### Hardening
 
-## Technical health (staff review, 2026-10-04)
+| Item | Ref |
+|---|---|
+| Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | L1–L4 |
+| API token lookup by an indexed SHA-256 digest. Today MCP auth does one bcrypt comparison per active token, and tokens accumulate, so authenticating gets linearly slower and costs an unauthenticated caller the same | S9 |
+| Lost updates on the group and user forms: neither carries a stale check and each replaces whole lists (grants, members, a user's groups), so of two admins saving the same record the second silently undoes the first. `base_updated_at` and a 409 as Settings has; `replace_grants`, `sync_members` and `sync_groups` must touch the record | Round 3 final review |
+| Access control, dormant grant names: `can_assign_group?`, `can_manage_group?` and `Groups::Save`'s member loop judge a group's live grants only. A removed content type's name grants nothing while the type is unregistered, but it can be handed on with a membership or a token by someone who couldn't grant it, and it revives if a type of that name is registered again. Judge the carried scope instead | Round 3, Tasks 10–12 |
+| Access control, grants per permission: no unique index on `access_control_grants (group_id, permission)` while the group editor shows one grant per key, so a group holding two loses one on a save from the screen; `Groups::Save#live` matches greedily and can refuse a harmless shrink in that state | Round 3, Task 10 |
+| Owner flag: `:owner` is still permitted in the ordinary user params (a second door beside `PATCH users/:id/owner`, owners only), and `Users::Save#owner_change?` reads a blank value as a flip | Round 3, Task 12 |
+| Guarantees by behaviour, not grep: a behavioural service contract test, and the remaining permitted-attribute slices | S19, S21, S24 |
+| `site_settings.locales` is read, changed and written without a row lock: two language changes at once can lose one. `lock!` the row in `Locales::Enable`, `Disable`, `MakeDefault`, `Configure` and `Settings::Save` | Round 3 final review |
 
-From `docs/architecture/2026-10-04-staff-review.md` (findings referenced as `S<n>`, `M<n>`, `L<n>`; read-only review, nothing measured). Bugs first, then the items that share a cause.
+### Performance and caching
+
+In this order; each step needs the one before.
+
+| Step | Ref |
+|---|---|
+| 1. Stop recomputing URLs on every page save: sync `public_paths` only when slug, parent, position, publication or trash state changed, set-based, from the services rather than `after_save` | S6, M2 |
+| 2. A content version that moves only on changes to published output (one version row), instead of 14 aggregate queries per public request that any draft autosave invalidates; preload after `stale?` | S7, S8 |
+| 3. A whole-page cache inside Rails keyed on the version row, path and language, so every publishing change takes effect at once | C1 |
+| 4. A "Clear cache" button: site-wide under System (its own permission, audited) and "Clear this page's cache" in the editor's ⋯ menu, for what the services can't see (a console change, a restored backup, a stuck CDN) | C6 |
+
+Then, Should: caching as a per-instance setting under Settings (the shared lifetime sent to proxies and CDNs, default 0; a CDN provider with encrypted credentials from a registry like `AI::Providers`, purged from a job after each version bump) (C7); a cache lifetime per page for static pages, as presets in the page settings (C8); library images served in Active Storage proxy mode with long-lived headers (C2); 404s cached briefly, and purge on publish once a CDN exists (C3, C4). Could: fragment and admin-side caching, deliberately deferred until measuring shows a need (C5).
+
+### Observability
 
 | Item | Priority | Ref |
 |---|---|---|
-| ~~Five bugs: trashed subpages listed on the public site; an admin's password change leaves the user's sessions alive; block reorder and tree move render any response as a stream and fail silently; no unload guard on autosave; multi-upload reloads over its own errors~~ — done: the first four in PR #39, the upload in round 3 of the design pass (every file is its own tile and a refused one keeps its reason) | Must | S1–S5 |
-| Stop recomputing URLs on every page save: sync `public_paths` only when slug, parent, position, publication or trash state changed, set-based, from the services rather than `after_save` | Must | S6, M2 |
-| A content version that moves only on changes to published output (one version row), instead of 15 aggregates per public request that any draft autosave invalidates; preload after `stale?` | Must | S7, S8 |
-| Public-site caching, step 1: a whole-page cache inside Rails keyed on the site version row, path and language, so every publishing change and the Clear cache button take effect at once (needs the version row above first). A short shared lifetime at the proxy (Thruster is already in the start command and stores nothing because pages answer `max-age=0`) is an optional layer on top, only if a delay after publishing is acceptable | Must | C1 |
-| A "Clear cache" button in CS Studio: site-wide under System (its own permission, recorded in the audit log) and "Clear this page's cache" in the editor's ⋯ menu. For what the services can't see: a console change, a restored backup, a stuck CDN. Normal publishing clears the cache by itself and never needs the button | Must | C6 |
-| Public caching as a per-instance setting (Settings → "Caching"): the shared cache lifetime sent to proxies and CDNs (default 0, so an installation without a CDN stays correct), and a CDN provider with encrypted credentials from a registry like `AI::Providers`, purged from a job after each version bump and by the Clear cache button. The Rails-side page cache stays always on; asset and image hosts stay deploy-time choices | Should | C7 |
-| A cache lifetime per page for static pages (imprint, privacy, about): presets in the page settings — site default, 1 hour, 1 day, 1 week, never cache. Only the shared lifetime is raised; browsers keep revalidating, because a browser cache can't be cleared. A warning where the page lists posts or has a scheduled go-live below it | Should | C8 |
-| Public-site caching, step 2: serve library images in Active Storage proxy mode with long-lived headers (today each image is a redirect through Rails to a short-lived URL) | Should | C2 |
-| Public-site caching, step 3: cache 404s briefly; then purge on publish once a CDN exists (closes the staleness trade-off; see "Caching / CDN purge" in Phase 3, keyed on the version row above) | Should | C3, C4 |
-| Fragment caching and admin-side caching: deliberately deferred; the public site comes first, and the rich-text body cache stays only if measuring shows it still helps under the whole-page cache | Could | C5 |
-| API token lookup by indexed SHA-256 digest (closes the bcrypt-per-token interim state below, and its unauthenticated cost) | Must | S9 |
-| Guarantees by behaviour, not grep: a behavioural service contract test, permitted-attribute slices in `Pages::Save`/`Posts::Save`/`Settings::Save`, the restore parent picker through the read scope | Must | S19, S21, S24 |
-| System tests fail on JavaScript errors and click natively; test the Turbo internals `queue.js` relies on (`turbo-rails` is pinned to 2.0.23 since round 3 of the design pass, and the save footer's own internals each have a system test that fails without them); a Tiptap schema drift test | Should | S22, S23, S25 |
-| Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
-| Public read path: no `posts` scan on a 404, batched URL and internal-link lookups, a cap on unlimited listings | Should | S11, S14, S15 |
-| MCP `list_posts` paginated, without rendering bodies | Should | S12 |
-| Lazy-load Tiptap and d3-force instead of evaluating them on every admin page | Should | S13 |
-| One shared `fetchStream` helper and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
-| Fix the remaining dependency inversions (a model calling `ApplicationController.render`, a model calling services, models and queries using route helpers), then a guard test. The direction is written down (`CLAUDE.md`, "Dependency order"), and the query that built a component is fixed (`Dashboard::Activity` returns data; `Audit::Sentence` hands up route names) | Should | M1 |
-| Public-site strings in German and Spanish (about 15), then a key scheme for the admin UI before more strings land | Should | M8 |
-| Script CSP with nonces (the four `CLAUDE.md` claims the review found false are corrected) | Should | S20, review §7 |
-| Indexes the queries need: `updated_at`/`published_at` on posts and pages, one GIN index on the slug jsonb queried by containment, `content_blocks.block_type` | Should | D1–D3 |
-| Sibling positions that can't collide (advisory lock, one set-based renumber, a deferrable unique constraint); an atomic stale-autosave check (conditional `UPDATE`) | Should | S16, D6, D8 |
-| Dashboard drafts without the per-row audit join; drop redundant indexes; the missing `created_by_id` FK; narrower row loads | Could | S17, S18, D4, D9 |
-| Partition `audit_events` by month when retention is built; `pg_trgm` for title search; `tsvector` for site search | Could | D5, D2 (with audit retention and site search) |
-| Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
-| One plugin registration facade over the four registries | Could | M4 (with Plugin API v1) |
-| Remove leftovers: the ActionText import path, unused Action Mailbox / Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
-| Observability, first step: one span in `ApplicationService` (service, actor type, channel, outcome, audit event id) so every write is traced; attributes on the public request (resolver result, language, cache hit or miss); rescued exceptions reported through `Rails.error` instead of logged as a string | Must | O1, O2 |
+| One span in `ApplicationService` (service, actor type, channel, outcome, audit event id) so every write is traced; attributes on the public request (resolver result, language, cache hit or miss); rescued exceptions reported through `Rails.error` | Must | O1, O2 |
 | Guards against the performance problems returning: N+1 detection raising in tests, and query-count assertions on a public page render and a page save | Should | O5 |
-| Structured logs tied to traces (trace id, actor); a jobs dashboard and failed-job counts on System status; browser errors reported to the server; a cache hit rate; `/up` that checks the database | Should | O3, O4, O6, O7, O8 |
-| Pre-launch checklist: SSL and hosts, mailer host and sender, deploy secrets, error reporting, backups, no console span exporter in production | Must (before a first deploy) | L1–L4 |
-| Access-control hardening before the first deploy: `can_assign_group?`, `can_manage_group?` and `Groups::Save`'s member loop judge a group's *live* grants only, so a dormant removed content-type name can be handed on with a membership or a token by someone who couldn't grant it (and since round 3 the editor keeps such a name until Remove is pressed, where a save used to erase it). Such a name grants nothing while its type is unregistered (`AccessControl::Scoping::Condition` matches registered types only, fixed in round 3), so the gap opens only when a content type of that name is registered again: judge the carried scope instead. `Groups::Save#live` matches greedily, so with two stored grants of one permission a harmless shrink can be refused (fails closed; not reachable from the screen) — fix with the unique index. No unique index on `access_control_grants (group_id, permission)` while the group editor shows one grant per key, so a group holding two loses one on a save from the screen. `:owner` is still permitted in the ordinary user params (a second door beside `PATCH users/:id/owner`, owners only), and `Users::Save#owner_change?` reads a blank value as a flip | Must (before a first deploy) | Design pass round 3 (Tasks 10–12) |
-| Lost updates on the group and user forms: neither carries a stale check, and each replaces whole lists (grants, members, a user's groups), so of two admins saving the same group or user the second silently undoes the first. `base_updated_at` and a 409 as Settings has; `replace_grants`, `sync_members` and `sync_groups` must touch the record so the base moves | Must (before a first deploy) | Design pass round 3 (final review, S-I2) |
-| `site_settings.locales` is read, changed and written without a row lock (`Locales::Enable`, `Disable`, `MakeDefault`, `Configure`, `Settings::Save`): two language changes at once can lose one. `lock!` the row in each | Should | Design pass round 3 (final review, S-M1) |
-| Smaller defects from round 3's final review: `AccessControl.holds?` counts a grant whose content types are all unregistered, so its holder sees the Posts entry and an empty list; `Tags::Merge` racing a `Posts::Save` that inserts the same tag answers with the wrong message ("image doesn't exist"); the group delete dialog says tokens are "revoked" while `Groups::Destroy` deletes their rows; `translated_record_count` runs on every Settings render for a `languages.manage` holder (one query, pinned by a test) where loading it when the Default dialog opens would do; a scripted client posting `social_links` as an array clears the stored links, and a blank `main_base_updated_at` on a key form should never move the main base | Could | Design pass round 3 (final review; Tasks 5, 11) |
-| Smaller defects: unbounded titles in single-record flashes, forged param shapes that 500, a held Turbo submission cancelled by the next, translate timeout that doesn't abort, inconsistent result handling, two ways to enable a language, Duplicate across two transactions | Could | S26–S32 |
+| Structured logs tied to traces; a jobs dashboard and failed-job counts on System status; browser errors reported to the server; a cache hit rate; `/up` that checks the database | Should | O3, O4, O6, O7, O8 |
 
-## Known interim states
+## Product backlog (Phase 3)
 
-Deliberate gaps shipped ahead of the item that closes them (greenfield: fine while tracked here).
+What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Grouped by topic. Nothing here is ordered or scheduled.
 
-| Interim state | Since | Closed by |
+### Publishing
+
+| Item | Priority | Notes |
 |---|---|---|
-| CS Studio autosave writes straight to the record: edits to published pages/posts go live as the editor types (the editor header says so) | Sub-project 3 (CS Studio) | Versioning with pending revisions (Phase 3), then release management |
-| ~~Deletes are permanent~~ — resolved: pages, posts and library images now go to the trash first (single blocks, tags, groups, users and tokens are still deleted for good, by design) | Sub-project 3 | Trash (sub-project 6b, spec `2026-09-29-trash-design.md`) — done |
-| ~~CS Studio times (schedule input, "Saved HH:MM", scheduled hover) were UTC — no site time zone~~ — resolved: `site_settings.time_zone` (default UTC) wraps every CS Studio and MCP request (`Time.use_zone`); schedule inputs, "Saved HH:MM", the dashboard, the trash and audit screens, and MCP's own ISO-8601 dates all show and parse local time now; storage stays UTC | Sub-project 3 | Site time zone setting (sub-project 6c, spec `2026-09-30-dashboard-design.md`) — done |
-| ~~CS Studio tree column isn't a drawer on narrow screens~~ — resolved by round 1 of the design pass (PR pending): the sidebar is a drawer below 1280px and the page-tree column one below 1024px. The posts list is paginated since round 2 (PR pending). Still open: the tree column isn't resizable/collapsible | Sub-project 3 | Not scheduled |
-| Until a variant (`w480`/`w960`/`w1600`/`w2400`) has actually been processed, a page serves the original file at full size instead | Sub-project 6a (media library) | Preprocessing catches up on its own shortly after upload; `bin/rails media:variants` re-enqueues any still missing (design spec §8) |
-| MCP token auth does one bcrypt comparison per active token (tokens now accumulate — `ApiTokens::Issue` never rotates an existing one out), so authenticating gets linearly slower as tokens pile up | Sub-project 4 | The same item as "API token lookup by indexed SHA-256 digest" under Technical health (S9), which closes it |
-| ~~No drag-and-drop language reorder in CS Studio's Languages module — fallback/display order is set via a position select~~ — resolved by round 3 of the design pass (PR pending): the Languages card in Settings reorders by drag or keyboard, saved with the form | Sub-project 4 | CS Studio design pass, round 3 — done |
-| Editing an already-published page/post/block requires `publish`, not just `edit`, because autosave writes straight to the live record | Sub-project 5 (access control) | Versioning with pending revisions (Phase 3) |
-| Pages have no author, so there is no `own` scope for pages the way posts have one | Sub-project 5 | Page authorship (out of scope for now, spec §9) |
-| The audit log (`audit_events`) has no export or retention setting and grows without limit; the append-only trigger blocks `DELETE`/`UPDATE`/raw SQL but deliberately not `TRUNCATE`, so `db:truncate_all` still works in development | Sub-project 5 | Audit export/retention (not yet scheduled) |
-| The seeded Author group's `posts.read`/`posts.create` are unscoped by spec §5, so an Author reads every post, not only their own (only `posts.edit` is `own`-scoped) | Sub-project 5 | Revisit the seeded Author grants if this proves surprising in practice |
-| ~~The Tags list shows each tag's post count across every kept post, not scoped to what the viewer can read~~ — resolved by round 3 of the design pass (PR pending): the Posts column counts kept posts the viewer may read. The Merge and Delete dialogs still count every post carrying the tag (what the action touches), and say so when that is more than the column shows ("…including ones in the trash or that you can't open") | Sub-project 5 | CS Studio design pass, round 3 — done |
-| Deleting a tag (still permanent) takes it off trashed posts too, so a post restored later comes back without that tag (merging a tag likewise moves trashed posts to the target) | Sub-project 6b (trash) | Trash for tags (see "Trash for single content blocks, tags, …" above) |
-| A related post the viewer can't read is hidden from the editor but disclosed as a count — "+N related posts you can't open" — rather than fully hidden | Sub-project 5 | Accepted trade-off; revisit if disclosure of the count matters |
-| ~~The dashboard's "Recently edited by you" scans every page/post/image the viewer may read (`Dashboard::Feed#recently_edited`)~~ — resolved by round 2 of the design pass (PR pending): the list and the method are gone; the dashboard's drafts, going-live and activity cards are bounded queries (`Dashboard::Feed`, `Dashboard::Activity`, whose own cost bounds are the row below) | Sub-project 6c (dashboard) | CS Studio design pass, round 2 — done |
-| Changing the default language to a third one flags every translation as outdated: each `translation_sources` entry records the language its original was in (`from`), and that is used only to withhold the word diff (a diff against a text in another language would be noise) — the digests themselves still differ, so after en → de every Spanish translation (made from English) is compared against the German original and reads outdated. Still correct — mark up to date clears them one field at a time | Translation helpers (Task 1); `from` added in round 2 | Re-baseline the digests in the default-language change, if default-language changes happen on real sites |
-| AI translation suggestions run inside the web request: each holds a Puma thread (3 by default) for up to two 25 s provider calls, so concurrent bulk "Suggest translations for N empty fields" runs can starve the site of threads, and the request depends on the proxy's `response_timeout` (75 s in `config/deploy.yml`). The cap is 6,000 characters per request to keep each one short | Translation helpers (final fix wave) | Run suggestions as a background job (Solid Queue) that streams the suggestion boxes back over Turbo Streams; the per-request cap and timeout can then grow |
-| ~~The Translations overview filtered in Ruby, walking every readable record per request~~ — resolved by round 2 of the design pass (PR pending): the stored `translation_states` table (`Translations::StateIndex`) replaces `Translations::CachedStatus`; the matrix, the posts list's Translation filter, the tree counts and the dashboard card read it in SQL | Translation helpers (Task 4) | CS Studio design pass, round 2 (spec §5.3) — done |
-| ~~The mind graph fills the whole content column and some nodes animate outside its box~~ — resolved by round 1 of the design pass (PR pending): the graph fills the view (the content column's width, the window's remaining height) and clamps its nodes and labels to that box. Colours by type, tag nodes, the legend and the filter came in round 3 (PR pending). Still open: no cap on posts, labels can overlap, every node is one size, and a post of a type that is no longer registered (a ring in the `meta` grey) differs from a post of a 7–12 type (a ring in its hue) by colour alone — all with "Mind graph on a canvas" | Found 2026-10-02 | Mind graph on a canvas (Phase 2) |
-| The error toast has no "Retry" action (design pass spec §4): nothing raises an error a retry could repeat yet. (Upload progress on a media tile landed in round 3; a failed upload keeps its tile with the reason and Dismiss, not Retry) | CS Studio design pass, round 1 | With its first caller |
-| ~~The explicit-save leave guard (`admin--save-bar`, "Leave without saving?") only sees Turbo Drive visits (`turbo:before-visit`) and a page unload: a Turbo *frame* navigation inside `#content` and the browser's Back button both leave a dirty form without asking~~ — resolved by round 3 of the design pass (PR pending): the guard also asks about a link into the `#content` frame (stopped at `turbo:click`) and about Back / Forward within the document (`popstate`, heard ahead of Turbo). Still open: a GET *form* submitted into `#content` and a script setting the frame's `src` are not asked about (no explicit-save screen has either), and Back to an entry from before a full page load gets only the browser's own prompt | CS Studio design pass, round 1 | CS Studio design pass, round 3 — done; the two remaining gaps when a screen first needs them |
-| ~~`test/system/admin/translations_test.rb` "Suggest translations for N empty fields, then Use all" flaked under load; suspected race between the page's autosave and a block autosave's touch of the page~~ — the race was real and is closed by round 2 (PR pending): a stale save is now refused outright and every autosave of one screen goes through one write queue (`app/javascript/autosave/queue.js`), so a block's answer moves the page form's base before the next request is sent; "Use all" can no longer trip its own "Changed elsewhere" (two system tests pin it: the page's own fields and its block's, and two blocks). Rerun it alone if it ever fails again under load | CS Studio design pass, round 1 (final review) | CS Studio design pass, round 2 — done |
-| After a Back or Forward, the toast controller's "this render came from the cache" flag stays set until the next Turbo visit, so a top-level form that then fails with a 4xx re-render (a refused "Move to trash" on a page) loses its error toast | CS Studio design pass, round 1 (final review) | Clear the flag once the restored page has loaded (`turbo:load`) — a small follow-up fix |
-| A drag clone can stay on the page if the tree or block list is re-rendered while a row is being dragged with the mouse (SortableJS's fallback clone lives on `<body>` and `destroy` doesn't remove it) | CS Studio design pass, round 1 (final review) | Remove `Sortable.ghost` in the controllers' `disconnect` — a small follow-up fix |
-| Instant filters put focus back on the control that triggered the reload even if the editor moved focus elsewhere during the round trip | CS Studio design pass, round 1 (final review) | Restore focus only when it is still on `<body>` or inside the filter form — a small follow-up fix |
-| Mouse drag in the page tree and block list uses SortableJS's JS fallback (`forceFallback`) so it starts from a `<button>` handle in every browser; this was not hand-tested in Firefox | CS Studio design pass, round 1 (final review) | A manual check in Firefox |
-| Autosave: a save the server processed but whose answer was lost is retried on the old base and gets a final "Changed elsewhere" refusal (the editor locks themselves out until Reload) | CS Studio design pass, round 2 | Per-record version columns or pending revisions (Phase 3) instead of `updated_at` as the base |
-| Autosave: an edit typed between a header action's submit and its redirect is refused unseen; an edit typed during an in-flight save followed at once by Back/Forward is dropped | CS Studio design pass, round 2 | Pending revisions (Phase 3), or a page-level lock while an action runs |
-| Autosave: hover prefetch is off on the page and post editors (a prefetched answer could be older than a save), and a `#content` frame that was fetched again because a save landed meanwhile can lose a flash toast the first answer relayed | CS Studio design pass, round 2 | Re-enable prefetch with a freshness check against the queue's write count, and carry the relayed toast over to the refetched frame |
-| Autosave: after a block is deleted, the next queued write (a save, a reorder, a link click) waits up to 1 s, because the queue does not recognise the delete answer's stream as applied | CS Studio design pass, round 2 | Compare the held answer's streams on action, target and template content instead of their markup |
-| Autosave: three narrow cases in the content frame's stale-answer refetch — a refused (422) frame form answer can be replaced by a fresh render of the previous page when an edit lands during that submission; typing continuously across about three round trips after clicking the open page's own tree row can still render a stale frame; an aborted held request can overwrite a newer request's write count | CS Studio design pass, round 2 | Refetch only answers to a GET, check staleness once more after the last drain, and ignore an aborted request on resume |
-| Autosave: for up to 30 s after leaving a page with a hung save, the next page's visits wait and its header actions are declined | CS Studio design pass, round 2 | Cancel the queue on a hung request sooner (`HOLD_LIMIT_MS`/`DRAIN_LIMIT_MS` in `autosave/queue.js`) |
-| `translation_states` doesn't follow code changes (a deploy that adds a required translated field leaves rows stale until `bin/rails translations:reindex`), and a record created outside the services has no row: it reads complete and is absent from the matrix and the counts. `StateIndex.rebuild_all` runs synchronously on a language change, proportional to the site's size | CS Studio design pass, round 2 (spec §5.3) | Run the rebuild from a job and on deploy; a row for every record at creation |
-| A schema group field's reference card shows the raw Hash | CS Studio design pass, round 2 | A formatted rendering of a group value |
-| `Post.human_attribute_name` / `ContentBlock.human_attribute_name` name typed fields without an I18n lookup | CS Studio design pass, round 2 | Admin UI in German (admin i18n) |
-| The dashboard's activity feed looks back 90 days (`Dashboard::Activity::WINDOW`), and its event query's cost grows with the readable set (hashed subplans over readable ids: a `work_mem` cliff on a very large site) | CS Studio design pass, round 2 | A query driven from the viewer's grants, or a materialised feed, if it shows on large sites |
-| ~~The dashboard feed says "via an API token" without naming the token~~ — resolved by round 3 of the design pass (PR pending): tokens have names and each event keeps its token's name (`audit_events.actor_label`). Only an event recorded before that still reads "via an API token" | CS Studio design pass, round 2 | CS Studio design pass, round 3 — done |
-| Translations matrix: an old `?locale=` link lands on the unfiltered matrix (use `?language=`); the summary cards don't count the Site settings row; the ordering expression is evaluated over the filtered set, not only the page | CS Studio design pass, round 2 | Not scheduled |
-| Posts list: Undo for a bulk trash is offered only while its URL (which names the posts and keeps the filters) fits the session cookie (`Admin::BulkResponses::MAX_UNDO_URL`, 1,500 bytes, and URL plus the toast's sentences within `MAX_FLASH_BYTES`, 2,000: a few dozen posts); `Posts::Save#find_tag` costs up to two queries per submitted tag name | CS Studio design pass, round 2 | Hold the batch server-side instead of in the URL |
-| The chip input and the rich-text link search share `search/suggestions.js`; Escape during its 150 ms debounce closes the surrounding dialog | CS Studio design pass, round 2 | Swallow Escape while a search is pending |
-| The New page / New post forms load when the dialog opens (a short loading state), and the title preset travels in a GET query string, so it appears in the request log | CS Studio design pass, round 2 | Render the form with the page, or POST the preset |
-| `ContentModel::FieldSet#assign` still drops an unparseable date (and an integer drops garbage) for any caller but the post editor (`rejected_inputs`, read by `Post#assign_fields`): a block's settings silently lose such a value | CS Studio design pass, round 2 (final review) | Report rejected inputs from every caller (a block's settings form, MCP) as a field error |
-| Autosave: a double click on a header action that has already settled can fetch its redirect twice, and `admin--queue-hold`'s `passing` flag could stay set if `requestSubmit` fires no `submit` event | CS Studio design pass, round 2 (Task 6, parked) | Guard the action while it runs; reset `passing` in a `finally` |
-| The posts list's bulk bar precedes the table in the DOM (a keyboard user who ticks a row tabs back up to reach Publish / Move to trash); ~~the Languages screen's fallback ticks are still native checkboxes~~ (resolved by round 3: one "Falls back to" select per language) | CS Studio design pass, round 2 (final review) | Move the bar after the table with `order` in CSS |
-| New toasts end with a full stop ("Block order changed."), older ones don't ("Draft created"); some system tests click by script where a real click would catch an overlap, and several wait on fixed sleeps (a stubbed provider delay, a wall-clock window) that are load-sensitive under parallel workers | CS Studio design pass, round 2 (final review) | One punctuation rule applied when the strings are next touched; replace the sleeps with flags the stubs set |
-| Dashboard and design details left from the round-2 visual check: a date eyebrow above the H1, card titles with counts and "→ All drafts" / "Open →" links, "You" and initials avatars in the feed, a quieter empty-state line, the placeholder "Empty — write it, or use the suggestion." and a content-type dot in the post breadcrumb, the translation pair stacking at 1400px beside the page tree, the dark theme's dialog backdrop (ink at 38% reads as a light wash) | CS Studio design pass, round 2 (Task 19) | Polish pass |
-| The full system suite flakes at 12 parallel workers under load (the timing-sensitive tests are polled, but headless Chrome starves): run `PARALLEL_WORKERS=6 bin/rails test:system` on a laptop | CS Studio design pass, round 2 (Task 19) | A leaner browser fixture, or CI-sized runners |
-| The tree re-render after a move marks the MOVED page as selected even when another page is open in the editor | CS Studio design pass, round 2 (final fix wave 1) | Pass the open page to `Admin::TreeController#tree_stream(selected:)` |
-| ~~A form submitted while a `#content` frame navigation (a tab, a tile, a list row) is on its way is sent and its write done, but the answer is dropped when Turbo starts the visit the navigation is promoted to~~ — resolved in round 3 (PR pending): the write queue's promotion hold keeps a `_top` form back until the promoted visit has loaded. Still open: a `_top` *link* clicked during the frame fetch loses to the promoted visit (the click is followed, then overridden); a press during a frame fetch that hangs waits up to 10 s before it is sent; a held press whose screen was replaced is dropped unsent, with an error toast ("That didn't go through — the screen changed. Try again."), unless it is a Trash row's restore or purge form — that is the editor header's actions, the bulk bar, tags Merge, the user and group zones, "Still correct"; and a filter changed in the instant its own answer re-renders the toolbar (the audit log, the posts and media lists) is lost with the old control, which then shows the old value | CS Studio design pass, round 3 | Hold a `_top` link click the same way (or cancel the promotion when a newer visit was asked for); a shorter fetch limit once measured; opting those forms in to the stand-in (`data-promotion-stand-in`), form by form, where the new screen has the same action |
-| The audit log pages by `offset` over `last_occurred_at`, which moves when an event coalesces, so a row can repeat or be skipped between "Load older" pages. (An event's link no longer dies with its filter: outside the filter it redirects to its filter-free address) | CS Studio design pass, round 3 | Keyset paging on `(last_occurred_at, id)` |
-| A schedule set or changed in the same save as other fields is recorded inside `page.updated` / `post.updated`, so the log and the dashboard say "edited", not "scheduled" (a schedule removed on its own reads "removed the schedule from") | CS Studio design pass, round 3 | Record the schedule change as its own event, or derive the verb from the field changes |
-| A trashed page whose `trash_root_id` is NULL (its root's row deleted outside the services; `Trash::Purge` always takes whole branches) is listed nowhere and never swept: the Trash screen, `Trash.roots`, `Trash::Empty` and the retention job all define a root as `trash_root_id = id`, so the page stays trashed and invisible until someone repairs the column | CS Studio design pass, round 3 | Treat a NULL root as its own root in `Trash.roots` (one definition, in one place), or a repair task |
-| A trash row's retention date ("Deleted for good on or after <date>", worded so since round 3) counts calendar days in the site time zone, while the purge job's cutoff is the retention period as days × 24 hours: across a clock change the two differ by an hour, so an item trashed in the first hour of a day can become purgeable an hour before the date shown | CS Studio design pass, round 3 | Compute the job's cutoff in the site zone by calendar days, with a test across a clock change |
-| Media: the panel is a 340px column from 1024px and stacks under the grid below (the handoff's overlay at 1024–1279px is not built; stacked, the preview is as wide as the screen); leaving mid-batch asks nothing and drops the files still queued; the big "Choose file" drop zone is still drawn above the grid beside "Upload images"; a file dropped on a rich-text editor may still make the browser open it (the file-drop guard leaves anything `contenteditable` alone; not verified); a tile activated twice within a few milliseconds renders the frame twice with no promoted visit and no `turbo:load` (the "double connect" of the panel's controller seen in tests came from exactly that: the test driver's `send_keys(:enter)` clicks the tile before it types; whether a fast human double click does it is untested). Resolved in round 3: a file dropped elsewhere outside Media is refused (`admin--file-drop-guard`), and Sign out is a full document load, so the upload queue can't outlast it | CS Studio design pass, round 3 | A leave warning while the queue is busy; the mock's one-line hint instead of the zone; check the editor's own drop handling; try a real double click on a tile, and if it reproduces, ignore the second activation |
-| The group editor's locked tick ("You can't grant this") is unreachable from stored data: a group holding a grant the viewer couldn't hand out is view-only as a whole (spec §12), and the lock is kept only as a defensive rendering. A non-owner who couldn't grant a carried removed content type must press Remove before changing that row in any other way (else the save is a 403) | CS Studio design pass, round 3 | Accepted; revisit with the access-control hardening row above |
-| Settings: social links are a jsonb hash, so their row order isn't kept and two rows with one label collapse; a refused save can't put a chosen logo file back. (Same-page fragment links are handled everywhere in CS Studio since round 3, `admin--fragment-links`) | CS Studio design pass, round 3 | Store the links as an ordered list |
-| Trash: a holder of `trash.empty` alone can't delete a single item from the Trash screen (a 404), though `Trash::Purge` would allow it; the Media panel's "Only by items in the trash" line names trashed owners to a reader who may lack the delete right. (The setup wizard records the founding owner's `session.created` since round 3, so their last sign-in no longer reads "Never") | CS Studio design pass, round 3 | List by the purge right as well; accepted for the names |
-| From PR #39 (the code-check bugfixes): a block reorder queued behind one that failed is lost without a toast of its own; a block card answered 410 keeps the unload prompt up; a plugin's starter sample carrying a key outside `Pages::Save` / `Posts::Save`'s `ATTRIBUTES` now raises | PR #39 | Toast per reverted reorder; settle a 410 card; validate starter samples at registration |
-| Design details left from the round-3 visual check (none wrong, all departures from the mocks), Settings and the AI assistant: Settings' title and tagline stacked instead of side by side, a tall logo drop zone, inline "Default" / "Falls back to" labels instead of column headers, no active item in the in-page nav; the AI assistant's step 1 stacked instead of one row and its table's plain status text | CS Studio design pass, round 3 (Task 18) | Polish pass |
-| The same, Media, Groups, the audit log and System status: the Media panel as a card under the toolbar rather than a full-height column; the group editor's name, description and members in a narrow column without a card or breadcrumb; the audit log's large filter selects, row avatars and quoted titles, and its event page's two unaligned change tables and raw ids for related posts; System status rows without a card | CS Studio design pass, round 3 (Task 18) | Polish pass |
-| The same, across screens: segmented controls' selected state tinted rather than inverted (and drawn on more than one screen without a shared component); lists and editors spanning the full width where the mocks cap them near 1100px; the preview bar barely set apart from a dark public page | CS Studio design pass, round 3 (Task 18) | Polish pass; one segmented-control component |
-| Small things round 3's reviews listed and its fix waves left, Media: a tile stays in the Missing alt segment after its alt was typed, until the grid is loaded again; in the picker a selected image whose tile isn't on the listed page isn't named, a finished upload replaces a selection made by hand, and Escape from a tile doesn't put the focus back on the search; on an out-of-range page no list is drawn, so a finished upload's tile has nowhere to appear | CS Studio design pass, round 3 (Tasks 8, 9) | With the Media polish |
-| The same, Groups, tokens, Settings and Tags: with scripts off a ticked permission row shows an Edit scope button that does nothing; a stored branch root that is in the trash reads "A page you can't open (kept)" even to an owner; ticking an ancestor above a page ticked in the same session drops the child where a stored one is kept, and unticking a redundant root's ancestor counts as two changes; the token form decides whether a refusal belongs under Name or Group from the message's first word, and has no test for Back after the reveal, a hostile token name or the table's query count; Settings' language tabs' tablist semantics and the "●" inside Test connection's read-out text; no Enter / Escape on a tag's inline rename (the handoff doesn't ask for one) | CS Studio design pass, round 3 (Tasks 3, 5, 7, 10, 13) | Have the token service name the attribute; the rest with each screen's polish |
+| Versioning: revisions and restore, with pending revisions (drafts of live records) | Must | §7.3. Audit snapshots are the version basis; they keep a translation source's digest but not its text, so a restore can't reproduce a word diff's "before". Closes the largest group of known gaps (see "Closed by versioning") |
+| Publishing workflow: review and approval, draft comments, edit lock, scheduled unpublish | Should | Needs pending revisions |
+| Release management: bundle changes to several pages and posts, preview the whole site with the release applied, shareable preview links, publish atomically | Should | A release is a set of pending revisions |
+| Approval chains for releases: steps that specific groups must approve, defined in the admin by authorised groups, recorded in the audit log | Should | Needs releases |
+
+### SEO, navigation and the public site
+
+| Item | Priority | Notes |
+|---|---|---|
+| SEO: hreflang, Open Graph image per page and post, noindex, snippet preview, automatic sitemap | Must | Built on `PublicSite::Urls` |
+| Navigation and menu management | Should | `Navigation.for` (#52) |
+| RSS and Atom feeds | Should | Cheap now that URLs are canonical |
+| Legal and GDPR: imprint and privacy pages, consent hook, user export and delete | Should | |
+| A language dropdown on the public site | Could | |
+| Public-site dates in the site time zone (today the public site and `/preview` render in UTC) | Could | The render cache must vary on the zone |
+| 410 Gone for trashed or purged URLs instead of 404 | Could | Needs a tombstone; a trashed record's `public_paths` rows are deleted |
+| Forms with submissions and spam protection | Could | Routes hook before the catch-alls |
+
+### Content model and extension
+
+| Item | Priority | Notes |
+|---|---|---|
+| Custom content types and fields defined in the admin | Should | Registry with DB-backed definitions |
+| Plugin API v1: Rails engines, the registries behind one registration facade, event hooks, a routes hook, an MCP tool registry, a versioned API | Should | §8, M4 |
+| Languages outside the built-in list: today a language is switched on in Settings from `SUPPORTED_LOCALES`; adding one needs a code change | Should | |
+| Reusable content: global snippets, page templates, block presets | Could | Needs a block owner (#47) |
+| Headless read API and webhooks on publish | Could | Generalised serializers and events |
+| Import, export and backups | Could | A revision snapshot is the export format |
+| Content quality checks: broken links, required alt | Could | Event subscribers or a job |
+| Page authorship, so pages can have an `own` scope as posts do | Could | |
+
+### Search
+
+| Item | Priority | Notes |
+|---|---|---|
+| Site search and admin global search (Postgres full-text) | Should | ⌘K matches titles only today. `tsvector` for bodies and `pg_trgm` for titles (D2) |
+
+### Security and accounts
+
+| Item | Priority | Notes |
+|---|---|---|
+| Security basics: 2FA, session list and revoke, login history | Should | Login history is already in the audit log |
+| Script CSP with nonces | Should | S20 |
+| Audit log export and retention (the log grows without limit); partition `audit_events` by month when retention is built | Should | D5 |
+
+### AI
+
+Shipped: translation suggestions (provider registry, encrypted key, `ai.translate`, suggestions the editor applies with Use).
+
+| Item | Priority | Notes |
+|---|---|---|
+| Suggestions as a background job that streams boxes back over Turbo. Today each request holds a Puma thread for up to two 25 s provider calls, and is capped at 6,000 characters to stay short | Should | Lets the cap and timeout grow |
+| Excerpts, alt text and summaries | Could | `AI::Providers` and the suggestion box are the seams |
+| A monthly AI budget per site | Could | `ai.translated` events already record characters |
+| More built-in providers (an OpenAI-compatible one) | Could | Plugins can register providers today |
+| Whole-site translation as a background job | Could | |
+| Translation memory and glossary | Could | |
+
+Deliberately not planned: AI tools over MCP. MCP clients are already AIs and can translate through `update_post`.
+
+### Collaboration
+
+| Item | Priority | Notes |
+|---|---|---|
+| Workspaces: a place to work on pages together with what the work needs — links to pages, posts and images, uploaded documents, the people involved, and an AI assistant that can read those references. A workspace's work can flow into a release | Could | Builds on documents in the media library, comments and edit locks, pending revisions, `AI::Providers` and groups. Open: per page, per project or free-form; what the AI may write without a human pressing Use |
+
+### Media library
+
+All Could (media library spec §8).
+
+- Video and document files, not only images.
+- Cropping and a focal point.
+- Folders and tags for organising assets.
+- Automatic cleanup of unused assets (can build on the trash; today cleanup is by hand or `bin/rails media:orphans`).
+- Uploads through MCP (MCP is read-only over the library today).
+- The site logo moved into the library (needs SVG sanitising).
+
+### Trash
+
+All Could (trash spec §10).
+
+- Trash for single blocks, tags, groups, users and API tokens; deleting one is still permanent. Until tags have it, deleting or merging a tag also changes trashed posts, so a post restored later comes back without that tag.
+- MCP trash tools (list, restore, purge). MCP can't delete anything today.
+- A holder of `trash.empty` alone can't delete a single item from the Trash screen, though `Trash::Purge` would allow it: list by the purge right as well.
+
+### Dashboard and CS Studio
+
+| Item | Priority | Notes |
+|---|---|---|
+| Per-user time zones (today one site-wide zone) | Could | |
+| Dashboard customisation, widgets, statistics | Could | |
+| A resizable or collapsible page-tree column | Could | |
+| A "sample" marker on starter content | Could | |
+
+## Technical health
+
+From the staff review unless noted. What must happen before a deploy is in "Before the first deploy"; this is the rest.
+
+### Performance
+
+| Item | Priority | Ref |
+|---|---|---|
+| Public read path: no `posts` scan on a 404, batched URL and internal-link lookups, a cap on unlimited listings | Should | S11, S14, S15 |
+| Admin frame requests render a minimal layout; the tree loads only visible, kept pages | Should | S10 |
+| MCP `list_posts` paginated, without rendering bodies | Should | S12 |
+| Lazy-load Tiptap instead of evaluating it on every admin page | Should | S13 |
+| Indexes the queries need: `updated_at` / `published_at` on posts and pages, one GIN index on the slug jsonb, `content_blocks.block_type` | Should | D1–D3 |
+| The audit log pages by `offset` over `last_occurred_at`, which moves when an event coalesces, so a row can repeat or be skipped between pages: keyset paging on `(last_occurred_at, id)` | Should | Round 3 |
+| The dashboard feed's event query grows with the readable set (hashed subplans, a `work_mem` cliff on a very large site); dashboard drafts without the per-row audit join | Could | S17, round 2 |
+| `StateIndex.rebuild_all` runs synchronously on a language change, proportional to the site; `translated_record_count` runs on every Settings render for a `languages.manage` holder | Could | Round 2, round 3 |
+| Drop redundant indexes; the missing `created_by_id` foreign key; narrower row loads | Could | S18, D4, D9 |
+
+### Correctness
+
+| Item | Priority | Ref |
+|---|---|---|
+| Sibling positions that can't collide (advisory lock, one set-based renumber, a deferrable unique constraint); an atomic stale-autosave check (a conditional `UPDATE`) | Should | S16, D6, D8 |
+| `translation_states` doesn't follow code changes (a deploy that adds a required translated field leaves rows stale until `bin/rails translations:reindex`), and a record created outside the services has no row | Should | Round 2 |
+| Changing the default language to a third one flags every translation as outdated, because digests are compared against the new original. Re-baseline the digests in the default-language change | Could | Translation helpers |
+| A trashed page whose `trash_root_id` is NULL (its root's row deleted outside the services) is listed nowhere and never swept. Treat a NULL root as its own root in `Trash.roots`, or a repair task | Could | Round 3 |
+| The trash row's date counts calendar days in the site zone while the purge job's cutoff is days × 24 hours: across a clock change an item can become purgeable an hour before the date shown | Could | Round 3 |
+| A schedule set in the same save as other fields is recorded inside `*.updated`, so the log says "edited", not "scheduled" | Could | Round 3 |
+| `ContentModel::FieldSet#assign` drops an unparseable date or integer for any caller but the post editor: a block's settings silently lose the value | Could | Round 2 |
+| Social links are a jsonb hash, so their row order isn't kept and two rows with one label collapse; a scripted client posting them as an array clears the stored links | Could | Round 3 |
+| Smaller defects: `AccessControl.holds?` counts a grant whose content types are all unregistered; `Tags::Merge` racing a `Posts::Save` that inserts the same tag answers "image doesn't exist"; unbounded titles in single-record flashes; forged param shapes that 500; a translate timeout that doesn't abort; two ways to enable a language; Duplicate across two transactions; a plugin's starter sample with a key outside the Save allow-lists raises | Could | S26–S32, round 3, PR #39 |
+
+### Structure
+
+| Item | Priority | Ref |
+|---|---|---|
+| Fix the remaining dependency inversions (a model calling `ApplicationController.render`, a model calling services, models and queries using route helpers), then a guard test. The direction is written down in `CLAUDE.md` ("Dependency order") | Should | M1 |
+| One shared `fetchStream` helper, and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
+| One segmented-control component (drawn by hand on four screens) | Could | Round 3 |
+| Split `queue.js`, `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
+| Remove leftovers: the ActionText import path, unused Action Mailbox and Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
+| `CLAUDE.md` is about 127 KB and loaded into every session: move the per-screen descriptions to `docs/` and keep rules and pitfalls | Could | Round 3 final review |
+
+### Tests
+
+| Item | Priority | Ref |
+|---|---|---|
+| System tests fail on JavaScript errors and click natively; a Tiptap schema drift test; tests for the Turbo internals `queue.js` relies on (`turbo-rails` is pinned to 2.0.23) | Should | S22, S23, S25 |
+| Fixed sleeps in system tests (a stubbed provider delay, wall-clock windows) are load-sensitive; replace them with flags the stubs set | Should | Round 2 |
+| The system suite flakes at 12 parallel workers on a laptop (run it with `PARALLEL_WORKERS=6`): a leaner browser fixture, or CI-sized runners | Could | Round 2 |
+| Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
+
+## Known gaps (interim states)
+
+Knowingly shipped incomplete, and fine while tracked here. Grouped by what closes them.
+
+### Closed by versioning
+
+- CS Studio autosave writes straight to the record: edits to a published page or post go live as the editor types (the editor header says so).
+- Editing an already-published page, post or block therefore needs `publish`, not only `edit`.
+- A save the server processed but whose answer was lost is retried on the old base and gets a final "Changed elsewhere" refusal, locking the editor out until Reload. Per-record version columns would close it too.
+- An edit typed between a header action's submit and its redirect is refused unseen; an edit typed during an in-flight save followed at once by Back or Forward is dropped.
+
+### The write queue and Turbo
+
+Small follow-up fixes to `app/javascript/autosave/queue.js` and its neighbours; none loses saved data.
+
+- A `_top` link clicked while a `#content` frame navigation is loading loses to the visit that navigation is promoted to. Forms are held (the promotion hold); links are not.
+- A held press whose screen was replaced is dropped unsent with an error toast, unless it is a Trash row's restore or purge form. Affected: the editor header's actions, the bulk bar, tags Merge, the user and group zones, "Still correct". Opting a form in (`data-promotion-stand-in`) is the follow-up, form by form.
+- A press during a frame fetch that hangs waits up to 10 s before it is sent.
+- A filter changed in the instant its own answer re-renders the toolbar (the audit log, the posts and media lists) is lost with the old control.
+- Hover prefetch is off on the page and post editors, and a refetched `#content` frame can lose a flash toast the first answer relayed.
+- After a block is deleted, the next queued write waits up to 1 s, because the queue doesn't recognise the delete answer's stream as applied.
+- Three narrow cases in the content frame's stale-answer refetch (a 422 frame answer replaced by a fresh render; continuous typing across about three round trips after clicking the open page's own tree row; an aborted held request overwriting a newer write count).
+- For up to 30 s after leaving a page with a hung save, the next page's visits wait and its header actions are declined.
+- A double click on a header action that has already settled can fetch its redirect twice.
+- A block reorder queued behind one that failed is lost without a toast of its own; a block card answered 410 keeps the unload prompt up.
+- After Back or Forward, the toast controller's "this render came from the cache" flag stays set until the next visit, so a top-level form that then fails loses its error toast.
+- A drag clone can stay on the page if the tree or block list re-renders mid-drag.
+- Instant filters put focus back on the control that triggered the reload even if the editor moved focus elsewhere meanwhile.
+- The tree re-render after a move marks the moved page as selected even when another page is open.
+
+### Save footer screens
+
+- The leave guard doesn't ask about a GET form submitted into `#content` or a script setting the frame's `src` (no explicit-save screen has either), and Back to an entry from before a full page load gets only the browser's own prompt.
+- A refused Settings save can't put a chosen logo file back.
+- A non-owner who couldn't grant a carried removed content type must press Remove before changing that group row in any other way, else the save is a 403. The locked tick ("You can't grant this") is unreachable from stored data and kept only as a defensive rendering.
+
+### Media
+
+- Until a variant has been processed, a page serves the original file at full size. `bin/rails media:variants` re-enqueues any still missing.
+- The panel is a 340px column from 1024px and stacks under the grid below; the handoff's overlay at 1024–1279px is not built.
+- Leaving mid-upload asks nothing and drops the files still queued.
+- A file dropped on a rich-text editor may still make the browser open it (the file-drop guard leaves `contenteditable` alone; not verified).
+- A tile activated twice within a few milliseconds renders the frame twice with no promoted visit. Whether a fast human double click does it is untested.
+- A tile stays in the Missing alt segment after its alt was typed, until the grid reloads; in the picker a selected image whose tile isn't listed isn't named, a finished upload replaces a selection made by hand, and Escape from a tile doesn't return focus to the search; on an out-of-range page a finished upload's tile has nowhere to appear.
+- The Media panel's "Only by items in the trash" line names trashed owners to a reader who may lack the delete right. Accepted.
+
+### Lists and editors
+
+- Posts list: Undo for a bulk trash is offered only while its URL fits the session cookie (a few dozen posts); the bulk bar precedes the table in the DOM, so a keyboard user tabs back up to it; `Posts::Save#find_tag` costs up to two queries per submitted tag name.
+- Translations matrix: an old `?locale=` link lands on the unfiltered matrix; the summary cards don't count the Site settings row; the ordering expression is evaluated over the filtered set, not only the page.
+- The New page and New post forms load when the dialog opens, and the title preset travels in a GET query string, so it appears in the request log.
+- A schema group field's reference card shows the raw Hash.
+- Escape during a suggestion search's 150 ms debounce closes the surrounding dialog.
+- The error toast has no Retry action; nothing raises an error a retry could repeat yet.
+- The group editor with scripts off shows an Edit scope button that does nothing on a ticked row; a stored branch root in the trash reads "A page you can't open (kept)" even to an owner. Ticking an ancestor above a page ticked in the same session drops the child where a stored one is kept.
+- The token form decides whether a refusal belongs under Name or Group from the message's first word.
+- The group delete dialog says tokens are "revoked" while `Groups::Destroy` deletes their rows.
+
+### Accepted as they are
+
+- The seeded Author group's `posts.read` and `posts.create` are unscoped, so an Author reads every post (only `posts.edit` is `own`-scoped). Revisit if it surprises in practice.
+- A related post the viewer can't read is hidden but disclosed as a count ("+N related posts you can't open").
+- The audit log's append-only trigger blocks `DELETE` and `UPDATE` but deliberately not `TRUNCATE`, so `db:truncate_all` works in development.
+
+## Polish backlog
+
+Departures from the design mocks that the visual checks listed; none is wrong. One polish pass.
+
+- **Dashboard:** a date eyebrow above the heading; card titles with counts and "→ All drafts" / "Open →" links; a quieter empty-state line.
+- **Editors:** the placeholder "Empty — write it, or use the suggestion."; a content-type dot in the post breadcrumb; the translation pair stacking at 1400px beside the page tree.
+- **Settings and the AI assistant:** title and tagline stacked instead of side by side; a tall logo drop zone; inline labels instead of column headers in Languages; no active item in the in-page nav; the AI assistant's step 1 stacked instead of one row.
+- **Media:** the panel as a card under the toolbar rather than a full-height column; the big "Choose file" drop zone still drawn above the grid.
+- **Groups:** name, description and members in a narrow column without a card or breadcrumb.
+- **Audit log:** large filter selects, row avatars and quoted titles; the event page's two unaligned change tables and raw ids for related posts.
+- **System status:** rows without a card.
+- **Across screens:** segmented controls' selected state tinted rather than inverted; lists and editors spanning the full width where the mocks cap them near 1100px; the preview bar barely set apart from a dark public page; the dark theme's dialog backdrop reading as a light wash; new toasts end with a full stop and older ones don't.
 
 ## Out of scope (for now)
 
-Multi-site, e-commerce, memberships/paywall, built-in comments.
+Multi-site, e-commerce, memberships and paywalls, built-in comments.
 
 ## Guardrails while the roadmap is pending
 
-From the structure review: no new integer enums, no new `has_one_attached` on content models, no new `after_save` side effects on `Page`/`Post` (use services and events), no hand-built URLs outside `PublicUrls`, no new per-locale columns/indexes without the locale decision. Respect the "don't touch" list in §6 of the structure review.
+From the structure review: no new integer enums, no new `has_one_attached` on content models, no new `after_save` side effects on `Page` or `Post` (use services and events), no hand-built URLs outside `PublicSite::Urls`, no new per-locale columns or indexes. Respect the "don't touch" list in §6 of the structure review.
