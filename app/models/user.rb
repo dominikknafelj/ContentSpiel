@@ -32,6 +32,23 @@ class User < ApplicationRecord
   # index or a case-sensitivity option here.
   validates :email_address, presence: true, uniqueness: true
 
+  # The users whose name or email address contains this text, whatever the
+  # case; a typed `%` or `_` is a character to find, not a wildcard. A user
+  # without a name is found by the address alone.
+  scope :name_or_email_containing, ->(text) {
+    where("LOWER(users.name) LIKE :any OR LOWER(users.email_address) LIKE :any", any: "%#{sanitize_sql_like(text.to_s.downcase)}%")
+  }
+  # Ordering: the users whose name or address STARTS with this text ahead of
+  # the rest.
+  scope :name_or_email_starting_first, ->(text) {
+    order(Arel.sql(sanitize_sql_array([
+      "(COALESCE(LOWER(users.name), '') LIKE :prefix OR LOWER(users.email_address) LIKE :prefix) DESC",
+      { prefix: "#{sanitize_sql_like(text.to_s.downcase)}%" }
+    ])))
+  }
+  # Ordering: by address, capitals and small letters together.
+  scope :by_email, -> { order(Arel.sql("LOWER(users.email_address) ASC")) }
+
   # `prepend: true` (final fix wave, P16; still needed now that this checks
   # owners rather than "any user" -- access-control design spec §3.2/§6):
   # `has_many ..., dependent: :destroy` above registered its own

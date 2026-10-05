@@ -130,4 +130,43 @@ class UserTest < ActiveSupport::TestCase
     assert_not user.valid?
     assert_includes user.errors.full_messages, "Password can't be blank"
   end
+
+
+  # The members picker's search (`Admin::UserSuggestionsController`).
+  test "name_or_email_containing matches the name or the address, whatever the case" do
+    named = User.create!(email_address: "x1@example.org", name: "Greta Lindqvist", password: "password12345")
+    by_address = User.create!(email_address: "lindqvist@example.org", password: "password12345")
+    User.create!(email_address: "nobody@example.org", name: "Somebody Else", password: "password12345")
+
+    assert_equal [ named, by_address ].sort_by(&:id), User.name_or_email_containing("LINDQ").order(:id).to_a
+    assert_empty User.name_or_email_containing("zzz-no-such")
+  end
+
+  test "name_or_email_containing finds a user without a name by the address alone" do
+    nameless = User.create!(email_address: "nameless@example.org", password: "password12345")
+    assert_nil nameless.name
+
+    assert_equal [ nameless ], User.name_or_email_containing("nameless").to_a
+    assert_not_includes User.name_or_email_containing("greta"), nameless
+  end
+
+  test "name_or_email_containing reads a typed % or _ as a character, not a wildcard" do
+    percent = User.create!(email_address: "p@example.org", name: "100% Pia", password: "password12345")
+    underscore = User.create!(email_address: "under_score@example.org", password: "password12345")
+
+    assert_equal [ percent ], User.name_or_email_containing("%").to_a
+    assert_equal [ underscore ], User.name_or_email_containing("r_s").to_a
+  end
+
+  test "name_or_email_starting_first puts prefix matches ahead (a missing name is no prefix), by_email sorts the rest" do
+    User.where.not(id: users(:one).id).destroy_all
+    users(:one).update!(name: nil, email_address: "zed@example.org")
+    User.create!(email_address: "b@example.org", name: "Mona Anders", password: "password12345")
+    User.create!(email_address: "anders@example.org", password: "password12345")
+    User.create!(email_address: "c@example.org", name: "Anders Berg", password: "password12345")
+
+    assert_equal %w[anders@example.org c@example.org b@example.org zed@example.org],
+      User.name_or_email_starting_first("ANDERS").by_email.pluck(:email_address)
+    assert_equal %w[anders@example.org b@example.org c@example.org zed@example.org], User.by_email.pluck(:email_address)
+  end
 end
