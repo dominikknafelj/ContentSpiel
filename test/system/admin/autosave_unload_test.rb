@@ -77,8 +77,14 @@ class Admin::AutosaveUnloadSystemTest < ApplicationSystemTestCase
     # The Trash screen has no autosave form at all: the guard is not even
     # listening there (it is removed with the last form). Reached by a Turbo
     # visit, so this is the same document the unsaved form was in.
+    #
+    # Wait for the Trash screen itself, not for the word "Trash": the sidebar
+    # link on the editor already says it, and the visit is held until the
+    # write queue has given up on the failed form (`drained()`), so for that
+    # long this is still the editor, which rightly asks.
     within(".admin-shell__sidebar") { click_link "Trash" }
-    assert_text "Trash"
+    assert_current_path %r{/cs-studio/trash}
+    assert_no_selector "form[data-controller~='admin--autosave']"
     assert_not asks_before_unload?, "a screen with no autosave form asked before unloading"
   end
 
