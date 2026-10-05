@@ -18,6 +18,18 @@ require_relative "../support/service_calls"
 #   and the attributes of the record (and of any second record) it acts on
 #   are what they were before.
 #
+# SCOPE. This contract proves the FIRST refusal for an actor with no grants:
+# the right key, on the right record, and nothing written. The branches of a
+# service's rule (publish-only saves, edits to a live record, other subject
+# types, the uploader rule, scoped grants, `languages.manage`, escalation of
+# groups and users) belong to `authorization_matrix_test.rb`, which owns them.
+#
+# Nothing is read from source and no list of tables is trusted: the data is
+# a digest of every table but the audit log, before and after. A CONTROL
+# run (the same call, allowed, in a rolled-back savepoint) must answer ok and
+# change something, so "changes nothing" cannot be true of a call that would
+# have changed nothing anyway.
+#
 # The actor is a user with no memberships on the :admin channel, and, where
 # MCP reaches the service, an API token of that user (in the Admin group, so
 # only the intersection with the user's own rights can refuse it) on :mcp.
@@ -33,6 +45,16 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
 
   Rails.application.eager_load!
 
+  # Every service, by name. Adding or deleting one is a deliberate edit here
+  # (and a factory in test/support/service_calls.rb).
+  EXPECTED_SERVICES = %w[
+    AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Reorder ContentBlocks::Save
+    Groups::Destroy Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
+    Media::Upload Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
+    StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
+    Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
+  ].freeze
+
   # The app's own services: classes defined under app/, not the throwaway
   # subclasses tests define (`ApplicationServiceTest::NoOpService`). Found by
   # where the constant is defined, so a service defined several to a file, or
@@ -44,43 +66,77 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     end.sort_by(&:name)
   end
 
+  # A provider registered for `AI::Translate`'s factory is reset afterwards.
+  teardown { Rails.application.reloader.prepare! if @ai_providers_registered }
+
   def nobody
     @nobody ||= User.create!(email_address: "nobody@example.com", password: ServiceCalls::PASSWORD)
   end
 
-  def nobodys_token
-    @nobodys_token ||= ApiToken.generate!(nobody, group: access_control_groups(:admin)).first
+  def digests = ServiceCalls.digests
+
+  def user_of(actor) = actor.is_a?(ApiToken) ? actor.user : actor
+
+  # What the denial names: the permission, and its subject (a persisted
+  # record), or for a refused create only the type; nothing for a call that
+  # has no record.
+  def assert_denial_event(label, event, permission:, on:)
+    assert_equal "access.denied", event.action
+    assert_equal permission, event.metadata["permission"], "#{label} refused with the wrong permission key"
+    case on
+    when Class
+      assert_nil event.subject_id, "#{label}: an unsaved record is not an audit subject"
+      assert_equal on.polymorphic_name, event.metadata["subject_type"], "#{label} names the wrong type"
+    when nil
+      assert_nil event.subject_id
+      assert_nil event.metadata["subject_type"]
+    else
+      assert_equal [ on.class.polymorphic_name, on.id ], [ event.subject_type, event.subject_id ], "#{label} names the wrong record"
+    end
   end
 
-  # What a refusal must leave untouched: row counts and the attributes of
-  # every record named.
-  def snapshot(tables, records)
-    {
-      counts: tables.index_with(&:count),
-      attributes: records.compact.map { |record| [ record.class.name, record.id, record.class.unscoped.find_by(id: record.id)&.attributes ] }
-    }
-  end
-
-  # Runs `call` as `actor` on `channel` and asserts the whole contract.
-  def assert_refused_and_unchanged(label, call:, tables:, records:, actor:, channel:)
+  # Runs `call` as `actor` on `channel` and asserts the whole refusal: a
+  # denial, one audit row naming `permission` on `on`, and no table changed.
+  def assert_refused_and_unchanged(label, call:, permission:, on:, actor:, channel:)
     audit_ids = Audit::Event.pluck(:id)
-    before = snapshot(tables, records)
+    before = digests
 
     result = Current.set(actor: actor, channel: channel) { call.call }
 
     assert_respond_to result, :denied?, "#{label} did not answer with an ApplicationService::Result"
     assert_predicate result, :denied?, "#{label} was not refused (errors: #{result.errors.inspect})"
-    assert_not_predicate result, :ok?, "#{label} answered ok for an actor with no grants"
+    assert_not_predicate result, :ok?, "#{label} answered ok for an actor without the right"
 
     events = Audit::Event.where.not(id: audit_ids).to_a
-    assert_equal [ "access.denied" ], events.map(&:action), "#{label} must write exactly one audit event, an access.denied"
+    assert_equal 1, events.size, "#{label} must write exactly one audit event, an access.denied (got #{events.map(&:action).inspect})"
     assert_equal 1, events.first.occurrences, "#{label} recorded the denial more than once"
+    assert_denial_event(label, events.first, permission: permission, on: on)
     assert_equal channel.to_s, events.first.channel
-    assert_equal nobody.id, events.first.user_id, "#{label}'s denial is not attributed to the actor"
+    assert_equal user_of(actor).id, events.first.user_id, "#{label}'s denial is not attributed to the actor"
 
-    after = snapshot(tables, records)
-    assert_equal before[:counts], after[:counts], "#{label} changed the row count of a table although it refused"
-    assert_equal before[:attributes], after[:attributes], "#{label} changed a record although it refused"
+    changed = before.reject { |table, digest| digest == digests[table] }.keys
+    assert_empty changed, "#{label} refused but changed #{changed.join(", ")}"
+  end
+
+  # The same call, allowed, rolled back: it must answer ok and change a table
+  # (or, for a call that only logs, say so in the factory).
+  def assert_changes_something_when_allowed(label, built)
+    audit_before = Audit::Event.count
+    before = digests
+    actor = built[:control_actor]
+    result = changed = nil
+
+    ActiveRecord::Base.transaction(requires_new: true) do
+      result = Current.set(actor: actor, channel: actor ? :admin : :system) { built[:call].call }
+      changed = before.reject { |table, digest| digest == digests[table] }.keys
+      assert_operator Audit::Event.count, :>, audit_before, "#{label} is allowed but recorded no audit event"
+      raise ActiveRecord::Rollback
+    end
+
+    assert_predicate result, :ok?, "#{label}'s control run (#{actor ? "as an owner" : "as the trusted actor"}) was refused or failed: #{result.errors.inspect}"
+    return if built[:control_audit_only]
+
+    assert_not_empty changed, "#{label}: this call changes nothing even when allowed: make it change something (build what the service writes)"
   end
 
   services.each do |klass|
@@ -96,8 +152,9 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     if ServiceCalls::OWN_RESULT.key?(klass.name)
       test "#{klass} reports every id as not found to an actor who can read nothing" do
         built = ServiceCalls.for(klass, self)
-        before_audit = Audit::Event.count
-        before = snapshot(built[:tables], [ built[:subject], *built[:also] ])
+        nobody # created before the snapshot, not by it
+        audit_before = Audit::Event.count
+        before = digests
 
         result = Current.set(actor: nobody, channel: :admin) { built[:call].call }
 
@@ -107,8 +164,44 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
         # Not found, never forbidden: no denial is recorded either. Each post
         # that WOULD have been acted on is authorized and audited by the
         # single-record service the bulk one runs.
-        assert_equal before_audit, Audit::Event.count, "#{klass} wrote an audit event for ids it could not read"
-        assert_equal before, snapshot(built[:tables], [ built[:subject], *built[:also] ])
+        assert_equal audit_before, Audit::Event.count, "#{klass} wrote an audit event for ids it could not read"
+        assert_equal before, digests
+      end
+
+      # A reader may read the posts, so they are found; what they may not do
+      # is refused by the single-record service, once per post, with its own
+      # `access.denied`. Posts::BulkRestore loads through the delete right,
+      # which a reader lacks, so for it everything is still not found.
+      test "#{klass} for a reader" do
+        reader = users(:reader)
+        built = ServiceCalls.for(klass, self)
+        audit_ids = Audit::Event.pluck(:id)
+        before = digests
+        actions = klass == Posts::Bulk ? %w[publish trash] : [ nil ]
+
+        actions.each do |action|
+          result = Current.set(actor: reader, channel: :admin) do
+            action ? Posts::Bulk.call(action: action, ids: built[:ids]) : built[:call].call
+          end
+
+          if klass == Posts::Bulk
+            assert_equal built[:ids].sort, result.refused.map(&:id).sort, "#{action}: every readable post is refused"
+            assert_empty result.done
+            assert_equal 0, result.not_found
+          else
+            assert_equal built[:ids].size, result.not_found
+            assert_empty result.refused
+          end
+        end
+
+        events = Audit::Event.where.not(id: audit_ids)
+        if klass == Posts::Bulk
+          assert_equal([ "access.denied" ] * built[:ids].size * actions.size, events.pluck(:action), "one denial per post and action, recorded by the single-record service")
+          assert_equal (built[:posts].map(&:id) * actions.size).sort, events.pluck(:subject_id).sort
+        else
+          assert_empty events
+        end
+        assert_equal before, digests
       end
       next
     end
@@ -121,16 +214,31 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
       # own-record rule is tested below.
       test "#{label} refuses an actor with no grants" do
         built = ServiceCalls.for(klass, self, variant: variant)
-        assert_refused_and_unchanged(label, call: built[:call], tables: built[:tables], records: [ built[:subject], *built[:also] ],
+        assert_refused_and_unchanged(label, call: built[:call], permission: built[:permission], on: built[:on],
           actor: nobody, channel: :admin)
+      end
+
+      test "#{label} changes something when allowed" do
+        assert_changes_something_when_allowed(label, ServiceCalls.for(klass, self, variant: variant))
       end
 
       next unless ServiceCalls::MCP_REACHABLE.key?(klass.name)
 
+      # A token is judged on its group AND its user. Each half is tested
+      # alone: an Admin-group token of a user with no grants (the user half
+      # refuses), and a read-only-group token of an owner (the group half).
       test "#{label} refuses a token of a user with no grants" do
         built = ServiceCalls.for(klass, self, variant: variant)
-        assert_refused_and_unchanged("#{label} by token", call: built[:call], tables: built[:tables],
-          records: [ built[:subject], *built[:also] ], actor: nobodys_token, channel: :mcp)
+        token = ApiToken.generate!(nobody, group: access_control_groups(:admin)).first
+        assert_refused_and_unchanged("#{label} by token", call: built[:call], permission: built[:permission], on: built[:on],
+          actor: token, channel: :mcp)
+      end
+
+      test "#{label} refuses a read-only token of an owner" do
+        built = ServiceCalls.for(klass, self, variant: variant)
+        token = ApiToken.generate!(users(:one), group: access_control_groups(:read_only)).first
+        assert_refused_and_unchanged("#{label} by read-only token", call: built[:call], permission: built[:permission], on: built[:on],
+          actor: token, channel: :mcp)
       end
     end
 
@@ -153,25 +261,47 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     # user's rights, and has no business with the account itself.
     test "#{klass} refuses a token of the record's own user who has no grants" do
       built = ServiceCalls.for(klass, self)
-      owner = built[:owner]
-      token = ApiToken.generate!(owner, group: access_control_groups(:admin)).first
+      token = ApiToken.generate!(built[:owner], group: access_control_groups(:admin)).first
       audit_ids = Audit::Event.pluck(:id)
-      records = [ built[:own_subject] || owner, built[:subject] ]
-      before = snapshot(built[:tables], records)
+      before = digests
 
       result = Current.set(actor: token, channel: :mcp) { built[:own].call }
 
       assert_predicate result, :denied?, "#{klass} let a token act on its user's own record (errors: #{result.errors.inspect})"
       assert_equal [ "access.denied" ], Audit::Event.where.not(id: audit_ids).pluck(:action)
-      assert_equal before[:attributes], snapshot(built[:tables], records)[:attributes]
+      assert_equal before, digests
+    end
+
+    # The manager's side: a holder of the right (an Admin) acting on someone
+    # else's record.
+    manager_may = ServiceCalls::SELF_SERVICE.fetch(klass.name)[:manager_may]
+    test "#{klass} #{manager_may ? "lets" : "refuses"} a manager acting on someone else's record" do
+      built = ServiceCalls.for(klass, self)
+      manager = users(:two)
+
+      if manager_may
+        audit_ids = Audit::Event.pluck(:id)
+        result = Current.set(actor: manager, channel: :admin) { built[:call].call }
+
+        assert_predicate result, :ok?, "#{klass} refused a manager: #{result.errors.inspect}"
+        events = Audit::Event.where.not(id: audit_ids).to_a
+        assert_includes events.map(&:action), built[:own_event]
+        assert_not_includes events.map(&:action), "access.denied"
+        assert(events.all? { |event| event.user_id == manager.id })
+      else
+        assert_refused_and_unchanged("#{klass} by a manager", call: built[:call], permission: built[:permission], on: built[:on],
+          actor: manager, channel: :admin)
+      end
     end
   end
 
-  test "there are services to check" do
-    assert_operator self.class.services.size, :>=, 33
+  test "the services are exactly the expected ones" do
+    names = self.class.services.map(&:name)
+    assert_empty names - EXPECTED_SERVICES, "services with no entry in EXPECTED_SERVICES (add them, with a factory)"
+    assert_empty EXPECTED_SERVICES - names, "EXPECTED_SERVICES names services that no longer exist"
   end
 
-  test "every exemption names a real service" do
+  test "every exemption and factory names a real service" do
     names = self.class.services.map(&:name)
     (ServiceCalls::SELF_SERVICE.keys + ServiceCalls::OWN_RESULT.keys + ServiceCalls::FACTORIES.keys + ServiceCalls::MCP_REACHABLE.keys +
       ServiceCalls::VARIANTS.keys).each do |name|
