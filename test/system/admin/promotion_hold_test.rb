@@ -279,7 +279,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     assert_not @page.reload.trashed?
     # Turbo rethrows the failed fetch of the frame navigation, unhandled; that
     # is the failure this test provokes.
-    expect_js_error(/TypeError: Failed to fetch/)
+    expect_js_error(/TypeError: Failed to fetch/, times: 2)
   end
 
   test "a frame answer without the frame releases what was held" do

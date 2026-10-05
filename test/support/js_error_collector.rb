@@ -12,7 +12,13 @@
 #   an error thrown inside the application's own bundles (Turbo):
 #     text "Uncaught (in promise)", exception.description "TypeError: Failed to fetch\n at ..."
 #
-# Errors written with `console.error` are not exceptions and are not collected.
+# Stimulus catches an error thrown in an action or in `initialize`/`connect`/
+# `disconnect`, writes it with `console.error` and calls `window.onerror` by
+# hand: no exception reaches CDP. So a call to `console.error` is collected
+# too (`Runtime.consoleAPICalled`, type "error"), its arguments joined into one
+# message: a string as it is, an Error by the first line of its description. A
+# `console.warn` is not an error and is not collected. Both kinds go through the
+# same `IGNORED` list and `expect_js_error`.
 #
 # This is prepended onto `Ferrum::Page` rather than using the driver's own
 # `js_errors: true`: that option does `Thread.main.raise` from the CDP thread,
@@ -72,11 +78,27 @@ module JsErrorCollector
       end
     end
 
+    # What a `console.error(...)` call says: each argument's value, or for an
+    # object (an Error) the first line of its description, joined by a space.
+    def message_of_console(params)
+      Array(params["args"]).map do |arg|
+        value = arg.key?("value") ? arg["value"].to_s : arg["description"].to_s.lines.first.to_s.strip
+        value.presence || arg["type"].to_s
+      end.join(" ")
+    end
+
+    # A `console.error` call, shaped like an exception's details so one
+    # `IGNORED` list serves both: `text` is the joined message, there is no
+    # `exception`, and the stack is the call's own.
+    def record_console(params)
+      record({ "text" => message_of_console(params), "stackTrace" => params["stackTrace"], "console" => true })
+    end
+
     def record(details)
       return if IGNORED.any? { |matcher, _reason| matcher.call(details) }
 
       frame = details.dig("stackTrace", "callFrames")&.first
-      entry = {
+      entry = { console: details["console"],
         message: message_of(details),
         text: details["text"],
         class_name: details.dig("exception", "className"),
@@ -93,5 +115,6 @@ module JsErrorCollector
   def subscribe
     super
     on("Runtime.exceptionThrown") { |params| JsErrorCollector.record(params["exceptionDetails"]) }
+    on("Runtime.consoleAPICalled") { |params| JsErrorCollector.record_console(params) if params["type"] == "error" }
   end
 end

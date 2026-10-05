@@ -80,9 +80,14 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # For a test that provokes a JavaScript error on purpose (a request made to
   # fail, a response Turbo refuses): waits for an error whose message matches
   # and takes it out of the collector, so `teardown` doesn't fail the test for
-  # it. The test fails if the error never comes.
-  def expect_js_error(pattern)
-    assert_eventually(message: "no JavaScript error matching #{pattern.inspect} reached the page") { JsErrorCollector.consume(pattern) }
+  # it. The test fails if the error never comes. `times:` is for an error that
+  # reaches the collector more than once: Turbo writes a failed fetch it then
+  # rethrows with `console.error` as well, so the rejection arrives as a
+  # console error and an uncaught exception (two entries, one cause).
+  def expect_js_error(pattern, times: 1)
+    times.times do
+      assert_eventually(message: "no JavaScript error matching #{pattern.inspect} reached the page") { JsErrorCollector.consume(pattern) }
+    end
   end
 
   # Fails a test that otherwise passed because its page raised an error. A test
@@ -93,7 +98,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     JsErrorCollector.reset!
     if errors.any? && passed?
       flunk "JavaScript errors on the page:\n" + errors.map { |e|
-        "  #{e[:message]} (#{e[:url]})#{" at #{e[:frame]}" if e[:frame]}"
+        "  #{e[:console] ? "[console] " : ""}#{e[:message]} (#{e[:url]})#{" at #{e[:frame]}" if e[:frame]}"
       }.join("\n")
     end
   end
