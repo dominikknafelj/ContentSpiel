@@ -188,7 +188,7 @@ module Admin
       # trashed descendant is its own root (`trash_root_id = id`) and has
       # a row of its own instead.
       def subpages_by_root
-        @subpages_by_root ||= Page.where(trash_root_id: pages.map(&:id)).where("pages.id <> pages.trash_root_id")
+        @subpages_by_root ||= Page.where(trash_root_id: pages.map(&:id)).trash_branch_members
           .order(:id).group_by(&:trash_root_id)
       end
 

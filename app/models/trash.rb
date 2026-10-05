@@ -13,7 +13,7 @@ module Trash
   # `trash_root_id`) go with it through `Trash::Purge`, never on their own.
   def roots
     {
-      pages: Page.trashed.where("pages.trash_root_id = pages.id").order(:trashed_at, :id),
+      pages: Page.trashed.trash_roots.order(:trashed_at, :id),
       posts: Post.trashed.order(:trashed_at, :id),
       assets: Media::Asset.trashed.order(:trashed_at, :id)
     }
