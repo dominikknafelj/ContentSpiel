@@ -116,7 +116,7 @@ gem "sitemap_generator", "~> 7.1"
 # used in dev/test to a real backend later is an env var
 # (OTEL_EXPORTER_OTLP_ENDPOINT), not a new gem.
 gem "opentelemetry-sdk", "~> 1.13"
-gem "opentelemetry-exporter-otlp", "~> 0.36"
+gem "opentelemetry-exporter-otlp", "~> 0.37"
 gem "opentelemetry-instrumentation-all", "~> 0.96"
 
 # The official Ruby SDK for MCP servers (design spec section 10) --
