@@ -53,7 +53,7 @@ module Admin
         case item.type
         when "page" then helpers.admin_page_path(item.record, locale:)
         when "post" then helpers.admin_post_path(item.record, locale:)
-        when "media" then helpers.admin_medium_path(item.record, locale:)
+        when "media" then helpers.admin_media_path(selected: item.record.id, locale:)
         when "settings" then helpers.admin_settings_path(locale:)
         end
       end

@@ -1,102 +1,84 @@
 import { Controller } from "@hotwired/stimulus"
+import { UploadTiles, updateCounts } from "media/upload_tiles"
 
-// The Media module's own multi-file upload (media library design spec §6,
-// global constraints): drag and drop onto this controller's own element, or
-// the plain file picker it wraps -- either way, one POST per file straight
-// to `Admin::MediaController#create` (`Media::Upload` underneath), never a
-// batch request. That's what keeps one refused or oversized file (an SVG,
-// something over 10 MB) from blocking its siblings, and gives each its own
-// inline error line next to its own filename -- there is no browser
-// `alert()`/`confirm()` anywhere in this controller (spec: "no browser
-// dialogs").
+// The Media module's own multi-file upload (media library design spec §6, round 3
+// Task 9): files dropped anywhere on the screen (`admin--media-drop`, which hands
+// them over as `admin--media-drop:dropped`), the header's "Upload images" button
+// and the plain file input in the drop zone -- all three end in `#upload`, which
+// gives every file a progress tile at the start of the grid and sends them one at
+// a time, one POST per file, to `Admin::MediaController#create`. That is what
+// keeps one refused or oversized file (an SVG, something over 10 MB) from blocking
+// its siblings: it keeps its own tile with the server's reason and Dismiss, and
+// the others become real tiles. There is no browser `alert()`/`confirm()` here
+// (spec: "no browser dialogs") and, since this round, no reload: the answer carries
+// the finished tile and the new counts (`media/upload_tiles.js`), so an upload that
+// ends while an editor is typing in the side panel changes nothing under them.
 //
-// A successful batch reloads the page once every request in it has settled:
-// the grid has no partial-refresh endpoint of its own (unlike an autosave
-// form's own Turbo Stream), and this is always a top-level page, never a
-// `<turbo-frame>` this could instead ask to reload -- so a plain, real
-// navigation is both the simplest and the most honest way to show the new
-// cards, exactly as if the editor had reloaded by hand.
+// The queue is module-level, not per controller: choosing a tile is a frame
+// navigation that replaces this very element, and a file still going up (or a
+// refused one's tile) must outlive that. The next instance takes the queue over
+// (`connect`) and puts the live tiles back at the start of the new grid.
+let tiles = null
+
 export default class extends Controller {
-  static targets = [ "input", "list" ]
+  static targets = [ "input", "status" ]
   static values = { url: String }
+
+  connect() {
+    if (!tiles) {
+      tiles = new UploadTiles({ url: this.urlValue, grid: () => this.grid, fields: () => this.fields, onUploaded: (done) => this.uploaded(done), announce: (text) => this.announce(text) })
+    }
+    // This page's callbacks (its own status region, its own URL), the same queue.
+    Object.assign(tiles, { url: this.urlValue, grid: () => this.grid, fields: () => this.fields, announce: (text) => this.announce(text), onUploaded: (done) => this.uploaded(done) })
+    tiles.reattach()
+  }
+
+  // The header's "Upload images" button: the same file input the drop zone wraps,
+  // so one path -- `filesSelected` -- handles both.
+  browse() {
+    this.inputTarget.click()
+  }
 
   filesSelected() {
     this.upload(Array.from(this.inputTarget.files))
-    // Cleared immediately (not after the batch settles): re-picking the
-    // exact same file a second time wouldn't otherwise fire another
-    // `change` event at all, since the input's own value hasn't changed
-    // from the browser's point of view.
+    // Cleared immediately: re-picking the exact same file a second time wouldn't
+    // otherwise fire another `change` event at all, since the input's own value
+    // hasn't changed from the browser's point of view.
     this.inputTarget.value = ""
   }
 
-  dragOver(event) {
-    // Only a drag carrying files is any of this controller's business --
-    // preventing default on every dragover is what tells the browser this
-    // element accepts a drop at all (without it, `drop` below never fires).
-    event.preventDefault()
+  dropped(event) {
+    this.upload(Array.from(event.detail?.files || []))
   }
 
-  drop(event) {
-    event.preventDefault()
-    const files = event.dataTransfer?.files
-    if (files && files.length > 0) this.upload(Array.from(files))
+  upload(files) {
+    if (files.length > 0) tiles.add(files)
   }
 
-  async upload(files) {
-    if (files.length === 0) return
-
-    const outcomes = await Promise.all(files.map((file) => this.uploadOne(file)))
-
-    if (outcomes.some((ok) => ok)) window.location.reload()
+  // The grid on the screen now. The picker's own grid (a `ul` in a dialog in the
+  // layout) is not it.
+  get grid() {
+    return document.querySelector("#content ul.admin-media-grid")
   }
 
-  // One file, one request, one status line -- returns whether it
-  // succeeded, so `#upload` above knows whether a reload is worth doing at
-  // all (a batch that was entirely refused leaves the grid exactly as it
-  // was, with every error still readable in place).
-  async uploadOne(file) {
-    const row = this.addRow(file.name)
-
-    try {
-      const response = await fetch(this.urlValue, {
-        method: "POST",
-        body: this.formData(file),
-        headers: {
-          Accept: "application/json",
-          "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content
-        }
-      })
-
-      const body = await response.json().catch(() => ({}))
-
-      if (response.ok) {
-        row.textContent = `${file.name} — uploaded`
-        return true
-      }
-
-      this.showError(row, file.name, body.errors)
-      return false
-    } catch (error) {
-      this.showError(row, file.name, [ "Couldn't upload — check your connection" ])
-      return false
-    }
+  // The grid's state (search, segment, page), so the counts that come back are for
+  // the search and the finished tile's link keeps all three.
+  get fields() {
+    const fields = {}
+    const q = document.querySelector("#content input[type=search][name=q]")?.value
+    const filter = document.querySelector("#content input[type=radio][name=filter]:checked")?.value
+    const page = new URL(window.location.href).searchParams.get("page")
+    if (q) fields.q = q
+    if (filter) fields.filter = filter
+    if (page) fields.page = page
+    return fields
   }
 
-  formData(file) {
-    const data = new FormData()
-    data.append("file", file)
-    return data
+  uploaded({ json }) {
+    updateCounts(json.counts)
   }
 
-  addRow(name) {
-    const row = document.createElement("li")
-    row.textContent = `${name} — Uploading…`
-    this.listTarget.appendChild(row)
-    return row
-  }
-
-  showError(row, name, errors) {
-    row.textContent = `${name} — ${(errors && errors.length > 0 ? errors : [ "Couldn't upload" ]).join(", ")}`
-    row.classList.add("text-danger-ink")
+  announce(text) {
+    if (this.hasStatusTarget) this.statusTarget.textContent = text
   }
 }

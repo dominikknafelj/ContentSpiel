@@ -1,10 +1,11 @@
 require "test_helper"
 
 # `Admin::MediaAssetsController#create` (design spec §4.1/§4.2): the media
-# picker's Upload tab (media library Task 8) POSTs here directly (no page
+# picker's header Upload (media library Task 8) POSTs here directly (no page
 # or post owns this upload -- the picker hands the id to whichever field or
-# editor opened it once this answers), and gets back `{ id, url, title }`
-# or `{ errors }`.
+# editor opened it once this answers), and gets back `{ id, title, url, tile,
+# counts }` (the finished pick tile and the segment counts, round 3 Task 9) or
+# `{ errors }`.
 class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -24,6 +25,22 @@ class Admin::MediaAssetsTest < ActionDispatch::IntegrationTest
     assert_equal asset.url, body["url"]
     assert_equal "tiny", body["title"]
     assert asset.file.attached?
+  end
+
+  # Round 3 Task 9: the picker puts the finished tile into its grid, so the
+  # answer carries it -- a pick button with the asset's payload -- and counts.
+  test "the answer carries the picker's finished tile and the new counts" do
+    sign_in_as(users(:one))
+
+    post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
+
+    body = response.parsed_body
+    asset = Media::Asset.last
+    tile = Nokogiri::HTML.fragment(body["tile"])
+    assert_equal "media-picker-asset-#{asset.id}", tile.at_css("li")["id"]
+    button = tile.at_css("button[data-action*='admin--media-select#select']")
+    assert_equal asset.id, JSON.parse(button["data-admin--media-select-asset-param"])["id"]
+    assert_equal 1, body["counts"]["all"]
   end
 
   test "signed out is redirected to sign in, and creates nothing" do

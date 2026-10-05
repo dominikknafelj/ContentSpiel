@@ -1,76 +1,136 @@
 module Admin
-  # The group editor's permission matrix (access-control design spec §5
-  # "Groups module"): every registered permission, grouped by `area`, as a
-  # checkbox; a ticked *scoped* permission shows its scope controls --
+  # The group editor's permissions (access-control design spec §5 "Groups
+  # module"; round 3 Task 10 rebuilt it from a checkbox list into rows):
   #
-  # - content types (`content_type` scope): one checkbox per registered
-  #   type, read live from `ContentTypes` (`Permissions.content_type_
-  #   choices`), so a plugin's type appears without a code change;
-  # - "Own only" (`own`);
-  # - a page-branch picker (`branch`): the page tree with a checkbox per
-  #   page, storing the ticked pages as branch roots (`page_ids`).
+  # - **Content permissions**: every permission that carries a scope, one row
+  #   each (`GroupsScreen::PermissionRowComponent`) -- Posts x5, Pages x6 -- under
+  #   its area's heading, each with its own scope chips and "Edit scope";
+  # - **Other permissions**: the rest, as cards of toggles
+  #   (`GroupsScreen::ToggleListComponent`).
   #
-  # Nothing ticked in a scope control means "no restriction" on that
-  # dimension, which is what a grant without the key means.
-  #
-  # Params, per permission key (dots and slashes and all), under
-  # `form_name` -- `Admin::GroupsController#grants_from` reads them back:
+  # This component only composes them: it loads what the rows share (the page
+  # tree, once for all six pages rows; the notes about stale grants) and decides
+  # which rows start open. The posted params did not change:
   #
   #   group[grants][posts.edit][enabled]         "1" when ticked
   #   group[grants][posts.edit][content_types][] type names
   #   group[grants][posts.edit][own]             "1"
   #   group[grants][pages.edit][page_ids][]      branch root ids
   #
-  # `grants` is what's ticked now: the group's live grants
-  # (`AccessControl::LiveGrants#attributes`), or the submitted ones when a
-  # save failed. `stale` is the group's `LiveGrants` for the notes on what
-  # a save will drop (Review Focus 3) -- a deleted branch root, an
-  # unregistered content type, a whole grant that matches nothing any more
-  # (shown unticked; see `LiveGrants` for why it can't be shown ticked).
+  # `grants` is what's ticked now: the group's grants as the editor carries
+  # them (`AccessControl::LiveGrants#carried_attributes`: live values plus a
+  # removed content type), or the submitted ones when a save failed. `stale` is
+  # the group's `LiveGrants`, for the notes on what a save will still drop
+  # (Review Focus 3) -- a deleted branch root, a grant that matches nothing any
+  # more (shown unticked; see `LiveGrants` for why it can't be shown ticked), an
+  # unregistered permission. A removed content type is no longer a note: it is a
+  # chip with Remove inside the row (`ScopeEditorComponent`).
   #
-  # The branch picker only lists pages the actor can read
-  # (`AccessControl.tree_visibility`), with their unreadable ancestors as
-  # greyed-out context and no checkbox. A stored root the actor can't read
-  # stays in the form as a hidden input, shown as "a page you can't open",
-  # so saving the group doesn't silently drop it -- and a grant whose only
-  # roots were unreadable doesn't turn into an unscoped one.
+  # `open_keys`: the rows whose scope editor starts open -- after a failed save,
+  # the ones the error names, so the editor can see what was refused.
   #
-  # Showing and hiding the scope controls is `admin--permission-matrix`;
-  # the implied-branch logic (a page under a ticked page is covered by it,
-  # so it's shown ticked, disabled, and never submitted as a root of its
-  # own) is `admin--branch-picker`.
+  # A stored branch root the viewer can't read stays in the form as a hidden
+  # input (`ScopeEditorComponent`), so saving the group doesn't silently drop it
+  # -- and a grant whose only roots were unreadable doesn't turn into an
+  # unscoped one.
+  #
+  # LOCKED TICKS (round 3 Task 11, D15) are DEFENSIVE. A grant the group already
+  # STORES that the viewer couldn't hand out themselves (`AccessControl.can_grant?`
+  # false on its live scope) would be drawn locked: greyed, "You can't grant this",
+  # no scope editor, carried by hidden inputs holding the whole scope as stored
+  # (`PermissionRowComponent`), so a form saved as rendered changes nothing. But a
+  # stored group with such a grant is one the viewer can't manage at all
+  # (`can_manage_group?` asks the same question), so it is drawn read-only instead
+  # and no stored state is expected to reach the lock; it stays for any state that
+  # rule doesn't foresee. It is asked only for a non-owner, once per ticked
+  # permission, and ONLY while the row's scope still equals what is stored
+  # (`stored:`, the carried scopes): a typed tick -- one on a new group, or one the
+  # editor changed, coming back after a refused save (422) -- is never locked, it
+  # comes back ticked and editable, since a lock there would make the next Save a
+  # guaranteed refusal. The check costs at most one closure-table query for a pages
+  # row, never one per page in the tree or per member. `Groups::Save` decides every
+  # write; this is only what the form shows and carries.
+  #
+  # REMOVED TYPE HINT. A grant carrying a content type that no longer exists is
+  # editable, with its Remove chip, even when the viewer's own grant doesn't name
+  # that type (the lock is judged on the live scope, as `can_manage_group?` does).
+  # But then the carried scope as a whole is not one the viewer could hand out, and
+  # `Groups::Save` refuses any change to that row that doesn't also press Remove (a
+  # 403). For that viewer the chip says so: "Remove this type before changing the
+  # row." Not shown to an owner or to a viewer whose own grant covers the name.
+  # `view_only:` is a group the viewer can't manage at all: no locks (the whole form
+  # is disabled anyway) and the rows' scope toggle becomes a link that survives the
+  # disabled fieldset.
+  #
+  # Showing and hiding the editors and rewriting the chips is
+  # `admin--permission-matrix`; the tri-state tree is `admin--branch-picker`.
   class PermissionMatrixComponent < AdminComponent
-    SCOPE_LABELS = { content_type: "Content types", own: "Own only", branch: "Branches" }.freeze
-
-    def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default)
+    def initialize(grants:, stale: nil, form_name: "group[grants]", locale: Locales.default, open_keys: [], tree: nil, view_only: false, stored: [])
+      @view_only = view_only
+      @stored = Array(stored).to_h { |grant| [ grant[:permission].to_s, AccessControl::LiveGrants.normalize_scope(grant[:scope]) ] }
+      @locked = {}
       @grants = Array(grants).to_h { |grant| [ grant[:permission].to_s, grant[:scope].to_h.stringify_keys ] }
       @stale = stale
       @form_name = form_name
       @locale = locale.to_s
+      @open_keys = open_keys.to_set
+      @tree = tree
     end
 
     private
 
     attr_reader :form_name, :locale
 
-    def areas = AccessControl::Permissions.all.group_by(&:area)
+    # The scoped permissions by area, in registry order.
+    def sections = AccessControl::Permissions.all.reject { |permission| permission.scopes.empty? }.group_by(&:area)
 
-    def ticked?(permission) = @grants.key?(permission.key)
-    def scope_for(permission) = @grants.fetch(permission.key, {})
+    def tree = @tree ||= GroupsScreen::BranchTree.for(Current.actor, locale: locale)
 
-    def field_name(permission, *parts) = "#{form_name}[#{permission.key}]" + parts.map { |part| "[#{part}]" }.join
-    def field_id(permission, *parts) = [ "grant", permission.key.tr("./", "--"), *parts ].join("-")
+    def row_for(permission)
+      GroupsScreen::PermissionRowComponent.new(permission: permission, scope: @grants[permission.key], tree: permission.scopes.include?(:branch) ? tree : nil,
+        open: @open_keys.include?(permission.key), form_name: form_name, locked: locked?(permission), view_only: @view_only, removed_hint: removed_hint?(permission))
+    end
 
-    def content_type_choices = AccessControl::Permissions.content_type_choices
+    # See "LOCKED TICKS" above. Memoised per key: the rows and the footnote ask.
+    def locked?(permission)
+      # No actor is the trusted console/preview case (the checker lets it through).
+      return false if @view_only || Current.actor.nil? || !@grants.key?(permission.key) || AccessControl.owner?(Current.actor)
+      return false unless @stored[permission.key] == AccessControl::LiveGrants.normalize_scope(@grants[permission.key])
 
-    def content_type_label(name) = ContentTypes.find(name)&.label || name.to_s.humanize
+      @locked.fetch(permission.key) { @locked[permission.key] = !AccessControl.can_grant?(Current.actor, permission.key, live_scope(@grants[permission.key])) }
+    end
 
-    # Notes about what saving will drop, for one permission.
+    # The scope without the content types that no longer exist (none left: no
+    # restriction, as the editor reads it) -- what `can_manage_group?` judges.
+    def live_scope(scope)
+      types = Array(scope["content_types"])
+      return scope if types.empty?
+
+      live = types & AccessControl::Permissions.content_type_choices
+      live.empty? ? scope.except("content_types") : scope.merge("content_types" => live)
+    end
+
+    # "Remove this type before changing the row." -- see "REMOVED TYPE HINT".
+    def removed_hint?(permission)
+      return false if @view_only || Current.actor.nil? || AccessControl.owner?(Current.actor) || !@grants.key?(permission.key)
+
+      scope = @grants[permission.key]
+      return false if (Array(scope["content_types"]) - AccessControl::Permissions.content_type_choices).empty?
+
+      !AccessControl.can_grant?(Current.actor, permission.key, scope)
+    end
+
+    def any_locked? = AccessControl::Permissions.all.any? { |permission| locked?(permission) }
+
+    def locked_toggle_keys = AccessControl::Permissions.all.select { |permission| permission.scopes.empty? && locked?(permission) }.map(&:key)
+
+    # Notes about what saving will drop, for one permission. A removed content
+    # type is not among them (it is a chip, `PermissionRowComponent`).
     def stale_notes(permission)
       return [] unless @stale
 
       entry = @stale.entry_for(permission.key)
-      notes = entry ? entry.removed.map { |value| "#{value.upcase_first}: removed when you save." } : []
+      notes = entry ? entry.removed_notes.map { |value| "#{value.upcase_first}: removed when you save." } : []
       @stale.dead_for(permission.key).each do |dead|
         what = dead.removed.any? ? dead.removed.to_sentence : "nothing"
         notes << "This permission was limited to #{what}, so it matched nothing. It stays off unless you tick it again."
@@ -79,7 +139,7 @@ module Admin
     end
 
     # Stored grants whose permission key isn't registered any more -- no
-    # row in the matrix to hang them on.
+    # row to hang them on.
     def unregistered_notes
       return [] unless @stale
 
@@ -87,54 +147,6 @@ module Admin
         .map { |dead| "The permission “#{dead.permission}” no longer exists and will be removed when you save." }
     end
 
-    # --- The branch picker's tree, loaded once for every `branch` row ---------
-
-    def tree
-      @tree ||= begin
-        visibility = AccessControl.tree_visibility(Current.actor)
-        visible = visibility[:readable] | visibility[:context_only]
-        pages = Page.where(id: visible.to_a).order(:position, :id).to_a
-        { readable: visibility[:readable], children: pages.group_by(&:parent_id), roots: pages.select { |page| page.parent_id.nil? || !visible.include?(page.parent_id) } }
-      end
-    end
-
-    def page_title(page) = ::Locales.read(page, :title, locale: locale).presence || "(untitled)"
-
-    # Stored roots the picker can't show -- kept as hidden inputs.
-    def hidden_page_ids(permission)
-      Array(scope_for(permission)["page_ids"]).map(&:to_i).reject { |id| tree[:readable].include?(id) }
-    end
-
-    def selected_page_ids(permission) = Array(scope_for(permission)["page_ids"]).map(&:to_i)
-
-    def branch_summary(permission)
-      count = selected_page_ids(permission).size
-      count.zero? ? "All pages" : helpers.pluralize(count, "branch")
-    end
-
-    # The nested checkbox list, recursively. Readable pages get a checkbox;
-    # context-only ancestors are plain, greyed-out text.
-    def branch_list(permission, pages)
-      return "".html_safe if pages.empty?
-
-      selected = selected_page_ids(permission)
-      tag.ul(class: "ml-4 flex flex-col gap-1 first:ml-0") do
-        safe_join(pages.map do |page|
-          tag.li(data: { admin__branch_picker_target: "node" }) do
-            row =
-              if tree[:readable].include?(page.id)
-                id = field_id(permission, "page", page.id)
-                tag.label(for: id, class: "flex items-center gap-2 text-ink") do
-                  render(Admin::CheckboxComponent.new(name: field_name(permission, "page_ids") + "[]", value: page.id, checked: selected.include?(page.id), id: id,
-                    data: { admin__branch_picker_target: "box", action: "admin--branch-picker#change" })) + page_title(page)
-                end
-              else
-                tag.span(page_title(page), class: "block text-dim", title: "You can't open this page")
-              end
-            row + branch_list(permission, tree[:children].fetch(page.id, []))
-          end
-        end)
-      end
-    end
+    def toggle_grants = @grants.slice(*AccessControl::Permissions.all.select { |permission| permission.scopes.empty? }.map(&:key))
   end
 end

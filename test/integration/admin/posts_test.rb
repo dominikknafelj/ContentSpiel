@@ -194,7 +194,6 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/required_company" do |t|
         t.label "Required company"
-        t.color "#f59e0b"
         t.list_component Posts::BlogListComponent
         t.detail_component Posts::DetailComponent
         t.field :company, :string, required: true
@@ -630,7 +629,6 @@ class Admin::PostsTest < ActionDispatch::IntegrationTest
     with_test_types do
       ContentTypes.register "test/mixed" do |t|
         t.label "Mixed"
-        t.color "#f59e0b"
         t.list_component Posts::BlogListComponent
         t.detail_component Posts::DetailComponent
         t.field :blurb, :string, translated: true

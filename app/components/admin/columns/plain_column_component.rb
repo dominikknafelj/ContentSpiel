@@ -21,13 +21,18 @@ module Admin
     #   library text (`admin/shared/_override_field`).
     class PlainColumnComponent < Base
       def initialize(name:, value:, original: nil, errors: [], locale: nil, multiline: false, id: nil, html_name: nil,
-        translation_state: nil, translation_confirm: nil, translation_record: nil, counter: nil, override: nil, **html)
+        translation_state: nil, translation_confirm: nil, translation_record: nil, counter: nil, override: nil, label: nil, **html)
         super(name: name, value: value, original: original, errors: errors, locale: locale, id: id, html_name: html_name,
           translation_state: translation_state, translation_confirm: translation_confirm, translation_record: translation_record, **html)
         @multiline = multiline
+        @label = label
         @counter = counter
         @override = override
       end
+
+      # The label's text; the field's humanized name unless the caller says
+      # otherwise (Settings' "Title · translatable").
+      def label_text = (@label || name.to_s.humanize)
 
       def counter? = counter.present?
 

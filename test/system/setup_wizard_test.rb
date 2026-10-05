@@ -39,10 +39,11 @@ class SetupWizardTest < ApplicationSystemTestCase
     select "Deutsch", from: "Default language"
     press "Continue"
 
-    assert_selector "h1", text: "MCP token"
+    assert_selector "h1", text: "Connect an AI agent"
+    fill_in "Token name", with: "claude-desktop"
     press "Generate token"
 
-    assert_selector "h1", text: "Your MCP token"
+    assert_selector "h1", text: "Your token"
     assert_selector "#mcp-token", text: /\A.+\z/
     press "Continue"
 
@@ -51,6 +52,7 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     assert_selector "h1", text: "Review"
     assert_text "Blog, Resume and Now pages"
+    assert_text "claude-desktop (created)"
     press "Finish setup"
 
     assert_current_path %r{\A/cs-studio}
@@ -68,7 +70,7 @@ class SetupWizardTest < ApplicationSystemTestCase
 
     fill_in "Email address", with: "owner@example.com"
     fill_in "Password", with: "12345678"
-    assert_text "Use at least 12 characters."
+    assert_text "Too short. Use 12 or more characters."
     assert_selector "button[data-password-submit][disabled]", text: "Continue"
 
     fill_in "Password", with: "12345678901234"

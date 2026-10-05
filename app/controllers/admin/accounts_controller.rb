@@ -12,6 +12,8 @@ module Admin
   # service does that itself, together with the write
   # (`Users::OwnerProtection#end_sessions_after_password_change`).
   class AccountsController < BaseController
+    include AutosaveResponses
+
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
@@ -30,6 +32,10 @@ module Admin
         redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Password changed. Your other sessions were signed out."
       else
         @errors = result.errors
+        # By field too, so the current-password message can sit under its own
+        # input as well as in the summary. A denied result carries no record
+        # errors, only its sentence.
+        @field_errors = result.record.errors.to_hash(true)
         render :edit, status: :unprocessable_entity
       end
     end
@@ -37,10 +43,30 @@ module Admin
     # "Your name" (design pass spec §5.1): the one profile field. Not
     # `Users::Save` -- that needs `users.manage`; `Users::UpdateProfile` is
     # open to every user for their own account only.
+    #
+    # A success answers Turbo with a STREAM, not a redirect: the screen has a
+    # second form (the password), and re-rendering the screen -- or the whole
+    # shell, as the `_top` redirect did -- threw away whatever was typed into
+    # it, after asking "Leave without saving?" about a save that had already
+    # happened. The stream replaces the one thing a new name changes outside
+    # the field itself, the sidebar's account block, and says "Name saved.";
+    # the footer takes what it sent as its new baseline
+    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
     def update_profile
       result = Users::UpdateProfile.call(Current.user, name: params[:name])
       if result.ok?
-        redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+        # Decided by "does the client take a stream", not `respond_to`: the
+        # name is saved by now, and a client that accepts neither format must
+        # not be told 406 about a save that happened. Everything else gets
+        # the redirect.
+        if request.accepts.any? { |type| type.symbol == :turbo_stream }
+          render turbo_stream: [
+            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
+            toast_stream("Name saved.")
+          ]
+        else
+          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+        end
       else
         @profile_errors = result.errors
         render :edit, status: :unprocessable_entity

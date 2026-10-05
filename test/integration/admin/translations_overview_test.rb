@@ -66,7 +66,7 @@ class Admin::TranslationsOverviewTest < ActionDispatch::IntegrationTest
     assert_select "#{row("page", outdated_page)} [data-locale=es][data-translation-state=outdated]"
     assert_select "#{row("page", outdated_page)} td a", text: "Review changes →"
     assert_select "#{row("post", stale_post)} a[href='/cs-studio/posts/#{stale_post.id}?locale=de'] [data-translation-state=outdated]"
-    assert_select "#{row("media", image)} a[href='/cs-studio/media/#{image.id}?locale=es']"
+    assert_select "#{row("media", image)} a[href='/cs-studio/media?locale=es&selected=#{image.id}']"
     # One card per target language, none for the original.
     assert_select "[data-translation-summary] [data-locale]", count: 2
     assert_select "[data-translation-summary] [data-locale=en]", count: 0

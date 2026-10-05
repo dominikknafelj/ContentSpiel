@@ -7,6 +7,8 @@ module Tags
   # `PostTag#sync_post_paths` only fires on a join row being added or
   # removed, and nothing here does either.
   class Rename < ApplicationService
+    include Tags::Listings
+
     def initialize(tag, name:, actor: Current.actor)
       @tag = tag
       @name = name.to_s.strip.downcase
@@ -29,7 +31,7 @@ module Tags
         # (`touch_all`: callbacks and validations skipped, only the base moves).
         # Only when the name really changed: a rename to the same name is no
         # change and records no event, so it must not stale those forms.
-        Post.where(id: @tag.post_tags.select(:post_id)).touch_all if @tag.saved_change_to_name?
+        touch_carrying_posts(@tag) if @tag.saved_change_to_name?
 
         changes = Audit::Snapshot.field_changes_for(@tag)
         record_event("tag.renamed", subject: @tag, field_changes: changes) if changes.any?
@@ -57,33 +59,6 @@ module Tags
     # advance which of the two names a given block's posts actually needed.
     def resync(old_name, new_name)
       affected_content_types(old_name, new_name).each { |content_type| PublicSite::Paths.sync_posts(content_type) }
-    end
-
-    # `ContentBlock.listing` (every block with the `lists_posts` capability,
-    # not just `post_list` by name -- open-types spec §6), filtered to the
-    # ones whose own `tag` setting matches either name, case-insensitively
-    # (the same comparison `BlockTypes::PostList.lists?` makes against a
-    # post's actual tags). A block with no tag filter at all lists by
-    # content type alone and is untouched by any tag rename -- its posts'
-    # canonical pages can't have changed, so it's excluded here rather than
-    # matched against a blank name that could never legitimately equal
-    # either downcased argument.
-    #
-    # `content_type.presence` folds a blank filter to `nil`, which
-    # `PublicSite::Paths.sync_posts` already reads as "every content type"
-    # -- the same "or nil when an unfiltered listing is involved" case the
-    # brief calls out. `select` + `map`, not `filter_map`: that `nil` is a
-    # meaningful result here (sync everything), and `filter_map` would
-    # silently drop it as if the block had never matched at all.
-    def affected_content_types(old_name, new_name)
-      names = [ old_name, new_name ].map { |name| name.to_s.downcase }
-
-      matching = ContentBlock.listing.select do |block|
-        tag = block.settings_object&.tag.to_s.strip
-        tag.present? && names.include?(tag.downcase)
-      end
-
-      matching.map { |block| block.settings_object.content_type.presence }.uniq
     end
   end
 end

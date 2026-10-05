@@ -46,11 +46,13 @@ class Admin::TimeZoneTest < ActionDispatch::IntegrationTest
 
     get admin_audit_events_path
     assert_response :success
-    assert_match "title=\"1 Jul 2026, 09:30\"", response.body # the tooltip: the site zone, not UTC
+    # The row's time and its day header (round 3, Task 15), in the site zone, not UTC.
+    assert_select "##{ActionView::RecordIdentifier.dom_id(event)} a", text: "09:30"
+    assert_select "section h2", text: /\AWed 1 Jul/ # (with the year once it is not this one)
 
     get admin_audit_event_path(event)
     assert_response :success
-    assert_match "July 1, 2026 at 09:30", response.body
+    assert_select "dd", text: "Wed 1 Jul 2026, 09:30"
 
     Current.set(actor: users(:one)) { Trash::Move.call(@post) }
     @post.reload.update_columns(trashed_at: Time.utc(2026, 7, 1, 7, 30))

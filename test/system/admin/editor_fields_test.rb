@@ -67,7 +67,6 @@ class Admin::EditorFieldsSystemTest < ApplicationSystemTestCase
     with_test_types do
       ContentTypes.register "test/flagged" do |t|
         t.label "Flagged"
-        t.color "#f59e0b"
         t.list_component Posts::BlogListComponent
         t.detail_component Posts::DetailComponent
         t.field :featured, :boolean

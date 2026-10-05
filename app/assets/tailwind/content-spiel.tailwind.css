@@ -68,6 +68,18 @@
    the top bar; below 1024px the tree does too. A closed drawer is also
    `visibility: hidden` (after the slide), so its links leave the tab order. */
 .admin-shell { display: grid; grid-template-columns: 15rem minmax(0, 1fr); min-height: 100vh; }
+/* How far a sticky top has to stay clear of the window's top edge: nothing on
+   the desktop, the top bar's height (`h-12`) where there is one. Every sticky
+   top inside the shell uses it -- the editor header, Settings' in-page nav,
+   the media panel (and its max-height) -- so none slides under the bar. */
+:root { --admin-top-offset: 0px; }
+@media (max-width: 1279px) { :root { --admin-top-offset: 3rem; } }
+/* A save footer sticks to the bottom of the window; toasts rise above it, or
+   on a narrow window (where the form's column is the window) they cover Save.
+   By the footer's MEASURED height (`admin--save-bar` writes it: a footer that
+   wraps onto two or three lines is taller than any fixed offset), 4rem until
+   it has been measured. */
+body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4rem) + 1.5rem); }
 .admin-shell--tree { grid-template-columns: 15rem 17rem minmax(0, 1fr); }
 /* The sidebar's grid cell stretches the whole page height and paints the
    chrome background itself, so the column never ends at the viewport on a
@@ -126,6 +138,14 @@
    when centred, so a full one looks as before and a shorter one only grows
    downwards. `test/system/admin/media_picker_test.rb` pins it. */
 .admin-media-picker { margin-top: 7.5vh; }
+/* The same fixed top edge for the New page and New post dialogs
+   (`Admin::DialogComponent`'s `hang:`), round 3 Task 9: they open as a shell
+   with a loading line and the form loads into it, so a centred one grew in both
+   directions and moved its own header (and the Create button at the foot) under
+   the pointer. 7.5vh as above, where the top of a full-height dialog sits when
+   centred; a shorter one only grows downwards. `test/system/admin/dialogs_
+   hang_test.rb` pins it. */
+.admin-dialog[data-dialog-hang] { margin-top: 7.5vh; }
 
 /* The busy button's spinner (`admin--busy`): 11px, inherits the label's colour. */
 .admin-spinner { width: 11px; height: 11px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 999px; display: inline-block; animation: admin-spin 0.7s linear infinite; }
@@ -238,6 +258,19 @@
    border only while unfocused. */
 .admin-column:has(> [id$="-errors"] > p) .admin-prefix-input { border-color: var(--cs-danger); }
 .admin-column:not(:has(> [id$="-errors"] > p)) .admin-prefix-input:not(:focus-within) { border-color: var(--cs-line-strong); }
+/* The Media panel's Alt field while the default-language alt is empty (handoff
+   §4.6: "warn border when empty"): the warn colour, drawn only while the input
+   is empty (it carries a placeholder) so it clears as soon as the editor types,
+   and never over an error, whose red border stays. Warn is a hue, not the only
+   cue: the placeholder says "Add alt text" and the tile says NO ALT. */
+.admin-media-alt-warn .admin-column:not(:has(> [id$="-errors"] > p)) :is(input, textarea):placeholder-shown { border-color: var(--cs-warn); }
+/* A tag's name in the Tags list (handoff §4.9: "rename inline by clicking the
+   name") reads as text until it is hovered or focused. The row's form is an
+   `.admin-column` (its error slot colours the input red), so the rule above
+   would otherwise draw the resting border the input's own `border-transparent`
+   utility asks not to have: unlayered CSS wins over a utility. Only the resting,
+   valid state is touched -- hover, focus and an error keep their borders. */
+.admin-tags-table .admin-column:not(:has(> [id$="-errors"] > p)) input:not(:hover, :focus) { border-color: transparent; }
 
 /* Side-by-side translation (handoff §4.1, §9 A7). A translated field on a
    translation tab is a `.admin-translation-pair`: the field on one side, the
@@ -297,6 +330,12 @@
    it: sunken too, or it keeps a white frame around a sunken inner field. */
 .admin-view-only .admin-chip-field { background: var(--cs-sunken); }
 
+/* A link `admin--pending-lock` has locked (an instant action waiting for the
+   main form's unsaved changes, round 3 decision D10): it can't be `disabled`
+   like a button, so it is dimmed the way a disabled button is. The controller
+   swallows its click. */
+a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
+
 /* A post list's Limit is a 72px column, and its error slot is a child of that
    column: "Limit must be at least 1" wrapped word by word in 72px. Hanging the
    slot from the column's RIGHT edge (an RTL containing block, everything else
@@ -321,3 +360,48 @@
 .admin-card-table td:last-child {
   padding-right: 14px;
 }
+
+/* The mind graph (round 3, D27). Everything the graph draws takes its colour
+   from tokens through these classes -- the controller sets a class, never a
+   colour -- so light and dark both work and `admin_design_rules_test` finds no
+   literal in the JS. A post's hue is `--mg-hue`: `--cs-cat-1..6` by its type's
+   `colour_index` (7-12 reuse the six hues, 13+ cycle), `--cs-meta` for a type
+   that isn't registered any more. Two cues, neither of them colour alone,
+   and the two never the same shape:
+   - STATUS is the outline: a live post has a solid outline, a draft or
+     scheduled one a DASHED ring (hollow: surface fill);
+   - the INDEX is the fill, as `Admin::ContentTypeDotComponent` draws it: 1-6
+     filled with the hue, 7-12 a ring of it (surface fill). A type that isn't
+     registered any more is a `meta` ring.
+   So a live post is a filled dot (1-6) or a solid ring (7-12, or retired); a
+   draft is a dashed ring with the hue as a small core (1-6) or an empty dashed
+   ring (7-12, or retired) -- a draft of a 7-12 type still differs from a draft
+   of its 1-6 twin by shape. Edges differ by line style, not colour alone:
+   related is solid, a shared tag dashed. A focused node gets a ring of its
+   own outside the dot (`.mg-focus`): a stroke in the accent colour on the dot
+   itself is lost against a filled one. */
+.mg-node { --mg-hue: var(--cs-meta); cursor: pointer; user-select: none; }
+.mg-cat-1 { --mg-hue: var(--cs-cat-1); }
+.mg-cat-2 { --mg-hue: var(--cs-cat-2); }
+.mg-cat-3 { --mg-hue: var(--cs-cat-3); }
+.mg-cat-4 { --mg-hue: var(--cs-cat-4); }
+.mg-cat-5 { --mg-hue: var(--cs-cat-5); }
+.mg-cat-6 { --mg-hue: var(--cs-cat-6); }
+.mg-node .mg-dot { fill: var(--mg-hue); stroke: var(--mg-hue); stroke-width: 1.5; }
+.mg-node.mg-ring .mg-dot { fill: var(--cs-surface); stroke-width: 2.5; }
+.mg-node.mg-hollow .mg-dot { fill: var(--cs-surface); stroke-width: 2; stroke-dasharray: 3 2.5; }
+.mg-node .mg-core { fill: var(--mg-hue); stroke: none; }
+.mg-node .mg-focus { fill: none; stroke: none; }
+.mg-node:focus { outline: none; }
+.mg-node:focus-visible .mg-focus { stroke: var(--cs-accent); stroke-width: 2; }
+.mg-tag { cursor: grab; }
+.mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
+.mg-tag text { fill: var(--cs-meta); }
+.mg-edge { fill: none; }
+.mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }
+.mg-edge-tag { stroke: var(--cs-meta); stroke-opacity: 0.8; stroke-width: 1; stroke-dasharray: 4 3; }
+.mg-hidden { display: none; }
+/* The legend's own swatches reuse the same classes at a small size. */
+.mg-key { flex-shrink: 0; overflow: visible; }
+.mg-key .mg-edge-related, .mg-key .mg-edge-tag { stroke-opacity: 1; }
+.mg-key-hollow { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 2; stroke-dasharray: 3 2.5; }

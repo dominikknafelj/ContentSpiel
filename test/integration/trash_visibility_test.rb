@@ -202,6 +202,36 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert @gone_asset.reload.trashed?
   end
 
+  test "the media grid's Missing alt and Untranslated segments and every segment count hide a trashed image" do
+    with_locales(%w[en de], default: "en")
+    # Both images are missing alt AND, once given an English alt, untranslated:
+    # only the trashed one must be left out of each list and each number.
+    [ @kept_asset, @gone_asset ].each { |asset| assert Media::Save.call(asset, translations: { "en" => { alt: "Sand" } }, actor: users(:one)).ok? }
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { filter: "untranslated" }
+    assert_response :success
+    assert_select "#media-asset-#{@kept_asset.id}"
+    assert_select "#media-asset-#{@gone_asset.id}", count: 0
+    assert_select "#media-count-untranslated", text: "1"
+
+    Media::Save.call(@kept_asset, translations: { "en" => { alt: "" } }, actor: users(:one))
+    @gone_asset.update_columns(alt: {})
+    get "/cs-studio/media", params: { filter: "missing_alt" }
+    assert_select "#media-asset-#{@kept_asset.id}"
+    assert_select "#media-asset-#{@gone_asset.id}", count: 0
+
+    get "/cs-studio/media"
+    assert_select "#media-count-all", text: "1"
+    assert_select "#media-count-unused", text: "1"
+    assert_select "#media-count-missing_alt", text: "1"
+    assert_equal({ all: 1, unused: 1, missing_alt: 1, untranslated: 0, mine: 0 }, Media::Search.new(actor: users(:one)).counts)
+
+    # And the panel: a trashed image is not selectable.
+    get "/cs-studio/media", params: { selected: @gone_asset.id }
+    assert_response :not_found
+  end
+
   test "the ⌘K jump palette lists kept pages, posts and images and never trashed ones" do
     # Distinct titles so a match proves which record answered: the setup's
     # kept and trashed records are titled "Kept ..."/"Gone ..." (images
@@ -214,13 +244,13 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", "/cs-studio/pages/#{@kept_page.id}"
     assert_select "a[href=?]", "/cs-studio/posts/#{@kept_post.id}"
-    assert_select "a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
+    assert_select "a[href=?]", "/cs-studio/media?selected=#{@kept_asset.id}"
 
     get "/cs-studio/jump", params: { q: "gone" }
     assert_response :success
     assert_select "a[href=?]", "/cs-studio/pages/#{@gone_page.id}", count: 0
     assert_select "a[href=?]", "/cs-studio/posts/#{@gone_post.id}", count: 0
-    assert_select "a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_select "a[href=?]", "/cs-studio/media?selected=#{@gone_asset.id}", count: 0
     assert_select "p", text: /No results for/
   end
 
@@ -247,8 +277,8 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@kept_post.id}?locale=de"
     assert_select "section[aria-labelledby=dashboard-needs-translation] a[href=?]", "/cs-studio/posts/#{@gone_post.id}?locale=de", count: 0
     assert_select "section[aria-labelledby=dashboard-activity] a", text: "Kept page"
-    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@kept_asset.id}"
-    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media/#{@gone_asset.id}", count: 0
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media?selected=#{@kept_asset.id}"
+    assert_select "section[aria-labelledby=dashboard-activity] a[href=?]", "/cs-studio/media?selected=#{@gone_asset.id}", count: 0
     assert_no_match "Gone post", response.body
     assert_no_match "Gone page", response.body
     assert_no_match "Gone draft", response.body
@@ -327,6 +357,93 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # --- Final fix wave (S-M8): four readers added in round 3 --------------------
+
+  # The Settings screen's "(N items)" in the default-language dialog
+  # (`Translations::StateIndex.translated_record_count`): a trashed record's
+  # stored translations are kept for a restore, but it is not an item the
+  # change would re-mark today.
+  test "the default-language dialog's item count leaves out trashed pages, posts and images" do
+    with_locales(%w[en de], default: "en") do
+      as_owner do
+        pages = [ create_page(title: "Kept translated"), create_page(title: "Gone translated") ]
+        posts = [ create_post(title: "Kept translated post"), create_post(title: "Gone translated post") ]
+        assets = [ create_media_asset, create_media_asset ]
+        pages.each { |page| assert Pages::Save.call(page, translations: { "de" => { title: "Seite" } }).ok? }
+        posts.each { |post| assert Posts::Save.call(post, translations: { "de" => { title: "Beitrag" } }).ok? }
+        assets.each { |asset| assert Media::Save.call(asset, translations: { "en" => { alt: "A desk" }, "de" => { alt: "Ein Tisch" } }).ok? }
+        before = Translations::StateIndex.translated_record_count
+        assert_operator before, :>=, 6
+
+        [ pages.last, posts.last, assets.last ].each { |record| record.update!(trashed_at: Time.current) }
+
+        assert_equal before - 3, Translations::StateIndex.translated_record_count
+      end
+
+      sign_in_as users(:one)
+      get "/cs-studio/settings"
+      assert_select "dialog#language-default-dialog-de", text: /\(#{Translations::StateIndex.translated_record_count} items?\)/
+    end
+  end
+
+  # The audit log names every event's subject (its stored label), but LINKS
+  # only what the viewer can open -- and a trashed page or post can't be
+  # opened from anywhere but the Trash.
+  test "the audit log links a kept page's and post's events and leaves a trashed one's as plain text" do
+    rows = { @kept_page => true, @kept_post => true, @gone_page => false, @gone_post => false }.map do |record, linked|
+      event = Audit::Event.create!(action: "#{record.class.name.downcase}.updated", channel: "admin", user_id: users(:one).id,
+        subject_type: record.class.name, subject_id: record.id, subject_label: record.title, occurred_at: Time.current, last_occurred_at: Time.current)
+      [ event, record, linked ]
+    end
+    sign_in_as users(:one)
+
+    get "/cs-studio/audit_events"
+    rows.each do |event, record, linked|
+      row = "##{ActionView::RecordIdentifier.dom_id(event)}"
+      assert_select "#{row} p", text: /edited “#{record.title}”/
+      assert_select "#{row} p a", count: linked ? 1 : 0
+    end
+
+    event, = rows.last
+    get "/cs-studio/audit_events/#{event.id}"
+    assert_response :success
+    assert_select "h1", text: /Gone post/
+    assert_select "h1 a", count: 0
+  end
+
+  # The Media panel's "Used on" names kept places only; a trashed page that
+  # still uses the image is neither linked nor named there.
+  test "the media panel's Used on lists a kept page and never a trashed one" do
+    asset = create_media_asset
+    kept = create_page(title: "Uses it and stays")
+    gone = create_page(title: "Uses it and goes")
+    as_owner do
+      [ kept, gone ].each { |page| assert Pages::Save.call(page, attributes: { hero_media_asset_id: asset.id }).ok? }
+    end
+    gone.update!(trashed_at: Time.current)
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { selected: asset.id }
+
+    assert_select "#media-panel a[href='/cs-studio/pages/#{kept.id}']", text: /Uses it and stays/
+    assert_select "#media-panel a[href='/cs-studio/pages/#{gone.id}']", count: 0
+    assert_select "#media-panel", text: /Uses it and goes/, count: 0
+  end
+
+  # The group editor's page-scope tree (`Admin::GroupsScreen::BranchTree`): a
+  # branch can only be granted on a page that is there to be read.
+  test "the group editor's page tree offers kept pages and never a trashed one" do
+    sign_in_as users(:one)
+
+    get "/cs-studio/groups/new"
+
+    assert_response :success
+    assert_select "form#group-form input[type=checkbox][name$='[page_ids][]'][value='#{@kept_page.id}']", minimum: 1
+    assert_select "form#group-form input[name$='[page_ids][]'][value='#{@gone_page.id}']", count: 0
+    assert_select "form#group-form", text: /Kept page/
+    assert_select "form#group-form", text: /Gone page/, count: 0
+  end
+
   test "the page tree, posts list, link targets and mind graph hide trashed pages and posts" do
     sign_in_as users(:one)
 
@@ -348,6 +465,49 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     nodes = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)["nodes"]
     assert_includes nodes.map { |n| n["id"] }, @kept_post.id
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
+  end
+
+  # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
+  # readable posts carrying it, so a trashed one neither lists it nor makes a tag
+  # that only it shared a node.
+  test "the mind graph's tag nodes count kept posts only" do
+    sign_in_as users(:one)
+    tag = Tag.create!(name: "graph-shared")
+    other = create_post(title: "Second kept")
+    [ @kept_post, other, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+
+    get "/cs-studio/mind_graph"
+    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    assert_equal [ { "id" => "tag-#{tag.id}", "name" => "graph-shared", "count" => 2 } ], data["tags"]
+    assert_equal [ @kept_post.id, other.id ].sort, data["edges"].select { |e| e["kind"] == "tag" }.map { |e| e["source"] }.sort
+
+    other.update_column(:trashed_at, Time.current)
+    get "/cs-studio/mind_graph"
+    data = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    assert_empty data["tags"], "one kept post is not a connection"
+    assert_empty data["edges"]
+  end
+
+  # The Tags list (round 3, Task 13): its "Posts" column counts the KEPT posts the
+  # viewer may read, and links to the posts list for the tag, which shows the same
+  # ones. The dialogs' number is the one place a trashed post is counted on
+  # purpose -- a delete or merge reaches it too (what `tag.merged` records) -- so
+  # the pair is pinned both ways: the column ignores it, the dialog does not.
+  test "the tags list's post count and its link leave out a trashed post, while the dialogs' count includes it" do
+    sign_in_as users(:one)
+    tag = Tag.create!(name: "shared")
+    [ @kept_post, @gone_post ].each { |post| PostTag.create!(post: post, tag: tag) }
+
+    get "/cs-studio/tags"
+    assert_select "tr##{ActionView::RecordIdentifier.dom_id(tag)}" do
+      assert_select "a[href*='tag=shared']", text: "1 post"
+      assert_select "a", text: "2 posts", count: 0
+      assert_select "button[data-tag-delete-text=?]", "It is removed from 2 posts, including ones in the trash or that you can't open. The posts themselves stay."
+    end
+
+    get "/cs-studio/posts", params: { tag: "shared" }
+    assert_select "tbody tr", text: /Kept post/
+    assert_select "tbody tr", text: /Gone post/, count: 0
   end
 
   # The posts list's own filters, search, scope counts and pagination, and the
@@ -450,6 +610,19 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     get "/cs-studio/media", params: { q: "tiny" }
     assert_select "#media-asset-#{@kept_asset.id}"
     assert_select "#media-asset-#{@gone_asset.id}", count: 0
+  end
+
+  # Round 3 Task 9: the picker's frame answers a query and a segment too, and
+  # an upload's answer counts only what is kept.
+  test "the picker's searched and segmented frame hides trashed images, and an upload's counts skip them" do
+    sign_in_as users(:one)
+
+    get "/cs-studio/media", params: { picker: 1, q: "tiny", filter: "unused" }
+    assert_select "#media-picker-asset-#{@kept_asset.id}"
+    assert_select "#media-picker-asset-#{@gone_asset.id}", count: 0
+
+    post "/cs-studio/media_assets", params: { file: fixture_file_upload("tiny.png", "image/png") }
+    assert_equal Media::Asset.kept.count, response.parsed_body["counts"]["all"]
   end
 
   # --- Choosing and embedding images -------------------------------------------

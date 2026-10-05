@@ -699,7 +699,7 @@ DEPENDENCIES
   stimulus-rails
   tailwindcss-rails
   thruster
-  turbo-rails
+  turbo-rails (= 2.0.23)
   tzinfo-data
   view_component (~> 4.15)
   web-console

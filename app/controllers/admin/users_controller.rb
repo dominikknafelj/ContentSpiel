@@ -18,10 +18,12 @@ module Admin
     # The whole module is `users.manage` (access-control design spec §3.3
     # "Users"); `Users::*` check it again, per user, for every write.
     before_action -> { require_permission("users.manage") }
-    before_action :set_user, only: %i[edit update destroy]
+    before_action :set_user, only: %i[edit update destroy owner]
 
     def index
-      @users = User.includes(:groups).order(:email_address)
+      @users = User.includes(:groups).order(:email_address).to_a
+      # One grouped query for every listed user (`Users::LastSignIn`), never one per row.
+      @last_sign_ins = Users::LastSignIn.for(@users)
     end
 
     def new
@@ -32,7 +34,7 @@ module Admin
       result = Users::Save.call(User.new, attributes: user_params)
 
       if result.ok?
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User created"
+        redirect_to edit_admin_user_path(result.record, **admin_url_options), status: :see_other, notice: "User created"
       else
         forbidden_or(result) do
           @user = result.record
@@ -42,17 +44,42 @@ module Admin
     end
 
     def edit
+      @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
     end
 
     def update
       result = Users::Save.call(@user, attributes: user_params)
 
       if result.ok?
-        redirect_to admin_users_path(**admin_url_options), status: :see_other, notice: "User updated"
+        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: "User saved"
       else
         forbidden_or(result) do
           @user = result.record
+          @last_sign_in = Users::LastSignIn.for([ @user ])[@user.id]
           render :edit, status: :unprocessable_entity
+        end
+      end
+    end
+
+    # "Make owner…" / "Remove owner rights…" (round 3 Task 12, D18): an instant
+    # action, `owner=1|0`, answered by `Users::Save` and nothing else -- who may
+    # change an owner flag, and that the last owner can't be demoted, are its
+    # rules, asked again on this very request; the editor only decides whether to
+    # show the button. A refusal is the 403 page (and one `access.denied`), a
+    # failure the model's own ("can't demote the last owner") a toast on the editor.
+    # Anything but "0" or "1" is no request at all: `Users::Save` casts a blank
+    # value to nil, which differs from either flag and would flip it.
+    def owner
+      return head(:bad_request) unless %w[0 1].include?(params[:owner])
+
+      was_owner = @user.owner?
+      result = Users::Save.call(@user, attributes: { owner: params[:owner] })
+
+      if result.ok?
+        redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, notice: owner_notice(@user, was_owner)
+      else
+        forbidden_or(result) do
+          redirect_to edit_admin_user_path(@user, **admin_url_options), status: :see_other, alert: result.errors.to_sentence
         end
       end
     end
@@ -82,13 +109,20 @@ module Admin
 
     private
 
+    def owner_notice(user, was_owner)
+      name = user.display_name
+      return (user.owner? ? "#{name} is already an owner" : "#{name} is not an owner") if user.owner? == was_owner
+
+      user.owner? ? "#{name} is now an owner" : "#{name} is no longer an owner"
+    end
+
     def set_user
       @user = User.find(params[:id])
     end
 
     # `group_ids` and `owner` pass straight through: `Users::Save` decides
-    # who may change them (a non-owner's form has no owner field at all,
-    # and a forged one is refused there).
+    # who may change them (no form has an owner field now -- owner rights are
+    # `PATCH users/:id/owner` -- and a non-owner's forged one is refused there).
     def user_params
       params.fetch(:user, ActionController::Parameters.new).permit(:name, :email_address, :password, :password_confirmation, :owner, group_ids: [])
     end
@@ -103,6 +137,12 @@ module Admin
     helper_method def assignable_group_ids
       @assignable_group_ids ||= AccessControl.permitted_groups_for(Current.user).map(&:id).to_set
     end
+
+    # What the editor may draw for `@user` (round 3 Task 12, D17): `:editable`,
+    # `:owner_protected` or `:outranked` -- the very answer the services enforce,
+    # so the page and the writes can't drift. It decides only what is rendered;
+    # every refusal stays in `Users::Save`/`Users::Destroy`, which ask again.
+    helper_method def manageability(user) = Users::Manageability.for(Current.actor, user)
 
     helper_method def last_owner?(user)
       user.persisted? && user.owner_in_database && User.where(owner: true).count == 1

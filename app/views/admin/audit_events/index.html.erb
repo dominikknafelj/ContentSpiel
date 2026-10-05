@@ -1,59 +1,17 @@
-<%# The audit log's own list (design spec §5 "Audit log module", Task 9):
-    newest first, filterable by user/action/subject/date -- every event
-    `audit.view` holders may see (`Admin::AuditEventsController`'s own
-    comment: this module is never content-scoped the way Posts/Pages are),
-    with a subject link only where the current viewer can still read that
-    record (`audit_subject_path`). %>
+<%# The audit log (design pass round 3, Task 15): a row of filters, then the
+    events under day headers, newest first -- every event `audit.view` holders
+    may see (`Admin::AuditEventsController`'s own comment: this module is never
+    content-scoped), a subject linked only where the viewer can open it. %>
 <h1 class="mb-4 text-h1 text-ink">Audit log</h1>
 
-<% filter_keys = %i[user_id event_action subject_type subject_id from to] %>
-<%= form_with(**filter_form_options(admin_audit_events_path(**admin_url_options))) do %>
-  <% if admin_locale != Locales.default %>
-    <%= hidden_field_tag :locale, admin_locale %>
-  <% end %>
+<%= render Admin::AuditScreen::ToolbarComponent.new(filter: @filter, users: @users, other_actions: @other_actions,
+      url_options: admin_url_options, locale: admin_locale) %>
 
-  <div>
-    <%= label_tag :user_id, "User", class: setup_label_class %>
-    <%= select_tag :user_id, options_for_select(@users.map { |user| [ user.display_name, user.id ] }, params[:user_id]),
-          include_blank: "All users", class: setup_select_class %>
-  </div>
+<% event_path = ->(event) { admin_audit_event_path(event, **@filter.to_params.symbolize_keys, **admin_url_options) } %>
 
-  <div>
-    <%# Named `event_action`, not `action` -- `Admin::AuditEventsController`'s
-        own comment explains why `params[:action]` can't be reused here
-        (it's Rails' own routing parameter). %>
-    <%= label_tag :event_action, "Action", class: setup_label_class %>
-    <%= select_tag :event_action, options_for_select(@actions, params[:event_action]), include_blank: "All actions", class: setup_select_class %>
-  </div>
-
-  <div>
-    <%= label_tag :subject_type, "Subject type", class: setup_label_class %>
-    <%= select_tag :subject_type, options_for_select(@subject_types.map { |type, label| [ label, type ] }, params[:subject_type]),
-          include_blank: "All types", class: setup_select_class %>
-  </div>
-
-  <div>
-    <%= label_tag :subject_id, "Subject id", class: setup_label_class %>
-    <%= number_field_tag :subject_id, params[:subject_id], class: setup_input_class %>
-  </div>
-
-  <div>
-    <%= label_tag :from, "From", class: setup_label_class %>
-    <%= date_field_tag :from, params[:from], class: setup_input_class %>
-  </div>
-
-  <div>
-    <%= label_tag :to, "To", class: setup_label_class %>
-    <%= date_field_tag :to, params[:to], class: setup_input_class %>
-  </div>
-
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
-  <%= filter_clear_link(admin_audit_events_path(**admin_url_options), filter_keys) %>
-<% end %>
-
-<div class="rounded-cs border border-line bg-surface">
-  <% if @events.empty? %>
-    <% if filters_active?(filter_keys) %>
+<% if @entries.empty? %>
+  <div class="rounded-cs border border-line bg-surface">
+    <% if @filter.active? %>
       <%= render Admin::EmptyStateComponent.new(title: "No matches", description: "No events match these filters.") do |empty_state| %>
         <% empty_state.with_action do %>
           <%= link_to "Clear filters", admin_audit_events_path(**admin_url_options), class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
@@ -62,56 +20,22 @@
     <% else %>
       <%= render Admin::EmptyStateComponent.new(title: "No events", description: "Nothing has been recorded yet.") %>
     <% end %>
-  <% else %>
-  <table class="admin-audit-events-table admin-card-table w-full border-collapse text-sm">
-    <thead>
-      <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
-        <th class="py-2 pr-4">Time</th>
-        <th class="py-2 pr-4">Who</th>
-        <th class="py-2 pr-4">Channel</th>
-        <th class="py-2 pr-4">Action</th>
-        <th class="py-2">Subject</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @events.each do |event| %>
-        <tr id="<%= dom_id(event) %>" class="border-b border-line align-top">
-          <td class="py-2 pr-4">
-            <%= link_to render(Admin::TimeAgoComponent.new(time: event.occurred_at)), admin_audit_event_path(event, **admin_url_options), class: "hover:underline" %>
-          </td>
-          <td class="py-2 pr-4"><%= audit_actor_label(event) %></td>
-          <td class="py-2 pr-4 text-meta"><%= audit_channel_label(event.channel) %></td>
-          <td class="py-2 pr-4"><%= event.action %></td>
-          <td class="py-2">
-            <% if (path = audit_subject_path(event)) %>
-              <%= link_to event.subject_label, path, class: "hover:underline" %>
-            <% else %>
-              <%= event.subject_label %>
-            <% end %>
-          </td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
+  </div>
+<% else %>
+  <%= render Admin::AuditScreen::DayListComponent.new(entries: @entries, event_path: event_path) %>
 
-  <%# The audit log keeps its cursor-style paging (`Admin::AuditEventsController`'s
-      own comment: an offset over a log that keeps growing can't give a
-      reliable page count, so no page numbers). "Load older" is the footer
-      of the card; the filters carry over via `list_params(*filter_keys)`
-      (`Admin::ListLinksHelper`: only the keys this list names, never
-      `request.query_parameters` wholesale), which doesn't include `offset`,
-      so each link sets its own. %>
+  <%# Newer / Load older keep the filters (`Audit::Filter#to_params`: only valid
+      values, never the raw query string) and set their own `offset`. %>
   <% if @offset.positive? || @has_next %>
-    <div class="flex items-center justify-center gap-3 border-t border-line px-4 py-3">
+    <div class="flex items-center justify-center gap-3 py-3">
       <% if @offset.positive? %>
-        <%= link_to "Newer", admin_audit_events_path(list_params(*filter_keys).merge("offset" => [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max)),
+        <%= link_to "Newer", admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: [ @offset - Admin::AuditEventsController::PER_PAGE, 0 ].max),
               class: setup_secondary_link_class %>
       <% end %>
       <% if @has_next %>
-        <%= link_to "Load older", admin_audit_events_path(list_params(*filter_keys).merge("offset" => @offset + Admin::AuditEventsController::PER_PAGE)),
+        <%= link_to "Load older", admin_audit_events_path(**@filter.to_params.symbolize_keys, **admin_url_options, offset: @offset + Admin::AuditEventsController::PER_PAGE),
               class: setup_secondary_link_class %>
       <% end %>
     </div>
   <% end %>
 <% end %>
-</div>

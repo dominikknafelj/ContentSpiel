@@ -12,9 +12,15 @@ module ApiTokens
     # (design spec §3.3 "Tokens"). CS Studio's form offers only the groups
     # the user may assign (`AccessControl.permitted_groups_for`); the setup
     # wizard passes Admin for the first (owner) account.
-    def initialize(user, group:, actor: Current.actor)
+    #
+    # `name:` -- nil means "pick the next free Token N" (the setup wizard,
+    # and a form that doesn't ask yet); any String is validated as given,
+    # so a blank "" is a "Name can't be blank" failure rather than a quiet
+    # default (round 3 decision D2).
+    def initialize(user, group:, name: nil, actor: Current.actor)
       @user = user
       @group = group
+      @name = name
       @actor = actor
     end
 
@@ -41,13 +47,38 @@ module ApiTokens
       end
       return failure(ApiToken.new(user: @user), [ "Choose a group for the token" ]) if @group.nil?
       unless assignable_group?
-        return denied("tokens.manage", @user, message: "You don't have permission to give a token the #{@group.name} group")
+        # "that group", never its name: `Admin::ApiTokensController#create` is
+        # open to every signed-in user and finds the group by the raw id they
+        # post, so a refusal that named it would read out every group's name
+        # to anyone counting ids upwards (final fix wave, S-M6).
+        return denied("tokens.manage", @user, message: "You don't have permission to give a token that group")
       end
 
-      token, raw = ApiToken.transaction do
-        issued = ApiToken.generate!(@user, group: @group)
-        record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name })
-        issued
+      unless @name.nil?
+        candidate = ApiToken.new(user: @user, group: @group, name: @name)
+        return failure(candidate, candidate.errors.full_messages) unless candidate.valid?
+      end
+
+      begin
+        token, raw = ApiToken.transaction do
+          issued = ApiToken.generate!(@user, group: @group, name: @name)
+          record_event("token.issued", subject: issued.first, metadata: { "group" => @group.name, "name" => issued.first.name })
+          issued
+        end
+      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid => error
+        # The transaction rolled back, so no token and no event either way.
+        if ApiToken.name_taken?(error)
+          # Lost a race with another create of the same name (the pre-check
+          # above is check-then-insert; the partial unique index is the
+          # backstop): the same ordinary failure the validation gives.
+          return failure(ApiToken.new(user: @user, group: @group, name: @name), [ "Name #{ApiToken::NAME_TAKEN}" ])
+        end
+        # Anything else is NOT a name clash and must not be reported as one: a
+        # row that fails validation says what is wrong with it, and a unique
+        # violation on any other index is a bug to surface, not to explain away.
+        raise unless error.is_a?(ActiveRecord::RecordInvalid)
+
+        return failure(error.record, error.record.errors.full_messages)
       end
 
       success([ token, raw ])

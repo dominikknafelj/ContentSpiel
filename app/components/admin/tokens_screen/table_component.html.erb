@@ -1,0 +1,61 @@
+<section class="rounded-cs border border-line bg-surface">
+  <h2 class="px-4 pt-4 text-h2 text-ink">Tokens</h2>
+  <% if tokens.empty? %>
+    <%= render Admin::EmptyStateComponent.new(title: "No tokens yet", description: "Create a token to connect an assistant.") %>
+  <% else %>
+    <table class="admin-api-tokens-table admin-card-table mt-2 w-full border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-line-strong text-left font-cs-mono text-label uppercase tracking-mono text-meta">
+          <th class="py-2 pr-4">Name</th>
+          <th class="py-2 pr-4">Acts as</th>
+          <th class="py-2 pr-4">Group</th>
+          <th class="py-2 pr-4">Created</th>
+          <th class="py-2 pr-4">Last used</th>
+          <th class="py-2 pr-4">Status</th>
+          <th class="py-2"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% tokens.each do |token| %>
+          <tr id="<%= helpers.dom_id(token) %>" class="<%= row_class(token) %>">
+            <td class="py-2 pr-4 font-semibold text-ink"><%= token.name %></td>
+            <td class="py-2 pr-4 text-ink"><%= render Admin::UserNameComponent.new(user: token.user, user_id: token.user_id) %></td>
+            <td class="py-2 pr-4 text-ink"><%= token.group.name %></td>
+            <td class="py-2 pr-4 text-ink"><%= render Admin::TimeAgoComponent.new(time: token.created_at) %></td>
+            <td class="py-2 pr-4 text-ink">
+              <% if token.last_used_at %>
+                <%= render Admin::TimeAgoComponent.new(time: token.last_used_at) %>
+                <% if token.last_used_ip.present? %>
+                  <span class="block font-cs-mono text-meta"><%= token.last_used_ip %></span>
+                <% end %>
+              <% else %>
+                Never
+              <% end %>
+            </td>
+            <td class="py-2 pr-4">
+              <% if token.revoked_at %>
+                <span class="text-meta">Revoked <%= render Admin::TimeAgoComponent.new(time: token.revoked_at) %></span>
+              <% else %>
+                <span class="text-ok-ink">Active</span>
+              <% end %>
+            </td>
+            <td class="py-2 pr-4 text-right">
+              <% unless token.revoked_at %>
+                <%= render Admin::ButtonComponent.new(label: "Revoke…", variant: :danger_text, data: dialog_trigger(dialog_id(token))) %>
+
+                <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id(token), title: "Revoke “#{token.name}”?",
+                      body: revoke_body(token)) do |dialog| %>
+                  <% dialog.with_confirm_action do %>
+                    <%= form_with url: revoke_path(token), method: :delete do %>
+                      <%= render Admin::ButtonComponent.new(label: "Revoke token", variant: :danger, type: "submit") %>
+                    <% end %>
+                  <% end %>
+                <% end %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</section>

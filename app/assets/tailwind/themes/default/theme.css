@@ -9,6 +9,7 @@
 @source "../../../../components/blocks";
 @source "../../../../components/posts";
 @source "../../../../components/fields";
+@source "../../../../components/public";
 @import "./tokens.css";
 
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
@@ -35,6 +36,8 @@
   --color-danger: var(--th-danger);
   --color-danger-ink: var(--th-danger-ink);
   --color-danger-tint: var(--th-danger-tint);
+  --color-preview-bg: var(--th-preview-bg);
+  --color-preview-ink: var(--th-preview-ink);
   --font-cs: var(--th-font);
   --font-cs-mono: var(--th-mono);
   --text-display: var(--th-t-display);

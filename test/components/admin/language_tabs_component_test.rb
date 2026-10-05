@@ -48,6 +48,31 @@ class Admin::LanguageTabsComponentTest < ViewComponent::TestCase
     end
   end
 
+  test "buttons mode draws a tab per language that only switches, the current one selected, with no name" do
+    render_inline(Admin::LanguageTabsComponent.new(current: "de", mode: :buttons, missing: %w[es], outdated: %w[de],
+      button_data: ->(code) { { code: code, action: "x#select" } }, panel_id: ->(code) { "panel-#{code}" }))
+
+    assert_selector "ul[role=tablist] button[type=button][role=tab]", count: 3
+    assert_selector "button[role=tab][aria-selected=true][aria-controls=panel-de][data-code=de]", text: "Deutsch"
+    assert_selector "button[role=tab][aria-selected=false][aria-controls=panel-en]", text: "English"
+    assert_no_selector "a"
+    assert_no_selector "button[name]"
+    assert_selector "##{Admin::LanguageTabsComponent.outdated_marker_id('de')}"
+    assert_selector "[data-language-state=missing]", count: 1
+  end
+
+  test "buttons mode never collapses into a +N menu" do
+    with_locales(%w[en de es fr it pt]) do
+      render_inline(Admin::LanguageTabsComponent.new(current: "en", mode: :buttons, visible: 2))
+      assert_selector "button[role=tab]", count: 6
+      assert_no_selector "button[aria-haspopup=menu]"
+    end
+  end
+
+  test "an unknown mode is refused" do
+    assert_raises(ArgumentError) { Admin::LanguageTabsComponent.new(current: "en", mode: :tabs) }
+  end
+
   private
 
   def with_locales(codes)

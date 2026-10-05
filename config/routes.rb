@@ -160,8 +160,8 @@ Rails.application.routes.draw do
 
     # The Tags module (cs-studio spec §4.1/§5.3): a flat list with no
     # `:show`/`:new`/`:create` of its own -- a tag has no editor screen, only
-    # an inline rename (`:update`) and a delete (`:destroy`) from the list
-    # itself; new tags are only ever created in passing, through a post's own
+    # an inline rename (`:update`), a delete (`:destroy`) and a merge into
+    # another tag (`merge`, `Tags::Merge`) from the list itself; new tags are only ever created in passing, through a post's own
     # `tag_names` (`Posts::Save`).
     # The post editor's tag chip input asks this for suggestions
     # (`Admin::TagSuggestionsController`): needs `posts.read`, not the Tags
@@ -169,7 +169,9 @@ Rails.application.routes.draw do
     # has no `show`, so the two paths can't collide).
     get "tags/suggest", to: "tag_suggestions#index", as: :tag_suggestions
 
-    resources :tags, only: %i[index update destroy]
+    resources :tags, only: %i[index update destroy] do
+      member { post :merge }
+    end
 
     # The Settings module (cs-studio spec §6.1, Task 8): the `SiteSetting`
     # singleton's own autosaving form (title, tagline, logo, social links,
@@ -180,24 +182,29 @@ Rails.application.routes.draw do
       # Translation helpers spec §6.2: checks the saved AI provider, model
       # and key with one tiny request, answered inline as a Turbo Stream.
       post :test_ai_connection
+      # The API key's own save (PATCH) and remove (DELETE), `Admin::AiKeysController`:
+      # instant actions beside the Settings form, never part of it (the key is
+      # never in the form's data, so it can't be counted as a pending change or
+      # sent with the rest).
+      resource :ai_key, only: %i[update destroy]
     end
 
-    # The Languages module (cs-studio spec §6.1, Task 8), nested under
-    # "settings" by *path* only (`scope`, not `namespace` -- the brief calls
-    # for a plain `Admin::LanguagesController`, not `Admin::Settings::
-    # LanguagesController`) so its URLs read as part of the Settings module
-    # the way the spec's own module list ("Languages (settings/languages)")
-    # names it. `create`/`destroy` are `Locales::Enable`/`Locales::Disable`
-    # (one language at a time, by its code as `:id`); the bulk `update`
-    # (fallbacks + reorder, `Locales::Configure`) has no `:id` of its own --
-    # the languages screen's one form always submits every enabled
-    # language's row together, the same way `ContentBlocks::Reorder` is
-    # handed a complete order rather than a delta -- so it's a bare `patch`
-    # on the collection path rather than a `resources` member/collection
-    # action.
+    # Languages (cs-studio spec §6.1; round 3, Task 6 moved them INTO the
+    # Settings screen as its `#languages` card). Still under "settings" by
+    # *path* only (`scope`, not `namespace`: a plain `Admin::LanguagesController`).
+    # What is left is the card's INSTANT actions, each answering with a 303 back
+    # to the card: `create` is `Locales::Enable`, `destroy` `Locales::Disable`
+    # (one language at a time, by its code as `:id`), `make_default`
+    # `Locales::MakeDefault`. The order and fallbacks are not here: they are
+    # fields of the Settings form (`Settings::Save`'s `languages:`). The old
+    # screen's URL redirects (301) to the card, so bookmarks and links keep working.
     scope "settings", as: "settings" do
-      resources :languages, only: %i[index create destroy]
-      patch "languages", to: "languages#update"
+      get "languages", to: redirect(status: 301) { |_params, request|
+        query = request.query_string.presence
+        "#{request.path.sub(%r{/languages(?:/|\.[^/]*)?\z}, "")}#{"?#{query}" if query}#languages"
+      }, as: :languages_screen
+      resources :languages, only: %i[create destroy]
+      patch "languages/:id/default", to: "languages#make_default", as: :default_language
     end
 
     # The Users module (cs-studio spec §6.1, Task 8): list, new/create,
@@ -207,7 +214,17 @@ Rails.application.routes.draw do
     # ends your own session, since only the controller knows which request
     # this is). Invites stay on the roadmap (spec §6.1) -- there is no
     # separate "invite" action here.
-    resources :users, only: %i[index new create edit update destroy]
+    # The group editor's member chip input asks this for suggestions
+    # (`Admin::UserSuggestionsController`, needs `groups.manage`); declared before
+    # `resources :users` so `suggest` is never read as a user id.
+    get "users/suggest", to: "user_suggestions#index", as: :user_suggestions
+
+    resources :users, only: %i[index new create edit update destroy] do
+      # "Make owner…" / "Remove owner rights…" (round 3 Task 12, D18): an instant
+      # action of its own, `owner=1|0`, answered by `Users::Save` like any other
+      # change to a user -- never a field of the editor's form.
+      member { patch :owner }
+    end
 
     # The Groups module (access-control design spec §5): the list, the
     # editor (name, description, members, the permission matrix) and

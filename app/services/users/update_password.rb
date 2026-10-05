@@ -69,8 +69,11 @@ module Users
 
     def own_password? = actor.is_a?(User) && actor == @user
 
+    # A whole sentence for the field and for the summary alike
+    # (config/locales/en.yml drops the attribute prefix for it). Wording
+    # only: whether this refuses, and what it leaves untouched, is unchanged.
     def current_password_mismatch
-      @user.errors.add(:current_password, "is incorrect")
+      @user.errors.add(:current_password, "That's not your current password.")
       failure(@user)
     end
 

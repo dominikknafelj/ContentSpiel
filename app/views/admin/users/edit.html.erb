@@ -1,55 +1,42 @@
-<%# Edit a user (cs-studio spec §6.1) -- email and an optional password
-    change (`Users::Save`'s own doc comment: a blank password/confirmation
-    here means "leave it alone", never "clear it"). %>
-<div class="max-w-md">
-  <div class="mb-4 flex items-center justify-between gap-3">
-    <h1 class="font-cs-mono text-label uppercase tracking-mono text-meta">Edit user</h1>
-    <%# The Activity link (design spec §5 "Audit log module", Task 9):
-        opens the audit log filtered to this user -- visible only with
-        `audit.view`, the same permission `Admin::AuditEventsController`
-        itself requires (access-control design spec §5 "Everywhere").
-        `_top`, not the content frame it sits in: the leave guard
-        (`admin--save-bar`) listens for Turbo Drive visits, and a frame
-        navigation fires none -- in the frame this link would throw away
-        typed changes without asking. %>
+<%# Edit a user (cs-studio spec §6.1; round 3 Task 12, handoff `Studio User Edit`): the
+    heading is the user's name (as stored: a refused save's typed name isn't the
+    title), "Last signed in …" under it (from `session.created` audit events, D19),
+    the form, then -- for an editable user -- the owner zone (owners only) and the
+    delete zone, both AFTER the form (forms don't nest) and both instant actions
+    that wait for pending changes. A user the viewer can't manage
+    (`Users::Manageability`) is read-only with the reason. Up to 880px. %>
+<% state = manageability(@user) %>
+<% heading = @user.name_in_database.presence || @user.email_address_in_database %>
+<% content_for :title, heading %>
+<div class="max-w-[880px]">
+  <p class="mb-1 text-xs text-meta"><%= link_to "Users", admin_users_path(**admin_url_options), class: "text-meta" %> /</p>
+  <div class="mb-1 flex items-center justify-between gap-3">
+    <h1 class="text-h1 text-ink"><%= heading %></h1>
+    <%# The Activity link (design spec §5 "Audit log module", Task 9): opens the audit log filtered to this
+        user -- visible only with `audit.view`. `_top`, not the content frame it sits in. %>
     <% if can?("audit.view") %>
       <%= link_to "Activity", admin_audit_events_path(subject_type: "User", subject_id: @user.id, **admin_url_options), data: { turbo_frame: "_top" }, class: setup_secondary_link_class %>
     <% end %>
   </div>
+  <p class="mb-4 text-sm text-dim" data-last-sign-in>
+    <% if @last_sign_in %>Last signed in <%= render Admin::TimeAgoComponent.new(time: @last_sign_in) %>.<% else %>Never signed in.<% end %>
+  </p>
 
   <%= render Admin::ErrorSummaryComponent.new(errors: @user.errors, field_ids: { "name" => "user_name", "email_address" => "user_email_address", "password" => "user_password", "password_confirmation" => "user_password_confirmation" }) %>
 
-  <%= form_with url: admin_user_path(@user, **admin_url_options), method: :patch, id: "user-form", data: save_bar_form_data(dirty: @user.errors.any?) do %>
-    <div class="mb-4">
-      <%= label_tag "user_name", "Name", class: setup_label_class %>
-      <%= text_field_tag "user[name]", @user.name, id: "user_name", maxlength: 120, autocomplete: "name",
-            aria: { describedby: "user_name_help", invalid: (@user.errors.include?(:name) ? "true" : nil) }.compact,
-            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:name)) ] %>
-      <p id="user_name_help" class="mt-1 text-sm text-meta">Optional. Shown instead of the email.</p>
-    </div>
+  <% case state %>
+  <% when :owner_protected %>
+    <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">Only owners can change other owners.</p>
+  <% when :outranked %>
+    <p class="admin-view-only-notice mb-4 rounded-cs bg-sunken px-3 py-2.5 text-sm text-dim" role="note">This user has permissions you don't have, so you can't change them.</p>
+  <% end %>
 
-    <div class="mb-4">
-      <%= label_tag "user_email_address", "Email address", class: setup_label_class %>
-      <%= email_field_tag "user[email_address]", @user.email_address, id: "user_email_address", autofocus: true,
-            autocomplete: "username", aria: { invalid: (@user.errors.include?(:email_address) ? "true" : nil) }.compact,
-            class: [ setup_input_class, ("!border-danger" if @user.errors.include?(:email_address)) ] %>
-    </div>
+  <%= render "admin/users/form", user: @user, url: admin_user_path(@user, **admin_url_options), method: :patch, state: state %>
 
-    <%# No `data-password-submit` on this form's button: a blank password
-        means "keep the current one" here (Users::Save), so the meter must
-        not hold the submit back; the server still enforces the minimum
-        on a typed one. %>
-    <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "user[password]", id: "user_password", label: "New password", meter: true, required: false) %>
-      <p class="mt-1 text-sm text-meta">Leave blank to keep the current password.</p>
-    </div>
-
-    <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "user[password_confirmation]", id: "user_password_confirmation", label: "Confirm new password", required: false) %>
-    </div>
-
-    <%= render "admin/users/access_fields", user: @user %>
-
-    <%= render Admin::SaveBarComponent.new(form_id: "user-form", cancel_url: admin_users_path(**admin_url_options), save_label: "Save") %>
+  <% if state == :editable %>
+    <% if Current.user&.owner? %>
+      <%= render Admin::UsersScreen::OwnerZoneComponent.new(user: @user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
+    <% end %>
+    <%= render Admin::UsersScreen::DeleteZoneComponent.new(user: @user, own: @user == Current.user, last_owner: last_owner?(@user), url_options: admin_url_options) %>
   <% end %>
 </div>

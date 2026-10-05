@@ -108,17 +108,24 @@ export default class extends Controller {
     // and then follows its first row (or does nothing if it has none). A
     // ⌘/Ctrl+Enter waits the same way, remembered as "newTab", and opens that
     // first row in a new tab instead of following it in this one.
-    if (event.key === "Enter" && this.stale) { this.pendingEnter = (event.metaKey || event.ctrlKey) ? "newTab" : true; return }
+    // "Waiting" is also the moment AFTER the matching answer has been drawn
+    // and BEFORE `loaded` has run (`turbo:frame-load` comes a step after the
+    // render): the rows are the right ones, so nothing is stale, but none is
+    // selected yet (`index` is still the -1 `search` left). An Enter in that
+    // moment used to follow `options[-1]` -- nothing at all.
+    const waiting = this.stale || this.index < 0
+    if (event.key === "Enter" && waiting) { this.pendingEnter = (event.metaKey || event.ctrlKey) ? "newTab" : true; return }
+    // The arrows have nothing to move from while waiting.
+    if (waiting) return
     const options = this.options
     if (options.length === 0) return
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-      // Not stale here (the guard above caught that case): the selected row
+      // Not waiting here (the guard above caught that case): the selected row
       // answers the current query.
       this.openInNewTab(options[this.index])
       return
     }
     if (event.key === "Enter") return options[this.index]?.click()
-    if (this.stale) return
     this.select((this.index + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length)
   }
 

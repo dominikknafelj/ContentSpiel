@@ -35,7 +35,7 @@ import { createTargetSearch } from "rich_text/target_search"
 // opens the one picker (`admin--media-picker`, `Media::PickerComponent`),
 // and the picked asset goes on to the image dialog (alt text and caption),
 // whose "Insert image" adds `image{asset_id}` (`#picked`, `#dialogClosed`).
-// The editor has no upload of its own; the picker's Upload tab covers it.
+// The editor has no upload of its own; the picker's header Upload covers it.
 //
 // Dialogs (design pass round 2, Task 13): the image, YouTube and "Page link"
 // forms are three shared `<dialog>`s rendered once by the layout

@@ -1,0 +1,17 @@
+<div class="mb-4 flex flex-col gap-2">
+  <span class="text-xs text-meta"><%= link_to "Audit log", back_path, class: "text-meta hover:underline" %> /</span>
+  <h1 class="text-h1 text-ink"><%= render Admin::AuditScreen::SentenceComponent.new(sentence: sentence) %></h1>
+</div>
+
+<dl class="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] rounded-cs border border-line bg-surface">
+  <% cells.each do |label, value, mono| %>
+    <div class="flex min-w-0 flex-col gap-1 border-b border-r border-line px-4 py-3">
+      <dt class="font-cs-mono text-label uppercase tracking-mono text-meta"><%= label %></dt>
+      <dd class="m-0 break-words text-sm <%= mono ? "font-cs-mono" : "" %> <%= label == "Action" ? action_class : "text-ink" %>"><%= value %></dd>
+    </div>
+  <% end %>
+  <div class="flex min-w-0 flex-col gap-1 border-b border-r border-line px-4 py-3">
+    <dt class="font-cs-mono text-label uppercase tracking-mono text-meta">Channel</dt>
+    <dd class="m-0"><%= render(Admin::ChannelChipComponent.new(channel: event.channel)).presence || "—" %></dd>
+  </div>
+</dl>

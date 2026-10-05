@@ -17,6 +17,18 @@ class Admin::DialogComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog#d5[data-admin--dialog-open-on-load]", visible: :all
   end
 
+  # Round 3 Task 9: a dialog whose height changes while open hangs from a fixed
+  # top edge, like the media picker; the rule and the opt-in are both pinned.
+  test "hang marks the dialog for the fixed top edge, and is absent otherwise" do
+    render_inline(Admin::DialogComponent.new(id: "d6", title: "t", hang: true)) { "Body" }
+    assert_selector "dialog#d6[data-dialog-hang]", visible: :all
+
+    render_inline(Admin::DialogComponent.new(id: "d7", title: "t")) { "Body" }
+    assert_no_selector "dialog#d7[data-dialog-hang]", visible: :all
+
+    assert_match(/\.admin-dialog\[data-dialog-hang\] \{ margin-top: 7\.5vh; \}/, Rails.root.join("app/assets/tailwind/content-spiel.tailwind.css").read)
+  end
+
   test "an unknown width is a programming error" do
     assert_raises(ArgumentError) { Admin::DialogComponent.new(id: "d", title: "t", width: :huge) }
   end

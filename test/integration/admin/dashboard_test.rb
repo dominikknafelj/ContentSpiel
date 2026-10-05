@@ -89,14 +89,14 @@ class Admin::DashboardTest < ActionDispatch::IntegrationTest
     assert_select "section[aria-labelledby=dashboard-needs-translation] [role=progressbar]"
   end
 
-  test "a change made through an API token reads as its user's, via an API token, never the token" do
+  test "a change made through an API token reads as its user's, via the token's name, never the token" do
     post = Current.set(actor: users(:one)) { create_post(title: "From MCP") }
-    token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin))
+    token, = ApiToken.generate!(users(:two), group: access_control_groups(:admin), name: "Claude desktop")
     Current.set(actor: token, channel: :mcp) { Posts::Save.call(post, translations: { Locales.default => { title: "From MCP!" } }) }
 
     sign_in_as users(:one)
     get admin_root_path
-    assert_select "section[aria-labelledby=dashboard-activity] li", text: /#{Regexp.escape(users(:two).email_address)} via an API token edited “From MCP!”/
+    assert_select "section[aria-labelledby=dashboard-activity] li", text: /#{Regexp.escape(users(:two).email_address)} via Claude desktop edited “From MCP!”/
   end
 
   test "empty lists say so" do

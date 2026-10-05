@@ -14,7 +14,7 @@ module Admin
     def delete_group_with_details
       render(Admin::ConfirmDialogComponent.new(id: "delete-group-preview", title: "Delete the group “Bots”?", destructive: true,
         body: "Deleting it revokes 2 tokens. This can't be undone.")) do |component|
-        component.with_details { "API token #3 — ada@example.com, API token #7 — grace@example.com" }
+        component.with_details { "Claude desktop — ada@example.com, Nightly import — grace@example.com" }
         component.with_confirm_action { render(Admin::ButtonComponent.new(label: "Delete", variant: :danger, type: "submit")) }
       end
     end

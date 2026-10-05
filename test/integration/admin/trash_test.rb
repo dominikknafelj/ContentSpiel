@@ -7,12 +7,20 @@ require "test_helper"
 # for an id that isn't in the trash or isn't of the addressed type.
 class Admin::TrashTest < ActionDispatch::IntegrationTest
   setup do
+    # Midday, so "IN 30 DAYS" can't become 29 on a run that crosses midnight.
+    midday = Time.current.change(hour: 12)
+    travel_to midday
     Current.actor = users(:one)
     @section = create_page(title: "Section")
     @child = create_page(title: "Child", parent: @section)
     @post = create_post(title: "Gone post")
     @asset = create_media_asset
-    [ @section, @post, @asset ].each { |r| Trash::Move.call(r) }
+    # One second apart: the clock is stopped, and the list is newest first.
+    [ @section, @post, @asset ].each_with_index do |record, index|
+      travel_to midday + index.seconds
+      Trash::Move.call(record)
+    end
+    travel_to midday + 3.seconds
     Current.reset
   end
 
@@ -21,10 +29,10 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     get admin_trash_path
     assert_response :ok
     assert_select "tr", text: /Section/
-    assert_select "tr", text: /\+1 subpage/
+    assert_select "tr", text: /Includes 1 subpage: Child/
     assert_select "tr", text: /Gone post/
-    assert_match "Deleted permanently in 30 days", response.body
-    assert_select "tr", text: /Trashed by one@example.com/
+    assert_select "[data-retention]", text: /IN 30 DAYS/, minimum: 1
+    assert_select "tr", text: /You · /
 
     titles = css_select("tbody tr").map { |row| row["id"] }
     assert_equal [ "trash-media-#{@asset.id}", "trash-post-#{@post.id}", "trash-page-#{@section.id}" ], titles
@@ -32,7 +40,7 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
 
   test "filters by type" do
     sign_in_as users(:one)
-    get admin_trash_path(type: "post")
+    get admin_trash_path(type: "posts")
     assert_select "tr", text: /Gone post/
     assert_select "tr", text: /Section/, count: 0
   end
@@ -162,8 +170,8 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
       Trash::Move.call(@asset.reload)
     end
     sign_in_as users(:one)
-    get admin_trash_path(type: "media")
-    assert_select "#trash-media-#{@asset.id} button[disabled][title='Still used by an item in the trash']"
+    get admin_trash_path(type: "images")
+    assert_select "#trash-media-#{@asset.id} button[disabled][title='Still used by 1 item in the trash']"
   end
 
   test "empty trash needs trash.empty and removes everything" do
@@ -179,7 +187,7 @@ class Admin::TrashTest < ActionDispatch::IntegrationTest
     grant.destroy!
     sign_in_as users(:two)
     get admin_trash_path
-    assert_select "button", text: "Empty trash", count: 0
+    assert_select "button", text: /Empty trash/, count: 0
     delete admin_empty_trash_path
     assert_response :forbidden
     assert @post.reload.trashed?

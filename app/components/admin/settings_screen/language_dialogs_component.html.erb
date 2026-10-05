@@ -1,0 +1,24 @@
+<%= form_with url: admin_settings_languages_path, method: :post, id: add_form, html: { class: "hidden" } do end %>
+
+<% others.each do |code| %>
+  <%= render Admin::ConfirmDialogComponent.new(id: default_dialog_id(code), title: "Make #{name(code)} the default?",
+        body: "#{name(code)} moves to / and #{name(default_code)} to /#{default_code}. Existing links to #{name(default_code)} pages without /#{default_code} will open the #{name(code)} version, or show “not found” where there is none.") do |dialog| %>
+    <% dialog.with_details do %>
+      <p class="rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-ink"><%= name(code) %> becomes the source language, so every translation is marked outdated (<%= items_phrase %>).</p>
+    <% end %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: admin_settings_default_language_path(code), method: :patch do %>
+        <%= render Admin::ButtonComponent.new(label: "Change default language", variant: :primary, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render Admin::ConfirmDialogComponent.new(id: off_dialog_id(code), title: "Turn off #{name(code)}?",
+        body: "#{name(code)} disappears from the language switcher and /#{code} pages show “not found”. Translations are kept, so turning it back on restores them.") do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: admin_settings_language_path(code), method: :delete do %>
+        <%= render Admin::ButtonComponent.new(label: "Turn off #{name(code)}", variant: :primary, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -1,55 +1,79 @@
-<%# The Media module's own grid (media library design spec §6): search,
-    filters, the multi-file upload dropzone, and the grid itself
-    (`Admin::MediaLibrary::GridComponent`). No tree column (a library image
-    has no tree position of its own, the same reason Tags/Posts render
-    plain content frames) and no language switcher (title/alt/caption per
-    locale only exist once an image is open -- `Admin::MediaLibrary
-    ::DetailComponent`'s own). %>
-<h1 class="mb-4 text-h1 text-ink">Media</h1>
-
-<%# The wrapper keeps `admin--media-upload`'s own dragover/drop (a drop anywhere
-    on it uploads); the FileDropComponent inside is the visible zone and the
-    labelled file input, and stops its own drops from reaching that handler
-    twice (file_drop_controller.js). %>
-<div class="mb-6"
-     data-controller="admin--media-upload"
+<%# The editors' two head tags (`admin/pages/show`): Back never restores a panel form
+    with a stale `base_updated_at` (or a stale NO ALT chip or segment count) from
+    Turbo's page cache, and a hover-prefetched tile answer older than a save is
+    never used for a click. %>
+<%# The tab's title names the chosen image (the panel is a URL of its own). %>
+<% content_for :title, [ @selected&.title.presence, "Media", "CS Studio" ].compact.join(" · ") %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+  <meta name="turbo-prefetch" content="false">
+<% end %>
+<%# The Media module (media library design spec §6; round 3 Task 8, handoff §4.6):
+    the header with "Upload images", the drop zone, the toolbar (search and
+    segments with counts) and the grid, with the chosen image's side panel
+    (`Admin::MediaLibrary::PanelComponent`) at the right -- 340px; with nothing
+    chosen the grid takes the width. Choosing a tile is a link into the `content`
+    frame that keeps the search, the segment, the page and the language, so Back
+    returns to the previous choice. No tree column (a library image has no tree
+    position of its own, the same reason Tags/Posts render plain content frames). %>
+<%# Uploading (round 3, Task 9): the wrapper carries `admin--media-drop` (a file drag
+    anywhere on the screen shows the overlay below and a drop hands its files to
+    `admin--media-upload`) and `admin--media-upload` itself (the queue: a progress
+    tile per file at the start of the grid, one at a time, nothing reloads). The
+    FileDropComponent inside is the visible zone and the labelled file input; it
+    stops its own drops from reaching the document-level handler twice
+    (file_drop_controller.js). The header's button opens the same input. %>
+<div class="mb-4 flex flex-col gap-4"
+     data-controller="admin--media-drop admin--media-upload"
      data-admin--media-upload-url-value="<%= admin_media_path(**admin_url_options) %>"
-     data-action="dragover->admin--media-upload#dragOver drop->admin--media-upload#drop">
-  <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
-        hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
-        data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
-  <ul data-admin--media-upload-target="list" class="mt-2 flex flex-col gap-1 text-sm text-ink" aria-live="polite"></ul>
+     data-action="admin--media-drop:dropped->admin--media-upload#dropped">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-h1 text-ink">Media</h1>
+    <%= render Admin::ButtonComponent.new(label: "Upload images", variant: :primary, type: "button", data: { action: "admin--media-upload#browse" }) %>
+  </div>
+  <div>
+    <%= render Admin::FileDropComponent.new(name: "media-upload-input", id: "media-upload-input", multiple: true, label: "Upload images",
+          hint: "PNG, JPEG, GIF or WebP, up to 10 MB",
+          data: { "admin--media-upload-target": "input", action: "change->admin--media-upload#filesSelected" }) %>
+    <%# What each file's tile says, for a screen reader: uploaded, or not and why. %>
+    <p class="sr-only" role="status" aria-live="polite" data-admin--media-upload-target="status"></p>
+  </div>
+  <%# Centred by flex over the whole window, translucent (the page stays
+      visible behind it, as in the mock), and never in the way of the drop
+      itself (`pointer-events-none`: the drag keeps its real target). %>
+  <div hidden data-admin--media-drop-target="overlay" aria-hidden="true"
+       class="pointer-events-none fixed inset-0 z-30 flex items-center justify-center border-2 border-dashed border-accent bg-accent-tint/85">
+    <p class="rounded-cs bg-surface px-6 py-4 text-h2 text-ink shadow-menu">Drop images to upload</p>
+  </div>
 </div>
 
-<% filter_keys = %i[q filter] %>
-<%= form_with(**filter_form_options(admin_media_path(**admin_url_options))) do %>
-  <% if admin_locale != Locales.default %>
-    <%= hidden_field_tag :locale, admin_locale %>
-  <% end %>
+<%= render Admin::MediaLibrary::ToolbarComponent.new(counts: @counts, filter: @search.filter, q: params[:q], selected_id: @selected&.id, url_options: admin_url_options) %>
 
-  <div>
-    <%= label_tag :q, "Search", class: setup_label_class %>
-    <%= search_field_tag :q, params[:q], placeholder: "Title, alt text or filename", class: setup_input_class %>
+<% page_url = ->(page) { admin_media_path(list_params(:q, :filter, :selected).merge("page" => page)) } %>
+<%# DOM order is visual order at every width (grid, then panel; the panel stacks
+    below the grid under 1024px): no `order-*` swap, so tab order never contradicts
+    what is drawn. `admin--media-panel` moves focus into the panel when a tile was
+    chosen, and back to the tile when the panel is closed. %>
+<div class="grid items-start gap-6 <%= "lg:grid-cols-[minmax(0,1fr)_340px]" if @selected %>" data-controller="admin--media-panel">
+  <div class="min-w-0">
+    <% if @pagination.out_of_range? %>
+      <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
+    <% else %>
+      <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options, selected_id: @selected&.id, link_params: @link_params) %>
+      <% if @pagination.total_pages > 1 %>
+        <div class="mt-4 rounded-cs border border-line bg-surface">
+          <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+        </div>
+      <% end %>
+    <% end %>
   </div>
 
-  <div>
-    <%= label_tag :filter, "Show", class: setup_label_class %>
-    <%= select_tag :filter, options_for_select([ [ "All", "" ], [ "Unused", "unused" ], [ "Mine", "mine" ] ], params[:filter]),
-          class: setup_select_class %>
-  </div>
-
-  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
-  <%= filter_clear_link(admin_media_path(**admin_url_options), filter_keys) %>
-<% end %>
-
-<% page_url = ->(page) { admin_media_path(list_params(:q, :filter).merge("page" => page)) } %>
-<% if @pagination.out_of_range? %>
-  <%= render "admin/shared/out_of_range_page", url: page_url.call(1) %>
-<% else %>
-  <%= render Admin::MediaLibrary::GridComponent.new(assets: @assets, url_options: admin_url_options) %>
-  <% if @pagination.total_pages > 1 %>
-    <div class="mt-4 rounded-cs border border-line bg-surface">
-      <%= render Admin::PaginationComponent.new(pagination: @pagination, url: page_url) %>
+  <% if @selected %>
+    <%# A plain box: the panel inside is the one landmark (a `section` named by
+        the image's title, and the focus target). An `aside` around it was a
+        second landmark for the same thing. %>
+    <div class="min-w-0 rounded-cs border border-line bg-surface p-4 lg:sticky lg:top-[calc(var(--admin-top-offset)+1.5rem)] lg:max-h-[calc(100vh-var(--admin-top-offset)-3rem)] lg:overflow-y-auto">
+      <%= render Admin::MediaLibrary::PanelComponent.new(asset: @selected, locale: admin_locale, url_options: admin_url_options, link_params: @link_params) %>
     </div>
   <% end %>
-<% end %>
+</div>

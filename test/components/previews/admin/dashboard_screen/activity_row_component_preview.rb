@@ -1,22 +1,24 @@
 module Admin
   module DashboardScreen
     # A line of "Recent activity": a person (round avatar) and a change made
-    # through an API token (square accent avatar).
+    # through an API token (the user's own round avatar, "via <name>" and an MCP chip).
     class ActivityRowComponentPreview < ViewComponent::Preview
       def person
-        render Admin::DashboardScreen::ActivityRowComponent.new(row: row(via_token: false))
+        render Admin::DashboardScreen::ActivityRowComponent.new(row: row(via_label: nil))
       end
 
       def via_api_token
-        render Admin::DashboardScreen::ActivityRowComponent.new(row: row(via_token: true))
+        render Admin::DashboardScreen::ActivityRowComponent.new(row: row(via_label: "Claude desktop"))
       end
 
       private
 
-      def row(via_token:)
+      def row(via_label:)
         post = Post.first || Post.new(id: 1, content_type: "blog", title: "A sample post")
-        Dashboard::Activity::Row.new(event: nil, record: post, sentence_parts: [ "published", post, "" ], actor_name: "Dominik",
-          via_token:, at: 2.hours.ago, span_end: nil)
+        event = Audit::Event.new(action: "post.published", channel: via_label ? "mcp" : "admin", subject_label: post.title,
+          actor_type: ("ApiToken" if via_label), actor_label: via_label)
+        target = Audit::Sentence::Target.new(post.title, Audit::Sentence.route_for(post))
+        Dashboard::Activity::Row.new(event:, record: post, sentence: Audit::Sentence.build(event, viewer: nil, target:), at: 2.hours.ago, span_end: nil)
       end
     end
   end

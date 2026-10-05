@@ -5,8 +5,16 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
 
   def activity(actor = @me, limit: 15) = Current.set(actor:, channel: :admin) { Dashboard::Activity.new(actor:, limit:) }
 
+  # `[words before the subject, the subject, words after it]` -- the wording is
+  # `Audit::Sentence`'s now, as parts.
+  def words(row)
+    parts = row.sentence.parts
+    at = parts.index { |part| part.kind == :subject }
+    [ parts[0...at].map(&:text).join.strip, parts[at].text, parts[(at + 1)..].map(&:text).join ]
+  end
+
   def sentences(actor = @me)
-    activity(actor).rows.map { |row| [ row.actor_name, row.sentence_parts[0], row.record.title, row.sentence_parts[2] ] }
+    activity(actor).rows.map { |row| [ row.sentence.actor.you ? "You" : row.sentence.actor.user&.display_name, *words(row) ] }
   end
 
   test "lists content events only, never access.denied, sessions, users, groups, tokens or settings" do
@@ -24,9 +32,10 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     as(@me) { Posts::Save.call(post, attributes: { published: true }) }
     as(@me) { Posts::Save.call(post, attributes: { published_at: Time.zone.local(2031, 10, 6, 9) }) }
 
-    assert_includes sentences, [ "#{@me.display_name}", "published", "Hello", "" ]
-    assert_includes sentences, [ @me.display_name, "scheduled", "Hello", " for 6 Oct" ]
-    assert_includes sentences, [ @me.display_name, "created", "Hello", "" ]
+    # The viewer's own events read "You" (the log's wording, `Audit::Sentence`).
+    assert_includes sentences, [ "You", "published", "Hello", "" ]
+    assert_includes sentences, [ "You", "scheduled", "Hello", " for 6 Oct" ]
+    assert_includes sentences, [ "You", "created", "Hello", "" ]
   end
 
   test "an event about a post the viewer can't read is absent, not anonymised" do
@@ -48,16 +57,16 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
 
     as(@me) { Trash::Restore.call(post.reload) }
     assert_equal %w[post.restored post.trashed post.created], activity.rows.map { |row| row.event.action }
-    assert_equal "moved", activity.rows.second.sentence_parts[0]
-    assert_equal " to the trash", activity.rows.second.sentence_parts[2]
+    assert_equal [ "moved", "Gone soon", " to the trash" ], words(activity.rows.second)
   end
 
-  test "a block edit reads as editing the page and points at the page" do
+  test "a block event reads as the block, named, on the page, and points at the page" do
     page = as(@me) { create_page(title: "About") }
     block = as(@me) { ContentBlocks::Save.call(ContentBlock.new(owner: page, block_type: "rich_text")).record }
     row = activity.rows.find { |r| r.event.action.start_with?("block.") }
 
-    assert_equal "edited a block on", row.sentence_parts[0]
+    # Unified with the audit log: a created block is "added a <type> block to".
+    assert_equal [ "added a Rich text block to", "About", "" ], words(row)
     assert_equal page, row.record
     assert block.persisted?
   end
@@ -71,7 +80,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
 
     rows = activity.rows.select { |r| r.event.action == "block.updated" }
     assert_equal 1, rows.size
-    assert_equal "edited a block on", rows.first.sentence_parts[0]
+    assert_equal "edited a block on", words(rows.first).first
   end
 
   # Task 16's d3: the class comment promises "a viewer with no grants runs no
@@ -111,18 +120,24 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     as(gone) { create_post(title: "By a ghost", published: false) }
     gone.destroy!
 
-    names = activity.rows.to_h { |row| [ row.record.title, row.actor_name ] }
-    assert_equal "System", names["By the system"]
-    assert_equal "a deleted user", names["By a ghost"]
+    # Facts, not a label: the component names them (`Admin::UserNameComponent`).
+    actors = activity.rows.to_h { |row| [ row.record.title, row.sentence.actor ] }
+    assert_nil actors["By the system"].user
+    assert_nil actors["By the system"].user_id
+    assert_nil actors["By a ghost"].user
+    assert_equal gone.id, actors["By a ghost"].user_id
   end
 
-  test "a change through an API token is the user's, flagged via_token, and never names the token" do
-    token, = ApiToken.generate!(@me, group: access_control_groups(:admin))
+  test "a change through an API token is the user's, carries via_label, and the name outlives the token" do
+    token, = ApiToken.generate!(@me, group: access_control_groups(:admin), name: "Claude desktop")
     as(token, channel: :mcp) { create_post(title: "Via MCP", published: false) }
     row = activity.rows.first
 
-    assert row.via_token
-    assert_equal @me.display_name, row.actor_name
+    assert_equal "Claude desktop", row.sentence.actor.via_label
+    assert_equal @me, row.sentence.actor.user
+    assert row.sentence.actor.you
+    ApiToken.delete_all
+    assert_equal "Claude desktop", activity.rows.first.sentence.actor.via_label
   end
 
   test "images are listed only for a media.upload holder" do
@@ -214,7 +229,15 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     as(@me) { Audit.record("post.updated", subject: post, field_changes: { "published_at" => [ nil, Time.zone.local(2031, 10, 6, 9).iso8601 ] }) }
     row = activity.rows.find { |r| r.event.action == "post.updated" }
 
-    assert_equal [ "scheduled", post, " for 6 Oct" ], row.sentence_parts
+    assert_equal [ "scheduled", "Later", " for 6 Oct" ], words(row)
+  end
+
+  test "a page scheduled through the Schedule dialog's service reads as scheduled for that date" do
+    page = as(@me) { create_page(title: "About", published: false) }
+    as(@me) { Pages::Save.call(page, attributes: { published_at: Time.zone.local(2031, 10, 6, 9) }) }
+    row = activity.rows.find { |r| r.record == page && r.event.action != "page.created" }
+
+    assert_equal [ "scheduled", "About", " for 6 Oct" ], words(row)
   end
 
   test "a malformed stored published_at neither raises nor leaves a dangling for" do
@@ -222,7 +245,7 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     as(@me) { Audit.record("post.scheduled", subject: post, field_changes: { "published_at" => [ nil, "not a time" ] }) }
     row = activity.rows.find { |r| r.event.action == "post.scheduled" }
 
-    assert_equal "scheduled", row.sentence_parts[0]
-    assert_no_match(/ for\s*\z/, row.sentence_parts[2])
+    assert_equal "scheduled", words(row).first
+    assert_no_match(/ for\s*\z/, words(row).last)
   end
 end

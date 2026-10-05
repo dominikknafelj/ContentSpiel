@@ -168,6 +168,32 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     assert_empty scoped(@brancher, "posts.edit", Post.all)
   end
 
+  # Final fix wave (S-I1): posts that still carry an unregistered type are
+  # out of reach of a grant that names it, alone or beside a live type -- in
+  # SQL exactly as in `allowed?`.
+  test "a grant naming an unregistered content type doesn't return posts that still carry that type" do
+    group = access_control_groups(:branch_editors)
+    leftover = @posts.first
+    leftover.update_columns(content_type: "gone")
+    blogs = Post.where(content_type: "blog").pluck(:id).sort
+    assert_not_empty blogs
+
+    [ [ [ "gone" ], [] ], [ [ "blog", "gone" ], blogs ] ].each do |types, expected|
+      group.grants.destroy_all
+      %w[posts.read posts.edit posts.delete].each { |key| grant!(group, key).update_columns(scope: { "content_types" => types }) }
+      AccessControl::ActorGrants.reset!
+
+      %w[posts.read posts.edit posts.delete].each do |key|
+        assert_equal expected, scoped(@brancher, key, Post.all).pluck(:id).sort, "#{key} with #{types.inspect}"
+      end
+      assert_scope_agrees_with_allowed(@brancher)
+    end
+
+    # Unscoped holders (the Read only group's posts.read) and owners still reach it.
+    assert_includes scoped(@reader, "posts.read", Post.all).pluck(:id), leftover.id
+    assert_includes scoped(@owner, "posts.edit", Post.all).pluck(:id), leftover.id
+  end
+
   # --- Blocks ------------------------------------------------------------
 
   test "blocks follow their owning page or post" do

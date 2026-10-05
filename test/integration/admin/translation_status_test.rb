@@ -22,7 +22,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     record.reload
   end
 
-  def note_id(type, record, field) = "reference-card-#{type}-#{record.id}-#{field}"
+  def note_id(type, record, field, locale = "de") = "reference-card-#{type}-#{record.id}-#{field}-#{locale}"
 
   def confirm_params(record, field, locale = "de")
     { record_type: record.class.name, record_id: record.id, field: field, locale: locale }
@@ -166,7 +166,7 @@ class Admin::TranslationStatusTest < ActionDispatch::IntegrationTest
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand" }, "de" => { alt: "Sand (de)" } }).ok?
     assert Media::Save.call(asset, translations: { "en" => { alt: "Sand dunes" } }).ok?
 
-    get "/cs-studio/media/#{asset.id}", params: { locale: "de" }
+    get "/cs-studio/media", params: { selected: asset.id, locale: "de" }
 
     assert_response :success
     assert_select "[data-original-for='alt'] p", text: /Sand.*dunes/

@@ -43,7 +43,7 @@ module Admin
     # language -- the switcher's marker.
     def confirmed_streams(record)
       field = params[:field].to_s
-      card_id = Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field)
+      card_id = Admin::EditorScreen::ReferenceCardComponent.dom_id(record, field, params[:locale].to_s)
       card = Admin::EditorScreen::ReferenceCardComponent.current_for(record, field, locale: params[:locale].to_s)
       streams = [ turbo_stream.replace(card_id, card) ]
       switcher_record = record.is_a?(ContentBlock) ? record.owner : record

@@ -1,0 +1,56 @@
+<%= form_with(**form_options) do %>
+  <% if hidden_locale? %>
+    <%= hidden_field_tag :locale, @locale, id: nil %>
+  <% end %>
+
+  <div>
+    <%= label_tag :user_id, "User", class: "sr-only" %>
+    <%= select_tag :user_id, options_for_select(user_options, filter.user_id), include_blank: "Anyone", class: setup_select_class %>
+  </div>
+
+  <div>
+    <%# Named `event_action`, not `action`: `params[:action]` is Rails' own routing parameter. %>
+    <%= label_tag :event_action, "Action", class: "sr-only" %>
+    <%= select_tag :event_action, grouped_options_for_select(action_groups, filter.event_action), include_blank: "Any action", class: setup_select_class %>
+  </div>
+
+  <% if filter.subject? %>
+    <%= hidden_field_tag :subject_type, filter.subject_type, id: nil %>
+    <%= hidden_field_tag :subject_id, filter.subject_id, id: nil %>
+    <span class="inline-flex items-center gap-2 rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink" data-subject-chip>
+      About this <%= subject_label.downcase %> #<%= filter.subject_id %>
+      <%= link_to "×", subject_clear_path, aria: { label: "Remove the #{subject_label.downcase} filter" }, class: "text-meta hover:text-ink", data: { turbo_frame: "content", turbo_action: "replace" } %>
+    </span>
+  <% else %>
+    <div>
+      <%= label_tag :subject_type, "Type", class: "sr-only" %>
+      <%= select_tag :subject_type, options_for_select(type_options, filter.subject_type), include_blank: "Any content", class: setup_select_class %>
+    </div>
+  <% end %>
+
+  <div>
+    <%= label_tag :channel, "Channel", class: "sr-only" %>
+    <%= select_tag :channel, options_for_select(CHANNELS, filter.channel), include_blank: "All channels", class: setup_select_class %>
+  </div>
+
+  <div>
+    <%= label_tag :range, "Date", class: "sr-only" %>
+    <%= select_tag :range, options_for_select(DATES, filter.range), include_blank: "Any time", class: setup_select_class %>
+  </div>
+
+  <% if filter.custom? %>
+    <div>
+      <%= label_tag :from, "From", class: "sr-only" %>
+      <%= date_field_tag :from, filter.from&.iso8601, class: DATE_CLASS %>
+    </div>
+    <div>
+      <%= label_tag :to, "To", class: "sr-only" %>
+      <%= date_field_tag :to, filter.to&.iso8601, class: DATE_CLASS %>
+    </div>
+  <% end %>
+
+  <noscript><%= render Admin::ButtonComponent.new(label: "Filter", variant: :secondary, type: "submit") %></noscript>
+  <% if filter.active? %>
+    <%= link_to "Clear", path, class: setup_secondary_link_class, data: { turbo_frame: "content", turbo_action: "replace" } %>
+  <% end %>
+<% end %>

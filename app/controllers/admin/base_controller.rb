@@ -62,7 +62,7 @@ module Admin
       { label: "Trash", icon: :trash, path: :admin_trash_path, permission: TRASH_PERMISSIONS, group: :content },
       { label: "Users", icon: :users, path: :admin_users_path, permission: "users.manage", group: :people },
       { label: "Groups", icon: :groups, path: :admin_groups_path, permission: "groups.manage", group: :people },
-      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: "settings.manage", group: :system },
+      { label: "Settings", icon: :settings, path: :admin_settings_path, permission: %w[settings.manage languages.manage], group: :system },
       { label: "AI assistant", icon: :assistant, path: :admin_api_tokens_path, permission: nil, group: :system },
       { label: "System status", icon: :status, path: :admin_system_status_path, permission: "system_status.view", group: :system },
       { label: "Audit log", icon: :audit, path: :admin_audit_events_path, permission: "audit.view", group: :system }
@@ -136,6 +136,7 @@ module Admin
     def trash_badge_count
       return 0 unless admin_modules.any? { |entry| entry[:path] == :admin_trash_path }
 
+      # (`Admin::TrashController#index` presets it from its tabs' counts.)
       @trash_badge_count ||= Admin::TrashController.badge_count(Current.actor)
     end
 

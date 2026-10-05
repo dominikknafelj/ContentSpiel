@@ -1,18 +1,41 @@
-<%# "Change my password" (access-control design spec §5): every signed-in
-    user's own password, behind their current one. A deliberate submit,
-    never autosave, like the Users module's own forms. %>
-<% content_for :title, "Change password" %>
-<div class="max-w-md">
-  <h1 class="mb-1 text-h1 text-ink">Change password</h1>
-  <p class="mb-4 text-meta">Signed in as <%= Current.user.display_name %>. Changing your password signs you out everywhere else.</p>
+<%# "Change my password" (access-control design spec §5; round 3, handoff
+    "Studio Change Password"): every signed-in user's own password, behind
+    their current one, plus the one profile field, their name (design pass
+    spec §5.1). A deliberate submit, never autosave, like the Users module's
+    own forms.
 
-  <%# The service layer's `result.errors` are whole sentences with no field to
-      link to (the summary prints them as they are). One summary at a time:
-      only one of the two forms was submitted. %>
-  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@errors)) %>
+    Two forms, so two footers: each `Admin::SaveBarComponent` is the footer of
+    its own form and counts only that form's changes (one Leave prompt serves
+    both). Neither Save may throw away what the other form holds:
+    - "Save name" keeps the screen (a Turbo Stream answer, see the controller),
+      so the password fields stay as typed;
+    - "Change password" re-renders the screen, so it waits for the name:
+      while the name is unsaved it is locked, with "Save or cancel your
+      changes first." (`after:`, the D10 rule between two forms).
+    The current password alone is nothing to save and is what a password
+    manager fills in on load: it is not counted (`data-save-bar-ignore`), or
+    every visit here would end in "Leave without saving?".
+    The name form comes first and is the narrow one (420px, a single field);
+    the password form is the 560px card of the mock, its footer carrying the "Forgot your
+    current password?" link at the far end. The subtitle's promise is the
+    service's own rule (`Users::OwnerProtection#end_sessions_after_password_
+    change`: the acting session stays, the user's other sessions go). No
+    typed password is ever rendered back: the inputs have no `value`. %>
+<% content_for :title, "Change password" %>
+<% field_errors = @field_errors || {} %>
+<div class="max-w-[560px]">
+  <h1 class="mb-1 text-h1 text-ink">Change password</h1>
+  <p class="mb-4 text-meta">You'll stay signed in here. Other sessions are signed out.</p>
+
+  <%# One summary at a time: only one of the two forms was submitted. The
+      password form's messages link to their fields; the service's own
+      sentences stand when it left no per-field errors (a denial). %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: field_errors.presence || Array(@errors),
+        field_ids: { current_password: "current_password", password: "password", password_confirmation: "password_confirmation" }) %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
 
-  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8", data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
+  <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8 max-w-[420px]",
+        data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
     <div class="mb-4">
       <%= label_tag "name", "Your name", class: setup_label_class %>
       <%= text_field_tag "name", Current.user.name, id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
@@ -21,20 +44,27 @@
     <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Save name") %>
   <% end %>
 
-  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?) do %>
+  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
     <div class="mb-4">
       <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
-            autocomplete: "current-password", autofocus: true) %>
+            autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>
     </div>
 
     <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true) %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, errors: field_errors[:password]) %>
     </div>
 
     <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password") %>
+      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password",
+            errors: field_errors[:password_confirmation]) %>
     </div>
 
-    <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) %>
+    <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) do %>
+      <%# The reset flow is public and signs nobody out by being visited; it
+          asks for an email, so it is only useful where mail is configured
+          (System status says when it isn't). Opened in the page, not the
+          frame: it is a different layout. %>
+      <%= link_to "Forgot your current password?", new_admin_password_path, data: { turbo_frame: "_top" }, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %>
+    <% end %>
   <% end %>
 </div>

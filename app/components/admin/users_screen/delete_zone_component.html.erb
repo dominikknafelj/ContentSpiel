@@ -1,0 +1,22 @@
+<section class="admin-delete-zone mt-6 flex flex-wrap items-center justify-between gap-3 rounded-cs border border-line px-3.5 py-3"
+         aria-labelledby="delete-user-title" data-controller="admin--pending-lock">
+  <div class="flex min-w-0 flex-col gap-0.5">
+    <h2 id="delete-user-title" class="text-base font-medium text-ink">Delete user</h2>
+    <p class="text-sm text-dim">Their pages, posts and media stay. Posts they wrote are left without an author, and their AI tokens stop working.</p>
+    <% if last_owner %><p class="text-sm text-dim" data-delete-zone-reason><%= reason %></p><% end %>
+    <p class="text-sm text-meta" data-admin--pending-lock-target="hint" hidden></p>
+  </div>
+  <%= render Admin::ButtonComponent.new(label: "Delete user…", variant: :danger_text, size: :small, disabled: last_owner || nil,
+        data: dialog_trigger(dialog_id).merge("admin--pending-lock-target": "control")) %>
+</section>
+
+<%# After the user's form, never inside it (forms don't nest). %>
+<% unless last_owner %>
+  <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: "Delete #{name}?", body: dialog_body) do |dialog| %>
+    <% dialog.with_confirm_action do %>
+      <%= form_with url: helpers.admin_user_path(user, **url_options), method: :delete, data: { turbo_frame: "_top" } do %>
+        <%= render Admin::ButtonComponent.new(label: "Delete user", variant: :danger, type: "submit") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

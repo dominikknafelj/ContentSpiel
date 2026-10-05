@@ -111,13 +111,13 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/audit_events", params: { event_action: "test.paginate" }
     assert_response :success
-    assert_select "tbody tr", 50
+    assert_select "li[id^=audit_event_]", 50
     assert_select "a", { text: "Load older" }
     assert_select "a", { text: "Newer", count: 0 }
 
     get "/cs-studio/audit_events", params: { event_action: "test.paginate", offset: 50 }
     assert_response :success
-    assert_select "tbody tr", 1
+    assert_select "li[id^=audit_event_]", 1
     assert_select "a", { text: "Load older", count: 0 }
     assert_select "a", { text: "Newer" }
   end
@@ -175,7 +175,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
   # captured onto the row at write time (`Audit::Snapshot.label_for`), not
   # re-derived from today's model name -- so it reads back exactly as
   # recorded, same as a deleted subject's event above.
-  test "a legacy MediaAsset-typed event still shows its label, without a link, and doesn't raise" do
+  test "a legacy MediaAsset-typed event still shows its label, linked to the image for a media.upload holder, and doesn't raise" do
     sign_in_as(users(:one))
     asset = create_media_asset
     event = Audit::Event.create!(action: "media.uploaded", subject_type: "MediaAsset", subject_id: asset.id,
@@ -184,10 +184,10 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events"
 
     assert_response :success
+    # Linked now (the viewer holds `media.upload` and the image exists), as the
+    # dashboard's feed does; the stored label is what reads either way.
     assert_select "##{dom_id(event)}", text: /Media asset ##{asset.id}/
-    assert_select "##{dom_id(event)}" do
-      assert_select "a", text: /Media asset/, count: 0
-    end
+    assert_select "##{dom_id(event)} p a[href='/cs-studio/media?selected=#{asset.id}']", text: "Media asset ##{asset.id}"
 
     get "/cs-studio/audit_events/#{event.id}"
 
@@ -233,8 +233,8 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/audit_events/#{event.id}"
 
     assert_response :success
-    assert_select "dd a", text: post_record.title, count: 0
-    assert_select "dd", text: /#{Regexp.escape(post_record.title)}/
+    assert_select "h1 a", text: post_record.title, count: 0
+    assert_select "h1", text: /#{Regexp.escape(post_record.title)}/
   end
 
   test "the post editor's Activity link opens the log filtered to that post, and the page editor's own" do
@@ -261,13 +261,12 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     assert_select "a[href*='subject_type=User'][href*='subject_id=#{users(:two).id}']", text: "Activity"
   end
 
-  # Fix round 1 review: `Admin::AuditEventsHelper#audit_subject_path` asks
-  # `can?("pages.read", event.subject)` per row for a Page subject -- for
-  # a viewer whose `pages.read` grant is scoped by branch (`page_ids`),
-  # that used to cost its own closure-table query every time
-  # (`Checker#branch_ids`). `Admin::AuditEventsController#preload_page_
-  # branches` batches that into one `AccessControl.preload_branches` call
-  # per index request, so the query count for the same viewer's page
+  # Whether a Page subject links is "may this viewer read it", and for a
+  # viewer whose `pages.read` grant is scoped by branch (`page_ids`) a
+  # per-row check would cost its own closure-table query every time
+  # (`Checker#branch_ids`). `Audit::Sentence::Targets` resolves every
+  # subject on the page through one read-scoped query per kind instead,
+  # so the query count for the same viewer's page
   # doesn't grow with the number of Page-subject rows on the page --
   # asserted here by comparing two otherwise-identical requests, one with
   # 3 rows and one with 30, isolated from each other by date range so
@@ -305,7 +304,7 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
       assert_response :success
     end
 
-    assert_select "tbody tr", 30 # sanity: the last (30-row) request really rendered every row
+    assert_select "li[id^=audit_event_]", 30 # sanity: the last (30-row) request really rendered every row
     assert_equal few_count, many_count,
       "expected a constant number of queries regardless of Page-subject row count (3 rows: #{few_count}, 30 rows: #{many_count})"
   end
@@ -336,5 +335,39 @@ class Admin::AuditEventsTest < ActionDispatch::IntegrationTest
     counter = ->(*, payload) { count += 1 unless payload[:name] == "SCHEMA" }
     ActiveSupport::Notifications.subscribed(counter, "sql.active_record", &block)
     count
+  end
+
+  test "a token-made event reads <user> via <token name>, escaped, and the name outlives the token" do
+    token, = ApiToken.generate!(users(:two), name: "<b>Claude</b>")
+    Audit::Event.create!(action: "post.created", subject_label: "Via MCP", channel: "mcp", actor: token, user_id: users(:two).id,
+      actor_label: token.name, occurred_at: Time.current, last_occurred_at: Time.current)
+    token.destroy!
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_response :success
+    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via <b>Claude<\/b>/
+    assert_select "li p b", count: 0
+  end
+
+  test "a token event whose user is gone reads a deleted user via the name" do
+    Audit::Event.create!(action: "post.created", subject_label: "Orphan", channel: "mcp", actor_type: "ApiToken", actor_id: 999_999,
+      user_id: 999_998, actor_label: "Claude desktop", occurred_at: Time.current, last_occurred_at: Time.current)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_select "li p", text: /a deleted user via Claude desktop/
+  end
+
+  test "an old token event with no label reads via an API token" do
+    Audit::Event.create!(action: "post.created", subject_label: "Old", channel: "mcp", actor_type: "ApiToken", actor_id: 999_999,
+      user_id: users(:two).id, occurred_at: Time.current, last_occurred_at: Time.current)
+    sign_in_as(users(:one))
+
+    get "/cs-studio/audit_events"
+
+    assert_select "li p", text: /#{Regexp.escape(users(:two).display_name)} via an API token/
   end
 end

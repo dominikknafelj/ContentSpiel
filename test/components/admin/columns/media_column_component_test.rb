@@ -23,6 +23,25 @@ class Admin::Columns::MediaColumnComponentTest < ViewComponent::TestCase
     assert_no_selector "input[type=file]", visible: :all
   end
 
+  # Round 3 Task 9: no `media.upload` means no picker on the page, so the field
+  # offers Remove only and says why Choose is missing.
+  test "without media.upload there is no Choose, Remove stays, and the field says why" do
+    asset = Media::Asset.new(title: "Lake")
+    as(users(:reader)) { render_column(asset) }
+
+    assert_no_button "Choose image"
+    assert_no_button "Change image"
+    assert_button "Remove image"
+    assert_text "You can't choose images."
+  end
+
+  test "with media.upload the hint is not shown" do
+    as(users(:one)) { render_column(nil) }
+
+    assert_button "Choose image"
+    assert_no_text "You can't choose images."
+  end
+
   # Final fix wave (M12): a refused choice's message is announced.
   test "the error slot is a polite live region" do
     render_column(nil, errors: [ "Hero image doesn't exist" ])

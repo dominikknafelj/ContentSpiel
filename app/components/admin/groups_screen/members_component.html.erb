@@ -1,0 +1,4 @@
+<div class="admin-group-members max-w-md">
+  <%= render Admin::ChipInputComponent.new(name: "group[member_ids][]", id: "group_member_ids", label: "Members", search_url: search_url, chips: chips,
+        create: false, noun: "user", placeholder: "Add a user…", help: HELP, errors: errors, track: true) %>
+</div>

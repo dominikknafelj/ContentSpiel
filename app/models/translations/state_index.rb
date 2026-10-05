@@ -85,6 +85,29 @@ module Translations
       end
     end
 
+    # The number of records that actually hold a stored translation today
+    # (the Default-language dialog's "(N items)", decision D8): a non-empty
+    # `translation_sources` -- some field with an entry for some language, which
+    # is what the Tracker writes when a target-language value is saved and
+    # removes when it is blanked. NOT "has a non-`missing` state row": an image
+    # without alt text, or a page with nothing to translate, reads `complete`
+    # while holding nothing. A page's or post's blocks roll into it, as in the
+    # index (a page whose only translation is in a block counts once). Kept
+    # pages, posts and images only; the settings row has no trash. One query.
+    HOLDS_TRANSLATION = "jsonb_path_exists(%s, '$.*.*')".freeze
+
+    def translated_record_count
+      parts = [ Page, Post ].map do |model|
+        table = model.quoted_table_name
+        blocks = ContentBlock.where(owner_type: model.polymorphic_name).where("content_blocks.owner_id = #{table}.id")
+          .where(format(HOLDS_TRANSLATION, "content_blocks.translation_sources"))
+        model.kept.where("#{format(HOLDS_TRANSLATION, "#{table}.translation_sources")} OR EXISTS (#{blocks.select(1).to_sql})")
+      end
+      parts << Media::Asset.kept.where(format(HOLDS_TRANSLATION, "#{Media::Asset.quoted_table_name}.translation_sources"))
+      parts << SiteSetting.where(format(HOLDS_TRANSLATION, "site_settings.translation_sources"))
+      State.connection.select_value("SELECT #{parts.map { |relation| "(#{relation.select("COUNT(*)").to_sql})" }.join(" + ")}").to_i
+    end
+
     # `relation` (pages, posts or images) narrowed to the records whose state
     # in `locale` is one of `states` (Strings; `complete` includes a record
     # with no row). A join, so it composes with the caller's own

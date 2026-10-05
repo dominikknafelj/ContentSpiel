@@ -37,7 +37,9 @@ module Audit
         # A later event with no snapshot (an `access.denied`, which never
         # has one) must not wipe the one already stored.
         snapshot: attributes[:snapshot] || candidate.snapshot,
-        last_occurred_at: now
+        last_occurred_at: now,
+        # How many saves the row stands for ("N saves" in the log, D22).
+        occurrences: candidate.occurrences + 1
       )
       candidate
     end

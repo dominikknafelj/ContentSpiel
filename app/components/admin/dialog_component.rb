@@ -25,7 +25,14 @@ module Admin
     # appears (a form dialog whose submission was refused, with the message
     # inside it): `admin--dialog` opens it on connect and on every Turbo load
     # and strips the attribute, so a Turbo cache restore never reopens it.
-    def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false)
+    #
+    # `hang: true` is for a dialog whose height changes while it is open (the New
+    # page and New post dialogs: a loading line first, then the form loads into
+    # their shell): it hangs from a fixed top edge like the media picker
+    # (`.admin-media-picker`) instead of being centred, because a centred dialog
+    # moves its own header, and whatever is under the pointer, with every such
+    # change. See the comment on `.admin-dialog[data-dialog-hang]`.
+    def initialize(id:, title:, width: :confirm, destructive: false, open_on_load: false, hang: false)
       raise ArgumentError, "unknown dialog width #{width.inspect}" unless WIDTHS.key?(width)
 
       @id = id
@@ -33,10 +40,11 @@ module Admin
       @width = width
       @destructive = destructive
       @open_on_load = open_on_load
+      @hang = hang
     end
 
     private
 
-    attr_reader :id, :title, :width, :destructive, :open_on_load
+    attr_reader :id, :title, :width, :destructive, :open_on_load, :hang
   end
 end

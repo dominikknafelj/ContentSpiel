@@ -32,10 +32,11 @@ module Admin
     # Which forms refuse a stale save and which do not. The page settings
     # form, a block card and the post form refuse (`#refuse_stale_autosave`):
     # they have the `#editor-notice` area for the explanation bar and a
-    # Reload. Settings, the media detail panel and the tag rows still save on
-    # a stale base and pass `base_updated_at:` here for the after-the-fact
-    # warning; those screens have no notice area, and Settings moves to an
-    # explicit save bar in a later round. That warning is its own state
+    # Reload. The media detail panel and the tag rows still save on a stale
+    # base and pass `base_updated_at:` here for the after-the-fact warning;
+    # those screens have no notice area. Settings no longer autosaves at all
+    # (round 3, Task 5): it is one form with a save footer and refuses a stale
+    # base itself, with a 409 (`Admin::SettingsController#stale?`). That warning is its own state
     # (`:saved_over`, "SAVED · ALSO CHANGED ELSEWHERE -- RELOAD ..."), so the
     # refusal's "● CHANGED ELSEWHERE" always, everywhere, means "not saved".
     def autosave_stream(record:, result:, status_id:, error_prefix:, base_updated_at: nil, fields: {})

@@ -3,16 +3,19 @@ import { forceCenter, forceCollide, forceLink, forceManyBody, forceSimulation, f
 
 // CS Studio's mind graph (`admin/mind_graph/show`, design spec §6.1):
 // d3-force computes node positions, this controller turns them into SVG and
-// wires up dragging. The data is `PostGraph`'s `{ nodes, edges }`, read from a
+// wires up dragging and the All / Related / Tags filter. The data is
+// `PostGraph`'s `{ nodes, tags, edges }`, read from a
 // `<script type="application/json">` data island (see the view's own
-// comment for why not a data attribute). Each node carries its own `url`
-// (the post editor, built server-side through the route helper) and
-// `color` (the content type's registry colour, or `PostGraph::PALETTE`'s
-// stable pick) -- nothing here knows a path or a type.
+// comment for why not a data attribute). Each post node carries its own `url`
+// (the post editor, built server-side through the route helper), its
+// `colour_index` and its `status`; there is no colour value anywhere -- the
+// controller only picks CSS classes (`.mg-*` in content-spiel.tailwind.css),
+// which take their colours from the `--cs-*` tokens, so nothing here knows a
+// path, a type or a hue.
 const SVG_NS = "http://www.w3.org/2000/svg"
 
-// Only used if a node somehow arrives without a colour at all.
-const FALLBACK_NODE_COLOR = "var(--cs-meta)"
+// Half a tag node's side. Tag nodes are small squares.
+const TAG_HALF = 6
 
 // A pointerdown that moves less than this many total pixels before its
 // pointerup is a click, not a drag -- "click a node to open that post" and
@@ -21,7 +24,8 @@ const FALLBACK_NODE_COLOR = "var(--cs-meta)"
 const CLICK_DRAG_THRESHOLD = 5
 
 // Minimum distance between a node's centre and the SVG's edge: the circle's
-// radius (8) plus some air, so no node is ever cut off by the box.
+// radius (8) plus some air (a tag square's half side is smaller), so no node
+// is ever cut off by the box.
 const EDGE_PADDING = 16
 
 // A label longer than this is drawn cut off with an ellipsis, so even a very
@@ -31,7 +35,7 @@ const MAX_LABEL_CHARACTERS = 32
 const LABEL_OFFSET = 12
 
 export default class extends Controller {
-  static targets = ["data", "svg"]
+  static targets = ["data", "svg", "empty"]
 
   connect() {
     // Turbo snapshots the page *before* `disconnect()` below gets to clear
@@ -45,13 +49,21 @@ export default class extends Controller {
     // just starting.
     this.svgTarget.removeAttribute("data-settled")
 
-    const { nodes, edges } = JSON.parse(this.dataTarget.textContent)
-    this.nodes = nodes
+    const { nodes, tags, edges } = JSON.parse(this.dataTarget.textContent)
+    // Posts and tag nodes in one list for d3 (ids can't collide: a post's id is
+    // a number, a tag's is "tag-<id>"). `kind` tells them apart afterwards.
+    this.nodes = [
+      ...nodes.map((node) => ({ ...node, kind: "post" })),
+      ...tags.map((tag) => ({ ...tag, title: tag.name, kind: "tag" }))
+    ]
     this.edges = edges
+    // The radios may not be on "All": Back restores the page with the one that
+    // was chosen still checked, and the graph has to show what the control says.
+    this.mode = this.element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
 
     this.measure()
 
-    this.edgeElements = this.edges.map(() => this.buildEdgeElement())
+    this.edgeElements = this.edges.map((edge) => this.buildEdgeElement(edge))
     this.nodeElements = this.nodes.map((node) => this.buildNodeElement(node))
 
     this.simulation = forceSimulation(this.nodes)
@@ -68,6 +80,8 @@ export default class extends Controller {
       // `end` fires once alpha drops below alphaMin, i.e. the layout has
       // cooled down. Exposed as a DOM attribute so tests can wait on it.
       .on("end", () => this.svgTarget.setAttribute("data-settled", ""))
+
+    this.applyFilter()
 
     // The box is `w-full` of a shell column, so it changes with the window.
     // The observer also fires once on observe(); that first call finds the
@@ -107,6 +121,46 @@ export default class extends Controller {
       .force("y", forceY(height / 2).strength(0.04))
     this.clampNodes()
     this.reheat(0.3)
+  }
+
+  // The filter radios (All / Related / Tags), client-side. A node stays when
+  // the filter is All, or when it has at least one edge of the chosen kind;
+  // "All" keeps a post with no edge at all too (the message says there are no
+  // connections), the other two hide it. The simulation is handed only the
+  // visible nodes and edges, so hidden ones leave no gap and exert no force,
+  // and it is reheated so what is left spreads out again -- inside the same
+  // clamped box as ever.
+  filter(event) {
+    this.mode = event.target.value
+    this.applyFilter()
+    this.reheat(0.8)
+  }
+
+  applyFilter() {
+    const shows = (edge) => this.mode === "all" || edge.kind === this.mode
+    const connected = new Set()
+    this.edges.forEach((edge) => {
+      if (!shows(edge)) return
+      connected.add(edge.source.id ?? edge.source)
+      connected.add(edge.target.id ?? edge.target)
+    })
+
+    this.visibleEdges = this.edges.filter(shows)
+    this.visibleNodes = this.nodes.filter((node) => this.mode === "all" || connected.has(node.id))
+    const visibleIds = new Set(this.visibleNodes.map((node) => node.id))
+    // For `tick`: asked once per node per tick, so a Set, not a list search.
+    this.visibleSet = new Set(this.visibleNodes)
+
+    this.edges.forEach((edge, index) => this.edgeElements[index].classList.toggle("mg-hidden", !shows(edge)))
+    this.nodes.forEach((node, index) => this.nodeElements[index].classList.toggle("mg-hidden", !visibleIds.has(node.id)))
+    // Hidden elements have no text length; `placeLabel` measures a label again
+    // when its node comes back.
+    this.labelWidths = []
+
+    if (this.hasEmptyTarget) this.emptyTarget.classList.toggle("hidden", this.visibleEdges.length > 0)
+
+    this.simulation?.nodes(this.visibleNodes)
+    this.simulation?.force("link")?.links(this.visibleEdges)
   }
 
   reheat(alpha) {
@@ -150,7 +204,9 @@ export default class extends Controller {
 
     this.nodes.forEach((node, index) => {
       this.nodeElements[index].setAttribute("transform", `translate(${node.x}, ${node.y})`)
-      this.placeLabel(index, node)
+    })
+    this.nodes.forEach((node, index) => {
+      if (this.visibleSet.has(node)) this.placeLabel(index, node)
     })
   }
 
@@ -165,32 +221,84 @@ export default class extends Controller {
 
     const crossesRight = node.x + LABEL_OFFSET + this.labelWidths[index] > this.width
     const onLeft = crossesRight && node.x > this.width / 2
-    label.setAttribute("x", onLeft ? -LABEL_OFFSET : LABEL_OFFSET)
+    // On the left its END is at `x`: a label longer than the room to the
+    // node's left would start outside the box, so its end is pushed right
+    // until its start is inside (over the node, if it must be: readable beats
+    // tidy).
+    const leftX = Math.max(-LABEL_OFFSET, 2 - node.x + this.labelWidths[index])
+    label.setAttribute("x", onLeft ? leftX : LABEL_OFFSET)
     label.setAttribute("text-anchor", onLeft ? "end" : "start")
   }
 
-  buildEdgeElement() {
+  // Related edges are solid, a shared tag's dashed (`.mg-edge-*`): the two
+  // differ in line style, not only in colour.
+  buildEdgeElement(edge) {
     const line = document.createElementNS(SVG_NS, "line")
-    line.setAttribute("stroke", "currentColor")
-    line.setAttribute("stroke-opacity", "0.25")
+    line.setAttribute("class", `mg-edge mg-edge-${edge.kind}`)
     this.svgTarget.appendChild(line)
     return line
   }
 
+  // The `.mg-*` classes a post's mark needs (the CSS says what each draws).
+  // `colour_index` follows `Admin::ContentTypeDotComponent`: 1-6 are the six
+  // hues filled, 7-12 the same hues as a ring (`mg-ring`), 13+ cycle. No index
+  // at all (a type that isn't registered any more) is a ring in the neutral
+  // `meta` hue. A post that isn't live is `mg-hollow`: a dashed ring.
+  postClasses(node) {
+    const classes = ["mg-node"]
+    if (node.colour_index != null) {
+      const slot = (node.colour_index - 1) % 12
+      classes.push(`mg-cat-${(slot % 6) + 1}`)
+      if (slot >= 6) classes.push("mg-ring")
+    } else {
+      classes.push("mg-ring")
+    }
+    if (node.status !== "live") classes.push("mg-hollow")
+    return classes.join(" ")
+  }
+
+  circle(className, radius) {
+    const circle = document.createElementNS(SVG_NS, "circle")
+    circle.setAttribute("class", className)
+    circle.setAttribute("r", radius)
+    return circle
+  }
+
   buildNodeElement(node) {
     const group = document.createElementNS(SVG_NS, "g")
-    group.style.cursor = "pointer"
     // SVG <text> is natively selectable -- without this, a drag that starts
     // over a node's label selects the text instead of moving the node.
     group.style.userSelect = "none"
-    group.dataset.postId = node.id
 
-    const circle = document.createElementNS(SVG_NS, "circle")
-    circle.setAttribute("r", 8)
-    // `style`, not the attribute: a custom property reference is CSS, and the
-    // fallback is a token so it follows the theme.
-    circle.style.fill = node.color || FALLBACK_NODE_COLOR
-    group.appendChild(circle)
+    if (node.kind === "tag") {
+      group.setAttribute("class", "mg-tag")
+      group.dataset.tagId = node.id
+      const square = document.createElementNS(SVG_NS, "rect")
+      square.setAttribute("x", -TAG_HALF)
+      square.setAttribute("y", -TAG_HALF)
+      square.setAttribute("width", TAG_HALF * 2)
+      square.setAttribute("height", TAG_HALF * 2)
+      group.appendChild(square)
+    } else {
+      group.setAttribute("class", this.postClasses(node))
+      group.dataset.postId = node.id
+      // Reachable without a pointer: a link to the editor, in the tab order
+      // while the node is shown (a hidden node is display: none).
+      group.setAttribute("role", "link")
+      group.setAttribute("tabindex", "0")
+      group.setAttribute("aria-label", String(node.title))
+      group.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          this.open(node.url)
+        }
+      })
+      // The focus ring outside, the dot, and -- only where it is drawn, so no
+      // element sits in the SVG without a box -- the core a dashed 1-6 ring
+      // keeps its hue in.
+      group.append(this.circle("mg-focus", 12), this.circle("mg-dot", 8))
+      if (group.classList.contains("mg-hollow") && !group.classList.contains("mg-ring")) group.append(this.circle("mg-core", 3))
+    }
 
     // `textContent`, never markup -- a title is plain text whatever it
     // contains.
@@ -198,18 +306,26 @@ export default class extends Controller {
     // Counted and cut by character (code point), not by UTF-16 unit: slicing
     // the string itself can split an emoji or any other astral character in
     // two and leave half of it, a lone surrogate, at the end of the label.
+    // A tag's label carries its count: how many readable posts share it was
+    // only in the tooltip, which a touch screen and a keyboard never see. The
+    // NAME is what is cut to fit; the count is appended whole, or a long name
+    // would cut it off.
     const title = String(node.title)
+    const suffix = node.kind === "tag" ? ` (${node.count})` : ""
+    const room = MAX_LABEL_CHARACTERS - Array.from(suffix).length
     const characters = Array.from(title)
-    label.textContent = characters.length > MAX_LABEL_CHARACTERS ? `${characters.slice(0, MAX_LABEL_CHARACTERS - 1).join("")}\u2026` : characters.join("")
+    label.textContent = (characters.length > room ? `${characters.slice(0, room - 1).join("")}\u2026` : characters.join("")) + suffix
     label.setAttribute("x", 12)
     label.setAttribute("y", 4)
     label.setAttribute("font-size", "12")
-    label.setAttribute("fill", "currentColor")
+    // A post's label takes the SVG's text colour; a tag's is `meta` (CSS).
+    if (node.kind !== "tag") label.setAttribute("fill", "currentColor")
     group.appendChild(label)
 
-    // The full title as tooltip and accessible name, whatever the label shows.
+    // The full title as tooltip and accessible name, whatever the label shows;
+    // a tag's says how many readable posts carry it.
     const tooltip = document.createElementNS(SVG_NS, "title")
-    tooltip.textContent = title
+    tooltip.textContent = node.kind === "tag" ? `${title} (${node.count} posts)` : title
     group.appendChild(tooltip)
 
     this.svgTarget.appendChild(group)
@@ -245,7 +361,7 @@ export default class extends Controller {
         group.removeEventListener("pointerup", onUp)
         this.simulation.alphaTarget(0)
 
-        if (totalMovement < CLICK_DRAG_THRESHOLD) this.open(node.url)
+        if (node.kind === "post" && totalMovement < CLICK_DRAG_THRESHOLD) this.open(node.url)
       }
 
       group.addEventListener("pointermove", onMove)
