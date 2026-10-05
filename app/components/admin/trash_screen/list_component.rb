@@ -179,8 +179,7 @@ module Admin
           else
             events = items.group_by { |item| item.class.name }
               .map { |type, list| Audit::Event.where(subject_type: type, subject_id: list.map(&:id), action: TRASHED_ACTIONS.fetch(type)) }.reduce(:or)
-            events.includes(:user).select("DISTINCT ON (audit_events.subject_type, audit_events.subject_id) audit_events.*")
-              .order(Arel.sql("audit_events.subject_type, audit_events.subject_id, audit_events.occurred_at DESC, audit_events.id DESC"))
+            events.includes(:user).newest_per_subject
               .index_by { |event| [ event.subject_type, event.subject_id ] }
           end
       end
