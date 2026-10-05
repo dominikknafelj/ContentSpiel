@@ -320,7 +320,7 @@ module Admin
     def filter_by_scope(scope, name)
       case name
       when "live" then scope.published
-      when "scheduled" then scope.where("posts.published_at > ?", Time.current)
+      when "scheduled" then scope.scheduled
       when "drafts" then scope.where(published_at: nil)
       else scope
       end

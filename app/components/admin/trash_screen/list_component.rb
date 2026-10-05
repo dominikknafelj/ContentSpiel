@@ -196,7 +196,10 @@ module Admin
       # every descendant, branch member or trashed separately, the same set
       # `Trash::Purge` destroys -- off the closure table in one query.
       def descendant_counts
-        @descendant_counts ||= Page.hierarchy_class.where(ancestor_id: pages.map(&:id)).where("generations > 0").group(:ancestor_id).count
+        @descendant_counts ||= begin
+          hierarchies = Page.hierarchy_class
+          hierarchies.where(ancestor_id: pages.map(&:id)).where(hierarchies.arel_table[:generations].gt(0)).group(:ancestor_id).count
+        end
       end
 
       # For each listed image something still uses: how many ITEMS use it (a

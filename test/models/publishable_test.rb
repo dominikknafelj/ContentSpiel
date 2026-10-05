@@ -25,4 +25,35 @@ class PublishableTest < ActiveSupport::TestCase
     assert_not_includes block.listed_posts, scheduled
     assert_includes block.listed_posts(include_unpublished: true), scheduled
   end
+
+
+  # `scheduled` is strictly later than now: with `published` it splits the
+  # records that have a time, and a draft (NULL) is in neither.
+  test "scheduled holds exactly the records with a future time" do
+    freeze_time do
+      draft = Post.create!(content_type: :blog, title: "Draft")
+      future = Post.create!(content_type: :blog, title: "Soon", published_at: 1.second.from_now)
+      now = Post.create!(content_type: :blog, title: "Now", published_at: Time.current)
+      past = Post.create!(content_type: :blog, title: "Live", published_at: 1.day.ago)
+
+      assert_equal [ future ], Post.scheduled.to_a
+      assert_equal [ now, past ].sort_by(&:id), Post.published.order(:id).to_a
+      assert_not_includes Post.scheduled.or(Post.published), draft
+      assert_equal "scheduled", future.status
+      assert_equal "live", now.status
+    end
+  end
+
+  test "scheduled compares in UTC whatever the zone, and composes with a narrowed relation" do
+    soon = Post.create!(content_type: :blog, title: "Soon", published_at: 30.minutes.from_now)
+    Post.create!(content_type: :blog, title: "Just live", published_at: 30.minutes.ago)
+
+    # In a zone hours away from UTC a comparison made on local wall-clock time
+    # would move either post across the line.
+    %w[Pacific/Auckland America/Los_Angeles].each do |zone|
+      Time.use_zone(zone) { assert_equal [ soon ], Post.kept.scheduled.to_a, zone }
+    end
+    assert_empty Post.where.not(id: soon.id).scheduled
+    assert_match(/"posts"\."published_at" > '/, Post.scheduled.to_sql)
+  end
 end
