@@ -204,6 +204,23 @@ module Translations
       "COALESCE(GREATEST(#{parts.join(", ")}), #{table}.updated_at)"
     end
 
+    # `relation` (one model's, already read-scoped) as the translations matrix
+    # lists it: only the records that are missing or outdated in any of
+    # `locales`, those with an outdated language first (they are already
+    # visible on the site), then the most recently changed original
+    # (`original_changed_at_sql`), then the newest id. Each row carries the two
+    # sort keys as `has_outdated` and `original_changed_at`, so a caller that
+    # merges several models' lists can sort the merged rows the same way.
+    # Replaces the relation's own order; the caller limits.
+    def work_list(relation, locales:)
+      model = relation.klass
+      outdated = Arel.sql(exists_in_any_locale_sql(model, states: %w[outdated], locales:))
+      changed = Arel.sql(original_changed_at_sql(model))
+      relation.where(exists_in_any_locale_sql(model, states: %w[missing outdated], locales:))
+        .reorder(outdated.desc, changed.desc, model.arel_table[:id].desc)
+        .select(model.arel_table[Arel.star], outdated.as("has_outdated"), changed.as("original_changed_at"))
+    end
+
     def stamps_max_sql(column, from: "", where: "")
       "(SELECT max(CASE WHEN stamp.value ~ '#{ISO_TIMESTAMP}' THEN stamp.value::timestamptz END) " \
       "FROM #{from}jsonb_each_text(CASE WHEN jsonb_typeof(#{column}) = 'object' THEN #{column} ELSE '{}'::jsonb END) stamp #{where})"
