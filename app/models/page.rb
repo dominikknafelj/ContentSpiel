@@ -77,6 +77,7 @@ class Page < ApplicationRecord
   # (translation helpers spec §3.2). Never `slug`: it's generated per
   # language, not translated from the original's.
   include Translations::Tracker
+  include TitleSearch
   tracks_translations
 
   # A page's body is an ordered list of blocks; the renderer walks them in

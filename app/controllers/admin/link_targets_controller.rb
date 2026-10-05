@@ -64,15 +64,15 @@ module Admin
       Locales.enabled?(params[:locale]) ? params[:locale].to_s : admin_locale
     end
 
-    # `title ->> locale` read as raw SQL, not Mobility's own `.i18n` scope
-    # or a plain `where(title: ...)` -- `Page#title`/`Post#title` are jsonb
-    # columns (`{ locale => title }`), so comparing one to a bare String
-    # with `where` would compare jsonb to text and never match a row (the
-    # exact bug CLAUDE.md's own Mobility note warns about); this is the
-    # same `->> ? ILIKE ?` shape `Admin::PostsController#filter_by_title`
-    # already uses for its own title search, applied here to both models.
-    # `sanitize_sql_like` is what keeps a literal `%`/`_` in the query from
-    # being read as a SQL wildcard instead of a character to match.
+    # The title in ONE language, through `TitleSearch#title_matching` (the
+    # scope `Admin::PostsController#filter_by_title` uses too), not Mobility's
+    # own `.i18n` scope or a plain `where(title: ...)` -- `Page#title`/
+    # `Post#title` are jsonb columns (`{ locale => title }`), so comparing one
+    # to a bare String with `where` would compare jsonb to text and never
+    # match a row (the exact bug CLAUDE.md's own Mobility note warns about).
+    # The scope escapes the text itself, which is what keeps a literal
+    # `%`/`_` in the query from being read as a SQL wildcard instead of a
+    # character to match.
     #
     # Returns `[type, record]` pairs, not JSON -- `#index` above caps the
     # *combined* set at `LIMIT` before `target_json` ever runs on any of
@@ -80,13 +80,13 @@ module Admin
     # lookup and an ordering, nothing translated or path-resolved yet.
     def page_candidates
       scope = admin_scope(Page.all)
-      scope = scope.where("pages.title ->> ? ILIKE ?", locale, "%#{Page.sanitize_sql_like(query)}%") if query.present?
+      scope = scope.title_matching(query, locale:) if query.present?
       scope.order(:id).limit(LIMIT).map { |page| [ "page", page ] }
     end
 
     def post_candidates
       scope = admin_scope(Post.all)
-      scope = scope.where("posts.title ->> ? ILIKE ?", locale, "%#{Post.sanitize_sql_like(query)}%") if query.present?
+      scope = scope.title_matching(query, locale:) if query.present?
       scope.order(:id).limit(LIMIT).map { |post| [ "post", post ] }
     end
 

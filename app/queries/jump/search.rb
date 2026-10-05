@@ -9,9 +9,9 @@ module Jump
   # the same for images, which have no read scope of their own), so a title
   # the viewer couldn't open is never suggested.
   #
-  # The query is user text inside a LIKE pattern: `sanitize_sql_like`
-  # escapes `%`, `_` and `\`, so "%" searches for a percent sign rather than
-  # matching everything. It is cut to MAX_QUERY characters first, so a
+  # The query is user text inside a LIKE pattern: the title scope
+  # (`TitleSearch`) escapes `%`, `_` and `\` with `sanitize_sql_like`, so "%"
+  # searches for a percent sign rather than matching everything. It is cut to MAX_QUERY characters first, so a
   # pasted novel is a short search, not an error.
   #
   # A row says where it goes as a ROUTE -- `[route name, arguments, params]`,
@@ -69,17 +69,13 @@ module Jump
 
     def group(label, rows) = rows.empty? ? nil : { label: label, rows: rows.first(LIMIT) }
     def blank? = query.empty?
-    def pattern = "%#{ActiveRecord::Base.sanitize_sql_like(query)}%"
     def matches?(text) = text.to_s.downcase.include?(query.downcase)
 
-    # `title` is a jsonb of { locale => text }. `jsonb_each_text` unnests it
-    # so ILIKE tests only the VALUES: `title::text ILIKE` would also match a
-    # locale key ("de", "en") or JSON punctuation, filling the LIMIT with
-    # non-matches, and would miss a title containing `"` or `\` (jsonb's
-    # text form escapes both).
+    # Titles in EVERY language, values only (`TitleSearch
+    # #title_matching_any_locale` says why not `title::text ILIKE`: it would
+    # fill the LIMIT with matches on locale keys and JSON punctuation).
     def titled(relation)
-      relation.where("EXISTS (SELECT 1 FROM jsonb_each_text(#{relation.table_name}.title) AS t(locale, value) WHERE t.value ILIKE ?)", pattern)
-        .order(updated_at: :desc).limit(LIMIT).to_a
+      relation.title_matching_any_locale(query).order(updated_at: :desc).limit(LIMIT).to_a
     end
 
     def page_rows
