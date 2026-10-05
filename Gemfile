@@ -56,7 +56,7 @@ gem "thruster", require: false
 #
 # image_processing 2.x no longer bundles a backend gem -- Rails' default
 # variant processor is vips, so that backend has to be declared explicitly.
-gem "image_processing", "~> 2.1"
+gem "image_processing", "~> 2.2"
 gem "ruby-vips", "~> 2.2"
 
 group :development, :test do
