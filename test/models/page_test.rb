@@ -530,4 +530,58 @@ class PageTest < ActiveSupport::TestCase
     assert_equal({ "en" => "/about", "de" => "/about", "es" => "/about" },
       PublicPath.current.where(record: page).pluck(:locale, :path).to_h)
   end
+
+  # A URL is built from the slug, the parent, the position, publication and
+  # the trash state (`Page.url_inputs`); a save that changes none of them
+  # cannot have changed a URL, so it reads and writes nothing of them.
+  test "saving the homepage with only its title changed touches neither public_paths nor the hierarchy" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    blog = Page.create!(parent: root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    root = Page.find(root.id)
+
+    sql = capture_sql { Mobility.with_locale(:en) { root.update!(title: "Welcome", subtitle: "Hello there") } }
+
+    assert_empty sql.grep(/public_paths|page_hierarchies/i), "a title-only save went to the URL tables:\n#{sql.join("\n")}"
+  end
+
+  test "a save that changes a URL input still syncs, and one right after that changes none does not" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    about = Page.create!(parent: root, title: "About", published_at: 1.day.ago)
+
+    Mobility.with_locale(:en) { about.update!(slug: "company") }
+    assert_equal "/company", about.full_path("en")
+
+    sql = capture_sql { Mobility.with_locale(:en) { about.update!(title: "Company") } }
+    assert_empty sql.grep(/public_paths/i), "the object still believed its slug had changed"
+  end
+
+  test "url_inputs names what a page's URLs are built from" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    about = Page.create!(parent: root, title: "About", published_at: 1.day.ago)
+
+    assert_equal %w[slug parent_id position published_at trashed_at], about.url_inputs.keys
+    assert about.url_inputs.frozen?
+    assert_not about.url_inputs_changed?
+
+    about.title = "About us"
+    assert_not about.url_inputs_changed?, "a title is no URL input"
+    Mobility.with_locale(:de) { about.slug = "ueber" }
+    assert about.url_inputs_changed?, "a slug in any one language is"
+    assert Page.new.url_inputs_changed?, "a new record has no URLs yet"
+  end
+
+  test "a clash is still refused when a slug changes, and not looked for when it doesn't" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    Page.create!(parent: root, title: "About", published_at: 1.day.ago)
+    other = Page.create!(parent: root, title: "Other", published_at: 1.day.ago)
+
+    sql = capture_sql { other.title = "Another"; assert other.valid? }
+    assert_empty sql.grep(/public_paths/i)
+
+    Mobility.with_locale(:en) { other.slug = "about" }
+    assert_not other.valid?
+    assert other.errors[:slug_en].any?
+  end
 end

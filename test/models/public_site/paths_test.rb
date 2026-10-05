@@ -242,6 +242,25 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     assert_equal "/blog/team", current(post)
   end
 
+  # An address one record of a sync is leaving is free for another record of
+  # the same sync: who holds what is judged on where the rows end up, not on
+  # the order the records happen to be taken in.
+  test "two posts that trade addresses in one sync both get theirs" do
+    blogs = listing(@root, "First", "blog")
+    updates = listing(@root, "Second", "now_update")
+    post = Post.create!(content_type: :blog, title: "Same", published_at: 1.day.ago)
+    update = Post.create!(content_type: :now_update, title: "Same", published_at: 1.day.ago)
+    assert_equal [ "/first/same", "/second/same" ], [ current(post), current(update) ]
+
+    # Around the callbacks, so that one sync sees both changes at once.
+    blogs.content_blocks.first.update_columns(settings: { "content_type" => "now_update" })
+    updates.content_blocks.first.update_columns(settings: { "content_type" => "blog" })
+    PublicSite::Paths.sync_posts(nil)
+
+    assert_equal [ "/second/same", "/first/same" ], [ current(post), current(update) ]
+    assert_empty PublicPath.redirects.where(locale: "en", path: %w[/first/same /second/same]), "a redirect can't sit on a live address"
+  end
+
   test "a clash is logged with the record, locale and path" do
     block = add_listing_block(@root, "blog")
     blog = listing(@root, "Blog", "blog")
@@ -383,5 +402,297 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     other = Post.new(content_type: "now_update")
 
     assert_equal({ listed => blog, other => nil }, PublicSite::Paths.canonical_pages([ listed, other ]))
+  end
+
+  # -- parity with a full rebuild ----------------------------------------------
+  #
+  # `Page` and `Post` sync their URLs only when one of the values a URL is
+  # built from changed (`HasPublicPaths#url_inputs`). The risk of a condition
+  # is the input it forgot: the write then leaves `public_paths` saying
+  # something the records no longer do, and nothing notices until a visitor
+  # gets a 404. So after every write below the live rows must equal what
+  # `PublicSite::Paths.rebuild!` -- which derives every URL from scratch and
+  # asks no condition -- would write. One step per input and per write path
+  # that feeds a URL; a new one belongs in this list.
+  #
+  # Current rows only: a redirect is history (the address a record used to
+  # have), which a rebuild from the records alone cannot know and deletes.
+  def live_rows
+    PublicPath.current.order(:record_type, :record_id, :locale, :path).pluck(:record_type, :record_id, :locale, :path)
+  end
+
+  def assert_parity(step)
+    stored = live_rows
+    rebuilt = nil
+    PublicPath.transaction(requires_new: true) do
+      PublicSite::Paths.rebuild!
+      rebuilt = live_rows
+      raise ActiveRecord::Rollback
+    end
+
+    assert_equal rebuilt, stored, "after #{step}: public_paths is not what a full rebuild writes"
+    assert_empty PublicPath.current.group(:locale, :path).having("COUNT(*) > 1").count, "after #{step}: two live rows share an address"
+    assert_empty PublicPath.current.group(:record_type, :record_id, :locale).having("COUNT(*) > 1").count,
+      "after #{step}: a record has two live addresses in one language"
+  end
+
+  def ok!(result)
+    assert result.ok?, result.errors.to_sentence
+    result.record
+  end
+
+  def service_page(title, parent: @root, published: true)
+    ok! Pages::Save.call(attributes: { parent: parent, published: published }, translations: { "en" => { title: title } })
+  end
+
+  def service_listing(page, **settings)
+    ok! ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "post_list", settings: settings.compact })
+  end
+
+  def service_post(title, content_type: "blog", tags: [])
+    ok! Posts::Save.call(attributes: { content_type: content_type, published: true, tag_names: tags }, translations: { "en" => { title: title } })
+  end
+
+  test "every write path leaves public_paths equal to a full rebuild" do
+    with_locales(%w[en de es], default: "en")
+
+    as_owner do
+      # Fifteen pages besides the homepage, four levels deep.
+      about = service_page("About")
+      team = service_page("Team", parent: about)
+      alice = service_page("Alice", parent: team)
+      service_page("Bob", parent: team)
+      history = service_page("History", parent: about)
+      section = service_page("Section")
+      sub = service_page("Sub", parent: section)
+      service_page("Leaf", parent: sub)
+      service_page("Other leaf", parent: sub)
+      writing = service_page("Writing")
+      blog = service_page("Blog", parent: writing)
+      journal = service_page("Journal")
+      archive = service_page("Archive")
+      news = service_page("News")
+      drafts = service_page("Drafts", published: false)
+      assert_parity "building the tree"
+
+      teaser = service_listing(@root)
+      service_listing(blog, content_type: "blog")
+      service_listing(journal, content_type: "blog")
+      archive_block = service_listing(archive, content_type: "blog", tag: "old")
+      news_block = service_listing(news, content_type: "now_update")
+      service_listing(drafts, content_type: "resume_entry")
+      assert_parity "adding listing blocks"
+
+      hello = service_post("Hello")
+      second = service_post("Second")
+      old = service_post("Old", tags: %w[old])
+      update = service_post("Now", content_type: "now_update")
+      job = service_post("Job", content_type: "resume_entry")
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_equal "/archive/old", current(old)
+      assert_equal "/news/now", current(update)
+      assert_equal "/job", current(job), "the live homepage teaser beats a typed listing on a draft page"
+      assert_parity "creating posts"
+
+      # -- a page's own inputs -------------------------------------------------
+      ok! Pages::Save.call(about, translations: { "de" => { slug: "ueber-uns" } })
+      assert_equal "/ueber-uns/team/alice", current(alice, "de")
+      assert_equal "/about/team/alice", current(alice, "en")
+      assert PublicPath.redirects.exists?(record: alice, locale: "de", path: "/about/team/alice"), "the old address became a redirect"
+      assert_parity "renaming a slug in one language"
+
+      ok! Pages::Save.call(about.reload, translations: { "en" => { title: "About us", subtitle: "Who we are" } })
+      about.reload.touch
+      assert_parity "a title-only save and a bare touch"
+
+      ok! Pages::Move.call(section.reload, parent: about.reload, position: 0)
+      assert_equal "/about/section/sub", current(sub)
+      assert_parity "moving a branch under another parent"
+
+      # First under Team, first under History: the parent is all that changes.
+      assert_equal 0, alice.reload.position
+      ok! Pages::Move.call(alice, parent: history.reload, position: 0)
+      assert_equal "/about/history/alice", current(alice)
+      assert_parity "moving a page to the same rank under another parent"
+      ok! Pages::Move.call(alice.reload, parent: team.reload, position: 0)
+      assert_parity "moving it back"
+
+      ok! Pages::Move.call(journal.reload, parent: @root.reload, position: 0)
+      assert_equal "/journal/hello", current(hello), "the earlier of two equal listings is canonical"
+      assert_parity "reordering siblings"
+
+      ok! Pages::Move.call(journal.reload, parent: @root.reload, position: 99)
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_parity "reordering siblings back"
+
+      ok! Pages::Save.call(writing.reload, attributes: { published: false })
+      assert_equal "/journal/hello", current(hello), "a listing under a draft parent loses to a live one"
+      assert_parity "unpublishing a parent"
+
+      ok! Pages::Save.call(writing.reload, attributes: { published: true })
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_parity "republishing a parent"
+
+      ok! Pages::Save.call(drafts.reload, attributes: { published: true })
+      assert_equal "/drafts/job", current(job), "once live, the typed listing is the more specific one"
+      assert_parity "publishing a draft listing page"
+
+      # -- trash ---------------------------------------------------------------
+      ok! Trash::Move.call(about.reload)
+      assert_nil current(alice)
+      assert_not PublicPath.exists?(record: alice), "a trashed branch member keeps no redirect either"
+      assert_parity "trashing a branch"
+
+      ok! Trash::Restore.call(about.reload)
+      assert_equal "/about/team/alice", current(alice)
+      assert_parity "restoring a branch"
+
+      ok! Trash::Move.call(writing.reload)
+      assert_equal "/journal/hello", current(hello), "a trashed listing page gives its posts to the next one"
+      assert_parity "trashing a listing page's parent"
+
+      ok! Trash::Restore.call(writing.reload)
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_parity "restoring a listing page's parent"
+
+      ok! Trash::Move.call(team.reload)
+      ok! Trash::Move.call(about.reload)
+      ok! Trash::Restore.call(team.reload, parent: news.reload)
+      assert_equal "/news/team/alice", current(alice)
+      assert_parity "restoring a page under a new parent"
+      ok! Trash::Restore.call(about.reload)
+      assert_parity "restoring the rest of the branch"
+
+      ok! Trash::Move.call(hello.reload)
+      assert_nil current(hello)
+      assert_parity "trashing a post"
+
+      ok! Trash::Restore.call(hello.reload)
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_parity "restoring a post"
+
+      # -- a post's own inputs -------------------------------------------------
+      ok! Posts::Save.call(second.reload, translations: { "es" => { slug: "segundo" } })
+      assert_equal "/writing/blog/segundo", current(second, "es")
+      assert_parity "renaming a post's slug in one language"
+
+      ok! Posts::Save.call(second.reload, translations: { "en" => { excerpt: "An excerpt" } })
+      second.reload.touch
+      assert_parity "an excerpt-only post save and a bare touch"
+
+      ok! Posts::Save.call(second.reload, attributes: { tag_names: %w[old] })
+      assert_equal "/archive/second", current(second), "a tag-filtered listing is more specific"
+      assert_parity "adding a tag that changes a post's listing page"
+
+      ok! Posts::Save.call(second.reload, attributes: { tag_names: [] })
+      assert_equal "/writing/blog/second", current(second)
+      assert_parity "removing that tag"
+
+      ok! Posts::Save.call(second.reload, attributes: { content_type: "now_update" })
+      assert_equal "/news/second", current(second)
+      assert_parity "changing a post's content type"
+
+      ok! Posts::Save.call(second.reload, attributes: { published: false })
+      assert_parity "unpublishing a post"
+
+      # -- listing blocks ------------------------------------------------------
+      ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "blog" } })
+      assert_equal "/second", current(second), "only the homepage teaser lists it"
+      assert_parity "changing a listing block's content type"
+
+      ok! ContentBlocks::Save.call(news_block.reload, attributes: { settings: { content_type: "now_update" } })
+      assert_parity "changing it back"
+
+      ok! ContentBlocks::Destroy.call(teaser.reload)
+      assert_parity "removing a listing block"
+
+      body = ok! ContentBlocks::Save.call(ContentBlock.new(owner: news.reload), attributes: { block_type: "rich_text" },
+        translations: { "en" => { body: rich_doc("Text") } })
+      ok! ContentBlocks::Save.call(body, translations: { "en" => { body: rich_doc("Changed") } })
+      assert_parity "writing a text block"
+
+      # -- tags ----------------------------------------------------------------
+      ok! Tags::Rename.call(Tag.find_by!(name: "old"), name: "vintage")
+      assert_equal "/writing/blog/old", current(old), "the block still names the old tag, so the post falls out of it"
+      assert_parity "renaming a tag"
+
+      ok! ContentBlocks::Save.call(archive_block.reload, attributes: { settings: { content_type: "blog", tag: "vintage" } })
+      assert_equal "/archive/old", current(old)
+      assert_parity "changing a listing block's tag"
+
+      ok! Posts::Save.call(hello.reload, attributes: { tag_names: %w[classic] })
+      ok! Tags::Merge.call(Tag.find_by!(name: "classic"), into: Tag.find_by!(name: "vintage"))
+      assert_equal "/archive/hello", current(hello)
+      assert_parity "merging a tag into a listed one"
+
+      ok! Tags::Destroy.call(Tag.find_by!(name: "vintage"))
+      assert_equal "/writing/blog/hello", current(hello)
+      assert_parity "deleting a tag"
+
+      # -- languages -----------------------------------------------------------
+      ok! Locales::Disable.call("es")
+      assert_parity "turning a language off"
+
+      ok! Locales::Enable.call("es")
+      assert_equal "/about", current(about, "es")
+      assert_parity "turning a language on"
+
+      ok! Locales::MakeDefault.call("de")
+      assert_parity "changing the default language"
+
+      ok! Locales::Configure.call([ { "code" => "es" }, { "code" => "de" }, { "code" => "en", "fallbacks" => [ "de" ] } ])
+      assert_parity "reordering languages and changing a fallback"
+
+      # -- for good ------------------------------------------------------------
+      ok! Trash::Move.call(blog.reload)
+      ok! Trash::Purge.call(blog.reload)
+      assert_equal "/journal/hello", current(hello)
+      assert_parity "deleting a listing page for good"
+
+      ok! Trash::Move.call(hello.reload)
+      ok! Trash::Purge.call(hello.reload)
+      assert_parity "deleting a post for good"
+    end
+  end
+
+  # -- cost ---------------------------------------------------------------------
+  #
+  # Two sizes rather than a ceiling: a per-page cost hides comfortably under
+  # any number generous enough for the small tree.
+  def branch_with(descendants)
+    top = Page.create!(parent: @root, title: "Branch #{descendants}", published_at: 1.day.ago)
+    parent = top
+    descendants.times do |index|
+      parent = top if (index % 5).zero?
+      parent = Page.create!(parent: parent, title: "Page #{descendants} #{index}", published_at: 1.day.ago)
+    end
+    top
+  end
+
+  test "a slug change costs the same number of statements with 20 descendants as with 200" do
+    small = branch_with(20)
+    large = branch_with(200)
+
+    few = capture_sql { Mobility.with_locale(:en) { small.update!(slug: "small-moved") } }
+    many = capture_sql { Mobility.with_locale(:en) { large.update!(slug: "large-moved") } }
+
+    assert_equal few.size, many.size, "the statements grew with the subtree:\n#{many.first(40).map { |sql| sql.first(160) }.join("\n")}"
+    deepest = Page.where(parent_id: large.id).order(:id).first.descendants.order(:id).last
+    assert_equal "/large-moved", current(large)
+    assert current(deepest).start_with?("/large-moved/"), "every descendant moved with it"
+    assert_equal 201, PublicPath.redirects.where(locale: "en").where("path LIKE '/branch-200%'").count, "and left a redirect behind"
+  end
+
+  test "syncing every post costs the same number of statements for 5 posts as for 50" do
+    listing(@root, "Blog", "blog")
+    5.times { |index| Post.create!(content_type: :blog, title: "Post #{index}", published_at: 1.day.ago) }
+    PublicPath.where(record_type: "Post").delete_all
+    few = capture_sql { PublicSite::Paths.sync_posts("blog") }
+    45.times { |index| Post.create!(content_type: :blog, title: "More #{index}", published_at: 1.day.ago) }
+    PublicPath.where(record_type: "Post").delete_all
+    many = capture_sql { PublicSite::Paths.sync_posts("blog") }
+
+    assert_equal 50 * Locales.enabled.size, PublicPath.current.where(record_type: "Post").count
+    assert_equal few.size, many.size, "the statements grew with the posts:\n#{many.map { |sql| sql.first(160) }.join("\n")}"
   end
 end

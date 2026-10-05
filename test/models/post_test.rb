@@ -515,4 +515,56 @@ class PostTest < ActiveSupport::TestCase
     post.assign_fields({ start_date: "2024-01-31" }, locale: "en")
     assert post.valid?, post.errors.full_messages.to_sentence
   end
+
+  # A post's URL is its listing page's path plus its slug; which page that is
+  # depends on its content type and tags, and whether it has one at all on
+  # its trash state (`Post.url_inputs`). An excerpt is none of those.
+  test "a save that changes only the excerpt issues no statement on public_paths" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    blog = Page.create!(parent: root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.find(Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago).id)
+
+    sql = capture_sql { Mobility.with_locale(:en) { post.update!(excerpt: "A greeting") } }
+
+    assert_empty sql.grep(/public_paths/i), "an excerpt-only save went to the URL table:\n#{sql.join("\n")}"
+    assert_equal "/blog/hello", post.full_path("en")
+  end
+
+  test "url_inputs names what a post's URLs are built from, and a slug change still moves the post" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    blog = Page.create!(parent: root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+
+    assert_equal %w[slug content_type published_at trashed_at tag_ids], post.url_inputs.keys
+    assert_not post.url_inputs_changed?
+    post.tags << Tag.create!(name: "ruby")
+    assert post.url_inputs_changed?, "a tag coming or going is an input no column records"
+    post.save!
+    assert_not post.url_inputs_changed?
+
+    Mobility.with_locale(:en) { post.update!(slug: "hi") }
+    assert_equal "/blog/hi", post.full_path("en")
+    assert PublicPath.redirects.exists?(record: post, locale: "en", path: "/blog/hello")
+  end
+
+  # `post.tags = [...]` removes a join row with a plain DELETE, which runs no
+  # `PostTag` callback: only the post's own save can move it back.
+  test "a tag dropped through the association moves the post at its next save" do
+    root = Page.create!(title: "Home", slug: "", published_at: 1.day.ago)
+    blog = Page.create!(parent: root, title: "Blog", published_at: 1.day.ago)
+    blog.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog" })
+    rails = Page.create!(parent: root, title: "Rails", published_at: 1.day.ago)
+    rails.content_blocks.create!(block_type: :post_list, position: 0, settings: { "content_type" => "blog", "tag" => "rails" })
+    post = Post.create!(content_type: :blog, title: "Hello", published_at: 1.day.ago)
+    post.tags << Tag.create!(name: "rails")
+    assert_equal "/rails/hello", post.full_path("en")
+
+    post = Post.find(post.id)
+    post.tags = []
+    post.save!
+
+    assert_equal "/blog/hello", post.full_path("en")
+  end
 end

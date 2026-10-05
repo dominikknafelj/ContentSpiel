@@ -1,19 +1,105 @@
 # Keeps a record's rows in public_paths in step with its slugs (spec §5.4),
 # and refuses a slug whose resulting path another record already holds --
 # as a form error, before the unique index would reject it as an exception.
+#
+# Both only when a URL can have changed. The including model names the
+# columns its URLs are built from (`url_inputs_are`), and its `after_save`
+# sync asks `url_inputs_changed_by_save?` first: a save that changed none of
+# them -- a title, a body, a hero image, most autosaves -- reads and writes
+# nothing in `public_paths`. A bare `touch` runs no save callbacks at all, so
+# a block write touching its page, or a tag service touching its posts,
+# never gets here.
+#
+# What a record's URLs depend on that is NOT one of its own columns is
+# synced by whoever writes it, never by this condition, and each of them
+# calls `PublicSite::Paths` itself:
+# - a tag's *name*, which is what a listing block's `tag` setting matches,
+#   and join rows written around the association: `Tags::Rename`,
+#   `Tags::Merge` and `Tags::Destroy` (a post's own tags coming and going
+#   are an input of the post's save, see `Post`, and a join row added is
+#   also `PostTag`'s own `after_commit`);
+# - the listing blocks that give posts their page (`block_type`, `settings`'
+#   `content_type` and `tag`, the owning page): `ContentBlock#
+#   sync_listed_post_paths`, on every save and destroy of a listing block;
+# - an ancestor's slug, parent or trash state, and for posts the position
+#   and publication of every page on a listing page's chain: that page's own
+#   save, which syncs its whole subtree and the posts its blocks list
+#   (`Page#sync_public_paths`);
+# - descendants flagged around the callbacks (`Trash::Move` and
+#   `Trash::Restore` write a branch's members with `update_all`): the
+#   branch root's own save, last, whose `trashed_at` is an input;
+# - siblings renumbered by `Page::TreeRanking#place_among_siblings`
+#   (`update_columns`): the moved page's save, whose requested `position` is
+#   an input, resyncs the posts its subtree lists; the relative order of
+#   every other page is unchanged;
+# - the enabled languages: `Locales::Enable` syncs everything, `Locales::
+#   Disable` deletes the language's rows (the default language is no input:
+#   it decides how a link is written, not which rows exist);
+# - time: a scheduled page going live writes nothing (see `PublicSite::
+#   Paths.canonical_page`).
+# `test/models/public_site/paths_test.rb` ("every write path leaves
+# public_paths equal to a full rebuild") runs one step per entry of both
+# lists and compares the table with `PublicSite::Paths.rebuild!` after each;
+# a new input, or a new write path around the callbacks, belongs in it.
 module HasPublicPaths
   extend ActiveSupport::Concern
 
   included do
     has_many :public_paths, as: :record, dependent: :delete_all
     validate :public_paths_are_available
+
+    # The columns this model's URLs are built from, set by `url_inputs_are`.
+    class_attribute :url_input_names, instance_writer: false, default: [].freeze
+
+    # `before_save`, not `after_save`: by the time a `Page`'s own
+    # `after_save` runs, closure_tree's has reloaded the record and
+    # cleared its dirty flags, and `Page::TreeRanking#place_among_siblings`
+    # has written the dense `position` over the one that was asked for. So
+    # the question is asked while the changes are still pending and the
+    # answer kept for `url_inputs_changed_by_save?` (the same reason
+    # `TreeRanking#remember_requested_position` is a `before_save`).
+    before_save :remember_url_inputs_change
+  end
+
+  class_methods do
+    def url_inputs_are(*names)
+      self.url_input_names = names.map(&:to_s).freeze
+    end
   end
 
   def full_path(locale)
     PublicSite::Paths.current_path(self, locale)
   end
 
+  # The values this record's URLs are built from, as they stand in memory:
+  # `{ column => value }`, a translated column as its whole `{ locale =>
+  # value }` hash, since a slug is an input in every language at once.
+  def url_inputs
+    url_input_names.index_with { |name| read_attribute(name).then { |value| value.is_a?(Hash) ? value.dup.freeze : value } }.freeze
+  end
+
+  # Whether saving this record now would change one of them -- always, for a
+  # new record, which has no URLs yet. Asked of Active Record's own pending
+  # changes, so it is only meaningful *before* the row is written (a
+  # validation, a `before_save`); a jsonb column changed in place counts, and
+  # so does a column forced dirty with `_will_change!` (`Trash::Restore#
+  # keep_rank` asks for the same `position` again that way).
+  def url_inputs_changed?
+    new_record? || url_input_names.any? { |name| will_save_change_to_attribute?(name) }
+  end
+
   private
+
+  def remember_url_inputs_change
+    @url_inputs_changed_by_save = url_inputs_changed?
+  end
+
+  # For the including model's `after_save`: whether the save that just ran
+  # changed a URL input. True when nothing was remembered (a callback chain
+  # that skipped the `before_save`), so the doubt is a sync, never a skip.
+  def url_inputs_changed_by_save?
+    @url_inputs_changed_by_save != false
+  end
 
   # A path already held by *another* record's current row is a validation
   # error (spec §5.2), reported against the slug that produces it -- the same
@@ -27,12 +113,20 @@ module HasPublicPaths
   # returns nil rather than a borrowed path for that case, and `taken` below
   # additionally catches two *different*, non-blank slugs that would still
   # resolve to the same address.
+  #
+  # Skipped for a stored record none of whose URL inputs is about to change:
+  # its paths are the ones it already holds, so it cannot newly clash, and a
+  # title-only save computes no path and asks `public_paths` nothing.
   def public_paths_are_available
-    PublicSite::Paths.compute(self).each do |locale, path|
-      next if path.nil?
+    return unless url_inputs_changed?
 
-      taken = PublicPath.current.where(locale: locale, path: path).where.not(record_type: self.class.name, record_id: id).exists?
-      next unless taken
+    paths = PublicSite::Paths.compute(self).compact
+    return if paths.empty?
+
+    taken = PublicPath.current.where(path: paths.values.uniq)
+      .where.not(record_type: self.class.polymorphic_name, record_id: id).pluck(:locale, :path).to_set
+    paths.each do |locale, path|
+      next unless taken.include?([ locale.to_s, path ])
 
       errors.add(Mobility.normalize_locale_accessor(:slug, locale), :taken,
         message: "gives the address #{path}, which is already taken in #{locale.upcase}")
