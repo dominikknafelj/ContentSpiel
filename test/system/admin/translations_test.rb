@@ -52,25 +52,28 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the suggestion request never reached the provider") { GatedProvider.waiting == 1 }
   end
 
-  # Releases the gate and waits until the provider has answered the request
-  # that was cancelled or left behind -- the end of the window in which a late
-  # answer could land -- and until the page has run what that answer set going.
+  # Releases the gate and waits until the page's own request has ended
+  # (`track_suggestion_requests`, installed before pressing): an aborted fetch
+  # rejects at once, an un-aborted one is counted only when its answer's body
+  # has arrived, which is after the provider, the audit event and the render.
+  # `GatedProvider.served` is not that end: it counts provider calls finished,
+  # not responses delivered. Then the page runs what the answer set going.
   def await_late_answer
     GatedProvider.release
-    assert_eventually(message: "the held request never finished at the provider") { GatedProvider.served == 1 }
+    await_js "window.__suggestionRequestsEnded >= 1"
     await_frames
   end
 
-  # Counts the suggestion requests that have ended in this page, answered or
-  # failed (`window.__suggestionRequestsEnded`), for a request that is not
-  # aborted -- the timed-out box's own, whose late answer the page ignores.
+  # Counts the suggestion requests that have ended in this page
+  # (`window.__suggestionRequestsEnded`): aborted or failed, or answered AND
+  # the body read. It lives on `window`, which a Turbo visit keeps.
   def track_suggestion_requests
     page.execute_script(<<~JS)
       window.__suggestionRequestsEnded = 0
       const originalFetch = window.fetch
       window.fetch = (url, options = {}) => {
         const request = originalFetch(url, options)
-        if (String(url.url || url).includes("translations/suggest")) request.then(() => {}, () => {}).finally(() => { window.__suggestionRequestsEnded += 1 })
+        if (String(url.url || url).includes("translations/suggest")) request.then((response) => response.clone().text()).then(() => {}, () => {}).finally(() => { window.__suggestionRequestsEnded += 1 })
         return request
       }
     JS
@@ -302,6 +305,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
+    track_suggestion_requests
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
     await_provider_request # the request has reached the provider: its answer is a late one
@@ -321,6 +325,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
+    track_suggestion_requests
     press_within slot("title"), "Translate"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
     await_provider_request # the request has reached the provider: its answer is a late one
@@ -371,6 +376,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
 
     visit "/cs-studio/posts/#{post.id}?locale=de"
     await_admin_controllers
+    track_suggestion_requests
     press "Suggest translations for 2 empty fields"
     assert_selector "#translation-suggestion-post-title [data-translation-pending]"
     await_provider_request # the request has reached the provider: its answer is a late one

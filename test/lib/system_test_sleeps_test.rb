@@ -21,8 +21,14 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
   # followed by a number or a parenthesis or a variable. A method that merely
   # has the word in its name (`await_sleep`, `obj.sleep`, `sleeping`) isn't one,
   # nor is a word in a comment or in a string.
-  SLEEP = /^\s*sleep\b|[^.\w:]sleep\s*[\d(\w]/
-  REASON = /# sleep:\s*\S.{8,}/
+  #
+  # `Kernel.sleep`, `::Kernel.sleep` and `Kernel::sleep` are flagged too.
+  # Deliberately NOT caught: `send(:sleep, 1)` / `public_send` and a bare
+  # `sleep` with no argument inside a block (`loop { sleep }`) -- nothing in
+  # the system tests spells it so, and a regex over lines can't tell them from
+  # prose.
+  SLEEP = /^\s*sleep\b|[^.\w:]sleep\s*[\d(\w]|(?<![\w])(?:::)?Kernel(?:\.|::)sleep\b/
+  REASON = /# sleep:\s*\S.{9,}/
 
   # The code of a line: what is left once a string's content and a trailing
   # comment are taken out, so `setTimeout(...)` in a heredoc line, a "sleep"
@@ -31,19 +37,20 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
   # it is checked line by line).
   def code_lines(path)
     in_heredoc = nil
-    File.readlines(path).each_with_index.filter_map do |line, index|
+    File.readlines(path, chomp: true).each_with_index.filter_map do |line, index|
       if in_heredoc
         in_heredoc = nil if line.strip == in_heredoc
         next
       end
-      if (heredoc = line[/<<[~-]?(["']?)(\w+)\1/, 2])
-        in_heredoc = heredoc
+      # A heredoc opener names an UPPERCASE or quoted tag (`<<~JS`, `<<~'RUBY'`): `list <<item` is an append.
+      if (opener = line.match(/<<[~-]?(?:(["'])(\w+)\1|([A-Z][A-Z0-9_]*))/))
+        in_heredoc = opener[2] || opener[3]
       end
       code = line.gsub(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/, '""')
       code = code.sub(/\s#(?!\{).*\z/, "") unless code.strip.start_with?("#")
       next if code.strip.start_with?("#")
 
-      [ index + 1, line.chomp, code ]
+      [ index + 1, line, code ]
     end
   end
 
@@ -68,10 +75,11 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
   # nothing else.
   test "the pattern finds sleeps, and nothing that only looks like one" do
     [ "    sleep 0.3", "  sleep(0.5)", "sleep 1", "    sleep 0.05 until done", "Timeout.timeout(5) { sleep 0.05 until x }",
-      "loop { sleep 0.1 }", "x = 1; sleep(2)", "      sleep delay if delay.positive?", "sleep(self.class.delay.to_f)" ].each do |sample|
+      "loop { sleep 0.1 }", "x = 1; sleep(2)", "      sleep delay if delay.positive?", "sleep(self.class.delay.to_f)",
+      "Kernel.sleep 1", "Kernel.sleep(1)", "::Kernel.sleep 1", "Kernel::sleep 1" ].each do |sample|
       assert_match SLEEP, sample
     end
-    [ "await_sleep 1", "obj.sleep 1", "sleeping = true", "setTimeout(poll, 20)", "# sleep 1", "Kernel::sleep" ].each do |sample|
+    [ "await_sleep 1", "obj.sleep 1", "sleeping = true", "setTimeout(poll, 20)", "# sleep 1", "Kernel::sleeper" ].each do |sample|
       assert_no_match SLEEP, sample.sub(/\A\s*#.*/, "")
     end
   end
@@ -81,17 +89,20 @@ class SystemTestSleepsTest < ActiveSupport::TestCase
       file.write(<<~'RUBY')
         # sleep 1 in a comment
         message = "sleep 2 in a string"
+        x = 1 # then sleep 1 later
+        list <<item
         page.execute_script(<<~JS)
           setTimeout(() => sleep(3), 10)
           sleep 4
         JS
         sleep 5 # sleep: a reason long enough
         sleep 6 # no reason
+        sleep 7 # sleep: nine chr
       RUBY
       file.flush
       flagged = code_lines(file.path).select { |_, _, code| code.match?(SLEEP) }.map(&:first)
-      assert_equal [ 7, 8 ], flagged
-      assert_equal [ 8 ], flagged.reject { |n| File.readlines(file.path)[n - 1].match?(REASON) }
+      assert_equal [ 9, 10, 11 ], flagged
+      assert_equal [ 10, 11 ], flagged.reject { |n| File.readlines(file.path)[n - 1].match?(REASON) }
     end
   end
 end

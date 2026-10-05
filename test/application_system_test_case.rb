@@ -220,17 +220,24 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # Waits, in the browser (polling every 20 ms, like `await_admin_controllers`),
   # until `condition` -- a JS expression -- is true; fails after `wait`
   # seconds instead of hanging. The ONE copy.
+  #
+  # Cuprite hands `Capybara.default_max_wait_time` to Ferrum as the async
+  # script's own timeout, which rejects the promise after that long: the wait
+  # runs inside `using_wait_time(wait + 1)`, so the page's deadline (and this
+  # helper's message) comes first.
   def await_js(condition, wait: 5)
-    met = page.evaluate_async_script(<<~JS, condition, wait * 1000)
-      const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
-      const deadline = Date.now() + timeout
-      const poll = () => {
-        if (Function(`return (${condition})`)()) return done(true)
-        if (Date.now() > deadline) return done(false)
-        setTimeout(poll, 20)
-      }
-      poll()
-    JS
+    met = using_wait_time(wait + 1) do
+      page.evaluate_async_script(<<~JS, condition, wait * 1000)
+        const [condition, timeout, done] = [arguments[0], arguments[1], arguments[arguments.length - 1]]
+        const deadline = Date.now() + timeout
+        const poll = () => {
+          if (Function(`return (${condition})`)()) return done(true)
+          if (Date.now() > deadline) return done(false)
+          setTimeout(poll, 20)
+        }
+        poll()
+      JS
+    end
     assert met, "timed out waiting for: #{condition}"
   end
 
@@ -249,18 +256,20 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # can't use this, and a test about a page that has no autosave form has
   # nothing for it to wait on.
   def assert_writes_settled(wait: 8)
-    settled = page.evaluate_async_script(<<~JS, wait * 1000)
-      const [timeout, done] = [arguments[0], arguments[arguments.length - 1]]
-      import("autosave/queue").then((queue) => {
-        const deadline = Date.now() + timeout
-        const poll = () => {
-          if (queue.settled()) return done(true)
-          if (Date.now() > deadline) return done(false)
-          setTimeout(poll, 20)
-        }
-        poll()
-      }, (error) => done(String(error)))
-    JS
+    settled = using_wait_time(wait + 1) do # see `await_js`: Ferrum's own script timeout would otherwise cut this at 2 s
+      page.evaluate_async_script(<<~JS, wait * 1000)
+        const [timeout, done] = [arguments[0], arguments[arguments.length - 1]]
+        import("autosave/queue").then((queue) => {
+          const deadline = Date.now() + timeout
+          const poll = () => {
+            if (queue.settled()) return done(true)
+            if (Date.now() > deadline) return done(false)
+            setTimeout(poll, 20)
+          }
+          poll()
+        }, (error) => done(String(error)))
+      JS
+    end
     assert_equal true, settled, "the write queue never settled: #{settled.inspect}"
   end
 

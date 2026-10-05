@@ -12,9 +12,11 @@
 #   GatedProvider.release                  # the waiting ones answer, and later calls don't wait
 #   GatedProvider.release(error: "…")      # ...they raise AI::Error with this message instead
 #
-# `served` counts the calls that have finished (answered or raised), which is
-# the end of the window of a test that claims "a late answer changes nothing":
-# wait for it, then assert.
+# `served` counts provider calls FINISHED (answered or raised) -- not
+# responses delivered to the browser: the audit event, the render and the
+# network still lie between the two. A test that claims "a late answer changes
+# nothing" waits for the page's own request to end (see
+# `track_suggestion_requests` in translations_test.rb), not for `served`.
 #
 # `release` opens the gate for good (until the next `hold!`): a test that
 # presses Try again after releasing gets an immediate answer, not a second
@@ -88,14 +90,15 @@ class GatedProvider
         @waiting += 1
         deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + HOLD_LIMIT
         generation = @generation
+        gave_up = nil
         while @held && generation == @generation
           remaining = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
-          break (@error = "The gate was never released.") if remaining <= 0
+          break gave_up = "The gate was never released." if remaining <= 0 # this call's own error: the shared one stays as it is
 
           @opened.wait(@lock, remaining)
         end
         @waiting -= 1 if generation == @generation
-        generation == @generation ? @error : nil
+        generation == @generation ? (gave_up || @error) : nil
       end
     end
 
