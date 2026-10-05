@@ -56,7 +56,7 @@ class Admin::GroupsSystemTest < ApplicationSystemTestCase
       # above) -- scoped to that row alone since every row's own ×
       # button shares the same label.
       first_row = all('[data-admin--groups-target="row"]').first
-      first_row.find("button[aria-label='Remove Test/speaker']").execute_script("this.click()")
+      first_row.find("button[aria-label='Remove Test/speaker']").click
 
       assert_speakers_eventually(post_record, %w[Ada])
     end

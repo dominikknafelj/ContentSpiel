@@ -148,7 +148,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     caption.set("Typed before the move")
     caption.send_keys(:tab)
     await_js "typeof window.__releaseSave === 'function'"
-    page.execute_script("document.querySelector('[data-block-id=\"#{first.id}\"] [data-move=\"down\"]').click()")
+    find("[data-block-id='#{first.id}'] button[aria-label='Block actions']").click
+    find("[data-block-id='#{first.id}'] [data-move='down']").click
     sleep 0.5
     assert_equal [ "PATCH" ], page.evaluate_script("window.__writes"), "the move was sent before the save it queued behind finished"
 
@@ -209,7 +210,8 @@ class Admin::BlocksSystemTest < ApplicationSystemTestCase
     assert_selector "#block-#{second.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
     assert_equal 1, page.evaluate_script("window.__blockPatches")
 
-    page.execute_script(%(document.querySelector('[data-block-id="#{second.id}"] [data-move="up"]').click()))
+    find("[data-block-id='#{second.id}'] button[aria-label='Block actions']").click
+    find("[data-block-id='#{second.id}'] [data-move='up']").click
     assert_eventually { @page.content_blocks.reload.order(:position).ids == [ second.id, first.id ] }
     sleep 1.5 # past the debounce a restarted save would wait out
     fill_in id: "block-#{second.id}-caption", with: "My caption, edited again"

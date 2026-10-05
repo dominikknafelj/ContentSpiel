@@ -75,7 +75,7 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     visit "/cs-studio/posts/#{@post.id}"
     await_admin_controllers
 
-    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    find(".ProseMirror figure.admin-rich-text-image").click
     sleep 0.5
     assert_no_selector "dialog[open]"
   end

@@ -127,16 +127,30 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
     assert_selector "header.admin-editor-header [role=menu]"
   end
 
-  # Clicks through JavaScript (`element.click()`) instead of a native click.
-  # Under Selenium this first worked around headless Chrome intermittently
-  # dropping native WebDriver clicks made right after a page load. It stays
-  # under Cuprite: a scripted click fires just the `click` these tests mean
-  # to exercise. Tests that are *about* a real pointer click natively (the
-  # mind graph, and the related-posts picker -- a native click there once
-  # lost the pick, because the autosave its mousedown started grew the
-  # empty save-status line and moved the button out from under the
-  # mouseup; `Admin::SaveStatusComponent` now reserves that line).
+  # Clicks the way a person does: a native pointer click at the element's
+  # centre (Cuprite scrolls it into view first). A button another element
+  # covers -- a sticky footer, a dialog's backdrop, an overlapping panel --
+  # raises `Capybara::Cuprite::MouseEventFailed` and one inside a closed menu
+  # is not found, which is the point: a control a person can't press is a
+  # defect of the layout or of the test, and a scripted click hides both. The
+  # related-posts picker is a case in point: a native click there once lost
+  # the pick, because the autosave its mousedown started grew the empty
+  # save-status line and moved the button out from under the mouseup
+  # (`Admin::SaveStatusComponent` now reserves that line).
   def press(label)
+    find(:link_or_button, label).click
+  end
+
+  # The scripted click (`element.click()`), for the cases a native click
+  # changes what the test exercises. Every call carries a one-line comment
+  # naming which:
+  #   - the element is inside a closed menu the test reaches by other means;
+  #   - the control is shown only by a `hover:` style, which CI's headless
+  #     Chrome (no hover device) never applies;
+  #   - a native click would change the thing under test (a `mousedown` that
+  #     starts an autosave and moves the target; ProseMirror's node
+  #     selection), or the test builds a same-tick race on purpose.
+  def press_by_script(label)
     find(:link_or_button, label).execute_script("this.click()")
   end
 
@@ -172,8 +186,8 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # this checks. `within:` scopes to one editor's toolbar when a page has
   # several.
   def press_insert(label, within: "[role=toolbar]")
-    find("#{within} button[aria-haspopup=menu]", match: :first).execute_script("this.click()")
-    find("#{within} [role=menu] button", text: label, match: :first).execute_script("this.click()")
+    find("#{within} button[aria-haspopup=menu]", match: :first).click
+    find("#{within} [role=menu] button", text: label, match: :first).click
   end
 
   # CS Studio's Stimulus controllers (`controllers/admin/*`) are registered

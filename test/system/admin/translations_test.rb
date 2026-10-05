@@ -50,7 +50,7 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
   # `press` workaround (see `ApplicationSystemTestCase#press`), scoped,
   # since every translated field has its own "Translate" button.
   def press_within(scope, label)
-    within(scope) { find(:link_or_button, label, exact: true).execute_script("this.click()") }
+    within(scope) { find(:link_or_button, label, exact: true).click }
   end
 
   # A plain suggestion's text is the value of an editable textarea, which
@@ -374,9 +374,9 @@ class Admin::TranslationsSystemTest < ApplicationSystemTestCase
     assert_selector "[data-admin--translate-target='status']", text: "2 suggestions ready", visible: :all, wait: 8
 
     # Focus inside the box moves to the field after Use, to Translate-ish after Discard.
-    find("#translation-suggestion-post-title [data-translate-use]").execute_script("this.focus(); this.click()")
+    find("#translation-suggestion-post-title [data-translate-use]").click
     assert_equal "post-title", page.evaluate_script("document.activeElement.id")
-    find("#translation-suggestion-post-excerpt button", text: "Discard").execute_script("this.focus(); this.click()")
+    find("#translation-suggestion-post-excerpt button", text: "Discard").click
     assert_no_selector "#translation-suggestion-post-excerpt [data-translation-suggestion]"
     assert page.evaluate_script("document.activeElement.closest('[data-translate-slot]') !== null"), "focus lands on the field's Translate button"
   end

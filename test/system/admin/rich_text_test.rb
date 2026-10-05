@@ -89,7 +89,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
 
     # Clicking the image edits it: the same dialog, now titled for editing
     # with "Save".
-    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    find(".ProseMirror figure.admin-rich-text-image").click
     within("dialog#rich-text-image-dialog[open]") do
       assert_selector "h2", text: "Edit image"
       assert_field "Alt text", with: "A"
@@ -435,13 +435,13 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     visit_post
     updated_at = @post.reload.updated_at
 
-    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    find(".ProseMirror figure.admin-rich-text-image").click
     within("dialog#rich-text-image-dialog[open]") { press "Save" }
     refute_selector "dialog[open]"
     sleep 1.5
     assert_equal updated_at, @post.reload.updated_at
 
-    find(".ProseMirror figure.admin-rich-text-image").execute_script("this.click()")
+    find(".ProseMirror figure.admin-rich-text-image").click
     within("dialog#rich-text-image-dialog[open]") { press "Remove image" }
     refute_selector "dialog[open]"
     refute_selector ".ProseMirror figure"
@@ -577,7 +577,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
     JS
     assert spill["inside"], "a toolbar tool sits outside the toolbar's box"
     assert spill["clear"], "the original should stack above the toolbar, not overlap it"
-    find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
+    find("[role=toolbar] button[aria-haspopup=menu]").click
     assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
   ensure
     page.driver.resize(1400, 1400)
@@ -603,7 +603,7 @@ class Admin::RichTextSystemTest < ApplicationSystemTestCase
       "the toolbar's tools overflow its box"
 
     editor.click
-    find("[role=toolbar] button[aria-haspopup=menu]").execute_script("this.click()")
+    find("[role=toolbar] button[aria-haspopup=menu]").click
     assert_selector "[role=toolbar] [role=menu] button", text: "YouTube", visible: true
     # The open panel is really on screen: the element at the item's centre is
     # the item itself, not the toolbar or the editor clipping/covering it.

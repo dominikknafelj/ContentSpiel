@@ -164,7 +164,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     draft = Current.set(actor: users(:one)) { create_post(title: "A draft", published: false) }
     visit admin_posts_path
     await_admin_controllers
-    find("#select-post-#{draft.id}").execute_script("this.click()")
+    find("#select-post-#{draft.id}").click
     within("[data-admin--bulk-select-target=bar]") { press "Move to trash" }
     assert_selector "dialog#bulk-trash-dialog[open]"
     hold_frame_fetches
