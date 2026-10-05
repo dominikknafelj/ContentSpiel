@@ -1,0 +1,11 @@
+# Content blocks and content types
+
+> Describes: `app/models/content_block.rb`, `app/models/content_types/`, `app/models/block_types/`, `app/models/content_model/`, `app/components/admin/block_*`, `app/controllers/admin/content_blocks_controller.rb`.
+
+## Content blocks
+
+`ContentBlock` (`app/models/content_block.rb`) is one polymorphic-by-enum table (`block_type`: `rich_text` / `image` / `post_list`) belonging to a `Page`, ordered by `position`, edited in CS Studio as block cards, each its own autosaving form (see "Blocks" below). `Post` uses the same single-model-plus-enum shape for its own `content_type` (`blog` / `resume_entry` / `now_update`). A `post_list` block's `settings` jsonb names a `content_type` filter, a `tag`, and a `limit`; `listed_posts` is the canonical query both the listing partial and the permalink-resolution fallback in `PagesController` must agree on. A post's typed fields (`Post#fields`) name themselves in words wherever an error shows — `Post.human_attribute_name` turns `fields.speakers.0.name` into "Speakers, row 1: name" (without I18n lookup, so the German admin UI will need to revisit it) — and a typed date must be `yyyy-mm-dd` (`ContentModel::FieldSet::DATE_FORMAT`): free text that doesn't parse is *refused* on the field rather than silently wiping the stored date.
+
+## Blocks in CS Studio
+
+**Blocks.** `Admin::BlockCardComponent`: a drag handle, the type name (a button that collapses the card), and a ⋯ `Admin::MenuComponent` (Move up, Move down, Duplicate, a divider, "Delete block…"); `admin--blocks#refreshMoveState` keeps Move up/down right after every move, add and delete. A block whose stored type isn't registered any more is the minimal "Unavailable type" card (danger border, "Delete block…" its only action). There is one dashed "+ Add block" row at the end of the list (`Admin::BlockPickerComponent`: a `button_to` per registered type POSTing to `create`); Duplicate is what inserts below a block. A post-list block's Type, Tag and Limit share one row, Tag being a one-value chip input.
