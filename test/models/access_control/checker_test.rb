@@ -116,9 +116,13 @@ class AccessControl::CheckerTest < ActiveSupport::TestCase
     assert allowed?(@brancher, "posts.edit", create_post(title: "Anyone's"))
   end
 
-  test "grants combine with OR" do
+  # A group holds one grant per permission, so the OR is between grants of
+  # different groups of one user.
+  test "grants combine with OR across a user's groups" do
+    other_group = AccessControl::Group.create!(name: "Now editors")
+    AccessControl::Membership.create!(user: @brancher, group: other_group)
     grant!("posts.edit", { "content_types" => [ "blog" ] })
-    grant!("posts.edit", { "content_types" => [ "now_update" ] })
+    grant!("posts.edit", { "content_types" => [ "now_update" ] }, group: other_group)
 
     assert allowed?(@brancher, "posts.edit", create_post(title: "Blog"))
     assert allowed?(@brancher, "posts.edit", create_post(title: "Now", content_type: "now_update"))

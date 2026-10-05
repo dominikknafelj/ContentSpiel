@@ -294,6 +294,7 @@ class Trash::RestoreTest < ActiveSupport::TestCase
     # `pages.create` alone is enough from here: a write right on a branch is
     # also the right to read it.
     read_b.destroy!
+    AccessControl::Grant.where(group: access_control_groups(:branch_editors), permission: "pages.create").delete_all
     grant.("pages.create", b)
     assert as(users(:editor_branch)) { Trash::Restore.call(page.reload, parent: b) }.ok?
     assert_equal b, page.reload.parent

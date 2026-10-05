@@ -159,8 +159,10 @@ class AccessControl::ScopingTest < ActiveSupport::TestCase
     doomed = create_page(title: "Doomed")
     grant!(group, "pages.edit", { "page_ids" => [ doomed.id ] })
     assert delete_for_good(doomed)
+    other_group = AccessControl::Group.create!(name: "Stale too")
+    AccessControl::Membership.create!(user: @brancher, group: other_group)
     grant!(group, "posts.edit").update_columns(scope: { "content_types" => [ "gone" ] })
-    grant!(group, "posts.edit").update_columns(permission: "gone/thing.edit")
+    grant!(other_group, "posts.edit").update_columns(permission: "gone/thing.edit")
     grant!(group, "posts.read", { "content_types" => [] })
 
     assert_scope_agrees_with_allowed(@brancher)

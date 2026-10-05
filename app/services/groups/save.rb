@@ -47,6 +47,9 @@ module Groups
       return denied("groups.manage", @group) unless authorize!("groups.manage", @group)
 
       stored = AccessControl::LiveGrants.new(@group.persisted? ? @group.grants.to_a : [])
+      listed = twice_listed_permissions
+      return listed_twice(listed) if listed.any?
+
       desired = @attributes.key?(:grants) ? normalize_grants(@attributes[:grants]) : nil
       old_member_ids = @group.persisted? ? @group.memberships.pluck(:user_id).sort : []
       new_member_ids = @attributes.key?(:member_ids) ? User.where(id: Array(@attributes[:member_ids]).compact_blank).pluck(:id).sort : old_member_ids
@@ -66,12 +69,20 @@ module Groups
 
       old_grants = grant_list(@group.persisted? ? @group.grants.to_a : [])
 
-      saved = AccessControl::Group.transaction do
-        @group.save || raise(ActiveRecord::Rollback)
-        replace_grants(grants) if desired && desired != old_grants
-        sync_members(old_member_ids, new_member_ids)
-        record_changes(old_grants, desired, old_member_ids, new_member_ids)
-        true
+      saved = begin
+        AccessControl::Group.transaction do
+          @group.save || raise(ActiveRecord::Rollback)
+          replace_grants(grants) if desired && desired != old_grants
+          sync_members(old_member_ids, new_member_ids)
+          record_changes(old_grants, desired, old_member_ids, new_member_ids)
+          true
+        end
+      rescue ActiveRecord::RecordNotUnique
+        # The unique index on (group, permission) caught what no check could:
+        # another save of this group wrote a grant for one of these permissions
+        # between our reading the group and replacing its grants. The whole
+        # transaction is rolled back; the editor reloads and tries again.
+        return failure(@group, [ "This group was changed elsewhere. Reload and try again." ])
       end
       return failure(@group) unless saved
 
@@ -79,6 +90,31 @@ module Groups
     end
 
     private
+
+    # Permissions the posted grants list more than once, in the order first
+    # repeated. A group holds one grant per permission (the unique index
+    # `index_access_control_grants_on_group_id_and_permission`), so this is
+    # malformed input, not a right the actor lacks: it is answered as a
+    # validation failure BEFORE any authorisation comparison -- nothing is
+    # written, and neither `group.updated` nor `access.denied` is recorded.
+    # Judged on the list as posted, before `normalize_grants` collapses
+    # identical entries, so "listed twice" means what it says. There is no
+    # model validation on `Grant` for it: this service builds and validates the
+    # new grants while the old rows still exist, so such a validation would
+    # reject every re-save.
+    def twice_listed_permissions
+      return [] unless @attributes.key?(:grants)
+
+      Array(@attributes[:grants]).map { |grant| grant.to_h.symbolize_keys[:permission].to_s }.tally.select { |_, count| count > 1 }.keys
+    end
+
+    def listed_twice(permissions)
+      permissions.each do |key|
+        label = AccessControl::Permissions.find(key)&.label || key
+        @group.errors.add(:base, "#{label} is listed twice.")
+      end
+      failure(@group)
+    end
 
     # `[{ permission:, scope: }]`, scopes normalized, in a stable order so
     # an unchanged list compares equal to the stored one.
@@ -123,9 +159,10 @@ module Groups
     #   name and stays in.) What the subtraction took out is therefore a subset
     #   of what that grant already holds as removed: the dormant right can only
     #   stay or shrink, never appear, move or widen;
-    # - no other posted grant has already been read as that entry. One stored
-    #   grant stands for one posted grant, so its removed names can't be dealt
-    #   out over several.
+    #
+    # (A group holds one grant per permission and a request listing one twice
+    # is refused up front, so each posted grant meets at most one stored entry
+    # and a stored entry's removed names can't be dealt out over several.)
     #
     # Everything else is compared and checked raw, as before the editor carried
     # anything: `can_grant?` sees the removed name, and only an actor whose own
@@ -153,20 +190,15 @@ module Groups
     # that holds a removed type is therefore not blocked by the name; changing
     # the grant in the same save is.
     def live(grants, stored)
-      claimed = []
       grants.map do |grant|
         types = grant[:scope]["content_types"]
         next grant unless types
 
-        index = stored.entries.each_index.find do |i|
-          entry = stored.entries[i]
-          !claimed.include?(i) && entry.permission == grant[:permission] && entry.gone_types.intersect?(types) &&
-            entry.scope == grant[:scope].merge("content_types" => types - entry.gone_types)
+        entry = stored.entries.find do |candidate|
+          candidate.permission == grant[:permission] && candidate.gone_types.intersect?(types) &&
+            candidate.scope == grant[:scope].merge("content_types" => types - candidate.gone_types)
         end
-        next grant unless index
-
-        claimed << index
-        stored.entries[index].attributes
+        entry ? entry.attributes : grant
       end
     end
 

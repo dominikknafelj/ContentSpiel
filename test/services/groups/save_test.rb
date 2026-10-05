@@ -31,6 +31,64 @@ class Groups::SaveTest < ActiveSupport::TestCase
     assert_equal 2, event.snapshot["grants"].size
   end
 
+  # The database's unique index is the guarantee; the service refuses the
+  # request first, as malformed input (an ordinary validation failure), not as
+  # a right the actor lacks -- so for an owner and a non-owner alike, nothing is
+  # written and neither `group.updated` nor `access.denied` is recorded.
+  test "a request listing one permission twice is invalid, for an owner and for a non-owner, and writes nothing" do
+    group = AccessControl::Group.create!(name: "Twice")
+    grant(group, "posts.edit", "content_types" => %w[blog])
+    grant(@manager_group, "posts.edit")
+    posted = [ { permission: "posts.edit", scope: { content_types: %w[blog] } }, { permission: "posts.edit", scope: { own: true } } ]
+
+    [ nil, users(:editor_branch) ].each do |actor|
+      assert_no_difference -> { Audit::Event.count } do
+        result = actor ? as(actor) { Groups::Save.call(group, attributes: { name: "Renamed", grants: posted }) } : as_owner { Groups::Save.call(group, attributes: { name: "Renamed", grants: posted }) }
+
+        assert_not result.ok?
+        assert_not result.denied?
+        assert_includes result.errors, "Edit posts is listed twice."
+      end
+      assert_equal "Twice", group.reload.name
+      assert_equal [ { "content_types" => %w[blog] } ], group.grants.where(permission: "posts.edit").map(&:scope)
+    end
+  end
+
+  test "a request that lists one permission twice for a new group creates nothing" do
+    assert_no_difference [ -> { AccessControl::Group.count }, -> { AccessControl::Grant.count }, -> { Audit::Event.count } ] do
+      result = as_owner do
+        Groups::Save.call(attributes: { name: "New twice", grants: [ { permission: "posts.read", scope: {} }, { permission: "posts.read", scope: { own: true } } ] })
+      end
+      assert_not result.ok?
+      assert_not result.denied?
+    end
+  end
+
+  # Two saves of one group that both pass the up-front check: the loser's insert
+  # meets the unique index because the other save's row for that permission is
+  # already there. Provoked for real: just before a grant is saved, a second
+  # row for the same (group, permission) is written the way a concurrent save
+  # would. The answer is a plain failure, not a 500, and nothing is kept.
+  test "a unique-index violation while replacing grants is a plain failure and rolls the whole save back" do
+    group = AccessControl::Group.create!(name: "Race")
+    grant(group, "posts.read")
+    original = AccessControl::Grant.instance_method(:save!)
+    AccessControl::Grant.define_method(:save!) do |*args|
+      AccessControl::Grant.insert_all!([ { group_id: group_id, permission: permission, scope: {}, created_at: Time.current, updated_at: Time.current } ])
+      original.bind_call(self, *args)
+    end
+
+    result = as_owner { Groups::Save.call(group, attributes: { name: "Renamed", grants: [ { permission: "posts.edit", scope: {} } ] }) }
+
+    assert_not result.ok?
+    assert_not result.denied?
+    assert_includes result.errors, "This group was changed elsewhere. Reload and try again."
+    assert_equal "Race", group.reload.name
+    assert_equal [ "posts.read" ], group.grants.pluck(:permission)
+  ensure
+    AccessControl::Grant.define_method(:save!, original)
+  end
+
   test "editing records group.updated with the grant and member changes" do
     group = AccessControl::Group.create!(name: "Writers")
     grant(group, "posts.read")
@@ -398,35 +456,6 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
   end
 
-  test "C: a removed type can't be moved from the grant that holds it into another grant of the same permission" do
-    group = AccessControl::Group.create!(name: "C")
-    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
-    grant(group, "posts.edit", "content_types" => %w[now_update])
-
-    assert_refused_unchanged(group) do
-      Groups::Save.call(group, attributes: { name: "C", grants: [
-        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
-        { permission: "posts.edit", scope: { content_types: %w[now_update retired] } }
-      ] })
-    end
-  end
-
-  # The same move when the actor could hand out both live scopes: only the raw
-  # scope of the grant that GAINED the name shows the widening.
-  test "C, for a manager who holds both live scopes: still refused" do
-    group = AccessControl::Group.create!(name: "C2")
-    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
-    grant(group, "posts.edit", "content_types" => %w[now_update])
-    grant(@manager_group, "posts.edit", "content_types" => %w[blog now_update])
-
-    assert_refused_unchanged(group) do
-      Groups::Save.call(group, attributes: { name: "C2", grants: [
-        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
-        { permission: "posts.edit", scope: { content_types: %w[now_update retired] } }
-      ] })
-    end
-  end
-
   test "D: a dead grant can't be reposted without its Own only" do
     group = AccessControl::Group.create!(name: "D")
     grant(group, "posts.edit", "content_types" => %w[retired], "own" => true)
@@ -449,19 +478,26 @@ class Groups::SaveTest < ActiveSupport::TestCase
     end
   end
 
-  # One stored grant stands for one posted grant: two posted grants can't both
-  # be "the stored one, unchanged".
+  # A stored grant's removed names can't be dealt out over several posted grants:
+  # the request lists the permission twice, which is refused before any right is
+  # compared (an invalid request, not a denied one).
   test "a stored grant with two removed types can't be split into two grants that each carry one" do
     group = AccessControl::Group.create!(name: "Split")
     grant(group, "posts.edit", "content_types" => %w[blog retired vanished], "own" => true)
     grant(@manager_group, "posts.edit", "content_types" => %w[blog])
+    before = group.grants.reload.map { |g| [ g.id, g.scope ] }
 
-    assert_refused_unchanged(group) do
-      Groups::Save.call(group, attributes: { name: "Split", grants: [
-        { permission: "posts.edit", scope: { content_types: %w[blog retired], own: true } },
-        { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } }
-      ] })
+    assert_no_difference -> { Audit::Event.count } do
+      result = as(users(:editor_branch)) do
+        Groups::Save.call(group, attributes: { name: "Split", grants: [
+          { permission: "posts.edit", scope: { content_types: %w[blog retired], own: true } },
+          { permission: "posts.edit", scope: { content_types: %w[blog vanished], own: true } }
+        ] })
+      end
+      assert_not result.ok?
+      assert_not result.denied?
     end
+    assert_equal before, group.grants.reload.map { |g| [ g.id, g.scope ] }
   end
 
   test "a removed type one permission's grant holds can't be planted in another permission's grant" do
@@ -475,22 +511,6 @@ class Groups::SaveTest < ActiveSupport::TestCase
       Groups::Save.call(group, attributes: { name: "Across", grants: [
         { permission: "posts.edit", scope: { content_types: %w[blog retired] } },
         { permission: "posts.publish", scope: { content_types: %w[blog retired] } }
-      ] })
-    end
-  end
-
-  # Stripped, the posted scope equals the OTHER stored grant's -- but that one
-  # never held the name, so it isn't "that grant, unchanged".
-  test "a removed type can't be attached to a sibling grant whose live scope the stripped form happens to equal" do
-    group = AccessControl::Group.create!(name: "Sibling")
-    grant(group, "posts.edit", "content_types" => %w[blog retired], "own" => true)
-    grant(group, "posts.edit", "content_types" => %w[blog])
-    grant(@manager_group, "posts.edit", "content_types" => %w[blog])
-
-    assert_refused_unchanged(group) do
-      Groups::Save.call(group, attributes: { name: "Sibling", grants: [
-        { permission: "posts.edit", scope: { content_types: %w[blog], own: true } },
-        { permission: "posts.edit", scope: { content_types: %w[blog retired] } }
       ] })
     end
   end
