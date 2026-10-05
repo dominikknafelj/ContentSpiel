@@ -33,10 +33,12 @@ require "ripper"
 #   a `data` key, an id, a symbol and a `strftime` pattern are lower-case tokens
 #   with hyphens, dots or percent signs ("flex items-center gap-1.5",
 #   "admin--save-bar-target", "%-d %b"), which none of that matches. Exempt by
-#   rule, not by marker: `Admin::Foo` (a `::`), the name of a class that
-#   exists ("Page"), an HTTP header ("Content-Type"), a single word in capitals
+#   rule, not by marker: `Admin::Foo` (a `::`), an HTTP header ("Content-Type"), a single word in capitals
 #   with no ellipsis ("PATCH", "UTC"), and a literal with SQL in it ("LOWER(",
-#   "ORDER BY", "LIKE", ") AS name").
+#   "ORDER BY", "ILIKE", "IS NULL", "EXISTS", "->>", ") AS name"). A class name
+#   is NOT exempt ("Posts", "Settings", "Media" are namespaces here and also the
+#   commonest labels): a line that compares one with a `*_type` column carries
+#   a marker instead.
 #   (b) no call to a method that makes English: `humanize titleize pluralize
 #   to_sentence time_ago_in_words distance_of_time_in_words number_to_human*
 #   strftime to_fs to_formatted_s` (use `I18n.l`, `t` with `count`).
@@ -58,14 +60,17 @@ require "ripper"
 # THE ESCAPE HATCH, for the rare literal that is not copy but reads like it: a
 # comment on the same line, `# i18n-ok: <reason>` in Ruby, `// i18n-ok: <reason>`
 # in JavaScript, `<%# i18n-ok: <reason> %>` in ERB, with a reason of at least ten
-# characters. A bare marker does not count.
+# characters. A bare marker does not count. The ERB marker excuses only the
+# Ruby inside tags on its line, never markup text or an attribute value.
 #
 # BLIND SPOTS, on purpose, so a reviewer knows where this stops: a lower-case
 # single word or a lower-case phrase with no stop word in Ruby ("yesterday");
 # copy built from several literals; English that reaches the page through a
 # variable or a helper this list doesn't name; a JavaScript sink split over
 # several lines; a script that builds markup with `innerHTML`; copy in a
-# Ruby file that is not in `CONVERTED`.
+# Ruby file that is not in `CONVERTED`; a phrase with digits in it ("3 items");
+# English inside `${...}` of a template literal (the scanner blanks it); a
+# single word in JavaScript that is not on a sink line (`const s = "Retry"`).
 #
 # The rules are pinned against small samples at the foot of this file.
 class AdminI18nTest < ActiveSupport::TestCase
@@ -137,7 +142,8 @@ class AdminI18nTest < ActiveSupport::TestCase
   STOP_WORDS = %w[now ago not the is are to of your this that need needs changed since you and or in on for with from has have
     was were be can no yet just all any more less new].freeze
 
-  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ORDER BY|JOIN|ASC|DESC)\b|\) AS [a-z_]+/
+  SQL = /\b(?:LOWER|UPPER|COUNT|SELECT|FROM|WHERE|LIKE|ILIKE|ORDER BY|GROUP BY|JOIN|ASC|DESC|EXISTS|COALESCE|IS (?:NOT )?NULL)\b|\) AS [a-z_]+|->>/
+  HEADER = /\A[A-Z][a-z]*(?:-[A-Z][a-z]+)+\z/
   MARKER = /i18n-ok:\s*\S.{9,}/
 
   # --- ERB ------------------------------------------------------------------
@@ -184,8 +190,7 @@ class AdminI18nTest < ActiveSupport::TestCase
   # Whether the text of one string literal is copy (see the rules at the top).
   def copy?(text)
     return false if text.include?("::") || text.match?(SQL)
-    return false if text.match?(/\A[A-Z][a-z]+(?:-[A-Z][a-z]+)+\z/) # an HTTP header
-    return false if text.match?(/\A[A-Z]\w*\z/) && text.safe_constantize # a class name
+    return false if text.match?(HEADER) # an HTTP header, X-Page-Base-Updated-At included
 
     words = text.split(/\s+/).reject(&:empty?)
     prose = words.size >= 2 && words.all? { |word| word.match?(/\A[[:alpha:]'’]+[.,!?…:;]?\z/) }
@@ -283,9 +288,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     js_literals(source).filter_map do |line, text, before|
       next if lines[line - 1].to_s.match?(/\/\/\s*#{MARKER}/)
 
-      stripped = text.gsub(/\$\{[^}]*\}/, "$")
+      stripped = text.gsub(/\$\{[^}]*\}/, "$").gsub(/\\u\h{4}|\\u\{\h+\}/, "")
       sink = lines[line - 1].to_s.match?(SINK) && stripped.match?(/\p{L}/) &&
-        !before.match?(NAMING_CALL) && !text.match?(MESSAGE_KEY) && !%w[aria-label title placeholder].include?(text)
+        !before.match?(NAMING_CALL) && !text.match?(MESSAGE_KEY) && !text.match?(HEADER) && !%w[aria-label title placeholder].include?(text)
       "#{line}: #{text.strip.inspect}" if sink || js_sentence?(text)
     end
   end
@@ -360,12 +365,12 @@ class AdminI18nTest < ActiveSupport::TestCase
 
   test "Ruby: copy is a capitalised word, capitals, a stop-word phrase or a sentence, never a CSS token or a key" do
     [ "Cancel", "Couldn't save", "Save or cancel your changes first.", "SAVING…", "NOT SAVED · ", "Remove #", "try again.", "OF", "m ago",
-      " things need fixing", "not translated", "just now", "changed since translation", "UP TO DATE" ].each do |text|
+      " things need fixing", "not translated", "just now", "changed since translation", "UP TO DATE", "Posts", "Settings", "Media", "Trash", "Tags" ].each do |text|
       assert copy?(text), "#{text.inspect} should count as copy"
     end
     [ "flex items-center gap-1.5 rounded-cs", "admin--save-bar-target", "bg-meta", "%-d %b %Y, %H:%M", "min-h-[1lh]", "admin.datetime",
-      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC", "Page",
-      "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
+      "Admin::DialogComponent", "", " ", "·", "dialog", "just", "language-switcher-outdated-", "Content-Type", "PATCH", "UTC",
+      "X-Page-Base-Updated-At", "x-y", "name ILIKE ?", "a IS NOT NULL", "GROUP BY posts.id", "COALESCE(a, b)", "data->>'k'", "bg-gradient-to-r from-x to-y", "to-ink", "(LOWER(tags.name) LIKE ?) DESC", "tags.name ASC", "hidden sr-only" ].each do |text|
       assert_not copy?(text), "#{text.inspect} should not count as copy"
     end
   end
@@ -382,7 +387,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_equal [ %(1: "Cancel") ], ruby_offences(%(x = "Cancel" # i18n-ok\n))
     assert_equal [ %(2: "Retry") ], ruby_offences(%(a = "ok"\nb = { class: "x", title: "Retry" }\n))
     assert_empty ruby_offences(%(t(".cancel", label: label)\ntag.span class: "a b", data: { "admin--x-target": "y" }\n))
-    assert_empty ruby_offences(%(Tag.where("LOWER(tags.name) LIKE ?", x).where(owner_type: "Page")\n))
+    assert_empty ruby_offences(%(Tag.where("LOWER(tags.name) LIKE ?", x)\n))
+    assert_equal [ %(1: "Page") ], ruby_offences(%(block.owner_type == "Page"\n)), "a class name is copy unless marked"
+    assert_empty ruby_offences(%(block.owner_type == "Page" # i18n-ok: a class name compared with owner_type\n))
     assert_empty ruby_offences(%(headers["Content-Type"] = "x"; method = "PATCH"; zone = "UTC"\n))
   end
 
@@ -408,6 +415,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     assert_empty js_offences("note.textContent = ` ${this.text(\"a.b\")}`\n")
     assert_empty js_offences(%(el.setAttribute("aria-label", this.text("components.chip_input.remove", { label }))\n))
     assert_empty js_offences(%(headers["Content-Type"] = "x"; method: "PATCH"; zone = "UTC"\n))
+    assert_empty js_offences(%(headers["X-Page-Base-Updated-At"] = base; el.textContent = "\\u00b7\\u2192"\n))
     assert_empty js_offences(%(status.textContent = "" // i18n-ok: emptying the line, not saying anything\n))
     assert_equal [ %(1: "Retry") ], js_offences(%(button.textContent = "Retry" // i18n-ok: no\n))
   end

@@ -15,13 +15,24 @@ class ScriptMessagesTest < ActiveSupport::TestCase
   SCRIPTS = Dir[Rails.root.join("app/javascript/**/*.js")].reject { |path| path.include?("/javascript/i18n/") }
   KEY = /(?<=["`'])(?:#{I18n.t("admin").keys.map { |key| Regexp.escape(key.to_s) }.join("|")})\.[\w.${}]+(?=["`'])/
 
+  # What a message key looks like: dotted lower-case segments, a `${...}` for
+  # one of them. Every literal handed to `.t(` or `this.text(` has to be one,
+  # whatever its first segment, so a mistyped prefix is caught here rather
+  # than found by the one test that walks the path.
+  SHAPE = /\A[a-z_]+(?:\.(?:[a-z_]+|\$\{[^}]*\}))+\z/
+  ASKED = /(?:\.t|this\.text)\(\s*(["'`])(.*?)\1/
+
   def script_keys
-    SCRIPTS.flat_map { |path| File.read(path).scan(KEY).map { |key| [ key, Pathname(path).relative_path_from(Rails.root).to_s ] } }.uniq
+    SCRIPTS.flat_map do |path|
+      source = File.read(path)
+      relative = Pathname(path).relative_path_from(Rails.root).to_s
+      (source.scan(KEY) + source.scan(ASKED).map(&:last)).map { |key| [ key, relative ] }
+    end.uniq
   end
 
   def served
     calls = Dir[Rails.root.join("app/{views,components,helpers}/**/*.{rb,erb}")].flat_map do |path|
-      File.read(path).scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten
+      File.read(path).lines.reject { |line| line.match?(/\A\s*#/) }.join.gsub(/<%#.*?%>/m, "").scan(/messages_data\((.*?)\)(?=\s*(?:%>|\n|\)|,))/m).flatten
     end
     literals = calls.flat_map { |call| call.scan(/"([^"]+)"/).flatten }
     (Admin::MessagesHelper::SCRIPT_MESSAGES + literals).map { |key| key.gsub(/#\{.*?\}/, "x") }
@@ -37,6 +48,12 @@ class ScriptMessagesTest < ActiveSupport::TestCase
       served_keys.any? { |served_key| asked.match?(served_key) }
     end
     assert_empty unserved, "No messages_data call serves these (add the key to the element's data-messages):\n#{unserved.map { |key, path| "#{path}: #{key}" }.join("\n")}"
+  end
+
+  test "every literal handed to t( or this.text( has the shape of a key" do
+    odd = script_keys.reject { |key, _path| key.match?(SHAPE) }
+
+    assert_empty odd, "Not a message key (dotted lower-case segments):\n#{odd.map { |key, path| "#{path}: #{key}" }.join("\n")}"
   end
 
   test "every served key exists in the locale files" do

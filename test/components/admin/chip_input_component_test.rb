@@ -17,6 +17,16 @@ class Admin::ChipInputComponentTest < ViewComponent::TestCase
     assert_selector "li[data-chip-value='ruby'] button[aria-label='Remove ruby']"
   end
 
+  test "its script gets whole sentences per noun, never one glued from a noun" do
+    render_chips(noun: "tag")
+    messages = JSON.parse(page.find("[data-controller='admin--chip-input']")["data-messages"])
+
+    assert_equal "No matching tags.", messages["components.chip_input.nouns.tag.no_matches"]
+    assert_equal "Create tag “%{label}”", messages["components.chip_input.nouns.tag.create"]
+    assert_equal "Create tag “news”", I18n.t("admin.components.chip_input.nouns.tag.create", label: "news")
+    assert_equal "Create user “Ann”", I18n.t("admin.components.chip_input.nouns.user.create", label: "Ann")
+  end
+
   test "an empty sentinel is submitted ahead of the chips so an emptied list still saves" do
     render_chips(chips: [])
 

@@ -79,11 +79,16 @@ module JsErrorCollector
     end
 
     # What a `console.error(...)` call says: each argument's value, or for an
-    # object (an Error) the first line of its description, joined by a space.
+    # object (an Error) the first line of its description and of its stack, joined by a space.
     def message_of_console(params)
       Array(params["args"]).map do |arg|
-        value = arg.key?("value") ? arg["value"].to_s : arg["description"].to_s.lines.first.to_s.strip
-        value.presence || arg["type"].to_s
+        if arg.key?("value")
+          arg["value"].to_s.presence || arg["type"].to_s
+        else
+          # An Error: its message line, then the first line of its stack.
+          first, frame = arg["description"].to_s.lines.map(&:strip).reject(&:empty?)
+          [ first, (" (#{frame})" if frame) ].join.presence || arg["type"].to_s
+        end
       end.join(" ")
     end
 

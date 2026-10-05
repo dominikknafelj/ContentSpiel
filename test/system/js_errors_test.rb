@@ -97,6 +97,13 @@ class JsErrorsTest < ApplicationSystemTestCase
     expect_js_error(/no message "no.such.key"/)
   end
 
+  test "a console.error of an Error carries the first line of its stack" do
+    sign_in_via_form(users(:one))
+    visit admin_root_path
+    page.execute_script("console.error(new TypeError('with a stack'))")
+    expect_js_error(/TypeError: with a stack \(at /)
+  end
+
   test "a plain console.error is collected and console.warn is not" do
     sign_in_via_form(users(:one))
     visit admin_root_path

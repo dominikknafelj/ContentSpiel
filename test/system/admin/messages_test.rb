@@ -96,6 +96,14 @@ class Admin::MessagesTest < ApplicationSystemTestCase
     assert_match(/needs %\{name\}/, in_page(%(messages(document.getElementById("strict")).t("greeting")))["error"])
   end
 
+  test "a zero form wins for 0 as in Rails, and a locale tag Intl rejects falls back to other" do
+    add_messages_element("zero", { "@locale" => "en", "n" => { "zero" => "none", "one" => "one", "other" => "many" } }.to_json)
+    add_messages_element("badlocale", { "@locale" => "not a locale!", "n" => { "one" => "one", "other" => "many" } }.to_json)
+
+    assert_equal [ "none", "one", "many" ], in_page(%([ 0, 1, 2 ].map((count) => messages(document.getElementById("zero")).t("n", { count }))))["value"]
+    assert_equal [ "many", "many" ], in_page(%([ 1, 2 ].map((count) => messages(document.getElementById("badlocale")).t("n", { count }))))["value"]
+  end
+
   test "the plural category follows the language the server names" do
     add_messages_element("pl", { "@locale" => "pl", "n" => { "one" => "%{count} plik", "few" => "%{count} pliki",
       "many" => "%{count} plikow", "other" => "%{count} pliku" } }.to_json)
