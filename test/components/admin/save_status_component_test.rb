@@ -23,6 +23,10 @@ class Admin::SaveStatusComponentTest < ViewComponent::TestCase
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :error, count: 3)
     assert_text "Couldn't save — 3 problems"
 
+    render_inline Admin::SaveStatusComponent.new(id: "s", state: :error, count: 1)
+    assert_text "Couldn't save — 1 problem"
+    assert_no_text "1 problems"
+
     render_inline Admin::SaveStatusComponent.new(id: "s", state: :retrying)
     assert_text "NOT SAVED · RETRYING…"
 

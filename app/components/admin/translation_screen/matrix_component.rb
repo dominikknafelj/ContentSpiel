@@ -59,7 +59,7 @@ module Admin
       end
 
       def cell_label(item, locale)
-        state = Admin::TranslationChipComponent::ARIA_STATES.fetch(item.states.fetch(locale))
+        state = Admin::TranslationChipComponent.state_word(item.states.fetch(locale))
         "#{title(item)}: #{language_name(locale)}, #{state}"
       end
 

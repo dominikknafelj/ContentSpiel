@@ -8,17 +8,17 @@
       so when "Still correct — mark up to date" streams the marker away by id the
       announcement goes with the dot. %>
   <% if missing?(code) %>
-    <%= tag.span class: "size-[7px] shrink-0 rounded-full border border-meta", title: "Missing required fields", data: { language_state: "missing" } do %>
-      <span class="sr-only"><%= native_name(code) %>: not translated</span>
+    <%= tag.span class: "size-[7px] shrink-0 rounded-full border border-meta", title: t(".missing_title"), data: { language_state: "missing" } do %>
+      <span class="sr-only"><%= t(".missing", language: native_name(code)) %></span>
     <% end %>
   <% end %>
   <% if outdated?(code) %>
-    <%= tag.span id: outdated_marker_id(code), class: "size-[7px] shrink-0 rounded-full bg-warn", title: "Original changed", data: { language_state: "outdated" } do %>
-      <span class="sr-only"><%= native_name(code) %>: original changed</span>
+    <%= tag.span id: outdated_marker_id(code), class: "size-[7px] shrink-0 rounded-full bg-warn", title: t(".outdated_title"), data: { language_state: "outdated" } do %>
+      <span class="sr-only"><%= t(".outdated", language: native_name(code)) %></span>
     <% end %>
   <% end %>
 <% end %>
-<nav aria-label="Languages" class="admin-language-tabs border-b border-line">
+<nav aria-label="<%= t(".nav_label") %>" class="admin-language-tabs border-b border-line">
   <ul <%= "role=tablist" if buttons? %> class="flex items-end gap-5 font-cs text-sm">
     <% tabs.each do |code| %>
       <%# The underline and its padding sit on the <li>, not on the label: with
@@ -57,7 +57,7 @@
             Escape and outside click come with it. The `marks` lambda is
             still called as a silent scriptlet, never an output tag, so each
             language's marker id renders exactly once. %>
-        <%= render Admin::MenuComponent.new(label: "+#{overflow.size} ▾", button_class: "cursor-pointer text-meta hover:text-ink") do |menu| %>
+        <%= render Admin::MenuComponent.new(label: t(".more", count: overflow.size), button_class: "cursor-pointer text-meta hover:text-ink") do |menu| %>
           <% overflow.each do |code| %>
             <% menu.with_item do %>
               <span class="flex items-center gap-1.5">

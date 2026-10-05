@@ -39,8 +39,8 @@ module Admin
     # screen reader reads is exactly what is shown. `live:` also rides on the
     # element (`data-live`) so `autosave_controller.js`, which writes the
     # "saving" line itself, picks the same wording. Every string here that
-    # the controller also writes (`static texts`) must be changed on both
-    # sides together.
+    # the controller also writes is the same key (`messages_data` hands
+    # them to it from <body>), so the two cannot drift.
     def initialize(id:, state: :idle, at: nil, count: 0, live: false)
       raise ArgumentError, "unknown save status state #{state.inspect}" unless STATES.include?(state)
 
@@ -54,21 +54,21 @@ module Admin
     def text
       case state
       when :idle then ""
-      when :saving then live ? "SAVING TO SITE…" : "SAVING…"
-      when :saved then [ live ? "● SAVED TO SITE" : "SAVED", at&.strftime("%H:%M") ].compact.join(" ")
-      when :error then "Couldn't save — #{count} problems"
-      when :forbidden then "Not saved — you don't have permission to change this"
-      when :retrying then "NOT SAVED · RETRYING…"
+      when :saving then t(live ? ".saving_live" : ".saving")
+      when :saved then saved_text
+      when :error then t(".error", count: count)
+      when :forbidden then t(".forbidden")
+      when :retrying then t(".retrying")
       # The Retry button is rendered after this text (see the template).
-      when :offline then "NOT SAVED · "
+      when :offline then t(".offline")
       # "Not saved": the three record editors refuse a stale save
       # (`Admin::AutosaveResponses#refuse_stale_autosave`).
-      when :stale then "● CHANGED ELSEWHERE"
+      when :stale then t(".stale")
       # The opposite meaning, for the forms that still save on a stale base
       # (Settings, media detail, tag rows): the save WENT THROUGH and
       # overwrote, so it must never read like the refusal above.
-      when :saved_over then "SAVED · ALSO CHANGED ELSEWHERE — RELOAD TO SEE THE LATEST"
-      when :signed_out then "Signed out — sign in again to keep saving"
+      when :saved_over then t(".saved_over")
+      when :signed_out then t(".signed_out")
       end
     end
 
@@ -89,5 +89,13 @@ module Admin
     private
 
     attr_reader :id, :state, :at, :count, :live
+
+    # "SAVED 14:05", or just "SAVED" for a save with no time (a stream that
+    # carries none); a live record's own wording says it went to the site.
+    def saved_text
+      return t(live ? ".saved_live" : ".saved") unless at
+
+      t(live ? ".saved_live_at" : ".saved_at", time: I18n.l(at, format: :"admin.time"))
+    end
   end
 end

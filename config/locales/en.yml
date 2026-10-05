@@ -30,6 +30,24 @@
 en:
   hello: "Hello world"
 
+  # CS Studio's named formats, for `I18n.l(value, format: :"admin.short")`
+  # (docs/reference/i18n.md, "A date or a time"). Month names come from Rails'
+  # own `date.abbr_month_names`. The admin shows times in the site time zone
+  # (`Time.use_zone`); a format only lays the value out.
+  date:
+    formats:
+      admin:
+        short: "%-d %b"
+        short_with_year: "%-d %b %Y"
+  time:
+    formats:
+      admin:
+        short: "%-d %b"
+        short_with_year: "%-d %b %Y"
+        time: "%H:%M"
+        short_datetime: "%-d %b, %H:%M"
+        datetime: "%-d %b %Y, %H:%M"
+
   # How these columns are named in validation messages ("AI provider isn't
   # an available provider", not Rails' default "Ai provider ...").
   activerecord:

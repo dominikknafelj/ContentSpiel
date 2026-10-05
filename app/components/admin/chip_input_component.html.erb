@@ -4,6 +4,7 @@
      data-admin--chip-input-name-value="<%= name %>"
      data-admin--chip-input-create-value="<%= create %>"
      data-admin--chip-input-noun-value="<%= noun %>"
+     data-messages="<%= messages %>"
      data-admin--chip-input-single-value="<%= single %>"
      data-admin--chip-input-lowercase-value="<%= lowercase %>"
      data-admin--chip-input-exclude-value="<%= exclude.to_json %>"
@@ -23,7 +24,7 @@
         <%= tag.li class: chip_class(chip), data: { "chip-value": chip[:value], invalid: (true if chip[:invalid]) } do %>
           <% if chip[:dot].present? %><span class="admin-chip__dot h-[7px] w-[7px] shrink-0 rounded-full <%= chip[:dot] %>" aria-hidden="true"></span><% end %>
           <span class="min-w-0 truncate" data-chip-label><%= chip[:label] %></span>
-          <% if chip[:invalid] %><span class="sr-only" data-chip-invalid-note> (invalid)</span><% end %>
+          <% if chip[:invalid] %><span class="sr-only" data-chip-invalid-note> <%= t(".invalid") %></span><% end %>
           <% if chip[:hint].present? %><span class="shrink-0 text-meta" data-chip-hint>· <%= chip[:hint] %></span><% end %>
           <%= tag.input type: "hidden", name: name, value: chip[:value], autocomplete: "off", data: track_data %>
           <button type="button" class="admin-chip__remove inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-meta hover:bg-line hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
@@ -38,7 +39,7 @@
           role: "combobox", aria: { expanded: "false", controls: listbox_id, autocomplete: "list", describedby: described_by, invalid: (true if errors.any?) },
           data: { "admin--chip-input-target": "input", action: "keydown->admin--chip-input#keydown input->admin--chip-input#search blur->admin--chip-input#leave" } %>
 
-    <ul id="<%= listbox_id %>" role="listbox" aria-label="<%= label %> suggestions" hidden
+    <ul id="<%= listbox_id %>" role="listbox" aria-label="<%= t(".suggestions_label", label: label) %>" hidden
         class="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-cs border border-line-strong bg-surface py-1 shadow-menu"
         data-admin--chip-input-target="listbox"
         data-action="mousedown->admin--chip-input#holdFocus click->admin--chip-input#choose"></ul>

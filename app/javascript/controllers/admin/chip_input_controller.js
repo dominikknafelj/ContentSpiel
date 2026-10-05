@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
-import { createSuggestions, statusLabel } from "search/suggestions"
+import { createSuggestions } from "search/suggestions"
+import { messages } from "i18n/messages"
 
 // A multi-value input that shows each value as a removable chip, with
 // autocomplete (`Admin::ChipInputComponent`; its class comment has the form
@@ -100,6 +101,13 @@ export default class extends Controller {
     this.search()
   }
 
+  // A message by key (`data-messages` on this component's root,
+  // `Admin::ChipInputComponent#messages`), and the caller's noun in the
+  // singular (`noun(1)`, "tag") or the plural (`noun(2)`, "tags").
+  text(key, vars) { return messages(this.element).t(key, vars) }
+
+  noun(count) { return this.text(`chip_input.nouns.${this.nounValue}`, { count }) }
+
   get query() {
     return this.inputTarget.value.trim()
   }
@@ -109,10 +117,10 @@ export default class extends Controller {
   // "Draft" / "Scheduled" -- in the list and, after "·", on the chip. A row
   // may name the chip's hint itself (`chip_hint`: a member's email).
   normalize(row) {
-    const status = statusLabel(row)
+    const status = row.status && row.status !== "live" ? this.text(`status_chip.labels.${row.status}`) : null
     return {
       value: String(row.value ?? row.id),
-      label: row.label ?? row.title ?? "(untitled)",
+      label: row.label ?? row.title ?? this.text("chip_input.untitled"),
       hint: row.hint ?? status,
       chipHint: row.chip_hint ?? status,
       dot: row.dot ?? null
@@ -132,10 +140,10 @@ export default class extends Controller {
     // holds only options, so nothing there can be a disabled "option").
     if (items.length === 0) {
       this.close()
-      return this.announce(`No matching ${this.nounValue}s.`)
+      return this.announce(this.text("chip_input.no_matches", { noun: this.noun(2) }))
     }
 
-    this.announce(`${items.length} ${items.length === 1 ? "suggestion" : "suggestions"}.`)
+    this.announce(this.text("chip_input.results", { count: items.length }))
     this.items = items
     this.listboxTarget.replaceChildren(...items.map((item, index) => this.optionFor(item, index)))
     this.active = -1
@@ -149,7 +157,7 @@ export default class extends Controller {
 
     const label = option.querySelector("[data-option-label]")
     if (item.create) {
-      label.textContent = `Create ${this.nounValue} “${item.label}”`
+      label.textContent = this.text("chip_input.create", { noun: this.noun(1), label: item.label })
     } else {
       label.textContent = item.label
       this.setDot(option, item.dot)
@@ -160,7 +168,7 @@ export default class extends Controller {
 
   searchFailed() {
     this.close()
-    if (!this.createValue) this.announce("Search failed — try again.")
+    if (!this.createValue) this.announce(this.text("chip_input.search_failed"))
   }
 
   open() {
@@ -320,7 +328,7 @@ export default class extends Controller {
     const note = document.createElement("span")
     note.className = "sr-only"
     note.dataset.chipInvalidNote = ""
-    note.textContent = " (too long)"
+    note.textContent = ` ${this.text("chip_input.too_long")}`
     chip.querySelector("[data-chip-label]")?.after(note)
   }
 
@@ -328,7 +336,7 @@ export default class extends Controller {
     if (!item || this.inputTarget.disabled) return
     this.inputTarget.value = ""
     this.close()
-    if (this.hasChip(item.value)) return this.announce(`${item.label} is already added.`)
+    if (this.hasChip(item.value)) return this.announce(this.text("chip_input.already_added", { label: item.label }))
 
     // A one-value field (`single`) holds one chip: choosing another replaces it.
     if (this.singleValue) this.chips.forEach((existing) => existing.remove())
@@ -339,14 +347,14 @@ export default class extends Controller {
     this.setDot(chip, item.dot)
     this.setHint(chip.querySelector("[data-chip-hint]"), item.chipHint, "· ")
     chip.querySelector("input").value = item.value
-    this.removeButton(chip).setAttribute("aria-label", `Remove ${item.label}`)
+    this.removeButton(chip).setAttribute("aria-label", this.text("chip_input.remove", { label: item.label }))
     this.listTarget.append(chip)
     // Only a name typed in this session: an existing tag (rendered by the
     // server or picked from the suggestions) is reused by the server whatever
     // its length, so it must never be tinted as if it would be refused.
     if (item.typed) this.markInvalidLength(chip)
 
-    this.announce(`Added ${item.label}.`)
+    this.announce(this.text("chip_input.added", { label: item.label }))
     this.changed()
   }
 
@@ -382,7 +390,7 @@ export default class extends Controller {
     else this.removeButton(neighbour).focus()
 
     chip.remove()
-    this.announce(`Removed ${label}.`)
+    this.announce(this.text("chip_input.removed", { label }))
     this.changed()
   }
 

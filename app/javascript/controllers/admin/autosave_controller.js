@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus"
 import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
 import { currentGeneration, enqueue, isCurrentGeneration, registerForm, syncBases, unregisterForm } from "autosave/queue"
 
 // Each autosave form's SAVE STATE, by form ELEMENT:
@@ -97,23 +98,19 @@ export default class extends Controller {
 
   // Client-only states `Admin::SaveStatusComponent` never has occasion to
   // render server-side -- there is no request to answer with them, since
-  // they describe the request *not landing* at all. Every one of these has
-  // to read exactly like `Admin::SaveStatusComponent#text`'s own matching
-  // state (`signedOut`/`:signed_out` included, even though that one's never
-  // actually rendered by a server response either -- see that component's
-  // own comment for why it's still a named state there).
+  // they describe the request *not landing* at all. Each reads exactly like
+  // the component's own matching state because it IS the same key
+  // (`admin.components.save_status.*`, handed over on <body> by
+  // `Admin::MessagesHelper::SCRIPT_MESSAGES`): `saving`, `saving_live`,
+  // `retrying`, `offline`, `signed_out` (even though that one's never
+  // actually rendered by a server response either -- see the component's
+  // own comment for why it's still a named state there) and `retry`.
   //
-  // `savingLive` is the same line for a live record, whose edits go
+  // `saving_live` is the same line for a live record, whose edits go
   // straight to the site: the status element says so with `data-live`
   // (`Admin::SaveStatusComponent`'s `live:`). `offline` ends in a Retry
   // button (`setStatus` builds it), which is why its text stops at "· ".
-  static texts = {
-    saving: "SAVING…",
-    savingLive: "SAVING TO SITE…",
-    retrying: "NOT SAVED · RETRYING…",
-    offline: "NOT SAVED · ",
-    signedOut: "Signed out — sign in again to keep saving"
-  }
+  text(key) { return messages(this.element).t(`components.save_status.${key}`) }
 
   // Backoff after a failed attempt (spec §6.1/global constraints): 1s, 3s,
   // then 9s, then give up and show the offline state until the next edit.
@@ -245,7 +242,7 @@ export default class extends Controller {
   // everything that needs the controller's own state is done here, after.
   async attempt() {
     const status = document.getElementById(this.statusIdValue)
-    this.setStatus(status && status.hasAttribute("data-live") ? this.constructor.texts.savingLive : this.constructor.texts.saving)
+    this.setStatus(status && status.hasAttribute("data-live") ? this.text("saving_live") : this.text("saving"))
 
     const outcome = await enqueue((isCurrent) => this.send(isCurrent), { generation: this.generation })
 
@@ -274,7 +271,7 @@ export default class extends Controller {
         this.pending = false
         this.retryCount = 0
         this.busy = false
-        this.setStatus(this.constructor.texts.signedOut)
+        this.setStatus(this.text("signed_out"))
         return
       case "conflict":
         // 409: the server refused this save because the record changed since
@@ -457,7 +454,7 @@ export default class extends Controller {
     const delays = this.constructor.retryDelays
 
     if (this.retryCount >= delays.length) {
-      this.setStatus(this.constructor.texts.offline, { retry: true })
+      this.setStatus(this.text("offline"), { retry: true })
       this.failed = true
       // Given up: an edit typed during the backoff waits for Retry or the
       // next edit like everything else in the form, it is not "about to be
@@ -468,7 +465,7 @@ export default class extends Controller {
       return
     }
 
-    this.setStatus(this.constructor.texts.retrying)
+    this.setStatus(this.text("retrying"))
     const delay = delays[this.retryCount]
     this.retryCount += 1
     // `busy` stays true across the wait: an edit that lands mid-backoff
@@ -523,7 +520,7 @@ export default class extends Controller {
     const button = document.createElement("button")
     button.type = "button"
     button.className = "cursor-pointer underline hover:text-ink"
-    button.textContent = "Retry"
+    button.textContent = this.text("retry")
     button.addEventListener("click", () => this.saveNow())
     status.append(button)
   }

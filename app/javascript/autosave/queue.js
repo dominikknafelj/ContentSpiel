@@ -111,6 +111,7 @@
 // retire that body: forms a generation behind for good. CS Studio does not use
 // it; whoever turns it on must re-stamp the controllers.)
 import { Turbo } from "@hotwired/turbo-rails"
+import { messages } from "i18n/messages"
 
 const HOLD_LIMIT_MS = 30000
 const DRAIN_LIMIT_MS = 10000
@@ -863,13 +864,12 @@ function promotionEnds() {
 // server's own markup (`#toast-error-template` in the layout, as
 // `orderErrorToast` clones it); errors never auto-hide. Not for a press the
 // editor took back by closing its dialog: that entry is gone before release.
-const DROPPED_MESSAGE = "That didn't go through — the screen changed. Try again."
 function droppedToast() {
   const toast = document.getElementById("toast-error-template")?.content.firstElementChild?.cloneNode(true)
   const region = document.getElementById("toasts")
   if (!toast || !region) return
   toast.id = "toast-promotion-dropped"
-  toast.querySelector("span").textContent = DROPPED_MESSAGE
+  toast.querySelector("span").textContent = messages(document.body).t("components.toast.dropped")
   document.getElementById(toast.id)?.remove()
   region.append(toast)
 }

@@ -24,7 +24,7 @@ module Admin
     # what it affects (deleting a group names the tokens it revokes).
     renders_one :details
 
-    def initialize(id:, title:, body: nil, cancel_label: "Cancel", destructive: false)
+    def initialize(id:, title:, body: nil, cancel_label: nil, destructive: false)
       @id = id
       @title = title
       @body = body
@@ -34,6 +34,9 @@ module Admin
 
     private
 
-    attr_reader :id, :title, :body, :cancel_label, :destructive
+    attr_reader :id, :title, :body, :destructive
+
+    # A default argument can't ask `t`: nothing is rendering yet at `initialize`.
+    def cancel_label = @cancel_label || t(".cancel")
   end
 end

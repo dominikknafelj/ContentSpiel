@@ -84,7 +84,18 @@ module Admin
 
     def status_id = "#{id}-status"
 
-    def remove_label(chip) = "Remove #{chip[:label]}"
+    def remove_label(chip) = t(".remove", label: chip[:label])
+
+    # What `admin--chip-input` says and writes into the page, by key
+    # (`app/javascript/i18n/messages.js`): the same keys the server-rendered
+    # chips above use, so a chip the script adds reads like one rendered here.
+    # The noun is the caller's `noun:` (a key under `nouns`).
+    def messages
+      messages_data("admin.components", "chip_input.nouns.#{noun}", "chip_input.remove", "chip_input.untitled",
+        "chip_input.too_long", "chip_input.no_matches", "chip_input.results", "chip_input.create", "chip_input.search_failed",
+        "chip_input.already_added", "chip_input.added", "chip_input.removed", "status_chip.labels.draft",
+        "status_chip.labels.scheduled")
+    end
 
     # The `data:` a hidden input carries so the explicit-save footer counts it.
     def track_data = track ? { save_bar_track: true } : {}

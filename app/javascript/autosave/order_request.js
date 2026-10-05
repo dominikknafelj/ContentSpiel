@@ -25,12 +25,15 @@
 // send time and writes the answer's back (`syncBases`) exactly as before.
 // `sendOrder` never throws, so the task always ends and the slot is released.
 
-// The texts of the toast. `signedOut` is word for word the autosave status
-// line's (`admin--autosave`'s `texts.signedOut`, `Admin::SaveStatusComponent`'s
+import { messages } from "i18n/messages"
+
+// The texts of the toast are the page's messages (`i18n/messages.js`).
+// `signedOut` is the autosave status line's own key
+// (`components.save_status.signed_out`, `Admin::SaveStatusComponent`'s
 // `:signed_out`): the same thing happened, and the same thing fixes it.
-export const orderMessages = {
-  failed: "Couldn't save the new order. Check your connection and try again.",
-  signedOut: "Signed out — sign in again to keep saving"
+const ORDER_MESSAGES = {
+  failed: "components.toast.order_failed",
+  signedOut: "components.save_status.signed_out"
 }
 
 // Sends the PATCH and answers with one of:
@@ -73,7 +76,7 @@ export function orderErrorToast(outcome, id) {
   if (!toast || !region) return
 
   toast.id = id
-  toast.querySelector("span").textContent = orderMessages[outcome] || orderMessages.failed
+  toast.querySelector("span").textContent = messages(document.body).t(ORDER_MESSAGES[outcome] || ORDER_MESSAGES.failed)
   document.getElementById(id)?.remove()
   region.append(toast)
 }

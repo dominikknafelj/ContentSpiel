@@ -32,7 +32,7 @@ module Admin
     attr_reader :entries, :field_ids
 
     def heading
-      entries.size == 1 ? "1 thing needs fixing" : "#{entries.size} things need fixing"
+      t(".heading", count: entries.size)
     end
 
     def normalize(errors)

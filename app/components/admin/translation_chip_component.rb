@@ -17,7 +17,11 @@ module Admin
       outdated: { classes: "border-warn text-warn-ink", glyph: "↻" }
     }.freeze
 
-    ARIA_STATES = { complete: "translated", missing: "not translated", outdated: "outdated" }.freeze
+    # The state as one lower-case word ("not translated"), for a caller that
+    # builds its own label around it (`TranslationScreen::MatrixComponent`).
+    # The chip's own labels are whole sentences with the language in them
+    # (`aria_label`), never this word glued on.
+    def self.state_word(state) = I18n.t("admin.components.translation_chip.state.#{state}", raise: true)
 
     def initialize(state:, locale:)
       @state = state.to_sym
@@ -31,18 +35,14 @@ module Admin
       tag.span(safe_join([ @locale, style[:glyph] ].compact, " "),
         class: "admin-translation-chip inline-flex items-center gap-0.5 rounded-cs border px-1 font-cs-mono text-[10px] uppercase #{style[:classes]}",
         role: "img", title: tooltip,
-        aria: { label: "#{::Locales.name(@locale, native: true)}: #{ARIA_STATES.fetch(@state)}" },
+        aria: { label: t(".aria_label.#{@state}", language: ::Locales.name(@locale, native: true)) },
         data: { locale: @locale, translation_state: @state })
     end
 
     # Outdated names the source language, so the hover says what to compare
     # against; the aria-label stays the short state word.
     def tooltip
-      case @state
-      when :complete then "Translated"
-      when :missing then "Not translated"
-      when :outdated then "#{::Locales.name(::Translations.primary_locale, native: true)} changed since translation"
-      end
+      t(".tooltip.#{@state}", language: ::Locales.name(::Translations.primary_locale, native: true))
     end
   end
 end

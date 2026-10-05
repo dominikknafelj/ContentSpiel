@@ -24,7 +24,7 @@ module Admin
     def render? = !time.nil?
 
     def call
-      tag.time(phrase, datetime: time.iso8601, title: @title || time.strftime("%-d %b %Y, %H:%M"))
+      tag.time(phrase, datetime: time.iso8601, title: @title || I18n.l(time, format: :"admin.datetime"))
     end
 
     private
@@ -33,18 +33,18 @@ module Admin
 
     def phrase
       now = Time.zone.now
-      return time.strftime(time.year == now.year ? "%-d %b, %H:%M" : "%-d %b %Y, %H:%M") if time > now
+      return I18n.l(time, format: time.year == now.year ? :"admin.short_datetime" : :"admin.datetime") if time > now
 
       seconds = now - time
-      return "just now" if seconds < 1.minute
-      return "#{(seconds / 1.minute).floor}m ago" if seconds < 1.hour && time.to_date == now.to_date
-      return "#{(seconds / 1.hour).floor}h ago" if seconds < 1.day && time.to_date == now.to_date
-      return "yesterday" if time.to_date == now.to_date - 1
+      return t(".just_now") if seconds < 1.minute
+      return t(".minutes_ago", count: (seconds / 1.minute).floor) if seconds < 1.hour && time.to_date == now.to_date
+      return t(".hours_ago", count: (seconds / 1.hour).floor) if seconds < 1.day && time.to_date == now.to_date
+      return t(".yesterday") if time.to_date == now.to_date - 1
       days = (now.to_date - time.to_date).to_i
-      return "#{days}d ago" if days < 7
-      return time.strftime("%-d %b") if time.year == now.year
+      return t(".days_ago", count: days) if days < 7
+      return I18n.l(time, format: :"admin.short") if time.year == now.year
 
-      time.strftime("%-d %b %Y")
+      I18n.l(time, format: :"admin.short_with_year")
     end
   end
 end

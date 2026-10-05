@@ -11,7 +11,7 @@ module Admin
   # password form needs `data-password-submit` on it so the strength meter can
   # hold the submit back until the password is long enough.
   class SaveBarComponent < AdminComponent
-    def initialize(form_id:, cancel_url:, save_label: "Save", save_data: {})
+    def initialize(form_id:, cancel_url:, save_label: nil, save_data: {})
       @form_id = form_id
       @cancel_url = cancel_url
       @save_label = save_label
@@ -20,6 +20,9 @@ module Admin
 
     private
 
-    attr_reader :form_id, :cancel_url, :save_label, :save_data
+    attr_reader :form_id, :cancel_url, :save_data
+
+    # A default argument can't ask `t`: nothing is rendering yet at `initialize`.
+    def save_label = @save_label || t(".save")
   end
 end

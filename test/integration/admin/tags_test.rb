@@ -143,7 +143,7 @@ class Admin::TagsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/tags/#{other.id}", params: { tag: { name: "rails" }, base_updated_at: other.updated_at.iso8601(6) }, as: :turbo_stream
     assert_response :unprocessable_entity
-    assert_match(/Couldn.*?t save — 1 problem/, response.body.gsub("problems", "problem"))
+    assert_match(/Couldn.*?t save — 1 problem(?!s)/, response.body)
     assert_match(/has already been taken/, response.body)
     assert_equal "ruby", other.reload.name
   end
