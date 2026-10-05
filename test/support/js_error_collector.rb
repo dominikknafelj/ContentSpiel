@@ -24,10 +24,24 @@ module JsErrorCollector
   # Errors the application cannot prevent, each with the reason it can't. A
   # matcher gets the CDP `exceptionDetails` hash and must be as narrow as the
   # one error it names: widening one to silence a new failure hides defects.
+  #
+  # Turbo's bundle is served as `/assets/turbo.min-<digest>.js` (the importmap
+  # pin `turbo.min.js`).
+  TURBO_BUNDLE = %r{/assets/turbo\.min[-.]}
+
   IGNORED = [
     [
-      ->(details) { JsErrorCollector.message_of(details).match?(/\AUncaught \(in promise\) AbortError\b/) },
-      "Turbo: a <turbo-frame> disconnected mid-load aborts its fetch and the AbortError escapes unhandled"
+      ->(details) {
+        urls = [ details["url"], *details.dig("stackTrace", "callFrames")&.map { |frame| frame["url"] } ]
+        JsErrorCollector.message_of(details).match?(/\AUncaught \(in promise\) AbortError\b/) &&
+          urls.any? { |url| url.to_s.match?(TURBO_BUNDLE) }
+      },
+      "Turbo: a <turbo-frame> disconnected mid-load aborts its fetch and the AbortError escapes unhandled " \
+      "(an unawaited read on the aborted response, with the Turbo bundle in its stack). Only an AbortError " \
+      "that comes from the Turbo bundle is ignored; one from our own code is a defect. The real error's " \
+      "shape was never reproduced (the matcher is built from the Turbo-shaped errors that were seen: bare " \
+      "text \"Uncaught (in promise)\", exception.description \"AbortError: ...\", Turbo's url): if the " \
+      "flake surfaces with another shape, adjust this matcher from the failure's message and frame."
     ]
   ].freeze
 
