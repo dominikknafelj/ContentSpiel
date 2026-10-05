@@ -682,8 +682,8 @@ DEPENDENCIES
   lookbook (~> 2.3)
   mcp (~> 1.6)
   mobility (~> 1.3)
-  opentelemetry-instrumentation-all (~> 0.97)
   opentelemetry-exporter-otlp (~> 0.37)
+  opentelemetry-instrumentation-all (~> 0.97)
   opentelemetry-sdk (~> 1.13)
   pg (~> 1.1)
   propshaft
