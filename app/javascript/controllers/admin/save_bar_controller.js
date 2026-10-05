@@ -133,7 +133,7 @@ const mustAsk = () => !shared.leaving && guarded().length > 0
 // password manager fills a field) made the guard cancel it and ask "Leave
 // without saving?" about the very screen that had just opened -- and re-arm
 // an open dialog's Discard with a visit to the page already showing.
-// As the write queue does for the same visit (`autosave/queue.js`,
+// As the write queue does for the same visit (`autosave/frame_hold.js`,
 // `expectVisit`), the frame's URL is noted as `#content` renders and the next
 // `turbo:before-visit` to exactly that URL is let through. The note is spent
 // by the next visit whichever it is, and expires: not every frame render is

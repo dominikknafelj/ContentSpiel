@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# The promotion hold (`app/javascript/autosave/queue.js`, "THE PROMOTION
+# The promotion hold (`app/javascript/autosave/promotion_hold.js`, "THE PROMOTION
 # HOLD"). A link into `#content` is a frame navigation that Turbo promotes to
 # a page visit once the frame has rendered, and that visit's start stops any
 # form submission Turbo's session is running: the POST is done on the server,

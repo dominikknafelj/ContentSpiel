@@ -1,6 +1,6 @@
 require "application_system_test_case"
 
-# Closing the tab, or reloading it, on an autosave screen (`autosave/queue.js`,
+# Closing the tab, or reloading it, on an autosave screen (`autosave/queue_core.js`,
 # "THE UNLOAD GUARD"): the browser asks first exactly when leaving would lose
 # something -- an edit not yet sent or not yet answered, or text a refused save
 # left only in the page -- and never on a screen that has nothing to lose.

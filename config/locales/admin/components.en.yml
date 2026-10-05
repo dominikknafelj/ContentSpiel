@@ -22,7 +22,7 @@ en:
         # What the layout's `<template id="toast-error-template">` is cloned
         # with when a save got no answer at all, and the two sentences a
         # script puts into a clone of it (`autosave/order_request.js`,
-        # `autosave/queue.js`).
+        # `autosave/promotion_hold.js`).
         save_failed: "Couldn't save."
         order_failed: "Couldn't save the new order. Check your connection and try again."
         dropped: "That didn't go through — the screen changed. Try again."

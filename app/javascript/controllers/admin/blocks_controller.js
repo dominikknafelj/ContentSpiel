@@ -50,7 +50,7 @@ export default class extends Controller {
 
   connect() {
     // The page this list was rendered on: a reorder belongs to it whenever it
-    // is queued (`autosave/queue.js`, "PAGE GENERATIONS").
+    // is queued (`autosave/queue_state.js`, "PAGE GENERATIONS").
     this.generation = currentGeneration()
     // A write (never a GET) waits its turn in the page-level queue
     // (`autosave/queue.js`) and reads the page base when it is actually sent;

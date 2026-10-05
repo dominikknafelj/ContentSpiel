@@ -172,7 +172,7 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # (Create user): that render is promoted the same way.
   #
   # The write queue itself holds a non-GET form pressed in that window (the
-  # "promotion hold", `autosave/queue.js`), so a write is no longer lost
+  # "promotion hold", `autosave/promotion_hold.js`), so a write is no longer lost
   # there; `test/system/admin/promotion_hold_test.rb` presses without this
   # wait on purpose, and must keep doing so.
   def click_frame_link(locator = nil, **options)

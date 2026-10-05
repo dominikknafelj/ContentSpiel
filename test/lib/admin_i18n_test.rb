@@ -77,6 +77,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/autosave_controller.js
     app/javascript/autosave/order_request.js
     app/javascript/autosave/queue.js
+    app/javascript/autosave/queue_state.js
+    app/javascript/autosave/queue_core.js
+    app/javascript/autosave/frame_hold.js
+    app/javascript/autosave/promotion_hold.js
     app/views/admin/tags/index.html.erb
     app/controllers/admin/tags_controller.rb
     app/controllers/admin/tag_suggestions_controller.rb
