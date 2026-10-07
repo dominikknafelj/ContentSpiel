@@ -332,11 +332,12 @@ module Admin
     # comparisons so a post can't be counted as live and scheduled at once.
     def scope_counts
       now = Time.current
+      published_at = Post.arel_table[:published_at]
       all, live, drafts, scheduled = base_posts.reorder(nil).pick(
-        Arel.sql("COUNT(*)"),
-        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at <= ?)", now ])),
-        Arel.sql("COUNT(*) FILTER (WHERE posts.published_at IS NULL)"),
-        Arel.sql(Post.sanitize_sql_array([ "COUNT(*) FILTER (WHERE posts.published_at > ?)", now ]))
+        Arel.star.count,
+        SqlNodes.count_where(published_at.lteq(now)),
+        SqlNodes.count_where(published_at.eq(nil)),
+        SqlNodes.count_where(published_at.gt(now))
       )
       { "all" => all, "live" => live, "drafts" => drafts, "scheduled" => scheduled }
     end
