@@ -28,20 +28,29 @@ module Audit
     scope :by_user, ->(user) { where(user_id: user.id) }
 
     # The events on either side of `event` in the log's own order
-    # (`last_occurred_at, id`, see `Audit::Filter.ordered`): a row comparison
-    # on the very pair `index_audit_events_on_recent` is ordered by, so the
-    # neighbour of an event is one indexed lookup. Neither scope orders.
-    scope :older_in_log_than, ->(event) { where("(audit_events.last_occurred_at, audit_events.id) < (?, ?)", event.last_occurred_at, event.id) }
-    scope :newer_in_log_than, ->(event) { where("(audit_events.last_occurred_at, audit_events.id) > (?, ?)", event.last_occurred_at, event.id) }
+    # (`last_occurred_at, id`, see `Audit::Filter.ordered`): a row comparison,
+    # `(last_occurred_at, id) < (?, ?)`, on the very pair
+    # `index_audit_events_on_recent` is ordered by, so the neighbour of an
+    # event is one indexed lookup. It stays a row comparison (`SqlNodes.row`)
+    # rather than `a < x OR (a = x AND b < y)`, which says the same and which
+    # the planner doesn't read as one index bound. Neither scope orders.
+    scope :older_in_log_than, ->(event) { where(log_position.lt(SqlNodes.row(event.last_occurred_at, event.id))) }
+    scope :newer_in_log_than, ->(event) { where(log_position.gt(SqlNodes.row(event.last_occurred_at, event.id))) }
 
     # Of the events in the relation, only the newest of each subject (by when
-    # it was recorded, `occurred_at`, then id) -- `DISTINCT ON`, so however
-    # many subjects are asked about it is one query. It selects and orders:
-    # put the conditions before it.
+    # it was recorded, `occurred_at`, then id) -- `DISTINCT ON (subject_type,
+    # subject_id) audit_events.*`, so however many subjects are asked about it
+    # is one query. Active Record has no `distinct_on`, so the select list is
+    # the two nodes side by side (`Fragments`). It selects and orders: put the
+    # conditions before it.
     scope :newest_per_subject, -> {
-      select("DISTINCT ON (audit_events.subject_type, audit_events.subject_id) audit_events.*")
-        .order(Arel.sql("audit_events.subject_type, audit_events.subject_id, audit_events.occurred_at DESC, audit_events.id DESC"))
+      per_subject = Arel::Nodes::DistinctOn.new([ arel_table[:subject_type], arel_table[:subject_id] ])
+      select(Arel::Nodes::Fragments.new([ per_subject, arel_table[Arel.star] ]))
+        .order(:subject_type, :subject_id, occurred_at: :desc, id: :desc)
     }
+
+    # `(last_occurred_at, id)`: where an event stands in the log's order.
+    def self.log_position = SqlNodes.row(arel_table[:last_occurred_at], arel_table[:id])
 
     before_update :only_coalescing_columns_changed
     before_destroy { throw :abort }

@@ -55,7 +55,11 @@ module Audit
         last_occurred_at: (now - COALESCE_WINDOW)..
       )
       if attributes[:action] == "access.denied"
-        scope = scope.where("metadata->>'permission' IS NOT DISTINCT FROM ?", attributes[:metadata]["permission"])
+        # `metadata ->> 'permission' IS NOT DISTINCT FROM ?`: a denial recorded
+        # without a permission matches only another without one, which `=`
+        # (NULL = NULL is not true) would never say.
+        permission = SqlNodes.json_text(Event.arel_table[:metadata], "permission")
+        scope = scope.where(permission.is_not_distinct_from(attributes[:metadata]["permission"]))
       end
       scope.order(last_occurred_at: :desc, id: :desc)
     end
