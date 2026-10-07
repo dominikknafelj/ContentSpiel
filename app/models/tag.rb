@@ -60,6 +60,6 @@ class Tag < ApplicationRecord
   # `{ tag id => how many of the given posts carry it }` for these tag ids, in
   # one grouped query; a tag none of them carries has no entry.
   def self.posts_counts(posts, ids)
-    posts.joins(:post_tags).where(post_tags: { tag_id: ids }).group(PostTag.arel_table[:tag_id]).count
+    posts.joins(:post_tags).where(post_tags: { tag_id: ids }).group(post_tags: :tag_id).count
   end
 end
