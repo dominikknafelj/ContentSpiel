@@ -104,7 +104,7 @@ module Translations
       parts << Media::Asset.kept.where(holds_translation(Media::Asset))
       parts << SiteSetting.where(holds_translation(SiteSetting))
       counts = parts.map { |relation| Arel::Nodes::Grouping.new(relation.select(Arel.star.count).arel.ast) }
-      # sql: no string here -- a SELECT with no table has no relation to run it, so the Arel statement goes to the connection
+      # sql: an Arel SELECT with no FROM (the sum of four counts) has no relation to run it
       State.connection.select_value(Arel::SelectManager.new.project(counts.reduce(:+))).to_i
     end
 
@@ -153,7 +153,7 @@ module Translations
         total = base.count
         result.each_value { |counts| counts[:total] += total }
         base.joins(state_join(relation.klass, locales, Arel::Nodes::InnerJoin)).merge(State.where(state: %w[missing outdated]))
-          .group(State.arel_table[:locale], State.arel_table[:state]).count
+          .group(translation_states: %i[locale state]).count
           .each { |(locale, state), count| result.fetch(locale)[state.to_sym] += count }
       end
       result.transform_values { |counts| counts.merge(complete: counts[:total] - counts[:missing] - counts[:outdated]) }

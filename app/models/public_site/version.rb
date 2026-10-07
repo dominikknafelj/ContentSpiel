@@ -25,6 +25,7 @@ module PublicSite
     # missing row, the loser's becomes the update.
     def self.bump!
       upsert({ id: ROW_ID, counter: 1 }, unique_by: :id,
+        # sql: `upsert`'s ON CONFLICT ... DO UPDATE SET takes SQL text; Arel has no node for the `excluded` row
         on_duplicate: Arel.sql("counter = public_site_versions.counter + 1, updated_at = excluded.updated_at"))
     end
   end

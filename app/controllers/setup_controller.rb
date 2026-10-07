@@ -153,7 +153,7 @@ class SetupController < ApplicationController
       result = nil
 
       User.transaction do
-        User.connection.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE")
+        User.connection.execute("LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE") # sql: neither Active Record nor Arel has a table lock; a constant statement
         result = Users::Save.call(User.new, attributes: attributes, actor: nil) if User.none?
       end
 
