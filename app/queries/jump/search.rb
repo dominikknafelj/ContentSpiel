@@ -10,9 +10,10 @@ module Jump
   # the viewer couldn't open is never suggested.
   #
   # The query is user text inside a LIKE pattern: the title scope
-  # (`TitleSearch`) escapes `%`, `_` and `\` with `sanitize_sql_like`, so "%"
-  # searches for a percent sign rather than matching everything. It is cut to MAX_QUERY characters first, so a
-  # pasted novel is a short search, not an error.
+  # (`TitleSearch`) escapes `%`, `_` and `\` (`SqlNodes.like_pattern`), so "%"
+  # searches for a percent sign rather than matching everything. It is cut to
+  # MAX_QUERY characters first, so a pasted novel is a short search, not an
+  # error.
   #
   # A row says where it goes as a ROUTE -- `[route name, arguments, params]`,
   # `[:admin_page_path, [ page ], {}]` -- and never as a URL: a query knows no
