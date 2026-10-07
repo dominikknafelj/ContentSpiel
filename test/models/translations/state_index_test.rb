@@ -124,6 +124,34 @@ class Translations::StateIndexTest < ActiveSupport::TestCase
     assert_equal [ done ], Translations::StateIndex.joins(Page.kept.where.not(parent_id: nil), locale: "de", states: %w[complete]).to_a
   end
 
+  # The edges of the node-built conditions: no state asked for, several
+  # states, a caller's own join and order beside this one's.
+  test "joins: no state matches nothing, complete includes a record with no row, and it composes" do
+    done = create_page(title: "Done", translations: { "de" => { title: "Fertig" } })
+    todo = create_page(title: "Todo")
+    rowless = create_page(title: "No row")
+    Translations::State.where(record_type: "Page", record_id: rowless.id).delete_all
+    pages = Page.kept.where(id: [ done.id, todo.id, rowless.id ])
+
+    assert_empty Translations::StateIndex.joins(pages, locale: "de", states: [])
+    assert_equal [ todo ], Translations::StateIndex.joins(pages, locale: :de, states: :missing).to_a
+    assert_equal [ done, rowless ].map(&:id).sort, Translations::StateIndex.joins(pages, locale: "de", states: %w[complete outdated]).ids.sort
+    assert_equal [ done, todo, rowless ].map(&:id).sort, Translations::StateIndex.joins(pages, locale: "de", states: %w[complete missing]).ids.sort
+    assert_equal 1, Translations::StateIndex.joins(pages.order(updated_at: :desc), locale: "de", states: "missing").limit(5).count
+  end
+
+  test "exists_in_any_locale_sql is a condition for where and where.not; no language matches no record" do
+    done = create_page(title: "Done", translations: { "de" => { title: "Fertig" }, "es" => { title: "Hecho" } })
+    todo = create_page(title: "Todo")
+    pages = Page.kept.where(id: [ done.id, todo.id ])
+    needs = ->(locales) { Translations::StateIndex.exists_in_any_locale_sql(Page, states: %w[missing outdated], locales:) }
+
+    assert_equal [ todo ], pages.where(needs.call(%w[de es])).to_a
+    assert_equal [ done ], pages.where.not(needs.call(%i[de])).to_a
+    assert_empty pages.where(needs.call([]))
+    assert_equal 2, pages.where.not(needs.call([])).count
+  end
+
   test "work_list keeps only what needs work, outdated first, then the most recently changed original" do
     create_page(title: "Done", translations: { "de" => { title: "Fertig" }, "es" => { title: "Hecho" } })
     missing_old = travel_to(3.days.ago) { create_page(title: "Missing, older") }

@@ -1,8 +1,8 @@
 # The library search query (media library design spec §6): title, alt (any
-# locale's jsonb value) and the original filename, one `:q` bind reused for
-# all three ILIKEs -- there is no string interpolation of the search term
-# anywhere in the SQL this builds, only the named bind Postgres substitutes
-# safely.
+# locale's jsonb value) and the original filename, one pattern for all three
+# ILIKEs. Every condition here is an Arel node (`SqlNodes`), so the search
+# term and the viewer's id reach the query as quoted values and there is no
+# SQL text to interpolate anything into.
 #
 # Pulled out of `Admin::MediaController` (Task 7) so the MCP `list_media_tool`,
 # the ⌘K palette and the Media screen all search the same way without
@@ -48,12 +48,10 @@ class Media::Search
     # `unscope(:includes)`: the default scope preloads variants, and a `pick`
     # over a relation with `includes` turns into an eager-loading join with a
     # `DISTINCT ... LIMIT 1` subselect -- one row's worth of counts.
+    # `COUNT(*), COUNT(*) FILTER (WHERE <segment>), ...`: the segments' own
+    # conditions, the ones `#segment` narrows by.
     all, unused, missing_alt, untranslated, mine = matching.unscope(:includes, :order).pick(
-      Arel.sql("COUNT(*)"),
-      Arel.sql("COUNT(*) FILTER (WHERE #{UNUSED_SQL})"),
-      Arel.sql("COUNT(*) FILTER (WHERE #{missing_alt_sql})"),
-      Arel.sql("COUNT(*) FILTER (WHERE #{untranslated_sql})"),
-      Arel.sql("COUNT(*) FILTER (WHERE #{mine_sql})")
+      Arel.star.count, *%w[unused missing_alt untranslated mine].map { |name| SqlNodes.count_where(condition(name)) }
     )
     { all: all, unused: unused, missing_alt: missing_alt, untranslated: untranslated, mine: mine }
   end
@@ -62,12 +60,12 @@ class Media::Search
   def matching
     return @scope if @query.blank?
 
-    like = "%#{Media::Asset.sanitize_sql_like(@query)}%"
-    # `jsonb_each_text(media_assets.alt)` unnests the translated `{locale =>
-    # text}` hash into rows so ILIKE can test every language's value, not
-    # just the one the caller happens to be viewing in -- an `EXISTS`
-    # correlated subquery, not a join, so it can't multiply a matching
-    # asset's own row for however many locales matched.
+    pattern = SqlNodes.like_pattern(@query)
+    # `jsonb_each_text(media_assets.alt)` (`SqlNodes.any_json_value`) unnests
+    # the translated `{locale => text}` hash into rows so ILIKE can test every
+    # language's value, not just the one the caller happens to be viewing in
+    # -- an `EXISTS` correlated subquery, not a join, so it can't multiply a
+    # matching asset's own row for however many locales matched.
     #
     # `file_attachment: :blob` is the same association `Media::Asset
     # ::VARIANT_INCLUDES`/`#with_variants` already preload, joined here (not
@@ -76,49 +74,59 @@ class Media::Search
     # #file_is_attached`), so the inner join can't drop or duplicate a row
     # the way joining a one-to-many association could.
     @scope.joins(file_attachment: :blob).where(
-      "media_assets.title ILIKE :q " \
-      "OR EXISTS (SELECT 1 FROM jsonb_each_text(media_assets.alt) AS alt(locale, value) WHERE alt.value ILIKE :q) " \
-      "OR active_storage_blobs.filename ILIKE :q",
-      q: like
+      assets[:title].matches(pattern)
+        .or(SqlNodes.any_json_value(assets[:alt]) { |value| value.matches(pattern) })
+        .or(ActiveStorage::Blob.arel_table[:filename].matches(pattern))
     )
   end
 
   private
 
-  # No `usages` row at all (`Media::Asset.unused`, as SQL for a FILTER).
-  UNUSED_SQL = "NOT EXISTS (SELECT 1 FROM media_usages WHERE media_usages.media_asset_id = media_assets.id)".freeze
+  def assets = Media::Asset.arel_table
 
   def available?(name) = name != "untranslated" || Translations.target_locales.any?
 
+  # A segment's condition on `media_assets`, one definition for the list
+  # (`#segment`) and for its number (`#counts`).
+  def condition(name)
+    case name
+    when "unused" then unused
+    when "missing_alt" then missing_alt
+    when "untranslated" then untranslated
+    when "mine" then mine
+    end
+  end
+
+  # No `usages` row at all (what `Media::Asset.unused` lists, as a condition a
+  # FILTER can take): `NOT EXISTS (SELECT 1 FROM media_usages WHERE
+  # media_usages.media_asset_id = media_assets.id)`.
+  def unused
+    SqlNodes.exists(Media::Usage.where(Media::Usage.arel_table[:media_asset_id].eq(assets[:id])).select(1)).not
+  end
+
   # The default-language alt is blank (absent, null or whitespace): an alt
   # written only in German is still "missing" while English is the default.
+  # `COALESCE(alt ->> 'en', '') !~ '\S'`.
   #
   # "Whitespace" as Ruby's `String#strip` means it, because that is what the
   # tile's NO ALT chip and the panel's warning use (`TileComponent#no_alt?`,
   # `PanelComponent#alt_warn?`): `!~ '\S'` is "holds no non-whitespace
   # character". Postgres's one-argument `btrim` removes spaces only, so an alt
   # of a newline or a tab wore the chip without being listed here.
-  def missing_alt_sql
-    Media::Asset.sanitize_sql_array([ "COALESCE(media_assets.alt ->> ?, '') !~ '\\S'", Locales.default.to_s ])
+  def missing_alt
+    SqlNodes.coalesce(SqlNodes.json_text(assets[:alt], Locales.default), "").does_not_match_regexp("\\S")
   end
 
   # `missing` in ANY target language, from the stored `translation_states`
   # rows; an image with no row reads complete, so it is not untranslated.
-  def untranslated_sql
-    return "FALSE" unless available?("untranslated")
+  def untranslated
+    return Arel::Nodes::False.new unless available?("untranslated")
 
     Translations::StateIndex.exists_in_any_locale_sql(Media::Asset, states: %w[missing], locales: Translations.target_locales)
   end
 
-  def mine_sql = @user_id ? Media::Asset.sanitize_sql_array([ "media_assets.created_by_id = ?", @user_id ]) : "FALSE"
+  # The viewer's own uploads; nobody's when there is no viewer.
+  def mine = @user_id ? assets[:created_by_id].eq(@user_id) : Arel::Nodes::False.new
 
-  def segment(scope, name)
-    case name
-    when "unused" then scope.where(UNUSED_SQL)
-    when "missing_alt" then scope.where(missing_alt_sql)
-    when "untranslated" then scope.where(untranslated_sql)
-    when "mine" then scope.where(mine_sql)
-    else scope
-    end
-  end
+  def segment(scope, name) = name == "all" ? scope : scope.where(condition(name))
 end
