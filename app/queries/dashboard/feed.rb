@@ -15,7 +15,7 @@ module Dashboard
   # MCP is still mine.
   #
   # The newest event is decided in SQL, per row, through a LATERAL subquery
-  # (`#with_newest_event`) rather than by loading candidates and checking
+  # (`#with_newest_event`, named `newest`) rather than by loading candidates and checking
   # them in Ruby: a filter applied before the LIMIT can't under-fill a list
   # the way "load 3x the limit, then drop what isn't mine" can, and it keeps
   # each list to exactly one query per model however many records exist.
@@ -31,6 +31,10 @@ module Dashboard
     # The LATERAL join excludes exactly this list. (`Dashboard::Activity`
     # never lists the action either: it only lists content events.)
     NOT_A_CHANGE = %w[access.denied].freeze
+
+    # The LATERAL subquery `#with_newest_event` joins, as a table to read its
+    # columns from: `newest.newest_user_id`, `newest.newest_at`.
+    NEWEST = Arel::Table.new("newest")
 
     # `channel:` is captured here rather than read from `Current` each time
     # a list is first asked for: the lists are lazy, and a view may well
@@ -52,10 +56,9 @@ module Dashboard
           # The limit is taken on the ids first, so the LATERAL "newest
           # event" lookup runs for at most LIMIT rows, not for every
           # scheduled record before the cut.
-          soonest = relation.select("#{relation.quoted_table_name}.id").limit(LIMITS[:going_live_next])
+          soonest = relation.select(:id).limit(LIMITS[:going_live_next])
           outer = relation.klass.where(id: soonest).reorder(published_at: :asc, id: :asc)
-          with_newest_event(outer, join: "LEFT JOIN")
-            .select("#{outer.quoted_table_name}.*, newest.newest_user_id AS dashboard_newest_user_id").to_a
+          with_newest_event(outer).select(outer.arel_table[Arel.star], NEWEST[:newest_user_id].as("dashboard_newest_user_id")).to_a
         end
         .then { |records| soonest_first(records, :published_at, LIMITS[:going_live_next]) }
     end
@@ -88,18 +91,15 @@ module Dashboard
     # Each (already ordered) relation narrowed to my records -- a post I
     # authored, or a record whose newest event is mine -- and loaded, at
     # most `limit` per relation (the caller sorts and cuts the merged set
-    # to the same limit). LEFT JOIN, so an authored post with no event at all
-    # still counts.
+    # to the same limit). The join is a LEFT JOIN, so an authored post with no
+    # event at all still counts.
     def mine(relations, limit:)
       return [] unless @user
 
       relations.flat_map do |relation|
-        table = relation.quoted_table_name
-        condition = +"newest.newest_user_id = :user"
-        condition << " OR #{table}.author_id = :user" if relation.klass <= Post
-        with_newest_event(relation, join: "LEFT JOIN")
-          .where(condition, user: @user.id)
-          .limit(limit).to_a
+        mine = NEWEST[:newest_user_id].eq(@user.id)
+        mine = mine.or(relation.arel_table[:author_id].eq(@user.id)) if relation.klass <= Post
+        with_newest_event(relation).where(mine).limit(limit).to_a
       end
     end
 
@@ -116,41 +116,52 @@ module Dashboard
     # An event about a block deleted since can't be traced back to its owner
     # any more (the block row is gone) -- its edit still shows through the
     # owner's `updated_at`, which `ContentBlocks::Destroy` bumps.
-    def with_newest_event(relation, join: "JOIN")
-      table = relation.quoted_table_name
-      own = <<~SQL.squish
-        SELECT e.user_id, e.last_occurred_at, e.id
-        FROM audit_events e
-        WHERE e.subject_type IN (:types) AND e.subject_id = #{table}.id AND e.action NOT IN (:ignored)
-        ORDER BY e.last_occurred_at DESC, e.id DESC
-        LIMIT 1
-      SQL
-      candidates = if block_owner?(relation.klass)
-        <<~SQL.squish
-          (#{own})
-          UNION ALL
-          (SELECT e.user_id, e.last_occurred_at, e.id
-           FROM content_blocks b
-           JOIN audit_events e ON e.subject_type IN (:block_types) AND e.subject_id = b.id
-           WHERE b.owner_type = :owner_type AND b.owner_id = #{table}.id AND e.action NOT IN (:ignored)
-           ORDER BY e.last_occurred_at DESC, e.id DESC
-           LIMIT 1)
-        SQL
-      else
-        own
-      end
-      sql = <<~SQL.squish
-        #{join} LATERAL (
-          SELECT c.user_id AS newest_user_id, c.last_occurred_at AS newest_at
-          FROM (#{candidates}) c
-          ORDER BY c.last_occurred_at DESC, c.id DESC
-          LIMIT 1
-        ) newest ON true
-      SQL
-      relation.joins(ActiveRecord::Base.sanitize_sql_array([ sql, {
-        types: subject_type_names(relation.klass), block_types: subject_type_names(ContentBlock),
-        owner_type: relation.klass.base_class.name, ignored: NOT_A_CHANGE
-      } ]))
+    #
+    # The two halves are relations (`#newest_own_event`, `#newest_block_event`)
+    # that refer to the outer row's id; what Active Record has no syntax for --
+    # the UNION ALL, the derived table and the LATERAL join -- is Arel:
+    #
+    #   LEFT OUTER JOIN LATERAL (
+    #     SELECT c.user_id AS newest_user_id, c.last_occurred_at AS newest_at
+    #     FROM ( (<own newest>) UNION ALL (<newest about a block>) ) c
+    #     ORDER BY c.last_occurred_at DESC, c.id DESC LIMIT 1
+    #   ) newest ON TRUE
+    def with_newest_event(relation)
+      model = relation.klass
+      own = newest_own_event(model).arel
+      candidates = block_owner?(model) ? Arel::Nodes::TableAlias.new(own.union(:all, newest_block_event(model).arel), "c") : own.as("c")
+      c = Arel::Table.new("c")
+      newest = Arel::SelectManager.new(candidates)
+        .project(c[:user_id].as("newest_user_id"), c[:last_occurred_at].as("newest_at"))
+        .order(c[:last_occurred_at].desc, c[:id].desc).take(1)
+      relation.joins(model.arel_table.join(newest.lateral("newest"), Arel::Nodes::OuterJoin).on(Arel::Nodes::True.new).join_sources)
+    end
+
+    # The newest event about the outer row itself (`user_id, last_occurred_at,
+    # id`, one row).
+    def newest_own_event(model)
+      events = Audit::Event.arel_table
+      newest_of(Audit::Event.where(subject_type: subject_type_names(model)).where(events[:subject_id].eq(model.arel_table[:id])))
+    end
+
+    # The newest event about any block the outer row owns: `content_blocks
+    # INNER JOIN audit_events ON subject_type IN (<block types>) AND
+    # subject_id = content_blocks.id`, a join on a polymorphic pair no
+    # association describes.
+    def newest_block_event(model)
+      events, blocks = Audit::Event.arel_table, ContentBlock.arel_table
+      about_block = events[:subject_type].in(subject_type_names(ContentBlock)).and(events[:subject_id].eq(blocks[:id]))
+      owned = ContentBlock.joins(blocks.join(events).on(about_block).join_sources)
+        .where(owner_type: model.base_class.name).where(blocks[:owner_id].eq(model.arel_table[:id]))
+      newest_of(owned)
+    end
+
+    # The newest change among the events `relation` reaches: one row of
+    # `user_id, last_occurred_at, id`, `NOT_A_CHANGE` left out.
+    def newest_of(relation)
+      events = Audit::Event.arel_table
+      relation.merge(Audit::Event.where.not(action: NOT_A_CHANGE).order(last_occurred_at: :desc, id: :desc))
+        .select(events[:user_id], events[:last_occurred_at], events[:id]).limit(1)
     end
 
     def block_owner?(model) = AccessControl::Checker::BLOCK_OWNER_PREFIX.key?(model.base_class.name)

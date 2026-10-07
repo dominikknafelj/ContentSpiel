@@ -81,11 +81,11 @@ module Dashboard
     private
 
     def build_rows
-      condition = readable_subjects_sql
-      return [] unless condition # nothing readable: no query at all
+      readable = readable_subjects
+      return [] unless readable # nothing readable: no query at all
 
-      events = Audit::Event.where(action: ACTIONS).where(last_occurred_at: WINDOW.ago..)
-        .where(condition).order(last_occurred_at: :desc, id: :desc).limit(@limit).to_a
+      events = Audit::Event.where(action: ACTIONS).where(last_occurred_at: WINDOW.ago..).and(readable)
+        .order(last_occurred_at: :desc, id: :desc).limit(@limit).to_a
       return [] if events.empty?
 
       records = readable_records(events)
@@ -93,35 +93,34 @@ module Dashboard
       events.filter_map { |event| row_for(event, records) }
     end
 
-    # The SQL condition on an event's subject (see the class comment); nil
-    # for a viewer who can read nothing.
-    def readable_subjects_sql
+    # The events whose subject the viewer may read (see the class comment), as
+    # a relation holding only that condition -- the branches joined by OR --
+    # for `and`; nil for a viewer who can read nothing.
+    def readable_subjects
+      events = Audit::Event.all
       pages = readable_ids(Page, "pages.read")
       posts = readable_ids(Post, "posts.read")
       branches = []
-      branches << "(audit_events.subject_type = 'Page' AND audit_events.subject_id IN (#{pages}))" if pages
-      branches << "(audit_events.subject_type = 'Post' AND audit_events.subject_id IN (#{posts}))" if posts
+      branches << events.where(subject_type: "Page", subject_id: pages) if pages
+      branches << events.where(subject_type: "Post", subject_id: posts) if posts
       owners = []
-      owners << "(owner_type = 'Page' AND owner_id IN (#{pages}))" if pages
-      owners << "(owner_type = 'Post' AND owner_id IN (#{posts}))" if posts
-      if owners.any?
-        branches << "(audit_events.subject_type = 'ContentBlock' AND audit_events.subject_id IN " \
-                    "(SELECT id FROM content_blocks WHERE #{owners.join(' OR ')}))"
-      end
+      owners << ContentBlock.where(owner_type: "Page", owner_id: pages) if pages
+      owners << ContentBlock.where(owner_type: "Post", owner_id: posts) if posts
+      branches << events.where(subject_type: "ContentBlock", subject_id: owners.reduce(:or).select(:id)) if owners.any?
       if AccessControl.holds?(@actor, "media.upload", channel: @channel)
-        types = ([ "Media::Asset" ] + Audit::Event::LEGACY_POLYMORPHIC_TYPES.keys).map { |t| ActiveRecord::Base.connection.quote(t) }.join(", ")
-        branches << "(audit_events.subject_type IN (#{types}) AND audit_events.subject_id IN " \
-                    "(SELECT id FROM #{Media::Asset.quoted_table_name} WHERE trashed_at IS NULL))"
+        types = [ "Media::Asset" ] + Audit::Event::LEGACY_POLYMORPHIC_TYPES.keys
+        branches << events.where(subject_type: types, subject_id: Media::Asset.kept.select(:id))
       end
-      branches.any? ? "(#{branches.join(' OR ')})" : nil
+      branches.reduce(:or)
     end
 
-    # `SELECT id` SQL of the records of `model` the viewer may read, or nil
-    # when they hold no such right at all (so no subquery is built).
+    # The ids (a `SELECT id` subquery) of the records of `model` the viewer may
+    # read, or nil when they hold no such right at all (so no subquery is
+    # built).
     def readable_ids(model, key)
       return unless AccessControl.holds?(@actor, key, channel: @channel)
 
-      AccessControl.scope(@actor, key, model.all, channel: @channel).unscope(:order).select("#{model.quoted_table_name}.id").to_sql
+      AccessControl.scope(@actor, key, model.all, channel: @channel).unscope(:order).select(:id)
     end
 
     def row_for(event, records)

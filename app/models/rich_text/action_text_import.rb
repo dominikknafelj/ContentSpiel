@@ -59,14 +59,20 @@ module RichText
     class SqlSource
       def available? = connection.table_exists?(:action_text_rich_texts)
 
+      # Both tables are ActionText's and the old embed's own, with no model
+      # left to ask: the statements are Arel over the bare table names.
       def each_row(&)
-        connection.select_all("SELECT record_type, record_id, name, locale, body FROM action_text_rich_texts ORDER BY record_type, record_id, locale").each(&)
+        texts = Arel::Table.new("action_text_rich_texts")
+        rows = texts.project(texts[:record_type], texts[:record_id], texts[:name], texts[:locale], texts[:body])
+          .order(texts[:record_type], texts[:record_id], texts[:locale])
+        connection.select_all(rows).each(&) # sql: an Arel SELECT on a legacy table that has no model
       end
 
       def youtube_video_id(id)
         return nil unless connection.table_exists?(:youtube_embeds)
 
-        connection.select_value(ActiveRecord::Base.sanitize_sql([ "SELECT video_id FROM youtube_embeds WHERE id = ?", id.to_i ]))
+        embeds = Arel::Table.new("youtube_embeds")
+        connection.select_value(embeds.project(embeds[:video_id]).where(embeds[:id].eq(id.to_i))) # sql: an Arel SELECT on a legacy table that has no model
       end
 
       private

@@ -87,7 +87,7 @@ module Admin
       @summaries = Translations::StateIndex.summaries(@target_locales, readable.values)
       # What each type would list: the filter's counts, grouped SQL over the
       # index. "Site settings" is one row or none.
-      @counts = readable.transform_values { |relation| relation.where(needs_work_sql(relation.klass)).count }
+      @counts = readable.transform_values { |relation| relation.where(needs_work(relation.klass)).count }
       settings = settings_item
       @counts["settings"] = settings ? 1 : 0 if @types.include?("settings")
       # The settings row is on top of the page's 50, not one of them: page 1
@@ -207,7 +207,7 @@ module Admin
       relations
     end
 
-    def needs_work_sql(model)
+    def needs_work(model)
       Translations::StateIndex.exists_in_any_locale_sql(model, states: %w[missing outdated], locales: @needed_in)
     end
 

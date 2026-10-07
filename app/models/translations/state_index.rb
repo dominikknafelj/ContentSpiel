@@ -93,20 +93,24 @@ module Translations
     # without alt text, or a page with nothing to translate, reads `complete`
     # while holding nothing. A page's or post's blocks roll into it, as in the
     # index (a page whose only translation is in a block counts once). Kept
-    # pages, posts and images only; the settings row has no trash. One query.
-    HOLDS_TRANSLATION = "jsonb_path_exists(%s, '$.*.*')".freeze
-
+    # pages, posts and images only; the settings row has no trash. One query:
+    # `SELECT (SELECT COUNT(*) ...) + (SELECT COUNT(*) ...) + ...`.
     def translated_record_count
       parts = [ Page, Post ].map do |model|
-        table = model.quoted_table_name
-        blocks = ContentBlock.where(owner_type: model.polymorphic_name).where("content_blocks.owner_id = #{table}.id")
-          .where(format(HOLDS_TRANSLATION, "content_blocks.translation_sources"))
-        model.kept.where("#{format(HOLDS_TRANSLATION, "#{table}.translation_sources")} OR EXISTS (#{blocks.select(1).to_sql})")
+        blocks = ContentBlock.where(owner_type: model.polymorphic_name)
+          .where(ContentBlock.arel_table[:owner_id].eq(model.arel_table[:id])).where(holds_translation(ContentBlock))
+        model.kept.where(holds_translation(model).or(SqlNodes.exists(blocks.select(1))))
       end
-      parts << Media::Asset.kept.where(format(HOLDS_TRANSLATION, "#{Media::Asset.quoted_table_name}.translation_sources"))
-      parts << SiteSetting.where(format(HOLDS_TRANSLATION, "site_settings.translation_sources"))
-      State.connection.select_value("SELECT #{parts.map { |relation| "(#{relation.select("COUNT(*)").to_sql})" }.join(" + ")}").to_i
+      parts << Media::Asset.kept.where(holds_translation(Media::Asset))
+      parts << SiteSetting.where(holds_translation(SiteSetting))
+      counts = parts.map { |relation| Arel::Nodes::Grouping.new(relation.select(Arel.star.count).arel.ast) }
+      # sql: an Arel SELECT with no FROM (the sum of four counts) has no relation to run it
+      State.connection.select_value(Arel::SelectManager.new.project(counts.reduce(:+))).to_i
     end
+
+    # `jsonb_path_exists(translation_sources, '$.*.*')`: some field has an
+    # entry for some language.
+    def holds_translation(model) = SqlNodes.function("jsonb_path_exists", model.arel_table[:translation_sources], "$.*.*")
 
     # `relation` (pages, posts or images) narrowed to the records whose state
     # in `locale` is one of `states` (Strings; `complete` includes a record
@@ -120,9 +124,12 @@ module Translations
     # outdated would read every readable record before returning nothing.
     def joins(relation, locale:, states:)
       states = Array(states).map(&:to_s)
-      return relation.joins(join_sql(relation.klass, locale)).where("COALESCE(translation_states.state, 'complete') IN (?)", states) if states.include?("complete")
-
-      relation.joins(join_sql(relation.klass, locale, inner: true)).where("translation_states.state IN (?)", states)
+      if states.include?("complete")
+        relation.joins(state_join(relation.klass, locale.to_s, Arel::Nodes::OuterJoin))
+          .where(SqlNodes.coalesce(State.arel_table[:state], "complete").in(states))
+      else
+        relation.joins(state_join(relation.klass, locale.to_s, Arel::Nodes::InnerJoin)).merge(State.where(state: states))
+      end
     end
 
     # `{ total:, complete:, missing:, outdated: }` over the given (already
@@ -145,27 +152,23 @@ module Translations
         base = relation.unscope(:order)
         total = base.count
         result.each_value { |counts| counts[:total] += total }
-        table = relation.klass.quoted_table_name
-        join = ActiveRecord::Base.sanitize_sql_array([
-          "INNER JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{table}.id " \
-          "AND translation_states.locale IN (?)", relation.klass.polymorphic_name, locales
-        ])
-        base.joins(join).where("translation_states.state IN ('missing', 'outdated')")
-          .group("translation_states.locale", "translation_states.state").count
+        base.joins(state_join(relation.klass, locales, Arel::Nodes::InnerJoin)).merge(State.where(state: %w[missing outdated]))
+          .group(translation_states: %i[locale state]).count
           .each { |(locale, state), count| result.fetch(locale)[state.to_sym] += count }
       end
       result.transform_values { |counts| counts.merge(complete: counts[:total] - counts[:missing] - counts[:outdated]) }
     end
 
-    # SQL for "this record is in one of `states` in any of `locales`", for
-    # embedding in a `WHERE` (or a `SELECT` list) over `model`'s table: an
+    # "This record is in one of `states` in any of `locales`" as a condition (an
+    # Arel node, despite the name it has kept) for a `where`, a `where.not`, a
+    # `SELECT` list or a `FILTER` over `model`'s table: an
     # EXISTS rather than `joins`, which narrows by one language. The posts
     # list's Translation filter and the translations matrix both ask about a
     # record as a whole this way; a record with no row never matches.
     def exists_in_any_locale_sql(model, states:, locales:)
       rows = State.where(record_type: model.polymorphic_name, locale: Array(locales).map(&:to_s), state: Array(states).map(&:to_s))
-        .where("translation_states.record_id = #{model.quoted_table_name}.id")
-      "EXISTS (#{rows.to_sql})"
+        .where(State.arel_table[:record_id].eq(model.arel_table[:id]))
+      SqlNodes.exists(rows)
     end
 
     # Matches what `Time#iso8601` writes into `translation_original_changed_at`
@@ -186,7 +189,8 @@ module Translations
     # 16:00 or more ("time zone displacement out of range").
     ISO_TIMESTAMP = "^#{ISO_DATE}T([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(\\.\\d+)?(Z|[+-](0\\d|1[0-5]):[0-5]\\d)$".freeze
 
-    # SQL for when this record's original text last changed, "the most
+    # When this record's original text last changed (an Arel expression, despite
+    # the name it has kept), "the most
     # recently changed original" the translations matrix sorts by: the
     # greatest of the stamps in the record's own `translation_original_changed_at`
     # (any tracked field) and, for a page or post, of its blocks' stamps (a
@@ -194,14 +198,17 @@ module Translations
     # correlated aggregate over the `owner_type, owner_id` index), falling
     # back to `updated_at` for a record that predates the stamps. A save that
     # changes only a translation, or a Confirm, moves none of it.
+    #
+    #   COALESCE(GREATEST(<newest own stamp>, <newest stamp of its blocks>), updated_at)
     def original_changed_at_sql(model)
-      table = model.quoted_table_name
-      parts = [ stamps_max_sql("#{table}.translation_original_changed_at") ]
+      table = model.arel_table
+      newest = [ newest_stamp(table[:translation_original_changed_at]) ]
       if [ Page, Post ].include?(model)
-        parts << stamps_max_sql("blocks.translation_original_changed_at", from: "#{ContentBlock.quoted_table_name} blocks, ",
-          where: "WHERE blocks.owner_type = #{ActiveRecord::Base.connection.quote(model.polymorphic_name)} AND blocks.owner_id = #{table}.id")
+        blocks = ContentBlock.arel_table.alias("blocks")
+        newest << newest_stamp(blocks[:translation_original_changed_at], of: blocks,
+          where: blocks[:owner_type].eq(model.polymorphic_name).and(blocks[:owner_id].eq(table[:id])))
       end
-      "COALESCE(GREATEST(#{parts.join(", ")}), #{table}.updated_at)"
+      SqlNodes.coalesce(SqlNodes.function("GREATEST", *newest), table[:updated_at])
     end
 
     # `relation` (one model's, already read-scoped) as the translations matrix
@@ -214,23 +221,43 @@ module Translations
     # Replaces the relation's own order; the caller limits.
     def work_list(relation, locales:)
       model = relation.klass
-      outdated = Arel.sql(exists_in_any_locale_sql(model, states: %w[outdated], locales:))
-      changed = Arel.sql(original_changed_at_sql(model))
+      outdated = exists_in_any_locale_sql(model, states: %w[outdated], locales:)
+      changed = original_changed_at_sql(model)
       relation.where(exists_in_any_locale_sql(model, states: %w[missing outdated], locales:))
         .reorder(outdated.desc, changed.desc, model.arel_table[:id].desc)
         .select(model.arel_table[Arel.star], outdated.as("has_outdated"), changed.as("original_changed_at"))
     end
 
-    def stamps_max_sql(column, from: "", where: "")
-      "(SELECT max(CASE WHEN stamp.value ~ '#{ISO_TIMESTAMP}' THEN stamp.value::timestamptz END) " \
-      "FROM #{from}jsonb_each_text(CASE WHEN jsonb_typeof(#{column}) = 'object' THEN #{column} ELSE '{}'::jsonb END) stamp #{where})"
+    # The newest of the stamps in one `translation_original_changed_at` column
+    # (a jsonb of { field => ISO time }), as a scalar subquery:
+    #
+    #   (SELECT MAX(CASE WHEN stamp.value ~ '<ISO_TIMESTAMP>' THEN CAST(stamp.value AS timestamptz) END)
+    #    FROM [content_blocks blocks INNER JOIN] jsonb_each_text(<the column, when it is an object>) AS stamp [ON TRUE]
+    #    [WHERE <the blocks of this record>])
+    #
+    # `of:`/`where:` are the block rows whose column is read (the function is
+    # evaluated per block row, as in `FROM blocks, jsonb_each_text(...)`);
+    # without them it is the outer record's own column. A column that is not a
+    # JSON object reads as `{}`, and a value that is not a real ISO timestamp
+    # is never cast (see `ISO_TIMESTAMP`).
+    def newest_stamp(column, of: nil, where: nil)
+      stamp = Arel::Table.new("stamp")
+      object = Arel::Nodes::Case.new.when(SqlNodes.function("jsonb_typeof", column).eq("object")).then(column).else(SqlNodes.cast("{}", "jsonb"))
+      stamps = SqlNodes.function("jsonb_each_text", object).as("stamp")
+      time = Arel::Nodes::Case.new.when(stamp[:value].matches_regexp(ISO_TIMESTAMP)).then(SqlNodes.cast(stamp[:value], "timestamptz"))
+      query = of ? Arel::SelectManager.new(of).join(stamps).on(Arel::Nodes::True.new).where(where) : Arel::SelectManager.new(stamps)
+      Arel::Nodes::Grouping.new(query.project(time.maximum).ast)
     end
 
-    def join_sql(model, locale, inner: false)
-      ActiveRecord::Base.sanitize_sql_array([
-        "#{inner ? "INNER" : "LEFT"} JOIN translation_states ON translation_states.record_type = ? AND translation_states.record_id = #{model.quoted_table_name}.id " \
-        "AND translation_states.locale = ?", model.polymorphic_name, locale.to_s
-      ])
+    # The join of `model`'s table to its `translation_states` rows in one
+    # language (a String) or several (an Array), INNER or LEFT OUTER:
+    #
+    #   JOIN translation_states ON record_type = '<Model>' AND record_id = <table>.id AND locale = '<locale>'
+    def state_join(model, locales, type)
+      states = State.arel_table
+      in_locale = locales.is_a?(Array) ? states[:locale].in(locales) : states[:locale].eq(locales)
+      on = states[:record_type].eq(model.polymorphic_name).and(states[:record_id].eq(model.arel_table[:id])).and(in_locale)
+      model.arel_table.join(states, type).on(on).join_sources
     end
 
     # Upserts one row per owner and target locale from `Status.counts`.
@@ -261,6 +288,6 @@ module Translations
 
     def key(record) = [ record.class.polymorphic_name, record.id ]
 
-    private_class_method :stamps_max_sql, :join_sql, :write, :rows_for, :key
+    private_class_method :holds_translation, :newest_stamp, :state_join, :write, :rows_for, :key
   end
 end

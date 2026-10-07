@@ -62,6 +62,23 @@ class TagTest < ActiveSupport::TestCase
     assert_equal [ ruby ], Tag.not_named(%w[RAILS go]).to_a
   end
 
+  # `NOT (LOWER(name) IN (NULL))`, what the condition was as a SQL string, is
+  # NULL for every row; the node-built scope keeps that answer.
+  test "not_named with no name at all is no tag, as it always was" do
+    Tag.create!(name: "ruby")
+
+    assert_empty Tag.not_named([]).to_a
+    assert_empty Tag.not_named(nil).to_a
+    assert_equal 0, Tag.not_named([]).count
+  end
+
+  test "the name scopes compose with each other" do
+    rails = Tag.create!(name: "Rails")
+    Tag.create!(name: "ruby")
+
+    assert_equal [ rails ], Tag.name_containing("AIL").not_named(%w[ruby]).name_starting_first("ra").by_name.to_a
+  end
+
   test "name_containing matches anywhere in the name, whatever the case" do
     rails = Tag.create!(name: "Rails")
     trails = Tag.create!(name: "trails")

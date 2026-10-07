@@ -68,4 +68,24 @@ class TitleSearchTest < ActiveSupport::TestCase
     assert_equal [ percent ], Page.title_matching_any_locale("%").to_a
     assert_equal [ underscore ], Page.title_matching_any_locale("e_c").to_a
   end
+
+  # The text and the language reach the query as quoted values, never as SQL:
+  # an apostrophe ends no literal, and a "language" is a key to look up.
+  test "an apostrophe or a backslash in the text, or a strange language key, is only a value" do
+    apostrophe = create_page(title: "Baker's dozen")
+    backslash = create_page(title: "C:\\temp")
+
+    assert_equal [ apostrophe ], Page.title_matching("r's d", locale: "en").to_a
+    assert_equal [ apostrophe ], Page.title_matching_any_locale("r's d").to_a
+    assert_equal [ backslash ], Page.title_matching("c:\\t", locale: "en").to_a
+    assert_equal [ backslash ], Page.title_matching_any_locale("\\").to_a
+    assert_empty Page.title_matching("harbour", locale: "en' OR '1'='1")
+  end
+
+  # The subquery's own table is named `t`; the outer table keeps its name, so
+  # the scope works inside a join that also reads `title`.
+  test "title_matching_any_locale composes with a narrowed relation and a second scope" do
+    assert_equal [ @page ], Page.kept.where(id: [ @page.id, @other_page.id ]).title_matching_any_locale("hafen").title_matching("harbour", locale: "en").to_a
+    assert_equal 1, Page.title_matching_any_locale("hafen").count
+  end
 end

@@ -97,6 +97,28 @@ class Media::SearchTest < ActiveSupport::TestCase
     assert_equal [ @german_only.id ], Media::Search.new(q: "deutsch", filter: "missing_alt").results.map(&:id)
   end
 
+  # The segments' conditions are nodes shared by the list and its number, so
+  # the two can't disagree: each count is the size of its list.
+  test "every count is the size of the list its segment gives, with and without a search" do
+    [ nil, "dunes", "50%_o\\ff 'x'" ].each do |q|
+      counts = Media::Search.new(q: q, actor: @viewer).counts
+
+      Media::Search::FILTERS.each do |filter|
+        assert_equal Media::Search.new(q: q, filter: filter, actor: @viewer).results.count, counts.fetch(filter.to_sym), "#{filter} for #{q.inspect}"
+      end
+    end
+  end
+
+  test "an alt that is only whitespace, or absent in the default language, is missing; a typed quote or wildcard is only text" do
+    blank = create_media_asset.tap { |asset| asset.update_columns(alt: { "en" => " \n\t" }) }
+    quoted = create_media_asset.tap { |asset| asset.update!(title: "Baker's 100%") }
+
+    assert_includes ids(filter: "missing_alt"), blank.id
+    assert_not_includes ids(filter: "missing_alt"), @complete.id
+    assert_equal [ quoted.id ], Media::Search.new(q: "r's 100%").results.map(&:id)
+    assert_empty Media::Search.new(q: "r's 1%0").results
+  end
+
   private
 
   def save(asset, translations)
