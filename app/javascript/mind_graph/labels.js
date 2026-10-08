@@ -21,8 +21,8 @@
 //    the filter) or not on the canvas gets no label, like any other node.
 //
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
-// `x`/`y` the label's left edge and vertical middle in screen pixels: right
-// of the node, as the SVG graph drew it.
+// `x`/`y` the label's left edge and vertical middle in screen pixels: a label
+// sits right of its node, GAP pixels from the node's edge, centred on it.
 export const LABEL_BUDGET = 40
 
 const GAP = 4
