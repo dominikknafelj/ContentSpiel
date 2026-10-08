@@ -4,6 +4,8 @@ The first sub-project after the technical cleanup (`docs/roadmap.md`, "Mind grap
 
 **Status: implemented** (branch `mind-graph-canvas`, plan `docs/superpowers/plans/2026-10-07-mind-graph-canvas.md`). The measured numbers are in §7; where the build departs from this text, §11 says how and why.
 
+**Revised on 2026-10-08, after the owner tried it.** Five things were wrong in use: the layout jumped to its end ("it was more alive before"), a dragged node sprang back, the card opened in a corner far from its node, a node's label could not be clicked, and the list was a collapsed box under the canvas that nobody reached. A design review against the design system settled the target, and §4.2 (pacing), §4.4 (drag), §5.1–§5.3, §5.5–§5.7 and the new §5.9 below describe it. The sections are rewritten in place, so this is the screen as built; the last part of §11 lists what changed and why.
+
 ## 1. Purpose
 
 CS Studio's Mind graph shows how posts relate through related-post links and shared tags. Before this sub-project it drew every readable post as SVG elements inside a fixed box, computed the layout in the page, and embedded the whole data set in the HTML. That worked for a few dozen posts and broke down well before a serious site's size:
@@ -66,7 +68,7 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 
 ```
 {
-  nodes: [{ id, title, type, colour_index, status, url, degree }],
+  nodes: [{ id, title, type, colour_index, status, url, degree, related_count, tag_count }],
   tags:  [{ id: "tag-<id>", name, count, degree }],
   edges: [{ source, target, kind: "related" | "tag" }],
   total: <readable posts with at least one connection>,
@@ -77,6 +79,7 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 ```
 
 - `degree` is the number of edges the node has *in this response*, so size and label priority match what is drawn.
+- `related_count` and `tag_count` are the two halves of a post's `degree`: its related-post edges and its edges to tags that are nodes in this response. The card says "3 related · 2 tags" from them; they are counted where the edges are made, so the page never derives them by walking the edges (§11).
 - `url` is the post's editor URL, built by the caller's `url_for:`. A query knows no routes (`test/lib/dependency_direction_test.rb`).
 - Posts are loaded with only the columns the node needs: id, the title column, the content type, and the columns `Publishable#status` reads.
 
@@ -119,28 +122,35 @@ The 385-line `admin/mind_graph_controller.js` becomes a thin Stimulus controller
 | `layout_client.js` | Starts the worker, sends commands, hands positions to the page | the worker's messages |
 | `camera.js` | Zoom, pan, fit-to-view, screen ↔ graph coordinates | numbers |
 | `renderer.js` | Draws edges, nodes, labels and the selection onto the canvas | camera, theme, positions |
-| `hit_test.js` | Finds the node under a point | positions |
-| `labels.js` | Decides which labels are shown at this zoom | degree, camera, positions |
+| `hit_test.js` | Finds the node under a point: its mark, or its label as the last frame drew it | positions, the drawn labels |
+| `labels.js` | Decides which labels are shown at this zoom, and where a node's label stands | degree, camera, positions |
 | `theme.js` | Reads the colour tokens from CSS custom properties | the document |
-| `input.js` | Turns the canvas's pointer, wheel and key events into callbacks: press, drag, drop, pan, click, zoom, hover, Escape | the canvas element |
-| `card.js` | The selection card | the server's URL templates, the messages |
-| `node_list.js` | The list of links below the box | the same |
+| `input.js` | Turns the canvas's pointer, wheel and key events into callbacks: press, drag, drop, pan, click, double click, zoom, hover, Escape | the canvas element |
+| `card.js` | The selection card's content | the server's URL templates, the messages, the shared button and dot classes |
+| `card_placement.js` | Where the card stands beside its node | numbers |
+| `node_list.js` | The list beside the canvas: a row per node, which selects it | the messages, the shared dot classes |
 | `search_box.js` | The search field's results | `search/suggestions.js`, the messages |
-| `app.js` | Wires the above: the data request, the worker, the state, the redraw loop, the filter, the notice, the tooltip, and the state said on the element | all of them |
+| `app.js` | Wires the above: the data request, the worker, the state, the redraw loop, the filter, the notice, the hover, the pins, the card's place, the tooltip, and the state said on the element | all of them |
 
 `app.js` owns the HTML around the canvas through those modules: the filter, the search field, the card and the list.
 
 ### 4.2 The worker
 
 - A module worker, served through the asset pipeline with a digest URL. It imports the vendored `d3-force.js` by its asset URL, because an import map does not apply inside a worker. The file is one self-contained bundle, so that import needs nothing else.
-- Page to worker: `start` (the d3-force URL, nodes as `{ id, radius }`, edges as `{ source, target }`), `filter` (the visible node ids and the indexes of the visible edges), `pin` (id, x, y) / `unpin` (id) for dragging a node. There is no `stop` message: the page terminates the worker.
+- Page to worker: `start` (the d3-force URL, nodes as `{ id, radius }`, edges as `{ source, target }`, and `reducedMotion`), `filter` (the visible node ids and the indexes of the visible edges), `drag` (id, x, y: the node is held under the pointer), `drop` (id: the pointer let go, and the node stays where it is), `pin` (id: hold the node where it is now), `unpin` (ids: let these go). There is no `stop` message: the page terminates the worker.
 - Worker to page: `tick` with one `Float32Array` of x/y pairs for every node given to `start`, transferred and not copied; `settled` with `after`, the number of messages the worker had taken up when the layout cooled down (§11); `error`.
-- The worker runs as many simulation ticks as fit into 12 ms, sends one message, and yields before the next slice, so a `pin` or `filter` that arrived meanwhile is handled first.
+- **Pacing.** The simulation is stepped by hand, at one of three paces:
+  - *Frame pace* — one simulation tick, one `tick` message, then 16 ms until the next — so the page shows every step and the graph visibly eases to rest. This is the pace of a small graph's first layout (up to `SMALL_GRAPH`, 300 nodes: about five seconds from the first position to rest), of a drag (the neighbours follow the held node), and of the settle after a drop, a filter change or an unpin.
+  - *Fast* — as many ticks as fit into 12 ms, one message, then a yield so a message that arrived meanwhile is handled before the next slice. A larger graph's first layout runs like this until about 600 ms of frame-paced ticks are left (`FINAL_STRETCH_MS`, 37 ticks), and those are shown one by one.
+  - *Silent*, with reduced motion — the ticks run in slices with no message, and the one `tick` posted is the layout at rest. A dragged node moves alone: `drag` posts the positions last shown with that one node moved, and ticks nothing; `drop` lays the rest out and shows the result in one step.
+- Whatever the pace, a run ends: `alpha` decays below `alphaMin` and `settled` is posted. Only a node held under the pointer keeps the layout warm, and `drop` takes that back. Nothing moves forever.
+- The page says whether the person prefers reduced motion, with `start`: a worker has no reliable `matchMedia`. It is read once per load.
+- A node that was dropped or pinned keeps its place (`fx` / `fy`) until `unpin`; a `filter` lets go of every node it hides.
 - The worker handles its messages strictly in order (§11).
 - An error inside the worker is forwarded to the page and reported with `console.error`, so the system tests' JavaScript-error rule sees it.
 - The worker is terminated on `disconnect()`.
 
-There is no second code path that runs the simulation in the page. If the worker can't start, the box shows a message and the list of links (§5.7) still works.
+There is no second code path that runs the simulation in the page. If the worker can't start, the box shows a message and the list (§5.7) still works.
 
 `hit_test.js` is a linear scan over the visible nodes: at the cap that is 2,000 distance checks per pointer event, which needs no index.
 
@@ -156,8 +166,8 @@ There is no second code path that runs the simulation in the page. If the worker
 
 ### 4.4 The camera
 
-- Wheel and pinch zoom towards the pointer. Dragging empty space pans. Dragging a node moves that node (`pin` / `unpin`).
-- Three buttons in a corner of the box: zoom in, zoom out, "Fit all".
+- Wheel and pinch zoom towards the pointer; the wheel always zooms (no modifier key, and no hint). Dragging empty space pans. Dragging a node moves that node, its neighbours follow, and **it stays where it is dropped** (`drag` / `drop`; §5.3 says how a pinned node is shown and released). The node is held where it was grabbed, not by its centre, so a drag by the label does not make the mark jump.
+- A zoom control in a corner of the box: − and + with the zoom as a percentage between them, and "Fit". Each is named in full for a screen reader and in its tooltip ("Zoom out", "Zoom in", "Fit all"). "Release N pinned" stands beside it while a node is pinned.
 - With the canvas focused, arrow keys pan and `+` / `-` zoom.
 - The first view fits everything: the camera follows the layout from its first positions until it has settled, and that fit is final (§11). After that — or from the user's first zoom, pan or drag of a node, if that comes sooner — the camera moves only on the user's input or on "Fit all". A change of focus is a new visit, and so a new first view.
 - Nodes are no longer clamped to the box. The box is a window onto the graph.
@@ -171,7 +181,7 @@ There is no second code path that runs the simulation in the page. If the worker
 
 ### 4.6 Kept from today
 
-- Dragging a node.
+- Dragging a node (it now stays where it is dropped; §4.4).
 - The All / Related / Tags filter, client-side, handing the simulation only what is visible.
 - Back restores a clean screen, and the graph shows what the filter control says.
 - A drag below a few pixels of movement is a click.
@@ -186,6 +196,13 @@ The legend is rendered by the server from the content types of the viewer's read
 - Size follows `degree` in four steps, from 6 to 14 pixels radius for a post (6 up to two connections, 8 up to five, 11 up to twelve, 14 beyond), and three quarters of that as a tag's half side. A node is the same size on screen at every zoom.
 - Type and status cues are unchanged: slots 1–6 filled, slots 7–12 a ring of the same hues; a draft or scheduled post has a dashed outline, with a small filled core for slots 1–6.
 - A post whose type is no longer registered is a grey ring with a diagonal stroke through it. The legend shows a "Retired type" entry when one is present.
+- **States**, which combine:
+  - *Hovered* (by the pointer, or by its row in the list): a 1px ink ring round the mark, and its label in full ink on a subtle backing. Hovering does not fade anything else.
+  - *Selected*: a 2px accent ring with a gap, a semibold label, its edges brightened, and every node and edge not connected to it drawn at 28% strength.
+  - *Pinned*: a small ink dot with a surface-coloured ring at the mark's top-right. The legend has a "Pinned" entry.
+  - The focus of a local view keeps its dotted accent ring.
+  - A tag's rings are squares, like its mark.
+- **The target.** A node's mark and its label are one target, for hover, click and drag. A label counts only while it is drawn. The mark's target is at least 24 pixels across on screen, at any zoom. The pointer is a hand over a target. The hit test is still a linear scan: the labels' boxes are the ones the frame placed.
 
 ### 5.2 Labels
 
@@ -193,32 +210,37 @@ The legend is rendered by the server from the content types of the viewer's read
 - A label is skipped when it would overlap one already placed. Higher degree places first.
 - The selected node, the focus and the selection's direct neighbours are labelled at any zoom, in that order, unless one would overlap an earlier one of them (§11).
 - The last quarter of the labels the zoom allows is drawn fainter, the last one faintest, so a label arrives gradually as you zoom in. With `prefers-reduced-motion` it switches without fading.
+- The hovered node's label is shown whatever these rules say of it, on its backing, over the others.
 - A long title is cut with an ellipsis, by code point as today; a tag's label keeps its count.
 
-### 5.3 Selecting
+### 5.3 Selecting, the card and pinning
 
-- A click on a node selects it. It and its direct neighbours stay at full strength, the rest dims, and the card opens.
-- The card is HTML over the top-right corner of the canvas, with a Close button.
-  - Post: title, type, status chip, number of connections, "Open post", "Focus graph here".
-  - Tag: name, number of posts, "Focus graph here", "Show posts with this tag" (the posts list with its `tag` filter).
-- A click on empty space, or Escape, clears the selection and closes the card.
-- Hovering a node shows its full title in a tooltip.
+- A click on a node — its mark or its drawn label — selects it. It and its direct neighbours stay at full strength, the rest dims, and the card opens.
+- **The card stands beside the node**: 22 pixels from the node's edge, vertically centred on it; on the node's left where the canvas's right edge is too near; and clamped inside the canvas, 8 pixels from every edge. It follows the node through a pan, a zoom and the layout's own movement, hides while its own node is being dragged and returns on the drop. (It covers the selected node's own label, which the card repeats as its title.)
+- Its look is the design system's menu surface: surface background, a strong 1px border, the 2px radius, the menu shadow, no pointer arrow.
+- Its content, in order:
+  - Post: the type's dot and name, the status chip, and a Close button (×, named "Close") in the corner; the title; one line "N related · N tags" in the small upper-case mono label style; then **buttons**: "Open post" (primary), "Focus" (the local view around it), "Pin" / "Unpin".
+  - Tag: the tag's square and "Tag", Close; the name; "N posts"; then "Show posts with this tag" (primary; the posts list with its `tag` filter), "Focus", "Pin" / "Unpin".
+  - "Open post", "Focus" and "Show posts with this tag" lead somewhere, so they are links drawn as buttons (`Admin::ButtonComponent`'s classes, handed over by the view); Pin / Unpin is a button.
+- A click on empty canvas, Escape (from the canvas or from inside the card) and Close clear the selection and close the card.
+- Hovering shows the hovered state of §5.1. The tooltip with the whole title is shown only for a title the label cuts short.
+- **Pinning.** A dropped node is pinned: it stays where it was dropped. A node can also be pinned where it stands from its card. Pinned nodes carry the mark of §5.1, and are released by "Unpin" in the card, by "Release N pinned" beside the zoom control (present only while something is pinned, pluralised through the locale file), and by a double click on the node. Pins live in the page only: a reload or leaving the screen forgets them, and a filter change keeps those of the nodes that remain and forgets the others. `data-pinned` on the graph's element says how many there are.
 
 ### 5.4 Local view
 
 - The focus is drawn with a marker ring and is always labelled. It is not held in the middle (§11).
-- A bar above the box names it — "Around ‘Title’" — with a two-way depth switch (1 · 2) and a "Whole graph" link.
+- A bar names it — "Around ‘Title’" — with a two-way depth switch (1 · 2) and a "Whole graph" link. It is the first row of the graph's own column, above the legend (§5.9).
 - "Focus graph here" and the depth switch are ordinary visits, so Back works.
 
 ### 5.5 Search
 
-One field above the box. Typing lists matching posts and tags; choosing one opens its local view. This is how a post outside the capped global view is reached.
+One field at the top of the panel beside the canvas (§5.9). Typing lists matching posts and tags; choosing one opens its local view. This is how a post outside the capped global view is reached.
 
 ### 5.6 Messages
 
 - Over the cap, global view: "Showing the 2,000 best-connected of 6,000 posts." The second figure is `total`, the posts with a connection; the isolated ones are the next sentence's.
 - Over the cap, local view: "Showing the 2,000 nearest of 2,695 posts around this one." A local view keeps the nearest posts first (§3.3), so "best-connected" would be untrue of it (§11).
-- Isolated posts, global view: "214 posts have no connections yet." Every figure in these sentences is grouped for the language of the messages ("1,214").
+- Isolated posts, global view: "214 other posts have no connections yet and aren't shown." ("1 other post has no connections yet and isn't shown.") The bare "214 posts have no connections yet." read as a contradiction beside a canvas full of connected posts, so the sentence says these are *other* posts and that they are not drawn. With nothing drawn at all there are no others, and it is the plain "2 posts have no connections yet." Every figure in these sentences is grouped for the language of the messages ("1,214").
 - No connections at all: today's hint about related posts and shared tags.
 - The viewer can read no post: "No posts yet.", as today.
 - The data could not be loaded: a message in the box with Retry.
@@ -227,18 +249,27 @@ One field above the box. Typing lists matching posts and tags; choosing one open
 ### 5.7 Keyboard and screen reader
 
 - The canvas is one labelled image: its name says how many posts and connections are shown.
-- Below the box, a collapsed "List of posts and tags in this graph" holds every drawn node, grouped as posts and tags, each with its connection count. A row links to the node's local view; a post's row also links to its editor.
-- The list is rendered by the script from the same data as the canvas, and follows the filter.
-- Tab order: search, the focus bar's links in a local view (§11), filter, zoom buttons, the canvas, the card when open, the list.
+- **The list beside the canvas** holds every node the graph draws, in two groups headed "Posts · N" and "Tags · N", best-connected first, each row with the type's dot (or the tag's square) and its number of connections. It is rendered by the script from the same data as the canvas, and follows the filter.
+- **A row is a button** reachable by Tab, and the list is the keyboard and screen-reader path to a node. Pressing it selects the node, brings it to the middle of the canvas at the zoom it has, opens its card and moves the focus to the card; it does not navigate — the card's "Open post" does. Closing a card opened from a row gives the focus back to that row. A row's accessible name says what it is and what it does: "Alpha: post, 2 connections. Shows it in the graph."
+- Hovering or focusing a row gives its node the hovered state. Selecting a node on the canvas marks its row (`aria-current`) and scrolls the list — not the page — until the row is in view.
+- In the card the Close button is last in the document, so Tab meets the actions first.
+- Tab order: search, the focus bar's links in a local view, filter, "Release N pinned" when present, the zoom buttons, the canvas, the card when open, the list. The list is last because it can hold two thousand rows. On screen the search and the list are one column on the right; a grid places them, so the order of the document is free (§5.9).
 
 ### 5.8 Strings
 
 Every string of the screen, the card, the legend and the script is a key in `config/locales/admin/`, read with `t(".key")` or, in the script, `messages(element).t(key)`. The screen and its components join `CONVERTED` in `test/lib/admin_i18n_test.rb`.
 
+### 5.9 The layout of the screen
+
+- The screen fills the window's height: the heading, then one box that takes what is left, so the page does not scroll on a normal desktop window.
+- In the box, the graph's column on the left — a local view's focus bar, the legend and filter row, the canvas — and a 300-pixel panel on the right: the search field on top, the list below it, scrolling on its own.
+- Below about 1,100 pixels of width the panel stands under the canvas, the search field between the two, and the page may scroll.
+- The collapsed "List of posts and tags in this graph" under the canvas is gone.
+
 ## 6. Errors
 
 - The data request fails or times out (after 15 seconds): the box message with Retry. Search keeps working.
-- The worker fails: the box message; the list still gives every node as a link, and still follows the filter.
+- The worker fails: the box message; the list still gives every node as a row, and still follows the filter. A row opens the node's card in the canvas's top-right corner (there is no node to stand beside), without Pin, and the card's links lead on.
 - A stale focus: 404.
 - Leaving the screen stops the worker, the animation frame and the observers.
 
@@ -255,12 +286,15 @@ Every string of the screen, the card, the legend and the script is a key in `con
 - The trash-visibility test covers the new endpoints.
 - No page other than the Mind graph references d3-force.
 
-**System** — the project has no JavaScript test runner and gains none. The screen is tested through the browser (`test/system/admin/mind_graph_test.rb`), and the modules that are plain functions — the camera, the hit test, the label rule, the renderer's culling, the input's gestures, the worker and its client — are imported in the test browser from a CS Studio page and called directly (`test/system/admin/mind_graph_modules_test.rb`; §11). The app says its state on the element as data attributes: `data-state`, `data-settled`, `data-nodes`, `data-edges`, `data-zoom`, `data-labelled`, `data-selected`, `data-neighbours`. `element.mindGraph.screenPosition(id)` returns a node's place on screen, where the test clicks with a real click, and `element.mindGraph.draws()` the number of frames drawn.
+**System** — the project has no JavaScript test runner and gains none. The screen is tested through the browser (`test/system/admin/mind_graph_test.rb`), and the modules that are plain functions — the camera, the hit test, the label rule, the renderer's culling, the input's gestures, the worker and its client — are imported in the test browser from a CS Studio page and called directly (`test/system/admin/mind_graph_modules_test.rb`; §11). The app says its state on the element as data attributes: `data-state`, `data-settled`, `data-nodes`, `data-edges`, `data-zoom`, `data-labelled`, `data-selected`, `data-neighbours`, `data-hovered`, `data-pinned`. `element.mindGraph.screenPosition(id)` returns a node's place on screen, where the test clicks with a real click, `.labelBox(id)` the box of its label as drawn, and `element.mindGraph.draws()` the number of frames drawn.
 - The graph settles and the first view fits everything.
 - A click selects, opens the card, and both actions go where they say.
 - Zoom buttons and keys change the zoom, and more labels appear.
 - The filter, search to focus, the depth switch, Back.
-- The list of links matches what is drawn.
+- The list matches what is drawn; a row selects and centres, a selection marks its row.
+- A dropped node stays; the three ways to release it; the card's place beside the node, its flip, and that it follows.
+- A click on a label; the hovered state; reduced motion (what the worker sends is recorded).
+- The page does not scroll; under 1,100 pixels the panel is below.
 - The worker-failure and load-failure messages.
 - Any JavaScript error, in the page or the worker, fails the test.
 
@@ -297,6 +331,16 @@ How each was taken:
 - **Frame times:** the differences between successive `requestAnimationFrame` timestamps over 240 frames of a scripted drag on empty space, one pointer event per frame, and 60 frames of wheel events for the zoom. At 60 Hz these are multiples of 16.7 ms, so "worst 16.8 ms" means no frame was late; it does not say how much room was left. The script time is the duration of the app's own frame callback.
 - **The filter:** `performance.now()` around the radio's `click()`, whose `change` handler runs `applyFilter` — the visible sets, the list of links, the message to the worker — before it returns. The list alone is `renderList` called on a detached container, seven times. With the list open the browser needs one more frame to lay the rows out (about 50 ms from the click to the second frame after it, 33 ms with it closed). Nothing here is near 100 ms, so the list is still rebuilt on every filter change, open or not.
 - **A local view** at 6,000 posts, for comparison: a hub's depth 1 (725 posts) answers in 49 ms; its depth 2 reaches 2,695 posts, is cut to 2,000 and answers in 117 ms with 14 statements (22–29 ms). The frame page itself is 46 ms and 78 kB whatever the site's size, and a search 20 ms.
+
+**After the round of 2026-10-08** the table above was not taken again; three of its rows are no longer what the screen does, and these were measured the same day in the system-test browser (headless Chrome, the same machine, the endpoint's saved answers for the two sites replayed into the page):
+
+| | 2,000 posts | 6,000 posts |
+|---|---|---|
+| Navigation to settled (computed fast, the last 600 ms at frame pace) | 2.8 s, in 136 messages; the last stretch 637 ms | 3.0 s, in 153 messages; the last stretch 636 ms |
+| A filter change, until the handler returns (the list is now a row of four elements per node) | 9 ms for 1,769 rows | 11 ms for 1,953 rows |
+| A filter change, until the layout is at rest again (now at frame pace: 291 ticks) | 5.2 s; a tick every 18 ms (95th percentile 18.9, worst 19.7) | 5.1 s; a tick every 17.9 ms (worst 19.1) |
+
+So one tick per frame holds at the cap: a tick of 2,000 nodes takes well under a frame, and the worker's 16 ms timer comes out at about 18. A settle after a filter, a drop or an unpin is deliberately slow now — it is the motion the owner asked for — where before it took as long as the machine needed.
 
 What the measurement changed:
 - **Off-canvas culling.** Before it, at the largest zoom, five or six of 240 frames of a pan took 33 ms instead of 17 at 2,000 posts (three runs, the same each time), while the script time stayed under a millisecond: the cost was the rasteriser's, walking every dash of long dashed edges that are almost wholly outside the view. With the culling of §4.3 no frame is late.
@@ -343,12 +387,12 @@ The sections above are corrected where they stated something that is no longer t
 
 **The page**
 - *The data request times out after 15 seconds* (§6 said "fails or times out" without a number), into the same message with Retry.
-- *The search field is first in the document*, before the focus bar's links, so Tab reaches it first; on screen the bar is on the left (`order-first`). §5.7 lists search first and did not place the bar.
+- *The search field is first in the document*, before the focus bar's links, so Tab reaches it first. §5.7 lists search first and did not place the bar. (As first built the bar stood left of the search above the box, by `order-first`; since the round of 2026-10-08 the search is in the panel and the bar in the graph's column — see the end of this section.)
 - *The card has a Close button*, and Escape closes it from inside the card as well as from the canvas; the focus then goes back to the canvas.
-- *Turbo's page snapshot is undone on connect.* Turbo caches the page as it stood when it was left, script-written state included: `data-state="ready"`, `data-settled`, the counts, the notice, an open card, the search's text and results, the list's rows. The controller's `reset()` clears all of it before anything is fetched, and puts the canvas's name back to the server's (kept in its `data-label`), since the script writes the counts into it. The filter's radios and whether the list is open are the person's own state and are kept.
+- *Turbo's page snapshot is undone on connect.* Turbo caches the page as it stood when it was left, script-written state included: `data-state="ready"`, `data-settled`, the counts, the notice, an open card, the search's text and results, the list's rows. The controller's `reset()` clears all of it before anything is fetched, and puts the canvas's name back to the server's (kept in its `data-label`), since the script writes the counts into it. The filter's radios are the person's own state and are kept (so, as first built, was whether the list's `<details>` was open; the list is no `<details>` any more).
 - *The scripts' class names need a line in the Tailwind build.* `app/assets/tailwind/application.css` reads only the paths its `@source` lines name, and `app/javascript/mind_graph` was not one: `w-fit`, used only there, was never built, and nothing failed. The line is there now, and `test/lib/tailwind_sources_test.rb` fails for any directory of scripts that writes class names without one.
 - *The current depth is text, not a disabled link.* It is marked `aria-current` and carries a visually hidden "Depth" before its number; the other depth is a link named "Depth 2".
-- *The edit link of a list row is named by a key of its own* ("Edit %{title}"), not by joining "Edit" and the title in the script.
+- *A list row's accessible name is one key* ("%{title}: post, %{count} connections. Shows it in the graph."), not strings joined in the script. (As first built a row had an edit link named "Edit %{title}" the same way; the rows are buttons since the round of 2026-10-08.)
 
 **The data**
 - *Under the cap, a kept post can be drawn with no edge.* A post is ranked by its connections among all readable posts. If its only link is a tag whose other posts were cut, the tag has one edge left in the response, is no node (§3.4), and the post stands alone. It is still counted in `shown`, and its `degree` is 0. In the measured 6,000-post set this happened to no post.
@@ -360,9 +404,32 @@ The sections above are corrected where they stated something that is no longer t
 **Drawing**
 - *Hit testing is a linear scan* (already in §4.1): measured at 0.2 ms per pointer event at the cap.
 - *What is outside the canvas is not drawn*, and *nothing is drawn before the first positions* — both added after the measurement, which is where §7 describes them.
-- *The list of links is rebuilt on every filter change, open or closed.* Building it lazily was considered and measured unnecessary (§7).
+- *The list is rebuilt on every filter change.* Building it lazily was considered and measured unnecessary (§7).
 
 **Tests**
 - *The pure modules are tested by importing them in the browser*, not "through the screen" as §7 first said: a camera's arithmetic or the label rule can't be asserted through a canvas's pixels, and the import map already resolves the modules on any CS Studio page.
 - *What the worker is told is recorded in the test*, by wrapping `Worker.prototype.postMessage`: no pixel shows that a plain click sent the layout nothing.
 
+**After the owner's trial and the design review of 2026-10-08**
+
+What the owner reported, and what was built for each. The sections above describe the result; this is the list of what moved.
+
+- *The layout is shown at a pace a person can follow* (§4.2). The worker ran as many ticks as fit into 12 ms and posted the result, so a small graph was at rest in its first message: correct, and dead. Now a graph of up to 300 nodes unfolds one tick a frame, a larger one is computed fast and shows its last 600 ms, and every later settle — a drag, a drop, a filter, an unpin — is at frame pace. The cost is time: a filter change at the cap is at rest after five seconds instead of two and a half (§7), and the system tests wait about five seconds per layout. With reduced motion none of it moves: one message per layout.
+- *The threshold is 300 nodes, a constant* (`SMALL_GRAPH`). Below it the whole unfolding is watchable in five seconds; above it, five seconds of hundreds of nodes shuffling is noise, not life. The figure is the brief's "around 300"; it was not arrived at by measuring.
+- *The last stretch of a large layout moves little.* It is the final 37 ticks, when the layout is nearly cold. The brief asked for it; what a person sees of a large graph's load is mostly the fast part, a message per 12 ms slice, as before.
+- *A dropped node stays* (§4.4, §5.3). `onDrop` sent `unpin`, which is why it sprang back. The messages are now `drag`, `drop`, `pin` and `unpin`, and what is pinned is the page's to know (`state.pinned`).
+- *A filter change forgets the pins of the nodes it hides.* The brief said it keeps those of the nodes that remain; a pin on a node nobody can see, counted in "Release N pinned", would be a number without a referent. The worker lets go of them with the `filter` message itself.
+- *The card stands beside its node* (§5.3), not in the canvas's corner, and its actions are buttons. "Focus graph here" is "Focus". The card's Close is × in its corner and last in the document.
+- *The card covers the selected node's own label.* A label starts 4 pixels from the node's edge and the card 22: with the card on the right, the title drawn on the canvas is under it. The card's own title says the same thing, and the design's mock shows exactly this.
+- *"N related · N tags" come from the server* (§3.3): `related_count` and `tag_count` on each post node, the two halves of `degree`. They count edges in this response, like `degree`: a tag only one drawn post carries is no node, no edge, and not counted, so "2 tags" can be fewer than the post's tags in its editor.
+- *Mark and label are one target, at least 24 pixels across* (§5.1). The hovered node's label is shown even where the ranking hides it, and is then part of the target.
+- *Hovering dims nothing*; the selection's dim is 28%, where it was 18%.
+- *The tooltip is only for a title the label cuts short.* The hovered label on its backing already names the node; a tooltip repeating it beside the pointer was the same words twice.
+- *The list moved beside the canvas, and its rows select* (§5.7, §5.9). The rows were links to a node's local view, with an "Edit" link each; they are buttons now, and the two links are the card's ("Focus", "Open post"). This closes the known gap "selecting a node is pointer-only": the keyboard selects from the list, and the focus is moved to the card, which a screen reader announces by its title.
+- *The focus moves to the card when a row is pressed, and back to the row when that card is closed.* The brief did not ask for it. Without it, a keyboard user who pressed a row would have to Tab backwards through every row above it to reach the card, which comes before the list in the document.
+- *The search is first in the document and on the right on screen*, and the list is last (§5.7, §5.9). A grid places the three parts of the box, so the Tab order did not have to follow the picture; the focus bar of a local view moved into the graph's column for the same reason.
+- *The zoom control is − / the zoom as a percentage / + / Fit*, as the review's mock draws it, where it was three buttons with their names written out. The names are the buttons' `aria-label` and tooltip.
+- *The isolated sentence says "other" and "aren't shown"* (§5.6), and has a second form for a graph with nothing drawn.
+- *Reduced motion is read once per load.* A change of the system setting during a visit applies from the next load. With reduced motion a large graph shows nothing between "ready" and its one message — two and a half seconds at the cap.
+- *Turbo's snapshot*: the controller's `reset()` now also takes back the pin count, "Release N pinned", the zoom's figure, the hovered node, the list's rows and the card's place and name. Whether the list was open is no longer anyone's state: it is always there.
+- *Tests*: what the worker *sends* is recorded too (`record_worker_answers`, by wrapping the `Worker` constructor), since "the layout arrived in one step" is not something a pixel shows. A system test presses Escape on the canvas through `escape_on_canvas`, because Cuprite's `send_keys` clicks an unfocused element in its middle, where a centred node's card now stands.
