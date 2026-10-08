@@ -232,6 +232,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | A Tiptap schema drift test; tests for the Turbo internals the write queue relies on (`turbo-rails` is pinned to 2.0.23) | Should | S23, S25 |
 | Two-connection race tests for the settings row lock (`Settings::Save`, `Locales::Enable` / `Disable` / `MakeDefault` / `Configure`): today the tests prove where the lock is taken and what is read after it, not two writers meeting | Could | Technical cleanup §10 |
 | The system suite flakes at 12 parallel workers on a laptop (run it with `PARALLEL_WORKERS=6`): a leaner browser fixture, or CI-sized runners | Could | Round 2 |
+| The system-test job takes about 17 minutes in CI (16m41s for 477 tests on PR #52, against 4m20s for the unit job), and the mind graph's tests now each wait out a real settle of about five seconds: find where the time goes, then split the job across runners, raise its workers, or shorten the waits | Should | PR #52 |
 | Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
 
 ## Known gaps (interim states)
