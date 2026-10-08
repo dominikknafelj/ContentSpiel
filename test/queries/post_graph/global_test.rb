@@ -15,7 +15,24 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
     node = graph[:nodes].find { |n| n[:id] == a.id }
 
     assert_equal({ id: a.id, title: "Alpha", type: "resume_entry", colour_index: ContentTypes.fetch("resume_entry").colour_index,
-                   status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1 }, node)
+                   status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1, related_count: 1, tag_count: 0 }, node)
+  end
+
+  # The selection card says "N related · N tags": the two halves of `degree`,
+  # counted where the edges are made, so the page never has to walk them. A
+  # tag that is no node here (one post carries it) is no edge and not counted.
+  test "a post carries its related and its tag edges separately, and they add up to its degree" do
+    a = create_post(title: "Alpha", tags: %w[shared other lonely])
+    b = create_post(title: "Beta", tags: %w[shared other])
+    c = create_post(title: "Gamma")
+    relate(a, c)
+    relate(c, b)
+
+    nodes = graph[:nodes].index_by { |n| n[:id] }
+
+    assert_equal [ 1, 2, 3 ], nodes[a.id].values_at(:related_count, :tag_count, :degree)
+    assert_equal [ 2, 0, 2 ], nodes[c.id].values_at(:related_count, :tag_count, :degree)
+    nodes.each_value { |node| assert_equal node[:degree], node[:related_count] + node[:tag_count] }
   end
 
   test "the url comes from the given builder" do

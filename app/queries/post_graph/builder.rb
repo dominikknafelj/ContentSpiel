@@ -2,7 +2,10 @@
 # spec §3.3): given the posts to draw and what connects them, the
 # `{ nodes, tags, edges }` the page draws, each node with its `degree` -- the
 # number of edges it has IN THIS RESPONSE, so size and label priority match
-# what is on screen.
+# what is on screen. A post also carries the two halves of that number,
+# `related_count` and `tag_count` (its related-post edges and its edges to
+# tags that are nodes here): the selection card says "3 related · 2 tags",
+# and the page can't tell the two apart without walking every edge.
 #
 # The callers decide WHICH posts; this decides nothing about access. Every id
 # handed in is already readable, and the rules that keep the graph from
@@ -37,12 +40,13 @@ module PostGraph
       names = Tag.where(id: by_tag.keys).pluck(:id, :name).to_h
       by_tag.select! { |tag_id, _rows| names.key?(tag_id) }
 
-      degree = Hash.new(0)
-      related.each { |post_id, related_id| degree[post_id] += 1; degree[related_id] += 1 }
-      by_tag.each_value { |rows| rows.each { |_tag_id, post_id| degree[post_id] += 1 } }
+      related_count = Hash.new(0)
+      related.each { |post_id, related_id| related_count[post_id] += 1; related_count[related_id] += 1 }
+      tag_count = Hash.new(0)
+      by_tag.each_value { |rows| rows.each { |_tag_id, post_id| tag_count[post_id] += 1 } }
 
       {
-        nodes: nodes(post_ids, degree),
+        nodes: nodes(post_ids, related_count, tag_count),
         tags: by_tag.map { |tag_id, rows| { id: "tag-#{tag_id}", name: names[tag_id], count: tag_counts.fetch(tag_id, rows.size), degree: rows.size } }
                     .sort_by { |tag| [ tag[:name].to_s.downcase, tag[:id] ] },
         edges: related.map { |post_id, related_id| { source: post_id, target: related_id, kind: "related" } } +
@@ -52,7 +56,7 @@ module PostGraph
 
     private
 
-    def nodes(post_ids, degree)
+    def nodes(post_ids, related_count, tag_count)
       Post.where(id: post_ids).select(*COLUMNS).order(:id).map do |post|
         {
           id: post.id,
@@ -61,7 +65,9 @@ module PostGraph
           colour_index: post.definition&.colour_index,
           status: post.status,
           url: @url_for.call(post),
-          degree: degree[post.id]
+          degree: related_count[post.id] + tag_count[post.id],
+          related_count: related_count[post.id],
+          tag_count: tag_count[post.id]
         }
       end
     end

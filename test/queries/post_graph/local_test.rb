@@ -77,6 +77,8 @@ class PostGraph::LocalTest < ActiveSupport::TestCase
     assert result[:edges].all? { |edge| node_ids.include?(edge[:source]) && node_ids.include?(edge[:target]) }
     centre = result[:nodes].find { |n| n[:id] == @centre.id }
     assert_equal result[:edges].count { |edge| edge[:source] == @centre.id || edge[:target] == @centre.id }, centre[:degree]
+    assert_equal result[:edges].count { |edge| edge[:kind] == "related" && [ edge[:source], edge[:target] ].include?(@centre.id) }, centre[:related_count]
+    assert_equal result[:edges].count { |edge| edge[:kind] == "tag" && edge[:source] == @centre.id }, centre[:tag_count]
   end
 
   test "over the cap the focus stays, nearer posts come first, and total says how many there were" do
