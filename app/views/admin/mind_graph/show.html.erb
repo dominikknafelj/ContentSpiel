@@ -50,14 +50,19 @@
         </div>
       </fieldset>
     </div>
+    <%# In the document the zoom buttons come BEFORE the canvas, because the
+        Tab key follows the document (spec §5.7: filter, zoom buttons, canvas);
+        on screen they sit in the canvas's bottom-right corner, positioned, so
+        they are painted over it whatever the order. The notice is a polite
+        live region: loading, a failure and the cap's sentences are announced. %>
     <div class="relative min-h-0 flex-1">
-      <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>"></canvas>
-      <div data-admin--mind-graph-target="notice" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
       <div class="absolute bottom-3 right-3 flex gap-1.5">
         <%= render Admin::ButtonComponent.new(label: t(".zoom_out"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomOut" }) %>
         <%= render Admin::ButtonComponent.new(label: t(".zoom_in"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomIn" }) %>
         <%= render Admin::ButtonComponent.new(label: t(".fit"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#fit" }) %>
       </div>
+      <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>"></canvas>
+      <div data-admin--mind-graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
     </div>
   </div>
 <% end %>

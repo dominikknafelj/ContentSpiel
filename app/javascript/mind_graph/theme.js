@@ -6,7 +6,7 @@
 // `watchTheme` answers a function that stops watching. The theme changes when
 // `<html data-theme>` does (`theme_controller.js`) or, with no explicit
 // choice, when the system's scheme does.
-const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", accent: "--cs-accent", line: "--cs-line" }
+const TOKENS = { ink: "--cs-ink", meta: "--cs-meta", surface: "--cs-surface", accent: "--cs-accent" }
 const CATEGORIES = 6
 
 export function readTheme(element) {

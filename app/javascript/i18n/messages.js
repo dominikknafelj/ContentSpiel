@@ -26,6 +26,7 @@
 // pluralisation is Rails': `one`/`other` only without the `rails-i18n` gem, so
 // a `few` form the browser would pick is not one the server can render.)
 // `%{name}` is replaced by `vars.name`; `count` is itself a variable.
+// `messages(element).locale()` answers the nearest holder's `@locale`.
 //
 // Loud on purpose. An unknown key, a plural value asked for without a `count`,
 // a placeholder with no variable and a value of any other type all THROW: a
@@ -64,6 +65,13 @@ function category(locale, count) {
 
 export function messages(element) {
   return {
+    // The language the nearest holder's texts are in (its `@locale`), for a
+    // script that formats a number or a date to go INTO one of them: the
+    // figure follows the sentence's language, not the browser's.
+    locale() {
+      const holder = holders(element)[0]
+      return (holder && payload(holder)["@locale"]) || "en"
+    },
     t(key, vars = {}) {
       const holder = holders(element).find((candidate) => Object.hasOwn(payload(candidate), key))
       if (!holder) throw new Error(`i18n: no message "${key}"`)

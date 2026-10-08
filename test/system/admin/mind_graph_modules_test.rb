@@ -89,6 +89,85 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_in_delta(-300, result["pinned"][1], 0.01)
   end
 
+  # `settled` carries `after`, the number of messages the worker had taken up
+  # when it cooled down, and the client believes only the one that answers
+  # everything it sent. Two nodes cool down inside the first slice, so the
+  # worker itself posts `settled` twice here (`raw:1`, `raw:2`); the page must
+  # hear of one. The end of the watch is a message that changes nothing (a pin
+  # for a node that isn't there), which the idle worker answers at once: every
+  # `settled` before it has arrived by then, so "exactly once" is not a wait.
+  test "a filter sent right behind start is settled once, and only when the filter's layout has cooled down" do
+    log = settled_log(<<~JS)
+      layout.start([{ id: 1, radius: 8 }, { id: 2, radius: 8 }, { id: 3, radius: 6 }], [{ source: 1, target: 2 }, { source: 2, target: 3 }])
+      layout.filter([1, 2], [0])
+      onCall = (count) => { if (count === 1) layout.pin("no such node", 0, 0); else finish() }
+    JS
+
+    assert_equal 2, log.count("called"), "one for the filter's layout, one for the pin that ended the watch: #{log}"
+    first = log.index("called")
+    assert_equal "raw:2", log[first + 1], "the page was told of a settled that did not answer the filter: #{log}"
+    assert_equal %w[called raw:3], log.last(2), log.inspect
+    assert_not_includes log[0...first], "raw:2"
+  end
+
+  test "a pin and an unpin on a graph at rest are settled exactly once more" do
+    log = settled_log(<<~JS)
+      layout.start([{ id: 1, radius: 8 }, { id: 2, radius: 8 }], [{ source: 1, target: 2 }])
+      onCall = (count) => {
+        if (count === 1) { layout.pin(1, 300, 200); layout.unpin(1) }
+        else if (count === 2) layout.pin("no such node", 0, 0)
+        else finish()
+      }
+    JS
+
+    assert_equal 3, log.count("called"), "the first layout, the pin and unpin together, and the pin that ended the watch: #{log}"
+    calls = log.each_index.select { |index| log[index] == "called" }
+    assert_equal %w[raw:1 raw:3 raw:4], calls.map { |index| log[index + 1] }, log.inspect
+  end
+
+  # Mind graph canvas spec §4.4: a pinch zooms towards the point between the
+  # two fingers, and moving both pans. Synthetic pointer events on a canvas of
+  # the test's own, at the window's top-left corner so client coordinates are
+  # canvas coordinates.
+  test "input: two pointers pinch -- the change in their distance zooms around their midpoint, the midpoint's movement pans" do
+    calls = input_calls(<<~JS)
+      fire("pointerdown", 1, 100, 100)
+      fire("pointerdown", 2, 200, 100)
+      fire("pointermove", 2, 300, 100)
+    JS
+
+    assert_equal [ [ "press", 100, 100 ], [ "pan", 50, 0 ], [ "zoom", 200, 100, 2 ] ], calls
+  end
+
+  test "input: a two-pointer gesture ends a drag, is never a click, and lifting one finger does not jump" do
+    calls = input_calls(<<~JS, target: true)
+      fire("pointerdown", 1, 100, 100)
+      fire("pointermove", 1, 120, 100)
+      fire("pointerdown", 2, 220, 100)
+      fire("pointermove", 1, 100, 100)
+      fire("pointerup", 2, 220, 100)
+      fire("pointermove", 1, 400, 300)
+      fire("pointerup", 1, 400, 300)
+      fire("pointermove", 1, 50, 50)
+    JS
+
+    assert_equal [ [ "press", 100, 100 ], [ "drag", 120, 100 ], [ "drop" ], [ "pan", -10, 0 ], [ "zoom", 160, 100, 1.2 ], [ "hover", 50, 50 ] ], calls
+  end
+
+  test "input: one pointer still pans, a press without movement is a click, and a cancelled press is neither" do
+    calls = input_calls(<<~JS)
+      fire("pointerdown", 1, 10, 10)
+      fire("pointermove", 1, 40, 30)
+      fire("pointerup", 1, 40, 30)
+      fire("pointerdown", 1, 60, 60)
+      fire("pointerup", 1, 61, 60)
+      fire("pointerdown", 1, 80, 80)
+      fire("pointercancel", 1, 80, 80)
+    JS
+
+    assert_equal [ [ "press", 10, 10 ], [ "pan", 30, 20 ], [ "press", 60, 60 ], [ "click", 61, 60 ], [ "press", 80, 80 ] ], calls
+  end
+
   test "a worker that can't load d3-force reports an error instead of hanging" do
     result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"))
       const [workerUrl, done] = arguments
@@ -295,6 +374,63 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   end
 
   private
+
+  # Runs `script` against a layout and answers what happened, in order:
+  # "raw:<after>" for each `settled` the WORKER posted and "called" for each
+  # `onSettled` the client made of them (for one message the client's handler
+  # runs first: it was attached first). The script sets `onCall(count)`, which
+  # is told of every `onSettled`, and ends the watch with `finish()`.
+  def settled_log(script)
+    page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"), ActionController::Base.helpers.asset_path("d3-force.js"))
+      const [workerUrl, d3Url, done] = arguments
+      const Real = window.Worker
+      let worker = null
+      window.Worker = class extends Real { constructor(...args) { super(...args); worker = this } }
+      import("mind_graph/layout_client").then(({ createLayout }) => {
+        const log = []
+        let count = 0
+        let onCall = () => {}
+        // A task later, so the watch's own listener has logged the message
+        // that ended it.
+        const finish = () => setTimeout(() => { layout.stop(); window.Worker = Real; done(log) }, 0)
+        const layout = createLayout({
+          workerUrl, d3Url,
+          onTick: () => {},
+          onSettled: () => { log.push("called"); count += 1; onCall(count) },
+          onError: (message) => { log.push(`error: ${message}`); finish() }
+        })
+        worker.addEventListener("message", ({ data }) => { if (data.type === "settled") log.push(`raw:${data.after}`) })
+        #{script}
+      })
+    JS
+  end
+
+  # Attaches `mind_graph/input` to a canvas made for the test, runs `script`
+  # (which has `fire(type, pointerId, x, y)`) and answers the callbacks made,
+  # in order, as [name, *arguments]. `target:` is what `onPress` answers: true
+  # makes a press the start of a drag, false of a pan.
+  def input_calls(script, target: false)
+    page.evaluate_async_script(<<~JS, target)
+      const [target, done] = arguments
+      import("mind_graph/input").then(({ attachInput }) => {
+        const canvas = document.createElement("canvas")
+        canvas.style.cssText = "position: fixed; left: 0; top: 0; width: 600px; height: 400px; z-index: 1000"
+        document.body.append(canvas)
+        const calls = []
+        const record = (name) => (...args) => { calls.push([name, ...args.map((value) => Math.round(value * 1000) / 1000)]) }
+        const detach = attachInput(canvas, {
+          onPress: (x, y) => { calls.push(["press", x, y]); return target ? "node" : null },
+          onDrag: record("drag"), onDrop: record("drop"), onPan: record("pan"), onClick: record("click"),
+          onZoom: record("zoom"), onHover: record("hover"), onEscape: record("escape")
+        })
+        const fire = (type, pointerId, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: "touch", isPrimary: pointerId === 1, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true }))
+        #{script}
+        detach()
+        canvas.remove()
+        done(calls)
+      })
+    JS
+  end
 
   # Imports a module of the page's import map and answers `expression`, in
   # which the module is `m`.

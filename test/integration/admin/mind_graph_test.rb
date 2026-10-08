@@ -172,6 +172,33 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "label[for=mind-graph-filter-tag]", text: "Tags"
   end
 
+  # Mind graph canvas spec §5.7: the tab order is the filter, the zoom buttons,
+  # then the canvas. The buttons sit in the canvas's corner on screen, but they
+  # come BEFORE it in the document, which is what the Tab key follows.
+  test "the tab order is the filter, the zoom buttons, then the canvas" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    order = css_select("[data-controller='admin--mind-graph'] input[type=radio], [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas")
+      .map { |node| node.name == "button" ? node.text.strip : node.name }
+    assert_equal [ "input", "input", "input", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_select "[data-controller='admin--mind-graph'] [tabindex]:not([tabindex='0'])", count: 0
+  end
+
+  # Loading, a failure and the cap's sentences are written by the script into
+  # this region; `role="status"` (a polite live region) is what gets them
+  # announced.
+  test "the notice over the canvas is a polite live region" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-admin--mind-graph-target='notice'][role='status']", count: 1
+  end
+
   test "zoom in, zoom out and Fit all are buttons beside the canvas" do
     sign_in_as(users(:one))
     create_post(title: "A")

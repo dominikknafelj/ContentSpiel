@@ -298,6 +298,83 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_button "Retry"
   end
 
+  # Mind graph canvas spec §6: a request that gets no answer is given up after
+  # 15 seconds and shown like any other failure. The stubbed request never
+  # answers but honours its signal, as `fetch` does; the 15 seconds are made 50
+  # milliseconds by handing `AbortSignal.timeout` a shorter one, so nothing
+  # here waits out the real time.
+  test "the data request gets no answer: it times out into the same message, and Retry loads the graph" do
+    2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      window.hangGraph = true
+      window.askedFor = []
+      AbortSignal.timeout = (milliseconds) => { window.askedFor.push(milliseconds); return timeout(window.hangGraph ? 50 : milliseconds) }
+      window.fetch = (url, options) => {
+        if (!window.hangGraph || !String(url).includes("/mind_graph/data")) return original(url, options)
+        return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => reject(options.signal.reason)))
+      }
+    JS
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    assert_selector "#{GRAPH}[data-state='failed']"
+    assert_text "The graph could not be loaded."
+    assert_equal [ 15_000 ], page.evaluate_script("window.askedFor"), "the request is given fifteen seconds"
+
+    page.execute_script("window.hangGraph = false")
+    press "Retry"
+    await_graph
+    assert_no_text "The graph could not be loaded."
+    assert_equal "3", graph["data-nodes"]
+  end
+
+  # Mind graph canvas spec §5.6. Six thousand posts are not made for this: the
+  # endpoint's answer is replaced by one that says it was cut, and the screen
+  # has to say so. (The isolated count is the message's own `%{count}`, which
+  # is written plainly, as Rails writes a count.)
+  test "over the cap the screen says what it shows and what it leaves out" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_GRAPH)
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    assert_text "Showing the 2,000 best-connected of 6,000 posts."
+    assert_text "1214 posts have no connections yet."
+    assert_no_text "Link posts with Related posts"
+    assert_equal "2", graph["data-nodes"]
+  end
+
+  # The numbers in those sentences are written the way the UI's language
+  # writes them -- the `@locale` the server's messages name -- and not the way
+  # the browser's own locale would. There is no German UI yet, so the test says
+  # the messages are German between a failed load and its Retry.
+  test "the cap's numbers are formatted for the language of the messages, not the browser's" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script("window.failGraph = true")
+    stub_graph_data(CAPPED_GRAPH)
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    assert_selector "#{GRAPH}[data-state='failed']"
+    page.execute_script(<<~JS)
+      const element = document.querySelector(#{GRAPH.to_json})
+      element.setAttribute("data-messages", JSON.stringify({ ...JSON.parse(element.getAttribute("data-messages")), "@locale": "de" }))
+      window.failGraph = false
+    JS
+    press "Retry"
+    await_graph
+
+    assert_text "Showing the 2.000 best-connected of 6.000 posts."
+    assert_text "1214 posts have no connections yet."
+  end
+
   test "the worker can't start: a message without Retry, and an error in the console" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_tags_path
@@ -315,64 +392,86 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     expect_js_error(/layout worker.*no workers here/)
   end
 
-  # Review focus 2.
+  # Review focus 2. Leaving while the request is out, and leaving while the
+  # layout is still running. For the second the graph has to be big enough to
+  # be settling for seconds, so the endpoint's answer is replaced by 1,500
+  # posts and 30 tags made in the page (`BIG_GRAPH`); the worker is the real one.
   test "leaving while the graph is loading or settling raises nothing and stops the worker" do
-    posts = 40.times.map { |i| create_post(title: "P#{i}", tags: [ "t#{i % 4}" ]) }
-    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    create_post(title: "A")
     visit admin_tags_path
     await_admin_controllers
+    count_workers
     page.execute_script(<<~JS)
-      window.liveWorkers = 0
-      window.startedWorkers = 0
-      const Real = window.Worker
-      window.Worker = class extends Real {
-        constructor(...args) { super(...args); window.liveWorkers += 1; window.startedWorkers += 1 }
-        terminate() { window.liveWorkers -= 1; super.terminate() }
+      const original = window.fetch
+      window.holdGraph = true
+      window.heldRequests = 0
+      window.abortedRequests = 0
+      window.fetch = (url, options) => {
+        if (!window.holdGraph || !String(url).includes("/mind_graph/data")) return original(url, options)
+        window.heldRequests += 1
+        return new Promise((resolve, reject) => options.signal.addEventListener("abort", () => { window.abortedRequests += 1; reject(options.signal.reason) }))
       }
     JS
 
+    # Loading: the request is out when the screen is left, and is aborted.
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
-    assert_selector GRAPH
+    await_js("window.heldRequests === 1")
+    assert_selector "#{GRAPH}[data-state='loading']"
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
-    await_js("window.liveWorkers === 0")
+    await_js("window.abortedRequests === window.heldRequests")
+    assert_equal [ 0, 0 ], page.evaluate_script("[window.startedWorkers, window.liveWorkers]"), "no data, no worker"
 
+    # Settling: a worker was started, is still laying out, and is terminated.
+    page.execute_script("window.holdGraph = false")
+    stub_graph_data(BIG_GRAPH)
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
-    assert_selector "#{GRAPH}[data-state='ready']", wait: 15
+    assert_selector "#{GRAPH}[data-state='ready'][data-nodes='1530']", wait: 15
     await_js("window.liveWorkers === 1")
+    page.execute_script("window.leftGraph = document.querySelector(#{GRAPH.to_json})")
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
     await_js("window.liveWorkers === 0")
-
-    within("nav[aria-label='Modules']") { click_link "Mind graph" }
-    await_graph
-    await_js("window.liveWorkers === 1")
-    within("nav[aria-label='Modules']") { click_link "Tags" }
-    assert_selector "h1", text: "Tags"
-    await_js("window.liveWorkers === 0")
-    assert_operator page.evaluate_script("window.startedWorkers"), :>=, 2
+    assert_not page.evaluate_script("window.leftGraph.hasAttribute('data-settled')"), "the layout had cooled down before the screen was left: nothing was stopped"
+    assert_operator page.evaluate_script("window.startedWorkers"), :>=, 1
   end
 
-  # Nothing draws after disconnect: the element that was left keeps no hook,
-  # and the frame counter of the screen that was left stands still.
+  # Nothing draws after disconnect. The screen is left while the layout of
+  # 1,500 nodes is still running (the element that was left never got
+  # `data-settled`), so there IS something to stop: frames were being drawn up
+  # to the moment of leaving, and none is drawn afterwards.
   test "nothing is drawn once the screen is left" do
-    posts = 20.times.map { |i| create_post(title: "P#{i}", tags: [ "t#{i % 4}" ]) }
-    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
-    visit admin_mind_graph_path
-    assert_selector "#{GRAPH}[data-state='ready']", wait: 15
-    # Still settling: frames are being drawn right now.
-    page.execute_script("window.leftGraph = document.querySelector(#{GRAPH.to_json}); window.leftDraws = window.leftGraph.mindGraph.draws; window.leftContext = window.leftGraph.querySelector('canvas').getContext('2d'); window.drawnAfter = 0")
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(BIG_GRAPH)
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    assert_selector "#{GRAPH}[data-state='ready'][data-nodes='1530']", wait: 15
+    await_js("document.querySelector(#{GRAPH.to_json}).mindGraph.draws() >= 2")
+    page.execute_script(<<~JS)
+      window.leftGraph = document.querySelector(#{GRAPH.to_json})
+      window.leftDraws = window.leftGraph.mindGraph.draws
+      window.drawnAfter = null
+      const context = window.leftGraph.querySelector("canvas").getContext("2d")
+      const clear = context.clearRect.bind(context)
+      context.clearRect = (...args) => { if (window.drawnAfter !== null) window.drawnAfter += 1; clear(...args) }
+      // The moment of leaving: Stimulus disconnects the controller when the
+      // element goes, and from then on a frame drawn is a frame too many.
+      new MutationObserver((_, observer) => {
+        if (window.leftGraph.isConnected) return
+        observer.disconnect()
+        queueMicrotask(() => { window.drawnAfter = 0; window.countAtLeave = window.leftDraws() })
+      }).observe(document.documentElement, { childList: true, subtree: true })
+    JS
 
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
-    page.execute_script(<<~JS)
-      window.countAtLeave = window.leftDraws()
-      const clear = window.leftContext.clearRect.bind(window.leftContext)
-      window.leftContext.clearRect = (...args) => { window.drawnAfter += 1; clear(...args) }
-    JS
+    await_js("window.drawnAfter !== null")
     await_frames
     await_frames
 
+    assert_not page.evaluate_script("window.leftGraph.hasAttribute('data-settled')"), "the layout had cooled down before the screen was left: nothing was stopped"
+    assert_operator page.evaluate_script("window.countAtLeave"), :>=, 2
     assert_equal [ true, 0 ], page.evaluate_script("[window.leftDraws() === window.countAtLeave, window.drawnAfter]")
     assert page.evaluate_script("window.leftGraph.mindGraph === undefined"), "the element that was left still carries its hook"
   end
@@ -455,6 +554,58 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   private
+
+  # What the endpoint answers for a site over the cap, cut down to two nodes:
+  # the counts are the point.
+  CAPPED_GRAPH = <<~JS.freeze
+    ({
+      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1 } ],
+      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
+    })
+  JS
+
+  # A graph that takes the worker seconds to lay out: 1,500 posts in a chain,
+  # each also on one of 30 tags. A JavaScript expression, made in the page.
+  BIG_GRAPH = <<~JS.freeze
+    (() => {
+      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: index + 1, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3 }))
+      const tags = Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index + 1}`, name: `tag ${index + 1}`, count: 50, degree: 50 }))
+      const edges = [
+        ...nodes.slice(1).map((node) => ({ source: node.id - 1, target: node.id, kind: "related" })),
+        ...nodes.map((node) => ({ source: node.id, target: `tag-${(node.id % 30) + 1}`, kind: "tag" }))
+      ]
+      return { nodes, tags, edges, total: 1500, shown: 1500, isolated: 0 }
+    })()
+  JS
+
+  # Answers the data endpoint from the page: `payload` is a JavaScript
+  # expression for the graph. Installed on a screen visited BEFORE the Mind
+  # graph (the window outlives a Turbo visit), so the graph's first request
+  # already gets it. While `window.failGraph` is set the request fails instead.
+  def stub_graph_data(payload)
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return original(url, options)
+        if (window.failGraph) return Promise.reject(new TypeError("Failed to fetch"))
+        return Promise.resolve(new Response(JSON.stringify(#{payload}), { headers: { "Content-Type": "application/json" } }))
+      }
+    JS
+  end
+
+  # Counts the workers started and still alive, on a screen visited before the
+  # Mind graph.
+  def count_workers
+    page.execute_script(<<~JS)
+      window.liveWorkers = 0
+      window.startedWorkers = 0
+      const Real = window.Worker
+      window.Worker = class extends Real {
+        constructor(...args) { super(...args); window.liveWorkers += 1; window.startedWorkers += 1 }
+        terminate() { window.liveWorkers -= 1; super.terminate() }
+      }
+    JS
+  end
 
   def graph = find(GRAPH)
 

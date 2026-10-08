@@ -31,6 +31,9 @@ import { attachInput } from "mind_graph/input"
 // the test that asks it directly: a drawn label is not an element to read.
 const MAX_LABEL_CHARACTERS = 32
 const BUTTON_ZOOM = 1.4
+// How long the data request may go unanswered before it is given up and shown
+// as a failure, with Retry (spec §6).
+const LOAD_TIMEOUT_MS = 15_000
 
 export function labelFor(node) {
   const suffix = node.kind === "tag" ? ` (${node.count})` : ""
@@ -60,11 +63,23 @@ export function mount(element) {
   let frame = null
   let draws = 0
   let labelled = null
+  let zoom = null
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
   const setState = (value) => { element.dataset.state = value }
 
-  // The lines over the canvas's top-left corner. A line is a string or a node
+  // A figure that goes into a sentence is written the way the sentence's
+  // language writes it (the messages' `@locale`), not the browser's own. A
+  // tag `Intl` does not know falls back to the plain digits.
+  function number(value) {
+    try {
+      return new Intl.NumberFormat(text.locale()).format(value)
+    } catch {
+      return String(value)
+    }
+  }
+
+  // The lines over the canvas's top-left corner (a polite live region). A line is a string or a node
   // (the Retry button); always `textContent`, never markup.
   function say(...lines) {
     notice.replaceChildren(...lines.filter(Boolean).map((line) => {
@@ -93,7 +108,9 @@ export function mount(element) {
       draw(context, { ...state, labels })
       draws += 1
 
-      element.dataset.zoom = state.camera.k.toFixed(3)
+      // Written only when changed: a pan redraws every frame and changes neither.
+      const k = state.camera.k.toFixed(3)
+      if (k !== zoom) element.dataset.zoom = zoom = k
       const ids = labels.map((label) => state.nodes[label.index].id).join(",")
       if (ids !== labelled) element.dataset.labelled = labelled = ids
     })
@@ -135,7 +152,10 @@ export function mount(element) {
     const touched = new Set(state.visibleEdges.flatMap((index) => [ state.edges[index].source, state.edges[index].target ]))
     state.visibleNodes = state.nodes.flatMap((_, index) => (chosen === "all" || touched.has(index) ? [ index ] : []))
     state.order = state.visibleNodes.slice().sort((a, b) => state.nodes[b].degree - state.nodes[a].degree || a - b)
-    if (state.selected >= 0 && !state.visibleNodes.includes(state.selected)) select(-1)
+    // The selection goes with a node the filter hides; one that stays keeps
+    // its place, but its neighbours are the ones the shown edges give it now,
+    // so nothing stays lit (or dimmed) by an edge that is no longer drawn.
+    if (state.selected >= 0) select(state.visibleNodes.includes(state.selected) ? state.selected : -1)
     element.dataset.nodes = state.visibleNodes.length
     element.dataset.edges = state.visibleEdges.length
   }
@@ -174,7 +194,7 @@ export function mount(element) {
 
     say(
       state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
-      data.shown < data.total ? text.t("mind_graph.script.capped", { shown: data.shown.toLocaleString(), total: data.total.toLocaleString() }) : null,
+      data.shown < data.total ? text.t("mind_graph.script.capped", { shown: number(data.shown), total: number(data.total) }) : null,
       data.isolated > 0 ? text.t("mind_graph.script.isolated", { count: data.isolated }) : null
     )
     setState("ready")
@@ -241,7 +261,11 @@ export function mount(element) {
     element.removeAttribute("data-settled")
     say(text.t("mind_graph.script.loading"))
     try {
-      const response = await fetch(element.dataset.url, { headers: { Accept: "application/json" }, signal: aborter.signal })
+      // Two ways out of a request that is still open: leaving the screen
+      // (`aborter`, an AbortError, silent) and no answer in time (a
+      // TimeoutError, which is a failure like any other and gets Retry).
+      const signal = AbortSignal.any([ aborter.signal, AbortSignal.timeout(LOAD_TIMEOUT_MS) ])
+      const response = await fetch(element.dataset.url, { headers: { Accept: "application/json" }, signal })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json()
       if (!destroyed) show(data)
