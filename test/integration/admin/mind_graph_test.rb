@@ -72,7 +72,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
     assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts isolated load_failed loading no_connections retry search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts isolated load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
@@ -266,6 +266,41 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
     assert_select "label.sr-only[for=mind-graph-search]", text: "Find a post or tag"
     assert_select "[data-mind-graph-search] [data-mind-graph-results][hidden]:empty"
+  end
+
+  # Spec §5.7: the search comes first, then (in a local view) the focus bar's
+  # links, then the filter, the zoom buttons and the canvas. The bar is
+  # `order-first` on screen, so it still stands on the left.
+  test "in a local view the tab order is the search, the bar's links, the filter, the zoom buttons, the canvas" do
+    sign_in_as(users(:one))
+    post = create_post(title: "A")
+
+    get "/cs-studio/mind_graph", params: { post: post.id }
+
+    order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=radio] button canvas].map { |part| "[data-controller='admin--mind-graph'] #{part}" }.join(", "))
+      .map { |node| { "button" => node.text.strip, "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
+    assert_equal [ "search", "link:2", "link:Whole graph", "radio", "radio", "radio", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+  end
+
+  test "the depth switch names its depth for assistive technology, the current one too" do
+    sign_in_as(users(:one))
+    post = create_post(title: "A")
+
+    get "/cs-studio/mind_graph", params: { post: post.id }
+
+    assert_select "[data-mind-graph-focus] a[aria-label='Depth 2']", text: "2"
+    assert_select "[data-mind-graph-focus] [aria-current='true'][aria-label='Depth 1']", text: "1"
+  end
+
+  test "the search has a live region that stays in the page, apart from the list of links" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-mind-graph-search] p[data-mind-graph-status][role=status]:not([hidden]):empty"
+    assert_select "[data-mind-graph-results][role]", count: 0
+    assert_select "[data-mind-graph-results] [data-mind-graph-status]", count: 0
   end
 
   # Loading, a failure and the cap's sentences are written by the script into

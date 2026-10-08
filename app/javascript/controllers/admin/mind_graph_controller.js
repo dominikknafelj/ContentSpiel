@@ -52,6 +52,7 @@ export default class extends Controller {
     // the visit that was left. Back shows the field empty and the list closed.
     const field = this.element.querySelector("[data-mind-graph-search] input")
     if (field) field.value = ""
+    this.element.querySelector("[data-mind-graph-status]")?.replaceChildren()
     for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip], [data-mind-graph-results]")) {
       floating.hidden = true
       floating.replaceChildren()

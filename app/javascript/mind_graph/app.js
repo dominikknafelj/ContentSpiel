@@ -113,7 +113,7 @@ export function mount(element) {
   // The search field is HTML beside the canvas, not part of the data request:
   // it works whatever the graph is doing, a failed load included (spec §6).
   const search = element.querySelector("[data-mind-graph-search]")
-  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text })
+  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]") })
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
   const setState = (value) => { element.dataset.state = value }

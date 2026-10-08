@@ -890,8 +890,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_text "Tag"
     end
 
+    assert_selector "[data-mind-graph-status]", text: "1 result", visible: :all
+
     fill_in "Find a post or tag", with: "zzzz"
     assert_selector "[data-mind-graph-results]", text: "No post or tag matches."
+    assert_selector "[data-mind-graph-status]", text: "No post or tag matches.", visible: :all
 
     find_field("Find a post or tag").send_keys(:escape)
     assert_no_selector "[data-mind-graph-results]", visible: :visible
@@ -922,7 +925,38 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     fill_in "Find a post or tag", with: "hidden"
 
     assert_selector "[data-mind-graph-results]", text: "Search failed — check your connection."
+    assert_selector "[data-mind-graph-status][role=status]", text: "Search failed — check your connection.", visible: :all
     assert_equal "ready", graph["data-state"]
+  end
+
+  test "earlier rows are gone as soon as the text changes" do
+    create_post(title: "Hidden gem")
+    create_post(title: "Zebra")
+    visit admin_mind_graph_path
+    await_graph
+    field = find_field("Find a post or tag")
+    field.fill_in with: "hidden"
+    assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
+    # Hold the next answer back, so what is on screen meanwhile is the point.
+    page.execute_script("const original = window.fetch; window.fetch = (url, options) => String(url).includes('/mind_graph/search') ? new Promise(() => {}) : original(url, options)")
+
+    field.send_keys("x")
+
+    assert_no_selector "[data-mind-graph-results] a", visible: :all
+  end
+
+  test "Tabbing past the last result closes the list" do
+    create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+    field = find_field("Find a post or tag")
+    field.fill_in with: "hidden"
+    assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
+
+    field.send_keys(:tab, :tab)
+
+    assert_no_selector "[data-mind-graph-results]", visible: :visible
+    assert_equal "", find("[data-mind-graph-status]", visible: :all).text(:all)
   end
 
   test "the results are text: a title with markup is not inserted as markup" do
@@ -968,10 +1002,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     fill_in "Find a post or tag", with: "hid"
     assert_eventually(wait: 3, message: "the search request was never sent") { page.evaluate_script("window.searchSignals.length") == 1 }
 
-    # A Turbo visit, not `visit`: the window (and the recorded signals) must outlive it.
-    watch_frame_load
-    page.execute_script("Turbo.visit(#{admin_posts_path.to_json})")
-    await_frame_load
+    # Left through a real link (the sidebar's Posts), a Turbo visit: the window,
+    # and the signals recorded in it, outlive it.
+    click_frame_link { within("nav[aria-label='Modules']") { click_link "Posts" } }
 
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
   end

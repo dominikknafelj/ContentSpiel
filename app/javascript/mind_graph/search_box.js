@@ -15,17 +15,35 @@
 // `search/suggestions.js`'s, shared with the chip input and the link search.
 import { createSuggestions } from "search/suggestions"
 
-export function attachSearch(field, list, { url, text }) {
+//
+// Announcing: the list stays a plain list of links, and what a screen reader
+// should hear -- how many results arrived, "No post or tag matches.", the
+// failure -- goes through the `role="status"` line beside it, which stays in
+// the page. The same two sentences are drawn in the list for the eye, hidden
+// from assistive technology so they are not read twice.
+//
+// Old rows never sit under newer text: the list is emptied the moment the text
+// changes, and filled again by the answer to the new text.
+const KIND_KEYS = {
+  post: "mind_graph.script.search.post",
+  tag: "mind_graph.script.search.tag"
+}
+
+export function attachSearch(field, list, { url, text, status }) {
+  const block = list.parentElement
   const close = () => {
     list.hidden = true
     list.replaceChildren()
+    status.textContent = ""
   }
   const say = (line) => {
     const item = document.createElement("li")
     item.className = "px-2 py-1.5 text-sm text-meta"
+    item.setAttribute("aria-hidden", "true")
     item.textContent = line
     list.replaceChildren(item)
     list.hidden = false
+    status.textContent = line
   }
 
   const suggestions = createSuggestions({
@@ -43,12 +61,13 @@ export function attachSearch(field, list, { url, text }) {
         label.textContent = row.label
         const kind = document.createElement("span")
         kind.className = "shrink-0 text-label text-meta"
-        kind.textContent = text.t(`mind_graph.script.search.${row.kind}`)
+        kind.textContent = text.t(KIND_KEYS[row.kind])
         link.append(label, kind)
         item.append(link)
         return item
       }))
       list.hidden = false
+      status.textContent = text.t("mind_graph.script.search.count", { count: rows.length })
     },
     onError: () => say(text.t("mind_graph.script.search.failed"))
   })
@@ -58,6 +77,7 @@ export function attachSearch(field, list, { url, text }) {
       suggestions.cancel()
       close()
     } else {
+      close()
       suggestions.schedule()
     }
   }
@@ -74,7 +94,16 @@ export function attachSearch(field, list, { url, text }) {
     suggestions.cancel()
     close()
   }
+  // Keyboard focus leaving the search block (Tab past the last result) closes
+  // the list. A focusout with no next target (a click on a scrollbar, the
+  // window losing focus) is left to `pressOutside`.
+  const focusout = (event) => {
+    if (!event.relatedTarget || block.contains(event.relatedTarget)) return
+    suggestions.cancel()
+    close()
+  }
   field.addEventListener("input", input)
+  block.addEventListener("focusout", focusout)
   field.addEventListener("keydown", keydown)
   list.addEventListener("keydown", keydown)
   document.addEventListener("pointerdown", pressOutside)
@@ -82,6 +111,7 @@ export function attachSearch(field, list, { url, text }) {
   return () => {
     suggestions.cancel()
     field.removeEventListener("input", input)
+    block.removeEventListener("focusout", focusout)
     field.removeEventListener("keydown", keydown)
     list.removeEventListener("keydown", keydown)
     document.removeEventListener("pointerdown", pressOutside)

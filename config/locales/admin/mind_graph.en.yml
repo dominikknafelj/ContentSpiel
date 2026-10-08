@@ -26,6 +26,7 @@ en:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
           depth: "Depth"
+          depth_n: "Depth %{depth}"
           whole: "Whole graph"
         search:
           label: "Find a post or tag"
@@ -58,6 +59,9 @@ en:
             scheduled: "Scheduled"
             live: "Live"
         search:
+          count:
+            one: "%{count} result"
+            other: "%{count} results"
           none: "No post or tag matches."
           failed: "Search failed — check your connection."
           post: "Post"
