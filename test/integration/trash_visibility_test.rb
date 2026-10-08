@@ -465,6 +465,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     nodes = JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)["nodes"]
     assert_includes nodes.map { |n| n["id"] }, @kept_post.id
     assert_not_includes nodes.map { |n| n["id"] }, @gone_post.id
+
+    get "/cs-studio/mind_graph/data"
+    assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
+    get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
+    assert_response :not_found
+    get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
+    assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    get "/cs-studio/mind_graph/search", params: { q: "gone" }
+    assert_empty response.parsed_body
   end
 
   # The mind graph's tag nodes (round 3, Task 17): a tag counts only the KEPT
