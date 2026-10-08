@@ -101,9 +101,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Mind graph canvas spec §5.1, read from the pixels. Both posts have one
-  # connection, so both are drawn six pixels in radius; four pixels left of the
+  # connection, so both are drawn seven pixels in radius; four pixels left of the
   # centre is inside a filled dot, and in a draft's ring it is the gap between
-  # the core (2.4 px) and the dashed outline (from 5 px). Left, because the
+  # the core (2.8 px) and the dashed outline (from 6 px). Left, because the
   # label is on the right.
   test "a live post is a filled dot, a draft a ring with a core: the status is a shape, not a colour" do
     live = create_post(title: "Live one")
@@ -1260,7 +1260,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Dot and label are one target: a press on the title is a press on the node.
-  # The point is 8 px into the text, 18 px from the centre of a 6 px dot --
+  # The point is 8 px into the text, 19 px from the centre of a 7 px dot --
   # outside the dot's own 12 px target, so it is the label that answers.
   test "a click on a node's drawn label selects it, and the pointer says it can be clicked" do
     a = create_post(title: "A title long enough to press")
@@ -1299,21 +1299,21 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     point = screen_position(a.id)
-    # 8.5 px left of the centre: outside the 6 px dot, on the hover's ring.
-    ring_before = pixel_at(point["x"] - 8.5, point["y"])
+    # 9.5 px left of the centre: outside the 7 px dot, on the hover's ring.
+    ring_before = pixel_at(point["x"] - 9.5, point["y"])
     others = [ c, d ].to_h { |post| [ post, pixels_of(post).first ] }
 
     page.driver.browser.mouse.move(x: point["x"], y: point["y"])
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
 
-    assert_not_equal ring_before, pixel_at(point["x"] - 8.5, point["y"]), "no ring round the hovered node"
+    assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the hovered node"
     others.each { |post, pixel| assert_equal pixel, pixels_of(post).first, "#{post.title} changed while another node was hovered" }
     assert_equal "", graph["data-selected"].to_s
 
     box = canvas_box
     page.driver.browser.mouse.move(x: box[0] + 5, y: box[3] - 5)
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === ''")
-    assert_equal ring_before, pixel_at(point["x"] - 8.5, point["y"])
+    assert_equal ring_before, pixel_at(point["x"] - 9.5, point["y"])
   end
 
   # Zoomed far out only the hubs are named. The hovered node's label is shown
@@ -1815,12 +1815,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     point = screen_position(a.id)
-    ring_before = pixel_at(point["x"] - 8.5, point["y"])
+    ring_before = pixel_at(point["x"] - 9.5, point["y"])
 
     find("#{LIST} button", text: "Alpha").hover
 
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
-    assert_not_equal ring_before, pixel_at(point["x"] - 8.5, point["y"]), "no ring round the node whose row is hovered"
+    assert_not_equal ring_before, pixel_at(point["x"] - 9.5, point["y"]), "no ring round the node whose row is hovered"
     assert_equal "", graph["data-selected"].to_s
 
     find("h1", text: "Mind graph").hover
@@ -1939,9 +1939,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     to
   end
 
-  # The card stands 22 px from the edge of a node of one connection (a 6 px
+  # The card stands 22 px from the edge of a node of one connection (a 7 px
   # dot), on the given side, and is vertically centred on it.
-  def assert_card_beside(id, side: nil, radius: 6)
+  def assert_card_beside(id, side: nil, radius: 7)
     node = screen_position(id)
     card = element_box("[data-mind-graph-card]")
     shown = find("[data-mind-graph-card]")["data-side"]
@@ -1973,10 +1973,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # The canvas's colour where a pinned node's mark is: up and to the right of
-  # the centre of a 6 px dot.
+  # the centre of a 7 px dot.
   def pin_pixel(post)
     point = screen_position(post.id)
-    pixel_at(point["x"] + 4.32, point["y"] - 4.32)
+    pixel_at(point["x"] + 5.04, point["y"] - 5.04)
   end
 
   # The browser says the person prefers reduced motion inside the block, and

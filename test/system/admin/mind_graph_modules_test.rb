@@ -661,6 +661,16 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ [ 10, 10 ], [ -5, 50 ], [ 203, 50 ] ], drawn["arcs"]
   end
 
+  # Mind graph canvas spec §5.1: four steps by the number of connections, a
+  # post's a step larger than first built (the design review's mock), a tag's
+  # square as it was.
+  test "renderer: a node's size is one of four steps by its connections" do
+    sizes = ->(kind) { js_module("mind_graph/renderer", "[1, 2, 3, 5, 6, 12, 13, 400].map((degree) => m.radiusFor({ kind: #{kind.to_json}, degree }))") }
+
+    assert_equal [ 7, 7, 10, 10, 13, 13, 16, 16 ], sizes.call("post")
+    assert_equal [ 4.5, 4.5, 6, 6, 8.25, 8.25, 10.5, 10.5 ], sizes.call("tag")
+  end
+
   # The states of the round of 2026-10-08, read from what the renderer asks of
   # the context. A post alone is one circle; pinned, it has a second, small one
   # up and to the right of its centre; selected or hovered, a ring round the
@@ -672,11 +682,11 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     hovered = renderer_calls(positions: [ 50, 50 ], edges: [], hovered: 0)
     both = renderer_calls(positions: [ 50, 50 ], edges: [], selected: 0, hovered: 0, pinned: [ 0 ])
 
-    assert_equal [ [ 50, 50, 6 ] ], plain["circles"]
-    assert_equal [ [ 50, 50, 6 ], [ 54.32, 45.68, 3 ] ], pinned["circles"]
-    assert_equal [ [ 50, 50, 6 ], [ 50, 50, 10 ] ], selected["circles"], "the selection's ring leaves a gap round the mark"
-    assert_equal [ [ 50, 50, 6 ], [ 50, 50, 8.5 ] ], hovered["circles"]
-    assert_equal [ [ 50, 50, 6 ], [ 54.32, 45.68, 3 ], [ 50, 50, 10 ] ], both["circles"], "the pin mark combines with a state, and a selected node gets the selection's ring only"
+    assert_equal [ [ 50, 50, 7 ] ], plain["circles"]
+    assert_equal [ [ 50, 50, 7 ], [ 55.04, 44.96, 3 ] ], pinned["circles"]
+    assert_equal [ [ 50, 50, 7 ], [ 50, 50, 11 ] ], selected["circles"], "the selection's ring leaves a gap round the mark"
+    assert_equal [ [ 50, 50, 7 ], [ 50, 50, 9.5 ] ], hovered["circles"]
+    assert_equal [ [ 50, 50, 7 ], [ 55.04, 44.96, 3 ], [ 50, 50, 11 ] ], both["circles"], "the pin mark combines with a state, and a selected node gets the selection's ring only"
     assert_equal [ 2 ], selected["ringWidths"]
     assert_equal [ 1 ], hovered["ringWidths"]
   end
@@ -765,7 +775,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   # Draws one frame through `mind_graph/renderer` onto a context that only
   # records, on a 200 x 100 canvas with the camera at rest: every position is
-  # a live post of degree one (radius 6) -- or, for an index in `tags`, a tag
+  # a live post of degree one (radius 7) -- or, for an index in `tags`, a tag
   # of degree one (half side 4.5) -- and `edges` are pairs of node indexes.
   # `selected` / `hovered` are indexes, `pinned` a list of them; the selected
   # node's neighbours are the nodes its edges reach. Answers:
@@ -776,7 +786,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   #   pass) and the strength it was stroked at;
   # - `nodeAlphas`: the strength each post's mark was filled at, in order;
   # - `ringWidths`: the line widths of the rings.
-  NODE_RADIUS = 6
+  NODE_RADIUS = 7
   PIN_RADIUS = 3
 
   def renderer_calls(positions:, edges:, selected: -1, hovered: -1, pinned: [], tags: [])

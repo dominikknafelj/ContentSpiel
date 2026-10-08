@@ -193,7 +193,7 @@ The legend is rendered by the server from the content types of the viewer's read
 ### 5.1 Nodes
 
 - A post is a circle and a tag is a square.
-- Size follows `degree` in four steps, from 6 to 14 pixels radius for a post (6 up to two connections, 8 up to five, 11 up to twelve, 14 beyond), and three quarters of that as a tag's half side. A node is the same size on screen at every zoom.
+- Size follows `degree` in four steps, from 7 to 16 pixels radius for a post (7 up to two connections, 10 up to five, 13 up to twelve, 16 beyond), and 4.5, 6, 8.25 and 10.5 pixels as a tag's half side. A node is the same size on screen at every zoom. (As first built a post's steps were 6, 8, 11 and 14; §11.)
 - Type and status cues are unchanged: slots 1–6 filled, slots 7–12 a ring of the same hues; a draft or scheduled post has a dashed outline, with a small filled core for slots 1–6.
 - A post whose type is no longer registered is a grey ring with a diagonal stroke through it. The legend shows a "Retired type" entry when one is present.
 - **States**, which combine:
@@ -424,6 +424,7 @@ What the owner reported, and what was built for each. The sections above describ
 - *"N related · N tags" come from the server* (§3.3): `related_count` and `tag_count` on each post node, the two halves of `degree`. They count edges in this response, like `degree`: a tag only one drawn post carries is no node, no edge, and not counted, so "2 tags" can be fewer than the post's tags in its editor.
 - *Mark and label are one target, at least 24 pixels across* (§5.1). The hovered node's label is shown even where the ranking hides it, and is then part of the target.
 - *Hovering dims nothing*; the selection's dim is 28%, where it was 18%.
+- *A post's dot is a step larger* (§5.1): 7, 10, 13 and 16 pixels radius where it was 6, 8, 11 and 14. The owner, looking at the review's designs beside the screen, saw that their dots are larger. Measured in the mock (drawn at 0.6 of its size: the 300-pixel panel is 186 pixels wide in it), its dots are 6.3, 7, 8.3, 10.8 and 12.4 pixels radius for 1, 2, 3, 5 and 6 connections — a sliding scale, where this screen keeps four steps, because small differences in size can't be read. The steps were moved to sit on that scale; a tag's square is the size it was, which already matched.
 - *The tooltip is only for a title the label cuts short.* The hovered label on its backing already names the node; a tooltip repeating it beside the pointer was the same words twice.
 - *The list moved beside the canvas, and its rows select* (§5.7, §5.9). The rows were links to a node's local view, with an "Edit" link each; they are buttons now, and the two links are the card's ("Focus", "Open post"). This closes the known gap "selecting a node is pointer-only": the keyboard selects from the list, and the focus is moved to the card, which a screen reader announces by its title.
 - *The focus moves to the card when a row is pressed, and back to the row when that card is closed.* The brief did not ask for it. Without it, a keyboard user who pressed a row would have to Tab backwards through every row above it to reach the card, which comes before the list in the document.

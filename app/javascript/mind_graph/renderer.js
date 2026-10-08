@@ -37,7 +37,10 @@
 //
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
 // what dims is dimmed by `globalAlpha`.
-const STEPS = [ [ 2, 6 ], [ 5, 8 ], [ 12, 11 ], [ Infinity, 14 ] ]
+// Up to this many connections: a post's radius, a tag's half side. The
+// posts' are the sizes of the design review's mock (2026-10-08), which draws
+// its dots a step larger than the first build did (6, 8, 11, 14).
+const STEPS = [ [ 2, 7, 4.5 ], [ 5, 10, 6 ], [ 12, 13, 8.25 ], [ Infinity, 16, 10.5 ] ]
 const DIM = 0.28
 // The width of the surface-coloured outline under a label, which keeps a title
 // readable where it crosses an edge.
@@ -57,8 +60,8 @@ const FOCUS_RING = 5
 // Four sizes by degree: small differences in size can't be read, so a hub is
 // one of four steps, not a point on a scale. A tag's is its half side.
 export function radiusFor(node) {
-  const radius = STEPS.find(([ upTo ]) => node.degree <= upTo)[1]
-  return node.kind === "tag" ? radius * 0.75 : radius
+  const [ , post, tag ] = STEPS.find(([ upTo ]) => node.degree <= upTo)
+  return node.kind === "tag" ? tag : post
 }
 
 // `edges[i].source` / `.target` are node INDEXES (`app.js` converts the ids
