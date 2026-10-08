@@ -397,6 +397,28 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   private
 
+  # Zoomed in, most of the graph is outside the canvas, and a path of long
+  # dashed lines costs the rasteriser by its length whether or not it is seen
+  # (measured: a dropped frame in fifty while panning 2,000 posts at the
+  # largest zoom; none with this). An edge is left out only when it CAN'T
+  # cross the canvas -- both ends beyond the same side -- so one whose ends
+  # lie on opposite sides is still drawn.
+  test "renderer: an edge with both ends beyond the same side of the canvas is not drawn, one that may cross it is" do
+    drawn = renderer_calls(
+      positions: [ 10, 10, -500, 50, -400, -300, 700, 50 ],
+      edges: [ [ 1, 2 ], [ 1, 3 ], [ 0, 1 ], [ 2, 3 ] ]
+    )
+
+    assert_equal [ [ -500, 50, 700, 50 ], [ 10, 10, -500, 50 ], [ -400, -300, 700, 50 ] ], drawn["lines"],
+      "left to left is skipped; left to right, on-canvas to left, and above-left to right are drawn"
+  end
+
+  test "renderer: a node outside the canvas is not drawn, one whose mark reaches in is" do
+    drawn = renderer_calls(positions: [ 10, 10, -500, 50, -5, 50, 100, 300, 203, 50 ], edges: [])
+
+    assert_equal [ [ 10, 10 ], [ -5, 50 ], [ 203, 50 ] ], drawn["arcs"]
+  end
+
   # Runs `script` against a layout and answers what happened, in order:
   # "raw:<after>" for each `settled` the WORKER posted and "called" for each
   # `onSettled` the client made of them (for one message the client's handler
@@ -451,6 +473,39 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
         canvas.remove()
         done(calls)
       })
+    JS
+  end
+
+  # Draws one frame through `mind_graph/renderer` onto a context that only
+  # records, on a 200 x 100 canvas with the camera at rest: every position is
+  # a live post of degree one (radius 6), `edges` are pairs of node indexes.
+  # Answers the line segments stroked as [x1, y1, x2, y2] and the centres of
+  # the circles drawn.
+  def renderer_calls(positions:, edges:)
+    page.evaluate_async_script(<<~JS, positions, edges)
+      const [positions, pairs, done] = arguments
+      import("mind_graph/renderer").then(({ draw, radiusFor }) => {
+        const lines = [], arcs = []
+        let from = null
+        const context = new Proxy({}, {
+          get: (_, name) => {
+            if (name === "moveTo") return (x, y) => { from = [x, y] }
+            if (name === "lineTo") return (x, y) => { lines.push([...from, x, y]) }
+            if (name === "arc") return (x, y) => { arcs.push([x, y]) }
+            return () => {}
+          },
+          set: () => true
+        })
+        const nodes = Array.from({ length: positions.length / 2 }, (_, id) => ({ id, kind: "post", degree: 1, colour_index: 1, status: "live", label: "" }))
+        draw(context, {
+          width: 200, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
+          theme: { ink: "", meta: "", surface: "", accent: "", categories: Array(6).fill(""), font: "" },
+          nodes, edges: pairs.map(([source, target]) => ({ source, target, kind: "related" })), positions: Float32Array.from(positions),
+          radii: nodes.map(radiusFor), visibleNodes: nodes.map((_, index) => index), visibleEdges: pairs.map((_, index) => index),
+          labels: [], selected: -1, neighbours: new Set(), focusIndex: -1
+        })
+        done({ lines, arcs })
+      }).catch((error) => done({ error: String(error) }))
     JS
   end
 

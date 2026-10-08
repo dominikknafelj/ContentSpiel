@@ -14,6 +14,15 @@
 //   by shape, not by colour alone.
 // A tag is a square. A related edge is solid, a shared tag's dashed.
 //
+// WHAT IS OUTSIDE THE CANVAS IS NOT DRAWN. A node whose mark lies wholly
+// outside is skipped, and so is an edge that can't cross the canvas: both its
+// ends beyond the same side. (Not "both ends outside": an edge from far left
+// to far right crosses the whole view.) Zoomed in, most of the graph is
+// outside, and a path of long dashed lines costs the rasteriser by its length,
+// seen or not -- measured at 2,000 posts and the largest zoom, about one frame
+// in fifty took two frames' time while panning without this, none with it
+// (spec §7).
+//
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
 // what dims is dimmed by `globalAlpha`.
 const STEPS = [ [ 2, 6 ], [ 5, 8 ], [ 12, 11 ], [ Infinity, 14 ] ]
@@ -21,6 +30,10 @@ const DIM = 0.18
 // The width of the surface-coloured outline under a label, which keeps a title
 // readable where it crosses an edge.
 const LABEL_HALO = 3
+// How far outside the canvas an edge's end or a node's edge may be and still
+// count as on it: half the widest stroke, rounded up, and a node's rings.
+const EDGE_MARGIN = 2
+const NODE_MARGIN = 8
 
 // Four sizes by degree: small differences in size can't be read, so a hub is
 // one of four steps, not a point on a scale. A tag's is its half side.
@@ -39,6 +52,10 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   const x = (index) => positions[index * 2] * camera.k + camera.tx
   const y = (index) => positions[index * 2 + 1] * camera.k + camera.ty
   const dimmed = (index) => selected >= 0 && index !== selected && !neighbours.has(index)
+  // Which sides of the canvas a point lies beyond, as four bits (left, right,
+  // above, below; 0 is "on the canvas", give or take `margin`).
+  const beyond = (sx, sy, margin) =>
+    (sx < -margin ? 1 : sx > width + margin ? 2 : 0) | (sy < -margin ? 4 : sy > height + margin ? 8 : 0)
 
   // One path per kind and strength, so a few thousand edges are four strokes.
   // With a selection, the edges that do not touch it are the faded pass.
@@ -50,8 +67,10 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
         if (edge.kind !== kind) continue
         const touchesSelection = selected < 0 || edge.source === selected || edge.target === selected
         if (touchesSelection === faded) continue
-        context.moveTo(x(edge.source), y(edge.source))
-        context.lineTo(x(edge.target), y(edge.target))
+        const fromX = x(edge.source), fromY = y(edge.source), toX = x(edge.target), toY = y(edge.target)
+        if (beyond(fromX, fromY, EDGE_MARGIN) & beyond(toX, toY, EDGE_MARGIN)) continue
+        context.moveTo(fromX, fromY)
+        context.lineTo(toX, toY)
       }
       context.globalAlpha = (kind === "tag" ? 0.8 : 0.35) * (faded ? DIM : 1)
       context.strokeStyle = kind === "tag" ? theme.meta : theme.ink
@@ -63,6 +82,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
   context.setLineDash([])
 
   for (const index of visibleNodes) {
+    if (beyond(x(index), y(index), radii[index] + NODE_MARGIN)) continue
     context.globalAlpha = dimmed(index) ? DIM : 1
     if (nodes[index].kind === "tag") drawTag(context, theme, x(index), y(index), radii[index])
     else drawPost(context, theme, nodes[index], x(index), y(index), radii[index])
