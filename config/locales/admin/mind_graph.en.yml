@@ -21,6 +21,7 @@ en:
         zoom_in: "Zoom in"
         zoom_out: "Zoom out"
         fit: "Fit all"
+        card_label: "Selected in the graph"
       script:
         loading: "Loading the graph…"
         load_failed: "The graph could not be loaded."
@@ -32,3 +33,19 @@ en:
           one: "%{count} post has no connections yet."
           other: "%{count} posts have no connections yet."
         summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
+        card:
+          connections:
+            one: "%{count} connection"
+            other: "%{count} connections"
+          tag_posts:
+            one: "%{count} post"
+            other: "%{count} posts"
+          open_post: "Open post"
+          focus: "Focus graph here"
+          show_tagged: "Show posts with this tag"
+          close: "Close"
+          tag: "Tag"
+          status:
+            draft: "Draft"
+            scheduled: "Scheduled"
+            live: "Live"

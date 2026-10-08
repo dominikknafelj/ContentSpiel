@@ -32,6 +32,33 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
   end
 
+  # The selection card's links (spec §5.3) are filled into templates the route
+  # helpers built: the placeholders arrive literally, for the script to
+  # replace with a URL-encoded id or name, and no path is written in JavaScript.
+  test "the card's URL templates and the type labels ride on the element" do
+    sign_in_as(users(:one))
+    create_post(title: "A", content_type: "resume_entry")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-controller='admin--mind-graph'][data-post-focus-url='/cs-studio/mind_graph?post=__ID__'][data-tag-focus-url='/cs-studio/mind_graph?tag=__ID__'][data-tag-posts-url='/cs-studio/posts?tag=__NAME__']"
+    labels = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-type-labels"])
+    assert_equal({ "resume_entry" => ContentTypes.fetch("resume_entry").label }, labels)
+    assert_select "[data-mind-graph-card][hidden]:empty"
+    assert_select "[data-mind-graph-tooltip][hidden]:empty"
+  end
+
+  # A type that is no longer registered has no label to send: the card shows
+  # the stored name.
+  test "a retired type has no entry among the type labels" do
+    sign_in_as(users(:one))
+    create_post(title: "A").update_columns(content_type: "gone_type")
+
+    get "/cs-studio/mind_graph"
+
+    assert_equal "{}", css_select("[data-controller='admin--mind-graph']").first["data-type-labels"]
+  end
+
   # The strings the script shows are the server's (docs/reference/i18n.md): a
   # plural rides whole, for the script to choose a form by count.
   test "the script's messages ride on the element" do
@@ -43,7 +70,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     messages = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-messages"])
     assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
     assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
-    assert_equal %w[capped isolated load_failed loading no_connections retry summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+    assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
+    assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
+                    card.tag card.tag_posts isolated load_failed loading no_connections retry summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 

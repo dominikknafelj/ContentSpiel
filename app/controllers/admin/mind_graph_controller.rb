@@ -25,11 +25,15 @@ module Admin
     # What the page needs from the database is whether this viewer can read a
     # post at all ("No posts yet."), which content types their posts have (the
     # legend names only those, so it discloses no type they can't see) and the
-    # focus, which is not found when it is outside their scope.
+    # focus, which is not found when it is outside their scope. `@type_labels`
+    # is the human name of each of those types that is still registered, for
+    # the selection card (a retired type has none; the card shows its stored
+    # name, as `Admin::ContentTypeDotComponent` does).
     def show
       @focus = PostGraph::Focus.find(actor: Current.actor, post: params[:post], tag: params[:tag], locale: admin_locale)
       @depth = params[:depth].to_s == "2" ? 2 : 1
       @content_types = AccessControl.scope(Current.actor, "posts.read", Post.all).distinct.pluck(:content_type)
+      @type_labels = @content_types.filter_map { |name| (definition = ContentTypes.find(name)) && [ name, definition.label ] }.to_h
     end
 
     def data

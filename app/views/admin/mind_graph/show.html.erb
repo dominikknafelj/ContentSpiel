@@ -25,7 +25,11 @@
       `data-state="loading"` is what the server says; the script takes it from
       there (`mind_graph/app.js` lists the attributes it writes). The notice is
       over the canvas's top-left corner and lets the pointer through, except
-      for a button in it (Retry). The message keys are written out one by
+      for a button in it (Retry). The three URL templates are for the
+      selection card's links: built here, by the route helpers, with `__ID__`
+      and `__NAME__` where the script puts a node's id or a tag's name
+      (URL-encoded), so no path is written in JavaScript; `data-type-labels`
+      is each shown type's human name. The message keys are written out one by
       one: `test/lib/script_messages_test.rb` reads the literals to check that
       every key the script asks for is served. %>
   <div data-controller="admin--mind-graph"
@@ -33,7 +37,14 @@
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
        data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",
-                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.isolated", "mind_graph.script.summary") %>"
+                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.isolated", "mind_graph.script.summary",
+                                     "mind_graph.script.card.connections", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
+                                     "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag",
+                                     "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live") %>"
+       data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
+       data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
+       data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
+       data-type-labels="<%= @type_labels.to_json %>"
        data-state="loading"
        class="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
     <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line px-3.5 py-2.5">
@@ -63,6 +74,14 @@
       </div>
       <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>"></canvas>
       <div data-admin--mind-graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
+      <%# The selection card and the hover tooltip (spec §5.3): HTML over the
+          canvas, filled by `mind_graph/card.js` and `app.js` with `textContent`
+          and `href` only. Both are empty and `hidden` until the script shows
+          them, and the controller's `reset` hides them again on a page Turbo
+          restored from its cache. The card's links are the only way a
+          selection leads anywhere: a click on the canvas never navigates. %>
+      <aside data-mind-graph-card hidden aria-label="<%= t(".card_label") %>" class="absolute right-3 top-3 flex max-h-[calc(100%-4.5rem)] w-64 max-w-[calc(100%-1.5rem)] flex-col gap-2 overflow-y-auto rounded-cs border border-line-strong bg-surface p-3 shadow-menu"></aside>
+      <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
     </div>
   </div>
 <% end %>

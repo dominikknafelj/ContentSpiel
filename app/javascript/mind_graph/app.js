@@ -7,16 +7,26 @@
 // What the screen shows is said on the element, for tests and for anything
 // that wants to know without reading a canvas: `data-state` (loading, ready,
 // failed, worker-failed), `data-settled`, `data-nodes`, `data-edges`,
-// `data-zoom`, `data-labelled`. `element.mindGraph.screenPosition(id)` answers
-// where a visible node is, in client coordinates, and `.draws()` how many
-// frames have been drawn.
+// `data-zoom`, `data-labelled`, `data-selected` (the selected node's id, or
+// empty). `element.mindGraph.screenPosition(id)` answers where a visible node
+// is, in client coordinates, and `.draws()` how many frames have been drawn.
 //
 // THE CAMERA. The first view fits everything: while the layout takes shape the
 // camera follows it, and when it has cooled down the fit is final
 // (`state.fitted`). From then on -- or from the user's first zoom or pan, if
 // that comes sooner -- the camera moves only on the user's input or "Fit all":
 // a filter, a resize and a later reheat of the layout leave it where it is.
+// Dragging a node is such an input too: the camera stops following the layout
+// the moment a node is held, or the node would slide from under the pointer.
 // Nodes are not clamped to the box; the box is a window onto the graph.
+//
+// SELECTING (spec §5.3). A click on a node selects it: it and its direct
+// neighbours stay at full strength and are always labelled, the rest dims,
+// and the card (`card.js`) opens with what can be done with it. A click on
+// empty space, Escape and the card's Close clear the selection. A click never
+// navigates by itself; the card's links do. A press that moves is a drag, not
+// a click: it moves the node (`pin` / `unpin` in the worker) and leaves the
+// selection as it was. Hovering a node shows its whole title in the tooltip.
 import { messages } from "i18n/messages"
 import { createLayout } from "mind_graph/layout_client"
 import { identity, toGraph, zoomAt, panBy, bounds, fit } from "mind_graph/camera"
@@ -25,6 +35,7 @@ import { chooseLabels } from "mind_graph/labels"
 import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor } from "mind_graph/renderer"
 import { attachInput } from "mind_graph/input"
+import { createCard } from "mind_graph/card"
 
 // A label longer than this is cut with an ellipsis; a tag's count is appended
 // whole. Counted by code point, so an emoji is never cut in half. Exported for
@@ -34,6 +45,10 @@ const BUTTON_ZOOM = 1.4
 // How long the data request may go unanswered before it is given up and shown
 // as a failure, with Retry (spec §6).
 const LOAD_TIMEOUT_MS = 15_000
+// The tooltip's distance from the pointer, and from the box's edge when it
+// would otherwise leave the box.
+const TOOLTIP_OFFSET = 14
+const TOOLTIP_MARGIN = 4
 
 export function labelFor(node) {
   const suffix = node.kind === "tag" ? ` (${node.count})` : ""
@@ -64,6 +79,21 @@ export function mount(element) {
   let draws = 0
   let labelled = null
   let zoom = null
+  // The node a press is on (an index, -1 for none) and whether the layout was
+  // told to hold it: a press becomes a drag only once it has moved, and a
+  // plain click must send the worker nothing -- an `unpin` reheats the layout
+  // as a `pin` does, and the graph would twitch under a click.
+  let pressed = -1
+  let pinned = false
+
+  const tooltip = element.querySelector("[data-mind-graph-tooltip]")
+  const card = createCard(element.querySelector("[data-mind-graph-card]"), {
+    text,
+    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl },
+    typeLabels: JSON.parse(element.dataset.typeLabels),
+    // The button goes with the card it is in; the focus goes back to the canvas.
+    onClose: () => { select(-1); canvas.focus() }
+  })
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
   const setState = (value) => { element.dataset.state = value }
@@ -171,7 +201,25 @@ export function mount(element) {
       }
     }
     element.dataset.selected = index >= 0 ? state.nodes[index].id : ""
+    if (index >= 0) card.show(state.nodes[index])
+    else card.hide()
     requestDraw()
+  }
+
+  // The whole title of the node under the pointer, beside the pointer and
+  // inside the box (which clips what leaves it). `textContent`: a title is text.
+  function hover(x, y) {
+    const index = pressed < 0 && x >= 0 ? hit(x, y) : -1
+    canvas.style.cursor = index >= 0 ? "pointer" : ""
+    tooltip.hidden = index < 0
+    if (index < 0) return
+
+    tooltip.textContent = state.nodes[index].title
+    const left = Math.min(x + TOOLTIP_OFFSET, state.width - tooltip.offsetWidth - TOOLTIP_MARGIN)
+    const below = y + TOOLTIP_OFFSET
+    const top = below + tooltip.offsetHeight + TOOLTIP_MARGIN > state.height ? y - TOOLTIP_OFFSET - tooltip.offsetHeight : below
+    tooltip.style.left = `${Math.max(TOOLTIP_MARGIN, left)}px`
+    tooltip.style.top = `${Math.max(TOOLTIP_MARGIN, top)}px`
   }
 
   function show(data) {
@@ -185,9 +233,8 @@ export function mount(element) {
     state.nodes.forEach((node) => { node.label = labelFor(node) })
     state.widths = state.nodes.map((node) => context.measureText(node.label).width)
     state.focusIndex = data.focus ? indexOf.get(data.focus.node_id) ?? -1 : -1
-    state.selected = -1
-    state.neighbours = new Set()
     state.fitted = false
+    select(-1)
     applyFilter()
     // The canvas is one image to a screen reader, and its name says what is on it.
     canvas.setAttribute("aria-label", text.t("mind_graph.script.summary", { posts: state.nodes.length, edges: state.edges.length }))
@@ -281,17 +328,49 @@ export function mount(element) {
     }
   }
 
-  // This task draws and moves the camera; what a press, a click, a hover and
-  // Escape mean (selecting, dragging a node, the card) comes with the next.
+  // The tooltip is where the pointer was when it was shown: once the view
+  // moves under it, it names the wrong place.
+  const moveCamera = (camera) => {
+    state.camera = camera
+    state.fitted = true
+    tooltip.hidden = true
+    requestDraw()
+  }
+
   const stopInput = attachInput(canvas, {
-    onPress: () => null,
-    onDrag: () => {},
-    onDrop: () => {},
-    onClick: () => {},
-    onHover: () => {},
-    onEscape: () => {},
-    onPan: (dx, dy) => { state.camera = panBy(state.camera, dx, dy); state.fitted = true; requestDraw() },
-    onZoom: (x, y, factor) => { state.camera = zoomAt(state.camera, x, y, factor); state.fitted = true; requestDraw() }
+    // A press on a node may become a drag of it, a press on empty space pans.
+    // Whether the press was a click is known only at release (`input.js`), so
+    // nothing is sent to the layout yet. The answer is the index plus one,
+    // because `input.js` asks for something truthy and index 0 is a node.
+    onPress: (x, y) => {
+      pressed = hit(x, y)
+      pinned = false
+      tooltip.hidden = true
+      return pressed >= 0 ? pressed + 1 : null
+    },
+    // The press has moved: the node is held under the pointer in the worker
+    // (`pin`), which reheats the layout so the rest resettles around it.
+    onDrag: (x, y) => {
+      if (pressed < 0 || !layout) return
+      const [ gx, gy ] = toGraph(state.camera, x, y)
+      state.fitted = true
+      pinned = true
+      element.removeAttribute("data-settled")
+      layout.pin(state.nodes[pressed].id, gx, gy)
+    },
+    // Also the end of a press a second finger took over (a pinch). `unpin`
+    // only answers a `pin`; `settled` is announced again when the layout has
+    // cooled down with the node let go.
+    onDrop: () => {
+      if (pinned) layout?.unpin(state.nodes[pressed].id)
+      pressed = -1
+      pinned = false
+    },
+    onClick: (x, y) => select(hit(x, y)),
+    onEscape: () => select(-1),
+    onHover: hover,
+    onPan: (dx, dy) => moveCamera(panBy(state.camera, dx, dy)),
+    onZoom: (x, y, factor) => moveCamera(zoomAt(state.camera, x, y, factor))
   })
   const stopTheme = watchTheme(() => { state.theme = readTheme(canvas); requestDraw() })
   const observer = new ResizeObserver(resize)
@@ -299,7 +378,7 @@ export function mount(element) {
   resize()
   load()
 
-  const zoomBy = (factor) => { state.camera = zoomAt(state.camera, state.width / 2, state.height / 2, factor); state.fitted = true; requestDraw() }
+  const zoomBy = (factor) => moveCamera(zoomAt(state.camera, state.width / 2, state.height / 2, factor))
 
   element.mindGraph = {
     screenPosition(id) {
@@ -336,6 +415,9 @@ export function mount(element) {
       observer.disconnect()
       stopInput()
       stopTheme()
+      card.hide()
+      tooltip.hidden = true
+      canvas.style.cursor = ""
       delete element.mindGraph
     }
   }

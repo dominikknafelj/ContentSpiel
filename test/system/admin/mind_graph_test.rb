@@ -553,6 +553,263 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
   end
 
+  test "a click on a post selects it and opens its card; Open post opens the editor" do
+    a = create_post(title: "Alpha", content_type: "resume_entry")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    visit admin_mind_graph_path
+    await_graph
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+
+    click_node(a.id)
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    within("[data-mind-graph-card]") do
+      assert_text "Alpha"
+      assert_text ContentTypes.fetch("resume_entry").label
+      assert_text "Live"
+      assert_text "1 connection"
+      assert_link "Focus graph here", href: /mind_graph\?post=#{a.id}\z/
+      click_link "Open post"
+    end
+    assert_current_path admin_post_path(a)
+  end
+
+  test "a draft's card says Draft" do
+    a = create_post(title: "Unfinished", published: false)
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card] [data-status='draft']", text: "Draft"
+  end
+
+  test "a click on a tag opens its card, with the posts list filtered by it" do
+    2.times { |i| create_post(title: "P#{i}", tags: [ "c++ & more" ]) }
+    create_post(title: "Untagged")
+    tag = Tag.find_by!(name: "c++ & more")
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node("tag-#{tag.id}")
+
+    within("[data-mind-graph-card]") do
+      assert_text "c++ & more"
+      assert_text "2 posts"
+      assert_link "Focus graph here", href: /mind_graph\?tag=#{tag.id}\z/
+    end
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Show posts with this tag" } }
+    assert_current_path admin_posts_path(tag: "c++ & more")
+    # The posts list read the name back as it is: the two tagged posts, only.
+    assert_text "P0"
+    assert_text "P1"
+    assert_no_text "Untagged"
+  end
+
+  test "a click on empty space, Escape and the card's Close all clear the selection" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    corner = page.evaluate_script("(() => { const r = document.querySelector(#{CANVAS.to_json}).getBoundingClientRect(); return [r.left + 6, r.top + 6] })()")
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card]"
+    page.driver.browser.mouse.click(x: corner[0], y: corner[1])
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"]
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card]"
+    find(CANVAS).send_keys(:escape)
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"]
+
+    click_node(a.id)
+    within("[data-mind-graph-card]") { press "Close" }
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"]
+  end
+
+  test "the selected node and its neighbours are labelled at any zoom" do
+    hub = create_post(title: "Hub")
+    spokes = 30.times.map { |i| create_post(title: "Spoke #{i}") }
+    spokes.each { |spoke| PostRelation.create!(post: hub, related_post: spoke) }
+    spokes.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    visit admin_mind_graph_path
+    await_graph
+    6.times { press "Zoom out" }
+    last = spokes.last
+
+    click_node(last.id)
+
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.labelled.split(',').includes('#{last.id}')")
+    labelled = graph["data-labelled"].split(",")
+    assert_includes labelled, hub.id.to_s
+  end
+
+  # What dims is everything but the selection and its neighbours: read from the
+  # canvas, a far node's mark is fainter than it was and a neighbour's is not.
+  test "with a node selected the rest dims, and clearing the selection brings it back" do
+    a, b, c, d = %w[A B C D].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: c, related_post: d)
+    visit admin_mind_graph_path
+    await_graph
+    before = { b => pixels_of(b).first, c => pixels_of(c).first }
+
+    click_node(a.id)
+
+    assert_equal before[b], pixels_of(b).first, "a neighbour stays at full strength"
+    assert_operator pixels_of(c).first[3], :<, before[c][3] / 2, "a node that is neither selected nor a neighbour dims"
+
+    find(CANVAS).send_keys(:escape)
+    assert_equal before[c], pixels_of(c).first
+  end
+
+  # The neighbours are the ones the SHOWN edges give the selection: a filter
+  # change with a node selected recomputes them. Read through the labels --
+  # a neighbour is always labelled, and the tag, the least connected node
+  # here, is labelled at this zoom for no other reason.
+  test "a filter change with a node selected recomputes its neighbours" do
+    hub = create_post(title: "Hub")
+    spokes = 30.times.map { |i| create_post(title: "Spoke #{i}", tags: (i >= 28 ? [ "shared" ] : [])) }
+    spokes.each { |spoke| PostRelation.create!(post: hub, related_post: spoke) }
+    spokes.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    tag_id = "tag-#{Tag.find_by!(name: "shared").id}"
+    last = spokes.last
+    visit admin_mind_graph_path
+    await_graph
+    2.times { press "Zoom out" }
+    labelled = -> { await_frames; graph["data-labelled"].split(",") }
+    assert_not_includes labelled.call, tag_id, "the tag is labelled without a selection: this test would show nothing"
+
+    click_node(last.id)
+    assert_includes labelled.call, tag_id, "the selection's neighbour by a tag edge is labelled"
+
+    find("label", text: "Related").click
+    await_graph
+    assert_equal last.id.to_s, graph["data-selected"], "a selection the filter still shows stays"
+    assert_selector "[data-mind-graph-card]", text: "Spoke 29"
+    assert_not_includes labelled.call, tag_id
+    assert_includes labelled.call, hub.id.to_s
+
+    find("label", text: "All").click
+    await_graph
+    assert_includes labelled.call, tag_id, "back under All the tag is a neighbour again"
+    assert_includes labelled.call, hub.id.to_s
+  end
+
+  test "a filter that hides the selected node clears the selection and closes the card" do
+    a, b = 2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
+    PostRelation.create!(post: a, related_post: b)
+    tag = Tag.find_by!(name: "t")
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node("tag-#{tag.id}")
+    assert_selector "[data-mind-graph-card]", text: "2 posts"
+
+    find("label", text: "Related").click
+    await_graph
+    assert_equal "", graph["data-selected"]
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+  end
+
+  # Review focus 1.
+  test "a title with markup in it is text in the card" do
+    a = create_post(title: %(</script><img src=x onerror="window.pwned=1"> "quoted" 🎉))
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+
+    within("[data-mind-graph-card]") { assert_text %(</script><img src=x onerror="window.pwned=1"> "quoted" 🎉) }
+    assert_no_selector "[data-mind-graph-card] img", visible: :all
+    assert_nil page.evaluate_script("window.pwned")
+  end
+
+  test "dragging a node moves it and the selection is not changed by the drag" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    from = screen_position(a.id)
+    zoom = graph["data-zoom"]
+
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from["x"], y: from["y"])
+    mouse.down
+    mouse.move(x: from["x"] + 40, y: from["y"] + 30)
+    mouse.move(x: from["x"] + 80, y: from["y"] + 60)
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{from["x"] + 80}) < 6 && Math.abs(p.y - #{from["y"] + 60}) < 6 })()")
+    # Not a pan, which would move the node on screen just the same: the layout
+    # was told to hold the node, and is running again.
+    assert_no_selector "#{GRAPH}[data-settled]"
+    assert_equal zoom, graph["data-zoom"]
+    mouse.up
+
+    assert_equal "", graph["data-selected"].to_s
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    await_graph
+    there = screen_position(a.id)
+    assert_operator Math.hypot(there["x"] - from["x"], there["y"] - from["y"]), :>, 20, "the node went back to where it was when it was let go"
+  end
+
+  # A click sends the layout nothing: no `pin`, so no `unpin`, so the graph is
+  # not reheated and nothing moves under a pointer that only selected.
+  test "a plain click leaves the layout at rest" do
+    a = create_post(title: "A")
+    b = create_post(title: "B")
+    PostRelation.create!(post: a, related_post: b)
+    visit admin_mind_graph_path
+    await_graph
+    before = [ screen_position(a.id), screen_position(b.id) ]
+
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card]"
+    await_frames
+    assert_selector "#{GRAPH}[data-settled]"
+    assert_equal before, [ screen_position(a.id), screen_position(b.id) ]
+  end
+
+  test "hovering a node shows its full title" do
+    long = "A title that is certainly longer than thirty-two characters"
+    a = create_post(title: long)
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    point = screen_position(a.id)
+
+    page.driver.browser.mouse.move(x: point["x"], y: point["y"])
+
+    assert_selector "[data-mind-graph-tooltip]", text: long
+    page.driver.browser.mouse.move(x: point["x"] + 200, y: point["y"] + 200)
+    assert_no_selector "[data-mind-graph-tooltip]", visible: :visible
+  end
+
+  # Turbo's snapshot is the page as it was left, card and all; Back shows a
+  # clean screen (the controller's `reset`), and nothing is selected.
+  test "Back to the graph after a selection shows no card" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Open post" } }
+    assert_current_path admin_post_path(a)
+
+    page.go_back
+    await_graph
+
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"].to_s
+  end
+
   private
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:
@@ -605,6 +862,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         terminate() { window.liveWorkers -= 1; super.terminate() }
       }
     JS
+  end
+
+  # A real click where the node is drawn.
+  def click_node(id)
+    point = screen_position(id)
+    assert point, "node #{id} is not on screen"
+    page.driver.browser.mouse.click(x: point["x"], y: point["y"])
   end
 
   def graph = find(GRAPH)

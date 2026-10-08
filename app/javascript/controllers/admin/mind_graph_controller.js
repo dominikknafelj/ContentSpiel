@@ -13,11 +13,11 @@ import { Controller } from "@hotwired/stimulus"
 //
 // `connect()` also takes back what a Turbo snapshot carries. Turbo caches the
 // page as it stood when it was left -- `data-state="ready"`, `data-settled`,
-// the counts, the notice's lines -- and Back restores exactly that, before
-// anything has been fetched or laid out. Those attributes say what the screen
-// SHOWS, so they are reset here, synchronously, and the app writes them again
-// as they become true. (The filter's radios are restored too, and they are
-// kept: the graph shows what the control says.)
+// the counts, the notice's lines, an open selection card -- and Back restores
+// exactly that, before anything has been fetched or laid out. All of it says
+// what the screen SHOWS, so it is reset here, synchronously, and the app
+// writes it again as it becomes true. (The filter's radios are restored too,
+// and they are kept: the graph shows what the control says.)
 //
 // A failed `import()` is left unhandled on purpose: the rejection is a
 // JavaScript error, loud in the console and in the system tests, and never a
@@ -48,5 +48,9 @@ export default class extends Controller {
     this.element.dataset.state = "loading"
     for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected"]) this.element.removeAttribute(name)
     if (this.hasNoticeTarget) this.noticeTarget.replaceChildren()
+    for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip]")) {
+      floating.hidden = true
+      floating.replaceChildren()
+    }
   }
 }
