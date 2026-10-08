@@ -34,19 +34,20 @@ export function panBy(camera, dx, dy) {
   return { k: camera.k, tx: camera.tx + dx, ty: camera.ty + dy }
 }
 
-// The box around the nodes at `indexes`; null when there are none.
+// The box around the nodes at `indexes`; null when there are none. A node
+// whose position is not a finite number (not laid out yet) is skipped, so the
+// box -- and the camera fitted to it -- is never NaN.
 export function bounds(positions, indexes) {
-  if (indexes.length === 0) return null
-
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const index of indexes) {
     const x = positions[index * 2], y = positions[index * 2 + 1]
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
     if (x < minX) minX = x
     if (x > maxX) maxX = x
     if (y < minY) minY = y
     if (y > maxY) maxY = y
   }
-  return { minX, minY, maxX, maxY }
+  return minX === Infinity ? null : { minX, minY, maxX, maxY }
 }
 
 // The camera that shows the whole box with `padding` pixels around it, its

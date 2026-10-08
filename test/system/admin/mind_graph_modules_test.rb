@@ -220,14 +220,90 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 62, 50 ], labels.first.values_at("x", "y")
   end
 
+  test "camera: zooming at either limit still keeps the point under the pointer" do
+    %w[1000 0.000001].each do |factor|
+      point = js_module("mind_graph/camera", "(() => { const c = m.zoomAt({ k: 1, tx: 30, ty: -20 }, 100, 80, #{factor}); return m.toScreen(c, m.toGraph({ k: 1, tx: 30, ty: -20 }, 100, 80)[0], m.toGraph({ k: 1, tx: 30, ty: -20 }, 100, 80)[1]) })()")
+      assert_in_delta 100, point[0], 0.001
+      assert_in_delta 80, point[1], 0.001
+    end
+  end
+
+  test "camera: fit of a tall box is limited by the height" do
+    result = js_module("mind_graph/camera", <<~JS)
+      (() => {
+        const box = { minX: -100, minY: -500, maxX: 100, maxY: 500 }
+        const c = m.fit(box, 800, 600)
+        return { k: c.k, top: m.toScreen(c, 0, box.minY), bottom: m.toScreen(c, 0, box.maxY), middle: m.toScreen(c, 0, 0) }
+      })()
+    JS
+
+    assert_in_delta 0.52, result["k"], 0.001
+    assert_in_delta 40, result["top"][1], 0.01
+    assert_in_delta 560, result["bottom"][1], 0.01
+    assert_equal [ 400, 300 ], result["middle"].map(&:round)
+  end
+
+  test "camera: bounds skip positions that are not laid out yet, and fit never returns NaN" do
+    assert_equal({ "minX" => 5, "minY" => 6, "maxX" => 15, "maxY" => 16 },
+      js_module("mind_graph/camera", "m.bounds(new Float32Array([NaN, NaN, 5, 6, 15, 16, 7, NaN]), [0, 1, 2, 3])"))
+    assert_nil js_module("mind_graph/camera", "m.bounds(new Float32Array([NaN, NaN, NaN, 1]), [0, 1])")
+    camera = js_module("mind_graph/camera", "m.fit(m.bounds(new Float32Array([NaN, NaN]), [0]), 800, 600)")
+    assert_equal({ "k" => 1, "tx" => 400, "ty" => 300 }, camera)
+  end
+
+  test "labels: nodes outside the canvas do not use up the budget" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      (() => {
+        const n = 105
+        const positions = new Float32Array(n * 2)
+        for (let i = 0; i < 100; i++) { positions[i * 2] = -5000 - i * 100; positions[i * 2 + 1] = 50 }
+        for (let i = 100; i < n; i++) { positions[i * 2] = 50 + (i - 100) * 150; positions[i * 2 + 1] = 100 }
+        return m.chooseLabels({ order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
+          camera: { k: 1, tx: 0, ty: 0 }, width: 1000, height: 1000, always: new Set() }).map((label) => label.index)
+      })()
+    JS
+
+    assert_equal [ 100, 101, 102, 103, 104 ], labelled
+  end
+
+  test "labels: the last quarter of the reach fades, strictly, and the rest is at full strength" do
+    labels = js_module("mind_graph/labels", <<~JS)
+      (() => {
+        const n = 100
+        const positions = new Float32Array(n * 2)
+        for (let i = 0; i < n; i++) { positions[i * 2] = (i % 10) * 200; positions[i * 2 + 1] = Math.floor(i / 10) * 200 }
+        return m.chooseLabels({ order: Array.from({ length: n }, (_, i) => i), positions, widths: new Array(n).fill(60), radii: new Array(n).fill(8),
+          camera: { k: 1, tx: 0, ty: 0 }, width: 5000, height: 5000, always: new Set() })
+      })()
+    JS
+
+    assert_equal (0...40).to_a, labels.map { |label| label["index"] }
+    assert_equal [ 1 ] * 30, labels.first(30).map { |label| label["alpha"] }
+    fading = labels.last(10).map { |label| label["alpha"] }
+    assert fading.all? { |alpha| alpha > 0 && alpha < 1 }
+    assert_equal fading.sort.reverse, fading
+    assert_equal fading.uniq, fading
+  end
+
+  test "labels: rank order decides which of two overlapping labels wins" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      m.chooseLabels({ order: [1, 0, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+        camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set() }).map((label) => label.index)
+    JS
+
+    assert_equal [ 1, 2 ], labelled
+  end
+
   private
 
   # Imports a module of the page's import map and answers `expression`, in
   # which the module is `m`.
   def js_module(path, expression)
-    page.evaluate_async_script(<<~JS)
+    result = page.evaluate_async_script(<<~JS)
       const done = arguments[arguments.length - 1]
-      import(#{path.to_json}).then((m) => done(#{expression}))
+      import(#{path.to_json}).then((m) => done(#{expression})).catch((error) => done({ error: String(error) }))
     JS
+    flunk "#{path}: #{result["error"]}" if result.is_a?(Hash) && result.keys == [ "error" ]
+    result
   end
 end

@@ -1,10 +1,13 @@
 // Which labels the mind graph shows (mind graph canvas spec §5.2). Three rules:
 //
-// 1. HUBS FIRST. `order` is the visible nodes, best-connected first, and the
-//    zoom decides how far down that list labels reach: LABEL_BUDGET of them at
-//    zoom 1, growing with the square of the zoom (four times the area on
-//    screen per node, four times the labels). The last quarter of that reach
-//    fades, so a label arrives gradually as you zoom in.
+// 1. HUBS FIRST, AMONG THE NODES ON THE CANVAS. `order` is the visible nodes,
+//    best-connected first, and the zoom decides how far down that list labels
+//    reach: LABEL_BUDGET of them at zoom 1, growing with the square of the zoom
+//    (four times the area on screen per node, four times the labels). Only a
+//    node on the canvas has a rank: one outside neither gets a label nor uses
+//    up a place, so zoomed into a corner the budget goes to what can be seen.
+//    The last quarter of that reach fades -- strictly, from just below full
+//    strength to just above none -- so a label arrives gradually as you zoom in.
 // 2. NO OVERLAP. A label is placed only where no label placed before it is;
 //    better-connected nodes place first, so the hub wins.
 // 3. `always` -- the selection, its neighbours, the focus -- is labelled at
@@ -24,11 +27,15 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
   const placed = []
   const labels = []
 
+  const onCanvas = (index) => {
+    const sx = positions[index * 2] * camera.k + camera.tx
+    const sy = positions[index * 2 + 1] * camera.k + camera.ty
+    return sx >= 0 && sy >= 0 && sx <= width && sy <= height
+  }
+
   const place = (index, alpha) => {
     const sx = positions[index * 2] * camera.k + camera.tx
     const sy = positions[index * 2 + 1] * camera.k + camera.ty
-    if (sx < 0 || sy < 0 || sx > width || sy > height) return
-
     const box = { left: sx + radii[index] + GAP, top: sy - HEIGHT / 2, right: sx + radii[index] + GAP + widths[index], bottom: sy + HEIGHT / 2 }
     if (placed.some((other) => box.left < other.right && box.right > other.left && box.top < other.bottom && box.bottom > other.top)) return
 
@@ -36,14 +43,15 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
     labels.push({ index, alpha, x: box.left, y: sy })
   }
 
-  for (const index of order) if (always.has(index)) place(index, 1)
+  for (const index of order) if (always.has(index) && onCanvas(index)) place(index, 1)
 
   let rank = 0
   for (const index of order) {
     if (rank >= reach) break
-    const alpha = rank < fadeFrom ? 1 : 1 - (rank - fadeFrom) / (reach - fadeFrom)
+    if (!onCanvas(index)) continue
+    const alpha = rank < fadeFrom ? 1 : 1 - (rank - fadeFrom + 1) / (reach - fadeFrom + 1)
     rank += 1
-    if (!always.has(index) && alpha > 0) place(index, alpha)
+    if (!always.has(index)) place(index, alpha)
   }
   return labels
 }
