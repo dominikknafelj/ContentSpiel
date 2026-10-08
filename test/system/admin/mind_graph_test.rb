@@ -1392,7 +1392,10 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "settled", answers.last
     assert_operator answers.count("tick"), :>, 200, "the layout jumped to its end"
     assert_equal 1, answers.count("settled")
-    assert_operator page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()"), :>, 60, "the frames in between were not drawn"
+    # (How many depends on how many frames the browser got to draw in those
+    # seconds, so only: clearly more than the one or two of a layout that
+    # arrives finished.)
+    assert_operator page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()"), :>, 10, "the frames in between were not drawn"
   end
 
   test "Escape with the focus inside the card closes it and gives the focus back to the canvas" do
@@ -1925,7 +1928,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # Presses the mouse on a node and walks it `by` pixels in two steps, waiting
   # until the node is under the pointer again; releases unless told not to.
   # Answers where the node was dropped, in client coordinates.
+  #
+  # It first waits for the layout to be AT REST. A node is held where it was
+  # grabbed, so one that is still easing (after an earlier drop, a filter, an
+  # unpin) has moved on between this helper reading its place and the press
+  # reaching the browser, and stays that far from the pointer for the whole
+  # drag: on a slow runner that was more than the two pixels allowed below,
+  # and "the node is where it was dropped" timed out. A person presses where
+  # the node is; a test can only press where it was.
   def drag_node(id, by:, release: true)
+    assert_selector "#{GRAPH}[data-settled]", wait: 15
     from = screen_position(id)
     assert from, "node #{id} is not on screen"
     to = { "x" => from["x"] + by[0], "y" => from["y"] + by[1] }

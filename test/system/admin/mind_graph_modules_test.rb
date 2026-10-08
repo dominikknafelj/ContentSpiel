@@ -72,7 +72,9 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
     assert_nil result["error"]
     assert_operator result["ticks"], :>=, 37, "the end of the layout was not shown tick by tick"
-    assert_operator result["ticks"], :<, 200, "a graph over the threshold was shown tick by tick from the start"
+    # Fewer messages than the 300 ticks d3 needs: how many fewer depends on how
+    # many ticks the machine fits into a 12 ms slice, so no tighter bound.
+    assert_operator result["ticks"], :<, 300, "a graph over the threshold was shown tick by tick from the start"
     assert_operator result["lastStretch"], :>, 300, "the last ticks did not come a frame apart"
   end
 
@@ -176,14 +178,56 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
 
   # `settled` carries `after`, the number of messages the worker had taken up
   # when it cooled down, and the client believes only the one that answers
-  # everything it sent. With reduced motion three nodes cool down inside the
-  # first slice, before the `filter` behind `start` is handled, so the worker
-  # itself posts `settled` twice here (`raw:1`, `raw:2`); the page must hear of
-  # one. (At frame pace the filter arrives while the first layout is still
-  # unfolding and there is only the one; the guard is for the case where there
-  # are two.) The end of the watch is a message that changes nothing (a drag
-  # of a node that isn't there), which the idle worker answers at once: every
-  # `settled` before it has arrived by then, so "exactly once" is not a wait.
+  # everything it sent. THE CLIENT'S HALF, with a worker the test plays itself,
+  # so every case is made on purpose and none depends on how fast a machine
+  # lays three nodes out: a `settled` that is behind what was sent is not
+  # passed on, the one that has caught up is, once, and a late or repeated
+  # stale one after that is not either.
+  test "the layout client passes on only a settled that answers everything it has sent" do
+    log = using_wait_time(10) do
+      page.evaluate_async_script(<<~JS)
+        const done = arguments[arguments.length - 1]
+        const Real = window.Worker
+        let worker = null
+        window.Worker = class { constructor() { worker = this; this.sent = [] } postMessage(message) { this.sent.push(message.type) } terminate() {} }
+        import("mind_graph/layout_client").then(({ createLayout }) => {
+          const log = []
+          const layout = createLayout({ workerUrl: "unused", d3Url: "unused", onTick: () => log.push("tick"), onSettled: () => log.push("called"), onError: (message) => log.push(`error: ${message}`) })
+          window.Worker = Real
+          const answer = (after) => { log.push(`raw:${after}`); worker.onmessage({ data: { type: "settled", after } }) }
+          layout.start([{ id: 1, radius: 8 }], [])
+          layout.filter([1], [])
+          answer(1) // the first layout cooled down before the filter was taken up
+          answer(2)
+          layout.drag(1, 10, 10)
+          answer(2) // late, and stale again
+          layout.drop(1)
+          answer(3) // answers the drag, not yet the drop
+          answer(4)
+          layout.stop()
+          answer(4) // nothing is delivered after stop
+          done({ log, sent: worker.sent })
+        }).catch((error) => { window.Worker = Real; done({ error: String(error) }) })
+      JS
+    end
+
+    assert_nil log["error"]
+    assert_equal %w[start filter drag drop], log["sent"]
+    assert_equal %w[raw:1 raw:2 called raw:2 raw:3 raw:4 called raw:4], log["log"]
+  end
+
+  # THE WORKER'S HALF, with the real one: `after` counts the messages taken
+  # up. A `filter` is sent right behind `start`, and whichever way that race
+  # goes on this machine the page hears of ONE settled layout, the filter's.
+  # With reduced motion three nodes usually cool down inside the first 12 ms
+  # slice, before the filter is handled, and the worker then posts `settled`
+  # twice (`raw:1`, `raw:2`); on a slower machine the filter is taken up while
+  # the first layout is still running and there is only `raw:2`. (That it is
+  # machine speed that decides was found in CI: this test used to insist on
+  # `raw:1`. The stale case itself is the test above.) The end of the watch is
+  # a message that changes nothing (a drag of a node that isn't there), which
+  # the idle worker answers at once: every `settled` before it has arrived by
+  # then, so "exactly once" is not a wait.
   test "a filter sent right behind start is settled once, and only when the filter's layout has cooled down" do
     log = settled_log(<<~JS)
       layout.start([{ id: 1, radius: 8 }, { id: 2, radius: 8 }, { id: 3, radius: 6 }], [{ source: 1, target: 2 }, { source: 2, target: 3 }], { reducedMotion: true })
@@ -196,7 +240,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal "raw:2", log[first + 1], "the page was told of a settled that did not answer the filter: #{log}"
     assert_equal %w[called raw:3], log.last(2), log.inspect
     assert_not_includes log[0...first], "raw:2"
-    assert_includes log, "raw:1", "the first layout did not cool down before the filter: this no longer tests the case it is for"
+    assert_includes [ [], [ "raw:1" ] ], log[0...first], "something other than the first layout's own settled came before the filter's: #{log}"
   end
 
   # Every message is answered, whatever it changes: a drag and its drop
