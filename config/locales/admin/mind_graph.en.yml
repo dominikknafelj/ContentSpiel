@@ -22,6 +22,7 @@ en:
         zoom_out: "Zoom out"
         fit: "Fit all"
         card_label: "Selected in the graph"
+        list_summary: "List of posts and tags in this graph"
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
@@ -58,6 +59,13 @@ en:
             draft: "Draft"
             scheduled: "Scheduled"
             live: "Live"
+        list:
+          posts: "Posts"
+          tags: "Tags"
+          edit: "Edit"
+          connections:
+            one: "%{count} connection"
+            other: "%{count} connections"
         search:
           count:
             one: "%{count} result"

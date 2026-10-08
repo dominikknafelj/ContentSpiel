@@ -17,6 +17,12 @@
 // The status chip is `Admin::StatusChipComponent`'s, class for class: a dot in
 // the status's token colour AND the word, so the colour is never the only cue.
 const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
+// A URL template filled with one value: a function as the replacement, because
+// a string would have its `$&` and `$1` read as patterns. (`encodeURIComponent`
+// escapes `$` anyway; this does not rely on it.) `node_list.js` fills its links
+// with the same function.
+export const fill = (template, placeholder, value) => template.replace(placeholder, () => encodeURIComponent(value))
+
 const LINK = "w-fit text-sm text-accent underline hover:text-accent-hover"
 
 export function createCard(container, { text, urls, typeLabels, onClose }) {
@@ -31,11 +37,6 @@ export function createCard(container, { text, urls, typeLabels, onClose }) {
     anchor.href = href
     return anchor
   }
-  // A function as the replacement: a string would have its `$&` and `$1` read
-  // as patterns. (`encodeURIComponent` escapes `$` anyway; this does not rely
-  // on it.)
-  const fill = (template, placeholder, value) => template.replace(placeholder, () => encodeURIComponent(value))
-
   const title = (node) => element("h2", "m-0 break-words text-base font-semibold text-ink", node.title)
 
   function statusChip(status) {

@@ -43,7 +43,8 @@
                                      "mind_graph.script.card.connections", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
-                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag") %>"
+                                     "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
+                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.edit", "mind_graph.script.list.connections") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
@@ -124,5 +125,14 @@
         <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
       </div>
     </div>
+    <%# The keyboard and screen-reader path (mind graph canvas spec §5.7): a
+        canvas's nodes can't take focus, so every node the graph draws is also a
+        link here, filled by `mind_graph/node_list.js` from the same data and
+        following the filter. It comes last in the document, after the canvas
+        and the card, and starts closed. %>
+    <details data-mind-graph-list class="mt-3 rounded-cs border border-line bg-surface px-3.5 py-2.5 text-sm">
+      <summary class="cursor-pointer text-dim"><%= t(".list_summary") %></summary>
+      <div data-mind-graph-list-body class="mt-2 grid gap-x-8 gap-y-3 sm:grid-cols-2"></div>
+    </details>
   </div>
 <% end %>

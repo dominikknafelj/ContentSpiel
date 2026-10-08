@@ -71,8 +71,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
     assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
+    assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.list.connections"])
     assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts isolated load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts isolated list.connections list.edit list.posts list.tags load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
@@ -280,6 +281,20 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     order = css_select(%w[input[type=search] [data-mind-graph-focus]\ a input[type=radio] button canvas].map { |part| "[data-controller='admin--mind-graph'] #{part}" }.join(", "))
       .map { |node| { "button" => node.text.strip, "canvas" => "canvas" }.fetch(node.name) { node.name == "a" ? "link:#{node.text.strip}" : node["type"] } }
     assert_equal [ "search", "link:2", "link:Whole graph", "radio", "radio", "radio", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+  end
+
+  # Spec §5.7: the list of links comes after the canvas (and the card), so it
+  # is the last stop; it starts closed and empty, the script fills it.
+  test "the list of links comes last, closed and empty" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-controller='admin--mind-graph'] details[data-mind-graph-list]:not([open]) summary", text: "List of posts and tags in this graph"
+    assert_select "[data-mind-graph-list-body]:empty"
+    order = css_select("[data-controller='admin--mind-graph'] canvas, [data-controller='admin--mind-graph'] [data-mind-graph-card], [data-controller='admin--mind-graph'] summary").map(&:name)
+    assert_equal %w[canvas aside summary], order
   end
 
   test "the depth switch names its depth for assistive technology, the current one too" do

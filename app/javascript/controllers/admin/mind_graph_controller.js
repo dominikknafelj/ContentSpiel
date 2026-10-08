@@ -53,6 +53,11 @@ export default class extends Controller {
     const field = this.element.querySelector("[data-mind-graph-search] input")
     if (field) field.value = ""
     this.element.querySelector("[data-mind-graph-status]")?.replaceChildren()
+    // The list of links: its rows are the visit that was left. The `<details>`
+    // is left as the snapshot has it (open if the person had it open): it is
+    // the person's own state, like the filter's radios, and the rows come back
+    // with the data.
+    this.element.querySelector("[data-mind-graph-list-body]")?.replaceChildren()
     for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip], [data-mind-graph-results]")) {
       floating.hidden = true
       floating.replaceChildren()

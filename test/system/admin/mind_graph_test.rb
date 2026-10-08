@@ -1063,6 +1063,90 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     JS
   end
 
+  # Mind graph canvas spec §5.7: nothing on a canvas takes focus, so every node
+  # the graph draws is also a link in a list below it, and the list follows the
+  # filter.
+  test "the list below the graph holds every drawn node as a link, and follows the filter" do
+    a = create_post(title: "Alpha", tags: [ "shared" ])
+    create_post(title: "Beta", tags: [ "shared" ])
+    c = create_post(title: "Gamma")
+    PostRelation.create!(post: a, related_post: c)
+    tag = Tag.find_by!(name: "shared")
+    visit admin_mind_graph_path
+    await_graph
+
+    find("[data-mind-graph-list] summary", text: "List of posts and tags in this graph").click
+    within("[data-mind-graph-list]") do
+      assert_link "Alpha", href: /mind_graph\?post=#{a.id}\z/
+      assert_link "shared", href: /mind_graph\?tag=#{tag.id}\z/
+      assert_selector "li", text: /Alpha\s+2 connections/
+      assert_selector "li", text: /Gamma\s+1 connection\b/
+      assert_selector "a[href='#{admin_post_path(a)}'][aria-label='Edit: Alpha']", text: "Edit"
+      assert_selector "li", count: 4
+    end
+
+    find("label", text: "Related").click
+    await_graph
+    within("[data-mind-graph-list]") do
+      assert_selector "li", count: 2
+      assert_no_link "Beta"
+      assert_no_link "shared"
+    end
+  end
+
+  test "the list holds exactly the nodes a capped graph draws" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_GRAPH)
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    find("[data-mind-graph-list] summary").click
+    within("[data-mind-graph-list]") do
+      assert_selector "li", count: 2
+      assert_link "One", href: /mind_graph\?post=1\z/
+      assert_link "Two"
+    end
+  end
+
+  test "the list is a keyboard path: its link opens a node's neighbourhood" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+
+    # Real keys, on elements focused by script: Cuprite's `send_keys` CLICKS an
+    # element that is not focused, and a click on the summary would open the
+    # list by itself and the Enter after it would close it again.
+    find("[data-mind-graph-list] summary").execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Enter)
+    link = find("[data-mind-graph-list] a", text: "Alpha")
+    click_frame_link do
+      link.execute_script("this.focus()")
+      page.driver.browser.keyboard.type(:Enter)
+    end
+
+    assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
+  end
+
+  test "a title with markup in it is text in the list and in the search results" do
+    nasty = %(<img src=x onerror="window.pwned=1"> & co)
+    a = create_post(title: nasty)
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+
+    find("[data-mind-graph-list] summary").click
+    within("[data-mind-graph-list]") { assert_link nasty }
+    fill_in "Find a post or tag", with: "onerror"
+    within("[data-mind-graph-results]") { assert_link nasty }
+
+    assert_no_selector "[data-mind-graph-list] img, [data-mind-graph-results] img", visible: :all
+    assert_nil page.evaluate_script("window.pwned")
+  end
+
   # A real click where the node is drawn.
   def click_node(id)
     point = screen_position(id)

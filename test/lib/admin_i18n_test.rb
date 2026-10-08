@@ -130,6 +130,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/views/admin/mind_graph/show.html.erb
     app/javascript/controllers/admin/mind_graph_controller.js
     app/javascript/mind_graph/app.js
+    app/javascript/mind_graph/card.js
+    app/javascript/mind_graph/node_list.js
     app/javascript/mind_graph/input.js
     app/javascript/mind_graph/renderer.js
     app/javascript/mind_graph/search_box.js

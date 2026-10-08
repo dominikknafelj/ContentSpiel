@@ -40,6 +40,7 @@ import { draw, radiusFor } from "mind_graph/renderer"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
 import { attachSearch } from "mind_graph/search_box"
+import { renderList } from "mind_graph/node_list"
 
 // A label longer than this is cut with an ellipsis; a tag's count is appended
 // whole. Counted by code point, so an emoji is never cut in half. Exported for
@@ -113,6 +114,9 @@ export function mount(element) {
   // The search field is HTML beside the canvas, not part of the data request:
   // it works whatever the graph is doing, a failed load included (spec §6).
   const search = element.querySelector("[data-mind-graph-search]")
+  // The list of links (spec §5.7): rewritten by `applyFilter`, which runs once
+  // per load and once per filter change, never per frame.
+  const listBody = element.querySelector("[data-mind-graph-list-body]")
   const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text, status: search.querySelector("[data-mind-graph-status]") })
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
@@ -212,6 +216,10 @@ export function mount(element) {
     if (state.selected >= 0) select(state.visibleNodes.includes(state.selected) ? state.selected : -1)
     element.dataset.nodes = state.visibleNodes.length
     element.dataset.edges = state.visibleEdges.length
+    renderList(listBody, {
+      nodes: state.visibleNodes.map((index) => state.nodes[index]), text,
+      urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl }
+    })
   }
 
   function select(index) {
@@ -461,6 +469,7 @@ export function mount(element) {
       stopTheme()
       cardElement.removeEventListener("keydown", cardKeydown)
       stopSearch()
+      listBody.replaceChildren()
       card.hide()
       hideTooltip()
       canvas.style.cursor = ""
