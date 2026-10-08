@@ -379,20 +379,21 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_tags_path
     await_admin_controllers
-    page.execute_script("window.Worker = class { constructor() { throw new Error('no workers here') } }")
 
-    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    without_workers do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
 
-    assert_selector "#{GRAPH}[data-state='worker-failed']"
-    assert_text "The graph can't be drawn in this browser."
-    assert_no_button "Retry"
-    assert_no_selector "#{GRAPH}[data-settled]"
-    # Nothing was ever laid out, so nothing is drawn: without positions every
-    # node is at 0, 0, and the graph would be a pile in the canvas's corner.
-    assert_operator pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })[3], :<, 10, "the unplaced nodes are drawn in the corner"
-    # Loud: the failure is a console error, which is what fails any test that
-    # did not ask for it.
-    expect_js_error(/layout worker.*no workers here/)
+      assert_selector "#{GRAPH}[data-state='worker-failed']"
+      assert_text "The graph can't be drawn in this browser."
+      assert_no_button "Retry"
+      assert_no_selector "#{GRAPH}[data-settled]"
+      # Nothing was ever laid out, so nothing is drawn: without positions every
+      # node is at 0, 0, and the graph would be a pile in the canvas's corner.
+      assert_operator pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })[3], :<, 10, "the unplaced nodes are drawn in the corner"
+      # Loud: the failure is a console error, which is what fails any test that
+      # did not ask for it.
+      expect_js_error(/layout worker.*no workers here/)
+    end
   end
 
   # A node that was never placed is nowhere: every position is still 0, 0, the
@@ -403,10 +404,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     create_post(title: "Beta", tags: [ "shared" ])
     visit admin_tags_path
     await_admin_controllers
-    page.execute_script("window.Worker = class { constructor() { throw new Error('no workers here') } }")
-    within("nav[aria-label='Modules']") { click_link "Mind graph" }
-    assert_selector "#{GRAPH}[data-state='worker-failed']"
-    expect_js_error(/layout worker.*no workers here/)
+    without_workers do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      assert_selector "#{GRAPH}[data-state='worker-failed']"
+      expect_js_error(/layout worker.*no workers here/)
+    end
 
     left, top = canvas_box.first(2)
     page.driver.browser.mouse.move(x: left + 3, y: top + 3)
@@ -428,13 +430,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     tag = Tag.find_by!(name: "shared")
     visit admin_tags_path
     await_admin_controllers
-    page.execute_script("window.RealWorker = window.Worker; window.Worker = class { constructor() { throw new Error('no workers here') } }")
 
-    within("nav[aria-label='Modules']") { click_link "Mind graph" }
-    assert_selector "#{GRAPH}[data-state='worker-failed']"
-    expect_js_error(/layout worker.*no workers here/)
     # The window outlives the visit below: the real worker comes back first.
-    page.execute_script("window.Worker = window.RealWorker")
+    without_workers do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      assert_selector "#{GRAPH}[data-state='worker-failed']"
+      expect_js_error(/layout worker.*no workers here/)
+    end
 
     find("[data-mind-graph-list] summary").click
     within("[data-mind-graph-list]") do
@@ -720,7 +722,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     # another's where the two would overlap (no overlap wins), the selected
     # node's never does: it places first.
     assert_equal [ hub.id, spokes[28].id ].map(&:to_s).sort, graph["data-neighbours"].split(",").sort
-    await_js("document.querySelector(#{GRAPH.to_json}).dataset.labelled.split(',').includes('#{last.id}')")
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{last.id}')")
     assert_equal last.id.to_s, graph["data-labelled"].split(",").first, "the selected node's label is placed first"
   end
 
@@ -918,7 +920,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
     await_graph
     assert_equal "2", graph["data-nodes"]
-    assert_includes graph["data-labelled"].split(","), a.id.to_s, "the focus is always labelled"
+    # `data-settled` is written before the frame that writes `data-labelled`.
+    assert await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')"), "the focus is always labelled"
 
     click_frame_link { within("[data-mind-graph-focus]") { click_link "2" } }
     await_graph
@@ -1240,8 +1243,25 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   def graph = find(GRAPH)
 
+  # The graph is loaded and its layout has cooled down -- and the frame that
+  # was asked for when it did has been drawn. `data-settled` is written BEFORE
+  # that frame, which is the one that writes `data-zoom` and `data-labelled`
+  # for the final fit, so a test that read either straight after the selector
+  # could find nothing there yet, or the value of the frame before.
   def await_graph
     assert_selector "#{GRAPH}[data-state='ready'][data-settled]", wait: 15
+    await_frames
+  end
+
+  # No worker can be started inside the block (the constructor throws, as in a
+  # browser that has none), and the real one is back afterwards whatever
+  # happened: the window outlives a Turbo visit, and a test that fails halfway
+  # must not leave the stub behind.
+  def without_workers
+    page.execute_script("window.RealWorker = window.Worker; window.Worker = class { constructor() { throw new Error('no workers here') } }")
+    yield
+  ensure
+    page.execute_script("if (window.RealWorker) { window.Worker = window.RealWorker; delete window.RealWorker }")
   end
 
   def screen_position(id)
