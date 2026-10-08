@@ -1,5 +1,5 @@
 // Draws one frame of the mind graph (mind graph canvas spec §4.3, §5.1).
-// Order: edges, nodes, labels, rings. Everything is in SCREEN pixels: the
+// Order: edges, nodes (each with its pin mark), labels, rings. Everything is in SCREEN pixels: the
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
 // A node's mark carries two cues that never share a shape, exactly as
@@ -23,17 +23,36 @@
 // in fifty took two frames' time while panning without this, none with it
 // (spec §7).
 //
+// THE STATES (the round of 2026-10-08), which combine:
+// - HOVERED (`hovered`, by the pointer or by its row in the list): a 1px ink
+//   ring round the mark, and its label in full ink on a backing, drawn even
+//   where the label rule hides it. Hovering dims nothing.
+// - SELECTED: a 2px accent ring with a gap, a semibold label, its edges
+//   brightened, and every node and edge not connected to it at DIM.
+// - PINNED (`pinned`, a Set of indexes): a small ink dot with a surface ring
+//   at the mark's top-right. It is drawn with the node, at the node's
+//   strength, whatever else the node is.
+// - The focus of a local view: a dotted accent ring.
+// A tag's rings are squares, like its mark.
+//
 // Nothing here is a colour: every one comes in with `theme` (`theme.js`), and
 // what dims is dimmed by `globalAlpha`.
 const STEPS = [ [ 2, 6 ], [ 5, 8 ], [ 12, 11 ], [ Infinity, 14 ] ]
-const DIM = 0.18
+const DIM = 0.28
 // The width of the surface-coloured outline under a label, which keeps a title
 // readable where it crosses an edge.
 const LABEL_HALO = 3
+// The backing of the hovered node's label: how far it reaches beyond the text.
+const BACKING_X = 4
+const BACKING_HEIGHT = 18
 // How far outside the canvas an edge's end or a node's edge may be and still
 // count as on it: half the widest stroke, rounded up, and a node's rings.
 const EDGE_MARGIN = 2
 const NODE_MARGIN = 8
+// A ring's distance from the mark's edge.
+const HOVER_RING = 2.5
+const SELECTED_RING = 4
+const FOCUS_RING = 5
 
 // Four sizes by degree: small differences in size can't be read, so a hub is
 // one of four steps, not a point on a scale. A tag's is its half side.
@@ -45,7 +64,8 @@ export function radiusFor(node) {
 // `edges[i].source` / `.target` are node INDEXES (`app.js` converts the ids
 // once), `visibleNodes` / `visibleEdges` indexes too. `width` and `height` are
 // CSS pixels; the bitmap is `ratio` times that, which the transform takes up.
-export function draw(context, { width, height, ratio, camera, theme, nodes, edges, positions, radii, visibleNodes, visibleEdges, labels, selected, neighbours, focusIndex }) {
+// A label of `labels` marked `hover` is the hovered node's.
+export function draw(context, { width, height, ratio, camera, theme, nodes, edges, positions, radii, widths = [], visibleNodes, visibleEdges, labels, selected, neighbours, focusIndex, hovered = -1, pinned = new Set() }) {
   context.setTransform(ratio, 0, 0, ratio, 0, 0)
   context.clearRect(0, 0, width, height)
 
@@ -58,23 +78,25 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     (sx < -margin ? 1 : sx > width + margin ? 2 : 0) | (sy < -margin ? 4 : sy > height + margin ? 8 : 0)
 
   // One path per kind and strength, so a few thousand edges are four strokes.
-  // With a selection, the edges that do not touch it are the faded pass.
+  // With a selection, the edges that touch it are the bright pass and the
+  // rest the faded one; with none, every edge is the plain pass.
   for (const kind of [ "tag", "related" ]) {
-    for (const faded of [ true, false ]) {
+    for (const pass of selected < 0 ? [ "plain" ] : [ "faded", "bright" ]) {
       context.beginPath()
       for (const edgeIndex of visibleEdges) {
         const edge = edges[edgeIndex]
         if (edge.kind !== kind) continue
-        const touchesSelection = selected < 0 || edge.source === selected || edge.target === selected
-        if (touchesSelection === faded) continue
+        const touchesSelection = edge.source === selected || edge.target === selected
+        if (pass !== "plain" && touchesSelection !== (pass === "bright")) continue
         const fromX = x(edge.source), fromY = y(edge.source), toX = x(edge.target), toY = y(edge.target)
         if (beyond(fromX, fromY, EDGE_MARGIN) & beyond(toX, toY, EDGE_MARGIN)) continue
         context.moveTo(fromX, fromY)
         context.lineTo(toX, toY)
       }
-      context.globalAlpha = (kind === "tag" ? 0.8 : 0.35) * (faded ? DIM : 1)
-      context.strokeStyle = kind === "tag" ? theme.meta : theme.ink
-      context.lineWidth = kind === "tag" ? 1 : 1.5
+      const bright = pass === "bright"
+      context.globalAlpha = bright ? 0.9 : (kind === "tag" ? 0.8 : 0.35) * (pass === "faded" ? DIM : 1)
+      context.strokeStyle = kind === "tag" && !bright ? theme.meta : theme.ink
+      context.lineWidth = (kind === "tag" ? 1 : 1.5) + (bright ? 0.5 : 0)
       context.setLineDash(kind === "tag" ? [ 4, 3 ] : [])
       context.stroke()
     }
@@ -86,31 +108,74 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     context.globalAlpha = dimmed(index) ? DIM : 1
     if (nodes[index].kind === "tag") drawTag(context, theme, x(index), y(index), radii[index])
     else drawPost(context, theme, nodes[index], x(index), y(index), radii[index])
+    if (pinned.has(index)) drawPin(context, theme, x(index), y(index), radii[index])
   }
 
-  context.font = theme.font
   context.textBaseline = "middle"
   context.lineJoin = "round"
-  context.lineWidth = LABEL_HALO
-  context.strokeStyle = theme.surface
   for (const label of labels) {
+    const node = nodes[label.index]
+    context.font = label.index === selected ? theme.strongFont : theme.font
+    if (label.hover) {
+      // Full ink on a backing, at full strength whatever the selection dims.
+      context.globalAlpha = 1
+      context.fillStyle = theme.sunken
+      context.fillRect(label.x - BACKING_X, label.y - BACKING_HEIGHT / 2, (widths[label.index] || 0) + BACKING_X * 2, BACKING_HEIGHT)
+      context.fillStyle = theme.ink
+      context.fillText(node.label, label.x, label.y)
+      continue
+    }
     context.globalAlpha = label.alpha * (dimmed(label.index) ? DIM : 1)
-    context.fillStyle = nodes[label.index].kind === "tag" ? theme.meta : theme.ink
-    context.strokeText(nodes[label.index].label, label.x, label.y)
-    context.fillText(nodes[label.index].label, label.x, label.y)
+    context.lineWidth = LABEL_HALO
+    context.strokeStyle = theme.surface
+    context.fillStyle = node.kind === "tag" ? theme.meta : theme.ink
+    context.strokeText(node.label, label.x, label.y)
+    context.fillText(node.label, label.x, label.y)
   }
 
+  // Rings, over everything: the focus's, the hovered node's, the selection's.
+  // The selection's own ring says more than the hover's, so a node that is
+  // both gets the one.
   context.globalAlpha = 1
-  for (const index of [ focusIndex, selected ]) {
-    if (index == null || index < 0 || !visibleNodes.includes(index)) continue
+  const shown = (index) => index != null && index >= 0 && visibleNodes.includes(index)
+  const ring = (index, distance) => {
+    const reach = radii[index] + distance
     context.beginPath()
-    context.arc(x(index), y(index), radii[index] + 5, 0, Math.PI * 2)
-    context.strokeStyle = theme.accent
-    context.lineWidth = index === selected ? 2 : 1.5
-    context.setLineDash(index === selected ? [] : [ 2, 3 ])
+    if (nodes[index].kind === "tag") context.rect(x(index) - reach, y(index) - reach, reach * 2, reach * 2)
+    else context.arc(x(index), y(index), reach, 0, Math.PI * 2)
     context.stroke()
   }
+  if (shown(focusIndex) && focusIndex !== selected) {
+    context.strokeStyle = theme.accent
+    context.lineWidth = 1.5
+    context.setLineDash([ 2, 3 ])
+    ring(focusIndex, FOCUS_RING)
+  }
   context.setLineDash([])
+  if (shown(hovered) && hovered !== selected) {
+    context.strokeStyle = theme.ink
+    context.lineWidth = 1
+    ring(hovered, HOVER_RING)
+  }
+  if (shown(selected)) {
+    context.strokeStyle = theme.accent
+    context.lineWidth = 2
+    ring(selected, SELECTED_RING)
+  }
+}
+
+// A small ink dot with a surface ring, at the mark's top-right: "this node
+// stays where it was put". The legend's "Pinned" swatch is the same mark.
+function drawPin(context, theme, x, y, radius) {
+  const offset = radius * 0.72
+  context.beginPath()
+  context.arc(x + offset, y - offset, 3, 0, Math.PI * 2)
+  context.setLineDash([])
+  context.fillStyle = theme.ink
+  context.fill()
+  context.strokeStyle = theme.surface
+  context.lineWidth = 1.5
+  context.stroke()
 }
 
 function drawTag(context, theme, x, y, half) {

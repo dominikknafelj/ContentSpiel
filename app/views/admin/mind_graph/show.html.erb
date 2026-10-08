@@ -8,6 +8,13 @@
     it has an HTML path beside it. Read-only: relations are edited in the post
     editor's related-posts picker. %>
 <% content_for :title, t(".title") %>
+<%# THE SCREEN FILLS THE WINDOW (the round of 2026-10-08): from 1,100px of
+    width the heading and the box together are exactly as tall as the window
+    less <main>'s padding and the top bar where there is one
+    (`--admin-top-offset`), so the page does not scroll and the canvas and the
+    list each take what is left. Below that width the list stands under the
+    canvas, the box is as tall as its content and the page scrolls. %>
+<div class="<%= "flex min-h-[560px] flex-col min-[1100px]:h-[calc(100vh_-_3rem_-_var(--admin-top-offset))]" if @content_types.any? %>">
 <div class="mb-4">
   <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
   <p class="mt-1 text-meta"><%= t(".intro") %></p>
@@ -17,10 +24,17 @@
   <%# For THIS viewer: a viewer who can read no post sees this, whatever the site holds. %>
   <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-posts"><%= t(".no_posts") %></div>
 <% else %>
-  <%# The box takes the width of the content column and the height left under
-      the heading (never less than 480px); the canvas takes what the legend row
-      leaves (`flex-1`) and follows the box's resizes. The filter is three
-      radios (arrow keys move between them), applied client-side.
+  <%# One box, three parts: the SEARCH, the GRAPH (a local view's focus bar,
+      the legend and filter row, the canvas) and the LIST. In the document
+      they come in that order, because the Tab key follows the document (spec
+      §5.7: search, focus bar, filter, zoom buttons, canvas, card, list -- the
+      list last, since it can hold two thousand rows). On screen, from
+      1,100px, the graph is the left column over the box's whole height and
+      the search and the list are a 300px column on its right, the search on
+      top: a grid places each part, so the order of the document is free.
+      Below that width they stack with the graph FIRST (`order-first`), the
+      search and the list under it. The filter is three radios (arrow keys
+      move between them), applied client-side.
 
       `data-state="loading"` is what the server says; the script takes it from
       there (`mind_graph/app.js` lists the attributes it writes). The notice is
@@ -29,44 +43,51 @@
       selection card's links: built here, by the route helpers, with `__ID__`
       and `__NAME__` where the script puts a node's id or a tag's name
       (URL-encoded), so no path is written in JavaScript; `data-type-labels`
-      is each shown type's human name. The message keys are written out one by
-      one: `test/lib/script_messages_test.rb` reads the literals to check that
-      every key the script asks for is served. %>
-  <%# The bar and the search field are INSIDE the controller's element: the
-      script finds the field there and reads its messages from there. %>
+      is each shown type's human name. `data-button-classes` and
+      `data-dot-classes` hand the script the classes of
+      `Admin::ButtonComponent` (the card's actions) and of
+      `Admin::ContentTypeDotComponent` (a type's dot in the card and the list,
+      slots 1-12 in order), so neither is copied into JavaScript. The message
+      keys are written out one by one: `test/lib/script_messages_test.rb`
+      reads the literals to check that every key the script asks for is
+      served. %>
   <div data-controller="admin--mind-graph"
        data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
        data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",
-                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.capped_local", "mind_graph.script.isolated", "mind_graph.script.summary",
-                                     "mind_graph.script.card.connections", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
-                                     "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag",
+                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.capped_local", "mind_graph.script.isolated", "mind_graph.script.isolated_only",
+                                     "mind_graph.script.summary", "mind_graph.script.release_pinned",
+                                     "mind_graph.script.card.related", "mind_graph.script.card.tags", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
+                                     "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag", "mind_graph.script.card.pin", "mind_graph.script.card.unpin",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
                                      "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
-                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.edit", "mind_graph.script.list.edit_named", "mind_graph.script.list.empty", "mind_graph.script.list.connections") %>"
+                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.empty", "mind_graph.script.list.select_post", "mind_graph.script.list.select_tag") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
        data-type-labels="<%= @type_labels.to_json %>"
-       data-state="loading">
-    <div class="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-      <%# The search field: how a post or tag the graph doesn't draw is reached.
-          Its rows are links to that row's local view, filled in by
-          `mind_graph/search_box.js` with text and `href` only. The results are
-          ordinary links after the field in the document, so Tab reaches them.
-          It comes FIRST in the document (spec §5.7: search, then the rest); the
-          focus bar is `order-first`, so on screen it still stands on the left.
-          The status line is the live region the results' wording goes through
-          (a count, "No post or tag matches.", the failure): it stays in the DOM,
-          so the list itself can stay a plain list of links. %>
-      <div class="relative ml-auto w-72 max-w-full" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
+       data-button-classes="<%= { primary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:primary]}", secondary: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES[:secondary]}" }.to_json %>"
+       data-dot-classes="<%= (Admin::ContentTypeDotComponent::FILLED + Admin::ContentTypeDotComponent::RINGS).to_json %>"
+       data-state="loading"
+       class="grid min-h-0 flex-1 overflow-hidden rounded-cs border border-line bg-surface min-[1100px]:grid-cols-[minmax(0,1fr)_300px] min-[1100px]:grid-rows-[auto_minmax(0,1fr)]">
+    <%# The search field: how a post or tag the graph doesn't draw is reached.
+        Its rows are links to that row's local view, filled in by
+        `mind_graph/search_box.js` with text and `href` only. The results are
+        ordinary links after the field in the document, so Tab reaches them.
+        The status line is the live region the results' wording goes through
+        (a count, "No post or tag matches.", the failure): it stays in the DOM,
+        so the list itself can stay a plain list of links. %>
+    <div class="border-t border-line p-2.5 min-[1100px]:col-start-2 min-[1100px]:row-start-1 min-[1100px]:border-l min-[1100px]:border-t-0">
+      <div class="relative" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
         <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
         <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
-              class: "block w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+              class: "block w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-sm text-ink focus:outline-2 focus:outline-accent" %>
         <p data-mind-graph-status role="status" class="sr-only"></p>
         <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-cs border border-line-strong bg-surface p-1 shadow-menu"></ul>
       </div>
+    </div>
+    <div class="order-first flex h-[70vh] min-h-[480px] min-w-0 flex-col min-[1100px]:order-none min-[1100px]:col-start-1 min-[1100px]:row-span-2 min-[1100px]:row-start-1 min-[1100px]:h-auto min-[1100px]:min-h-0">
       <% if @focus %>
         <%# The local view's bar (spec §5.4): what the graph is drawn around, both
             depths and the way back to the whole graph. The current depth is
@@ -75,7 +96,7 @@
             a bare "1", so it carries the word "Depth" for a screen reader, as
             the other depth's link does in its name. All ordinary links, so Back works. The depth
             link of 1 carries no `depth`, as the screen's own URLs do. %>
-        <p data-mind-graph-focus class="order-first m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dim">
+        <p data-mind-graph-focus class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3.5 py-2 text-sm text-dim">
           <span class="font-semibold text-ink"><%= t(".focus.around_#{@focus.kind}", title: @focus.title) %></span>
           <span class="inline-flex items-center gap-1.5"><%= t(".focus.depth") %>
             <% [ 1, 2 ].each do |depth| %>
@@ -89,8 +110,6 @@
           <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
         </p>
       <% end %>
-    </div>
-    <div class="flex h-[calc(100vh-14rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
       <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line px-3.5 py-2.5">
         <%= render Admin::MindGraphLegendComponent.new(content_types: @content_types) %>
         <fieldset class="m-0 min-w-0 border-0 p-0">
@@ -108,13 +127,23 @@
       <%# In the document the zoom buttons come BEFORE the canvas, because the
           Tab key follows the document (spec §5.7: filter, zoom buttons, canvas);
           on screen they sit in the canvas's bottom-right corner, positioned, so
-          they are painted over it whatever the order. The notice is a polite
-          live region: loading, a failure and the cap's sentences are announced. %>
+          they are painted over it whatever the order. "Release N pinned" is
+          beside them only while a node is pinned: the script writes its label
+          (a plural) and shows it, and the controller's `reset` hides it again.
+          The zoom's figure between the two buttons is the script's too. Each
+          zoom button is a glyph or a short word with its whole name as
+          `aria-label` and `title`. The notice is a polite live region:
+          loading, a failure and the cap's sentences are announced. %>
       <div class="relative min-h-0 flex-1">
-        <div class="absolute bottom-3 right-3 flex gap-1.5">
-          <%= render Admin::ButtonComponent.new(label: t(".zoom_out"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomOut" }) %>
-          <%= render Admin::ButtonComponent.new(label: t(".zoom_in"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomIn" }) %>
-          <%= render Admin::ButtonComponent.new(label: t(".fit"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#fit" }) %>
+        <div class="absolute bottom-3 right-3 flex items-stretch gap-2">
+          <%= render Admin::ButtonComponent.new(label: "", variant: :secondary, size: :small, hidden: true, data: { mind_graph_release: true, action: "admin--mind-graph#releasePinned" }) %>
+          <div role="group" aria-label="<%= t(".zoom") %>" class="inline-flex items-stretch overflow-hidden rounded-cs border border-line-strong bg-surface text-sm text-ink">
+            <% zoom_button = "cursor-pointer px-2.5 py-0.5 font-semibold hover:bg-sunken focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" %>
+            <%= tag.button "−", type: "button", class: zoom_button, title: t(".zoom_out"), "aria-label": t(".zoom_out"), data: { action: "admin--mind-graph#zoomOut" } %>
+            <span data-mind-graph-zoom class="flex min-w-12 items-center justify-center border-x border-line px-1 font-cs-mono text-label text-meta"></span>
+            <%= tag.button "+", type: "button", class: zoom_button, title: t(".zoom_in"), "aria-label": t(".zoom_in"), data: { action: "admin--mind-graph#zoomIn" } %>
+            <%= tag.button t(".fit_short"), type: "button", class: "#{zoom_button} border-l border-line", title: t(".fit"), "aria-label": t(".fit"), data: { action: "admin--mind-graph#fit" } %>
+          </div>
         </div>
         <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
         <div data-admin--mind-graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
@@ -125,20 +154,25 @@
             canvas, filled by `mind_graph/card.js` and `app.js` with `textContent`
             and `href` only. Both are empty and `hidden` until the script shows
             them, and the controller's `reset` hides them again on a page Turbo
-            restored from its cache. The card's links are the only way a
-            selection leads anywhere: a click on the canvas never navigates. %>
-        <aside data-mind-graph-card hidden aria-label="<%= t(".card_label") %>" class="absolute right-3 top-3 flex max-h-[calc(100%-4.5rem)] w-64 max-w-[calc(100%-1.5rem)] flex-col gap-2 overflow-y-auto rounded-cs border border-line-strong bg-surface p-3 shadow-menu"></aside>
+            restored from its cache. The card stands beside its node: the
+            script writes its `left` and `top` (`mind_graph/card_placement.js`).
+            It can take the focus (`tabindex="-1"`), which a row of the list
+            hands it, and is named by its title once it has one. The card's
+            links are the only way a selection leads anywhere: a click on the
+            canvas never navigates. %>
+        <aside data-mind-graph-card hidden tabindex="-1" aria-label="<%= t(".card_label") %>" class="absolute left-0 top-0 z-10 flex w-60 max-w-[calc(100%-1rem)] flex-col gap-2 rounded-cs border border-line-strong bg-surface p-3 shadow-menu focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"></aside>
         <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
       </div>
     </div>
-    <%# The keyboard and screen-reader path (mind graph canvas spec §5.7): a
-        canvas's nodes can't take focus, so every node the graph draws is also a
-        link here, filled by `mind_graph/node_list.js` from the same data and
-        following the filter. It comes last in the document, after the canvas
-        and the card, and starts closed. %>
-    <details data-mind-graph-list class="mt-3 rounded-cs border border-line bg-surface px-3.5 py-2.5 text-sm">
-      <summary class="cursor-pointer text-dim"><%= t(".list_summary") %></summary>
-      <div data-mind-graph-list-body class="mt-2 grid gap-x-8 gap-y-3 sm:grid-cols-2"></div>
-    </details>
+    <%# The list (mind graph canvas spec §5.7): every node the graph draws, as
+        a row, filled by `mind_graph/node_list.js` from the same data and
+        following the filter. A canvas's nodes can't take focus, so this is
+        the keyboard and screen-reader path to them: a row is a button that
+        selects its node, and the card it opens holds the links. It comes last
+        in the document and scrolls on its own beside the canvas. Under the
+        canvas it keeps a least height, so the search's results (which hang
+        over it, inside the box) are not cut off by a list of two rows. %>
+    <div data-mind-graph-list aria-label="<%= t(".list_label") %>" role="region" class="min-h-80 border-t border-line pb-3 min-[1100px]:col-start-2 min-[1100px]:row-start-2 min-[1100px]:min-h-0 min-[1100px]:overflow-y-auto min-[1100px]:border-l"></div>
   </div>
 <% end %>
+</div>

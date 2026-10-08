@@ -3,13 +3,18 @@ require "application_system_test_case"
 # The Mind graph (mind graph canvas spec): drawn on a canvas, so nothing on it
 # is an element a test can find. The controller says what it shows through
 # data attributes on its element (`data-state`, `data-settled`, `data-nodes`,
-# `data-edges`, `data-zoom`, `data-labelled`) and answers a node's place on
-# screen through `element.mindGraph.screenPosition(id)`, where a test then
-# points for real. What a mark LOOKS like is read from the canvas's own pixels
+# `data-edges`, `data-zoom`, `data-labelled`, `data-selected`, `data-hovered`,
+# `data-pinned`) and answers a node's place on screen through
+# `element.mindGraph.screenPosition(id)`, where a test then points for real.
+#
+# A small graph UNFOLDS at one tick a frame, about five seconds from load to
+# rest, and eases for about as long after a drop, a filter or an unpin: every
+# `await_graph` here waits that out, which is the screen as a person gets it. What a mark LOOKS like is read from the canvas's own pixels
 # (`pixel_at`): a canvas can pass every other test and still draw nothing.
 class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   GRAPH = "[data-controller~='admin--mind-graph']".freeze
   CANVAS = "#{GRAPH} canvas".freeze
+  LIST = "#{GRAPH} [data-mind-graph-list]".freeze
 
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
@@ -35,27 +40,52 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_no_text "Loading the graph…"
   end
 
-  # The box is the whole view: (almost) the content column wide -- main's width
-  # less its padding and the box's border -- and it ends inside the window, so
-  # the graph is there without scrolling.
-  test "the box fills the content column and ends inside the window" do
+  # The screen fills the window (the round of 2026-10-08): the box is (almost)
+  # the content column wide -- main's width less its padding -- and ends
+  # exactly where the window does less that padding, so the page itself does
+  # not scroll. Inside it the canvas is on the left and the search and the
+  # list are a 300px column on its right, the search on top.
+  test "the screen fills the window: the page does not scroll, and the list stands beside the canvas" do
     2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
     visit admin_mind_graph_path
     await_graph
 
-    sizes = page.evaluate_script(<<~JS)
-      (() => {
-        const box = document.querySelector(#{GRAPH.to_json}).getBoundingClientRect()
-        const canvas = document.querySelector(#{CANVAS.to_json}).getBoundingClientRect()
-        return { width: box.width, main: document.querySelector("main").getBoundingClientRect().width, bottom: box.bottom, viewport: window.innerHeight, canvasHeight: canvas.height, canvasBottom: canvas.bottom }
-      })()
-    JS
+    sizes = layout_boxes
 
-    assert_operator sizes["width"], :>=, sizes["main"] - 60
-    assert_operator sizes["width"], :<=, sizes["main"]
-    assert_operator sizes["bottom"], :<=, sizes["viewport"]
-    assert_operator sizes["canvasHeight"], :>, 300
-    assert_operator sizes["canvasBottom"], :<=, sizes["bottom"]
+    assert_operator sizes["page"], :<=, sizes["viewport"], "the page scrolls: #{sizes}"
+    assert_operator sizes["box"]["width"], :>=, sizes["main"] - 60
+    assert_operator sizes["box"]["width"], :<=, sizes["main"]
+    assert_in_delta sizes["viewport"] - 24, sizes["box"]["bottom"], 2, "the box does not reach the bottom of the window: #{sizes}"
+    assert_operator sizes["canvas"]["height"], :>, 600
+    assert_in_delta 300, sizes["list"]["width"], 2
+    assert_in_delta sizes["canvas"]["right"], sizes["list"]["left"], 2, "the list is not beside the canvas: #{sizes}"
+    assert_in_delta sizes["list"]["left"], sizes["search"]["left"], 16
+    assert_operator sizes["search"]["bottom"], :<=, sizes["list"]["top"] + 1, "the search field is not above the list"
+    assert_in_delta sizes["box"]["bottom"], sizes["list"]["bottom"], 2, "the list does not reach the bottom of the box"
+    assert_in_delta sizes["box"]["bottom"], sizes["canvas"]["bottom"], 2
+  end
+
+  # Below about 1,100 px the list has no room beside the canvas: it stands
+  # under it, with the search field between them, and the page may scroll.
+  test "in a window narrower than 1,100 pixels the search and the list stand under the canvas" do
+    2.times.map { |i| create_post(title: "P#{i}", tags: [ "t" ]) }
+    visit admin_mind_graph_path
+    await_graph
+    original = page.current_window.size
+
+    begin
+      page.current_window.resize_to(1000, 900)
+      await_js("document.querySelector(#{CANVAS.to_json}).getBoundingClientRect().width > 800")
+      sizes = layout_boxes
+
+      assert_in_delta sizes["box"]["width"], sizes["canvas"]["width"], 4, "the canvas is not as wide as the box: #{sizes}"
+      assert_in_delta sizes["box"]["width"], sizes["list"]["width"], 4
+      assert_operator sizes["search"]["top"], :>=, sizes["canvas"]["bottom"], "the search field is not under the canvas: #{sizes}"
+      assert_operator sizes["list"]["top"], :>=, sizes["search"]["bottom"] - 1, "the list is not under the search field: #{sizes}"
+      assert_operator sizes["canvas"]["height"], :>=, 480
+    ensure
+      page.current_window.resize_to(*original)
+    end
   end
 
   test "the canvas is sharp: its bitmap is the box times the device pixel ratio" do
@@ -110,6 +140,8 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     labelled = -> { graph["data-labelled"].split(",") }
 
     fitted = graph["data-zoom"].to_f
+    # The figure between the two zoom buttons is the zoom, as a percentage.
+    assert_selector "[data-mind-graph-zoom]", exact_text: "#{(fitted * 100).round}%"
     4.times { press "Zoom out" }
     await_js("Math.abs(#{zoom} - #{fitted / (1.4**4)}) < 0.002")
     await_frames
@@ -213,7 +245,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_equal "2", graph["data-nodes"]
     assert_nil screen_position(alone.id)
-    assert_text "1 post has no connections yet."
+    # "Other", and "isn't shown": beside two connected posts the bare "1 post
+    # has no connections yet." read as a contradiction.
+    assert_text "1 other post has no connections yet and isn't shown."
     assert_no_text "Link posts with Related posts"
   end
 
@@ -223,7 +257,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     assert_selector "#{GRAPH}[data-state='ready'][data-settled]"
     assert_text "Link posts with Related posts, or give them shared tags, to see connections."
+    # Nothing is drawn, so there are no "other" posts: the plain sentence.
     assert_text "2 posts have no connections yet."
+    assert_no_text "other posts"
     assert_equal "0", graph["data-nodes"]
   end
 
@@ -346,7 +382,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_text "Showing the 2,000 best-connected of 6,000 posts."
-    assert_text "1,214 posts have no connections yet."
+    assert_text "1,214 other posts have no connections yet and aren't shown."
     assert_no_text "Link posts with Related posts"
     assert_equal "2", graph["data-nodes"]
   end
@@ -369,13 +405,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # A notice line is a chip around its own words, not a bar as wide as the
-  # longest line beside it, and a link of the card ends where its text ends,
-  # so a click beside it is not a click on it. Both are `w-fit`, a class only
-  # the mind graph's scripts use: this is the built stylesheet's own answer to
-  # whether Tailwind read them (`test/lib/tailwind_sources_test.rb` is the
-  # guard on the source). The capped answer, because it gives two lines of
-  # different lengths.
-  test "a notice line and a link of the card are as wide as their text, not as their container" do
+  # longest line beside it, and an action of the card is a button around its
+  # own word, so a click beside it is not a click on it. The line is `w-fit`,
+  # a class only the mind graph's scripts use: this is the built stylesheet's
+  # own answer to whether Tailwind read them (`test/lib/tailwind_sources_test.rb`
+  # is the guard on the source). The capped answer, because it gives two lines
+  # of different lengths.
+  test "a notice line and an action of the card are as wide as their text, not as their container" do
     create_post(title: "A")
     visit admin_tags_path
     await_admin_controllers
@@ -390,16 +426,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
         const graph = document.querySelector(#{GRAPH.to_json})
         const width = (element) => element.getBoundingClientRect().width
         const text = (element) => { const range = document.createRange(); range.selectNodeContents(element); return width(range) }
-        const line = Array.from(graph.querySelectorAll("[data-admin--mind-graph-target='notice'] p")).at(-1)
+        const line = Array.from(graph.querySelectorAll("[data-admin--mind-graph-target='notice'] p")).at(0)
         const link = graph.querySelector("[data-mind-graph-card] a")
-        return { line: width(line), lineText: text(line), notice: width(line.parentElement), link: width(link), linkText: text(link), card: width(link.parentElement) }
+        return { line: width(line), lineText: text(line), notice: width(line.parentElement), link: width(link), linkText: text(link), card: width(link.closest("[data-mind-graph-card]")) }
       })()
     JS
 
     assert_in_delta widths["lineText"], widths["line"], 10, "the shorter notice line is not as wide as its text (plus its padding): #{widths}"
     assert_operator widths["line"], :<, widths["notice"] - 20, "the shorter notice line is as wide as the longer one: #{widths}"
-    assert_in_delta widths["linkText"], widths["link"], 1, "the card's link is wider than its text: #{widths}"
-    assert_operator widths["link"], :<, widths["card"] / 2, "the card's link stretches across the card: #{widths}"
+    assert_in_delta widths["linkText"], widths["link"], 20, "the card's action is wider than its text and its padding: #{widths}"
+    assert_operator widths["link"], :<, widths["card"] / 2, "the card's action stretches across the card: #{widths}"
   end
 
   # The numbers in those sentences are written the way the UI's language
@@ -424,7 +460,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_text "Showing the 2.000 best-connected of 6.000 posts."
-    assert_text "1.214 posts have no connections yet."
+    assert_text "1.214 other posts have no connections yet and aren't shown."
   end
 
   test "the worker can't start: a message without Retry, and an error in the console" do
@@ -475,10 +511,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Spec §6: the list is filled before the layout starts, so a worker that
-  # fails leaves the nodes reachable.
-  test "the worker can't start: the list still gives every node as a link, and a link opens its local view" do
-    a = create_post(title: "Alpha", tags: [ "shared" ])
-    b = create_post(title: "Beta", tags: [ "shared" ])
+  # fails leaves the nodes reachable. A row opens the node's card -- in the
+  # canvas's corner, since no node has a place to stand beside -- and the
+  # card's links lead on. There is nothing to pin without a layout.
+  test "the worker can't start: the list still gives every node as a row, and its card leads to the node's local view" do
+    create_post(title: "Alpha", tags: [ "shared" ])
+    create_post(title: "Beta", tags: [ "shared" ])
     tag = Tag.find_by!(name: "shared")
     visit admin_tags_path
     await_admin_controllers
@@ -490,14 +528,22 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       expect_js_error(/layout worker.*no workers here/)
     end
 
-    find("[data-mind-graph-list] summary").click
-    within("[data-mind-graph-list]") do
+    within(LIST) do
       assert_selector "li", count: 3
-      assert_link "Alpha", href: /mind_graph\?post=#{a.id}\z/
-      assert_link "Beta", href: /mind_graph\?post=#{b.id}\z/
-      assert_link "shared", href: /mind_graph\?tag=#{tag.id}\z/
+      assert_row "Alpha: post, 1 connection. Shows it in the graph."
+      assert_row "Beta: post, 1 connection. Shows it in the graph."
+      find("button", text: "shared").click
     end
-    click_frame_link { within("[data-mind-graph-list]") { click_link "shared" } }
+    assert_equal "tag-#{tag.id}", graph["data-selected"]
+    within("[data-mind-graph-card]") do
+      assert_link "Focus", href: /mind_graph\?tag=#{tag.id}\z/
+      assert_no_button "Pin"
+    end
+    card = element_box("[data-mind-graph-card]")
+    box = canvas_box
+    assert_in_delta box[2] - 8, card["right"], 1, "with no layout the card stands in the canvas's top-right corner"
+    assert_in_delta box[1] + 8, card["top"], 1
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
     assert_selector "[data-mind-graph-focus]", text: "Around the tag “shared”"
   end
 
@@ -515,18 +561,17 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='4'][data-edges='3']"
       expect_js_error(/layout worker.*no workers here/)
     end
-    find("[data-mind-graph-list] summary").click
-    assert_selector "[data-mind-graph-list] li", count: 4
+    assert_selector "#{LIST} li", count: 4
 
     find("label", text: "Related").click
 
     assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='2'][data-edges='1']"
-    within("[data-mind-graph-list]") do
+    within(LIST) do
       assert_selector "li", count: 2
-      assert_link "Alpha"
-      assert_link "Gamma"
-      assert_no_link "Beta"
-      assert_no_link "shared"
+      assert_selector "button", text: "Alpha"
+      assert_selector "button", text: "Gamma"
+      assert_no_selector "button", text: "Beta"
+      assert_no_selector "button", text: "shared"
     end
     assert_no_selector "#{GRAPH}[data-settled]"
     assert_text "The graph can't be drawn in this browser."
@@ -541,8 +586,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
 
-    find("[data-mind-graph-list] summary").click
-    within("[data-mind-graph-list]") do
+    within(LIST) do
       assert_text "Nothing is drawn yet."
       assert_no_selector "li"
     end
@@ -738,11 +782,56 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_text "Alpha"
       assert_text ContentTypes.fetch("resume_entry").label
       assert_text "Live"
-      assert_text "1 connection"
-      assert_link "Focus graph here", href: /mind_graph\?post=#{a.id}\z/
+      # The counts are in the small upper-case label style, so the text a
+      # person reads is upper-case: matched whatever the case.
+      assert_text(/1 related\s*·\s*0 tags/i)
+      assert_link "Focus", href: /mind_graph\?post=#{a.id}\z/
+      assert_button "Pin"
+      assert_selector "button[aria-label='Close']", text: "×"
       click_link "Open post"
     end
     assert_current_path admin_post_path(a)
+  end
+
+  # In order (the design review of 2026-10-08): the type's dot, the type and
+  # the status chip with Close at the end of the row; the title; the counts;
+  # then the actions, which are CS Studio's buttons -- the primary one first --
+  # and not underlined links.
+  test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons" do
+    a = create_post(title: "Alpha", tags: %w[one two])
+    b = create_post(title: "Beta", tags: %w[one two])
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: a, related_post: create_post(title: "Gamma"))
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+
+    card = find("[data-mind-graph-card]")
+    # Close is the last child, so Tab meets the actions before it; on screen
+    # it stands in the card's top-right corner.
+    assert_equal %w[DIV H2 P DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
+    within(card) do
+      assert_selector ":scope > div:first-child span[aria-hidden='true'].rounded-full", count: 2 # the type's dot, the status chip's
+      assert_selector ":scope > button:last-child[data-mind-graph-card-close][aria-label='Close']"
+      assert_selector "h2", text: "Alpha"
+      assert_text(/2 related\s*·\s*2 tags/i)
+      assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(4) > *").map(&:text)
+      assert_equal %w[A A BUTTON], all(":scope > div:nth-child(4) > *").map(&:tag_name).map(&:upcase)
+    end
+    close = element_box("[data-mind-graph-card-close]")
+    box = element_box("[data-mind-graph-card]")
+    assert_operator box["right"] - close["right"], :<, 12, "Close is not in the card's right corner"
+    assert_operator close["top"] - box["top"], :<, 12, "Close is not in the card's top corner"
+    styles = page.evaluate_script(<<~JS)
+      Array.from(document.querySelectorAll("[data-mind-graph-card] > div:nth-child(4) > *")).map((action) => {
+        const style = getComputedStyle(action)
+        return { underlined: style.textDecorationLine !== "none", filled: style.backgroundColor, bordered: style.borderTopWidth }
+      })
+    JS
+    assert styles.none? { |style| style["underlined"] }, "an action of the card is an underlined link: #{styles}"
+    assert_not_equal styles[1]["filled"], styles[0]["filled"], "Open post is not the primary button"
+    assert_equal "1px", styles[1]["bordered"], "Focus is not a secondary button"
   end
 
   test "a draft's card says Draft" do
@@ -767,8 +856,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     within("[data-mind-graph-card]") do
       assert_text "c++ & more"
-      assert_text "2 posts"
-      assert_link "Focus graph here", href: /mind_graph\?tag=#{tag.id}\z/
+      assert_text(/2 posts/i)
+      assert_link "Focus", href: /mind_graph\?tag=#{tag.id}\z/
+      assert_button "Pin"
     end
     click_frame_link { within("[data-mind-graph-card]") { click_link "Show posts with this tag" } }
     assert_current_path admin_posts_path(tag: "c++ & more")
@@ -793,7 +883,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     click_node(a.id)
     assert_selector "[data-mind-graph-card]"
-    find(CANVAS).send_keys(:escape)
+    escape_on_canvas
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "", graph["data-selected"]
 
@@ -838,7 +928,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal before[b], pixels_of(b).first, "a neighbour stays at full strength"
     assert_operator pixels_of(c).first[3], :<, before[c][3] / 2, "a node that is neither selected nor a neighbour dims"
 
-    find(CANVAS).send_keys(:escape)
+    escape_on_canvas
     assert_equal before[c], pixels_of(c).first
   end
 
@@ -866,7 +956,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
 
-    find(CANVAS).send_keys(:escape)
+    escape_on_canvas
     assert_equal "", graph["data-neighbours"]
   end
 
@@ -878,7 +968,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     click_node("tag-#{tag.id}")
-    assert_selector "[data-mind-graph-card]", text: "2 posts"
+    assert_selector "[data-mind-graph-card]", text: /2 posts/i
 
     find("label", text: "Related").click
     await_graph
@@ -925,11 +1015,384 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     await_graph
     # What the layout was told: the node held (once per move past the click
-    # slop), then let go, once, and nothing after.
+    # slop), then dropped, once, and nothing after -- no `unpin`: it stays.
     sent = worker_messages
-    assert_equal [ "unpin" ], sent.last(1), "the drag did not end with one unpin: #{sent}"
+    assert_equal [ "drop" ], sent.last(1), "the drag did not end with one drop: #{sent}"
     assert_operator sent.size, :>=, 2
-    assert_equal [ "pin" ], sent[0...-1].uniq, "something other than pins came before the unpin: #{sent}"
+    assert_equal [ "drag" ], sent[0...-1].uniq, "something other than drags came before the drop: #{sent}"
+  end
+
+  # The round of 2026-10-08: "it springs back" was the complaint. A dropped
+  # node is pinned -- it is where it was dropped once the layout has come to
+  # rest around it -- its neighbour has followed it, it carries the pin mark,
+  # and the screen says how many are pinned.
+  test "a dropped node stays where it was dropped, its neighbour follows, and it is pinned" do
+    a = create_post(title: "A")
+    b = create_post(title: "B")
+    PostRelation.create!(post: a, related_post: b)
+    visit admin_mind_graph_path
+    await_graph
+    assert_equal "0", graph["data-pinned"]
+    assert_no_selector "[data-mind-graph-release]", visible: :visible
+    neighbour = screen_position(b.id)
+    unpinned_corner = pin_pixel(a)
+
+    dropped = drag_node(a.id, by: [ 90, 70 ])
+    assert_equal "1", graph["data-pinned"]
+    await_graph
+
+    at = screen_position(a.id)
+    assert_in_delta dropped["x"], at["x"], 2, "the node did not stay where it was dropped"
+    assert_in_delta dropped["y"], at["y"], 2
+    moved = screen_position(b.id)
+    assert_operator Math.hypot(moved["x"] - neighbour["x"], moved["y"] - neighbour["y"]), :>, 20, "the neighbour did not follow the dragged node"
+    assert_equal "1", graph["data-pinned"]
+    assert_button "Release 1 pinned"
+    assert_not_equal unpinned_corner, pin_pixel(a), "no pin mark at the node's top-right"
+    assert_selector "[data-legend='pinned']", text: "Pinned"
+  end
+
+  # The three ways to let a pinned node go: Unpin in its card, "Release N
+  # pinned" beside the zoom buttons, and a double click on it. The card's
+  # button also pins a node where it stands, and that moves nothing.
+  test "Unpin in the card, Release N pinned and a double click each let a pinned node go" do
+    a, b, c = %w[A B C].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: b, related_post: c)
+    visit admin_mind_graph_path
+    await_graph
+
+    dropped = drag_node(a.id, by: [ 110, 60 ])
+    await_graph
+    click_node(a.id)
+    within("[data-mind-graph-card]") do
+      assert_no_button "Pin", exact: true
+      press "Unpin"
+      assert_button "Pin", exact: true
+    end
+    assert_equal "0", graph["data-pinned"]
+    assert_no_selector "[data-mind-graph-release]", visible: :visible
+    await_graph
+    freed = screen_position(a.id)
+    assert_operator Math.hypot(freed["x"] - dropped["x"], freed["y"] - dropped["y"]), :>, 5, "an unpinned node stayed exactly where it was held"
+
+    # Pin from the card: where it stands, and nothing moves.
+    within("[data-mind-graph-card]") { press "Pin" }
+    assert_equal "1", graph["data-pinned"]
+    await_graph
+    assert_equal freed, screen_position(a.id)
+    within("[data-mind-graph-card]") { assert_button "Unpin" }
+    press "Release 1 pinned"
+    assert_equal "0", graph["data-pinned"]
+    assert_no_selector "[data-mind-graph-release]", visible: :visible
+    within("[data-mind-graph-card]") { assert_button "Pin", exact: true }
+    await_graph
+    escape_on_canvas
+
+    # Two pinned: the button counts them, and a double click frees the one.
+    drag_node(a.id, by: [ 40, 80 ])
+    drag_node(c.id, by: [ -50, 40 ])
+    assert_button "Release 2 pinned"
+    await_graph
+    point = screen_position(c.id)
+    mouse = page.driver.browser.mouse
+    mouse.click(x: point["x"], y: point["y"])
+    mouse.click(x: point["x"], y: point["y"], count: 2)
+    assert_button "Release 1 pinned"
+    assert_equal "1", graph["data-pinned"]
+    assert_equal c.id.to_s, graph["data-selected"], "the double click's clicks select the node, as any click does"
+    await_graph
+    press "Release 1 pinned"
+    assert_equal "0", graph["data-pinned"]
+  end
+
+  # A double click on a node that is not pinned is two clicks and nothing
+  # more: the layout is told nothing.
+  test "a double click on a node that is not pinned changes nothing" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    record_worker_messages
+    point = screen_position(a.id)
+
+    mouse = page.driver.browser.mouse
+    mouse.click(x: point["x"], y: point["y"])
+    mouse.click(x: point["x"], y: point["y"], count: 2)
+    await_frames
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    assert_equal [], worker_messages
+    assert_equal "0", graph["data-pinned"]
+  end
+
+  # Pins are for nodes on screen: the filter keeps those of the nodes that
+  # stay (and the node stays put through the new layout) and forgets those of
+  # the nodes it hides.
+  test "a filter change keeps the pins of the nodes that remain and forgets the others" do
+    a, b, c = 3.times.map { |i| create_post(title: "P#{i}") }
+    PostRelation.create!(post: a, related_post: b)
+    [ b, c ].each { |post| PostTag.create!(post: post, tag: Tag.find_or_create_by!(name: "t")) }
+    tag_id = "tag-#{Tag.find_by!(name: "t").id}"
+    visit admin_mind_graph_path
+    await_graph
+
+    dropped = drag_node(a.id, by: [ 70, -60 ])
+    drag_node(tag_id, by: [ -60, 50 ])
+    assert_equal "2", graph["data-pinned"]
+    await_graph
+
+    find("label", text: "Related").click
+    assert_equal "1", graph["data-pinned"], "the hidden tag's pin was kept"
+    assert_button "Release 1 pinned"
+    await_graph
+    at = screen_position(a.id)
+    assert_in_delta dropped["x"], at["x"], 2, "a pinned node that the filter still shows moved"
+    assert_in_delta dropped["y"], at["y"], 2
+
+    find("label", text: "All").click
+    await_graph
+    assert_equal "1", graph["data-pinned"], "a pin came back with the node"
+  end
+
+  # Pins live in the page that made them. Turbo's snapshot holds the count and
+  # the button; Back shows neither, and the new layout holds nothing.
+  test "Back to the graph forgets the pins" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    drag_node(a.id, by: [ 80, 60 ])
+    assert_button "Release 1 pinned"
+    await_graph
+
+    within("nav[aria-label='Modules']") { click_link "Tags" }
+    assert_selector "h1", text: "Tags"
+    page.go_back
+    assert_selector "h1", text: "Mind graph"
+    assert_no_selector "#{GRAPH}[data-pinned='1']"
+    await_graph
+
+    assert_equal "0", graph["data-pinned"]
+    assert_no_selector "[data-mind-graph-release]", visible: :visible
+  end
+
+  # The round of 2026-10-08: the card was in a corner, far from what it is
+  # about. It stands 22 px from the node's edge, centred on it, and stays
+  # there when the view moves: after a pan and after a zoom it is where the
+  # node is.
+  test "the card opens beside the clicked node and follows it through a pan and a zoom" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+    assert_card_beside(a.id, side: "right")
+
+    box = canvas_box
+    mouse = page.driver.browser.mouse
+    before = screen_position(a.id)
+    mouse.move(x: box[0] + 200, y: box[3] - 12)
+    mouse.down
+    mouse.move(x: box[0] + 160, y: box[3] - 42)
+    mouse.move(x: box[0] + 120, y: box[3] - 72)
+    mouse.up
+    await_frames
+    assert_in_delta before["x"] - 80, screen_position(a.id)["x"], 2, "the view did not pan"
+    assert_card_beside(a.id, side: "right")
+
+    zoom = graph["data-zoom"]
+    # (A zoom is around the canvas's middle, so it moves the node; the card
+    # stands on whichever side has the room there.)
+    press "Zoom in"
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.zoom !== #{zoom.to_json}")
+    await_frames
+    assert_card_beside(a.id)
+    assert_equal a.id.to_s, graph["data-selected"]
+  end
+
+  # Near the canvas's right edge there is no room on the right: the card
+  # stands left of the node, the same distance away.
+  test "the card flips to the node's left near the canvas's right edge" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_card_beside(a.id, side: "right")
+
+    # Pan the node to 60 px from the right edge, by a drag on empty space.
+    box = canvas_box
+    node = screen_position(a.id)
+    shift = box[2] - 60 - node["x"]
+    mouse = page.driver.browser.mouse
+    mouse.move(x: box[0] + 12, y: box[3] - 12)
+    mouse.down
+    mouse.move(x: box[0] + 12 + (shift / 2), y: box[3] - 12)
+    mouse.move(x: box[0] + 12 + shift, y: box[3] - 12)
+    mouse.up
+    await_frames
+
+    assert_in_delta box[2] - 60, screen_position(a.id)["x"], 2
+    assert_card_beside(a.id, side: "left")
+    card = element_box("[data-mind-graph-card]")
+    assert_operator card["right"], :<, box[2]
+  end
+
+  test "the card is out of the way while its own node is dragged, and is back beside it after the drop" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card]", visible: :visible
+
+    drag_node(a.id, by: [ 60, 90 ], release: false)
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
+    page.driver.browser.mouse.up
+
+    assert_selector "[data-mind-graph-card]", visible: :visible
+    await_graph
+    assert_card_beside(a.id, side: "right")
+    within("[data-mind-graph-card]") { assert_button "Unpin" }
+  end
+
+  # Dot and label are one target: a press on the title is a press on the node.
+  # The point is 8 px into the text, 18 px from the centre of a 6 px dot --
+  # outside the dot's own 12 px target, so it is the label that answers.
+  test "a click on a node's drawn label selects it, and the pointer says it can be clicked" do
+    a = create_post(title: "A title long enough to press")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{a.id}')")
+    label = page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.labelBox(#{a.id})")
+    node = screen_position(a.id)
+    point = [ label["left"] + 12, (label["top"] + label["bottom"]) / 2 ]
+    assert_operator point[0] - node["x"], :>, 13, "the point is inside the dot's own target"
+
+    # Past the end of the text is empty canvas: nothing is under the pointer.
+    mouse = page.driver.browser.mouse
+    mouse.move(x: label["right"] + 8, y: point[1])
+    await_frames
+    assert_equal "", graph["data-hovered"].to_s
+    assert_not_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
+
+    mouse.move(x: point[0], y: point[1])
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    assert_equal "pointer", page.evaluate_script("getComputedStyle(document.querySelector(#{CANVAS.to_json})).cursor")
+    mouse.click(x: point[0], y: point[1])
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    assert_selector "[data-mind-graph-card] h2", text: "A title long enough to press"
+  end
+
+  # Hover (the round of 2026-10-08): a ring round the mark and the label on a
+  # backing -- and nothing else changes. Hovering used to be nothing but a
+  # tooltip; dimming the rest is the SELECTION's.
+  test "hovering a node rings it and does not dim the others" do
+    a, b, c, d = %w[A B C D].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: c, related_post: d)
+    visit admin_mind_graph_path
+    await_graph
+    point = screen_position(a.id)
+    # 8.5 px left of the centre: outside the 6 px dot, on the hover's ring.
+    ring_before = pixel_at(point["x"] - 8.5, point["y"])
+    others = [ c, d ].to_h { |post| [ post, pixels_of(post).first ] }
+
+    page.driver.browser.mouse.move(x: point["x"], y: point["y"])
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+
+    assert_not_equal ring_before, pixel_at(point["x"] - 8.5, point["y"]), "no ring round the hovered node"
+    others.each { |post, pixel| assert_equal pixel, pixels_of(post).first, "#{post.title} changed while another node was hovered" }
+    assert_equal "", graph["data-selected"].to_s
+
+    box = canvas_box
+    page.driver.browser.mouse.move(x: box[0] + 5, y: box[3] - 5)
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === ''")
+    assert_equal ring_before, pixel_at(point["x"] - 8.5, point["y"])
+  end
+
+  # Zoomed far out only the hubs are named. The hovered node's label is shown
+  # whatever the ranking says, and goes again when the pointer leaves.
+  test "a label the ranking hides is shown for the hovered node" do
+    posts = 60.times.map { |i| create_post(title: "Post #{i}", tags: [ "t#{i % 6}" ]) }
+    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    visit admin_mind_graph_path
+    await_graph
+    4.times { press "Zoom out" }
+    await_frames
+    labelled = graph["data-labelled"].split(",")
+    hidden = posts.find { |post| labelled.exclude?(post.id.to_s) }
+    assert hidden, "every post is labelled: nothing to show"
+
+    point = screen_position(hidden.id)
+    page.driver.browser.mouse.move(x: point["x"], y: point["y"])
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{hidden.id}'")
+    hovered = hidden.id
+    await_js("(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{hovered}')")
+
+    box = canvas_box
+    page.driver.browser.mouse.move(x: box[0] + 5, y: box[3] - 5)
+    await_js("!(document.querySelector(#{GRAPH.to_json}).dataset.labelled || '').split(',').includes('#{hovered}')")
+  end
+
+  # Reduced motion (spec §4.2): the page tells the worker, and the layout is
+  # shown ONCE, at rest -- one `tick`, then `settled`. A dragged node moves
+  # alone, its neighbours stay put until the drop, and the drop shows the
+  # result in one step.
+  test "with reduced motion the layout arrives without intermediate frames, and a dragged node moves alone until the drop" do
+    a, b, c = %w[A B C].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: b, related_post: c)
+    visit admin_tags_path
+    await_admin_controllers
+    record_worker_answers
+
+    with_reduced_motion do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      await_graph
+      assert_equal %w[tick settled], worker_answers, "the layout was shown in more than one step"
+
+      neighbours = [ screen_position(b.id), screen_position(c.id) ]
+      dropped = drag_node(a.id, by: [ 90, 70 ], release: false)
+      await_frames
+      assert_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "a neighbour moved while the node was still held"
+      drags = worker_answers.size - 2
+      assert_operator drags, :>=, 1
+      assert_equal [ "tick" ], worker_answers.last(drags).uniq, "a drag was answered by something other than the node's own move"
+
+      page.driver.browser.mouse.up
+      await_graph
+      assert_equal %w[tick settled], worker_answers.last(2)
+      assert_equal drags + 4, worker_answers.size, "the drop was shown in more than one step: #{worker_answers}"
+      assert_not_equal neighbours, [ screen_position(b.id), screen_position(c.id) ], "the drop did not lay the neighbours out again"
+      at = screen_position(a.id)
+      assert_in_delta dropped["x"], at["x"], 2
+      assert_in_delta dropped["y"], at["y"], 2
+    end
+  end
+
+  # Without reduced motion a small graph unfolds: the page is sent a frame for
+  # each tick of the simulation, and draws them.
+  test "a small graph unfolds frame by frame" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_tags_path
+    await_admin_controllers
+    record_worker_answers
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    answers = worker_answers
+    assert_equal "settled", answers.last
+    assert_operator answers.count("tick"), :>, 200, "the layout jumped to its end"
+    assert_equal 1, answers.count("settled")
+    assert_operator page.evaluate_script("document.querySelector(#{GRAPH.to_json}).mindGraph.draws()"), :>, 60, "the frames in between were not drawn"
   end
 
   test "Escape with the focus inside the card closes it and gives the focus back to the canvas" do
@@ -1004,7 +1467,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "", graph["data-selected"].to_s
   end
 
-  test "Focus graph here opens that node's neighbourhood, the depth switch widens it, and Back returns" do
+  test "Focus opens that node's neighbourhood, the depth switch widens it, and Back returns" do
     a, b, c = %w[Alpha Beta Gamma].map { |title| create_post(title: title) }
     PostRelation.create!(post: a, related_post: b)
     PostRelation.create!(post: b, related_post: c)
@@ -1012,7 +1475,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     click_node(a.id)
-    click_frame_link { within("[data-mind-graph-card]") { click_link "Focus graph here" } }
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Focus" } }
 
     assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
     await_graph
@@ -1186,7 +1649,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # the counts are the point.
   CAPPED_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1 } ],
+      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
       tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 6000, shown: 2000, isolated: 1214
     })
   JS
@@ -1195,7 +1658,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # more posts than the cap keeps.
   CAPPED_LOCAL_GRAPH = <<~JS.freeze
     ({
-      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1 } ],
+      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1, related_count: 1, tag_count: 0 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1, related_count: 1, tag_count: 0 } ],
       tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 2695, shown: 2000,
       focus: { kind: "post", id: 1, node_id: 1, title: "One", depth: 2 }
     })
@@ -1205,7 +1668,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # each also on one of 30 tags. A JavaScript expression, made in the page.
   BIG_GRAPH = <<~JS.freeze
     (() => {
-      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: index + 1, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3 }))
+      const nodes = Array.from({ length: 1500 }, (_, index) => ({ id: index + 1, title: `Post ${index + 1}`, type: "blog", colour_index: 1, status: "live", url: "/post", degree: 3, related_count: 2, tag_count: 1 }))
       const tags = Array.from({ length: 30 }, (_, index) => ({ id: `tag-${index + 1}`, name: `tag ${index + 1}`, count: 50, degree: 50 }))
       const edges = [
         ...nodes.slice(1).map((node) => ({ source: node.id - 1, target: node.id, kind: "related" })),
@@ -1245,33 +1708,37 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # Mind graph canvas spec §5.7: nothing on a canvas takes focus, so every node
-  # the graph draws is also a link in a list below it, and the list follows the
-  # filter.
-  test "the list below the graph holds every drawn node as a link, and follows the filter" do
+  # the graph draws is also a row in the list beside it -- grouped, counted,
+  # best-connected first -- and the list follows the filter. A row is a button
+  # and says in its name what it is and what pressing it does. The collapsed
+  # list of links that stood under the canvas is gone.
+  test "the list beside the canvas holds every drawn node as a row, grouped and counted, and follows the filter" do
     a = create_post(title: "Alpha", tags: [ "shared" ])
     create_post(title: "Beta", tags: [ "shared" ])
     c = create_post(title: "Gamma")
     PostRelation.create!(post: a, related_post: c)
-    tag = Tag.find_by!(name: "shared")
     visit admin_mind_graph_path
     await_graph
 
-    find("[data-mind-graph-list] summary", text: "List of posts and tags in this graph").click
-    within("[data-mind-graph-list]") do
-      assert_link "Alpha", href: /mind_graph\?post=#{a.id}\z/
-      assert_link "shared", href: /mind_graph\?tag=#{tag.id}\z/
-      assert_selector "li", text: /Alpha\s+2 connections/
-      assert_selector "li", text: /Gamma\s+1 connection\b/
-      assert_selector "a[href='#{admin_post_path(a)}'][aria-label='Edit Alpha']", text: "Edit"
-      assert_selector "li", count: 4
+    assert_no_selector "#{GRAPH} details"
+    assert_no_text "List of posts and tags in this graph"
+    within(LIST) do
+      # (The headings are in the upper-case label style.)
+      assert_equal [ "POSTS · 3", "TAGS · 1" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal [ "Alpha", "Beta", "Gamma", "shared" ], all("li button span.truncate").map(&:text), "posts then tags, best-connected first, equals by title"
+      assert_equal %w[2 1 1 2], all("li button span:last-child").map(&:text), "each row's number of connections"
+      assert_row "Alpha: post, 2 connections. Shows it in the graph."
+      assert_row "Gamma: post, 1 connection. Shows it in the graph."
+      assert_row "shared: tag, 2 connections. Shows it in the graph."
+      assert_selector "li button > span[aria-hidden='true']", count: 4
+      assert_no_selector "a", visible: :all
     end
 
     find("label", text: "Related").click
     await_graph
-    within("[data-mind-graph-list]") do
-      assert_selector "li", count: 2
-      assert_no_link "Beta"
-      assert_no_link "shared"
+    within(LIST) do
+      assert_equal [ "POSTS · 2" ], all("h2").map { |heading| heading.text.upcase }
+      assert_equal %w[Alpha Gamma], all("li button span.truncate").map(&:text)
     end
   end
 
@@ -1284,32 +1751,141 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     within("nav[aria-label='Modules']") { click_link "Mind graph" }
     await_graph
 
-    find("[data-mind-graph-list] summary").click
-    within("[data-mind-graph-list]") do
+    within(LIST) do
       assert_selector "li", count: 2
-      assert_link "One", href: /mind_graph\?post=1\z/
-      assert_link "Two"
+      assert_equal %w[One Two], all("li button span.truncate").map(&:text)
     end
   end
 
-  test "the list is a keyboard path: its link opens a node's neighbourhood" do
+  # A row does to the graph what a click on the node does, and brings the
+  # node to the middle of the canvas. It does not navigate: the card does.
+  test "a row selects its node, centres the canvas on it and marks itself; it does not navigate" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    box = canvas_box
+    centre = [ (box[0] + box[2]) / 2, (box[1] + box[3]) / 2 ]
+    from = screen_position(a.id)
+    assert_operator Math.hypot(from["x"] - centre[0], from["y"] - centre[1]), :>, 20, "the node is in the middle already: nothing to see"
+    zoom = graph["data-zoom"]
+
+    within(LIST) { find("button", text: "Alpha").click }
+
+    assert_equal a.id.to_s, graph["data-selected"]
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{a.id}); return Math.abs(p.x - #{centre[0]}) < 2 && Math.abs(p.y - #{centre[1]}) < 2 })()")
+    assert_equal zoom, graph["data-zoom"], "centring changed the zoom"
+    assert_selector "#{LIST} button[aria-current='true']", text: "Alpha", count: 1
+    assert_selector "[data-mind-graph-card] h2", text: "Alpha"
+    await_frames
+    assert_card_beside(a.id, side: "right")
+    assert_current_path admin_mind_graph_path
+
+    # Another row moves the mark; clearing the selection takes it away.
+    within(LIST) { find("button", text: "Beta").click }
+    assert_selector "#{LIST} button[aria-current='true']", text: "Beta", count: 1
+    escape_on_canvas
+    assert_no_selector "#{LIST} button[aria-current]"
+  end
+
+  # The other direction: a node selected on the canvas has its row marked, and
+  # the list scrolls -- by itself, not the page -- until the row is in view.
+  test "selecting a node on the canvas marks its row and scrolls the list to it" do
+    posts = 70.times.map { |i| create_post(title: format("Post %02d", i)) }
+    posts.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    visit admin_mind_graph_path
+    await_graph
+    # The last row: one of the chain's two ends, which have one connection.
+    last = posts.last
+    row_in_view = "(() => { const list = document.querySelector(#{LIST.to_json}).getBoundingClientRect(); const row = document.querySelector(#{LIST.to_json} + ' button[data-node-id=\"#{last.id}\"]').getBoundingClientRect(); return row.top >= list.top - 1 && row.bottom <= list.bottom + 1 })()"
+    assert_not page.evaluate_script(row_in_view), "the row is in view before anything is selected: the list is not long enough for this test"
+    scrolled = page.evaluate_script("window.scrollY")
+
+    click_node(last.id)
+
+    assert_selector "#{LIST} button[aria-current='true'][data-node-id='#{last.id}']"
+    await_js(row_in_view)
+    assert_equal scrolled, page.evaluate_script("window.scrollY"), "the page scrolled, not the list"
+  end
+
+  # Hovering a row lights its node up as the pointer on the node would.
+  test "hovering a row of the list highlights its node on the canvas" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    point = screen_position(a.id)
+    ring_before = pixel_at(point["x"] - 8.5, point["y"])
+
+    find("#{LIST} button", text: "Alpha").hover
+
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === '#{a.id}'")
+    assert_not_equal ring_before, pixel_at(point["x"] - 8.5, point["y"]), "no ring round the node whose row is hovered"
+    assert_equal "", graph["data-selected"].to_s
+
+    find("h1", text: "Mind graph").hover
+    await_js("document.querySelector(#{GRAPH.to_json}).dataset.hovered === ''")
+  end
+
+  # The keyboard's whole way: a row is reached by Tab (it is a button), Enter
+  # selects its node and hands the focus to the card, whose first stop is
+  # "Open post"; Escape gives the focus back to the row.
+  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
     await_graph
 
-    # Real keys, on elements focused by script: Cuprite's `send_keys` CLICKS an
-    # element that is not focused, and a click on the summary would open the
-    # list by itself and the Enter after it would close it again.
-    find("[data-mind-graph-list] summary").execute_script("this.focus()")
+    # Real keys, on an element focused by script: Cuprite's `send_keys` CLICKS
+    # an element that is not focused, and the click would do what Enter is
+    # here to show.
+    find("#{LIST} button", text: "Alpha").execute_script("this.focus()")
     page.driver.browser.keyboard.type(:Enter)
-    link = find("[data-mind-graph-list] a", text: "Alpha")
-    click_frame_link do
-      link.execute_script("this.focus()")
-      page.driver.browser.keyboard.type(:Enter)
-    end
 
-    assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
+    assert_equal a.id.to_s, graph["data-selected"]
+    assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
+    assert_equal "mind-graph-card-title", find("[data-mind-graph-card]")["aria-labelledby"], "the card is not named by its title"
+    page.driver.browser.keyboard.type(:Tab)
+    assert_equal "Open post", page.evaluate_script("document.activeElement.textContent")
+    page.driver.browser.keyboard.type(:Escape)
+
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('span.truncate')?.textContent"), "the focus did not go back to the row"
+
+    page.driver.browser.keyboard.type(:Enter)
+    page.driver.browser.keyboard.type(:Tab)
+    click_frame_link { page.driver.browser.keyboard.type(:Enter) }
+    assert_current_path admin_post_path(a)
+  end
+
+  # Spec §5.7, as the round of 2026-10-08 left it: the Tab key meets the
+  # search first, then a local view's bar, the filter, the zoom buttons, the
+  # canvas, the card and, last, the list -- though on screen the search and
+  # the list are one column on the right.
+  test "the Tab key meets the search first and the list last" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path(post: a.id)
+    await_graph
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card] a", text: "Open post"
+
+    stops = page.evaluate_script(<<~JS)
+      Array.from(document.querySelector(#{GRAPH.to_json}).querySelectorAll("input, button, a[href], canvas[tabindex='0']"))
+        .filter((element) => element.checkVisibility() && !element.closest("[hidden]"))
+        .map((element) => {
+          if (element.id === "mind-graph-search") return "search"
+          if (element.closest("[data-mind-graph-focus]")) return "focus bar"
+          if (element.name === "mind_graph_filter") return "filter"
+          if (element.dataset.action?.includes("admin--mind-graph#")) return "zoom"
+          if (element.tagName === "CANVAS") return "canvas"
+          if (element.closest("[data-mind-graph-card]")) return "card"
+          if (element.closest("[data-mind-graph-list]")) return "list"
+          return element.outerHTML
+        })
+    JS
+
+    assert_equal [ "search", "focus bar", "filter", "zoom", "canvas", "card", "list" ], stops.chunk_while { |a, b| a == b }.map(&:first)
   end
 
   test "a title with markup in it is text in the list and in the search results" do
@@ -1319,14 +1895,25 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
 
-    find("[data-mind-graph-list] summary").click
-    within("[data-mind-graph-list]") { assert_link nasty }
+    within(LIST) { assert_selector "button span.truncate", exact_text: nasty }
     fill_in "Find a post or tag", with: "onerror"
     within("[data-mind-graph-results]") { assert_link nasty }
 
-    assert_no_selector "[data-mind-graph-list] img, [data-mind-graph-results] img", visible: :all
+    assert_no_selector "#{LIST} img, [data-mind-graph-results] img", visible: :all
     assert_nil page.evaluate_script("window.pwned")
   end
+
+  # Escape with the canvas focused. The key is real; the focus is given by
+  # script, because Cuprite's `send_keys` CLICKS an element that is not
+  # focused -- in its middle, where the card of a centred node now stands.
+  def escape_on_canvas
+    find(CANVAS).execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Escape)
+  end
+
+  # A row of the list by its accessible name (Capybara's button locator does
+  # not read `aria-label`).
+  def assert_row(name) = assert_selector("button[aria-label=#{name.to_json}]")
 
   # A real click where the node is drawn.
   def click_node(id)
@@ -1334,6 +1921,87 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert point, "node #{id} is not on screen"
     page.driver.browser.mouse.click(x: point["x"], y: point["y"])
   end
+
+  # Presses the mouse on a node and walks it `by` pixels in two steps, waiting
+  # until the node is under the pointer again; releases unless told not to.
+  # Answers where the node was dropped, in client coordinates.
+  def drag_node(id, by:, release: true)
+    from = screen_position(id)
+    assert from, "node #{id} is not on screen"
+    to = { "x" => from["x"] + by[0], "y" => from["y"] + by[1] }
+    mouse = page.driver.browser.mouse
+    mouse.move(x: from["x"], y: from["y"])
+    mouse.down
+    mouse.move(x: from["x"] + (by[0] / 2), y: from["y"] + (by[1] / 2))
+    mouse.move(x: to["x"], y: to["y"])
+    await_js("(() => { const p = document.querySelector(#{GRAPH.to_json}).mindGraph.screenPosition(#{id.to_json}); return Math.abs(p.x - #{to["x"]}) < 2 && Math.abs(p.y - #{to["y"]}) < 2 })()")
+    mouse.up if release
+    to
+  end
+
+  # The card stands 22 px from the edge of a node of one connection (a 6 px
+  # dot), on the given side, and is vertically centred on it.
+  def assert_card_beside(id, side: nil, radius: 6)
+    node = screen_position(id)
+    card = element_box("[data-mind-graph-card]")
+    shown = find("[data-mind-graph-card]")["data-side"]
+    assert_equal side, shown if side
+    if shown == "right"
+      assert_in_delta node["x"] + radius + 22, card["left"], 1.5, "the card is not 22 px right of the node: #{node} #{card}"
+    else
+      assert_in_delta node["x"] - radius - 22, card["right"], 1.5, "the card is not 22 px left of the node: #{node} #{card}"
+    end
+    assert_in_delta node["y"], (card["top"] + card["bottom"]) / 2, 1.5, "the card is not centred on the node: #{node} #{card}"
+  end
+
+  # An element's box in client coordinates.
+  def element_box(selector)
+    page.evaluate_script("(() => { const r = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } })()")
+  end
+
+  # The boxes the screen is made of, the window's height and the page's own.
+  def layout_boxes
+    page.evaluate_script(<<~JS)
+      (() => {
+        const box = (selector) => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height } }
+        return {
+          box: box(#{GRAPH.to_json}), canvas: box(#{CANVAS.to_json}), list: box(#{LIST.to_json}), search: box("#mind-graph-search"),
+          main: document.querySelector("main").getBoundingClientRect().width, viewport: window.innerHeight, page: document.documentElement.scrollHeight
+        }
+      })()
+    JS
+  end
+
+  # The canvas's colour where a pinned node's mark is: up and to the right of
+  # the centre of a 6 px dot.
+  def pin_pixel(post)
+    point = screen_position(post.id)
+    pixel_at(point["x"] + 4.32, point["y"] - 4.32)
+  end
+
+  # The browser says the person prefers reduced motion inside the block, and
+  # no longer afterwards: it is shared with the tests that follow.
+  def with_reduced_motion
+    page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [ { name: "prefers-reduced-motion", value: "reduce" } ])
+    yield
+  ensure
+    page.driver.browser.page.command("Emulation.setEmulatedMedia", features: [])
+  end
+
+  # Records the type of every message a worker started from now on sends the
+  # page (`tick`, `settled`, `error`), on a screen visited BEFORE the Mind
+  # graph: how many steps a layout was shown in.
+  def record_worker_answers
+    page.execute_script(<<~JS)
+      window.workerAnswers = []
+      const Real = window.Worker
+      window.Worker = class extends Real {
+        constructor(...args) { super(...args); this.addEventListener("message", ({ data }) => window.workerAnswers.push(data.type)) }
+      }
+    JS
+  end
+
+  def worker_answers = page.evaluate_script("window.workerAnswers")
 
   # Records the type of every message the page sends a worker from now on
   # (the prototype's method, so the graph's own worker, already running, is

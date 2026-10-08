@@ -371,8 +371,9 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
    shared tag's dashed (line style, not colour alone); a draft or scheduled
    post is a dashed ring; a post whose type is no longer registered is a `meta`
    ring WITH A STROKE THROUGH IT, so it differs from a ring of slots 7-12 by
-   shape. (A type's own dot is `Admin::ContentTypeDotComponent`.) Change one
-   side and the other with it. */
+   shape; a pinned node carries a small ink dot with a surface ring at its
+   top-right (here on a faint stand-in for the node). (A type's own dot is
+   `Admin::ContentTypeDotComponent`.) Change one side and the other with it. */
 .mg-tag rect { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 1.5; }
 .mg-edge { fill: none; }
 .mg-edge-related { stroke: var(--cs-ink); stroke-opacity: 0.35; stroke-width: 1.5; }
@@ -381,3 +382,5 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .mg-key .mg-edge-related, .mg-key .mg-edge-tag { stroke-opacity: 1; }
 .mg-key-hollow { fill: var(--cs-surface); stroke: var(--cs-meta); stroke-width: 2; stroke-dasharray: 3 2.5; }
 .mg-key-retired { fill: none; stroke: var(--cs-meta); stroke-width: 1.5; }
+.mg-key-pinned-node { fill: none; stroke: var(--cs-meta); stroke-width: 1; }
+.mg-key-pin { fill: var(--cs-ink); stroke: var(--cs-surface); stroke-width: 1.5; }

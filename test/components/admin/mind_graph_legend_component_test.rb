@@ -45,4 +45,14 @@ class Admin::MindGraphLegendComponentTest < ViewComponent::TestCase
     assert_selector "[data-legend=related] .mg-edge-related"
     assert_selector "[data-legend=tag-edge] .mg-edge-tag"
   end
+
+  # The mark of a node that stays where it was dropped (the round of
+  # 2026-10-08): the canvas draws a small ink dot at the node's top-right, and
+  # the legend names it.
+  test "names the pin mark, last" do
+    render_inline(Admin::MindGraphLegendComponent.new(content_types: []))
+
+    assert_selector "li:last-child[data-legend=pinned]", text: "Pinned"
+    assert_selector "[data-legend=pinned] circle.mg-key-pin"
+  end
 end

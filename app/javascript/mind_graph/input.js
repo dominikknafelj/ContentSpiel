@@ -30,6 +30,9 @@
 // left out: it always produces a `pointerup`, and a capture the browser drops
 // between its press and its first move must not end a drag that is still held.
 //
+// - `onDoubleClick(x, y)` is the browser's own `dblclick` (a mouse's second
+//   click in a short time, a touch's double tap): both of its clicks have
+//   been `onClick`s already, so it is for what a double click ADDS.
 // - `onZoom(x, y, factor)` is also the wheel (and a trackpad's pinch, which
 //   arrives as a wheel with ctrlKey), and + / - with the canvas focused,
 //   around its middle.
@@ -40,7 +43,7 @@ const CLICK_SLOP = 5
 const KEY_PAN = 60
 const KEY_ZOOM = 1.25
 
-export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, onZoom, onHover, onEscape }) {
+export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, onDoubleClick = () => {}, onZoom, onHover, onEscape }) {
   const at = (event) => {
     const box = canvas.getBoundingClientRect()
     return [ event.clientX - box.left, event.clientY - box.top ]
@@ -143,8 +146,9 @@ export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, o
     event.preventDefault()
   }
   const pointerleave = () => onHover(-1, -1)
+  const dblclick = (event) => onDoubleClick(...at(event))
 
-  const listeners = { pointerdown, pointermove, pointerup, pointercancel, lostpointercapture, pointerleave, keydown }
+  const listeners = { pointerdown, pointermove, pointerup, pointercancel, lostpointercapture, pointerleave, dblclick, keydown }
   Object.entries(listeners).forEach(([ name, handler ]) => canvas.addEventListener(name, handler))
   canvas.addEventListener("wheel", wheel, { passive: false })
 

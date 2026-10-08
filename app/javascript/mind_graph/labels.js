@@ -22,11 +22,24 @@
 //
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
 // `x`/`y` the label's left edge and vertical middle in screen pixels: a label
-// sits right of its node, GAP pixels from the node's edge, centred on it.
+// sits right of its node, LABEL_GAP pixels from the node's edge, centred on
+// it. `labelAt` answers that place for one node, whatever the rules say of
+// it: the hovered node's label is shown even where the ranking hides it.
+//
+// LABEL_GAP and LABEL_HEIGHT are also the hit test's (`hit_test.js`): a drawn
+// label is part of its node's target.
 export const LABEL_BUDGET = 40
+export const LABEL_GAP = 4
+export const LABEL_HEIGHT = 14
 
-const GAP = 4
-const HEIGHT = 14
+const GAP = LABEL_GAP
+const HEIGHT = LABEL_HEIGHT
+
+export function labelAt({ index, positions, radii, camera }) {
+  const sx = positions[index * 2] * camera.k + camera.tx
+  const sy = positions[index * 2 + 1] * camera.k + camera.ty
+  return { index, alpha: 1, x: sx + radii[index] + GAP, y: sy }
+}
 
 export function chooseLabels({ order, positions, widths, radii, camera, width, height, always }) {
   const reach = Math.max(1, Math.ceil(LABEL_BUDGET * camera.k * camera.k))

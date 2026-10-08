@@ -30,10 +30,13 @@ export function createLayout({ workerUrl, d3Url, onTick, onSettled, onError }) {
   }
 
   return {
-    start(nodes, edges) { send({ type: "start", d3Url, nodes, edges }) },
+    // `reducedMotion`: the worker has no `matchMedia`, so the page says it.
+    start(nodes, edges, { reducedMotion = false } = {}) { send({ type: "start", d3Url, nodes, edges, reducedMotion }) },
     filter(nodeIds, edgeIndexes) { send({ type: "filter", nodeIds, edgeIndexes }) },
-    pin(id, x, y) { send({ type: "pin", id, x, y }) },
-    unpin(id) { send({ type: "unpin", id }) },
+    drag(id, x, y) { send({ type: "drag", id, x, y }) },
+    drop(id) { send({ type: "drop", id }) },
+    pin(id) { send({ type: "pin", id }) },
+    unpin(ids) { send({ type: "unpin", ids }) },
     stop() {
       stopped = true
       worker.terminate()

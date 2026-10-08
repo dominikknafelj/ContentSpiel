@@ -5,7 +5,12 @@
 # `show.canvas_label` names the canvas until the data has arrived; `script.
 # summary` is the whole name it has afterwards (the same words, then what is
 # drawn), so the script never joins two strings with punctuation of its own;
-# `script.list.edit_named` is the edit link's whole name for the same reason.
+# `script.list.select_post` and `select_tag` are a row's whole accessible name
+# for the same reason: what it is, how connected, and what pressing it does.
+# `script.list.posts` and `tags` are a group's heading with how many it holds.
+#
+# `show.zoom_out`, `zoom_in` and `fit` are the zoom buttons' whole names (their
+# `aria-label` and tooltip); what is drawn on them is a glyph, or `fit_short`.
 #
 # `script.capped` is the global view's sentence (it keeps the best-connected
 # posts), `script.capped_local` a local view's (it keeps the nearest to the
@@ -25,11 +30,13 @@ en:
           related: "Related"
           tag: "Tags"
         canvas_label: "Post relationship graph"
+        zoom: "Zoom"
         zoom_in: "Zoom in"
         zoom_out: "Zoom out"
         fit: "Fit all"
+        fit_short: "Fit"
         card_label: "Selected in the graph"
-        list_summary: "List of posts and tags in this graph"
+        list_label: "Posts and tags in this graph"
         focus:
           around_post: "Around “%{title}”"
           around_tag: "Around the tag “%{title}”"
@@ -48,18 +55,29 @@ en:
         capped: "Showing the %{shown} best-connected of %{total} posts."
         capped_local: "Showing the %{shown} nearest of %{total} posts around this one."
         isolated:
+          one: "%{figure} other post has no connections yet and isn't shown."
+          other: "%{figure} other posts have no connections yet and aren't shown."
+        isolated_only:
           one: "%{figure} post has no connections yet."
           other: "%{figure} posts have no connections yet."
+        release_pinned:
+          one: "Release %{count} pinned"
+          other: "Release %{count} pinned"
         summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
         card:
-          connections:
-            one: "%{count} connection"
-            other: "%{count} connections"
+          related:
+            one: "%{count} related"
+            other: "%{count} related"
+          tags:
+            one: "%{count} tag"
+            other: "%{count} tags"
           tag_posts:
             one: "%{count} post"
             other: "%{count} posts"
           open_post: "Open post"
-          focus: "Focus graph here"
+          focus: "Focus"
+          pin: "Pin"
+          unpin: "Unpin"
           show_tagged: "Show posts with this tag"
           close: "Close"
           tag: "Tag"
@@ -68,14 +86,15 @@ en:
             scheduled: "Scheduled"
             live: "Live"
         list:
-          posts: "Posts"
-          tags: "Tags"
-          edit: "Edit"
-          edit_named: "Edit %{title}"
+          posts: "Posts · %{count}"
+          tags: "Tags · %{count}"
           empty: "Nothing is drawn yet."
-          connections:
-            one: "%{count} connection"
-            other: "%{count} connections"
+          select_post:
+            one: "%{title}: post, %{count} connection. Shows it in the graph."
+            other: "%{title}: post, %{count} connections. Shows it in the graph."
+          select_tag:
+            one: "%{title}: tag, %{count} connection. Shows it in the graph."
+            other: "%{title}: tag, %{count} connections. Shows it in the graph."
         search:
           count:
             one: "%{count} result"

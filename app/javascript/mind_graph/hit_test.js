@@ -1,20 +1,43 @@
-// The node under a screen point (mind graph canvas spec §4.1). A linear scan
-// over the visible nodes: at the cap that is 2,000 distance checks per pointer
-// event, which needs no index. A node's radius is in SCREEN pixels -- nodes
-// are drawn the same size at every zoom -- so the camera moves the centres
-// only. `slack` makes a small dot easier to hit. Where two overlap, the
-// nearer centre wins.
-export function nodeAt({ positions, indexes, radii, camera, sx, sy, slack = 4 }) {
+// The node under a screen point (mind graph canvas spec §4.1, §5.3). A node's
+// DOT AND ITS LABEL ARE ONE TARGET: a press on the title is a press on the
+// node, as a person expects of a name written beside a mark.
+//
+// The dot. A node's radius is in SCREEN pixels -- nodes are drawn the same size
+// at every zoom -- so the camera moves the centres only. A small dot would be
+// hard to hit, so its target is its radius plus `slack`, and never less than
+// MIN_TARGET pixels across, at any zoom. Where two overlap, the nearer centre
+// wins.
+//
+// The label. `labels` is what the last frame DREW (`labels.js`'s answer, plus
+// the hovered node's): a label counts only while it is drawn, so nothing
+// invisible can be pressed. Its box runs from the node's edge to the end of
+// the text (`widths`), LABEL_HEIGHT tall. A dot wins over a label it lies
+// under; among labels the LAST drawn wins, because that is the one on top
+// (the hovered node's is drawn over the others).
+//
+// Still a linear scan: at the cap that is 2,000 distance checks and at most a
+// few hundred box checks per pointer event, which needs no index.
+import { LABEL_GAP, LABEL_HEIGHT } from "mind_graph/labels"
+
+export const MIN_TARGET = 24
+
+export function nodeAt({ positions, indexes, radii, camera, sx, sy, slack = 4, labels = [], widths = [] }) {
   let best = -1
   let bestDistance = Infinity
   for (const index of indexes) {
     const dx = positions[index * 2] * camera.k + camera.tx - sx
     const dy = positions[index * 2 + 1] * camera.k + camera.ty - sy
     const distance = Math.hypot(dx, dy)
-    if (distance <= radii[index] + slack && distance < bestDistance) {
+    if (distance <= Math.max(radii[index] + slack, MIN_TARGET / 2) && distance < bestDistance) {
       best = index
       bestDistance = distance
     }
   }
-  return best
+  if (best >= 0) return best
+
+  for (let at = labels.length - 1; at >= 0; at -= 1) {
+    const label = labels[at]
+    if (sx >= label.x - LABEL_GAP && sx <= label.x + widths[label.index] && Math.abs(sy - label.y) <= LABEL_HEIGHT / 2) return label.index
+  }
+  return -1
 }
