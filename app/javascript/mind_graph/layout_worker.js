@@ -18,6 +18,9 @@
 // numbers each: a node the filter hides keeps its last place, so it comes
 // back where it was.
 //
+// Messages are handled strictly in order (see `queue` below): the first
+// `start` awaits the d3 import, and what follows it must wait for it.
+//
 // The simulation's own timer is stopped at once and it is stepped by hand:
 // as many ticks as fit into SLICE_MS, one message, then a zero timeout so a
 // `pin` or `filter` that arrived meanwhile is handled before the next slice.
@@ -29,8 +32,17 @@ let nodes = []
 let edges = []
 let running = false
 
+// Messages are handled strictly in order, each after the previous one has
+// finished. `start` awaits the d3 import, and a `filter`, `pin` or `unpin`
+// sent right behind it would otherwise run before the simulation exists: the
+// filter would throw and report a spurious error, a drag would be dropped.
+// An error in one message is posted and the chain goes on with the next.
+let queue = Promise.resolve()
+
 self.onmessage = (event) => {
-  handle(event.data).catch((error) => self.postMessage({ type: "error", message: String(error?.message || error) }))
+  queue = queue
+    .then(() => handle(event.data))
+    .catch((error) => self.postMessage({ type: "error", message: String(error?.message || error) }))
 }
 
 async function handle(message) {
@@ -44,7 +56,10 @@ async function handle(message) {
     if (!node) return
     node.fx = message.x
     node.fy = message.y
-    simulation.alphaTarget(0.3)
+    // A pin on a graph that has cooled down must wake it: `alphaTarget` only
+    // pulls `alpha` up by ticking, and the slice loop does not tick while
+    // `alpha` is below `alphaMin`.
+    simulation.alphaTarget(0.3).alpha(Math.max(simulation.alpha(), 0.3))
     run()
   } else if (message.type === "unpin") {
     const node = nodes.find((candidate) => candidate.id === message.id)
