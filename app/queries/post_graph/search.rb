@@ -3,6 +3,7 @@
 # how a post the capped global view doesn't draw is reached. A tag is listed
 # only when a readable post carries it, the same rule `Focus` applies -- so a
 # result never leads to a 404, and never names a tag the viewer can't see used.
+# A post is loaded with its id and title only, never its body.
 module PostGraph
   class Search
     def self.call(...) = new(...).call
@@ -18,7 +19,7 @@ module PostGraph
       return [] if @text.empty?
 
       readable = AccessControl.scope(@actor, "posts.read", Post.all)
-      posts = readable.title_matching_any_locale(@text).order(:id).limit(@limit)
+      posts = readable.title_matching_any_locale(@text).select(:id, :title).order(:id).limit(@limit)
       tags = Tag.name_containing(@text).where(id: PostTag.where(post_id: readable.select(:id)).select(:tag_id))
                 .name_starting_first(@text).by_name.limit(@limit).pluck(:id, :name)
 

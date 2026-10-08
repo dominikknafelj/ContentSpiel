@@ -38,6 +38,15 @@ class PostGraph::SearchTest < ActiveSupport::TestCase
     assert_equal 2, rows.count { |row| row[:kind] == "tag" }
   end
 
+  test "posts are loaded with only the id and the title" do
+    create_post(title: "Ruby notes", tags: [ "ruby" ])
+
+    statements = capture_sql { search("rub") }
+
+    assert statements.any? { |sql| sql.include?('"posts"."id", "posts"."title"') }, "the posts were not read:\n#{statements.join("\n")}"
+    assert statements.none? { |sql| sql.include?('"posts".*') }, "a whole post row was loaded:\n#{statements.grep(/"posts"/).join("\n")}"
+  end
+
   test "blank text finds nothing" do
     create_post(title: "A")
 

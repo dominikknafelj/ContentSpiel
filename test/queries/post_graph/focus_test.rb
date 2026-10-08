@@ -29,6 +29,27 @@ class PostGraph::FocusTest < ActiveSupport::TestCase
     assert_equal "post", PostGraph::Focus.find(actor: nil, post: post.id, tag: Tag.find_by!(name: "ruby").id).kind
   end
 
+  # An id is decimal digits and nothing else. Ruby's `Integer("010")` is 8 and
+  # `Integer("0x1A")` 26: either would open a post other than the one the URL
+  # names.
+  test "an id is read as a decimal: a leading zero is not octal, and a prefixed form names nothing" do
+    # Ten of them, so the last one's id has two digits at least, whatever the
+    # sequence started at: "07" is 7 either way.
+    post = 10.times.map { |i| create_post(title: "Post #{i}", tags: [ "t#{i}" ]) }.last
+    tag = Tag.find_by!(name: "t9")
+    assert_operator tag.id, :>=, 10
+
+    assert_equal post.id, PostGraph::Focus.find(actor: nil, post: "0#{post.id}").id
+    assert_equal post.id, PostGraph::Focus.find(actor: nil, post: "00#{post.id}").id
+    assert_equal tag.id, PostGraph::Focus.find(actor: nil, tag: "0#{tag.id}").id
+    [ "0x#{post.id.to_s(16)}", "0b#{post.id.to_s(2)}", "0o#{post.id.to_s(8)}", "#{post.id}.0", "#{post.id}abc", [ post.id.to_s ], { "id" => post.id.to_s } ].each do |value|
+      assert_raises(ActiveRecord::RecordNotFound, "post=#{value.inspect} was found") { PostGraph::Focus.find(actor: nil, post: value) }
+    end
+    [ "0x#{tag.id.to_s(16)}", [ tag.id.to_s ] ].each do |value|
+      assert_raises(ActiveRecord::RecordNotFound, "tag=#{value.inspect} was found") { PostGraph::Focus.find(actor: nil, tag: value) }
+    end
+  end
+
   test "an unknown, trashed or unreadable post is not found" do
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })

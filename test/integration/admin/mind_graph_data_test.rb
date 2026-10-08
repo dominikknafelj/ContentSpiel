@@ -73,6 +73,52 @@ class Admin::MindGraphDataTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A parameter in a shape the screen never sends is answered like any other
+  # value that names nothing -- never with a 500.
+  test "a parameter that is a list, or a depth that is not a number, is answered without an error" do
+    sign_in_as(users(:one))
+    a = create_post(title: "A", tags: [ "t" ])
+    b = create_post(title: "B", tags: [ "t" ])
+    PostRelation.create!(post: a, related_post: b)
+    tag = Tag.find_by!(name: "t")
+
+    # A list is not an id: the focus it would name does not exist, so 404, as
+    # for `post=abc`. (Not the global graph: the request did ask for a focus.)
+    get "/cs-studio/mind_graph/data", params: { post: [ a.id ] }
+    assert_response :not_found
+    get "/cs-studio/mind_graph/data", params: { tag: [ tag.id ] }
+    assert_response :not_found
+    get "/cs-studio/mind_graph", params: { post: [ a.id ] }
+    assert_response :not_found
+
+    # A depth other than 2 is 1, whatever it is: the documented reading.
+    get "/cs-studio/mind_graph/data", params: { post: a.id, depth: "abc" }
+    assert_response :success
+    assert_equal 1, data["focus"]["depth"]
+    get "/cs-studio/mind_graph/data", params: { post: a.id, depth: [ "2" ] }
+    assert_response :success
+    assert_equal 1, data["focus"]["depth"]
+
+    # A list is not a text to search for: it matches no title and no tag, and
+    # the answer is the empty list a search with no match gives.
+    get "/cs-studio/mind_graph/search", params: { q: [ "A" ] }
+    assert_response :success
+    assert_equal [], data
+  end
+
+  # The id in the URL is the id in decimal: `?post=010` is post 10.
+  test "an id with a leading zero is that id, and a hexadecimal one is not found" do
+    sign_in_as(users(:one))
+    post = 10.times.map { |i| create_post(title: "Post #{i}") }.last
+
+    get "/cs-studio/mind_graph/data", params: { post: "0#{post.id}" }
+    assert_response :success
+    assert_equal post.id, data["focus"]["id"]
+
+    get "/cs-studio/mind_graph/data", params: { post: "0x#{post.id.to_s(16)}" }
+    assert_response :not_found
+  end
+
   test "editor urls keep the editing language" do
     sign_in_as(users(:one))
     with_locales(%w[en de], default: "en")
