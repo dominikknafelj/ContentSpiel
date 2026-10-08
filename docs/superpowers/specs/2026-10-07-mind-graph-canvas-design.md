@@ -45,16 +45,16 @@ Agreed on 2026-10-07:
 
 ### 3.1 Routes
 
-- `GET <admin>/mind-graph` — the screen. With no parameters, the global view.
-- `GET <admin>/mind-graph?post=<id>&depth=<1|2>` and `?tag=<id>&depth=<1|2>` — a local view. A depth other than 1 or 2 is read as 1. `post` wins if both are given.
-- `GET <admin>/mind-graph/data.json` with the same parameters — the graph's data.
-- `GET <admin>/mind-graph/search.json?q=<text>` — posts and tags by name, for the search field.
+- `GET <admin>/mind_graph` — the screen (the existing path). With no parameters, the global view.
+- `GET <admin>/mind_graph?post=<id>&depth=<1|2>` and `?tag=<id>&depth=<1|2>` — a local view. A depth other than 1 or 2 is read as 1. `post` wins if both are given.
+- `GET <admin>/mind_graph/data` with the same parameters — the graph's data, as JSON.
+- `GET <admin>/mind_graph/search?q=<text>` — posts and tags by name, for the search field.
 
 All three need `posts.read` somewhere, as the screen does today. A focus the viewer may not read, a trashed post and an unknown id answer 404, from the page and from the data endpoint alike.
 
 ### 3.2 The data moves out of the page
 
-The page renders only the frame: heading, focus bar, search field, legend, filter, the empty canvas, the card's container and the list's container. The script fetches `data.json`. The `<script type="application/json">` island is removed.
+The page renders only the frame: heading, focus bar, search field, legend, filter, the empty canvas, the card's container and the list's container. The script fetches the data endpoint. The `<script type="application/json">` island is removed.
 
 Reason: at the cap the JSON is several hundred kilobytes, which would otherwise sit in every page load and in Turbo's page cache.
 
@@ -84,6 +84,7 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 - Ranks the readable posts by connection count: related-post links (either direction) plus tag links to tags that qualify as nodes.
 - Keeps the top `PostGraph::CAP` posts with a count above zero. Ties break by newest `updated_at`, then id, so the result is stable between requests.
 - Derives tags and edges only from the kept posts.
+- A tag's weight in the ranking is decided before the cut, among all readable posts.
 
 **`PostGraph::Local`**
 - Starts from the focus and walks outward one level per depth, following both edge kinds, one set of queries per level and never one per node.
@@ -95,15 +96,16 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 
 ### 3.4 Rules that do not change
 
-- Tags are derived only from the readable posts already selected, and a tag's `count` is that readable number.
+- Tags are derived only from readable posts, and a tag's `count` is the number of *readable* posts carrying it — never the tag's true total, and not the smaller number drawn, which would understate it.
 - No edge points at a post that isn't in `nodes`.
-- A tag is a node only when at least two selected posts carry it (`MIN_TAGGED_POSTS`). One exception: the focused tag of a local view is always a node, even with one readable post.
+- A tag is a node only when at least two readable posts carry it (`MIN_TAGGED_POSTS`) and it has enough edges in this response to say something: two in the global view, one in a local view (where a post's own tags are its depth-1 neighbours). One exception: the focused tag of a local view is always a node.
+- A focused tag that no readable post carries is not found.
 - Trashed posts are hidden explicitly, and the data and search endpoints are added to `test/integration/trash_visibility_test.rb`.
 - The cost does not grow with the number of posts: a fixed number of queries for the global view, and a fixed number per depth level for the local one.
 
 ### 3.5 Search
 
-`search.json` returns up to ten posts and ten tags whose name matches, through the existing scopes (`title_matching_any_locale`, `Tag.name_containing`), posts through `AccessControl.scope`. A tag is listed only if at least one readable post carries it. Each row carries a label, a kind and the URL of its local view.
+The search endpoint returns up to ten posts and ten tags whose name matches, through the existing scopes (`title_matching_any_locale`, `Tag.name_containing`), posts through `AccessControl.scope`. A tag is listed only if at least one readable post carries it. Each row carries a label, a kind and the URL of its local view.
 
 ## 4. The script
 
@@ -117,7 +119,7 @@ The 385-line `admin/mind_graph_controller.js` becomes a thin Stimulus controller
 | `layout_client.js` | Starts the worker, sends commands, hands positions to the page | the worker's messages |
 | `camera.js` | Zoom, pan, fit-to-view, screen ↔ graph coordinates | numbers |
 | `renderer.js` | Draws edges, nodes, labels and the selection onto the canvas | camera, theme, positions |
-| `hit_test.js` | Finds the node under a point, through a quadtree | positions |
+| `hit_test.js` | Finds the node under a point | positions |
 | `labels.js` | Decides which labels are shown at this zoom | degree, camera, positions |
 | `theme.js` | Reads the colour tokens from CSS custom properties | the document |
 
@@ -133,6 +135,8 @@ The controller wires them together and owns the HTML around the canvas: the filt
 - The worker is terminated on `disconnect()`.
 
 There is no second code path that runs the simulation in the page. If the worker can't start, the box shows a message and the list of links (§5.7) still works.
+
+`hit_test.js` is a linear scan over the visible nodes: at the cap that is 2,000 distance checks per pointer event, which needs no index.
 
 ### 4.3 Drawing
 
@@ -165,6 +169,8 @@ There is no second code path that runs the simulation in the page. If the worker
 - A drag below a few pixels of movement is a click.
 
 ## 5. What the user sees
+
+The legend is rendered by the server from the content types of the viewer's readable posts (one distinct query), since the page no longer holds the graph's data.
 
 ### 5.1 Nodes
 
@@ -222,7 +228,7 @@ Every string of the screen, the card, the legend and the script is a key in `con
 
 ## 6. Errors
 
-- `data.json` fails or times out: the box message with Retry. Search keeps working.
+- The data request fails or times out: the box message with Retry. Search keeps working.
 - The worker fails: the box message; the list still gives every node as a link.
 - A stale focus: 404.
 - Leaving the screen stops the worker, the animation frame and the observers.
@@ -236,7 +242,7 @@ Every string of the screen, the card, the legend and the script is a key in `con
 - Both: the number of statements does not depend on the number of posts (`capture_sql`).
 
 **Integration**
-- The page, `data.json` and `search.json`: permission, scoping, 404 on an unreadable, trashed or unknown focus.
+- The page, the data endpoint and the search endpoint: permission, scoping, 404 on an unreadable, trashed or unknown focus.
 - The trash-visibility test covers the new endpoints.
 - No page other than the Mind graph references d3-force.
 
@@ -251,7 +257,7 @@ Every string of the screen, the card, the legend and the script is a key in `con
 
 **Measurement**
 - A development script builds 2,000 and 6,000 posts with realistic relations and tags through the save services.
-- Recorded in this spec once measured: time to first draw, time to settle, frame time while panning, the response size and time of `data.json`.
+- Recorded in this spec once measured: time to first draw, time to settle, frame time while panning, the response size and time of the data endpoint.
 - The cap is set from those numbers. If 2,000 is too many, the cap comes down and the design stands.
 
 ## 8. Risk
