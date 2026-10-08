@@ -20,5 +20,10 @@
 @source "../../javascript/controllers/admin";
 @source "../../javascript/controllers/password_field_controller.js";
 @source "../../javascript/rich_text";
+/* The mind graph's scripts build the notice lines, the selection card, the
+   list of links and the search results (`w-fit` is used nowhere else). A new
+   directory of scripts that writes class names needs its line here too:
+   `test/lib/tailwind_sources_test.rb` fails without it. */
+@source "../../javascript/mind_graph";
 @import "./content-spiel.tailwind.css";
 @import "./admin-rich-text.css";
