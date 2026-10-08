@@ -50,7 +50,7 @@ Agreed on 2026-10-07:
 - `GET <admin>/mind_graph/data` with the same parameters — the graph's data, as JSON.
 - `GET <admin>/mind_graph/search?q=<text>` — posts and tags by name, for the search field.
 
-The screen and both JSON reads need `posts.read` somewhere, as the screen does today. A focus the viewer may not read, a trashed post and an unknown id answer 404, from the page and from the data endpoint alike.
+The screen and both JSON reads need `posts.read` somewhere, as the screen does today. A focus the viewer may not read, a trashed post and an unknown id answer 404, from the page and from the data endpoint alike. An id is read as a decimal number and nothing else: `post=010` is post 10, and `post=0x1A`, a word or a list (`post[]=1`) names nothing and is a 404 (§11).
 
 ### 3.2 The data moves out of the page
 
@@ -90,7 +90,7 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 - Starts from the focus and walks outward one level per depth, following both edge kinds, one set of queries per level and never one per node.
 - From a post: its related posts and its qualifying tags are depth 1; their posts and tags are depth 2.
 - From a tag: its readable posts are depth 1; their related posts and other tags are depth 2.
-- Capped at `PostGraph::CAP` posts too. Over the cap it keeps the focus, then the best-connected neighbours, nearer depth first, and `total` / `shown` say so.
+- Capped at `PostGraph::CAP` posts too. Over the cap it keeps the focus, then nearer posts before farther ones, and among equals the better connected; `total` / `shown` say so.
 
 **The cap** is one constant, `PostGraph::CAP`, starting at 2,000 and set from the measurements in §7.
 
@@ -105,7 +105,7 @@ Reason: at the cap the JSON is several hundred kilobytes, which would otherwise 
 
 ### 3.5 Search
 
-The search endpoint returns up to ten posts and ten tags whose name matches, through the existing scopes (`title_matching_any_locale`, `Tag.name_containing`), posts through `AccessControl.scope`. A tag is listed only if at least one readable post carries it. Each row carries a label, a kind, an id and the URL of its local view (the query answers the first three; the controller adds the URL, since a query knows no routes). Posts come in id order; tags whose name starts with the text come before those that only contain it.
+The search endpoint returns up to ten posts and ten tags whose name matches, through the existing scopes (`title_matching_any_locale`, `Tag.name_containing`), posts through `AccessControl.scope`. A tag is listed only if at least one readable post carries it. Each row carries a label, a kind, an id and the URL of its local view (the query answers the first three; the controller adds the URL, since a query knows no routes). Posts come in id order, loaded with their id and title only; tags whose name starts with the text come before those that only contain it.
 
 ## 4. The script
 
@@ -216,8 +216,9 @@ One field above the box. Typing lists matching posts and tags; choosing one open
 
 ### 5.6 Messages
 
-- Over the cap: "Showing the 2,000 best-connected of 6,000 posts." The second figure is `total`, the posts with a connection; the isolated ones are the next sentence's.
-- Isolated posts, global view: "214 posts have no connections yet."
+- Over the cap, global view: "Showing the 2,000 best-connected of 6,000 posts." The second figure is `total`, the posts with a connection; the isolated ones are the next sentence's.
+- Over the cap, local view: "Showing the 2,000 nearest of 2,695 posts around this one." A local view keeps the nearest posts first (§3.3), so "best-connected" would be untrue of it (§11).
+- Isolated posts, global view: "214 posts have no connections yet." Every figure in these sentences is grouped for the language of the messages ("1,214").
 - No connections at all: today's hint about related posts and shared tags.
 - The viewer can read no post: "No posts yet.", as today.
 - The data could not be loaded: a message in the box with Retry.
@@ -237,7 +238,7 @@ Every string of the screen, the card, the legend and the script is a key in `con
 ## 6. Errors
 
 - The data request fails or times out (after 15 seconds): the box message with Retry. Search keeps working.
-- The worker fails: the box message; the list still gives every node as a link.
+- The worker fails: the box message; the list still gives every node as a link, and still follows the filter.
 - A stale focus: 404.
 - Leaving the screen stops the worker, the animation frame and the observers.
 
@@ -337,19 +338,24 @@ The sections above are corrected where they stated something that is no longer t
 
 **The camera and input**
 - *The camera follows the layout until it has settled.* §4.4 had the first view fit "once the layout has settled enough to have a shape". There is no good moment for that: the graph keeps growing for a second or two, and a fit made early leaves it running out of the box. The camera is refitted on every tick until the layout has cooled down or the user moves it, whichever comes first.
-- *A two-finger touch pinch is implemented*, beside the wheel and the trackpad's pinch (which arrives as a wheel event). It is tested with synthetic pointer events only; no touch device was used.
+- *A two-finger touch pinch is implemented*, beside the wheel and the trackpad's pinch (which arrives as a wheel event). It is tested with synthetic pointer events only; no touch device was used. A pointer also ends on `lostpointercapture`, as on a cancel and without a click: a touch whose `pointerup` and `pointercancel` are both lost would otherwise stay in the table of pointers and turn every later touch into a pinch. A new finger arriving while one of a pinch remains restarts the pinch.
 - *The focus is not held in the middle.* §5.4 said it "starts in the middle". The layout places it like any other node and the first view fits everything, so a focus with neighbours on one side sits off-centre. It has its ring and is always labelled.
 
 **The page**
 - *The data request times out after 15 seconds* (§6 said "fails or times out" without a number), into the same message with Retry.
 - *The search field is first in the document*, before the focus bar's links, so Tab reaches it first; on screen the bar is on the left (`order-first`). §5.7 lists search first and did not place the bar.
 - *The card has a Close button*, and Escape closes it from inside the card as well as from the canvas; the focus then goes back to the canvas.
-- *Turbo's page snapshot is undone on connect.* Turbo caches the page as it stood when it was left, script-written state included: `data-state="ready"`, `data-settled`, the counts, the notice, an open card, the search's text and results, the list's rows. The controller's `reset()` clears all of it before anything is fetched. The filter's radios and whether the list is open are the person's own state and are kept.
+- *Turbo's page snapshot is undone on connect.* Turbo caches the page as it stood when it was left, script-written state included: `data-state="ready"`, `data-settled`, the counts, the notice, an open card, the search's text and results, the list's rows. The controller's `reset()` clears all of it before anything is fetched, and puts the canvas's name back to the server's (kept in its `data-label`), since the script writes the counts into it. The filter's radios and whether the list is open are the person's own state and are kept.
+- *The scripts' class names need a line in the Tailwind build.* `app/assets/tailwind/application.css` reads only the paths its `@source` lines name, and `app/javascript/mind_graph` was not one: `w-fit`, used only there, was never built, and nothing failed. The line is there now, and `test/lib/tailwind_sources_test.rb` fails for any directory of scripts that writes class names without one.
+- *The current depth is text, not a disabled link.* It is marked `aria-current` and carries a visually hidden "Depth" before its number; the other depth is a link named "Depth 2".
+- *The edit link of a list row is named by a key of its own* ("Edit %{title}"), not by joining "Edit" and the title in the script.
 
 **The data**
 - *Under the cap, a kept post can be drawn with no edge.* A post is ranked by its connections among all readable posts. If its only link is a tag whose other posts were cut, the tag has one edge left in the response, is no node (§3.4), and the post stands alone. It is still counted in `shown`, and its `degree` is 0. In the measured 6,000-post set this happened to no post.
 - *The local view's cap ranks by the connections inside the neighbourhood*, nearer depth first; the global view's by those among all readable posts.
-- *`PostGraph::Search` loads whole post rows.* It needs the id and the title; the narrower `select` works and is a pending tidy-up. At ten rows a request it costs nothing that shows in §7.
+- *A capped local view has a sentence of its own* (§5.6), chosen when the response carries a `focus`.
+- *The isolated count is grouped like the other figures.* The script hands the message the formatted figure as `%{figure}`; `count` stays, to choose the plural form.
+- *An id is parsed as a strict decimal* (`Integer(value.to_s, 10, exception: false)` in `PostGraph::Focus`). Ruby's `Integer("010")` is 8 and `Integer("0x1A")` 26, so a URL could open a post other than the one it names.
 
 **Drawing**
 - *Hit testing is a linear scan* (already in §4.1): measured at 0.2 ms per pointer event at the cap.
