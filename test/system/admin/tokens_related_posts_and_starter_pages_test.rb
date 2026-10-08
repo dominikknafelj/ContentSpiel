@@ -1,11 +1,12 @@
 require "application_system_test_case"
 
-# Task 9's browser-only behaviour: the token reveal's copy button (and its
-# visible select-the-text fallback), the related-posts picker saving
-# through the post form's own autosave, and "Create starter pages" refreshing
-# the tree. (The mind graph's own tests are in
-# `test/system/admin/mind_graph_test.rb` since it became a canvas.)
-class Admin::AiAssistantAndGraphSystemTest < ApplicationSystemTestCase
+# Three behaviours that only a browser shows, each small enough to share a
+# file: the token reveal's copy button (and its visible select-the-text
+# fallback), the related-posts picker saving through the post form's own
+# autosave, and "Create starter pages" refreshing the tree. (The mind graph's
+# tests are in `test/system/admin/mind_graph_test.rb` and
+# `mind_graph_modules_test.rb`.)
+class Admin::TokensRelatedPostsAndStarterPagesSystemTest < ApplicationSystemTestCase
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     sign_in_via_form(users(:one))
