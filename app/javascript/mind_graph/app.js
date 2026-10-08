@@ -11,8 +11,9 @@
 // empty) and `data-neighbours` (the ids of the selection's direct neighbours
 // by the edges shown, comma-separated, or empty; written when the selection
 // or the filter changes, never per frame). `element.mindGraph.
-// screenPosition(id)` answers where a visible node is, in client coordinates,
-// and `.draws()` how many frames have been drawn.
+// screenPosition(id)` answers where a visible node is, in client coordinates
+// (null for one the filter hides, and for every node until the layout has
+// placed them), and `.draws()` how many frames have been drawn.
 //
 // THE CAMERA. The first view fits everything: while the layout takes shape the
 // camera follows it, and when it has cooled down the fit is final
@@ -201,7 +202,11 @@ export function mount(element) {
     requestDraw()
   }
 
+  // No node is under any point until the layout has placed them: unplaced,
+  // every one is at 0, 0 -- the canvas's corner, where nothing is drawn -- and
+  // when the worker failed that is for good.
   function hit(x, y) {
+    if (!state.placed) return -1
     return nodeAt({ positions: state.positions, indexes: state.visibleNodes, radii: state.radii, camera: state.camera, sx: x, sy: y })
   }
 
@@ -439,7 +444,7 @@ export function mount(element) {
   element.mindGraph = {
     screenPosition(id) {
       const index = state.nodes.findIndex((node) => node.id === id)
-      if (index < 0 || !state.visibleNodes.includes(index)) return null
+      if (index < 0 || !state.placed || !state.visibleNodes.includes(index)) return null
       const box = canvas.getBoundingClientRect()
       return { x: box.left + state.positions[index * 2] * state.camera.k + state.camera.tx, y: box.top + state.positions[index * 2 + 1] * state.camera.k + state.camera.ty }
     },

@@ -395,6 +395,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     expect_js_error(/layout worker.*no workers here/)
   end
 
+  # A node that was never placed is nowhere: every position is still 0, 0, the
+  # canvas's top-left corner, and nothing is drawn there -- so nothing may be
+  # hovered, clicked or located there either.
+  test "the worker can't start: the corner where unplaced nodes would be answers no hover, no click and no position" do
+    post = create_post(title: "Alpha", tags: [ "shared" ])
+    create_post(title: "Beta", tags: [ "shared" ])
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script("window.Worker = class { constructor() { throw new Error('no workers here') } }")
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    assert_selector "#{GRAPH}[data-state='worker-failed']"
+    expect_js_error(/layout worker.*no workers here/)
+
+    left, top = canvas_box.first(2)
+    page.driver.browser.mouse.move(x: left + 3, y: top + 3)
+    await_frames
+    assert_no_selector "[data-mind-graph-tooltip]", visible: :visible
+    page.driver.browser.mouse.click(x: left + 3, y: top + 3)
+    await_frames
+
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"].to_s
+    assert_nil screen_position(post.id), "an unplaced node has no place on screen"
+  end
+
   # Spec §6: the list is filled before the layout starts, so a worker that
   # fails leaves the nodes reachable.
   test "the worker can't start: the list still gives every node as a link, and a link opens its local view" do
