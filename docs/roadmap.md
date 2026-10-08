@@ -305,6 +305,9 @@ Left by the technical cleanup (spec §10). The caching sub-project ("Performance
 - The group editor with scripts off shows an Edit scope button that does nothing on a ticked row; a stored branch root in the trash reads "A page you can't open (kept)" even to an owner. Ticking an ancestor above a page ticked in the same session drops the child where a stored one is kept.
 - The token form decides whether a refusal belongs under Name or Group from the message's first word.
 - The group delete dialog says tokens are "revoked" while `Groups::Destroy` deletes their rows.
+- Mind graph: a label can run over a neighbouring node or past the canvas's right edge; the overlap rule compares labels with labels only.
+- Mind graph: selecting a node is pointer-only, and opening its card is not announced; the list of links and the search field are the keyboard path.
+- Mind graph: the search results close and reopen on each keystroke, and have no arrow-key navigation.
 
 ### Accepted as they are
 
