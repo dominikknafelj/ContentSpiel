@@ -43,6 +43,11 @@ class PostGraph
   # A tag on fewer readable posts than this is no connection and has no node.
   MIN_TAGGED_POSTS = 2
 
+  # The most posts one graph draws (mind graph canvas spec §3.3): beyond it the
+  # global view keeps the best-connected, and a local view the nearest. Set
+  # from the measurements in that spec's §7.
+  CAP = 2_000
+
   def self.call(...) = new(...).call
 
   # `locale:` is the language titles are read in, through `Locales.read`'s
