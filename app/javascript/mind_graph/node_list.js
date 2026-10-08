@@ -2,7 +2,8 @@
 // path for a keyboard and a screen reader, since nothing on a canvas can take
 // focus. Two lists, posts and tags, best-connected first as on the canvas; a
 // row links to the node's local view and says how many connections it has,
-// and a post's row links to its editor too.
+// and a post's row links to its editor too ("Edit", named "Edit <title>" for
+// a screen reader, which hears the links one by one).
 //
 // Text goes in with `textContent`, a URL from the server's templates (filled
 // by `card.js`'s `fill`) or the node's own `url`; no path is written here.
@@ -36,7 +37,7 @@ export function renderList(container, { nodes, text, urls }) {
     if (node.kind === "post") {
       const edit = element("a", "text-accent underline", text.t("mind_graph.script.list.edit"))
       edit.href = node.url
-      edit.setAttribute("aria-label", `${text.t("mind_graph.script.list.edit")}: ${node.title}`)
+      edit.setAttribute("aria-label", text.t("mind_graph.script.list.edit_named", { title: node.title }))
       item.append(edit)
     }
     return item

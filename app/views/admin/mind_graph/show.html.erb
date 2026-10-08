@@ -39,12 +39,12 @@
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
        data-d3-url="<%= asset_path("d3-force.js") %>"
        data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",
-                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.isolated", "mind_graph.script.summary",
+                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.capped_local", "mind_graph.script.isolated", "mind_graph.script.summary",
                                      "mind_graph.script.card.connections", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag",
                                      "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
                                      "mind_graph.script.search.none", "mind_graph.script.search.count", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag",
-                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.edit", "mind_graph.script.list.empty", "mind_graph.script.list.connections") %>"
+                                     "mind_graph.script.list.posts", "mind_graph.script.list.tags", "mind_graph.script.list.edit", "mind_graph.script.list.edit_named", "mind_graph.script.list.empty", "mind_graph.script.list.connections") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
@@ -69,15 +69,18 @@
       </div>
       <% if @focus %>
         <%# The local view's bar (spec §5.4): what the graph is drawn around, both
-            depths (the current one is text, the other a link) and the way back
-            to the whole graph. All ordinary links, so Back works. The depth
+            depths and the way back to the whole graph. The current depth is
+            plain text marked `aria-current`, not a disabled link: it leads
+            nowhere, so it is nothing to press. Read out of the row it would be
+            a bare "1", so it carries the word "Depth" for a screen reader, as
+            the other depth's link does in its name. All ordinary links, so Back works. The depth
             link of 1 carries no `depth`, as the screen's own URLs do. %>
         <p data-mind-graph-focus class="order-first m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dim">
           <span class="font-semibold text-ink"><%= t(".focus.around_#{@focus.kind}", title: @focus.title) %></span>
           <span class="inline-flex items-center gap-1.5"><%= t(".focus.depth") %>
             <% [ 1, 2 ].each do |depth| %>
               <% if depth == @depth %>
-                <span role="link" aria-disabled="true" aria-current="true" aria-label="<%= t(".focus.depth_n", depth: depth) %>" class="font-semibold text-ink"><%= depth %></span>
+                <span aria-current="true" class="font-semibold text-ink"><span class="sr-only"><%= t(".focus.depth") %></span> <%= depth %></span>
               <% else %>
                 <%= link_to depth, admin_mind_graph_path(**admin_url_options, @focus.kind => @focus.id, depth: (depth if depth == 2)), "aria-label": t(".focus.depth_n", depth: depth), class: "text-accent underline" %>
               <% end %>
@@ -113,8 +116,11 @@
           <%= render Admin::ButtonComponent.new(label: t(".zoom_in"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomIn" }) %>
           <%= render Admin::ButtonComponent.new(label: t(".fit"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#fit" }) %>
         </div>
-        <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>"></canvas>
+        <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>" data-label="<%= t(".canvas_label") %>"></canvas>
         <div data-admin--mind-graph-target="notice" role="status" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
+        <%# (The canvas's `data-label` is its name as the server wrote it: the
+            script puts the counts into `aria-label`, and the controller's
+            `reset` puts this back on a page Turbo restored.) %>
         <%# The selection card and the hover tooltip (spec §5.3): HTML over the
             canvas, filled by `mind_graph/card.js` and `app.js` with `textContent`
             and `href` only. Both are empty and `hidden` until the script shows

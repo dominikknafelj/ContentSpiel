@@ -69,11 +69,13 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
 
     messages = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-messages"])
     assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
-    assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
+    assert_equal({ "one" => "%{figure} post has no connections yet.", "other" => "%{figure} posts have no connections yet." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.list.connections"])
-    assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts isolated list.connections list.edit list.empty list.posts list.tags load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+    assert_equal "Edit %{title}", messages["mind_graph.script.list.edit_named"]
+    assert_equal "Showing the %{shown} nearest of %{total} posts around this one.", messages["mind_graph.script.capped_local"]
+    assert_equal %w[capped capped_local card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
+                    card.tag card.tag_posts isolated list.connections list.edit list.edit_named list.empty list.posts list.tags load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
@@ -227,11 +229,11 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-focus]", text: /Around “Alpha”/
     link = css_select("[data-mind-graph-focus] a").find { |a| a.text == "2" }
     assert_equal({ "post" => post.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
-    assert_select "[data-mind-graph-focus] [aria-current='true']", text: "1"
+    assert_select "[data-mind-graph-focus] [aria-current='true']", text: /\ADepth\s+1\z/
     assert_select "[data-mind-graph-focus] a[href='/cs-studio/mind_graph']", text: "Whole graph"
 
     get "/cs-studio/mind_graph", params: { post: post.id, depth: 2 }
-    assert_select "[data-mind-graph-focus] [aria-current='true']", text: "2"
+    assert_select "[data-mind-graph-focus] [aria-current='true']", text: /\ADepth\s+2\z/
     one = css_select("[data-mind-graph-focus] a").find { |a| a.text == "1" }
     assert_equal({ "post" => post.id.to_s }, Rack::Utils.parse_query(URI(one["href"]).query))
   end
@@ -297,6 +299,9 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal %w[canvas aside summary], order
   end
 
+  # The current depth is text, not a link that can't be followed: no link
+  # role, nothing disabled, and its name is its own text -- the word "Depth",
+  # hidden from the eye (the row already says it once), then the number.
   test "the depth switch names its depth for assistive technology, the current one too" do
     sign_in_as(users(:one))
     post = create_post(title: "A")
@@ -304,7 +309,23 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph", params: { post: post.id }
 
     assert_select "[data-mind-graph-focus] a[aria-label='Depth 2']", text: "2"
-    assert_select "[data-mind-graph-focus] [aria-current='true'][aria-label='Depth 1']", text: "1"
+    assert_select "[data-mind-graph-focus] span[aria-current='true']", text: /\ADepth\s+1\z/ do
+      assert_select "span.sr-only", text: "Depth"
+    end
+    assert_select "[data-mind-graph-focus] [aria-current]", count: 1
+    assert_select "[data-mind-graph-focus] [role], [data-mind-graph-focus] [aria-disabled], [data-mind-graph-focus] span[aria-label]", count: 0
+  end
+
+  # The canvas's name as the server wrote it rides beside it, for the
+  # controller to put back on a page Turbo restored (the script writes the
+  # counts into `aria-label`).
+  test "the canvas carries its own name twice: as its name, and for the reset" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "canvas[aria-label='Post relationship graph'][data-label='Post relationship graph']"
   end
 
   test "the search has a live region that stays in the page, apart from the list of links" do

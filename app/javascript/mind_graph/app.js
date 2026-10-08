@@ -44,8 +44,7 @@ import { attachSearch } from "mind_graph/search_box"
 import { renderList } from "mind_graph/node_list"
 
 // A label longer than this is cut with an ellipsis; a tag's count is appended
-// whole. Counted by code point, so an emoji is never cut in half. Exported for
-// the test that asks it directly: a drawn label is not an element to read.
+// whole. Counted by code point, so an emoji is never cut in half.
 const MAX_LABEL_CHARACTERS = 32
 const BUTTON_ZOOM = 1.4
 // How long the data request may go unanswered before it is given up and shown
@@ -56,6 +55,8 @@ const LOAD_TIMEOUT_MS = 15_000
 const TOOLTIP_OFFSET = 14
 const TOOLTIP_MARGIN = 4
 
+// Exported for the test that asks it directly: a drawn label is not an
+// element to read.
 export function labelFor(node) {
   const suffix = node.kind === "tag" ? ` (${node.count})` : ""
   const room = MAX_LABEL_CHARACTERS - Array.from(suffix).length
@@ -70,10 +71,14 @@ export function mount(element) {
   const text = messages(element)
   const aborter = new AbortController()
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
-  // The state later tasks extend. `edges[i].source` / `.target`, `visibleNodes`,
-  // `visibleEdges`, `selected`, `neighbours` and `focusIndex` are all INDEXES
-  // into `nodes` (or `edges`); `positions` is the worker's x/y pairs, in the
-  // order of `nodes`. `order` is the visible nodes, best-connected first.
+  // Everything the graph is and how it is looked at: the data as it arrived
+  // (`data`), the nodes and edges made from it, what the filter shows, the
+  // layout's positions, the camera, the selection, the theme and the canvas's
+  // size. `renderer.js` draws from it and nothing else. `edges[i].source` /
+  // `.target`, `visibleNodes`, `visibleEdges`, `selected`, `neighbours` and
+  // `focusIndex` are all INDEXES into `nodes` (or `edges`); `positions` is the
+  // worker's x/y pairs, in the order of `nodes`. `order` is the visible nodes,
+  // best-connected first.
   const state = {
     nodes: [], edges: [], positions: new Float32Array(0), radii: [], widths: [], order: [],
     visibleNodes: [], visibleEdges: [], camera: identity(), selected: -1, neighbours: new Set(), focusIndex: -1,
@@ -299,10 +304,16 @@ export function mount(element) {
     // The canvas is one image to a screen reader, and its name says what is on it.
     canvas.setAttribute("aria-label", text.t("mind_graph.script.summary", { posts: state.nodes.length, edges: state.edges.length }))
 
+    // The two views cut differently (`PostGraph::Global` keeps the best
+    // connected, `PostGraph::Local` the nearest to the focus), so each has its
+    // own sentence. A figure in a sentence is grouped (`number`); `count`
+    // only chooses the plural form.
+    const cut = { shown: number(data.shown), total: number(data.total) }
+    const capped = data.focus ? text.t("mind_graph.script.capped_local", cut) : text.t("mind_graph.script.capped", cut)
     say(
       state.edges.length === 0 ? text.t("mind_graph.script.no_connections") : null,
-      data.shown < data.total ? text.t("mind_graph.script.capped", { shown: number(data.shown), total: number(data.total) }) : null,
-      data.isolated > 0 ? text.t("mind_graph.script.isolated", { count: data.isolated }) : null
+      data.shown < data.total ? capped : null,
+      data.isolated > 0 ? text.t("mind_graph.script.isolated", { count: data.isolated, figure: number(data.isolated) }) : null
     )
     setState("ready")
 
@@ -452,17 +463,18 @@ export function mount(element) {
   }
 
   return {
-    state, requestDraw, select, toGraph, hit,
-    layout: () => layout,
     zoomIn: () => zoomBy(BUTTON_ZOOM),
     zoomOut: () => zoomBy(1 / BUTTON_ZOOM),
     fit: fitAll,
     // The control changed: hand the layout only what is shown now. The camera
-    // stays where it is.
+    // stays where it is. The list of links and the counts follow the control
+    // whenever there is data, a layout or not: when the worker could not
+    // start, the list is all there is, and it must show what the control says.
     filter() {
-      if (!layout) return
+      if (!state.data) return
       applyFilter()
       hideTooltip()
+      if (!layout) return
       element.removeAttribute("data-settled")
       sendFilter()
       requestDraw()

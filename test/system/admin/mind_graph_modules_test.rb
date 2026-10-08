@@ -168,6 +168,37 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ [ "press", 10, 10 ], [ "pan", 30, 20 ], [ "press", 60, 60 ], [ "click", 61, 60 ], [ "press", 80, 80 ] ], calls
   end
 
+  # A touch whose `pointerup` and `pointercancel` never reach the canvas still
+  # loses its capture, and that ends it -- without a click. Left in the table,
+  # it would make the next touch the second finger of a pinch with a ghost.
+  test "input: a pointer whose capture is lost is over, without a click, and the next touch is a press of its own" do
+    calls = input_calls(<<~JS)
+      fire("pointerdown", 1, 100, 100)
+      fire("lostpointercapture", 1, 100, 100)
+      fire("pointerdown", 2, 200, 100)
+      fire("pointermove", 2, 300, 100)
+      fire("pointerup", 2, 300, 100)
+      fire("pointermove", 2, 50, 50)
+    JS
+
+    assert_equal [ [ "press", 100, 100 ], [ "press", 200, 100 ], [ "pan", 100, 0 ], [ "hover", 50, 50 ] ], calls
+  end
+
+  # After an ordinary release the browser reports the lost capture too: it
+  # finds nothing left to end, so the click is made once and nothing else.
+  test "input: the lost capture that follows an ordinary release changes nothing, and a held node is dropped when the capture is lost" do
+    calls = input_calls(<<~JS, target: true)
+      fire("pointerdown", 1, 60, 60)
+      fire("pointerup", 1, 61, 60)
+      fire("lostpointercapture", 1, 61, 60)
+      fire("pointerdown", 1, 100, 100)
+      fire("pointermove", 1, 120, 100)
+      fire("lostpointercapture", 1, 120, 100)
+    JS
+
+    assert_equal [ [ "press", 60, 60 ], [ "drop" ], [ "click", 61, 60 ], [ "press", 100, 100 ], [ "drag", 120, 100 ], [ "drop" ] ], calls
+  end
+
   test "a worker that can't load d3-force reports an error instead of hanging" do
     result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"))
       const [workerUrl, done] = arguments

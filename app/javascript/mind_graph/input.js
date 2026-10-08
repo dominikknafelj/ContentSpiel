@@ -16,7 +16,17 @@
 // point's own movement pans. When one of the two is lifted the gesture ends
 // and the finger that stays down does NOTHING until it is lifted too: it must
 // not turn into a pan that starts from where the pinch began (a jump), nor
-// into a click. A third finger is ignored.
+// into a click. A third finger is ignored. A NEW finger that comes down while
+// that one remains restarts the pinch: the two now down are the gesture, and
+// it starts from where they are, so nothing jumps.
+//
+// A POINTER THAT IS NEVER LIFTED. A touch can end with neither `pointerup` nor
+// `pointercancel` reaching the canvas (the browser takes the gesture, the
+// window loses the pointer). What always comes is `lostpointercapture`, since
+// every press is captured, and it ends the pointer as a cancel does: no
+// click. Without it the entry would stay in the table for good, and every
+// later touch would be the "second finger" of a pinch with a ghost. After an
+// ordinary `pointerup` the same event finds nothing left to end.
 //
 // - `onZoom(x, y, factor)` is also the wheel (and a trackpad's pinch, which
 //   arrives as a wheel with ctrlKey), and + / - with the canvas focused,
@@ -107,6 +117,7 @@ export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, o
   }
   const pointerup = (event) => release(event, true)
   const pointercancel = (event) => release(event, false)
+  const lostpointercapture = (event) => release(event, false)
   const wheel = (event) => {
     event.preventDefault()
     const [ x, y ] = at(event)
@@ -126,7 +137,7 @@ export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, o
   }
   const pointerleave = () => onHover(-1, -1)
 
-  const listeners = { pointerdown, pointermove, pointerup, pointercancel, pointerleave, keydown }
+  const listeners = { pointerdown, pointermove, pointerup, pointercancel, lostpointercapture, pointerleave, keydown }
   Object.entries(listeners).forEach(([ name, handler ]) => canvas.addEventListener(name, handler))
   canvas.addEventListener("wheel", wheel, { passive: false })
 

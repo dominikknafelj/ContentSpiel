@@ -4,7 +4,14 @@
 #
 # `show.canvas_label` names the canvas until the data has arrived; `script.
 # summary` is the whole name it has afterwards (the same words, then what is
-# drawn), so the script never joins two strings with punctuation of its own.
+# drawn), so the script never joins two strings with punctuation of its own;
+# `script.list.edit_named` is the edit link's whole name for the same reason.
+#
+# `script.capped` is the global view's sentence (it keeps the best-connected
+# posts), `script.capped_local` a local view's (it keeps the nearest to the
+# focus). In `script.isolated`, `%{figure}` is the count as the sentence's
+# language groups it ("1,214"), handed over by the script; `count` only
+# chooses the form.
 en:
   admin:
     mind_graph:
@@ -39,9 +46,10 @@ en:
         worker_failed: "The graph can't be drawn in this browser."
         no_connections: "Link posts with Related posts, or give them shared tags, to see connections."
         capped: "Showing the %{shown} best-connected of %{total} posts."
+        capped_local: "Showing the %{shown} nearest of %{total} posts around this one."
         isolated:
-          one: "%{count} post has no connections yet."
-          other: "%{count} posts have no connections yet."
+          one: "%{figure} post has no connections yet."
+          other: "%{figure} posts have no connections yet."
         summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."
         card:
           connections:
@@ -63,6 +71,7 @@ en:
           posts: "Posts"
           tags: "Tags"
           edit: "Edit"
+          edit_named: "Edit %{title}"
           empty: "Nothing is drawn yet."
           connections:
             one: "%{count} connection"

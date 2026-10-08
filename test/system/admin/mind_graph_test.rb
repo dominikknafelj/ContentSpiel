@@ -333,8 +333,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
   # Mind graph canvas spec §5.6. Six thousand posts are not made for this: the
   # endpoint's answer is replaced by one that says it was cut, and the screen
-  # has to say so. (The isolated count is the message's own `%{count}`, which
-  # is written plainly, as Rails writes a count.)
+  # has to say so. Every figure in the sentences is grouped, the isolated
+  # count too: it is handed to the message as `%{figure}`, and `count` only
+  # chooses the plural form.
   test "over the cap the screen says what it shows and what it leaves out" do
     create_post(title: "A")
     visit admin_tags_path
@@ -345,9 +346,60 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_text "Showing the 2,000 best-connected of 6,000 posts."
-    assert_text "1214 posts have no connections yet."
+    assert_text "1,214 posts have no connections yet."
     assert_no_text "Link posts with Related posts"
     assert_equal "2", graph["data-nodes"]
+  end
+
+  # A local view is cut differently (`PostGraph::Local#cut`: the nearest posts
+  # first, then the better connected), so it has a sentence of its own: "best-
+  # connected" would be untrue of it.
+  test "over the cap a local view says it shows the nearest posts, not the best-connected" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_LOCAL_GRAPH)
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    assert_text "Showing the 2,000 nearest of 2,695 posts around this one."
+    assert_no_text "best-connected"
+    assert_equal "2", graph["data-nodes"]
+  end
+
+  # A notice line is a chip around its own words, not a bar as wide as the
+  # longest line beside it, and a link of the card ends where its text ends,
+  # so a click beside it is not a click on it. Both are `w-fit`, a class only
+  # the mind graph's scripts use: this is the built stylesheet's own answer to
+  # whether Tailwind read them (`test/lib/tailwind_sources_test.rb` is the
+  # guard on the source). The capped answer, because it gives two lines of
+  # different lengths.
+  test "a notice line and a link of the card are as wide as their text, not as their container" do
+    create_post(title: "A")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data(CAPPED_GRAPH)
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+    click_node(1)
+    assert_selector "[data-mind-graph-card] a", text: "Open post"
+
+    widths = page.evaluate_script(<<~JS)
+      (() => {
+        const graph = document.querySelector(#{GRAPH.to_json})
+        const width = (element) => element.getBoundingClientRect().width
+        const text = (element) => { const range = document.createRange(); range.selectNodeContents(element); return width(range) }
+        const line = Array.from(graph.querySelectorAll("[data-admin--mind-graph-target='notice'] p")).at(-1)
+        const link = graph.querySelector("[data-mind-graph-card] a")
+        return { line: width(line), lineText: text(line), notice: width(line.parentElement), link: width(link), linkText: text(link), card: width(link.parentElement) }
+      })()
+    JS
+
+    assert_in_delta widths["lineText"], widths["line"], 10, "the shorter notice line is not as wide as its text (plus its padding): #{widths}"
+    assert_operator widths["line"], :<, widths["notice"] - 20, "the shorter notice line is as wide as the longer one: #{widths}"
+    assert_in_delta widths["linkText"], widths["link"], 1, "the card's link is wider than its text: #{widths}"
+    assert_operator widths["link"], :<, widths["card"] / 2, "the card's link stretches across the card: #{widths}"
   end
 
   # The numbers in those sentences are written the way the UI's language
@@ -372,7 +424,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
 
     assert_text "Showing the 2.000 best-connected of 6.000 posts."
-    assert_text "1214 posts have no connections yet."
+    assert_text "1.214 posts have no connections yet."
   end
 
   test "the worker can't start: a message without Retry, and an error in the console" do
@@ -447,6 +499,37 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     end
     click_frame_link { within("[data-mind-graph-list]") { click_link "shared" } }
     assert_selector "[data-mind-graph-focus]", text: "Around the tag “shared”"
+  end
+
+  # With no layout the list is all there is, so it has to follow the filter:
+  # the control saying "Related" over a list that still holds the tag would be
+  # the screen contradicting itself.
+  test "the worker can't start: the filter still narrows the list and the counts" do
+    a = create_post(title: "Alpha", tags: [ "shared" ])
+    create_post(title: "Beta", tags: [ "shared" ])
+    PostRelation.create!(post: a, related_post: create_post(title: "Gamma"))
+    visit admin_tags_path
+    await_admin_controllers
+    without_workers do
+      within("nav[aria-label='Modules']") { click_link "Mind graph" }
+      assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='4'][data-edges='3']"
+      expect_js_error(/layout worker.*no workers here/)
+    end
+    find("[data-mind-graph-list] summary").click
+    assert_selector "[data-mind-graph-list] li", count: 4
+
+    find("label", text: "Related").click
+
+    assert_selector "#{GRAPH}[data-state='worker-failed'][data-nodes='2'][data-edges='1']"
+    within("[data-mind-graph-list]") do
+      assert_selector "li", count: 2
+      assert_link "Alpha"
+      assert_link "Gamma"
+      assert_no_link "Beta"
+      assert_no_link "shared"
+    end
+    assert_no_selector "#{GRAPH}[data-settled]"
+    assert_text "The graph can't be drawn in this browser."
   end
 
   test "a graph with nothing to draw says so in the list" do
@@ -561,18 +644,32 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     find("label", text: "Related").click
     await_graph
     assert_equal "2", graph["data-nodes"]
+    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
 
     within("nav[aria-label='Modules']") { click_link "Tags" }
     assert_selector "h1", text: "Tags"
+    # The data request is counted, and held until `releaseGraph()`: what the
+    # restored page says before its data has come is the point of the middle.
     page.execute_script(<<~JS)
       window.graphFetches = 0
       const original = window.fetch
-      window.fetch = (url, options) => { if (String(url).includes("/mind_graph/data")) window.graphFetches += 1; return original(url, options) }
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/data")) return original(url, options)
+        window.graphFetches += 1
+        return new Promise((resolve) => { window.releaseGraph = () => resolve(original(url, options)) })
+      }
     JS
     page.go_back
     assert_selector "h1", text: "Mind graph"
     await_js("window.graphFetches === 1")
+    # The snapshot's canvas was named with the counts of the visit that was
+    # left; until this visit's data has come, it has the server's name again.
+    assert_selector "#{GRAPH}[data-state='loading']"
+    assert_selector "#{CANVAS}[aria-label='Post relationship graph']"
+    page.execute_script("window.releaseGraph()")
     await_graph
+    # (The name counts what was loaded, not what the filter shows.)
+    assert_selector "#{CANVAS}[aria-label='Post relationship graph: 3 posts and tags, 3 connections.']"
 
     assert_equal "2", graph["data-nodes"], "the Related filter is still chosen, so the tag is not drawn"
     assert_equal "1", graph["data-edges"]
@@ -1094,6 +1191,16 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     })
   JS
 
+  # The same for a local view: the data names its focus, and the walk reached
+  # more posts than the cap keeps.
+  CAPPED_LOCAL_GRAPH = <<~JS.freeze
+    ({
+      nodes: [ { id: 1, title: "One", type: "blog", colour_index: 1, status: "live", url: "/one", degree: 1 }, { id: 2, title: "Two", type: "blog", colour_index: 1, status: "live", url: "/two", degree: 1 } ],
+      tags: [], edges: [ { source: 1, target: 2, kind: "related" } ], total: 2695, shown: 2000,
+      focus: { kind: "post", id: 1, node_id: 1, title: "One", depth: 2 }
+    })
+  JS
+
   # A graph that takes the worker seconds to lay out: 1,500 posts in a chain,
   # each also on one of 30 tags. A JavaScript expression, made in the page.
   BIG_GRAPH = <<~JS.freeze
@@ -1155,7 +1262,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
       assert_link "shared", href: /mind_graph\?tag=#{tag.id}\z/
       assert_selector "li", text: /Alpha\s+2 connections/
       assert_selector "li", text: /Gamma\s+1 connection\b/
-      assert_selector "a[href='#{admin_post_path(a)}'][aria-label='Edit: Alpha']", text: "Edit"
+      assert_selector "a[href='#{admin_post_path(a)}'][aria-label='Edit Alpha']", text: "Edit"
       assert_selector "li", count: 4
     end
 

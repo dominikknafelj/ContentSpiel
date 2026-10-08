@@ -13,8 +13,6 @@
 //
 // Debounce, one request at a time and the stale-answer guard are
 // `search/suggestions.js`'s, shared with the chip input and the link search.
-import { createSuggestions } from "search/suggestions"
-
 //
 // Announcing: the list stays a plain list of links, and what a screen reader
 // should hear -- how many results arrived, "No post or tag matches.", the
@@ -24,6 +22,8 @@ import { createSuggestions } from "search/suggestions"
 //
 // Old rows never sit under newer text: the list is emptied the moment the text
 // changes, and filled again by the answer to the new text.
+import { createSuggestions } from "search/suggestions"
+
 const KIND_KEYS = {
   post: "mind_graph.script.search.post",
   tag: "mind_graph.script.search.tag"
