@@ -63,6 +63,7 @@ en:
           posts: "Posts"
           tags: "Tags"
           edit: "Edit"
+          empty: "Nothing is drawn yet."
           connections:
             one: "%{count} connection"
             other: "%{count} connections"

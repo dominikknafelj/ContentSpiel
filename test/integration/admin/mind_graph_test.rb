@@ -73,7 +73,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.list.connections"])
     assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts isolated list.connections list.edit list.posts list.tags load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts isolated list.connections list.edit list.empty list.posts list.tags load_failed loading no_connections retry search.count search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 

@@ -392,6 +392,49 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     expect_js_error(/layout worker.*no workers here/)
   end
 
+  # Spec §6: the list is filled before the layout starts, so a worker that
+  # fails leaves the nodes reachable.
+  test "the worker can't start: the list still gives every node as a link, and a link opens its local view" do
+    a = create_post(title: "Alpha", tags: [ "shared" ])
+    b = create_post(title: "Beta", tags: [ "shared" ])
+    tag = Tag.find_by!(name: "shared")
+    visit admin_tags_path
+    await_admin_controllers
+    page.execute_script("window.RealWorker = window.Worker; window.Worker = class { constructor() { throw new Error('no workers here') } }")
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    assert_selector "#{GRAPH}[data-state='worker-failed']"
+    expect_js_error(/layout worker.*no workers here/)
+    # The window outlives the visit below: the real worker comes back first.
+    page.execute_script("window.Worker = window.RealWorker")
+
+    find("[data-mind-graph-list] summary").click
+    within("[data-mind-graph-list]") do
+      assert_selector "li", count: 3
+      assert_link "Alpha", href: /mind_graph\?post=#{a.id}\z/
+      assert_link "Beta", href: /mind_graph\?post=#{b.id}\z/
+      assert_link "shared", href: /mind_graph\?tag=#{tag.id}\z/
+    end
+    click_frame_link { within("[data-mind-graph-list]") { click_link "shared" } }
+    assert_selector "[data-mind-graph-focus]", text: "Around the tag “shared”"
+  end
+
+  test "a graph with nothing to draw says so in the list" do
+    create_post(title: "Alone")
+    visit admin_tags_path
+    await_admin_controllers
+    stub_graph_data("({ nodes: [], tags: [], edges: [], total: 0, shown: 0, isolated: 0 })")
+
+    within("nav[aria-label='Modules']") { click_link "Mind graph" }
+    await_graph
+
+    find("[data-mind-graph-list] summary").click
+    within("[data-mind-graph-list]") do
+      assert_text "Nothing is drawn yet."
+      assert_no_selector "li"
+    end
+  end
+
   # Review focus 2. Leaving while the request is out, and leaving while the
   # layout is still running. For the second the graph has to be big enough to
   # be settling for seconds, so the endpoint's answer is replaced by 1,500

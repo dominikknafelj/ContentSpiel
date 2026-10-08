@@ -44,6 +44,10 @@ export function renderList(container, { nodes, text, urls }) {
   const posts = nodes.filter((node) => node.kind === "post").sort(byDegree)
   const tags = nodes.filter((node) => node.kind === "tag").sort(byDegree)
 
+  if (!nodes.length) {
+    container.replaceChildren(element("p", "m-0 text-meta", text.t("mind_graph.script.list.empty")))
+    return
+  }
   container.replaceChildren(
     ...(posts.length ? [ section(text.t("mind_graph.script.list.posts"), posts.map(row)) ] : []),
     ...(tags.length ? [ section(text.t("mind_graph.script.list.tags"), tags.map(row)) ] : [])
