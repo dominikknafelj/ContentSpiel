@@ -5,7 +5,7 @@
 # post and an id that names nothing all raise `ActiveRecord::RecordNotFound`,
 # and so does a tag no readable post carries -- a focus on it would say the
 # tag exists and is in use somewhere the viewer can't look.
-class PostGraph
+module PostGraph
   class Focus
     attr_reader :kind, :id, :title
 

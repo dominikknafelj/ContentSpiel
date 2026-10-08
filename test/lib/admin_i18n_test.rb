@@ -107,6 +107,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/chip_input_component.html.erb
     app/components/admin/menu_component.rb
     app/components/admin/menu_component.html.erb
+    app/components/admin/mind_graph_legend_component.rb
+    app/components/admin/mind_graph_legend_component.html.erb
     app/helpers/admin/messages_helper.rb
     app/javascript/i18n/messages.js
     app/javascript/controllers/admin/save_bar_controller.js
@@ -125,6 +127,12 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/helpers/admin/tags_helper.rb
     app/services/tags/merge.rb
     app/javascript/controllers/admin/tag_dialogs_controller.js
+    app/views/admin/mind_graph/show.html.erb
+    app/javascript/controllers/admin/mind_graph_controller.js
+    app/javascript/mind_graph/app.js
+    app/javascript/mind_graph/input.js
+    app/javascript/mind_graph/renderer.js
+    app/javascript/mind_graph/theme.js
   ].freeze
 
   PLACEHOLDER = "".freeze

@@ -9,16 +9,35 @@ class Admin::MindGraphLegendComponentTest < ViewComponent::TestCase
     assert_no_selector "[data-legend-type=blog]"
   end
 
-  test "types come in registry order, an unregistered one last" do
-    render_inline(Admin::MindGraphLegendComponent.new(content_types: %w[gone/type resume_entry blog]))
+  test "types come in registry order" do
+    render_inline(Admin::MindGraphLegendComponent.new(content_types: %w[resume_entry blog]))
 
-    assert_equal %w[blog resume_entry gone/type], page.all("[data-legend-type]").map { |li| li["data-legend-type"] }
-    assert_selector "[data-legend-type='gone/type']", text: "gone/type"
+    assert_equal %w[blog resume_entry], page.all("[data-legend-type]").map { |li| li["data-legend-type"] }
+  end
+
+  # Mind graph canvas spec §5.1: a post whose type is no longer registered is
+  # a grey ring with a stroke through it, and the legend says so once -- the
+  # stored name is not a label, and the type has no colour slot for a dot.
+  test "a retired type adds the Retired type entry, drawn with a stroke through it, and gets no dot of its own" do
+    render_inline(Admin::MindGraphLegendComponent.new(content_types: %w[gone/type resume_entry gone/other]))
+
+    assert_selector "[data-legend=retired]", text: "Retired type", count: 1
+    assert_selector "[data-legend=retired] circle.mg-key-retired"
+    assert_selector "[data-legend=retired] line.mg-key-retired"
+    assert_equal %w[resume_entry], page.all("[data-legend-type]").map { |li| li["data-legend-type"] }
+    assert_no_text "gone/type"
+  end
+
+  test "without a retired type there is no Retired type entry" do
+    render_inline(Admin::MindGraphLegendComponent.new(content_types: %w[blog resume_entry]))
+
+    assert_no_selector "[data-legend=retired]"
   end
 
   test "always names the tag node, draft, and both edge kinds, as text" do
     render_inline(Admin::MindGraphLegendComponent.new(content_types: []))
 
+    assert_selector "ul[aria-label='Legend']"
     assert_selector "[data-legend=tag]", text: "Tag"
     assert_selector "[data-legend=hollow]", text: "Draft or scheduled"
     assert_selector "[data-legend=related]", text: "Related post"

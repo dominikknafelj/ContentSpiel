@@ -17,7 +17,7 @@
 #
 # Cost: five queries whatever the size -- the readable ids with their
 # timestamps, the relations, the tag links, and the builder's two.
-class PostGraph
+module PostGraph
   class Global
     def self.call(...) = new(...).call
 

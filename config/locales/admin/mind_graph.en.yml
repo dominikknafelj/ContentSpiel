@@ -1,0 +1,34 @@
+# The Mind graph (docs/reference/i18n.md): `admin.mind_graph.show` is the
+# view's own lazy-lookup scope, `script` what `mind_graph/app.js` and its
+# modules show (handed over through the element's `data-messages`).
+#
+# `show.canvas_label` names the canvas until the data has arrived; `script.
+# summary` is the whole name it has afterwards (the same words, then what is
+# drawn), so the script never joins two strings with punctuation of its own.
+en:
+  admin:
+    mind_graph:
+      show:
+        title: "Mind graph"
+        intro: "How your posts relate to each other. Scroll or pinch to zoom, drag to move."
+        no_posts: "No posts yet."
+        filter:
+          legend: "Show connections"
+          all: "All"
+          related: "Related"
+          tag: "Tags"
+        canvas_label: "Post relationship graph"
+        zoom_in: "Zoom in"
+        zoom_out: "Zoom out"
+        fit: "Fit all"
+      script:
+        loading: "Loading the graph…"
+        load_failed: "The graph could not be loaded."
+        retry: "Retry"
+        worker_failed: "The graph can't be drawn in this browser."
+        no_connections: "Link posts with Related posts, or give them shared tags, to see connections."
+        capped: "Showing the %{shown} best-connected of %{total} posts."
+        isolated:
+          one: "%{count} post has no connections yet."
+          other: "%{count} posts have no connections yet."
+        summary: "Post relationship graph: %{posts} posts and tags, %{edges} connections."

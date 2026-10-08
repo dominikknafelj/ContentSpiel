@@ -142,3 +142,13 @@ en:
         already_added: "%{label} is already added."
         added: "Added %{label}."
         removed: "Removed %{label}."
+
+      # The Mind graph's legend. The content types' own names come from the
+      # registry (`Admin::ContentTypeDotComponent`); these are the shapes.
+      mind_graph_legend:
+        label: "Legend"
+        tag: "Tag"
+        hollow: "Draft or scheduled"
+        retired: "Retired type"
+        related: "Related post"
+        tag_edge: "Shares a tag"

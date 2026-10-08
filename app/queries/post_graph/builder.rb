@@ -18,7 +18,7 @@
 #
 # Two queries: the posts (only the columns a node is made from) and the tags'
 # names.
-class PostGraph
+module PostGraph
   class Builder
     COLUMNS = %i[id title content_type published_at].freeze
 

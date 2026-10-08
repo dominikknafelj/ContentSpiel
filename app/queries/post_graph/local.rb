@@ -21,7 +21,7 @@
 # Cost: three queries per depth level (the relations touching the frontier,
 # the frontier posts' tags, the frontier tags' posts) plus five whatever the
 # size -- never one per node.
-class PostGraph
+module PostGraph
   class Local
     def self.call(...) = new(...).call
 

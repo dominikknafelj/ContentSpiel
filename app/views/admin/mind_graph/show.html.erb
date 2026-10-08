@@ -1,49 +1,63 @@
-<%# The mind graph (design spec §6.1, Task 9): `PostGraph`'s data as a
-    `<script type="application/json">` data island rather than a
-    `data-*-value` attribute -- the browser never executes it, and
-    `json_escape` turns every `<`, `>` and `&` into a `\u` escape, so a
-    post title like `</script><script>…` can't close the element early.
-    `admin--mind-graph` parses it and draws the graph (d3-force).
-    Read-only: relations are edited in the post editor's related-posts
-    picker. %>
-<% content_for :title, "Mind graph" %>
+<%# The Mind graph (mind graph canvas spec §3.2, §5): a frame. The graph's data
+    is NOT in the page -- at the cap it is several hundred kilobytes, which
+    would sit in every load and in Turbo's page cache -- so `admin--mind-graph`
+    fetches it from `data-url`, lays it out in a worker (`data-worker-url`,
+    which imports d3-force from `data-d3-url`: an import map does not apply
+    inside a worker, so both are plain asset URLs) and draws it on the canvas.
+    The canvas is one image to assistive technology; what a pointer can do on
+    it has an HTML path beside it. Read-only: relations are edited in the post
+    editor's related-posts picker. %>
+<% content_for :title, t(".title") %>
 <div class="mb-4">
-  <h1 class="text-h1 text-ink">Mind graph</h1>
-  <p class="mt-1 text-meta">How your posts relate to each other. Drag a node to reposition it; click a node to open that post.</p>
+  <h1 class="text-h1 text-ink"><%= t(".title") %></h1>
+  <p class="mt-1 text-meta"><%= t(".intro") %></p>
 </div>
 
-<% if @graph[:nodes].empty? %>
+<% if @content_types.empty? %>
   <%# For THIS viewer: a viewer who can read no post sees this, whatever the site holds. %>
-  <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-posts">No posts yet.</div>
+  <div class="rounded-cs border border-line bg-surface p-6 text-meta" data-mind-graph-empty="no-posts"><%= t(".no_posts") %></div>
 <% else %>
-  <%# The graph takes the whole view: the full width of the content column
-      and the height left under the heading (never less than 480px). The
-      legend and the filter sit in a row at the top of the SAME box (round 3),
-      so the box keeps the round-1 size and the SVG takes what is left of it
-      (`flex-1`); `admin--mind-graph` still clamps every node and label to the
-      SVG's own box and follows its resizes, so the box itself needs no cap.
-      The empty message is in the box too, over the SVG's top-left corner.
-      Filter: three radios (arrow keys move between them), applied
-      client-side, not remembered. %>
-  <div data-controller="admin--mind-graph" class="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
-    <script type="application/json" id="mind-graph-data" data-admin--mind-graph-target="data"><%= json_escape(@graph.to_json).html_safe %></script>
+  <%# The box takes the width of the content column and the height left under
+      the heading (never less than 480px); the canvas takes what the legend row
+      leaves (`flex-1`) and follows the box's resizes. The filter is three
+      radios (arrow keys move between them), applied client-side.
+
+      `data-state="loading"` is what the server says; the script takes it from
+      there (`mind_graph/app.js` lists the attributes it writes). The notice is
+      over the canvas's top-left corner and lets the pointer through, except
+      for a button in it (Retry). The message keys are written out one by
+      one: `test/lib/script_messages_test.rb` reads the literals to check that
+      every key the script asks for is served. %>
+  <div data-controller="admin--mind-graph"
+       data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
+       data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
+       data-d3-url="<%= asset_path("d3-force.js") %>"
+       data-messages="<%= messages_data("mind_graph.script.loading", "mind_graph.script.load_failed", "mind_graph.script.retry", "mind_graph.script.worker_failed",
+                                     "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.isolated", "mind_graph.script.summary") %>"
+       data-state="loading"
+       class="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
     <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line px-3.5 py-2.5">
-      <%= render Admin::MindGraphLegendComponent.new(content_types: @graph[:nodes].map { |node| node[:type] }) %>
+      <%= render Admin::MindGraphLegendComponent.new(content_types: @content_types) %>
       <fieldset class="m-0 min-w-0 border-0 p-0">
-        <legend class="sr-only">Show connections</legend>
+        <legend class="sr-only"><%= t(".filter.legend") %></legend>
         <div class="inline-flex overflow-hidden rounded-cs border border-line-strong bg-surface">
-          <% [ [ "all", "All" ], [ "related", "Related" ], [ "tag", "Tags" ] ].each do |value, label| %>
+          <% %w[all related tag].each do |value| %>
             <label for="mind-graph-filter-<%= value %>" class="flex cursor-pointer items-center border-r border-line px-3 py-1.5 text-sm text-dim last:border-r-0 hover:bg-sunken has-[:checked]:bg-accent-tint has-[:checked]:font-semibold has-[:checked]:text-ink has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-accent">
               <%= radio_button_tag "mind_graph_filter", value, value == "all", id: "mind-graph-filter-#{value}", class: "sr-only", data: { action: "change->admin--mind-graph#filter" } %>
-              <span><%= label %></span>
+              <span><%= t(".filter.#{value}") %></span>
             </label>
           <% end %>
         </div>
       </fieldset>
     </div>
     <div class="relative min-h-0 flex-1">
-      <svg data-admin--mind-graph-target="svg" class="block h-full w-full text-ink" role="group" aria-label="Post relationship graph: <%= pluralize(@graph[:nodes].size, "post") %>, <%= pluralize(@graph[:edges].size, "connection") %>. Each post is a link to its editor."></svg>
-      <p data-admin--mind-graph-target="empty" data-mind-graph-empty="no-connections" class="absolute left-3.5 top-3 m-0 max-w-md rounded-cs bg-surface px-1 text-meta<%= " hidden" if @graph[:edges].any? %>">Link posts with Related posts, or give them shared tags, to see connections.</p>
+      <canvas data-admin--mind-graph-target="canvas" class="block h-full w-full touch-none text-ink focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent" role="img" tabindex="0" aria-label="<%= t(".canvas_label") %>"></canvas>
+      <div data-admin--mind-graph-target="notice" class="pointer-events-none absolute left-3.5 top-3 m-0 flex max-w-md flex-col gap-1 text-meta"></div>
+      <div class="absolute bottom-3 right-3 flex gap-1.5">
+        <%= render Admin::ButtonComponent.new(label: t(".zoom_out"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomOut" }) %>
+        <%= render Admin::ButtonComponent.new(label: t(".zoom_in"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#zoomIn" }) %>
+        <%= render Admin::ButtonComponent.new(label: t(".fit"), variant: :secondary, size: :small, data: { action: "admin--mind-graph#fit" }) %>
+      </div>
     </div>
   </div>
 <% end %>

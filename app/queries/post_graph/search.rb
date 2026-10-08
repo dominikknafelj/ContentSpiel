@@ -3,7 +3,7 @@
 # how a post the capped global view doesn't draw is reached. A tag is listed
 # only when a readable post carries it, the same rule `Focus` applies -- so a
 # result never leads to a 404, and never names a tag the viewer can't see used.
-class PostGraph
+module PostGraph
   class Search
     def self.call(...) = new(...).call
 

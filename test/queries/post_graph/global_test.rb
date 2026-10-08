@@ -18,6 +18,43 @@ class PostGraph::GlobalTest < ActiveSupport::TestCase
                    status: "live", url: "/cs-studio/posts/#{a.id}", degree: 1 }, node)
   end
 
+  test "the url comes from the given builder" do
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+
+    result = PostGraph::Global.call(actor: nil, url_for: ->(record) { "/edit/#{record.id}" })
+
+    assert_equal "/edit/#{a.id}", result[:nodes].find { |n| n[:id] == a.id }[:url]
+    assert result[:nodes].none? { |n| n.key?(:color) || n.key?(:colour) }, "no colour value: the page draws from the --cs-cat tokens"
+  end
+
+  test "each PostRelation row is exactly one edge" do
+    a = create_post(title: "A")
+    b = create_post(title: "B")
+    relate(a, b)
+
+    assert_equal [ { source: a.id, target: b.id, kind: "related" } ], graph[:edges]
+  end
+
+  test "a type that isn't registered any more has no colour index" do
+    a = create_post(title: "A")
+    relate(a, create_post(title: "B"))
+    a.update_column(:content_type, "gone/thing")
+
+    node = graph[:nodes].find { |n| n[:id] == a.id }
+
+    assert_equal [ "gone/thing", nil ], node.values_at(:type, :colour_index)
+  end
+
+  test "status is the post's own: draft, scheduled or live" do
+    draft, scheduled, live = %w[Draft Scheduled Live].map { |title| create_post(title: title, tags: [ "t" ]) }
+    draft.update_column(:published_at, nil)
+    scheduled.update_column(:published_at, 2.days.from_now)
+    live.update_column(:published_at, 1.day.ago)
+
+    assert_equal({ draft.id => "draft", scheduled.id => "scheduled", live.id => "live" }, graph[:nodes].to_h { |n| [ n[:id], n[:status] ] })
+  end
+
   test "a post with no connection is left out and counted as isolated" do
     a = create_post(title: "A")
     b = create_post(title: "B")

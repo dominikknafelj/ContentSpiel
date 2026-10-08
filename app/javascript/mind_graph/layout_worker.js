@@ -11,8 +11,14 @@
 //               { type: "filter", nodeIds: [...], edgeIndexes: [...] }
 //               { type: "pin", id, x, y } / { type: "unpin", id }
 // Messages out: { type: "tick", positions: Float32Array }   (transferred, not copied)
-//               { type: "settled" }
+//               { type: "settled", after }
 //               { type: "error", message }
+//
+// `after` is how many messages had been taken up when the layout cooled down.
+// The page counts what it sent and believes a `settled` only when the two
+// agree: a small graph can cool down inside the first slice, BEFORE a `filter`
+// sent right behind `start` is handled, and that first `settled` describes a
+// layout the page has already asked to change (`layout_client.js`).
 //
 // `positions` always covers EVERY node given to `start`, in that order, two
 // numbers each: a node the filter hides keeps its last place, so it comes
@@ -38,10 +44,14 @@ let running = false
 // filter would throw and report a spurious error, a drag would be dropped.
 // An error in one message is posted and the chain goes on with the next.
 let queue = Promise.resolve()
+let taken = 0
 
 self.onmessage = (event) => {
   queue = queue
-    .then(() => handle(event.data))
+    .then(() => {
+      taken += 1
+      return handle(event.data)
+    })
     .catch((error) => self.postMessage({ type: "error", message: String(error?.message || error) }))
 }
 
@@ -53,7 +63,7 @@ async function handle(message) {
     filter(new Set(message.nodeIds), new Set(message.edgeIndexes))
   } else if (message.type === "pin") {
     const node = nodes.find((candidate) => candidate.id === message.id)
-    if (!node) return
+    if (!node) return idle()
     node.fx = message.x
     node.fy = message.y
     // A pin on a graph that has cooled down must wake it: `alphaTarget` only
@@ -63,12 +73,19 @@ async function handle(message) {
     run()
   } else if (message.type === "unpin") {
     const node = nodes.find((candidate) => candidate.id === message.id)
-    if (!node) return
+    if (!node) return idle()
     node.fx = null
     node.fy = null
     simulation.alphaTarget(0)
     run()
   }
+}
+
+// A message that changes nothing (a pin for a node that isn't there) still has
+// to be answered when the layout is at rest: the page waits for a `settled`
+// that counts it. While the layout runs, the `settled` that ends the run does.
+function idle() {
+  if (!running) self.postMessage({ type: "settled", after: taken })
 }
 
 function start(givenNodes, givenEdges) {
@@ -116,6 +133,6 @@ function step() {
     setTimeout(step, 0)
   } else {
     running = false
-    self.postMessage({ type: "settled" })
+    self.postMessage({ type: "settled", after: taken })
   }
 }

@@ -291,9 +291,9 @@ class Admin::AccessControlTest < ActionDispatch::IntegrationTest
     PostRelation.create!(post: @own_post, related_post: second_own)
     sign_in_as(users(:author))
 
-    get "/cs-studio/mind_graph"
+    get "/cs-studio/mind_graph/data"
 
-    data = JSON.parse(css_select("script#mind-graph-data").first.text)
+    data = response.parsed_body
     assert_equal [ @own_post.id, second_own.id ].sort, data["nodes"].map { |node| node["id"] }.sort
     assert_equal [ { "source" => @own_post.id, "target" => second_own.id, "kind" => "related" } ], data["edges"]
   end

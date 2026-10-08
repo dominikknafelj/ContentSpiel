@@ -1,8 +1,11 @@
 require "test_helper"
 
-# The mind graph (design spec §6.1): `PostGraph`'s nodes and edges embedded
-# in the page as a JSON data island the `admin--mind-graph` controller
-# reads. Same session gate as every other CS Studio screen -- not public.
+# The mind graph's page (mind graph canvas spec §3.2): a frame -- heading,
+# legend, filter, an empty canvas -- with NO graph data in it. The
+# `admin--mind-graph` controller fetches the data from the URL the page names
+# (`test/integration/admin/mind_graph_data_test.rb` covers that endpoint) and
+# draws it (`test/system/admin/mind_graph_test.rb`). Same session gate as every
+# other CS Studio screen -- not public.
 class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   setup { site_settings(:default).update!(setup_completed_at: Time.current) }
 
@@ -13,81 +16,89 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/cs-studio/sign-in"
   end
 
-  test "embeds nodes with colour indexes and editor urls, and edges" do
+  test "the page is a frame: no graph data in it, and the script is told where to get it" do
     sign_in_as(users(:one))
-    a = create_post(title: "Post A")
-    b = create_post(title: "Post B", content_type: "resume_entry")
-    PostRelation.create!(post: a, related_post: b)
+    a = create_post(title: "A very particular title")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
 
     get "/cs-studio/mind_graph"
 
     assert_response :success
-    data = graph_data
-    # Replaces MindGraphTest's own "the mind graph renders every post as a
-    # node" -- the full id set, not just one node's own fields (checked
-    # separately below), so a post silently missing from the graph would
-    # fail here even if every node that *is* present still looks right.
-    assert_equal [ a.id, b.id ].sort, data["nodes"].map { |n| n["id"] }.sort
-    node = data["nodes"].find { |n| n["id"] == b.id }
-    assert_equal "Post B", node["title"]
-    assert_equal "resume_entry", node["type"]
-    assert_equal ContentTypes.fetch("resume_entry").colour_index, node["colour_index"]
-    assert_equal "live", node["status"]
-    assert_not node.key?("color")
-    assert_equal "/cs-studio/posts/#{b.id}", node["url"]
-    assert_equal [ { "source" => a.id, "target" => b.id, "kind" => "related" } ], data["edges"]
+    assert_select "script#mind-graph-data", count: 0
+    assert_no_match "A very particular title", response.body
+    assert_select "[data-controller='admin--mind-graph'][data-url='/cs-studio/mind_graph/data'][data-state='loading']"
+    assert_select "[data-controller='admin--mind-graph'][data-worker-url*='mind_graph/layout_worker'][data-d3-url*='d3-force']"
+    assert_select "canvas[role='img'][tabindex='0'][aria-label]"
     assert_select "nav[aria-label='Modules'] a[href='/cs-studio/mind_graph']", text: "Mind graph"
   end
 
-  test "editor urls keep the editing language" do
+  # The strings the script shows are the server's (docs/reference/i18n.md): a
+  # plural rides whole, for the script to choose a form by count.
+  test "the script's messages ride on the element" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    messages = JSON.parse(css_select("[data-controller='admin--mind-graph']").first["data-messages"])
+    assert_equal "The graph could not be loaded.", messages["mind_graph.script.load_failed"]
+    assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
+    assert_equal %w[capped isolated load_failed loading no_connections retry summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                 messages.keys.grep(/\Amind_graph/).sort
+  end
+
+  test "the data url carries the focus, the depth and the editing language" do
     sign_in_as(users(:one))
     with_locales(%w[en de], default: "en")
-    post = create_post(title: "Post A")
+    post = create_post(title: "A")
 
-    get "/cs-studio/mind_graph", params: { locale: "de" }
+    get "/cs-studio/mind_graph", params: { post: post.id, depth: 2, locale: "de" }
 
-    assert_equal "/cs-studio/posts/#{post.id}?locale=de", graph_data["nodes"].first["url"]
+    url = css_select("[data-controller='admin--mind-graph']").first["data-url"]
+    assert_equal "/cs-studio/mind_graph/data", URI(url).path
+    assert_equal({ "post" => post.id.to_s, "depth" => "2", "locale" => "de" }, Rack::Utils.parse_query(URI(url).query))
   end
 
-  test "a title containing </script> can't break out of the data island" do
+  test "a tag focus rides in the data url, and a depth other than 1 or 2 is read as 1" do
     sign_in_as(users(:one))
-    post = create_post(title: "</script><script>alert(1)</script>")
+    create_post(title: "A", tags: [ "t" ])
+    tag = Tag.find_by!(name: "t")
 
-    get "/cs-studio/mind_graph"
+    get "/cs-studio/mind_graph", params: { tag: tag.id, depth: 7 }
 
-    assert_not_includes response.body, "</script><script>alert(1)"
-    assert_equal post.title, graph_data["nodes"].first["title"]
+    url = css_select("[data-controller='admin--mind-graph']").first["data-url"]
+    assert_equal({ "tag" => tag.id.to_s, "depth" => "1" }, Rack::Utils.parse_query(URI(url).query))
   end
 
-  test "with no posts, 'No posts yet.' in the box instead of an empty canvas" do
+  test "a focus outside the viewer's scope, in the trash or unknown is 404" do
     sign_in_as(users(:one))
-    get "/cs-studio/mind_graph"
+    gone = create_post(title: "Gone")
+    gone.update_column(:trashed_at, Time.current)
 
+    [ { post: 0 }, { post: gone.id }, { tag: 0 } ].each do |params|
+      get "/cs-studio/mind_graph", params: params
+      assert_response :not_found, "expected 404 for #{params}"
+    end
+  end
+
+  test "a post the viewer may not read is not found as a focus, and neither is a tag only it carries" do
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    own = create_post(title: "Own")
+    own.update_column(:author_id, users(:author).id)
+    other = create_post(title: "Other", tags: [ "theirs" ])
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph", params: { post: own.id }
     assert_response :success
-    assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
-    assert_select "[data-controller~='admin--mind-graph']", count: 0
+
+    [ { post: other.id }, { tag: Tag.find_by!(name: "theirs").id } ].each do |params|
+      get "/cs-studio/mind_graph", params: params
+      assert_response :not_found, "expected 404 for #{params}"
+    end
   end
 
-  test "posts but no connections: the graph is drawn with the message about linking posts" do
-    sign_in_as(users(:one))
-    create_post(title: "Alone")
-
-    get "/cs-studio/mind_graph"
-
-    assert_select "[data-controller~='admin--mind-graph']"
-    assert_select "[data-mind-graph-empty=no-connections]:not(.hidden)", text: "Link posts with Related posts, or give them shared tags, to see connections."
-  end
-
-  test "with a connection the message is there but hidden" do
-    sign_in_as(users(:one))
-    PostRelation.create!(post: create_post(title: "A"), related_post: create_post(title: "B"))
-
-    get "/cs-studio/mind_graph"
-
-    assert_select "[data-mind-graph-empty=no-connections].hidden"
-  end
-
-  test "a viewer who can read no post sees 'No posts yet.' however many exist" do
+  test "a viewer who can read no post sees 'No posts yet.' and no canvas, however many exist" do
     create_post(title: "Hidden from them")
     access_control_grants(:author_posts_read).update!(scope: { "own" => true })
     access_control_grants(:author_posts_create).update!(scope: { "own" => true })
@@ -96,22 +107,57 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     get "/cs-studio/mind_graph"
 
     assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
+    assert_select "canvas", count: 0
+    assert_select "[data-controller='admin--mind-graph']", count: 0
     assert_not_includes response.body, "Hidden from them"
   end
 
-  test "the legend names only the content types present, plus the shapes" do
+  test "with no posts at all, 'No posts yet.' instead of an empty canvas" do
+    sign_in_as(users(:one))
+
+    get "/cs-studio/mind_graph"
+
+    assert_response :success
+    assert_select "[data-mind-graph-empty=no-posts]", text: "No posts yet."
+    assert_select "[data-controller~='admin--mind-graph']", count: 0
+  end
+
+  test "the legend names only the content types of the viewer's posts, plus the shapes" do
     sign_in_as(users(:one))
     create_post(title: "A", content_type: "resume_entry")
 
     get "/cs-studio/mind_graph"
 
     assert_select ".admin-mind-graph-legend [data-legend-type]", count: 1
-    assert_select "[data-legend-type=resume_entry]", text: /#{ContentTypes.fetch("resume_entry").label}/
-    assert_select "[data-legend-type=blog]", count: 0
-    assert_select "[data-legend=tag]", text: /Tag/
-    assert_select "[data-legend=hollow]", text: /Draft or scheduled/
-    assert_select "[data-legend=related]", text: /Related post/
-    assert_select "[data-legend=tag-edge]", text: /Shares a tag/
+    assert_select "[data-legend-type='resume_entry']", text: /#{ContentTypes.fetch("resume_entry").label}/
+    assert_select "[data-legend='tag']", text: /Tag/
+    assert_select "[data-legend='hollow']", text: /Draft or scheduled/
+    assert_select "[data-legend='related']", text: /Related post/
+    assert_select "[data-legend='tag-edge']", text: /Shares a tag/
+    assert_select "[data-legend='retired']", count: 0
+  end
+
+  test "the legend names no content type of a post the viewer can't read" do
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    create_post(title: "Own").update_column(:author_id, users(:author).id)
+    create_post(title: "Theirs", content_type: "resume_entry")
+    sign_in_as(users(:author))
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-legend-type]", count: 1
+    assert_select "[data-legend-type='resume_entry']", count: 0
+  end
+
+  test "a post of a type that is no longer registered adds the Retired type entry" do
+    sign_in_as(users(:one))
+    create_post(title: "A").update_column(:content_type, "gone/thing")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-legend='retired']", text: /Retired type/
+    assert_select "[data-legend-type]", count: 0
   end
 
   test "the filter is All, Related and Tags, with All chosen" do
@@ -126,23 +172,14 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_select "label[for=mind-graph-filter-tag]", text: "Tags"
   end
 
-  test "tag nodes and edges ride in the data island, with only the readable count" do
+  test "zoom in, zoom out and Fit all are buttons beside the canvas" do
     sign_in_as(users(:one))
-    a = create_post(title: "A")
-    b = create_post(title: "B")
-    tag = Tag.create!(name: "shared")
-    [ a, b ].each { |post| PostTag.create!(post: post, tag: tag) }
+    create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    data = graph_data
-    assert_equal [ { "id" => "tag-#{tag.id}", "name" => "shared", "count" => 2 } ], data["tags"]
-    assert_equal [ "tag" ], data["edges"].map { |e| e["kind"] }.uniq
-  end
-
-  private
-
-  def graph_data
-    JSON.parse(Nokogiri::HTML::Document.parse(response.body).at_css("script#mind-graph-data[type='application/json']").text)
+    { "Zoom in" => "zoomIn", "Zoom out" => "zoomOut", "Fit all" => "fit" }.each do |label, action|
+      assert_select "button[type=button][data-action='admin--mind-graph##{action}']", text: label
+    end
   end
 end

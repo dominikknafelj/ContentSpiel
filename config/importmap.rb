@@ -8,7 +8,7 @@
 #
 # `preload: "admin"` modulepreloads a module only on pages whose entry point
 # is `admin` (importmap-rails' per-entry-point preloading): CS Studio's own
-# controllers, the editor's modules, Tiptap/ProseMirror, SortableJS and D3.
+# controllers, the editor's modules, Tiptap/ProseMirror and SortableJS.
 # A public page neither imports nor preloads any of them. They all stay in
 # the import map itself (it's one shared lookup table), which is harmless:
 # a mapping is only fetched when something imports it.
@@ -48,7 +48,11 @@ pin_all_from "app/javascript/media", under: "media", preload: "admin"
 pin_all_from "app/javascript/mind_graph", under: "mind_graph", preload: false
 
 pin "sortablejs", preload: "admin" # @1.15.7
-pin "d3-force", preload: "admin" # @3.0.0
+# Vendored for the mind graph's layout WORKER, which imports the file by its
+# asset URL (an import map does not apply inside a worker). Nothing in a page
+# imports it, so it is not preloaded; the pin stays so `bin/importmap audit`
+# and `outdated` still see the package.
+pin "d3-force", preload: false # @3.0.0
 # Tiptap 3 and its ProseMirror dependencies (tiptap spec §4.1), vendored by
 # `bin/importmap pin @tiptap/core @tiptap/starter-kit @tiptap/extension-link`
 # -- no npm, no CDN at runtime. `preload: "admin"` on every one of them (see
