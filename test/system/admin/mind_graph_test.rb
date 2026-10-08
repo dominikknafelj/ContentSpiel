@@ -834,6 +834,148 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "", graph["data-selected"].to_s
   end
 
+  test "Focus graph here opens that node's neighbourhood, the depth switch widens it, and Back returns" do
+    a, b, c = %w[Alpha Beta Gamma].map { |title| create_post(title: title) }
+    PostRelation.create!(post: a, related_post: b)
+    PostRelation.create!(post: b, related_post: c)
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+    click_frame_link { within("[data-mind-graph-card]") { click_link "Focus graph here" } }
+
+    assert_selector "[data-mind-graph-focus]", text: "Around “Alpha”"
+    await_graph
+    assert_equal "2", graph["data-nodes"]
+    assert_includes graph["data-labelled"].split(","), a.id.to_s, "the focus is always labelled"
+
+    click_frame_link { within("[data-mind-graph-focus]") { click_link "2" } }
+    await_graph
+    assert_equal "3", graph["data-nodes"]
+
+    page.go_back
+    await_graph
+    assert_equal "2", graph["data-nodes"]
+
+    click_frame_link { within("[data-mind-graph-focus]") { click_link "Whole graph" } }
+    assert_no_selector "[data-mind-graph-focus]"
+    await_graph
+    assert_equal "3", graph["data-nodes"]
+  end
+
+  test "search finds a post the global view does not draw and opens its neighbourhood" do
+    a = create_post(title: "Connected")
+    PostRelation.create!(post: a, related_post: create_post(title: "Also connected"))
+    alone = create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+    assert_nil screen_position(alone.id)
+
+    fill_in "Find a post or tag", with: "hidden"
+    click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
+
+    assert_selector "[data-mind-graph-focus]", text: "Around “Hidden gem”"
+    await_graph
+    assert_equal "1", graph["data-nodes"]
+  end
+
+  test "search lists tags too, says when nothing matches, and Escape closes the list" do
+    2.times { |i| create_post(title: "P#{i}", tags: [ "ruby" ]) }
+    visit admin_mind_graph_path
+    await_graph
+
+    fill_in "Find a post or tag", with: "rub"
+    within("[data-mind-graph-results]") do
+      assert_link "ruby"
+      assert_text "Tag"
+    end
+
+    fill_in "Find a post or tag", with: "zzzz"
+    assert_selector "[data-mind-graph-results]", text: "No post or tag matches."
+
+    find_field("Find a post or tag").send_keys(:escape)
+    assert_no_selector "[data-mind-graph-results]", visible: :visible
+  end
+
+  test "a result is reached by Tab and opened with Enter" do
+    create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+
+    field = find_field("Find a post or tag")
+    field.fill_in with: "hidden"
+    assert_selector "[data-mind-graph-results] a", text: "Hidden gem"
+    click_frame_link { field.send_keys(:tab, :enter) }
+
+    assert_selector "[data-mind-graph-focus]", text: "Around “Hidden gem”"
+  end
+
+  test "a failed search says so and the graph keeps working" do
+    create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (url, options) => String(url).includes("/mind_graph/search") ? Promise.reject(new TypeError("Failed to fetch")) : original(url, options)
+    JS
+
+    fill_in "Find a post or tag", with: "hidden"
+
+    assert_selector "[data-mind-graph-results]", text: "Search failed — check your connection."
+    assert_equal "ready", graph["data-state"]
+  end
+
+  test "the results are text: a title with markup is not inserted as markup" do
+    create_post(title: "<img src=x onerror=alert(1)> gem")
+    visit admin_mind_graph_path
+    await_graph
+
+    fill_in "Find a post or tag", with: "gem"
+
+    assert_selector "[data-mind-graph-results] a", text: "<img src=x onerror=alert(1)> gem"
+    assert_no_selector "[data-mind-graph-results] img", visible: :all
+  end
+
+  test "Back to the graph shows no results list and an empty search field" do
+    create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+    fill_in "Find a post or tag", with: "hidden"
+    click_frame_link { within("[data-mind-graph-results]") { click_link "Hidden gem" } }
+    assert_selector "[data-mind-graph-focus]"
+
+    page.go_back
+    await_graph
+
+    assert_no_selector "[data-mind-graph-results]", visible: :visible
+    assert_equal "", find_field("Find a post or tag").value
+  end
+
+  test "leaving the screen aborts a search request still in flight" do
+    create_post(title: "Hidden gem")
+    visit admin_mind_graph_path
+    await_graph
+    # An answer that never comes, so the request is still open when we leave.
+    page.execute_script(<<~JS)
+      window.searchSignals = []
+      const original = window.fetch
+      window.fetch = (url, options) => {
+        if (!String(url).includes("/mind_graph/search")) return original(url, options)
+        window.searchSignals.push(options.signal)
+        return new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))))
+      }
+    JS
+    fill_in "Find a post or tag", with: "hid"
+    assert_eventually(wait: 3, message: "the search request was never sent") { page.evaluate_script("window.searchSignals.length") == 1 }
+
+    # A Turbo visit, not `visit`: the window (and the recorded signals) must outlive it.
+    watch_frame_load
+    page.execute_script("Turbo.visit(#{admin_posts_path.to_json})")
+    await_frame_load
+
+    assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
+  end
+
   private
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:

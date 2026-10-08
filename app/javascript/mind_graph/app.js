@@ -39,6 +39,7 @@ import { readTheme, watchTheme } from "mind_graph/theme"
 import { draw, radiusFor } from "mind_graph/renderer"
 import { attachInput } from "mind_graph/input"
 import { createCard } from "mind_graph/card"
+import { attachSearch } from "mind_graph/search_box"
 
 // A label longer than this is cut with an ellipsis; a tag's count is appended
 // whole. Counted by code point, so an emoji is never cut in half. Exported for
@@ -108,6 +109,11 @@ export function mount(element) {
     closeCard()
   }
   cardElement.addEventListener("keydown", cardKeydown)
+
+  // The search field is HTML beside the canvas, not part of the data request:
+  // it works whatever the graph is doing, a failed load included (spec §6).
+  const search = element.querySelector("[data-mind-graph-search]")
+  const stopSearch = attachSearch(search.querySelector("input"), search.querySelector("[data-mind-graph-results]"), { url: search.dataset.url, text })
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
   const setState = (value) => { element.dataset.state = value }
@@ -454,6 +460,7 @@ export function mount(element) {
       stopInput()
       stopTheme()
       cardElement.removeEventListener("keydown", cardKeydown)
+      stopSearch()
       card.hide()
       hideTooltip()
       canvas.style.cursor = ""

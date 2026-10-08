@@ -13,7 +13,7 @@ import { Controller } from "@hotwired/stimulus"
 //
 // `connect()` also takes back what a Turbo snapshot carries. Turbo caches the
 // page as it stood when it was left -- `data-state="ready"`, `data-settled`,
-// the counts, the notice's lines, an open selection card -- and Back restores
+// the counts, the notice's lines, an open selection card, the search's text and results -- and Back restores
 // exactly that, before anything has been fetched or laid out. All of it says
 // what the screen SHOWS, so it is reset here, synchronously, and the app
 // writes it again as it becomes true. (The filter's radios are restored too,
@@ -48,7 +48,11 @@ export default class extends Controller {
     this.element.dataset.state = "loading"
     for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected", "data-neighbours"]) this.element.removeAttribute(name)
     if (this.hasNoticeTarget) this.noticeTarget.replaceChildren()
-    for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip]")) {
+    // The search: the snapshot holds the typed text and the open results of
+    // the visit that was left. Back shows the field empty and the list closed.
+    const field = this.element.querySelector("[data-mind-graph-search] input")
+    if (field) field.value = ""
+    for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip], [data-mind-graph-results]")) {
       floating.hidden = true
       floating.replaceChildren()
     }

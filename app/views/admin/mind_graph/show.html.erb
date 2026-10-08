@@ -32,6 +32,8 @@
       is each shown type's human name. The message keys are written out one by
       one: `test/lib/script_messages_test.rb` reads the literals to check that
       every key the script asks for is served. %>
+  <%# The bar and the search field are INSIDE the controller's element: the
+      script finds the field there and reads its messages from there. %>
   <div data-controller="admin--mind-graph"
        data-url="<%= data_admin_mind_graph_path(**admin_url_options, post: params[:post].presence, tag: params[:tag].presence, depth: (@depth if @focus)) %>"
        data-worker-url="<%= asset_path("mind_graph/layout_worker.js") %>"
@@ -40,13 +42,45 @@
                                      "mind_graph.script.no_connections", "mind_graph.script.capped", "mind_graph.script.isolated", "mind_graph.script.summary",
                                      "mind_graph.script.card.connections", "mind_graph.script.card.tag_posts", "mind_graph.script.card.open_post", "mind_graph.script.card.focus",
                                      "mind_graph.script.card.show_tagged", "mind_graph.script.card.close", "mind_graph.script.card.tag",
-                                     "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live") %>"
+                                     "mind_graph.script.card.status.draft", "mind_graph.script.card.status.scheduled", "mind_graph.script.card.status.live",
+                                     "mind_graph.script.search.none", "mind_graph.script.search.failed", "mind_graph.script.search.post", "mind_graph.script.search.tag") %>"
        data-post-focus-url="<%= admin_mind_graph_path(**admin_url_options, post: "__ID__") %>"
        data-tag-focus-url="<%= admin_mind_graph_path(**admin_url_options, tag: "__ID__") %>"
        data-tag-posts-url="<%= admin_posts_path(**admin_url_options, tag: "__NAME__") %>"
        data-type-labels="<%= @type_labels.to_json %>"
-       data-state="loading"
-       class="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
+       data-state="loading">
+    <div class="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+      <% if @focus %>
+        <%# The local view's bar (spec §5.4): what the graph is drawn around, both
+            depths (the current one is text, the other a link) and the way back
+            to the whole graph. All ordinary links, so Back works. The depth
+            link of 1 carries no `depth`, as the screen's own URLs do. %>
+        <p data-mind-graph-focus class="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dim">
+          <span class="font-semibold text-ink"><%= t(".focus.around_#{@focus.kind}", title: @focus.title) %></span>
+          <span class="inline-flex items-center gap-1.5"><%= t(".focus.depth") %>
+            <% [ 1, 2 ].each do |depth| %>
+              <% if depth == @depth %>
+                <span aria-current="true" class="font-semibold text-ink"><%= depth %></span>
+              <% else %>
+                <%= link_to depth, admin_mind_graph_path(**admin_url_options, @focus.kind => @focus.id, depth: (depth if depth == 2)), class: "text-accent underline" %>
+              <% end %>
+            <% end %>
+          </span>
+          <%= link_to t(".focus.whole"), admin_mind_graph_path(**admin_url_options), class: "text-accent underline" %>
+        </p>
+      <% end %>
+      <%# The search field: how a post or tag the graph doesn't draw is reached.
+          Its rows are links to that row's local view, filled in by
+          `mind_graph/search_box.js` with text and `href` only. The results are
+          ordinary links after the field in the document, so Tab reaches them. %>
+      <div class="relative ml-auto w-72 max-w-full" data-mind-graph-search data-url="<%= search_admin_mind_graph_path(**admin_url_options) %>">
+        <%= label_tag "mind-graph-search", t(".search.label"), class: "sr-only" %>
+        <%= search_field_tag :mind_graph_search, nil, id: "mind-graph-search", autocomplete: "off", placeholder: t(".search.placeholder"),
+              class: "block w-full rounded-cs border border-line-strong bg-surface px-3 py-1.5 text-ink focus:outline-2 focus:outline-accent" %>
+        <ul data-mind-graph-results hidden class="absolute left-0 right-0 top-full z-20 m-0 mt-1 max-h-72 list-none overflow-y-auto rounded-cs border border-line-strong bg-surface p-1 shadow-menu"></ul>
+      </div>
+    </div>
+    <div class="flex h-[calc(100vh-14rem)] min-h-[480px] flex-col overflow-hidden rounded-cs border border-line bg-surface">
     <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-line px-3.5 py-2.5">
       <%= render Admin::MindGraphLegendComponent.new(content_types: @content_types) %>
       <fieldset class="m-0 min-w-0 border-0 p-0">
@@ -82,6 +116,7 @@
           selection leads anywhere: a click on the canvas never navigates. %>
       <aside data-mind-graph-card hidden aria-label="<%= t(".card_label") %>" class="absolute right-3 top-3 flex max-h-[calc(100%-4.5rem)] w-64 max-w-[calc(100%-1.5rem)] flex-col gap-2 overflow-y-auto rounded-cs border border-line-strong bg-surface p-3 shadow-menu"></aside>
       <div data-mind-graph-tooltip hidden role="presentation" class="pointer-events-none absolute z-10 max-w-xs break-words rounded-cs border border-line bg-surface px-2 py-1 text-sm text-ink shadow-menu"></div>
+    </div>
     </div>
   </div>
 <% end %>

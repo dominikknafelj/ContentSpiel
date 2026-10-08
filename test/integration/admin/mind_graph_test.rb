@@ -72,7 +72,7 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
     assert_equal({ "one" => "%{count} post has no connections yet.", "other" => "%{count} posts have no connections yet." }, messages["mind_graph.script.isolated"])
     assert_equal({ "one" => "%{count} connection", "other" => "%{count} connections" }, messages["mind_graph.script.card.connections"])
     assert_equal %w[capped card.close card.connections card.focus card.open_post card.show_tagged card.status.draft card.status.live card.status.scheduled
-                    card.tag card.tag_posts isolated load_failed loading no_connections retry summary worker_failed].map { |key| "mind_graph.script.#{key}" },
+                    card.tag card.tag_posts isolated load_failed loading no_connections retry search.failed search.none search.post search.tag summary worker_failed].map { |key| "mind_graph.script.#{key}" },
                  messages.keys.grep(/\Amind_graph/).sort
   end
 
@@ -204,16 +204,68 @@ class Admin::MindGraphTest < ActionDispatch::IntegrationTest
   # Mind graph canvas spec §5.7: the tab order is the filter, the zoom buttons,
   # then the canvas. The buttons sit in the canvas's corner on screen, but they
   # come BEFORE it in the document, which is what the Tab key follows.
-  test "the tab order is the filter, the zoom buttons, then the canvas" do
+  test "the tab order is the search, the filter, the zoom buttons, then the canvas" do
     sign_in_as(users(:one))
     create_post(title: "A")
 
     get "/cs-studio/mind_graph"
 
-    order = css_select("[data-controller='admin--mind-graph'] input[type=radio], [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas")
+    order = css_select("[data-controller='admin--mind-graph'] input[type=search], [data-controller='admin--mind-graph'] input[type=radio], [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas")
       .map { |node| node.name == "button" ? node.text.strip : node.name }
-    assert_equal [ "input", "input", "input", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal [ "input", "input", "input", "input", "Zoom out", "Zoom in", "Fit all", "canvas" ], order
+    assert_equal "search", css_select("[data-controller='admin--mind-graph'] input, [data-controller='admin--mind-graph'] button, [data-controller='admin--mind-graph'] canvas").first["type"]
     assert_select "[data-controller='admin--mind-graph'] [tabindex]:not([tabindex='0'])", count: 0
+  end
+
+  test "a focused view names its focus, offers both depths and the way back" do
+    sign_in_as(users(:one))
+    post = create_post(title: "Alpha")
+
+    get "/cs-studio/mind_graph", params: { post: post.id }
+
+    assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-focus]", text: /Around “Alpha”/
+    link = css_select("[data-mind-graph-focus] a").find { |a| a.text == "2" }
+    assert_equal({ "post" => post.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
+    assert_select "[data-mind-graph-focus] [aria-current='true']", text: "1"
+    assert_select "[data-mind-graph-focus] a[href='/cs-studio/mind_graph']", text: "Whole graph"
+
+    get "/cs-studio/mind_graph", params: { post: post.id, depth: 2 }
+    assert_select "[data-mind-graph-focus] [aria-current='true']", text: "2"
+    one = css_select("[data-mind-graph-focus] a").find { |a| a.text == "1" }
+    assert_equal({ "post" => post.id.to_s }, Rack::Utils.parse_query(URI(one["href"]).query))
+  end
+
+  test "a tag focus is named as a tag and its depth links keep the tag" do
+    sign_in_as(users(:one))
+    create_post(title: "A", tags: [ "ruby" ])
+    tag = Tag.find_by!(name: "ruby")
+
+    get "/cs-studio/mind_graph", params: { tag: tag.id }
+
+    assert_select "[data-mind-graph-focus]", text: /Around the tag “ruby”/
+    link = css_select("[data-mind-graph-focus] a").find { |a| a.text == "2" }
+    assert_equal({ "tag" => tag.id.to_s, "depth" => "2" }, Rack::Utils.parse_query(URI(link["href"]).query))
+  end
+
+  test "a focus title with markup in it is escaped" do
+    sign_in_as(users(:one))
+    post = create_post(title: "<b>x</b>")
+
+    get "/cs-studio/mind_graph", params: { post: post.id }
+
+    assert_select "[data-mind-graph-focus] b", count: 0
+  end
+
+  test "the global view has no focus bar, and every view has the search field inside the controller's element" do
+    sign_in_as(users(:one))
+    create_post(title: "A")
+
+    get "/cs-studio/mind_graph"
+
+    assert_select "[data-mind-graph-focus]", count: 0
+    assert_select "[data-controller='admin--mind-graph'] [data-mind-graph-search][data-url^='/cs-studio/mind_graph/search'] input[type=search]#mind-graph-search"
+    assert_select "label.sr-only[for=mind-graph-search]", text: "Find a post or tag"
+    assert_select "[data-mind-graph-search] [data-mind-graph-results][hidden]:empty"
   end
 
   # Loading, a failure and the cap's sentences are written by the script into

@@ -22,6 +22,14 @@ en:
         zoom_out: "Zoom out"
         fit: "Fit all"
         card_label: "Selected in the graph"
+        focus:
+          around_post: "Around “%{title}”"
+          around_tag: "Around the tag “%{title}”"
+          depth: "Depth"
+          whole: "Whole graph"
+        search:
+          label: "Find a post or tag"
+          placeholder: "Find a post or tag…"
       script:
         loading: "Loading the graph…"
         load_failed: "The graph could not be loaded."
@@ -49,3 +57,8 @@ en:
             draft: "Draft"
             scheduled: "Scheduled"
             live: "Live"
+        search:
+          none: "No post or tag matches."
+          failed: "Search failed — check your connection."
+          post: "Post"
+          tag: "Tag"
