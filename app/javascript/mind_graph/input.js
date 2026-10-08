@@ -26,7 +26,9 @@
 // every press is captured, and it ends the pointer as a cancel does: no
 // click. Without it the entry would stay in the table for good, and every
 // later touch would be the "second finger" of a pinch with a ghost. After an
-// ordinary `pointerup` the same event finds nothing left to end.
+// ordinary `pointerup` the same event finds nothing left to end. A MOUSE is
+// left out: it always produces a `pointerup`, and a capture the browser drops
+// between its press and its first move must not end a drag that is still held.
 //
 // - `onZoom(x, y, factor)` is also the wheel (and a trackpad's pinch, which
 //   arrives as a wheel with ctrlKey), and + / - with the canvas focused,
@@ -117,7 +119,12 @@ export function attachInput(canvas, { onPress, onDrag, onDrop, onPan, onClick, o
   }
   const pointerup = (event) => release(event, true)
   const pointercancel = (event) => release(event, false)
-  const lostpointercapture = (event) => release(event, false)
+  // Touch and pen only: a mouse's `pointerup` always comes, and ending its
+  // press here would leave a node where it started under a button still down.
+  const lostpointercapture = (event) => {
+    if (event.pointerType === "mouse") return
+    release(event, false)
+  }
   const wheel = (event) => {
     event.preventDefault()
     const [ x, y ] = at(event)

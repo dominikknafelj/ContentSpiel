@@ -199,6 +199,21 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ [ "press", 60, 60 ], [ "drop" ], [ "click", 61, 60 ], [ "press", 100, 100 ], [ "drag", 120, 100 ], [ "drop" ] ], calls
   end
 
+  # A mouse is the exception: it always produces a `pointerup`, so a capture
+  # the browser drops between the press and the first move must not end the
+  # drag -- the node would stay where it started under a pointer still held.
+  test "input: a mouse that loses its capture keeps its press -- the next move still drags, and the release ends it" do
+    calls = input_calls(<<~JS, target: true)
+      fire("pointerdown", 1, 100, 100, "mouse")
+      fire("lostpointercapture", 1, 100, 100, "mouse")
+      fire("pointermove", 1, 140, 130, "mouse")
+      fire("pointerup", 1, 140, 130, "mouse")
+      fire("pointermove", 1, 50, 50, "mouse")
+    JS
+
+    assert_equal [ [ "press", 100, 100 ], [ "drag", 140, 130 ], [ "drop" ], [ "hover", 50, 50 ] ], calls
+  end
+
   test "a worker that can't load d3-force reports an error instead of hanging" do
     result = page.evaluate_async_script(<<~JS, ActionController::Base.helpers.asset_path("mind_graph/layout_worker.js"))
       const [workerUrl, done] = arguments
@@ -481,7 +496,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
   end
 
   # Attaches `mind_graph/input` to a canvas made for the test, runs `script`
-  # (which has `fire(type, pointerId, x, y)`) and answers the callbacks made,
+  # (which has `fire(type, pointerId, x, y, pointerType = "touch")`) and answers the callbacks made,
   # in order, as [name, *arguments]. `target:` is what `onPress` answers: true
   # makes a press the start of a drag, false of a pan.
   def input_calls(script, target: false)
@@ -498,7 +513,7 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
           onDrag: record("drag"), onDrop: record("drop"), onPan: record("pan"), onClick: record("click"),
           onZoom: record("zoom"), onHover: record("hover"), onEscape: record("escape")
         })
-        const fire = (type, pointerId, x, y) => canvas.dispatchEvent(new PointerEvent(type, { pointerId, pointerType: "touch", isPrimary: pointerId === 1, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true }))
+        const fire = (type, pointerId, x, y, pointerType = "touch") => canvas.dispatchEvent(new PointerEvent(type, { pointerId, pointerType, isPrimary: pointerId === 1, button: 0, clientX: x, clientY: y, bubbles: true, cancelable: true }))
         #{script}
         detach()
         canvas.remove()
