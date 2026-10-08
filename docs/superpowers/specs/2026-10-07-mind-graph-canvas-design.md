@@ -6,15 +6,15 @@ The first sub-project after the technical cleanup (`docs/roadmap.md`, "Mind grap
 
 ## 1. Purpose
 
-CS Studio's Mind graph shows how posts relate through related-post links and shared tags. Today it draws every readable post as SVG elements inside a fixed box, computes the layout in the page, and embeds the whole data set in the HTML. That works for a few dozen posts and breaks down well before a serious site's size:
+CS Studio's Mind graph shows how posts relate through related-post links and shared tags. Before this sub-project it drew every readable post as SVG elements inside a fixed box, computed the layout in the page, and embedded the whole data set in the HTML. That worked for a few dozen posts and broke down well before a serious site's size:
 
-- There is no cap: the screen loads and simulates every readable post.
-- Labels overlap, because every node is labelled at all times.
-- Every node is one size, so a hub looks like a leaf.
-- Nodes are clamped to the box, so a large graph is pressed against its edges.
-- You can't zoom, pan, or look at one post's neighbourhood.
-- A post whose type is no longer registered differs from a ring of slots 7–12 by colour alone.
-- d3-force is preloaded on every CS Studio page.
+- There was no cap: the screen loaded and simulated every readable post.
+- Labels overlapped, because every node was labelled at all times.
+- Every node was one size, so a hub looked like a leaf.
+- Nodes were clamped to the box, so a large graph was pressed against its edges.
+- You couldn't zoom, pan, or look at one post's neighbourhood.
+- A post whose type was no longer registered differed from a ring of slots 7–12 by colour alone.
+- d3-force was preloaded on every CS Studio page.
 
 **Design target:** a site with low thousands of posts (2,000–5,000). The screen should feel the same at 200 posts and at the cap.
 
