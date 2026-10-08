@@ -12,7 +12,7 @@ MCP (`create_post`/`update_post`/`get_post`) exchanges `body` as Markdown: stand
 
 ## The vendored editor
 
-The Tiptap editor is vendored under `vendor/javascript` via import maps (`config/importmap.rb`) — no npm, no CDN at runtime. There are two entry points: the public site (and setup/sign-in) imports `application` (Turbo plus the site's own controllers); CS Studio's layout imports `admin` (`app/javascript/admin.js`: `application` plus `controllers/admin/*`). CS Studio's controllers, `rich_text/*`, Tiptap/ProseMirror, SortableJS and D3 are all `preload: "admin"`, so they're modulepreloaded in CS Studio and never on a public page.
+The Tiptap editor is vendored under `vendor/javascript` via import maps (`config/importmap.rb`) — no npm, no CDN at runtime. There are two entry points: the public site (and setup/sign-in) imports `application` (Turbo plus the site's own controllers); CS Studio's layout imports `admin` (`app/javascript/admin.js`: `application` plus `controllers/admin/*`). CS Studio's controllers, `rich_text/*`, Tiptap/ProseMirror and SortableJS are all `preload: "admin"`, so they're modulepreloaded in CS Studio and never on a public page. The mind graph's modules and d3-force are `preload: false`: only the Mind graph screen fetches them, d3-force from inside its layout worker (`docs/reference/cs-studio-shell-and-dashboard.md`).
 
 ## Importing ActionText
 
