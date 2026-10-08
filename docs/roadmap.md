@@ -34,7 +34,7 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | CS Studio design pass, three rounds (PRs #35–#37, #45): tokens and theme, shared components, the shell and ⌘K; the editors, side-by-side translation, the dashboard and posts list; Settings, Media, Groups, Users, Tags, Trash, the audit log, System status, the preview bar, the Mind graph | `2026-10-03-cs-studio-design-pass-design.md` (§12 lists where round 3 departs from it) |
 | Five staff-review bugs (S1–S5) | PR #39 and design pass round 3 |
 | Technical cleanup: system tests that fail on JavaScript errors, click natively and wait without fixed sleeps; a behavioural service contract and a dependency-direction guard; the admin i18n key scheme; `queue.js` and `CLAUDE.md` split; one grant per permission, dormant names judged as stored, stale checks on the group and user forms, the owner flag through one endpoint, API tokens found by an indexed digest, language changes under a row lock; URLs synced only when they can have changed; a content version that moves only on published changes | `2026-10-05-technical-cleanup-design.md` (§10 lists the rulings made while building) |
-| Mind graph on a canvas: one 2D canvas laid out by d3-force in a Web Worker, zoom and pan, hubs sized and labelled first with labels that never overlap, a local view around a post or tag to depth 1–2, a cap of 2,000 posts with a message, a search field that reaches everything else, a selection card, a list of links as the keyboard path, a retired type told apart by shape; d3-force loaded only by that screen | `2026-10-07-mind-graph-canvas-design.md` (§7 holds the measured numbers, §11 the departures made while building) |
+| Mind graph on a canvas: one 2D canvas laid out by d3-force in a Web Worker, zoom and pan, hubs sized and labelled first with labels that never overlap, a local view around a post or tag to depth 1–2, a cap of 2,000 posts with a message, a search field that reaches everything else, a selection card beside its node, a list beside the canvas whose rows select (the keyboard path), a layout shown at frame pace, nodes that stay where they are dropped, a retired type told apart by shape; d3-force loaded only by that screen | `2026-10-07-mind-graph-canvas-design.md` (§7 holds the measured numbers, §11 the departures made while building and the round after the owner's trial of 2026-10-08) |
 
 ## Next, in order
 
@@ -306,7 +306,8 @@ Left by the technical cleanup (spec §10). The caching sub-project ("Performance
 - The token form decides whether a refusal belongs under Name or Group from the message's first word.
 - The group delete dialog says tokens are "revoked" while `Groups::Destroy` deletes their rows.
 - Mind graph: a label can run over a neighbouring node or past the canvas's right edge; the overlap rule compares labels with labels only.
-- Mind graph: selecting a node is pointer-only, and opening its card is not announced; the list of links and the search field are the keyboard path.
+- Mind graph: a node can be pinned from the keyboard (its card's Pin) but not moved: dragging is pointer-only.
+- Mind graph: with reduced motion a large graph shows an empty canvas between "ready" and its one layout message (about two and a half seconds at the cap), and a change of the motion setting applies from the next load.
 - Mind graph: the search results close and reopen on each keystroke, and have no arrow-key navigation.
 
 ### Accepted as they are
