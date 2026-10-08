@@ -76,7 +76,7 @@ export function mount(element) {
   const state = {
     nodes: [], edges: [], positions: new Float32Array(0), radii: [], widths: [], order: [],
     visibleNodes: [], visibleEdges: [], camera: identity(), selected: -1, neighbours: new Set(), focusIndex: -1,
-    theme: readTheme(canvas), width: 0, height: 0, ratio: 1, fitted: false, data: null
+    theme: readTheme(canvas), width: 0, height: 0, ratio: 1, fitted: false, placed: false, data: null
   }
   let destroyed = false
   let layout = null
@@ -158,11 +158,14 @@ export function mount(element) {
       if (state.selected >= 0) always.add(state.selected)
       if (state.focusIndex >= 0) always.add(state.focusIndex)
       state.neighbours.forEach((index) => always.add(index))
-      const labels = chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
-        camera: state.camera, width: state.width, height: state.height, always })
+      // Until the worker's first positions arrive every node is at 0, 0 -- the
+      // canvas's top-left corner -- so a frame drawn before then (the data has
+      // just come, or the worker never started) is an empty one, not a pile.
+      const labels = state.placed ? chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
+        camera: state.camera, width: state.width, height: state.height, always }) : []
       // With reduced motion a label switches on, it does not fade in (§5.2).
       if (reducedMotion.matches) labels.forEach((label) => { label.alpha = 1 })
-      draw(context, { ...state, labels })
+      draw(context, state.placed ? { ...state, labels } : { ...state, labels, visibleNodes: [], visibleEdges: [] })
       draws += 1
 
       // Written only when changed: a pan redraws every frame and changes neither.
@@ -285,6 +288,7 @@ export function mount(element) {
     state.widths = state.nodes.map((node) => context.measureText(node.label).width)
     state.focusIndex = data.focus ? indexOf.get(data.focus.node_id) ?? -1 : -1
     state.fitted = false
+    state.placed = false
     select(-1)
     applyFilter()
     // The canvas is one image to a screen reader, and its name says what is on it.
@@ -312,6 +316,7 @@ export function mount(element) {
         d3Url: element.dataset.d3Url,
         onTick: (positions) => {
           state.positions = positions
+          state.placed = true
           // The first view fits everything as soon as there is a shape to fit;
           // after that the camera moves only when the user moves it.
           if (!state.fitted) state.camera = fit(bounds(positions, state.visibleNodes), state.width, state.height)

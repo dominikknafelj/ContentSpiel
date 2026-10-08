@@ -387,6 +387,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_text "The graph can't be drawn in this browser."
     assert_no_button "Retry"
     assert_no_selector "#{GRAPH}[data-settled]"
+    # Nothing was ever laid out, so nothing is drawn: without positions every
+    # node is at 0, 0, and the graph would be a pile in the canvas's corner.
+    assert_operator pixel_at(*canvas_box.first(2).map { |edge| edge + 3 })[3], :<, 10, "the unplaced nodes are drawn in the corner"
     # Loud: the failure is a console error, which is what fails any test that
     # did not ask for it.
     expect_js_error(/layout worker.*no workers here/)
