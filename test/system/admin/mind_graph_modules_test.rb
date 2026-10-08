@@ -289,6 +289,28 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal 1, labels.first["alpha"]
   end
 
+  # Spec §5.2 says both "labels never overlap" and "the selection, its
+  # neighbours and the focus are always labelled"; where two of them overlap,
+  # no-overlap wins and the `always` Set's own order decides who keeps the
+  # place (`app.js` puts the selected node in first).
+  test "labels: of two overlapping members of the always set the first in the set wins, whatever the order says" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      m.chooseLabels({ order: [0, 1, 2], positions: new Float32Array([0, 0, 10, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+        camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set([1, 0]) }).map((label) => label.index)
+    JS
+
+    assert_equal [ 1, 2 ], labelled
+  end
+
+  test "labels: a member of the always set the filter hides (not in the order) gets no label" do
+    labelled = js_module("mind_graph/labels", <<~JS)
+      m.chooseLabels({ order: [0, 2], positions: new Float32Array([0, 0, 300, 2, 0, 200]), widths: [80, 80, 80], radii: [8, 8, 8],
+        camera: { k: 1, tx: 100, ty: 100 }, width: 1000, height: 1000, always: new Set([1]) }).map((label) => label.index)
+    JS
+
+    assert_equal [ 0, 2 ], labelled
+  end
+
   test "labels: a node outside the canvas gets no label, and a label sits right of its node" do
     labels = js_module("mind_graph/labels", <<~JS)
       m.chooseLabels({ order: [0, 1], positions: new Float32Array([50, 50, 5000, 50]), widths: [80, 80], radii: [8, 8],

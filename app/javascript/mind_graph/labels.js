@@ -10,8 +10,15 @@
 //    strength to just above none -- so a label arrives gradually as you zoom in.
 // 2. NO OVERLAP. A label is placed only where no label placed before it is;
 //    better-connected nodes place first, so the hub wins.
-// 3. `always` -- the selection, its neighbours, the focus -- is labelled at
-//    any zoom, at full strength, and places before everything else.
+// 3. `always` -- the selection, the focus, the selection's neighbours -- is
+//    labelled at any zoom, at full strength, and places before everything
+//    else. Rule 2 still holds among them: where two of their labels would
+//    overlap both can't be shown, and NO OVERLAP WINS. Who keeps the place is
+//    the Set's own insertion order, not `order`: `app.js` puts the selected
+//    node in first, then the focus, then the neighbours, so the selection is
+//    labelled whenever it is on the canvas, and a neighbour gives way to it
+//    however well connected it is. A member that is not in `order` (hidden by
+//    the filter) or not on the canvas gets no label, like any other node.
 //
 // A node outside the canvas gets no label. Answers `{ index, alpha, x, y }`,
 // `x`/`y` the label's left edge and vertical middle in screen pixels: right
@@ -43,7 +50,8 @@ export function chooseLabels({ order, positions, widths, radii, camera, width, h
     labels.push({ index, alpha, x: box.left, y: sy })
   }
 
-  for (const index of order) if (always.has(index) && onCanvas(index)) place(index, 1)
+  const shown = new Set(order)
+  for (const index of always) if (shown.has(index) && onCanvas(index)) place(index, 1)
 
   let rank = 0
   for (const index of order) {

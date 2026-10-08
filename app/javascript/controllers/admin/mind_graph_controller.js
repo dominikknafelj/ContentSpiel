@@ -46,7 +46,7 @@ export default class extends Controller {
 
   reset() {
     this.element.dataset.state = "loading"
-    for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected"]) this.element.removeAttribute(name)
+    for (const name of ["data-settled", "data-nodes", "data-edges", "data-zoom", "data-labelled", "data-selected", "data-neighbours"]) this.element.removeAttribute(name)
     if (this.hasNoticeTarget) this.noticeTarget.replaceChildren()
     for (const floating of this.element.querySelectorAll("[data-mind-graph-card], [data-mind-graph-tooltip]")) {
       floating.hidden = true

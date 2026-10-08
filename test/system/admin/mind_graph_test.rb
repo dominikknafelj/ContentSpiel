@@ -645,9 +645,12 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
 
     click_node(last.id)
 
+    # The neighbours are said directly; a neighbour's LABEL may give way to
+    # another's where the two would overlap (no overlap wins), the selected
+    # node's never does: it places first.
+    assert_equal [ hub.id, spokes[28].id ].map(&:to_s).sort, graph["data-neighbours"].split(",").sort
     await_js("document.querySelector(#{GRAPH.to_json}).dataset.labelled.split(',').includes('#{last.id}')")
-    labelled = graph["data-labelled"].split(",")
-    assert_includes labelled, hub.id.to_s
+    assert_equal last.id.to_s, graph["data-labelled"].split(",").first, "the selected node's label is placed first"
   end
 
   # What dims is everything but the selection and its neighbours: read from the
@@ -670,36 +673,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # The neighbours are the ones the SHOWN edges give the selection: a filter
-  # change with a node selected recomputes them. Read through the labels --
-  # a neighbour is always labelled, and the tag, the least connected node
-  # here, is labelled at this zoom for no other reason.
+  # change with a node selected recomputes them (`data-neighbours`).
   test "a filter change with a node selected recomputes its neighbours" do
-    hub = create_post(title: "Hub")
-    spokes = 30.times.map { |i| create_post(title: "Spoke #{i}", tags: (i >= 28 ? [ "shared" ] : [])) }
-    spokes.each { |spoke| PostRelation.create!(post: hub, related_post: spoke) }
-    spokes.each_cons(2) { |a, b| PostRelation.create!(post: a, related_post: b) }
+    a, b, c = 3.times.map { |i| create_post(title: "P#{i}", tags: (i < 2 ? [ "shared" ] : [])) }
+    PostRelation.create!(post: a, related_post: c)
     tag_id = "tag-#{Tag.find_by!(name: "shared").id}"
-    last = spokes.last
+    neighbours = -> { graph["data-neighbours"].split(",").sort }
     visit admin_mind_graph_path
     await_graph
-    2.times { press "Zoom out" }
-    labelled = -> { await_frames; graph["data-labelled"].split(",") }
-    assert_not_includes labelled.call, tag_id, "the tag is labelled without a selection: this test would show nothing"
+    assert_equal "", graph["data-neighbours"].to_s
 
-    click_node(last.id)
-    assert_includes labelled.call, tag_id, "the selection's neighbour by a tag edge is labelled"
+    click_node(a.id)
+    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call
 
     find("label", text: "Related").click
     await_graph
-    assert_equal last.id.to_s, graph["data-selected"], "a selection the filter still shows stays"
-    assert_selector "[data-mind-graph-card]", text: "Spoke 29"
-    assert_not_includes labelled.call, tag_id
-    assert_includes labelled.call, hub.id.to_s
+    assert_equal a.id.to_s, graph["data-selected"], "a selection the filter still shows stays"
+    assert_selector "[data-mind-graph-card]", text: "P0"
+    assert_equal [ c.id.to_s ], neighbours.call, "the tag is no neighbour while its edges are not shown"
 
     find("label", text: "All").click
     await_graph
-    assert_includes labelled.call, tag_id, "back under All the tag is a neighbour again"
-    assert_includes labelled.call, hub.id.to_s
+    assert_equal [ c.id.to_s, tag_id ].sort, neighbours.call, "back under All the tag is a neighbour again"
+
+    find(CANVAS).send_keys(:escape)
+    assert_equal "", graph["data-neighbours"]
   end
 
   test "a filter that hides the selected node clears the selection and closes the card" do
@@ -739,6 +737,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     await_graph
     from = screen_position(a.id)
     zoom = graph["data-zoom"]
+    record_worker_messages
 
     mouse = page.driver.browser.mouse
     mouse.move(x: from["x"], y: from["y"])
@@ -755,8 +754,31 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal "", graph["data-selected"].to_s
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     await_graph
-    there = screen_position(a.id)
-    assert_operator Math.hypot(there["x"] - from["x"], there["y"] - from["y"]), :>, 20, "the node went back to where it was when it was let go"
+    # What the layout was told: the node held (once per move past the click
+    # slop), then let go, once, and nothing after.
+    sent = worker_messages
+    assert_equal [ "unpin" ], sent.last(1), "the drag did not end with one unpin: #{sent}"
+    assert_operator sent.size, :>=, 2
+    assert_equal [ "pin" ], sent[0...-1].uniq, "something other than pins came before the unpin: #{sent}"
+  end
+
+  test "Escape with the focus inside the card closes it and gives the focus back to the canvas" do
+    a = create_post(title: "A")
+    PostRelation.create!(post: a, related_post: create_post(title: "B"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    # The focus is put on a link of the card by script: Cuprite's `send_keys`
+    # CLICKS an element that is not focused, and a click here would follow the
+    # link (or press Close) and show nothing about the key. The key is real.
+    find("[data-mind-graph-card] a", text: "Open post").execute_script("this.focus()")
+    assert page.evaluate_script("document.querySelector('[data-mind-graph-card]').contains(document.activeElement)")
+    page.driver.browser.keyboard.type(:Escape)
+
+    assert_no_selector "[data-mind-graph-card]", visible: :visible
+    assert_equal "", graph["data-selected"]
+    assert page.evaluate_script("document.activeElement === document.querySelector(#{CANVAS.to_json})"), "the focus did not go back to the canvas"
   end
 
   # A click sends the layout nothing: no `pin`, so no `unpin`, so the graph is
@@ -768,11 +790,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     visit admin_mind_graph_path
     await_graph
     before = [ screen_position(a.id), screen_position(b.id) ]
+    record_worker_messages
 
     click_node(a.id)
 
     assert_selector "[data-mind-graph-card]"
     await_frames
+    assert_equal [], worker_messages, "a click sent the layout something"
     assert_selector "#{GRAPH}[data-settled]"
     assert_equal before, [ screen_position(a.id), screen_position(b.id) ]
   end
@@ -870,6 +894,19 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert point, "node #{id} is not on screen"
     page.driver.browser.mouse.click(x: point["x"], y: point["y"])
   end
+
+  # Records the type of every message the page sends a worker from now on
+  # (the prototype's method, so the graph's own worker, already running, is
+  # covered): what the layout is TOLD, which no pixel shows.
+  def record_worker_messages
+    page.execute_script(<<~JS)
+      window.workerMessages = []
+      const post = Worker.prototype.postMessage
+      Worker.prototype.postMessage = function(message, ...rest) { window.workerMessages.push(message?.type); return post.call(this, message, ...rest) }
+    JS
+  end
+
+  def worker_messages = page.evaluate_script("window.workerMessages")
 
   def graph = find(GRAPH)
 

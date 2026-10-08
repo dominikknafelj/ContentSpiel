@@ -8,8 +8,11 @@
 // that wants to know without reading a canvas: `data-state` (loading, ready,
 // failed, worker-failed), `data-settled`, `data-nodes`, `data-edges`,
 // `data-zoom`, `data-labelled`, `data-selected` (the selected node's id, or
-// empty). `element.mindGraph.screenPosition(id)` answers where a visible node
-// is, in client coordinates, and `.draws()` how many frames have been drawn.
+// empty) and `data-neighbours` (the ids of the selection's direct neighbours
+// by the edges shown, comma-separated, or empty; written when the selection
+// or the filter changes, never per frame). `element.mindGraph.
+// screenPosition(id)` answers where a visible node is, in client coordinates,
+// and `.draws()` how many frames have been drawn.
 //
 // THE CAMERA. The first view fits everything: while the layout takes shape the
 // camera follows it, and when it has cooled down the fit is final
@@ -85,15 +88,26 @@ export function mount(element) {
   // as a `pin` does, and the graph would twitch under a click.
   let pressed = -1
   let pinned = false
+  // The node the tooltip names (an index, -1 while it is hidden).
+  let hovered = -1
 
   const tooltip = element.querySelector("[data-mind-graph-tooltip]")
-  const card = createCard(element.querySelector("[data-mind-graph-card]"), {
+  const cardElement = element.querySelector("[data-mind-graph-card]")
+  const card = createCard(cardElement, {
     text,
     urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl },
     typeLabels: JSON.parse(element.dataset.typeLabels),
     // The button goes with the card it is in; the focus goes back to the canvas.
-    onClose: () => { select(-1); canvas.focus() }
+    onClose: closeCard
   })
+  // Escape closes the card from inside it too, not only from the canvas
+  // (`input.js` hears the canvas's keys alone).
+  const cardKeydown = (event) => {
+    if (event.key !== "Escape" || event.ctrlKey || event.metaKey || event.altKey) return
+    event.preventDefault()
+    closeCard()
+  }
+  cardElement.addEventListener("keydown", cardKeydown)
 
   const mode = () => element.querySelector("input[name=mind_graph_filter]:checked")?.value || "all"
   const setState = (value) => { element.dataset.state = value }
@@ -128,9 +142,12 @@ export function mount(element) {
       frame = null
       if (destroyed || state.width === 0) return
 
-      const always = new Set(state.neighbours)
+      // In this order: where two of these labels would overlap, the one put
+      // in first keeps the place (`labels.js`, rule 3).
+      const always = new Set()
       if (state.selected >= 0) always.add(state.selected)
       if (state.focusIndex >= 0) always.add(state.focusIndex)
+      state.neighbours.forEach((index) => always.add(index))
       const labels = chooseLabels({ order: state.order, positions: state.positions, widths: state.widths, radii: state.radii,
         camera: state.camera, width: state.width, height: state.height, always })
       // With reduced motion a label switches on, it does not fade in (§5.2).
@@ -167,6 +184,7 @@ export function mount(element) {
     if (state.width === 0) return
     state.camera = fit(bounds(state.positions, state.visibleNodes), state.width, state.height)
     state.fitted = true
+    hideTooltip()
     requestDraw()
   }
 
@@ -201,20 +219,39 @@ export function mount(element) {
       }
     }
     element.dataset.selected = index >= 0 ? state.nodes[index].id : ""
+    element.dataset.neighbours = Array.from(state.neighbours, (neighbour) => state.nodes[neighbour].id).join(",")
     if (index >= 0) card.show(state.nodes[index])
     else card.hide()
     requestDraw()
   }
 
+  // The card's Close and Escape inside it: what had the focus goes with the
+  // card, so the focus goes back to the canvas.
+  function closeCard() {
+    select(-1)
+    canvas.focus()
+  }
+
+  function hideTooltip() {
+    tooltip.hidden = true
+    hovered = -1
+  }
+
   // The whole title of the node under the pointer, beside the pointer and
-  // inside the box (which clips what leaves it). `textContent`: a title is text.
+  // inside the box (which clips what leaves it). `textContent`: a title is
+  // text, and it is written only when the pointer comes onto another node.
   function hover(x, y) {
     const index = pressed < 0 && x >= 0 ? hit(x, y) : -1
     canvas.style.cursor = index >= 0 ? "pointer" : ""
-    tooltip.hidden = index < 0
-    if (index < 0) return
+    if (index < 0) return hideTooltip()
 
-    tooltip.textContent = state.nodes[index].title
+    if (index !== hovered) tooltip.textContent = state.nodes[index].title
+    hovered = index
+    tooltip.hidden = false
+    // Measured from the left edge: an absolute box near the right edge is
+    // only as wide as the room left there, and the clamp needs the width the
+    // title has when it is not squeezed.
+    tooltip.style.left = "0px"
     const left = Math.min(x + TOOLTIP_OFFSET, state.width - tooltip.offsetWidth - TOOLTIP_MARGIN)
     const below = y + TOOLTIP_OFFSET
     const top = below + tooltip.offsetHeight + TOOLTIP_MARGIN > state.height ? y - TOOLTIP_OFFSET - tooltip.offsetHeight : below
@@ -333,7 +370,7 @@ export function mount(element) {
   const moveCamera = (camera) => {
     state.camera = camera
     state.fitted = true
-    tooltip.hidden = true
+    hideTooltip()
     requestDraw()
   }
 
@@ -345,7 +382,7 @@ export function mount(element) {
     onPress: (x, y) => {
       pressed = hit(x, y)
       pinned = false
-      tooltip.hidden = true
+      hideTooltip()
       return pressed >= 0 ? pressed + 1 : null
     },
     // The press has moved: the node is held under the pointer in the worker
@@ -401,6 +438,7 @@ export function mount(element) {
     filter() {
       if (!layout) return
       applyFilter()
+      hideTooltip()
       element.removeAttribute("data-settled")
       sendFilter()
       requestDraw()
@@ -415,8 +453,9 @@ export function mount(element) {
       observer.disconnect()
       stopInput()
       stopTheme()
+      cardElement.removeEventListener("keydown", cardKeydown)
       card.hide()
-      tooltip.hidden = true
+      hideTooltip()
       canvas.style.cursor = ""
       delete element.mindGraph
     }
