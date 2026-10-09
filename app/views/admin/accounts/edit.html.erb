@@ -24,7 +24,9 @@
     every visit here would end in "Leave without saving?".
     The first form is two cards of one width (560px), Profile (the name) and
     Notes, with the one footer under both (notes handoff, decisions 19 and
-    20); the Password card is 560px too, its footer under it the same way.
+    20); the Password card is 560px too, and its footer -- the footer of
+    that one card -- sits INSIDE it, under a line and within the card's
+    padding (decision 34: `contained: true`).
     Every string of the first form is a key (`admin.accounts`); the password
     form's are still literals, which is why this file is not in the i18n
     test's `CONVERTED` list. The password form is the 560px card of the mock, its footer carrying the "Forgot your
@@ -134,14 +136,14 @@
                 errors: field_errors[:password_confirmation]) %>
         </div>
       </div>
-    </section>
-
-    <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) do %>
+      <%# The card's own footer, inside it (the notes handoff's decision 34). %>
+      <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }, contained: true) do %>
       <%# The reset flow is public and signs nobody out by being visited; it
           asks for an email, so it is only useful where mail is configured
           (System status says when it isn't). Opened in the page, not the
           frame: it is a different layout. %>
-      <%= link_to "Forgot your current password?", new_admin_password_path, data: { turbo_frame: "_top" }, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %>
-    <% end %>
+        <%= link_to "Forgot your current password?", new_admin_password_path, data: { turbo_frame: "_top" }, class: "text-[13px] text-accent hover:text-accent-hover hover:underline" %>
+      <% end %>
+    </section>
   <% end %>
 </div>

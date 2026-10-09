@@ -30,13 +30,18 @@ module Notes
       errors = (body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)) + Files.errors_for(@files)
       return failure(nil, errors) if errors.any?
 
+      stored = true
       message = Thread.transaction(requires_new: true) do
         thread = lock_container(container) && Thread.where(id: @thread.id).lock.first
         next unless thread
 
         reopened = thread.resolved?
         created = thread.messages.create!(author: actor_user, body: @body)
-        Files.attach(created, @files)
+        # A file that could not be written fails the note, whole.
+        unless Files.attach(created, @files)
+          stored = false
+          raise ActiveRecord::Rollback
+        end
         thread.update!(last_message_at: created.created_at, **(reopened ? { state: "open", resolved_at: nil, resolved_by: nil } : {}))
         Deliveries.for_new_message(created, actor_user: actor_user)
         record_event("note.replied", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread, created))
@@ -44,6 +49,8 @@ module Notes
         Signals.threads(thread)
         created
       end
+
+      return failure(nil, [ Files.not_stored ]) unless stored
 
       message ? success(message) : failure(nil, [ gone("note") ])
     end

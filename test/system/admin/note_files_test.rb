@@ -109,7 +109,8 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     choose(file_fixture("tiny.png"), file_fixture("tiny.svg"))
     reply_field.send_keys("Keep these words", [ :control, :enter ])
 
-    assert_selector "#{reply} [role=alert][class~='text-danger-ink']", text: /tiny\.svg: this type of file can't be attached\.\s*Attach the files again: a browser does not keep them\./
+    assert_selector "#{reply} [role=alert][class~='text-danger-ink']", text: "tiny.svg: this type of file can't be attached."
+    assert_selector "#{reply} [data-note-files-lost][class~='text-meta']", text: "Choose the files again: tiny.png, tiny.svg"
     assert_no_selector "#toasts .admin-toast"
     assert_equal "Keep these words", reply_field.value
     assert_empty chosen
@@ -117,6 +118,7 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
 
     # Attached again, without the file that was refused, it goes through once.
     choose(file_fixture("tiny.png"))
+    assert_no_selector "#{reply} [data-note-files-lost]"
     within(reply) { press "Reply" }
     assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]:last-child [data-note-files] img[alt='tiny.png']"
     assert_writes_settled
@@ -159,17 +161,79 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     assert_equal [ 2, 1 ], [ Notes::Message.count, ActiveStorage::Blob.count ]
   end
 
-  test "a draft holds the text only: chosen files are gone when the composer is drawn again" do
+  # The handoff's decision 33. A draft holds the text and the NAMES of the
+  # files chosen with it, under the person's own key; never a file.
+  test "a draft that comes back names the files that have to be chosen again, until they are or the note is sent" do
     open_thread
-    choose(file_fixture("tiny.png"))
+    choose(file_fixture("tiny.png"), pdf_path)
     reply_field.send_keys("Half a thought")
-    assert_eventually { page.evaluate_script("Object.keys(window.sessionStorage).some((name) => name.startsWith('cs-note-draft:'))") }
-    assert_no_match(/tiny/, page.evaluate_script("JSON.stringify(Object.entries(window.sessionStorage))"))
+    key = "cs-note-draft:#{users(:one).id}:thread-#{@thread.id}"
+    assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').files") == [ "tiny.png", "#{Process.pid}-report.pdf" ] }
+    assert_no_selector "#{reply} [data-note-files-lost]"
 
     open_thread
 
     assert_equal "Half a thought", reply_field.value
     assert_empty chosen
+    line = "#{reply} [data-note-files-lost][class~='text-meta'][class~='text-[12px]']"
+    assert_selector line, text: "Choose the files again: tiny.png, #{Process.pid}-report.pdf"
+    # It stays while the text is typed on, and across another redraw.
+    reply_field.send_keys(", continued")
+    open_thread
+    assert_selector line, text: "Choose the files again: tiny.png, #{Process.pid}-report.pdf"
+
+    choose(file_fixture("tiny.png"))
+    assert_no_selector "#{reply} [data-note-files-lost]"
+    assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json})).files") == [ "tiny.png" ] }
+
+    reply_field.send_keys([ :control, :enter ])
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]:last-child [data-note-files] img[alt='tiny.png']"
+    assert_no_selector "#{reply} [data-note-files-lost]"
+    assert_nil page.evaluate_script("window.sessionStorage.getItem(#{key.to_json})")
+  end
+
+  test "a draft without files, and another person's draft on the same tab, say nothing about files" do
+    open_thread
+    reply_field.send_keys("Just text")
+    open_thread
+    assert_equal "Just text", reply_field.value
+    assert_no_selector "#{reply} [data-note-files-lost]"
+
+    page.execute_script("window.sessionStorage.setItem(arguments[0], JSON.stringify({ body: 'Someone else', names: {}, files: ['theirs.pdf'] }))", "cs-note-draft:424242:thread-#{@thread.id}")
+    open_thread
+    assert_no_selector "#{reply} [data-note-files-lost]"
+    assert_no_text "theirs.pdf"
+  end
+
+  # The handoff's decision 30.
+  test "the send key is in the submit button's tooltip, in the form the platform has, and no hint stands in the row" do
+    open_thread
+    apple = page.evaluate_script("/mac|iphone|ipad|ipod/i.test(navigator.userAgentData?.platform || navigator.platform || '')")
+
+    button = find("#{reply} button[data-admin--note-composer-target=submit]")
+    assert_equal (apple ? [ "Send (⌘↵)", "Meta+Enter" ] : [ "Send (Ctrl+Enter)", "Control+Enter" ]), [ button[:title], button["aria-keyshortcuts"] ]
+    assert_no_text "Ctrl+Enter to send"
+    # The row holds its controls on one line in the 400px drawer.
+    middles = [ "button[data-note-attach]", "button[data-note-state]", "button[data-admin--note-composer-target=submit]" ].map do |control|
+      page.evaluate_script("(() => { const r = document.querySelector(#{"#{reply} #{control}".to_json}).getBoundingClientRect(); return Math.round(r.top + r.height / 2) })()")
+    end
+    assert_operator middles.max - middles.min, :<=, 2, middles.inspect
+  end
+
+  # The handoff's decision 32.
+  test "a small picture is shown at its natural size, left-aligned, and a large one at the message's width" do
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "Two pictures", files: [ fixture_upload("tiny.png"), fixture_upload("wide.png") ]).ok? }
+    open_thread
+    box = ->(alt) { page.evaluate_script("(() => { const img = document.querySelector(#{"[data-note-files] img[alt='#{alt}']".to_json}); const files = img.closest('[data-note-files]').getBoundingClientRect(); const r = img.getBoundingClientRect(); const b = img.closest('a').getBoundingClientRect(); return [img.naturalWidth, Math.round(r.width), Math.round(r.height), Math.round(b.left - files.left), Math.round(b.width), Math.round(files.width)] })()") }
+    assert_eventually(message: "the pictures never loaded") { box.call("tiny.png").first.positive? && box.call("wide.png").first.positive? }
+
+    natural, width, _height, left, frame, = box.call("tiny.png")
+    assert_equal [ natural, 0, natural + 2 ], [ width, left, frame ] # its own size, at the left, in a box with a 1px border
+
+    natural, width, height, left, _frame, message = box.call("wide.png")
+    assert_operator natural, :>, message
+    assert_equal [ message - 2, 0 ], [ width, left ]
+    assert_in_delta 2000.0 / 3000, height.to_f / width, 0.01 # its own aspect ratio
   end
 
   # Notes spec §6.3: what is typed is never replaced by a refresh, and chosen

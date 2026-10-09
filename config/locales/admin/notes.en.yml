@@ -49,8 +49,19 @@ en:
         # under the text that was kept; never in a toast, a log or the audit log.
         files:
           too_many: "A note can carry at most %{count} files."
-          too_big: "%{name}: files can be at most 10 MB."
+          too_big: "%{name}: files can be at most %{size}."
           type: "%{name}: this type of file can't be attached."
+          # An allowed kind of file under a name that is not that kind's:
+          # "report.docm: a DOCX file's name must end in .docx.", "notes.pdf:
+          # a text file's name must end in .txt, .md, .log or .csv." `text`
+          # is the kind's word for plain text and CSV; `or` joins the endings.
+          ending: "%{name}: a %{kind} file's name must end in %{endings}."
+          text: "text"
+          or: " or "
+          # Text by its name, in an encoding that is not UTF-8.
+          encoding: "%{name}: text and CSV files must be saved as UTF-8."
+          # The storage refused a file whose checks had passed.
+          not_stored: "The files could not be stored. Nothing was saved: try again."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
       # What the notes' scripts say. `mentions` is `admin--note-composer`'s
@@ -87,8 +98,12 @@ en:
         # remove button.
         files:
           too_many: "A note can carry at most %{count} files."
-          too_big: "%{name} is over 10 MB."
+          too_big: "%{name} is over %{size}."
           remove: "Remove %{name}"
+          # The same line as `composer.files_lost`, for a draft that
+          # comes back: the script kept the names beside the text.
+          again: "Choose the files again: %{names}"
+        send_apple: "Send (⌘↵)"
         # The toast a note addressed to the viewer raises (`admin--notes-live`):
         # "Dana mentioned you on Pricing", with "Open". `placeholder` is what
         # the layout's template holds until the script writes the sentence.
@@ -406,13 +421,15 @@ en:
           people: "People you can mention"
           emoji: "Emoji"
           mention: "Mention someone"
-          send_hint: "Ctrl+Enter to send"
           attach: "Attach files"
-          attach_title: "Attach up to 5 files, 10 MB each"
+          attach_title: "Attach up to %{count} files, %{size} each"
           chosen: "Files to attach"
-          # After a note with files was refused: its text is back in the
-          # field, and a browser never gives a file field its files back.
-          attach_again: "Attach the files again: a browser does not keep them."
+          # Above the field of a form that was drawn again without the
+          # files chosen in it (after a refusal): their names, comma-separated.
+          files_lost: "Choose the files again: %{names}"
+          # The submit button's tooltip: the send key. The script writes
+          # `script.send_apple` instead on an Apple platform.
+          send_title: "Send (Ctrl+Enter)"
           # The field's placeholder, from its label: "Reply…", "Write a note…".
           placeholder: "%{label}…"
         # One line of the inbox. Each reason is a whole sentence in each of

@@ -69,9 +69,11 @@ class Admin::NoteEditDraftsSystemTest < ApplicationSystemTestCase
     menu(@first, "Edit")
 
     assert_equal "My first, changed", find(field(@first)).value
-    # Inside the form while it holds the restored text.
-    assert_selector "#note-message-#{@first.id} form[data-note-composer] [data-note-unsaved]", text: "Unsaved edit"
-    assert_selector unsaved(@first), count: 1
+    # In the message's meta line only while the form holds the restored text
+    # (the handoff's decision 29): no line above the field, which is for errors.
+    assert_selector unsaved(@first), text: "Unsaved edit", count: 1
+    assert_no_selector "#note-message-#{@first.id} form[data-note-composer] [data-note-unsaved]", visible: :all
+    assert_selector "#note-message-#{@first.id} [data-admin--note-unsaved-target=note]", text: "Unsaved edit"
 
     within("#note-message-#{@first.id}") { find("a[data-note-cancel]").click }
 
@@ -156,7 +158,8 @@ class Admin::NoteEditDraftsSystemTest < ApplicationSystemTestCase
     menu(@first, "Edit")
 
     assert_equal "My first, changed", find(field(@first)).value
-    assert_selector "#note-message-#{@first.id} form[data-note-composer] [data-note-unsaved]", text: "Unsaved edit"
+    assert_selector unsaved(@first), text: "Unsaved edit", count: 1
+    assert_no_selector "#note-message-#{@first.id} form[data-note-composer] [data-note-unsaved]", visible: :all
     within("#note-message-#{@first.id}") { find("a[data-note-cancel]").click }
     assert_selector "#note-message-#{@first.id}", text: "Saved elsewhere"
     assert_no_selector unsaved(@first)

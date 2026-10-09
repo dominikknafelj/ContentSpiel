@@ -11,8 +11,14 @@ module Admin
   # password form needs `data-password-submit` on it so the strength meter can
   # hold the submit back until the password is long enough.
   class SaveBarComponent < AdminComponent
-    def initialize(form_id:, cancel_url:, save_label: nil, save_data: {})
+    # `contained: true` is the footer of ONE card, drawn inside it (the notes
+    # handoff's decision 34): under a line, within the card's padding, on the
+    # card's own surface, and not stuck to the window -- the card is short
+    # and its footer is where the card ends. Put it in the card as its last
+    # part. The default is the footer of a whole form, unchanged.
+    def initialize(form_id:, cancel_url:, save_label: nil, save_data: {}, contained: false)
       @form_id = form_id
+      @contained = contained
       @cancel_url = cancel_url
       @save_label = save_label
       @save_data = save_data
@@ -24,5 +30,11 @@ module Admin
 
     # A default argument can't ask `t`: nothing is rendering yet at `initialize`.
     def save_label = @save_label || t(".save")
+
+    def bar_class
+      return "admin-save-bar admin-save-bar--contained flex flex-wrap items-center gap-3 border-t border-line px-[18px] py-3.5" if @contained
+
+      "admin-save-bar sticky bottom-0 z-20 mt-6 flex flex-wrap items-center gap-3 border-t border-line bg-paper py-3"
+    end
   end
 end

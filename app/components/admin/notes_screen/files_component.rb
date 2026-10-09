@@ -1,17 +1,22 @@
 module Admin
   module NotesScreen
     # A message's files (notes spec §3.6; handoff "Attachment row", "Inline
-    # image and still GIF tile"). An image is shown inline at the message's
-    # width, up to 368px, through the notes file action, and a click opens the
-    # same address in a new tab (there is no lightbox). Anything else is a
-    # row with its name, its kind and size, and a download. EVERY ADDRESS HERE
-    # IS `admin_record_note_file_path`: never a blob URL, a signed id or a
-    # variant (decision D15; `test/integration/admin/note_files_test.rb`).
+    # image and still GIF tile"). An image is shown inline through the notes
+    # file action, and a click opens the same address in a new tab (there is
+    # no lightbox). Anything else is a row with its name, its kind and size,
+    # and a download. EVERY ADDRESS HERE IS `admin_record_note_file_path`:
+    # never a blob URL, a signed id or a variant (decision D15;
+    # `test/integration/admin/note_files_test.rb`).
     #
-    # An image has no size until it is loaded (nothing analyzes a note's
-    # file, `Notes::Files`), so its box shows the placeholder gradient at a
-    # least height meanwhile; `object-contain` keeps a very wide image from
-    # being stretched to that height.
+    # A PICTURE IS SHOWN AT ITS NATURAL SIZE, up to the full width of the
+    # message, left-aligned, and never enlarged (the handoff's decision 32):
+    # the box shrinks to the picture (`w-fit`), the picture is `max-w-full`
+    # with `width` and `height` auto. Its size is not known before it has
+    # loaded -- nothing analyzes a note's file (`Notes::Files`), so there is
+    # no stored width or height to reserve the space with -- and the box
+    # grows from nothing to the picture when it arrives: that shift is
+    # accepted. The placeholder gradient is the box's background, seen behind
+    # a picture that is partly transparent.
     #
     # A GIF moves. Without reduced motion it plays, like any image. With it,
     # the tile shows a STILL: the picture itself is drawn invisible
@@ -26,8 +31,8 @@ module Admin
       NAME_CLASS = "truncate text-[13px] text-ink".freeze
       FACTS_CLASS = "truncate font-cs-mono text-[10px] text-meta".freeze
       ROW_BUTTON_CLASS = "flex size-7 items-center justify-center rounded-cs".freeze
-      PICTURE_BOX_CLASS = "admin-note-picture relative block w-full max-w-[368px] overflow-hidden border border-line".freeze
-      PICTURE_CLASS = "block h-auto min-h-16 w-full object-contain".freeze
+      PICTURE_BOX_CLASS = "admin-note-picture relative block w-fit max-w-full self-start overflow-hidden border border-line".freeze
+      PICTURE_CLASS = "block h-auto w-auto max-w-full".freeze
 
       def initialize(message:, listing:)
         @message = message

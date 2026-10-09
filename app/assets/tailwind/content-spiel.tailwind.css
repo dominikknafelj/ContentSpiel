@@ -406,8 +406,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
 
 /* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
-   image and still GIF tile"). Its box shows the placeholder gradient until
-   the picture is there, and behind a picture that is partly transparent.
+   image and still GIF tile"). Its box is the picture's own size and shows
+   the placeholder gradient behind a picture that is partly transparent.
    A GIF's Play / Pause is shown with reduced motion only (the component's
    `motion-reduce:` classes): centred over the still, and in the corner while
    the picture plays (`data-playing`), so it does not lie over what moves. */

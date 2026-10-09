@@ -10,10 +10,12 @@
       <strong class="text-[13px] font-semibold text-ink"><%= render Admin::UserNameComponent.new(user: author, user_id: message.author_id) %></strong>
       <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
       <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
-      <%# "Unsaved edit" (the handoff's decision 27): shown by the script while
-          this tab holds a draft of an edit of this message that was left
-          (`admin--note-unsaved`). While the form is open the form says it. %>
-      <% if own? && !editing? %><span hidden class="text-[12px] text-meta" data-note-unsaved data-admin--note-unsaved-target="note">· <%= t(".unsaved") %></span><% end %>
+      <%# "Unsaved edit" (the handoff's decisions 27 and 29): shown by the
+          script while this tab holds a draft of an edit of this message that
+          was left (`admin--note-unsaved`) -- here in the meta line only,
+          also while the edit form is open with the draft put back: the
+          space above the field is for errors. %>
+      <% if own? %><span hidden class="text-[12px] text-meta" data-note-unsaved data-admin--note-unsaved-target="note">· <%= t(".unsaved") %></span><% end %>
       <%= content %>
     </p>
     <%# The way to the emoji set of a message nobody reacted to (decision 26). %>
@@ -36,7 +38,7 @@
     <% text, names = editable %>
     <%# `files: false`: an edit changes the text; the files stay as they were written. %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: message_path, method: :patch, key: key, label: t(".edit_label"), submit: t(".save"),
-          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), unsaved: t(".unsaved"), files: false) %>
+          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), edit: true, files: false) %>
     <%# Cancel gives the edit up: its draft goes with it. %>
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, action: "admin--note-unsaved#forget", **frame_link } %></p>
   <% else %>

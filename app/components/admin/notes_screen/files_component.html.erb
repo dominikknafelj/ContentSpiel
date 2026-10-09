@@ -8,7 +8,7 @@
           <%= image_tag path(attachment), alt: name, loading: "lazy", class: "#{PICTURE_CLASS} motion-reduce:opacity-0",
                 data: { "admin--note-gif-target": "moving", action: "load->admin--note-gif#paint" } %>
         <% end %>
-        <canvas class="pointer-events-none absolute inset-0 hidden size-full object-contain motion-reduce:block" aria-hidden="true" data-admin--note-gif-target="still"></canvas>
+        <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--note-gif-target="still"></canvas>
         <%# Centred over the still; in the corner while the picture plays, so it does not lie over it. %>
         <%= tag.button type: "button", data: { playing: "false", action: "admin--note-gif#toggle", "admin--note-gif-target": "button", play: t(".play"), pause: t(".pause") },
               class: "admin-note-gif-button absolute hidden cursor-pointer items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent motion-reduce:inline-flex" do %>

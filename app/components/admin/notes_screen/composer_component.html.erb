@@ -1,14 +1,9 @@
 <%= form_with url: url, method: method, multipart: files?, class: "flex flex-col gap-2", data: form_data do %>
   <% hidden.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
   <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--note-composer-target": "names" } %>
-  <% if unsaved %>
-    <%# Shown by the script when the field holds a draft, not the saved text. %>
-    <p hidden class="text-[12px] text-meta" data-note-unsaved data-admin--note-composer-target="unsaved"><%= unsaved %></p>
-  <% end %>
   <% if errors.any? %>
     <ul role="alert" class="flex flex-col gap-0.5 text-[12px] text-danger-ink">
       <% errors.each do |error| %><li><%= error %></li><% end %>
-      <% if files_lost? %><li data-note-files-lost><%= t(".attach_again") %></li><% end %>
     </ul>
   <% end %>
   <% if files? %>
@@ -17,6 +12,12 @@
         says why a file was not taken. %>
     <ul class="flex flex-col gap-2" hidden aria-label="<%= t(".chosen") %>" data-admin--note-composer-target="chosen"></ul>
     <p class="text-[12px] text-danger-ink" role="alert" hidden data-admin--note-composer-target="fileError"></p>
+    <%# Files that were chosen and are gone with the form they were chosen
+        in (decision 33): after a refusal the server names them; for a draft
+        that comes back, the script does. `data-names` is what the script
+        keeps beside the draft while the line stands. %>
+    <%= tag.p (t(".files_lost", names: files_lost.join(", ")) if files_lost.any?), class: "text-[12px] text-meta", hidden: files_lost.none?,
+          data: { note_files_lost: true, "admin--note-composer-target": "lost", names: files_lost.to_json } %>
     <template data-admin--note-composer-target="row">
       <li class="<%= file_row::ROW_CLASS %>" data-note-chosen>
         <%= helpers.render "admin/shared/icon", name: :file_text, size: "size-4" %>
@@ -48,8 +49,8 @@
           <%# The field is the form's own and is opened by the button: it is out
               of sight and out of the Tab order, and the button carries its name. %>
           <%= file_field_tag "files[]", id: "#{field_id}-files", multiple: true, class: "sr-only", tabindex: -1, aria: { hidden: true },
-                data: { "admin--note-composer-target": "files", action: "change->admin--note-composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES } %>
-          <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".attach") %>" title="<%= t(".attach_title") %>"
+                data: { "admin--note-composer-target": "files", action: "change->admin--note-composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES, max_size: max_size } %>
+          <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".attach") %>" title="<%= t(".attach_title", count: ::Notes::Files::MAX_COUNT, size: max_size) %>"
                   data-note-attach data-action="admin--note-composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
         <% end %>
         <details class="group relative" data-admin--note-composer-target="emoji">
@@ -64,9 +65,8 @@
                 data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
       </div>
       <div class="flex items-center gap-2">
-        <span class="font-cs-mono text-[10px] text-meta" aria-hidden="true"><%= t(".send_hint") %></span>
         <%= secondary %>
-        <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", data: { "admin--note-composer-target": "submit" }) %>
+        <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", **submit_attributes) %>
       </div>
     </div>
   </div>

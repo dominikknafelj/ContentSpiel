@@ -106,6 +106,20 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_empty capture_sql { get @base, headers: frame }.grep(/active_storage/)
   end
 
+  # The handoff's decision 30: no hint in the composer's row; the send key
+  # is the submit button's tooltip and its `aria-keyshortcuts`. And the
+  # limits a person reads come from the constants.
+  test "the send key is said by the submit button, and the paperclip says the limits" do
+    sign_in_as(users(:reader))
+
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+
+    assert_select "[data-note-part=reply] form[data-note-composer] button[type=submit][title='Send (Ctrl+Enter)'][aria-keyshortcuts='Control+Enter']", text: "Reply"
+    assert_no_match(/Ctrl\+Enter to send/, response.body)
+    assert_select "[data-note-part=reply] button[data-note-attach][title='Attach up to #{Notes::Files::MAX_COUNT} files, 10 MB each'][aria-label='Attach files']"
+    assert_select "[data-note-part=reply] input[type=file][data-max-count='5'][data-max-bytes='#{10.megabytes}'][data-max-size='10 MB']"
+  end
+
   test "an edit form is drawn without a file field, and the message's files stay under it" do
     sign_in_as(users(:two))
 
@@ -117,14 +131,16 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_select "[data-note-part=reply] form[data-note-composer][enctype='multipart/form-data'] input[type=file][name='files[]'][multiple]"
   end
 
-  test "the headers: nosniff always, inline for an image only and under its stored type, never stored by a cache" do
+  GUARDS = { "X-Content-Type-Options" => "nosniff", "Content-Security-Policy" => "sandbox", "Cross-Origin-Resource-Policy" => "same-origin" }.freeze
+
+  test "the headers: nosniff, a sandbox and same-origin always; inline for an image only and under its stored type" do
     sign_in_as(users(:reader))
 
     get file_path(@image)
     assert_response :ok
-    assert_equal [ "image/png", "nosniff" ], [ response.media_type, response.headers["X-Content-Type-Options"] ]
-    assert_match(/\Ainline; filename="shot\.png"/, response.headers["Content-Disposition"])
-    assert_equal "private, no-store", response.headers["Cache-Control"]
+    assert_equal "image/png", response.media_type
+    assert_equal GUARDS, GUARDS.keys.index_with { |name| response.headers[name] }
+    assert_equal %(inline; filename="shot.png"; filename*=UTF-8''shot.png), response.headers["Content-Disposition"]
     assert_equal file_fixture("tiny.png").binread, response.body
 
     get file_path(@gif)
@@ -133,9 +149,104 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
 
     get file_path(@pdf)
     assert_equal "application/pdf", response.media_type
-    assert_match(/\Aattachment; filename="report\.pdf"/, response.headers["Content-Disposition"])
-    assert_equal [ "nosniff", "private, no-store" ], response.headers.values_at("X-Content-Type-Options", "Cache-Control")
+    assert_equal %(attachment; filename="report.pdf"; filename*=UTF-8''report.pdf), response.headers["Content-Disposition"]
+    assert_equal GUARDS, GUARDS.keys.index_with { |name| response.headers[name] }
     assert_equal PDF, response.body
+  end
+
+  test "a name with other than plain letters is sent in both forms of the header, and can't break out of it" do
+    odd = as(users(:two)) { Notes::Reply.call(@thread, body: "Odd name", files: [ note_upload(PDF, %(Ü"ber; x=1\r\nSet-Cookie: a=b.pdf)) ]) }.record
+    sign_in_as(users(:reader))
+
+    get file_path(odd.files.attachments.sole, note: odd)
+
+    assert_response :ok
+    disposition = response.headers["Content-Disposition"]
+    assert_match(/\Aattachment; filename="[^"\r\n]*"; filename\*=UTF-8''[!-~]+\z/, disposition)
+    assert_nil response.headers["Set-Cookie"].to_s[/a=b/]
+  end
+
+  # The ruling on caching: a picture is kept by the reader's own browser and
+  # RE-VALIDATED on every use -- the 304 comes out of the same action, after
+  # the same lookup -- and anything else is never stored.
+  test "an image is answered no-cache and private with an ETag and a 304 to a second request; a document is no-store" do
+    sign_in_as(users(:reader))
+
+    get file_path(@image)
+    assert_equal "no-cache, private", response.headers["Cache-Control"]
+    etag = response.headers["ETag"]
+    assert_predicate etag, :present?
+
+    get file_path(@image), headers: { "If-None-Match" => etag }
+    assert_response :not_modified
+    assert_empty response.body
+    assert_equal [ "no-cache, private", etag ], [ response.headers["Cache-Control"], response.headers["ETag"] ]
+
+    get file_path(@gif), headers: { "If-None-Match" => etag } # another file's
+    assert_response :ok
+
+    get file_path(@pdf)
+    assert_equal "private, no-store", response.headers["Cache-Control"]
+    get file_path(@pdf), headers: { "If-None-Match" => etag }
+    assert_response :ok
+    assert_equal PDF, response.body
+  end
+
+  test "a 304 is never given to someone who may not read the file: the same answers as a full request" do
+    asset = create_media_asset
+    on_image = as(users(:two)) { Notes::Start.call(asset, body: "On the image", files: [ fixture_upload("tiny.png") ]) }.record
+    media_path = file_path(on_image.first_message.files.attachments.sole, thread: on_image, note: on_image.first_message, base: "/cs-studio/notes/media/#{asset.id}")
+    sign_in_as(users(:two))
+    get media_path
+    media_etag = response.headers["ETag"]
+    get file_path(@image)
+    etag = response.headers["ETag"]
+    known = { "If-None-Match" => etag }
+
+    sign_in_as(users(:reader))
+    get media_path, headers: { "If-None-Match" => media_etag }
+    assert_response :forbidden
+
+    sign_in_as(User.create!(email_address: "stranger@example.com", password: "password-password"))
+    get file_path(@image), headers: known
+    assert_response :not_found
+
+    sign_in_as(users(:two))
+    get file_path(@image, note: Notes::Message.new(id: @note.id + 1)), headers: known
+    assert_response :not_found
+    @page.update!(trashed_at: Time.current)
+    get file_path(@image), headers: known
+    assert_response :not_found
+
+    reset!
+    get file_path(@image), headers: known
+    assert_response :redirect
+  end
+
+  # Decision D14: a file's name reaches no log line. `send_data` with a
+  # `filename:` makes Rails log "Sent data <name>" at INFO on every view and
+  # download, so the action builds the header itself.
+  test "no notes request logs a file's name: an upload, a refused one, a view, a download, a 304 and a 404" do
+    sign_in_as(users(:reader))
+    log = StringIO.new
+    sink = ActiveSupport::Logger.new(log, level: Logger::INFO) # production's level
+    Rails.logger.broadcast_to(sink)
+
+    post "#{@base}/threads", params: { body: "With files", files: [ fixture_file_upload("tiny.png", "image/png"), fixture_file_upload("small.gif", "image/gif") ] }
+    post "#{@base}/threads/#{@thread.id}/messages", params: { body: "Refused", files: [ fixture_file_upload("tiny.svg", "image/png") ] }, headers: frame
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+    get file_path(@image)
+    get file_path(@image), headers: { "If-None-Match" => response.headers["ETag"] }
+    get file_path(@pdf)
+    get file_path(@pdf, thread: Notes::Thread.new(id: 0))
+    delete "#{@base}/threads/#{@thread.id}/messages/#{@note.id}"
+
+    assert_match(/Sent data/, log.string) # the lines are there to be looked at
+    assert_match(/Processing by Admin::NoteFilesController#show/, log.string)
+    # (A temporary file's path is Rack's own name with the ending only.)
+    assert_no_match(/shot|report\.|loop|tiny|small\.gif/, log.string)
+  ensure
+    Rails.logger.stop_broadcasting_to(sink) if sink
   end
 
   # The type sent is the one stored, which was read from the bytes -- never
@@ -160,7 +271,7 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
   end
 
   test "text that is markup is a download of plain text" do
-    script = note_upload("<script>alert(1)</script>", "page.html", "text/html")
+    script = note_upload("<script>alert(1)</script>", "page.txt", "text/html")
     reply = as(users(:two)) { Notes::Reply.call(@thread, body: "Markup", files: [ script ]) }.record
     sign_in_as(users(:reader))
 
@@ -258,23 +369,26 @@ class Admin::NoteFilesTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
     assert_select "#notes-new [role=alert]", text: /tiny\.svg: this type of file can't be attached\./
     assert_select "#notes-new textarea[name=body]", text: "Keep this text"
-    assert_select "#notes-new [role=alert]", text: /Attach the files again/
+    # The files are gone with the form they were chosen in: named, above the field, not as an error.
+    assert_select "#notes-new p[data-note-files-lost][class~='text-meta'][class~='text-[12px]']:not([hidden])", text: "Choose the files again: tiny.svg"
+    assert_select "#notes-new [role=alert] [data-note-files-lost]", count: 0
     assert_select "#notes-new [role=alert][class~='text-danger-ink'][class~='text-[12px]']"
   end
 
   test "a refused reply keeps its text in the reply field and says the same; a refusal without files does not mention them" do
     sign_in_as(users(:reader))
 
-    post "#{@base}/threads/#{@thread.id}/messages", params: { body: "Keep this reply", files: [ fixture_file_upload("tiny.svg", "image/png") ] }, headers: frame
+    post "#{@base}/threads/#{@thread.id}/messages", params: { body: "Keep this reply", files: [ fixture_file_upload("tiny.png", "image/png"), fixture_file_upload("tiny.svg", "image/png") ] }, headers: frame
 
     assert_response :unprocessable_entity
-    assert_select "[data-note-part=reply] [role=alert]", text: /tiny\.svg: this type of file can't be attached\..*Attach the files again/m
+    assert_select "[data-note-part=reply] [role=alert]", text: /tiny\.svg: this type of file can't be attached\./
+    assert_select "[data-note-part=reply] p[data-note-files-lost]:not([hidden])", text: "Choose the files again: tiny.png, tiny.svg"
     assert_select "[data-note-part=reply] textarea[name=body]", text: "Keep this reply"
 
     post "#{@base}/threads/#{@thread.id}/messages", params: { body: "x" * 4_001 }, headers: frame
     assert_response :unprocessable_entity
     assert_select "[data-note-part=reply] [role=alert]", text: /at most 4,000/
-    assert_no_match(/Attach the files again/, response.body)
+    assert_select "[data-note-part=reply] p[data-note-files-lost][hidden]", text: ""
   end
 
   # Decision D14: a note's file names reach no log. Rails logs an uploaded

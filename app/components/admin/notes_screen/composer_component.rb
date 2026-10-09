@@ -27,10 +27,20 @@ module Admin
     # refused there, in a 12px line, before anything is sent. The server
     # decides again, and alone decides what a file IS (`Notes::Files`).
     # An edit form has none of this (`files: false`): a message's files are
-    # fixed when it is written. `files_lost` adds, under a refusal's
-    # reasons, that the files have to be attached again: the form that comes
-    # back has the text, and a browser never gives a file field its files
-    # back.
+    # fixed when it is written.
+    #
+    # FILES THAT WERE CHOSEN AND ARE GONE (the handoff's decision 33). A
+    # browser never gives a file field its files back, so a form that is
+    # drawn again has its text and not its files. A line above the field
+    # then names them: "Choose the files again: press-kit.pdf, about.png".
+    # `files_lost` is their names after a note that was refused (the server
+    # has just been sent them); for a draft that comes back the script fills
+    # the same line from the names it kept beside the text. It goes once
+    # files are chosen or the note is sent.
+    #
+    # THE SEND KEY is said by the submit button, not by a hint in the row
+    # (decision 30): its `title` and `aria-keyshortcuts`. The server writes
+    # the Ctrl form; on an Apple platform the script writes "Send (⌘↵)".
     #
     # `secondary` is a control drawn in the bottom row, 8px to the left of the
     # submit: the thread's Resolve / Reopen, which belongs to a form of its
@@ -47,11 +57,13 @@ module Admin
       EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
 
-      # `unsaved` makes it an EDIT form: the words of the note ("Unsaved
-      # edit") it shows when its field was filled from a draft instead of the
-      # saved text (`admin--note-composer`, "an edit that was left").
-      def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2, unsaved: nil,
-        files: true, files_lost: false)
+      # `edit` makes it an EDIT form: its field is drawn with the saved text,
+      # and a draft is what differs from that (`admin--note-composer`, "an
+      # edit that was left"). That a restored draft is unsaved is said in the
+      # message's meta line, never above the field (decision 29): that space
+      # is for errors.
+      def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2, edit: false,
+        files: true, files_lost: [])
         @url = url
         @key = key
         @label = label
@@ -63,18 +75,25 @@ module Admin
         @errors = Array(errors)
         @hidden = hidden
         @rows = rows
-        @unsaved = unsaved
+        @edit = edit
         @files = files
-        @files_lost = files_lost
+        @files_lost = Array(files_lost).map(&:to_s).compact_blank
       end
 
       private
 
-      attr_reader :url, :key, :label, :submit, :mentions_url, :method, :body, :names, :errors, :hidden, :rows, :unsaved
+      attr_reader :url, :key, :label, :submit, :mentions_url, :method, :body, :names, :errors, :hidden, :rows, :files_lost
 
       def files? = @files
 
-      def files_lost? = @files_lost.present?
+      def edit? = @edit
+
+      # The submit button's data and what says the send key.
+      def submit_attributes
+        { title: t(".send_title"), aria: { keyshortcuts: "Control+Enter" }, data: { "admin--note-composer-target": "submit" } } # i18n-ok: a key combination in ARIA's own notation
+      end
+
+      def max_size = ::Notes::Files.max_size
 
       def field_id = "note-field-#{key}"
 
@@ -86,14 +105,14 @@ module Admin
       def form_data
         { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
           "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": unsaved.present?,
+          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": edit?,
           action: "turbo:submit-start->admin--note-composer#sending turbo:submit-end->admin--note-composer#sent", messages: script_messages }
       end
 
       # On a line of its own, ending the line: `test/lib/script_messages_test.rb`
       # reads the literal keys of a `messages_data(...)` call only when the
       # closing bracket is followed by a line end, a comma or another bracket.
-      def script_messages = messages_data("notes.script.mentions.none", "notes.script.mentions.count", "notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove")
+      def script_messages = messages_data("notes.script.mentions.none", "notes.script.mentions.count", "notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove", "notes.script.files.again", "notes.script.send_apple")
     end
   end
 end

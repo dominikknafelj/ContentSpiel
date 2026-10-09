@@ -20,8 +20,9 @@ import { messages } from "i18n/messages"
 //   never applied to it and its draft was stored and then lost. For an edit
 //   the draft is what differs from the text the form was drawn with: typing
 //   that text back removes it, and a form drawn while one exists gets the
-//   draft IN PLACE of the saved text, with "Unsaved edit" above the field
-//   (`unsaved`). That goes for a draft older than the saved text too (the
+//   draft IN PLACE of the saved text; that it is unsaved is said in the
+//   message's meta line (`admin--note-unsaved`), never above the field
+//   (decision 29). That goes for a draft older than the saved text too (the
 //   author saved a newer one from another tab): it is their own words, so it
 //   is put back and said, never dropped in silence and never kept in
 //   silence -- Cancel shows the newer text. Saving forgets the draft here
@@ -33,6 +34,9 @@ import { messages } from "i18n/messages"
 //   Smith"; the hidden `mention_names` field carries name -> id for the server
 //   to turn into tokens. A name the picker did not insert is just text.
 // - An emoji button puts its character in at the caret.
+// - The send key is said by the submit button's tooltip and its
+//   `aria-keyshortcuts` (decision 30). The server writes the Ctrl form;
+//   on an Apple platform it is written again here: "Send (⌘↵)", `Meta+Enter`.
 // - The submit is disabled while the field is empty. The server draws it
 //   enabled (without this script the field's own `required` says so), and a
 //   draft put back on connect enables it again.
@@ -46,10 +50,13 @@ import { messages } from "i18n/messages"
 //   remove button. A sixth file, and one over the limit, are refused here in
 //   a line under the rows, before anything is sent; the server checks the
 //   same again, and what a file IS only the server can tell. A DRAFT HOLDS
-//   TEXT ONLY: a script cannot put a file back into a file field, so chosen
-//   files are gone when the form is drawn again -- after a note that went
-//   through, as they should be, and after one that was refused, which is
-//   why the form that comes back says to attach them again. While a note
+//   TEXT, AND THE NAMES OF THE FILES CHOSEN WITH IT: a script cannot put a
+//   file back into a file field, so chosen files are gone when the form is
+//   drawn again. A draft that comes back therefore says so above the field
+//   (`lost`, the handoff's decision 33): "Choose the files again:
+//   press-kit.pdf, about.png". After a note that was refused the server
+//   draws the same line with the names it was just sent. The line goes, and
+//   the names with it, once files are chosen or the note is sent. While a note
 //   with files is on its way the one-send guard holds for as long as the
 //   upload takes: `out` is set at the press and cleared at
 //   `turbo:submit-end`, however long that is.
@@ -62,24 +69,32 @@ const PREFIX = "cs-note-draft:"
 // The one place a draft's key is made: `cs-note-draft:<user id>:<form key>`,
 // the form key being "new", "thread-<id>" or, for an edit, "message-<id>".
 export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
+const APPLE = /mac|iphone|ipad|ipod/i
 const ROWS = 6
 // A lookup waits for a pause in the typing, not for every letter.
 const LOOKUP_DELAY_MS = 150
 
 export default class extends Controller {
-  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "unsaved", "files", "chosen", "fileError", "row" ]
+  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "files", "chosen", "fileError", "row", "lost" ]
   static values = { key: String, mentionsUrl: String, user: String, edit: Boolean }
 
   connect() {
     this.names = this.parse(this.namesTarget.value)
     // What the form was drawn with: for an edit, the text a draft is measured against.
     this.drawn = this.fieldTarget.value
+    // The files a form drawn again no longer holds: the server's, after a refusal.
+    this.lost = this.hasLostTarget ? this.list(this.lostTarget.dataset.names) : []
     const draft = this.stored()
     if (draft && (this.editValue ? draft.body !== this.drawn : !this.drawn)) {
       this.fieldTarget.value = draft.body
       this.names = { ...draft.names, ...this.names }
       this.namesTarget.value = JSON.stringify(this.names)
-      if (this.hasUnsavedTarget) this.unsavedTarget.hidden = false
+      if (draft.files.length > 0) this.lost = draft.files
+    }
+    this.sayLost()
+    if (this.hasSubmitTarget && APPLE.test(navigator.userAgentData?.platform || navigator.platform || "")) {
+      this.submitTarget.title = messages(this.element).t("notes.script.send_apple")
+      this.submitTarget.setAttribute("aria-keyshortcuts", "Meta+Enter")
     }
     this.refresh()
   }
@@ -187,7 +202,7 @@ export default class extends Controller {
     const bytes = Number(this.filesTarget.dataset.maxBytes)
     const all = [ ...(this.kept || []), ...this.filesTarget.files ]
     const fitting = all.filter((file) => file.size <= bytes)
-    const errors = all.filter((file) => file.size > bytes).map((file) => text.t("notes.script.files.too_big", { name: file.name }))
+    const errors = all.filter((file) => file.size > bytes).map((file) => text.t("notes.script.files.too_big", { name: file.name, size: this.filesTarget.dataset.maxSize }))
     if (fitting.length > limit) errors.push(text.t("notes.script.files.too_many", { count: limit }))
     this.setFiles(fitting.slice(0, limit))
     this.fileErrorTarget.textContent = errors.join(" ")
@@ -221,6 +236,23 @@ export default class extends Controller {
       return row
     }))
     this.chosenTarget.hidden = files.length === 0
+    // Chosen again: nothing is lost any more. The draft learns the names either way.
+    if (files.length > 0) this.lost = []
+    this.sayLost()
+    this.store()
+  }
+
+  // "Choose the files again: a.pdf, b.png", or nothing.
+  sayLost() {
+    if (!this.hasLostTarget) return
+    this.lostTarget.hidden = this.lost.length === 0
+    this.lostTarget.textContent = this.lost.length === 0 ? "" : messages(this.element).t("notes.script.files.again", { names: this.lost.join(", ") })
+  }
+
+  // The names beside a draft: of the files chosen now, or of those that
+  // were and are still to be chosen again.
+  get fileNames() {
+    return this.kept?.length > 0 ? this.kept.map((file) => file.name) : this.lost || []
   }
 
   // "PDF · 1.2 MB", as a sent file's row says it -- but the kind is only the
@@ -361,7 +393,7 @@ export default class extends Controller {
   stored() {
     try {
       const draft = this.parse(window.sessionStorage.getItem(this.storageKey))
-      return typeof draft.body === "string" && draft.body ? { body: draft.body, names: draft.names || {} } : null
+      return typeof draft.body === "string" && draft.body ? { body: draft.body, names: draft.names || {}, files: this.list(draft.files) } : null
     } catch {
       return null
     }
@@ -370,7 +402,7 @@ export default class extends Controller {
   store() {
     try {
       const value = this.fieldTarget.value
-      if (value && !(this.editValue && value === this.drawn)) window.sessionStorage.setItem(this.storageKey, JSON.stringify({ body: value, names: this.names }))
+      if (value && !(this.editValue && value === this.drawn)) window.sessionStorage.setItem(this.storageKey, JSON.stringify({ body: value, names: this.names, files: this.fileNames }))
       else window.sessionStorage.removeItem(this.storageKey)
     } catch {
       // Nothing to do: the text is still in the field.
@@ -382,6 +414,16 @@ export default class extends Controller {
       window.sessionStorage.removeItem(this.storageKey)
     } catch {
       // As above.
+    }
+  }
+
+  // A list of names, from JSON or from a draft: strings only, a handful at most.
+  list(source) {
+    try {
+      const value = typeof source === "string" ? JSON.parse(source || "[]") : source
+      return Array.isArray(value) ? value.filter((name) => typeof name === "string" && name).slice(0, 10) : []
+    } catch {
+      return []
     }
   }
 

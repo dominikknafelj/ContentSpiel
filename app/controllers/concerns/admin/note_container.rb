@@ -111,12 +111,14 @@ module Admin
     # What a failed form gets back: its own key, what was typed, and why.
     # Nothing here reads `result.record`: a notes service's failure has none
     # ("This note is gone" for a record trashed or a thread removed a moment
-    # ago is a failure like any other). `files_lost`: the form was sent with
-    # files, and the form drawn again cannot hold them -- a browser never
-    # gives a file field its files back -- so the form says to attach them
-    # again, whatever the note was refused for.
+    # ago is a failure like any other). `files_lost`: the names of the files
+    # the form was sent with. The form drawn again cannot hold them -- a
+    # browser never gives a file field its files back -- so it names them and
+    # says to choose them again, whatever the note was refused for (the
+    # handoff's decision 33). They go into the page the person who chose
+    # them is looking at, and nowhere else.
     def failed_form(key, result, **extra)
-      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, files_lost: note_files.any?, **extra }
+      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, files_lost: note_files.map { |file| Notes::Files.stored_name(file.original_filename).truncate(Notes::Files::NAME_SHOWN) }, **extra }
     end
 
     # The thread (or what it was on) is no longer there: back to the list,

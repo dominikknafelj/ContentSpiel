@@ -64,7 +64,13 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
       assert_select "h3#account-password + p", text: "You'll stay signed in here. Other sessions are signed out."
       assert_select "input[type=password]", count: 3
     end
-    assert_select "form#password-form section ~ .admin-save-bar button[type=submit]", text: "Change password"
+    # The Password card's footer is the card's own and sits inside it, under
+    # a line (notes handoff, decision 34); the first form's stays under its
+    # two cards, as it was.
+    assert_select "form#password-form section[aria-labelledby=account-password] > .admin-save-bar.admin-save-bar--contained.border-t:last-child button[type=submit]", text: "Change password"
+    assert_select "form#password-form section ~ .admin-save-bar", count: 0
+    assert_select "form#profile-form > section ~ .admin-save-bar.sticky:not(.admin-save-bar--contained) button[type=submit]", text: "Save"
+    assert_select "form#profile-form section .admin-save-bar", count: 0
     assert_select "h1 + p", count: 0
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
     assert_select "#profile-form .admin-save-bar a", text: "Forgot your current password?", count: 0
