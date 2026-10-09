@@ -32,11 +32,13 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
 
   def chips(note = @note) = "#note-message-#{note.id} [data-note-reactions]"
 
-  # The add chip. Under a message nobody reacted to it shows only on hover or
-  # focus of the message, which a test never waits for: `visible: :all`.
-  def add_chip(note = @note) = find("#{chips(note)} summary[aria-label='Add a reaction']", visible: :all)
+  # The emoji set of a message, wherever its control stands: at the end of the
+  # chip row, or in the meta line of a message nobody reacted to.
+  def set(note = @note) = "#note-message-#{note.id} details[data-reaction-add]"
 
-  def emoji(name, note = @note) = find("#{chips(note)} button[aria-label='React with #{name}']")
+  def add_chip(note = @note) = find("#{set(note)} > summary[aria-label='Add a reaction']", visible: :all)
+
+  def emoji(name, note = @note) = find("#{set(note)} button[aria-label='React with #{name}']")
 
   def rect(selector) = page.evaluate_script("(({ top, bottom }) => ({ top, bottom }))(document.querySelector(#{selector.to_json}).getBoundingClientRect())")
 
@@ -64,23 +66,32 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     open_thread
     reply_field.send_keys("Half a thought")
 
+    # Nobody has reacted: no row under the message, and the control in its meta line.
+    assert_no_selector chips, visible: :all
+    assert_selector "#note-message-#{@note.id} > div:first-child > details[data-reaction-add=meta]", visible: :all
+    bare = rect("#note-message-#{@note.id}")
     add_chip.click
-    assert_selector "#{chips} details[data-reaction-add][open] button[name=emoji]", count: Notes::EMOJI.size
+    assert_selector "#{set}[open] button[name=emoji]", count: Notes::EMOJI.size
     emoji("thumbs up").click
 
     assert_selector "#{chips} button[data-reaction='👍'][data-mine][aria-pressed=true][title='#{users(:one).display_name}']", text: /👍\s*1/
-    assert_no_selector "#{chips} details[open]"
+    assert_no_selector "#{set}[open]"
     assert_eventually(message: "the focus did not go to the new chip") { focused?("#{chips} button[data-reaction='👍']") }
+    # After the first reaction the add chip stands at the end of the chip row, on show; the meta line has none.
+    assert_selector "#{chips} > details[data-reaction-add=row]:last-child > summary", visible: :visible
+    assert_no_selector "#note-message-#{@note.id} details[data-reaction-add=meta]", visible: :all
+    assert_operator rect("#note-message-#{@note.id}")["bottom"] - rect("#note-message-#{@note.id}")["top"], :>, bare["bottom"] - bare["top"]
     assert_equal [ [ users(:one).id, "👍" ] ], @note.reactions.pluck(:user_id, :emoji)
     # What was being typed in the reply is there after the answer (its draft).
     assert_equal "Half a thought", reply_field.value
 
     find("#{chips} button[data-reaction='👍']").click
 
-    assert_no_selector "#{chips} button[data-reaction]"
-    assert_eventually(message: "the focus did not go to the add chip") { focused?("#{chips} summary") }
-    # With the focus in its message the add chip is on show, though nobody has reacted.
-    assert_selector "#{chips} summary", visible: :visible
+    # The last reaction took the row with it: the message is as tall as it was, and the focus is on the meta-line control.
+    assert_no_selector chips, visible: :all
+    assert_eventually(message: "the focus did not go to the add control") { focused?("#note-message-#{@note.id} details[data-reaction-add=meta] > summary") }
+    assert_selector "#{set} > summary", visible: :visible # on show while the focus is in its message
+    assert_in_delta bare["bottom"] - bare["top"], rect("#note-message-#{@note.id}")["bottom"] - rect("#note-message-#{@note.id}")["top"], 0.5
     assert_empty @note.reactions.reload
     assert_equal "Half a thought", reply_field.value
   end
@@ -90,21 +101,21 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     # The keys go to whatever has the focus (`send_keys` on an element would
     # click it first, and a click is what this test does without).
     keyboard = page.driver.browser.keyboard
-    page.execute_script("document.querySelector(#{"#{chips} summary".to_json}).focus()")
+    page.execute_script("document.querySelector(#{"#{set} > summary".to_json}).focus()")
 
     keyboard.type(:Enter)
-    assert_selector "#{chips} details[open]"
+    assert_selector "#{set}[open]"
     keyboard.type(:Tab)
-    assert_eventually(message: "Tab did not reach the first emoji") { focused?("#{chips} button[name=emoji]") }
+    assert_eventually(message: "Tab did not reach the first emoji") { focused?("#{set} button[name=emoji]") }
     keyboard.type(:Escape)
-    assert_no_selector "#{chips} details[open]", visible: :all
-    assert focused?("#{chips} summary"), "Escape did not give the focus back to the add chip"
+    assert_no_selector "#{set}[open]", visible: :all
+    assert focused?("#{set} > summary"), "Escape did not give the focus back to the add chip"
     assert_selector "#notes-drawer [data-notes-view=thread]" # the key was the set's, not the drawer's
 
     keyboard.type(:Enter)
-    assert_selector "#{chips} details[open]"
+    assert_selector "#{set}[open]"
     keyboard.type(:Tab)
-    assert_eventually(message: "Tab did not reach the first emoji") { focused?("#{chips} button[name=emoji]") }
+    assert_eventually(message: "Tab did not reach the first emoji") { focused?("#{set} button[name=emoji]") }
     keyboard.type(:Enter)
 
     assert_selector "#{chips} button[data-reaction='#{Notes::EMOJI.first}'][data-mine]"
@@ -135,15 +146,15 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
   test "the set that is open under a message is still open after a live refresh, and still works" do
     open_thread
     add_chip.click
-    assert_selector "#{chips} details[open]"
+    assert_selector "#{set}[open]"
 
     react_as_dana("🎉")
 
     assert_selector "#{chips} button[data-reaction='🎉']", wait: LIVE
-    assert_selector "#{chips} details[data-reaction-add][open]"
+    assert_selector "#{set}[open]"
     emoji("eyes").click
     assert_selector "#{chips} button[data-reaction='👀'][data-mine]"
-    assert_no_selector "#{chips} details[open]", visible: :all
+    assert_no_selector "#{set}[open]", visible: :all
   end
 
   test "a message with its delete question open keeps the question and gets the new chips" do
@@ -173,18 +184,18 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
   test "a press outside the set closes it; React in the menu opens it with the focus on the first emoji" do
     open_thread
     add_chip.click
-    assert_selector "#{chips} details[open]"
+    assert_selector "#{set}[open]"
 
     find("#note-thread-#{@thread.id}-messages h3").click
-    assert_no_selector "#{chips} details[open]", visible: :all
+    assert_no_selector "#{set}[open]", visible: :all
 
     within("#note-message-#{@note.id}") do
       find("button[aria-label='Note actions']").click
       press "React"
     end
-    assert_selector "#{chips} details[open]"
+    assert_selector "#{set}[open]"
     assert_no_selector "#note-message-#{@note.id} [role=menu]" # the menu closed behind it
-    assert focused?("#{chips} button[name=emoji]"), "the focus did not go to the first emoji"
+    assert focused?("#{set} button[name=emoji]"), "the focus did not go to the first emoji"
     emoji("party popper").click
     assert_selector "#{chips} button[data-reaction='🎉'][data-mine][aria-label='party popper, 1 reaction, yours']"
   end
@@ -194,17 +205,17 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
   test "the set opens above its chip, and below it where row 1 leaves no room above" do
     last = as(users(:two)) { Array.new(2) { |index| Notes::Reply.call(@thread, body: "Reply #{index}\nwith\nseveral\nlines").record } }.last
     open_thread
-    panel = ->(note) { "#{chips(note)} form[data-admin--note-reactions-target=panel]" }
+    panel = ->(note) { "#{set(note)} form[data-admin--note-reactions-target=panel]" }
 
     add_chip(last).click
-    assert_selector "#{chips(last)} details[open]:not([data-side])"
-    assert_operator rect(panel.call(last))["bottom"], :<=, rect("#{chips(last)} summary")["top"]
+    assert_selector "#{set(last)}[open]:not([data-side])"
+    assert_operator rect(panel.call(last))["bottom"], :<=, rect("#{set(last)} > summary")["top"]
     assert_operator rect(panel.call(last))["top"], :>=, rect("#notes-drawer a[data-note-back]")["bottom"]
 
     add_chip.click # the first message, right under the thread's two rows
-    assert_selector "#{chips} details[open][data-side=below]"
-    assert_no_selector "#{chips(last)} details[open]", visible: :all # one set at a time
-    assert_operator rect(panel.call(@note))["top"], :>=, rect("#{chips} summary")["bottom"]
+    assert_selector "#{set}[open][data-side=below]"
+    assert_no_selector "#{set(last)}[open]", visible: :all # one set at a time
+    assert_operator rect(panel.call(@note))["top"], :>=, rect("#{set} > summary")["bottom"]
     emoji("rocket").click
     assert_selector "#{chips} button[data-reaction='🚀'][data-mine]"
   end
@@ -222,6 +233,20 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{chips(mine)} button[data-reaction-add][disabled]"
     assert_equal "0.5", page.evaluate_script("getComputedStyle(document.querySelector(#{chips(mine).to_json})).opacity")
     assert_equal "none", page.evaluate_script("getComputedStyle(document.querySelector(#{chips(mine).to_json})).pointerEvents")
+
+    # A reaction that arrives meanwhile is counted on the disabled chips; the form is not touched.
+    find("#note-message-#{mine.id} form[data-note-composer] textarea[name=body]").send_keys(", changed")
+    page.execute_script("window.__edit = document.querySelector('#note-message-#{mine.id} form[data-note-composer] textarea[name=body]')")
+    as(users(:reader)) { assert Notes::React.call(mine, emoji: "🎉", on: true).ok? }
+    as(users(:reader)) { assert Notes::React.call(mine, emoji: "👀", on: true).ok? }
+
+    assert_selector "#{chips(mine)}[data-note-reactions=disabled] button[data-reaction='🎉'][disabled]", text: /🎉\s*2/, wait: LIVE
+    assert_selector "#{chips(mine)} button[data-reaction='👀'][disabled]", text: /👀\s*1/
+    assert_selector "#{chips(mine)} button[data-reaction-add][disabled]"
+    assert_no_selector "#note-message-#{mine.id} details[data-reaction-add]", visible: :all
+    assert_no_selector "#{chips(mine)} button:not([disabled])"
+    assert_equal "0.5", page.evaluate_script("getComputedStyle(document.querySelector(#{chips(mine).to_json})).opacity")
+    assert page.evaluate_script("window.__edit.isConnected && window.__edit.value === 'My own, changed'"), "the edit form was touched"
 
     within("#note-message-#{mine.id}") { find("a[data-note-cancel]").click }
     assert_selector "#{chips(mine)} button[data-reaction='🎉']:not([disabled])"
@@ -241,6 +266,6 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
 
     within("#note-thread-#{@thread.id}-reply") { press "Reopen" }
     assert_selector "#{chips} button[data-reaction='🎉']"
-    assert_selector "#{chips} details[data-reaction-add]", visible: :all
+    assert_selector "#{set}", visible: :all
   end
 end

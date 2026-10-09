@@ -22,13 +22,13 @@
     <%# Not shown inside the editors' drawer, whose header has the one "New
         note" (`.admin-notes-drawer` in content-spiel.tailwind.css); the empty
         state's action below follows the same rule. %>
-    <p class="px-4 pt-3"><%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes" } %></p>
+    <p class="px-4 pt-3"><%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %></p>
   <% end %>
 
   <% if empty? && !composing? %>
     <%= render Admin::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
       <% empty_state.with_action do %>
-        <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes" } %>
+        <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes", turbo_prefetch: false } %>
       <% end %>
     <% end %>
   <% end %>
@@ -57,7 +57,7 @@
         </section>
       <% end %>
       <% if listing.more? %>
-        <p class="px-4 py-3.5"><%= link_to t(".more"), more_path, class: setup_secondary_link_class, data: { turbo_frame: "notes" } %></p>
+        <p class="px-4 py-3.5"><%= link_to t(".more"), more_path, class: setup_secondary_link_class, data: { turbo_frame: "notes", turbo_prefetch: false } %></p>
       <% end %>
     </section>
   <% end %>

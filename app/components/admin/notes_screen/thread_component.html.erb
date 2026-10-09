@@ -18,7 +18,7 @@
     <div class="-mb-px grid grid-cols-[minmax(0,1fr)_auto]">
       <div class="col-start-1 row-start-1 flex items-center border-b border-line py-2.5 pl-3">
         <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
-              data: { note_back: true, turbo_frame: "notes" } do %>
+              data: { note_back: true, turbo_frame: "notes", turbo_prefetch: false } do %>
           <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
           <span><%= t(".back") %></span>
           <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>

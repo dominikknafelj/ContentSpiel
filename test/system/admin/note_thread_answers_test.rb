@@ -59,6 +59,90 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # Holds this tab's next POST whose address contains `part` until `release`:
+  # the time between a press and its answer, made as long as a test needs.
+  def hold_request(part)
+    page.execute_script(<<~JS)
+      window.__held = false
+      const original = window.fetch
+      window.fetch = (...args) => {
+        const url = String(args[0].url || args[0])
+        const method = String(args[1]?.method || args[0].method || "GET").toUpperCase()
+        if (method === "GET" || !url.includes(#{part.to_json}) || window.__held) return original(...args)
+        window.__held = true
+        return new Promise((resolve) => { window.__release = () => resolve(original(...args)) })
+      }
+    JS
+  end
+
+  def release = page.execute_script("window.__release()")
+
+  # What Turbo's hover prefetch of a link does, as far as anything listening
+  # can tell: `turbo:before-fetch-request` with the LINK as its target, a GET,
+  # and (when `marked`) the header Turbo sends with a prefetch.
+  def prefetch(selector, marked:)
+    page.execute_script(<<~JS)
+      const link = document.querySelector(#{selector.to_json})
+      const headers = #{marked ? '{ "X-Sec-Purpose": "prefetch" }' : "{}"}
+      link.dispatchEvent(new CustomEvent("turbo:before-fetch-request", { bubbles: true, cancelable: true,
+        detail: { url: new URL(link.href), fetchOptions: { method: "GET", headers }, resume: () => {} } }))
+    JS
+  end
+
+  # Prefetch is on in CS Studio: a pointer resting on a link fetches it. That
+  # request is not the frame's navigation, and must not make the answer that
+  # is on its way be drawn over the thread.
+  test "a link prefetched while Pin's answer is on its way does not cost the open edit its text" do
+    open_in_drawer
+    start_editing
+    hold_request("/pin")
+
+    find("[data-note-actions] button[aria-label='Pin']").click
+    assert_eventually(message: "the pin request was never sent") { page.evaluate_script("window.__held === true && typeof window.__release === 'function'") }
+    prefetch("#notes-drawer a[data-note-back]", marked: true)
+    prefetch("#note-message-#{@theirs.id} a[data-note-delete]", marked: false)
+    release
+
+    assert_selector "[data-note-badge=pinned]"
+    assert_predicate @thread.reload, :pinned
+    assert_edit_kept
+  end
+
+  test "no link in the thread view is prefetched" do
+    open_in_drawer
+
+    assert_no_selector "#notes-drawer turbo-frame#notes a[data-turbo-frame=notes]:not([data-turbo-prefetch=false])", visible: :all
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-drawer #notes-list"
+    assert_no_selector "#notes-drawer turbo-frame#notes a[data-turbo-frame=notes]:not([data-turbo-prefetch=false])", visible: :all
+  end
+
+  test "the focus is not taken out of a field the person moved into while the answer was on its way" do
+    open_in_drawer
+    start_editing
+    hold_request("/pin")
+
+    find("[data-note-actions] button[aria-label='Pin']").click
+    assert_eventually(message: "the pin request was never sent") { page.evaluate_script("window.__held === true && typeof window.__release === 'function'") }
+    find(edit_field).click
+    release
+
+    assert_selector "[data-note-badge=pinned]"
+    assert focused?(edit_field), "the focus was taken out of the edit field"
+    assert_edit_kept
+  end
+
+  test "a reply sent with the button leaves the focus in the emptied reply field" do
+    open_in_drawer
+    reply_field.send_keys("A new reply")
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "A new reply"
+    assert_equal "", reply_field.value
+    assert_eventually(message: "the focus did not go to the reply field") { focused?("#note-thread-#{@thread.id}-reply textarea[name=body]") }
+  end
+
   test "a reaction on another message leaves an open edit and a half-typed reply as they are" do
     open_in_drawer
     start_editing

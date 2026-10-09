@@ -15,6 +15,19 @@ import { messages } from "i18n/messages"
 //   is fetched again, the screen is left and come back to. It is dropped when
 //   the form's own submit succeeds. Unsent note text never raises the leave
 //   guard, which is about content.
+// - AN EDIT THAT WAS LEFT (the handoff's decision 27; `edit`). An edit form
+//   opens filled with the saved text, so "put back into an empty field"
+//   never applied to it and its draft was stored and then lost. For an edit
+//   the draft is what differs from the text the form was drawn with: typing
+//   that text back removes it, and a form drawn while one exists gets the
+//   draft IN PLACE of the saved text, with "Unsaved edit" above the field
+//   (`unsaved`). That goes for a draft older than the saved text too (the
+//   author saved a newer one from another tab): it is their own words, so it
+//   is put back and said, never dropped in silence and never kept in
+//   silence -- Cancel shows the newer text. Saving forgets the draft here
+//   (`sent`); Cancel is a link beside the form, and `admin--note-unsaved`, on
+//   the message, forgets it there and says "Unsaved edit" on the message
+//   while its form is closed. Both read the one key (`draftKey`).
 // - "@" opens the mention picker (six rows at most): the people who may read
 //   this record, from the server (`mentionsUrl`). The field shows "@Dana
 //   Smith"; the hidden `mention_names` field carries name -> id for the server
@@ -27,21 +40,28 @@ import { messages } from "i18n/messages"
 // Text goes into the page with `textContent` only: a name is a person's.
 const QUERY = /(?:^|\s)@([^\s@]{0,40})$/
 const PREFIX = "cs-note-draft:"
+
+// The one place a draft's key is made: `cs-note-draft:<user id>:<form key>`,
+// the form key being "new", "thread-<id>" or, for an edit, "message-<id>".
+export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
 const ROWS = 6
 // A lookup waits for a pause in the typing, not for every letter.
 const LOOKUP_DELAY_MS = 150
 
 export default class extends Controller {
-  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit" ]
-  static values = { key: String, mentionsUrl: String, user: String }
+  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "unsaved" ]
+  static values = { key: String, mentionsUrl: String, user: String, edit: Boolean }
 
   connect() {
     this.names = this.parse(this.namesTarget.value)
+    // What the form was drawn with: for an edit, the text a draft is measured against.
+    this.drawn = this.fieldTarget.value
     const draft = this.stored()
-    if (draft && !this.fieldTarget.value) {
+    if (draft && (this.editValue ? draft.body !== this.drawn : !this.drawn)) {
       this.fieldTarget.value = draft.body
       this.names = { ...draft.names, ...this.names }
       this.namesTarget.value = JSON.stringify(this.names)
+      if (this.hasUnsavedTarget) this.unsavedTarget.hidden = false
     }
     this.refresh()
   }
@@ -258,7 +278,7 @@ export default class extends Controller {
   // convenience, so every failure is the same as having none.
 
   get storageKey() {
-    return `${PREFIX}${this.userValue}:${this.keyValue}`
+    return draftKey(this.userValue, this.keyValue)
   }
 
   stored() {
@@ -272,7 +292,8 @@ export default class extends Controller {
 
   store() {
     try {
-      if (this.fieldTarget.value) window.sessionStorage.setItem(this.storageKey, JSON.stringify({ body: this.fieldTarget.value, names: this.names }))
+      const value = this.fieldTarget.value
+      if (value && !(this.editValue && value === this.drawn)) window.sessionStorage.setItem(this.storageKey, JSON.stringify({ body: value, names: this.names }))
       else window.sessionStorage.removeItem(this.storageKey)
     } catch {
       // Nothing to do: the text is still in the field.

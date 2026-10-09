@@ -312,12 +312,24 @@ export default class extends Controller {
   // `turbo:before-fetch-request` on the document, as `tag`: what the notes
   // frame is about to be answered for. A form that was sent (the event's
   // target; the redirect that follows is no second request here), or nothing
-  // for a link, whose answer is drawn as it comes.
+  // for the frame's own navigation (a link that was followed: the target is
+  // the frame), whose answer is drawn as it comes.
+  //
+  // A PREFETCH IS NEITHER. Prefetch is on in CS Studio: a pointer resting on
+  // a link for a moment fetches it, with the LINK as the event's target and
+  // `X-Sec-Purpose: prefetch` among its headers. It answers nothing the frame
+  // asked for, so it leaves what was sent alone -- or resting on "All notes"
+  // while Pin's answer was on its way would have that answer drawn in full,
+  // over an open edit. Only a form inside the frame and the frame itself are
+  // heard here; anything else changes nothing.
   asked(event) {
     const frame = event.target.closest?.("turbo-frame#notes")
     if (!frame) return
-    const sends = String(event.detail.fetchOptions?.method || "GET").toUpperCase() !== "GET"
-    if (!sends || !(event.target instanceof HTMLFormElement)) return void (this.sent = null)
+    const options = event.detail.fetchOptions
+    if (options?.headers?.["X-Sec-Purpose"] === "prefetch") return
+    const sends = String(options?.method || "GET").toUpperCase() !== "GET"
+    if (event.target === frame && !sends) return void (this.sent = null)
+    if (!sends || !(event.target instanceof HTMLFormElement)) return
     // What has the focus is noted now: Turbo disables the button that was
     // pressed for as long as its request is out, and a disabled button has
     // lost the focus by the time the answer is drawn.
@@ -524,7 +536,11 @@ export default class extends Controller {
     const scroller = this.scroller(view)
     const atBottom = nearBottom(scroller)
     const top = scroller.scrollTop
-    const held = heldBefore || this.hold(view)
+    // What had the focus at the press -- unless the person has since moved
+    // into a field: then that field, which is where their typing goes. (It
+    // is noted, not left alone: a message that is kept is moved into the new
+    // part, and an element that is moved drops the focus.)
+    const held = (!this.typing(view) && heldBefore) || this.hold(view)
     const known = new Set([ ...old.querySelectorAll("[data-note-message]") ].map((message) => message.dataset.noteMessage))
     const next = document.importNode(answer.querySelector(":scope > [data-note-part='messages']"), true)
     const find = (id) => [ ...next.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === id)
@@ -538,11 +554,10 @@ export default class extends Controller {
     // deleted meanwhile keeps its text at the end.
     busy.forEach((message) => {
       const twin = find(message.dataset.noteMessage)
-      // Its chips are what others did, not what is being typed: the new ones.
-      // Not under an edit form, where they are drawn disabled and the answer's are not.
-      const chips = message.querySelector("[data-note-reactions]")
-      const chipsTwin = twin?.querySelector("[data-note-reactions]")
-      if (chips && chipsTwin && !chips.querySelector("details[open]") && !message.querySelector("form[data-note-composer]")) chips.replaceWith(chipsTwin)
+      // Its reactions are what others did, not what is being typed: the new
+      // ones, disabled under an edit form (which is not touched). Not while
+      // its own set of emoji is open.
+      if (twin && !message.querySelector("details[data-reaction-add][open]")) this.takeReactions(message, twin, { disabled: Boolean(message.querySelector("form[data-note-composer]")) })
       if (twin) twin.replaceWith(message)
       else next.append(message)
       message.closest("details")?.setAttribute("open", "")
@@ -561,9 +576,13 @@ export default class extends Controller {
     view.dataset.state = answer.dataset.state
     this.takeCounts(view, answer)
     this.settle(reply, answer)
-    const nextReply = sentReply && answer.querySelector(":scope > [data-note-part='reply']")
-    if (nextReply) reply.replaceWith(document.importNode(nextReply, true))
-    this.give(view, held)
+    const nextReply = sentReply && document.importNode(answer.querySelector(":scope > [data-note-part='reply']"), true)
+    // The reply was sent from its part -- the field, or the button beside
+    // it: the focus goes to the field of the part that takes its place.
+    const fromReply = Boolean(nextReply && held?.element && reply.contains(held.element))
+    if (nextReply) reply.replaceWith(nextReply)
+    if (fromReply) nextReply.querySelector("textarea")?.focus({ preventScroll: true })
+    else this.give(view, held)
 
     // The reader at the bottom stays there, and so sees what arrived; anyone
     // else stays where they are and is told.
@@ -712,7 +731,7 @@ export default class extends Controller {
       index: message ? [ ...message.querySelectorAll(FOCUSABLE) ].indexOf(active) : -1,
       // A reaction's chip, or an emoji of the set: by its emoji, since the
       // chips before it may be others after the redraw.
-      reaction: active.closest("[data-note-reactions]") ? active.dataset.reaction || active.value || null : null,
+      reaction: active.closest("[data-note-reactions], [data-reaction-add]") ? active.dataset.reaction || active.value || null : null,
       selection: typeof active.selectionStart === "number" ? [ active.selectionStart, active.selectionEnd, active.selectionDirection ] : null
     }
   }
@@ -736,13 +755,62 @@ export default class extends Controller {
     if (target === held.element && held.selection) target.setSelectionRange(...held.selection)
   }
 
-  // The chip of an emoji in a message as it is drawn now; the "Add a
-  // reaction" chip when that emoji's last reaction went and its chip with it.
-  // Compared as data, never built into a selector: the emoji is whatever the
-  // button held.
+  // Whether the focus is in a field of the view right now.
+  typing(root) {
+    const active = document.activeElement
+    return Boolean(active?.isConnected && root.contains(active) && active.matches("textarea, input:not([type=hidden]), select"))
+  }
+
+  // The chip of an emoji in a message as it is drawn now; the way to the set
+  // (the add chip, or the meta line's control once the row is gone) when that
+  // emoji's last reaction went and its chip with it. Compared as data, never
+  // built into a selector: the emoji is whatever the button held.
   reaction(message, emoji) {
-    const chips = message.querySelector("[data-note-reactions]")
-    return [ ...(chips?.querySelectorAll("button[data-reaction]:not([disabled])") || []) ].find((chip) => chip.dataset.reaction === emoji) || chips?.querySelector("summary")
+    return [ ...message.querySelectorAll("[data-note-reactions] button[data-reaction]:not([disabled])") ].find((chip) => chip.dataset.reaction === emoji)
+      || message.querySelector("details[data-reaction-add] > summary")
+  }
+
+  // A message that stays the element it is gets the answer's reactions: its
+  // row of chips, or -- for a message nobody has reacted to -- the control in
+  // its meta line. Either may have come or gone since, so each is taken out
+  // and put where the message's own markup has it: the row before whatever
+  // is asked under the text, the control before the "⋯" menu.
+  //
+  // `disabled`: the message is being edited. The answer draws it as it is
+  // for everyone else, with chips to press; here they are made what
+  // `ReactionsComponent` draws under an edit form -- its `:disabled` state:
+  // the row at half opacity taking no pointer, every button `disabled`, the
+  // add chip a disabled button in place of the <details>, and no control in
+  // the meta line.
+  takeReactions(message, twin, { disabled = false } = {}) {
+    const row = twin.querySelector(":scope > [data-note-reactions]")
+    const control = disabled ? null : twin.querySelector(":scope > div > details[data-reaction-add]")
+    if (row && disabled) {
+      row.dataset.noteReactions = "disabled"
+      row.classList.add("pointer-events-none", "opacity-50")
+      row.querySelectorAll("details[data-reaction-add]").forEach((add) => {
+        const summary = add.querySelector("summary")
+        const button = document.createElement("button")
+        button.type = "button"
+        button.className = summary.className
+        button.setAttribute("aria-label", summary.getAttribute("aria-label"))
+        button.dataset.reactionAdd = "true"
+        button.append(...summary.childNodes)
+        add.replaceWith(button)
+      })
+      row.querySelectorAll("button").forEach((button) => { button.disabled = true })
+    }
+    message.querySelectorAll(":scope > [data-note-reactions], :scope > div > details[data-reaction-add]").forEach((old) => old.remove())
+    if (row) {
+      const under = message.querySelector(":scope > [role='alert'], :scope > [data-note-delete-question]")
+      if (under) under.before(row)
+      else message.append(row)
+    }
+    if (control) {
+      const menu = message.querySelector(":scope > div > [data-controller~='admin--menu']")
+      if (menu) menu.before(control)
+      else message.firstElementChild?.append(control)
+    }
   }
 
   // `admin--notes`, on the same element.

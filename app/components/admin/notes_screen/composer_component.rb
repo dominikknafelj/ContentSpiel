@@ -27,12 +27,15 @@ module Admin
       # The emoji popover: the menu panel with the set (`Notes::EMOJI`) six to
       # a row. A message's "Add a reaction" chip opens the same panel with
       # the same buttons (`Admin::NotesScreen::ReactionsComponent`): one
-      # picker, drawn from here.
-      EMOJI_PANEL_CLASS = "absolute left-0 z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
+      # picker, drawn from here. Which edge it hangs from is its user's.
+      EMOJI_PANEL_CLASS = "absolute z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
       EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
 
-      def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2)
+      # `unsaved` makes it an EDIT form: the words of the note ("Unsaved
+      # edit") it shows when its field was filled from a draft instead of the
+      # saved text (`admin--note-composer`, "an edit that was left").
+      def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2, unsaved: nil)
         @url = url
         @key = key
         @label = label
@@ -44,11 +47,12 @@ module Admin
         @errors = Array(errors)
         @hidden = hidden
         @rows = rows
+        @unsaved = unsaved
       end
 
       private
 
-      attr_reader :url, :key, :label, :submit, :mentions_url, :method, :body, :names, :errors, :hidden, :rows
+      attr_reader :url, :key, :label, :submit, :mentions_url, :method, :body, :names, :errors, :hidden, :rows, :unsaved
 
       def field_id = "note-field-#{key}"
 
@@ -58,7 +62,7 @@ module Admin
       def form_data
         { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
           "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          "admin--note-composer-user-value": Current.user&.id,
+          "admin--note-composer-user-value": Current.user&.id, "admin--note-composer-edit-value": unsaved.present?,
           action: "turbo:submit-start->admin--note-composer#sending turbo:submit-end->admin--note-composer#sent", messages: script_messages }
       end
 

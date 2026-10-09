@@ -313,6 +313,9 @@ en:
           # The "⋯" menu's way to the emoji set, for touch (the add chip
           # shows on hover or focus).
           react: "React"
+          # On a message whose edit was left without saving, and in its edit
+          # form once the text is put back (the handoff's decision 27).
+          unsaved: "Unsaved edit"
         # A message's reaction chips. A chip's name for a screen reader says
         # the emoji in words, how many, whether one is the viewer's, and who
         # (its `title` shows the same names to a mouse). `add` names the chip

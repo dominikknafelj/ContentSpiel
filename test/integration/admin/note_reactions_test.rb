@@ -119,12 +119,33 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_select "form form", count: 0
   end
 
-  test "a message nobody reacted to has its add chip hidden at rest, shown on hover or focus of the message" do
+  # The handoff's decision 26: no row under a message nobody reacted to; its
+  # way to the set is in the meta line, just left of the "⋯" menu.
+  test "a message nobody reacted to has no reactions row: its add control is in the meta line, shown on hover or focus" do
     reply = as(users(:two)) { Notes::Reply.call(@thread, body: "Plain") }.record
     get @path, headers: frame
 
-    assert_select "#note-message-#{reply.id}[class~='group/note'] details[data-reaction-add][class~='opacity-0'][class~='group-hover/note:opacity-100'][class~='group-focus-within/note:opacity-100'][class~='open:opacity-100']"
+    assert_select "#note-message-#{reply.id} [data-note-reactions]", count: 0
     assert_select "#note-message-#{reply.id} button[data-reaction]", count: 0
+    hidden_at_rest = "[class~='opacity-0'][class~='group-hover/note:opacity-100'][class~='group-focus-within/note:opacity-100'][class~='open:opacity-100']"
+    meta = "#note-message-#{reply.id}[class~='group/note'] > div:first-child > details[data-reaction-add=meta]#{hidden_at_rest}"
+    assert_select "#{meta} + [data-controller='admin--menu']" # just left of the "⋯" menu
+    assert_select "#{meta} > summary[aria-label='Add a reaction'][class~='size-6'][class~='text-meta']"
+    assert_select "#{meta} form[data-turbo-frame=notes]:has(input[name=on][value=true]) button[name=emoji]", count: Notes::EMOJI.size
+    assert_select "#note-message-#{reply.id} [data-note-react]", text: "React"
+
+    # With a reaction: the add chip at the end of the chip row, always shown, and nothing in the meta line.
+    assert_select "#note-message-#{@note.id} [data-note-reactions] > details[data-reaction-add=row]:last-child:not([class~='opacity-0'])"
+    assert_select "#note-message-#{@note.id} details[data-reaction-add]", count: 1
+  end
+
+  test "a message nobody reacted to, while it is being edited, has neither a row nor the meta-line control" do
+    reply = as(users(:two)) { Notes::Reply.call(@thread, body: "Plain") }.record
+    sign_in_as(users(:two))
+    get "#{@path}?edit=#{reply.id}", headers: frame
+
+    assert_select "#note-message-#{reply.id} form[data-note-composer]"
+    assert_select "#note-message-#{reply.id} [data-note-reactions], #note-message-#{reply.id} [data-reaction-add], #note-message-#{reply.id} [data-note-react]", count: 0
   end
 
   test "a resolved thread shows its reactions read-only: no button, no add chip, no React; and a request sent all the same is refused" do

@@ -9,20 +9,28 @@ module Admin
     # `ComposerComponent::EMOJI_PANEL_CLASS`, over `Notes::EMOJI`), here with
     # each emoji a submit.
     #
+    # TWO PLACES (`place`), one of which is drawn (the handoff's decision 26).
+    # - `:row`, under the text, for a message that HAS reactions: its chips,
+    #   and the add chip at the end of the row, always on show.
+    # - `:meta`, in the message's meta line just left of the "⋯" menu, for a
+    #   message nobody reacted to: a 24px smile control, shown on hover or
+    #   keyboard focus of the message (`group/note` on the message,
+    #   `:focus-within`) and while its set is open. Such a message has no row
+    #   at all, so the control costs no height at rest. The set hangs from its
+    #   right edge there, since the control stands at the end of the line.
+    # For touch the message's "⋯" menu has "React", which opens the same set
+    # wherever it stands (`admin--note-reactions#open`).
+    #
     # THREE STATES (`state`).
-    # - `:open`: the chips are buttons and the add chip is there. The add chip
-    #   shows at rest only under a message that has reactions; otherwise on
-    #   hover or keyboard focus of the message (`group/note` on the message,
-    #   `:focus-within`), and while its set is open. It keeps its place when
-    #   it is not shown, so nothing moves under the pointer. For touch the
-    #   message's "⋯" menu has "React", which opens the same set
-    #   (`admin--note-reactions#open`).
-    # - `:disabled`, while the message is being edited: everything stays,
-    #   under the edit form, at half opacity, and nothing can be pressed --
-    #   the buttons are `disabled`, so the keyboard skips them. (A press would
-    #   be answered with the thread drawn again, without the form.)
+    # - `:open`: the chips are buttons and the way to the set is there.
+    # - `:disabled`, while the message is being edited: the row stays, under
+    #   the edit form, at half opacity, and nothing can be pressed -- the
+    #   buttons are `disabled`, so the keyboard skips them. (A press would be
+    #   answered with the thread drawn again, without the form.) The
+    #   meta-line control is not drawn.
     # - `:closed`, in a resolved thread: the chips are read, not pressed --
-    #   no button, no add chip. `Notes::React` refuses there too.
+    #   no button, no add chip, no meta-line control. `Notes::React` refuses
+    #   there too.
     #
     # A press says the state it is meant to reach (`on`), never "toggle": a
     # request sent twice ends where the person meant (`Notes::React`).
@@ -44,10 +52,12 @@ module Admin
     # database per message.
     class ReactionsComponent < Admin::AdminComponent
       STATES = %i[open disabled closed].freeze
+      PLACES = %i[row meta].freeze
 
       CHIP = "inline-flex h-6 items-center gap-[5px] rounded-full border px-[9px]".freeze
       PRESSABLE = "cursor-pointer focus-visible:outline-2 focus-visible:outline-accent".freeze
       ADD_CHIP = "flex h-6 w-[30px] items-center justify-center rounded-full border border-line text-meta".freeze
+      META_CONTROL = "flex size-6 items-center justify-center rounded-cs text-meta hover:text-ink".freeze
       # Shown on hover or focus of the message, and while the set is open.
       AT_REST_HIDDEN = "opacity-0 group-hover/note:opacity-100 group-focus-within/note:opacity-100 open:opacity-100".freeze
       # Above the chip; below it when `admin--note-reactions` found no room
@@ -57,8 +67,9 @@ module Admin
       # close each other, without a script.
       ADD_GROUP = "note-reaction-add".freeze
 
-      def initialize(message:, listing:, viewer:, type:, view:, state: :open)
+      def initialize(message:, listing:, viewer:, type:, view:, state: :open, place: :row)
         raise ArgumentError, "unknown reactions state #{state.inspect}" unless STATES.include?(state)
+        raise ArgumentError, "unknown reactions place #{place.inspect}" unless PLACES.include?(place)
 
         @message = message
         @listing = listing
@@ -66,14 +77,18 @@ module Admin
         @type = type
         @view = view
         @state = state
+        @place = place
       end
 
-      # Nothing at all for a resolved thread's message nobody reacted to.
-      def render? = !(closed? && groups.empty?)
+      # The row for a message with reactions; the meta-line control for one
+      # without, while the thread is open and the message is not being edited.
+      def render? = meta? ? @state == :open && groups.empty? : groups.any?
 
       private
 
       attr_reader :message, :listing, :viewer
+
+      def meta? = @place == :meta
 
       def closed? = @state == :closed
 
@@ -102,14 +117,16 @@ module Admin
 
       def count_class(mine) = "font-cs-mono text-[11px] #{mine ? "text-accent" : "text-dim"}"
 
-      def add_class = [ ADD_CHIP, PRESSABLE, "list-none hover:bg-sunken [&::-webkit-details-marker]:hidden" ].join(" ")
+      def add_class = [ meta? ? META_CONTROL : ADD_CHIP, PRESSABLE, "list-none hover:bg-sunken [&::-webkit-details-marker]:hidden" ].join(" ")
+
+      def add_icon_size = meta? ? "size-4" : "size-3"
 
       def path
         helpers.admin_record_note_message_reactions_path(*helpers.note_args(listing.container), message.thread_id, message,
           **{ view: (@view unless @view == "editor"), **helpers.admin_url_options }.compact)
       end
 
-      def panel_class = "#{Admin::NotesScreen::ComposerComponent::EMOJI_PANEL_CLASS} #{PANEL_SIDE}"
+      def panel_class = "#{Admin::NotesScreen::ComposerComponent::EMOJI_PANEL_CLASS} #{meta? ? "right-0" : "left-0"} #{PANEL_SIDE}"
 
       def emoji_class = Admin::NotesScreen::ComposerComponent::EMOJI_BUTTON_CLASS
     end

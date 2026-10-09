@@ -1,6 +1,10 @@
 <%= form_with url: url, method: method, class: "flex flex-col gap-2", data: form_data do %>
   <% hidden.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
   <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--note-composer-target": "names" } %>
+  <% if unsaved %>
+    <%# Shown by the script when the field holds a draft, not the saved text. %>
+    <p hidden class="text-[12px] text-meta" data-note-unsaved data-admin--note-composer-target="unsaved"><%= unsaved %></p>
+  <% end %>
   <% if errors.any? %>
     <ul role="alert" class="flex flex-col gap-0.5 text-[12px] text-danger-ink">
       <% errors.each do |error| %><li><%= error %></li><% end %>
@@ -23,7 +27,7 @@
       <div class="flex items-center gap-0.5" data-note-toolbar>
         <details class="group relative" data-admin--note-composer-target="emoji">
           <summary class="<%= TOOL_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
-          <div class="<%= EMOJI_PANEL_CLASS %> <%= POPOVER_SIDE %>">
+          <div class="<%= EMOJI_PANEL_CLASS %> left-0 <%= POPOVER_SIDE %>">
             <% ::Notes::EMOJI.each do |emoji| %>
               <button type="button" class="<%= EMOJI_BUTTON_CLASS %>" data-emoji="<%= emoji %>" data-action="admin--note-composer#emoji"><%= emoji %></button>
             <% end %>
