@@ -6,6 +6,12 @@ module Notes
   # order of the groups and for what each block is called). The resolved
   # threads are read only when asked for.
   #
+  # ONE THREAD (`find`, the thread view) costs one query more: the reactions
+  # of all its messages, read together (`messages: :reactions`), never per
+  # message. The people who reacted are named from the same one read of
+  # `users`, so that query grows in rows, not in number. The list reads no
+  # reactions: it draws none.
+  #
   # Open threads are grouped by what they are on: the record itself first,
   # then one group per block, in the order the page shows its blocks
   # (`BlockOutline#reading_order`). Pinned threads are listed apart, first.
@@ -50,7 +56,13 @@ module Notes
     def resolved = @resolved ||= load(scope.resolved.order(resolved_at: :desc, id: :desc))
 
     # One thread of this container, or nil: never a thread by its id alone.
-    def find(id) = load(scope.where(id: id)).first
+    # With its messages' reactions, which only the thread view draws.
+    def find(id) = load(scope.where(id: id), reactions: true).first
+
+    # A message's reactions, in the order they were given: those `find` read
+    # with the thread. Empty for a message of a thread that was listed, not
+    # found -- never a query per message.
+    def reactions_of(message) = message.association(:reactions).loaded? ? message.reactions : []
 
     def subject_of(thread) = subjects[Notes.key(thread.subject_type, thread.subject_id)]
 
@@ -79,10 +91,13 @@ module Notes
       @moderator
     end
 
-    # Everyone a loaded thread names: authors, the mentioned, who resolved it.
+    # Everyone a loaded thread names: authors, the mentioned, who resolved
+    # it, and who reacted (a chip's title names them).
     def users
       @users ||= begin
-        ids = loaded.flat_map { |thread| [ thread.resolved_by_id, *thread.messages.flat_map { |message| [ message.author_id, *message.mentioned_user_ids ] } ] }
+        ids = loaded.flat_map do |thread|
+          [ thread.resolved_by_id, *thread.messages.flat_map { |message| [ message.author_id, *message.mentioned_user_ids, *reactions_of(message).map(&:user_id) ] } ]
+        end
         User.where(id: ids.compact.uniq).index_by(&:id)
       end
     end
@@ -109,8 +124,8 @@ module Notes
 
     def open_threads = @open_threads ||= load(scope.unresolved.order(pinned: :desc, last_message_at: :desc, id: :desc))
 
-    def load(relation)
-      relation.limit(@limit).includes(:messages).to_a.tap { |threads| (@loaded ||= []).concat(threads) }
+    def load(relation, reactions: false)
+      relation.limit(@limit).includes(reactions ? { messages: :reactions } : :messages).to_a.tap { |threads| (@loaded ||= []).concat(threads) }
     end
 
     def loaded = (@loaded || open_threads)

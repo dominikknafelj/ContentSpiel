@@ -308,6 +308,15 @@ module ServiceCalls
       { call: -> { Notes::Pin.call(thread) }, permission: "pages.edit", on: page }
     },
 
+    # Whoever may read the record may react; the control is someone else's
+    # reaction to the owner's note.
+    "Notes::React" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note = note_on(page).first_message
+      { call: -> { Notes::React.call(note, emoji: "👍") }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "a reaction is an acknowledgement, not a change to content or to a note's text" }
+    },
+
     "Notes::Remove" => lambda {
       page = create_page(title: "Noted", published: false)
       note_on(page)

@@ -99,7 +99,8 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       assert_select "form[action$='/pin']", count: 0
     end
     assert_select "#note-thread-#{@thread.id}-reply form[action$='/resolve']"
-    assert_select "#note-message-#{@thread.first_message.id} form", count: 0 # someone else's note: nothing to edit or delete
+    # Someone else's note: nothing to edit or delete. (Its reactions' forms are anyone's who may read it.)
+    assert_select "#note-message-#{@thread.first_message.id} form:not([action*='/reactions'])", count: 0
     assert_select "#note-thread-#{@thread.id}-reply form[data-controller='admin--note-composer'][data-turbo-frame=notes] textarea[name=body]"
   end
 
@@ -280,7 +281,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
 
     first = @thread.first_message
     get thread_url, params: { edit: first.id, delete: first.id }, headers: frame
-    assert_select "#note-message-#{first.id} form", count: 0
+    assert_select "#note-message-#{first.id} form:not([action*='/reactions'])", count: 0
   end
 
   test "an edit that is refused comes back with its form open and the typed text in it" do

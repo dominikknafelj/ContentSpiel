@@ -38,6 +38,9 @@ en:
           block: "This block was deleted."
           note: "This note is gone: it was deleted, or what it was on was."
         not_yours: "Only the person who wrote a note can change it."
+        # An emoji that is not one of the offered set (`Notes::EMOJI`): only a
+        # forged request sends one.
+        emoji: "That reaction isn't available."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
       # What the notes' scripts say. `mentions` is `admin--note-composer`'s
@@ -293,6 +296,15 @@ en:
           delete: "Delete"
           delete_question: "Delete this note?"
           delete_confirm: "Delete"
+        # A message's reaction chips. `chip` is one chip's name for a screen
+        # reader (its `title` holds who reacted); `add` names the chip that
+        # opens the set, `react_with` each emoji in it.
+        reactions:
+          add: "Add a reaction"
+          react_with: "React with %{emoji}"
+          chip:
+            one: "%{emoji}, %{count} reaction"
+            other: "%{emoji}, %{count} reactions"
         # A block's marker as the server draws it, before the script has the
         # counts: its name without notes, and what it reads while text is
         # selected in the block (`admin.notes.script.marker` are its names

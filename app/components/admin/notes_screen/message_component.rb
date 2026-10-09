@@ -2,7 +2,8 @@ module Admin
   module NotesScreen
     # One message: who, when, "edited", the text, and a "⋯" menu with Edit (the
     # author's) and Delete (the author's, and a moderator's: notes spec §3.4).
-    # (Tasks 15 and 16 add the reactions and the files.)
+    # Under the text, its reactions (`ReactionsComponent`). (Task 16 adds the
+    # files.)
     #
     # THE MENU ASKS THE SERVER. Edit and Delete are links to the thread again
     # with `?edit=<id>` or `?delete=<id>` (`asked`), and the answer draws this

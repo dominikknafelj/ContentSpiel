@@ -14,6 +14,11 @@ module Notes
 
     belongs_to :thread, class_name: "Notes::Thread", inverse_of: :messages
     belongs_to :author, class_name: "User", optional: true
+    # In the order they were given, so a message's chips stand in the order
+    # each emoji first appeared. No `dependent:`: the foreign key removes a
+    # message's reactions with it, however the message goes (`delete_all` in
+    # `Notes::Remove` runs no callback).
+    has_many :reactions, -> { order(:created_at, :id) }, class_name: "Notes::Reaction", foreign_key: :message_id, inverse_of: :message
 
     # Of the messages in the relation, only the newest of each CONTAINER (the
     # page, post or image whose screen lists the thread), as its container

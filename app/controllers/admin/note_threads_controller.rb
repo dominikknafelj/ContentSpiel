@@ -118,7 +118,11 @@ module Admin
     # "Delete this note?", in place. Whether the viewer may is the
     # component's question (`Admin::NotesScreen::MessageComponent`), and the
     # service's when the form is sent; an id that names nothing draws nothing.
-    def asked = { edit: params[:edit].to_s.to_i, delete: params[:delete].to_s.to_i }
+    #
+    # `?shown=<message id>`: the message a reaction was just given to
+    # (`Admin::NoteReactionsController`). It asks for nothing but that the
+    # message be on screen: the fold it may sit in is drawn open.
+    def asked = { edit: params[:edit].to_s.to_i, delete: params[:delete].to_s.to_i, shown: params[:shown].to_s.to_i }
 
     # `Notes::MarkRead` on a thread takes the container's row lock (`FOR
     # UPDATE` on the page, post or image) before it writes, like every notes

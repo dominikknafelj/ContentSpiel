@@ -322,6 +322,9 @@ Rails.application.routes.draw do
       post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
       patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
       delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
+      # A reaction on one message: a toggle of the viewer's own (notes spec D10).
+      post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
+        constraints: { thread_id: /\d+/, id: /\d+/ }
     end
 
     # Quick draft (dashboard spec §4.1): a title and a content type, saved

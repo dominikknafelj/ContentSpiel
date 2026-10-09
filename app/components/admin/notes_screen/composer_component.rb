@@ -24,6 +24,12 @@ module Admin
       renders_one :secondary
 
       POPOVER_SIDE = "top-full mt-1.5 [[data-note-part=reply]_&]:top-auto [[data-note-part=reply]_&]:bottom-full [[data-note-part=reply]_&]:mb-1.5 [[data-note-part=reply]_&]:mt-0".freeze
+      # The emoji popover: the menu panel with the set (`Notes::EMOJI`) six to
+      # a row. A message's "Add a reaction" chip opens the same panel with
+      # the same buttons (`Admin::NotesScreen::ReactionsComponent`): one
+      # picker, drawn from here.
+      EMOJI_PANEL_CLASS = "absolute left-0 z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu".freeze
+      EMOJI_BUTTON_CLASS = "cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken".freeze
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
 
       def initialize(url:, key:, label:, submit:, mentions_url:, method: :post, body: "", names: {}, errors: [], hidden: {}, rows: 2)

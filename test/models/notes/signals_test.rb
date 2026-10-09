@@ -57,6 +57,11 @@ class Notes::SignalsTest < ActiveSupport::TestCase
       as(users(:two)) { assert Notes::Pin.call(@thread).ok? }
       { actor: users(:two), call: -> { Notes::Unpin.call(@thread) }, record: 1, people: {} }
     },
+    # The record's stream only: a reaction never writes a delivery.
+    "Notes::React" => -> {
+      note = @thread.first_message
+      { actor: users(:reader), call: -> { Notes::React.call(note, emoji: "🎉") }, record: 1, people: {} }
+    },
     # The actor's own rows: nobody else is signalled.
     "Notes::SetFollowing" => -> {
       { actor: users(:reader), call: -> { Notes::SetFollowing.call(@thread, following: false) }, record: 0, people: {} }
@@ -114,7 +119,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
   test "every notes service has its case here" do
     assert_equal services.sort, CASES.keys.sort, "a notes service without a case in CASES (or a case without its service)"
-    assert_operator services.size, :>=, 11
+    assert_operator services.size, :>=, 12
   end
 
   CASES.each do |name, build|
@@ -297,7 +302,8 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     signals = capture_signals do
       as(users(:two)) do
         [ Notes::Reply.call(thread, body: "Late"), Notes::Resolve.call(thread), Notes::Pin.call(thread), Notes::EditMessage.call(message, body: "Late"),
-          Notes::EditMessage.call(Notes::Message.new(body: "x"), body: "Late"), Notes::Start.call(ContentBlock.new, body: "Late") ].each do |result|
+          Notes::EditMessage.call(Notes::Message.new(body: "x"), body: "Late"), Notes::Start.call(ContentBlock.new, body: "Late"),
+          Notes::React.call(message, emoji: "👍"), Notes::React.call(Notes::Message.new(body: "x"), emoji: "👍") ].each do |result|
           assert_not result.ok?
           assert_not result.denied?
         end
@@ -306,6 +312,23 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     end
 
     assert_empty signals
+  end
+
+  # A reaction is for whoever has the thread open, and for nobody's inbox
+  # (handoff "Reaction chip": reactions never go to the inbox): the record's
+  # stream, given and taken back alike, and no person's -- not the author's,
+  # not a follower's, not the mentioned.
+  test "a reaction signals its record, given and taken back, and no person; a refused emoji signals nobody" do
+    thread = start
+    threads = [ @record, { "kind" => "threads", "thread_id" => thread.id } ]
+
+    as(users(:one)) do
+      assert_no_difference -> { Notes::Delivery.count } do
+        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍").ok? }
+        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍").ok? }
+      end
+      assert_empty capture_signals { assert_not Notes::React.call(thread.first_message, emoji: "a secret").ok? }
+    end
   end
 
   test "following signals nobody; reading tells the reader's own tabs once per call that read something" do

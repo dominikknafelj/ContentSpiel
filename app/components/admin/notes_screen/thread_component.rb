@@ -56,9 +56,10 @@ module Admin
       # being acted on: its edit form or its "Delete this note?" was asked
       # for, or its own write was just refused. Closed, the answer to Edit or
       # Delete would be drawn where nobody sees it, and the press would seem
-      # to have done nothing.
+      # to have done nothing. The same goes for the message a reaction was
+      # just given to (`shown`): its chip would vanish under the press.
       def fold_open?
-        folded.any? { |record| asked.values_at(:edit, :delete).include?(record.id) || (failed && failed[:key] == "message-#{record.id}") }
+        folded.any? { |record| asked.values_at(:edit, :delete, :shown).include?(record.id) || (failed && failed[:key] == "message-#{record.id}") }
       end
 
       # The first message carries the "written on" chip, as its content.

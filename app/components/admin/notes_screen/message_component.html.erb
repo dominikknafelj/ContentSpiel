@@ -23,6 +23,10 @@
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %></p>
   <% else %>
     <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users, viewer_id: viewer&.id) %>
+    <%# Below the text (handoff "Reaction chip"), and not while the message is
+        being edited: a press on a chip draws the thread again, without the
+        form. Its forms are siblings of everything here, inside no other form. %>
+    <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, type: type, view: view) %>
   <% end %>
   <% if bare_failure %>
     <ul role="alert" class="text-[12px] text-danger-ink"><% bare_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>

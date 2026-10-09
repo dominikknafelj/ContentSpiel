@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_09_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -209,6 +209,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
     t.datetime "updated_at", null: false
     t.index ["author_id"], name: "index_note_messages_on_author_id"
     t.index ["thread_id"], name: "index_note_messages_on_thread_id"
+  end
+
+  create_table "note_reactions", force: :cascade do |t|
+    t.bigint "message_id", null: false
+    t.bigint "user_id", null: false
+    t.string "emoji", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id", "user_id", "emoji"], name: "index_note_reactions_on_message_id_and_user_id_and_emoji", unique: true
+    t.index ["user_id"], name: "index_note_reactions_on_user_id"
   end
 
   create_table "note_threads", force: :cascade do |t|
@@ -412,6 +422,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_09_120000) do
   add_foreign_key "note_follows", "users", on_delete: :cascade
   add_foreign_key "note_messages", "note_threads", column: "thread_id", on_delete: :cascade
   add_foreign_key "note_messages", "users", column: "author_id", on_delete: :nullify
+  add_foreign_key "note_reactions", "note_messages", column: "message_id", on_delete: :cascade
+  add_foreign_key "note_reactions", "users", on_delete: :cascade
   add_foreign_key "note_threads", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "note_threads", "users", column: "pinned_by_id", on_delete: :nullify
   add_foreign_key "note_threads", "users", column: "resolved_by_id", on_delete: :nullify

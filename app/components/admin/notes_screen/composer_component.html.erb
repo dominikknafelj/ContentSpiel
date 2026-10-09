@@ -23,9 +23,9 @@
       <div class="flex items-center gap-0.5" data-note-toolbar>
         <details class="group relative" data-admin--note-composer-target="emoji">
           <summary class="<%= TOOL_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
-          <div class="absolute left-0 z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu <%= POPOVER_SIDE %>">
+          <div class="<%= EMOJI_PANEL_CLASS %> <%= POPOVER_SIDE %>">
             <% ::Notes::EMOJI.each do |emoji| %>
-              <button type="button" class="cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken" data-emoji="<%= emoji %>" data-action="admin--note-composer#emoji"><%= emoji %></button>
+              <button type="button" class="<%= EMOJI_BUTTON_CLASS %>" data-emoji="<%= emoji %>" data-action="admin--note-composer#emoji"><%= emoji %></button>
             <% end %>
           </div>
         </details>

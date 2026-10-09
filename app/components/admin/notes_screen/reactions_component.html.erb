@@ -1,0 +1,17 @@
+<div class="flex flex-wrap items-center gap-1.5" data-note-reactions>
+  <% groups.each do |emoji, reactions| %>
+    <% mine = mine?(reactions) %>
+    <%= button_to path, params: { emoji: emoji }, class: chip_class(mine), title: names(reactions), aria: { pressed: mine, label: t(".chip", emoji: emoji, count: reactions.size) },
+          data: { reaction: emoji, mine: (true if mine) }, form: { class: "inline-flex", data: { turbo_frame: "notes" } } do %>
+      <span class="text-[13px]" aria-hidden="true"><%= emoji %></span><span class="font-cs-mono text-[11px] <%= mine ? "text-accent" : "text-dim" %>" aria-hidden="true"><%= reactions.size %></span>
+    <% end %>
+  <% end %>
+  <details class="relative" name="<%= ADD_GROUP %>" data-reaction-add>
+    <summary class="flex h-6 w-[30px] cursor-pointer list-none items-center justify-center rounded-full border border-line text-meta hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden" aria-label="<%= t(".add") %>" title="<%= t(".add") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-3" %></summary>
+    <%= form_with url: path, method: :post, class: panel_class, data: { turbo_frame: "notes" } do %>
+      <% ::Notes::EMOJI.each do |emoji| %>
+        <button type="submit" name="emoji" value="<%= emoji %>" class="<%= emoji_class %>" aria-label="<%= t(".react_with", emoji: emoji) %>"><%= emoji %></button>
+      <% end %>
+    <% end %>
+  </details>
+</div>

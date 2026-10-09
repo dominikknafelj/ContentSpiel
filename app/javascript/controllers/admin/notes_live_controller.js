@@ -50,6 +50,10 @@ import { messages } from "i18n/messages"
 //   stays the element it is. The `reply` part is never replaced: only its
 //   Resolve / Reopen button and the empty form that button sends are swapped
 //   when the thread's state changed, so the button says what it now does.
+//   A message's reaction chips are read, not typed: they are redrawn with
+//   their message, and in a message that stays the element it is (a delete
+//   question is open) the chips alone are swapped. The set of emoji someone
+//   has open under a message ("Add a reaction") is open afterwards too.
 //   Whatever had the focus has it afterwards (the same element, or the same
 //   control of the new markup), and the scroll position stays -- unless the
 //   reader was at the bottom, who stays at the bottom. Messages that arrived
@@ -464,16 +468,23 @@ export default class extends Controller {
     const find = (id) => [ ...next.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === id)
 
     const arrived = [ ...next.querySelectorAll("[data-note-message]") ].filter((message) => !known.has(message.dataset.noteMessage))
+    // The set of emoji that is open under a message, to be open again.
+    const picking = old.querySelector("details[data-reaction-add][open]")?.closest("[data-note-message]")?.dataset.noteMessage
     // The very elements, in the place the answer gives their messages -- shown,
     // should that place now be among the folded ones; one whose message was
     // deleted meanwhile keeps its text at the end.
     busy.forEach((message) => {
       const twin = find(message.dataset.noteMessage)
+      // Its chips are what others did, not what is being typed: the new ones.
+      const chips = message.querySelector("[data-note-reactions]")
+      const chipsTwin = twin?.querySelector("[data-note-reactions]")
+      if (chips && chipsTwin && !chips.querySelector("details[open]")) chips.replaceWith(chipsTwin)
       if (twin) twin.replaceWith(message)
       else next.append(message)
       message.closest("details")?.setAttribute("open", "")
     })
     if (old.querySelector("details[data-note-fold]")?.open) next.querySelector("details[data-note-fold]")?.setAttribute("open", "")
+    if (picking) find(picking)?.querySelector("details[data-reaction-add]")?.setAttribute("open", "")
     // The divider stays where it first stood while the thread is open.
     const first = old.querySelector("[data-note-new-divider]")?.nextElementSibling?.dataset.noteMessage
     const mark = (first && find(first)) || arrived[0]

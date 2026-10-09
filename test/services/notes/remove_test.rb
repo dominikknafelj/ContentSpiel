@@ -10,16 +10,18 @@ class Notes::RemoveTest < ActiveSupport::TestCase
       Notes::Start.call(@block, body: "On the block")
       Notes::Start.call(@other, body: "Elsewhere")
     end
+    # A reaction on every message: it goes with its message (the foreign key).
+    as(users(:reader)) { Notes::Message.find_each { |note| Notes::React.call(note, emoji: "👍") } }
   end
 
-  def left = [ Notes::Thread.count, Notes::Message.count, Notes::Delivery.count, Notes::Follow.count ]
+  def left = [ Notes::Thread.count, Notes::Message.count, Notes::Delivery.count, Notes::Follow.count, Notes::Reaction.count ]
 
   test "it removes the threads of the record and of what goes with it, and nothing else" do
     result = Notes::Remove.call(@page, with: [ @block ])
 
     assert result.ok?
     assert_equal [ @other ], Notes::Thread.all.map(&:subject)
-    assert_equal [ 1, 1, 0, 1 ], left
+    assert_equal [ 1, 1, 0, 1, 1 ], left
   end
 
   test "one event on the record, ids only; none when there was nothing to remove" do
@@ -37,7 +39,12 @@ class Notes::RemoveTest < ActiveSupport::TestCase
 
   test "it costs the same statements for one thread as for many" do
     one = capture_sql { Notes::Remove.call(@other) }.size
-    as(users(:two)) { 6.times { |index| Notes::Start.call(@block, body: "Note #{index}") } }
+    as(users(:two)) do
+      6.times do |index|
+        note = Notes::Start.call(@block, body: "Note #{index}").record.first_message
+        Notes::EMOJI.first(3).each { |emoji| Notes::React.call(note, emoji: emoji) }
+      end
+    end
     many = capture_sql { Notes::Remove.call(@page, with: [ @block ]) }.size
 
     assert_equal one, many
