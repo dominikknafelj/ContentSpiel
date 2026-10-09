@@ -67,7 +67,7 @@ module Admin
       row = inbox.find(params[:id]) or raise ActiveRecord::RecordNotFound
 
       render json: { id: row.id, reason: row.reason, sentence: delivery_sentence(row), title: row.title || t("admin.components.notes_screen.inbox_row.untitled"),
-        excerpt: row.excerpt, url: public_send(row.route.name, *row.route.args, **row.route.params, **admin_url_options), thread_id: row.thread_id }
+        excerpt: row.excerpt, url: helpers.note_route_path(row.route, **admin_url_options), thread_id: row.thread_id }
     end
 
     private

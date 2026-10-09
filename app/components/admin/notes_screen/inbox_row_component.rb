@@ -27,7 +27,7 @@ module Admin
 
       attr_reader :row
 
-      def path = helpers.public_send(row.route.name, *row.route.args, **row.route.params, **url_options)
+      def path = helpers.note_route_path(row.route, **url_options)
 
       # A named person, or one who is gone; a reopen names nobody, and so
       # does a note whose author was deleted (the foreign key nulls the

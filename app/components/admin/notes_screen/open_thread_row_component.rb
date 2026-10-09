@@ -27,7 +27,7 @@ module Admin
 
       attr_reader :row
 
-      def path = helpers.public_send(row.route.name, *row.route.args, **row.route.params, **url_options)
+      def path = helpers.note_route_path(row.route, **url_options)
 
       def post? = row.kind == "post"
 
