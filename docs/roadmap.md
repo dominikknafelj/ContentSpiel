@@ -35,19 +35,28 @@ Sources: product review (`docs/product/2026-09-26-backend-product-review.md`), c
 | Five staff-review bugs (S1–S5) | PR #39 and design pass round 3 |
 | Technical cleanup: system tests that fail on JavaScript errors, click natively and wait without fixed sleeps; a behavioural service contract and a dependency-direction guard; the admin i18n key scheme; `queue.js` and `CLAUDE.md` split; one grant per permission, dormant names judged as stored, stale checks on the group and user forms, the owner flag through one endpoint, API tokens found by an indexed digest, language changes under a row lock; URLs synced only when they can have changed; a content version that moves only on published changes | `2026-10-05-technical-cleanup-design.md` (§10 lists the rulings made while building) |
 | Mind graph on a canvas: one 2D canvas laid out by d3-force in a Web Worker, zoom and pan, hubs sized and labelled first with labels that never overlap, a local view around a post or tag to depth 1–2, a cap of 2,000 posts with a message, a search field that reaches everything else, a selection card beside its node, a list beside the canvas whose rows select (the keyboard path), a layout shown at frame pace, nodes that stay where they are dropped, a retired type told apart by shape; d3-force loaded only by that screen | `2026-10-07-mind-graph-canvas-design.md` (§7 holds the measured numbers, §11 the departures made while building and the round after the owner's trial of 2026-10-08) |
+| Sections: a block that holds blocks in columns (six layouts) with a background and a width; in the editor a card of lanes and tiles with one block's form open under them, every move by drag and from a menu; on the public page a band with a grid that follows its own width. The first of the four sub-projects the block and type catalogue became | `2026-10-08-sections-layout-design.md` (§12 lists where the build left the spec and the plan) |
 
 ## Next, in order
 
-Agreed 2026-10-04. Each is its own sub-project with a spec and one PR.
+Agreed 2026-10-04; reordered 2026-10-08, when the block and type catalogue became four sub-projects (layout, shipped as "Sections" above; the built-in catalogue; content types defined in the admin; forms) and the owner put collaboration on content ahead of the three that remain. Each is its own sub-project with a spec and one PR.
 
-1. **Block and type catalogue** (Should). A demo site can only show layouts the block types allow. Today: 3 block types (rich text, image, post list), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's.
-   - Block candidates: hero or banner, columns or grid, gallery, call to action, quote or testimonial, video or embed, accordion or FAQ, teaser cards linking to pages, and a sitemap block (a human-readable list of the published tree in the visitor's language).
+1. **Collaboration on content** (Should; decided 2026-10-08). Four steps in this order, each its own sub-project:
+   1. Comments and notes on pages, posts, blocks and library images. A note attaches to the content record and is shown wherever that record appears: its editor, a count in the lists, the mind graph's node and card, the dashboard. The view and the language it was written in are stored as context only. A mind graph node is a post, so a note made there is the post's, one thread. No live push in this step. Open: whether tags take notes; a note about several posts at once.
+   2. Presence ("Dana is editing this page") and live delivery of comments.
+   3. Live refresh of blocks changed by someone else, and edit reservations.
+   4. True co-editing of rich text (Yjs): only if steps 1–3 prove insufficient, and after pending revisions (see "Versioning").
+   - Steps 1 and 3 are the comments and edit locks that "Publishing workflow" and "Workspaces" below build on.
+2. **The built-in catalogue of blocks, content types and page types** (Should). A demo site can only show layouts the block types allow. Today: 4 block types (rich text, image, post list, section), 3 content types (blog, resume entry, now update), 2 page types (standard, landing); the registries are generic, the shipped set is thin and still a personal site's. The target is all three kinds of site: business, portfolio, editorial.
+   - Block candidates: hero or banner, gallery, call to action, quote or testimonial, video or embed, accordion or FAQ, teaser cards linking to pages, and a sitemap block (a human-readable list of the published tree in the visitor's language). Columns and grids are sections; each block is designed for both places it can sit, the page's list and a section's column.
    - Content types: event, person or team member, project or case study; decide whether resume entry and now update stay defaults or move to an optional "personal site" starter set.
-   - Page types: contact, legal, redirect or link page, and a sitemap page (a standard page carrying the sitemap block).
-   - Not here: the contact form (see "Forms"), editor-defined types (see "Custom content types"). Needs designs for each block's editor card and public rendering.
-2. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
-3. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
-4. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the admin. The key scheme exists (`docs/reference/i18n.md`), and the shared components, the admin layout and the Tags screen are converted and guarded (`test/lib/admin_i18n_test.rb`); every other screen is still inline English, so this sub-project converts them, adds the German file and decides how CS Studio picks its own UI language. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
+   - Page types: contact, legal, redirect or link page, and a sitemap page (a standard page carrying the sitemap block). Page types become a registry first (no new integer enums, see "Guardrails").
+   - Needs designs for each block's editor card and public rendering: a real design pass on a design canvas.
+3. **Content types defined in the admin** (Should). "Custom content types and fields defined in the admin" under "Content model and extension": definitions stored in the database beside the code registry.
+4. **Forms, with mail delivery** (Should). A form block whose fields share the field builder of admin-defined types; submissions; spam protection without a third-party captcha; mail delivery, which is not set up yet. This is "Forms with submissions and spam protection" under "SEO, navigation and the public site", and the contact page type of item 2 waits for it.
+5. **Demo content in the setup wizard, plus a large debug and performance data set** (Should). The wizard's starter-content step gains a "Demo site" choice; a second, much larger set with varied layouts and images serves debugging, performance checks and the design issues an almost empty site hides. Built through the save services, not a seed script. Open: who may pick the large set.
+6. **Invites** (Should). A one-time set-password link without mail (`Users::Invite`).
+7. **Admin UI in German** (Should, #49, M8). The public site's own strings in German and Spanish first (about 15), then the admin. The key scheme exists (`docs/reference/i18n.md`), and the shared components, the admin layout and the Tags screen are converted and guarded (`test/lib/admin_i18n_test.rb`); every other screen is still inline English, so this sub-project converts them, adds the German file and decides how CS Studio picks its own UI language. Known English-only spots that build sentences in Ruby: `Audit::Sentence`, and `Post.human_attribute_name` / `ContentBlock.human_attribute_name`.
 
 ## Before the first deploy
 
@@ -89,7 +98,7 @@ What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Gro
 | Item | Priority | Notes |
 |---|---|---|
 | Versioning: revisions and restore, with pending revisions (drafts of live records) | Must | §7.3. Audit snapshots are the version basis; they keep a translation source's digest but not its text, so a restore can't reproduce a word diff's "before". Closes the largest group of known gaps (see "Closed by versioning") |
-| Publishing workflow: review and approval, draft comments, edit lock, scheduled unpublish | Should | Needs pending revisions |
+| Publishing workflow: review and approval, draft comments, edit lock, scheduled unpublish | Should | Needs pending revisions. Comments and edit reservations come first, with collaboration ("Next", item 1) |
 | Release management: bundle changes to several pages and posts, preview the whole site with the release applied, shareable preview links, publish atomically | Should | A release is a set of pending revisions |
 | Approval chains for releases: steps that specific groups must approve, defined in the admin by authorised groups, recorded in the audit log | Should | Needs releases |
 
@@ -104,13 +113,13 @@ What comes after the admin; code comments and `CLAUDE.md` call it "Phase 3". Gro
 | A language dropdown on the public site | Could | |
 | Public-site dates in the site time zone (today the public site and `/preview` render in UTC) | Could | The render cache must vary on the zone |
 | 410 Gone for trashed or purged URLs instead of 404 | Could | Needs a tombstone; a trashed record's `public_paths` rows are deleted |
-| Forms with submissions and spam protection | Could | Routes hook before the catch-alls |
+| Forms with submissions and spam protection | Could | Routes hook before the catch-alls. Scheduled as "Next", item 4 |
 
 ### Content model and extension
 
 | Item | Priority | Notes |
 |---|---|---|
-| Custom content types and fields defined in the admin | Should | Registry with DB-backed definitions |
+| Custom content types and fields defined in the admin | Should | Registry with DB-backed definitions. Scheduled as "Next", item 3 |
 | Plugin API v1: Rails engines, the registries behind one registration facade, event hooks, a routes hook, an MCP tool registry, a versioned API | Should | §8, M4 |
 | Languages outside the built-in list: today a language is switched on in Settings from `SUPPORTED_LOCALES`; adding one needs a code change | Should | |
 | Reusable content: global snippets, page templates, block presets | Could | Needs a block owner (#47) |
@@ -152,7 +161,7 @@ Deliberately not planned: AI tools over MCP. MCP clients are already AIs and can
 
 | Item | Priority | Notes |
 |---|---|---|
-| Workspaces: a place to work on pages together with what the work needs — links to pages, posts and images, uploaded documents, the people involved, and an AI assistant that can read those references. A workspace's work can flow into a release | Could | Builds on documents in the media library, comments and edit locks, pending revisions, `AI::Providers` and groups. Open: per page, per project or free-form; what the AI may write without a human pressing Use |
+| Workspaces: a place to work on pages together with what the work needs — links to pages, posts and images, uploaded documents, the people involved, and an AI assistant that can read those references. A workspace's work can flow into a release | Could | Builds on documents in the media library, the comments and edit reservations of collaboration ("Next", item 1, steps 1 and 3), pending revisions, `AI::Providers` and groups. Open: per page, per project or free-form; what the AI may write without a human pressing Use |
 
 ### Media library
 
@@ -214,6 +223,8 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | A schedule set in the same save as other fields is recorded inside `*.updated`, so the log says "edited", not "scheduled" | Could | Round 3 |
 | `ContentModel::FieldSet#assign` drops an unparseable date or integer for any caller but the post editor: a block's settings silently lose the value | Could | Round 2 |
 | Social links are a jsonb hash, so their row order isn't kept and two rows with one label collapse; a scripted client posting them as an array clears the stored links | Could | Round 3 |
+| A tag merge and a page's purge can still deadlock, and so can two purges of sibling pages: the purge locks its branch's pages in id order, but closure_tree's sibling renumbering (`_ct_reorder_siblings`) then updates the purged root's later siblings outside that order (`app/services/trash/purge.rb`, `app/services/tags/merge.rb`; both carry comments saying it cannot happen). Add the root's siblings to the lock | Could | Sections |
+| A block create that waits on the lock of a page which is purged meanwhile goes on to write a block whose page is gone: `ContentBlocks::Structure#lock_owner` answers nil for a missing row, nobody checks it, and the polymorphic owner has no foreign key (`app/services/content_blocks/save.rb`) | Could | Sections |
 | Smaller defects: `Tags::Merge` racing a `Posts::Save` that inserts the same tag answers "image doesn't exist"; unbounded titles in single-record flashes; forged param shapes that 500; a translate timeout that doesn't abort; two ways to enable a language; Duplicate across two transactions; a plugin's starter sample with a key outside the Save allow-lists raises | Could | S26–S32, round 3, PR #39 |
 
 ### Structure
@@ -222,7 +233,7 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 |---|---|---|
 | One shared `fetchStream` helper, and one `AccessControl.edit_keys(record)` for the "published needs publish" rule (written out five times) | Should | M6 |
 | One segmented-control component (drawn by hand on four screens) | Could | Round 3 |
-| Split `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7 |
+| Split `translate_controller.js`, `rich_text/document.rb` and `markdown.rb`; `admin/blocks_controller.js` (over 1,100 lines: the remembered orders, the menu moves with their dialog and focus rule are separable units) and the stream helpers of `Admin::ContentBlocksController` (a streams object); unit tests for the pure JavaScript; a posts list query object | Could | M3, M5, M7, sections |
 | Remove leftovers: the ActionText import path, unused Action Mailbox and Action Cable, test gems in the production image, unpinned CI Postgres | Could | M9 |
 
 ### Tests
@@ -230,10 +241,19 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 | Item | Priority | Ref |
 |---|---|---|
 | A Tiptap schema drift test; tests for the Turbo internals the write queue relies on (`turbo-rails` is pinned to 2.0.23) | Should | S23, S25 |
-| Two-connection race tests for the settings row lock (`Settings::Save`, `Locales::Enable` / `Disable` / `MakeDefault` / `Configure`): today the tests prove where the lock is taken and what is read after it, not two writers meeting | Could | Technical cleanup §10 |
+| Two-connection race tests for the settings row lock (`Settings::Save`, `Locales::Enable` / `Disable` / `MakeDefault` / `Configure`) and for the lock order of a page's blocks (the page's row, then block rows: `ContentBlocks::Save` / `Destroy` / `Reorder` / `Duplicate`, `Tags::Merge`, `Trash::Purge`; `test/services/content_blocks/`): today the tests prove where the lock is taken and what is read after it, not two writers meeting | Could | Technical cleanup §10, sections |
 | The system suite flakes at 12 parallel workers on a laptop (run it with `PARALLEL_WORKERS=6`): a leaner browser fixture, or CI-sized runners | Could | Round 2 |
 | The system-test job takes about 17 minutes in CI (16m41s for 477 tests on PR #52, against 4m20s for the unit job), and the mind graph's tests now each wait out a real settle of about five seconds: find where the time goes, then split the job across runners, raise its workers, or shorten the waits | Should | PR #52 |
 | Mouse drag in the page tree and block list (SortableJS's fallback) was never hand-tested in Firefox | Could | Round 1 |
+| A full system run prints Cuprite's "Modal window with text `` has been opened" once, among the media picker tests (`test/system/admin/media_picker_test.rb`) and never from the sections tests alone: find which test opens a dialog nobody answers | Could | Sections |
+| The coverage report (`COVERAGE=1 bin/rails test`) lists about 66 files at 0% that are loaded while the app boots, so its total (85.65% on the sections branch) understates: 98.7% of the lines it did measure are covered. Find why those files are not measured (`test/test_helper.rb`: where `SimpleCov.start` runs, and whether the parent process's result is merged with the workers') before a minimum is set | Could | Sections |
+
+### Accessibility
+
+| Item | Priority | Ref |
+|---|---|---|
+| After a block or a section is deleted the focus falls to `<body>`, the top of the page for a keyboard user (`Admin::ContentBlocksController#removal_streams`, `admin/blocks_controller.js`): move it to the neighbouring block | Could | Sections |
+| A section's Layout button does not say which layout is current, and the six diagrams in its menu have no visible name (`Admin::EditorScreen::SectionLayoutMenuComponent`) | Could | Sections |
 
 ## Known gaps (interim states)
 
@@ -311,6 +331,16 @@ Left by the technical cleanup (spec §10). The caching sub-project ("Performance
 - Mind graph: with reduced motion a large graph shows an empty canvas between "ready" and its one layout message (about two and a half seconds at the cap), and a change of the motion setting applies from the next load.
 - Mind graph: the search results close and reopen on each keystroke, and have no arrow-key navigation.
 
+### Sections
+
+Left by the sections sub-project (spec §12).
+
+- MCP has no page or block tools, so an AI client can't read or build a page at all. When they are built they carry a block's section and column on create and move and report them on read.
+- No Undo for a move into, out of or inside a section; the toast follows only a reorder of the page's own list.
+- An image inside a rich-text block in a column is requested at the content width: the rich-text render is cached by document digest and can't vary by where the block sits. Only an image block's `sizes` follows its column.
+- A tile in a section's lane has no pick-up-and-arrows keyboard drag; every one of its moves is in its ⋯ menu.
+- A duplicated section is several audit events (a `block.created` per copy and one `block.reordered`), not one.
+
 ### Accepted as they are
 
 - The seeded Author group's `posts.read` and `posts.create` are unscoped, so an Author reads every post (only `posts.edit` is `own`-scoped). Revisit if it surprises in practice.
@@ -332,7 +362,7 @@ Departures from the design mocks that the visual checks listed; none is wrong. O
 
 ## Out of scope (for now)
 
-Multi-site, e-commerce, memberships and paywalls, built-in comments.
+Multi-site, e-commerce, memberships and paywalls, built-in visitor comments on the public site (editors' comments on content are "Next", item 1).
 
 ## Guardrails while the roadmap is pending
 
