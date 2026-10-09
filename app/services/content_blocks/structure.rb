@@ -13,8 +13,11 @@ module ContentBlocks
     #
     # Every `ContentBlocks::Save` and `Destroy` takes it, as the first
     # statement of its transaction, whatever the block: the page's row, then
-    # block rows, is the one order of locks for a page's blocks
-    # (`ContentBlocks::Save#call` has the deadlock a second order made).
+    # block rows, is the order of locks for a page's blocks
+    # (`ContentBlocks::Save#call` has the deadlock a second order made, and
+    # the list of writers that keep it: these two, `Tags::Merge` and
+    # `Trash::Purge`, which lock their pages themselves -- and the one that
+    # doesn't yet, `ContentBlocks::Reorder`).
     #
     # An owner that isn't saved yet has no row to lock, and nobody else can
     # be writing its blocks: nil, and no query.

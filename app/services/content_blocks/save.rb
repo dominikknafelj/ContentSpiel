@@ -58,11 +58,11 @@ module ContentBlocks
         #
         # What is read under it is what the other writer committed: the new
         # block's column is checked, and the section's stranded blocks are
-        # looked up, against rows no other write to this page's blocks can
-        # change until this one commits.
+        # looked up, against rows no other save or delete of this page's
+        # blocks can change until this one commits.
         #
-        # And there is ONE order of locks for every write to a page's
-        # blocks: the page's row, then block rows (fix rounds 1 and 2). A
+        # And there is one order of locks for a write to a page's blocks:
+        # the page's row, then block rows (fix rounds 1 to 3). A
         # fold, a lift, a section's delete and the renumbering that follows
         # one go page-first and then write other blocks' rows -- the blocks
         # in the section, and for a lift and a renumbering the top-level
@@ -77,8 +77,13 @@ module ContentBlocks
         # It costs one short query and no new waiting: this transaction
         # always took this row, at the touch; it only takes it earlier, so
         # two saves on one page queue here instead of there.
-        # (`ContentBlocks::Reorder` still writes block rows first; that is
-        # its rework's to change.)
+        #
+        # The writers that keep this order: this service,
+        # `ContentBlocks::Destroy`, the tag merge (`Tags::Merge
+        # #repoint_blocks`, which rewrites listing blocks) and the purge of
+        # a page (`Trash::Purge#purge_branch`, which deletes them). ONE
+        # writer does not yet: `ContentBlocks::Reorder` still writes block
+        # rows and then touches the page, until the task that reworks it.
         lock_owner(@block.owner)
         reread_container
         assign

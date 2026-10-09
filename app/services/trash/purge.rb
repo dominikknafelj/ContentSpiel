@@ -107,6 +107,20 @@ module Trash
         raise ActiveRecord::Rollback
       end
 
+      # Every page of the branch, locked in id order before anything of it
+      # is deleted. The order of locks for a page's blocks is the page's
+      # row, then block rows (`ContentBlocks::Save#call`): a block save or
+      # delete holds its page and waits for the block. A page's destroy
+      # goes the other way -- its blocks' rows first (`dependent: :destroy`),
+      # its own row last -- so a save still arriving for a block of a
+      # trashed page (an editor tab left open) and this purge could each
+      # hold what the other waited for, until Postgres ended one with
+      # `ActiveRecord::Deadlocked`. Id order, whatever order the pages are
+      # then destroyed in (deepest first, below), so two purges, or a purge
+      # and a tag merge (`Tags::Merge#repoint_blocks`), queue up the same
+      # way round. A page already gone is not found, and skipped as before.
+      Page.where(id: pages.map(&:id)).order(:id).lock.pluck(:id)
+
       pages.each do |page|
         # Loaded *before* the destroy, so these are the very objects the
         # page's `dependent: :destroy` goes on to destroy (it destroys the

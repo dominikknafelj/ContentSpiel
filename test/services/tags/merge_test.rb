@@ -255,6 +255,38 @@ class Tags::MergeTest < ActiveSupport::TestCase
     assert_equal before, untouched.reload.updated_at
   end
 
+  # The order of locks for a page's blocks is the page's row, then block
+  # rows (`ContentBlocks::Save#call`): a block save holds the page and waits
+  # for the block, so a merge that held the block and then wanted the page
+  # (its `touch_all`) could deadlock with it. The pages are locked in one
+  # statement, in id order, before any block row is.
+  test "the pages of the blocks it repoints are locked, in id order, before any block row is locked or written" do
+    first = create_page(title: "First listing")
+    second = create_page(title: "Second listing")
+    listing_block(second, tag: "a")
+    listing_block(first, tag: "a")
+    Tag.create!(name: "a")
+    Tag.create!(name: "b")
+
+    statements = capture_sql { assert Tags::Merge.call(tag("a"), into: tag("b")).ok? }
+
+    page_locks = statements.each_index.select { |index| statements[index].match?(/FROM "pages".*FOR UPDATE/m) }
+    block_rows = statements.index { |sql| sql.match?(/FROM "content_blocks".*FOR UPDATE/m) || sql.start_with?('UPDATE "content_blocks"') }
+    assert_equal 1, page_locks.size
+    assert_match(/ORDER BY "pages"."id" ASC/, statements[page_locks.first])
+    assert_operator page_locks.first, :<, block_rows
+    assert_operator page_locks.first, :<, statements.index { |sql| sql.start_with?('UPDATE "pages"') }
+  end
+
+  test "a merge that repoints no block locks no page" do
+    Tag.create!(name: "a")
+    Tag.create!(name: "b")
+
+    statements = capture_sql { assert Tags::Merge.call(tag("a"), into: tag("b")).ok? }
+
+    assert_empty statements.grep(/FROM "pages".*FOR UPDATE/m)
+  end
+
   test "records exactly one tag.merged event on the target, counting trashed carriers" do
     create_post(title: "One", tags: [ "a" ])
     create_post(title: "Two", tags: [ "a", "b" ])
