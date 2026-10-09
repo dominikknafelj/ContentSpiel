@@ -366,7 +366,10 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
      no count at zero);
    - while the pointer is over its card or tile, or the focus is inside it,
      it is the add-note control: a 24px square holding the icon (18px on a
-     tile, with a 12px icon);
+     tile, with a 12px icon). On a card or tile that has no "⋯" menu, and so
+     no "Add note" in one (`data-notes-add`: a viewer who can't edit, a
+     translation tab's group card), the control is shown at rest: it is that
+     viewer's one way to start a note, and a touch screen has no hover;
    - `data-has-notes`: a pill with the icon and the count, always shown
      (20px high on a card, 18px on a tile); also while text is selected in the
      block, when it reads "Note on selection";
@@ -387,6 +390,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-notes-marker:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
 .admin-notes-marker:focus-visible,
 .admin-notes-marker[data-has-notes],
+[data-notes-add] .admin-notes-marker,
 :is(.admin-block-tile, .admin-block-card:not(.admin-section-card)):is(:hover, :focus-within) .admin-notes-marker { opacity: 1; }
 .admin-notes-marker > span { display: inline-flex; align-items: center; }
 .admin-notes-marker > span[hidden],
@@ -397,6 +401,12 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: 10px; }
 .admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
 .admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
+/* A block's delete dialog keeps its notes warning in the confirm dialog's
+   details box, alone, hidden until the block has open notes: until then the
+   box takes no room. Asked of the warning's own mark (`data-notes-alone`,
+   `Admin::EditorScreen::DeleteBlockDialogComponent`), so no other dialog's
+   box is ever touched. */
+.admin-dialog div:has(> [data-notes-alone][hidden]) { display: none; }
 
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked

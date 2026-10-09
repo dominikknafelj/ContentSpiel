@@ -144,7 +144,7 @@ module Admin
     def wrapper_attributes
       return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
 
-      { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}) } }
+      { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}), **(note_menu? ? {} : { notes_add: "shown" }) } }
     end
 
     # The panel is the region its tile's `aria-controls` points at, named by
@@ -198,6 +198,14 @@ module Admin
     def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
 
     def note_key = ::Notes.key(block)
+
+    # Whether this card has a "⋯" menu, whose first item is "Add note". Where
+    # it has none -- a viewer who can't edit, a translation tab's group card --
+    # the marker of a block without notes is the only way to start one, so it
+    # is shown at rest and not only on hover or focus (`data-notes-add`, read
+    # by `.admin-notes-marker`'s rules): who can read can write notes
+    # (decision D3), and a touch screen has no hover.
+    def note_menu? = list? && editable? && !unavailable?
 
     # A card of the list always has it (its menu opens it). A group card only
     # when the block is unavailable: the header's "Delete block…" is then the

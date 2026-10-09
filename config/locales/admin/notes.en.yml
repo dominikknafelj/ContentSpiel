@@ -53,8 +53,8 @@ en:
             other: "%{count} open notes on %{name}"
           selection: "Add a note on the selected text in %{name}"
         delete_warning:
-          one: "It has %{count} open note, which is deleted with it."
-          other: "It has %{count} open notes, which are deleted with it."
+          one: "This block has %{count} open note. It will be deleted with it."
+          other: "This block has %{count} open notes. They will be deleted with it."
         mentions:
           none: "Nobody by that name can see this."
           count:

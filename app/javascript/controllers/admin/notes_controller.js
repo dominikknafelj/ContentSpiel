@@ -45,7 +45,11 @@ import { messages } from "i18n/messages"
 // A SELECTION. With text selected in a rich-text field, that block's marker
 // reads "Note on selection" and a press starts a note quoting the text (cut
 // to 500 characters; a copy, decision D4). The selection is noted at
-// `mousedown` on the marker, because the press itself may move it. The
+// `mousedown` on the marker, because the press itself may move it, and is
+// good for the click of that same press only: any later press anywhere lets
+// it go first (`release`, heard in the capture phase, before a marker's own
+// `hold`), a click that no press began (the keyboard's) never reads it, and
+// neither does a note started after something else was selected. The
 // passage travels to the frame as `note_quote`, the one name a quote has in a
 // URL (it is filtered from the log under that name).
 //
@@ -120,6 +124,14 @@ export default class extends Controller {
     this.held = this.selection
   }
 
+  // Every `mousedown` in the document, in the capture phase, so before a
+  // marker's own `hold`: what an earlier press held is let go. A press that
+  // began on a marker and was dragged off it never became a click, and its
+  // selection must not be quoted by whatever is pressed next.
+  release() {
+    this.held = null
+  }
+
   // A marker, or "Add note" in a block's menu (`data-notes-compose`). With a
   // selection in that block: a new note quoting it. A marker with open
   // threads: the drawer at that block's group. Otherwise: a new note on the
@@ -127,7 +139,9 @@ export default class extends Controller {
   open(event) {
     const marker = event.currentTarget
     const key = marker.dataset.notesKey
-    const quote = this.held?.key === key ? this.held.text : null
+    // `detail` is the number of presses behind a click: 0 for the keyboard's
+    // and a script's, which no `mousedown` on this element began.
+    const quote = event.detail > 0 && this.held?.key === key ? this.held.text : null
     this.held = null
     if (quote) this.show({ compose: key, quote, trigger: marker })
     else if (!marker.hasAttribute("data-notes-compose") && (this.counts.subjects[key] || 0) > 0) this.show({ group: key, trigger: marker })
@@ -157,9 +171,31 @@ export default class extends Controller {
   // did (a link with `?notes=open`, the drawer remembered from the last
   // editor) or when what they pressed is gone (a marker on a card a stream
   // has drawn again). Never left to fall to <body>.
+  //
+  // What they pressed may also be there and have no box to take the focus:
+  // "Add note" in a block's "⋯" menu is hidden again with its menu, and a
+  // focus sent to it lands on <body> all the same. It counts as gone, and
+  // the focus goes to what stands for that block and can be seen: its marker
+  // when it shows a count, or else the "⋯" button of the menu the item is
+  // in. (A marker that was itself pressed is given the focus back even at
+  // rest: it has a box, and the focus inside its card is what shows it.)
   get trigger() {
-    if (this.returnTo?.isConnected) return this.returnTo
+    const from = this.returnTo
+    if (from?.isConnected) {
+      if (this.laidOut(from)) return from
+      const key = from.dataset.notesKey
+      const marker = key ? this.markerTargets.find((candidate) => candidate.dataset.notesKey === key) : null
+      if (marker && this.laidOut(marker) && window.getComputedStyle(marker).opacity !== "0") return marker
+      const menu = from.closest("[data-controller~='admin--menu']")?.querySelector("[aria-haspopup='menu']")
+      if (menu && this.laidOut(menu)) return menu
+    }
     return this.hasOpenerTarget ? this.openerTarget : null
+  }
+
+  // Whether the element has a box and can take the focus: nothing above it
+  // is `hidden` or `display: none`, and it is not `visibility: hidden`.
+  laidOut(element) {
+    return element.getClientRects().length > 0 && window.getComputedStyle(element).visibility !== "hidden"
   }
 
   // A shell drawer opened (`admin--drawer:opened`): this one makes room, and
@@ -250,6 +286,10 @@ export default class extends Controller {
     const key = editor ? this.blockKey(editor) : null
     const next = key ? { key, text: text.slice(0, MAX_QUOTE) } : null
     if (next?.key === this.selection?.key && next?.text === this.selection?.text) return
+    // Something else is selected now: what a press held is no longer what
+    // the person means. (A selection that only went away is the press's own
+    // doing, and is why it was held.)
+    if (next) this.held = null
     this.selection = next
     this.schedulePaint()
   }

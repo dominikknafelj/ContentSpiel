@@ -313,4 +313,31 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
     assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
   end
+
+  # Ruling on notes spec D3: who can read can write notes, and on touch there
+  # is no hover. A viewer with no "⋯" menu on the block has no "Add note"
+  # there, so the add-note control is shown at rest for them.
+  test "the add-note control is shown at rest on a card without a menu, and on hover or focus where the menu has Add note" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+    assert_selector ".admin-block-card:not([data-notes-add]) #notes-marker-ContentBlock-#{block.id}"
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false))
+    assert_selector ".admin-block-card[data-notes-add=shown] #notes-marker-ContentBlock-#{block.id}"
+
+    # A translation tab's group card has no menu for anyone.
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "de", editable: true, placement: :group))
+    assert_selector ".admin-block-card[data-notes-add=shown] #notes-marker-ContentBlock-#{block.id}"
+  end
+
+  test "a block's delete dialog marks its notes warning as alone in its box, and the shared dialog's box is as it was" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+
+    assert_selector "#delete-block-#{block.id} div[class='mt-2 text-ink'] > p[hidden][data-admin--notes-target=warning][data-notes-alone]", visible: :all
+  end
 end

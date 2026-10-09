@@ -104,4 +104,12 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
     assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
+
+  test "the add-note control is shown at rest on a view-only tile, which has no menu, and not on an editable one" do
+    render_tile(editable: false)
+    assert_selector ".admin-block-tile[data-notes-add=shown] [data-admin--notes-target=marker]"
+
+    render_tile
+    assert_selector ".admin-block-tile:not([data-notes-add]) [data-admin--notes-target=marker]"
+  end
 end

@@ -35,4 +35,15 @@ class Admin::ConfirmDialogComponentTest < ViewComponent::TestCase
     render_inline(Admin::ConfirmDialogComponent.new(id: "c2", title: "Turn off Deutsch?")) { |d| d.with_confirm_action { "x" } }
     assert_no_selector "dialog#c2 button[autofocus]"
   end
+
+  # The box is plain: nothing in the shared dialog hides it. A dialog that
+  # wants an empty box out of the way says so on what it puts there (the
+  # block's delete dialog and its notes warning, `data-notes-alone`).
+  test "the details box carries no rule of its own about what it holds" do
+    render_inline(Admin::ConfirmDialogComponent.new(id: "c2", title: "Delete this group?")) do |dialog|
+      dialog.with_details { "Two tokens are revoked.".html_safe }
+    end
+
+    assert_selector "dialog#c2 div[class='mt-2 text-ink']", text: "Two tokens are revoked."
+  end
 end

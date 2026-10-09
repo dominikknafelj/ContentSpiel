@@ -2,10 +2,8 @@
   <% if body.present? %>
     <p class="text-ink"><%= body %></p>
   <% end %>
-  <%# Takes no room while all it holds is one hidden element: a block's delete dialog
-      keeps its notes warning here, empty and `hidden` until there is something to say. %>
   <% if details? %>
-    <div class="mt-2 text-ink has-[>[hidden]:only-child]:hidden"><%= details %></div>
+    <div class="mt-2 text-ink"><%= details %></div>
   <% end %>
   <% dialog.with_footer do %>
     <%= tag.form method: "dialog" do %>

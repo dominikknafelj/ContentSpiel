@@ -46,7 +46,7 @@
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
   <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
-        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened"
+        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">
