@@ -27,3 +27,4 @@ en:
           note: "This note is gone: it was deleted, or what it was on was."
         not_yours: "Only the person who wrote a note can change it."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
+        pin_resolved: "Reopen this note before pinning it."

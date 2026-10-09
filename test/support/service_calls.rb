@@ -16,7 +16,9 @@
 #
 # Optional: `control_actor:` (a user to run the control as, for a service
 # with a User-only rule: the control then runs on the :admin channel) and `control_audit_only:` (a reason, for a call that
-# legitimately writes nothing but the audit log).
+# legitimately writes nothing but the audit log) and `control_unaudited:` (a
+# reason, for a service that says `# audit: none`: the control must then
+# record nothing).
 #
 # Two runs prove the call:
 #
@@ -292,15 +294,57 @@ module ServiceCalls
       { call: -> { Notes::EditMessage.call(message, body: "Reworded") }, permission: "pages.read", on: page, control_actor: users(:one) }
     },
 
+    # The actor's own inbox rows: the control runs as the person told.
+    "Notes::MarkRead" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note_on(page, by: users(:one), body: "Look, @[#{users(:two).id}]")
+      { call: -> { Notes::MarkRead.call(container: page) }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "a read mark is the reader's own bookkeeping, not a change to content" }
+    },
+
+    "Notes::Pin" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Pin.call(thread) }, permission: "pages.edit", on: page }
+    },
+
+    "Notes::Reopen" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      assert Notes::Resolve.call(thread).ok?
+      { call: -> { Notes::Reopen.call(thread) }, permission: "pages.read", on: page }
+    },
+
     "Notes::Reply" => lambda {
       page = create_page(title: "Noted", published: false)
       thread = note_on(page)
       { call: -> { Notes::Reply.call(thread, body: "An answer") }, permission: "pages.read", on: page }
     },
 
+    "Notes::Resolve" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Resolve.call(thread) }, permission: "pages.read", on: page }
+    },
+
+    # A person's own follow row: the control runs as someone who never wrote in the thread.
+    "Notes::SetFollowing" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page, by: users(:one))
+      { call: -> { Notes::SetFollowing.call(thread, following: true) }, permission: "pages.read", on: page, control_actor: users(:two),
+        control_unaudited: "following a thread changes who is told, not the content or the thread" }
+    },
+
     "Notes::Start" => lambda {
       page = create_page(title: "Noted", published: false)
       { call: -> { Notes::Start.call(page, body: "A question") }, permission: "pages.read", on: page }
+    },
+
+    "Notes::Unpin" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      assert Notes::Pin.call(thread).ok?
+      { call: -> { Notes::Unpin.call(thread) }, permission: "pages.edit", on: page }
     },
 
     "Pages::Move" => lambda {

@@ -69,10 +69,33 @@ module Notes
     end
 
     # Nil for a container in the trash or gone: every service that writes to
-    # an existing thread (`Reply`, `EditMessage`, `DeleteMessage`) then
+    # an existing thread (`Reply`, `EditMessage`, `DeleteMessage`, and through
+    # `with_locked_thread` `Resolve`, `Reopen`, `Pin`, `Unpin`, `SetFollowing`;
+    # `MarkRead` when it names a record) then
     # answers `gone("note")` and writes nothing, so none of them runs
     # without this lock beside `Trash::Purge`.
     def lock_container(container) = container.class.kept.where(id: container.id).lock.pick(:id)
+
+    # The thread re-read and locked, under its container's lock: the block's
+    # value, or `:gone` when the thread, or what it is on, is no longer there
+    # (a container in the trash reads as gone, `lock_container`). The lock is
+    # the first statement of the transaction, before any notes row is read.
+    def with_locked_thread(thread)
+      Thread.transaction(requires_new: true) do
+        current = lock_container(thread.container) && Thread.where(id: thread.id).lock.first
+        current ? yield(current) : :gone
+      end
+    end
+
+    # What `with_locked_thread` answered, as a Result: `:gone` and a sentence
+    # are failures, anything else is the record of a success.
+    def thread_answer(outcome, thread)
+      case outcome
+      when :gone then failure(thread, [ gone("note") ])
+      when String then failure(thread, [ outcome ])
+      else success(outcome)
+      end
+    end
 
     def kind_of(record)
       { "Page" => "page", "Post" => "post", "ContentBlock" => "block", "Media::Asset" => "image" }.fetch(record.class.polymorphic_name)

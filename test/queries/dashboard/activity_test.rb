@@ -248,4 +248,19 @@ class Dashboard::ActivityTest < ActiveSupport::TestCase
     assert_equal "scheduled", words(row).first
     assert_no_match(/ for\s*\z/, words(row).last)
   end
+
+  test "the feed lists a note started and a note resolved, on a page and on a block, and never a reply" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    as(users(:two)) do
+      thread = Notes::Start.call(block, body: "A question").record
+      Notes::Reply.call(thread, body: "More")
+      Notes::Resolve.call(thread)
+    end
+
+    rows = Dashboard::Activity.new(actor: users(:one), channel: :admin).rows.select { |row| row.event.action.start_with?("note.") }
+
+    assert_equal %w[note.resolved note.started], rows.map { |row| row.event.action }
+    assert_equal [ page, page ], rows.map(&:record) # a block's note is listed under its page
+  end
 end

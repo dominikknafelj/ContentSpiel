@@ -84,7 +84,8 @@ module Audit
     NOTE_VERBS = {
       "note.started" => [ "started a note on ", "" ], "note.replied" => [ "replied to a note on ", "" ],
       "note.edited" => [ "edited a note on ", "" ], "note.deleted" => [ "deleted a note on ", "" ],
-      "note.reopened" => [ "reopened a note on ", "" ]
+      "note.resolved" => [ "resolved a note on ", "" ], "note.reopened" => [ "reopened a note on ", "" ],
+      "note.pinned" => [ "pinned a note on ", "" ], "note.unpinned" => [ "unpinned a note on ", "" ]
     }.freeze
 
     # Sentences with no subject or their own shape (`#special`).
