@@ -30,6 +30,10 @@
       <span class="truncate text-sm font-semibold text-ink"><%= label %></span>
       <%= render note_marker %>
       <span class="flex-1"></span>
+      <%# The one thing a group card's menu holds, for every viewer: see `add_note_item`. %>
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+        <% menu.with_item { add_note_item } %>
+      <% end %>
     <% else %>
       <%# The name and the notes marker share the row's free width: the marker stands
           directly after the name, on the left, where the notes drawer cannot cover it
@@ -48,10 +52,7 @@
         <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
           <%# Always first, and always there: the marker of a block without notes shows only
               on hover or focus, and neither touch nor a test depends on that (notes spec §4.3). %>
-          <% menu.with_item do %>
-            <%= tag.button t(".add_note"), type: "button", class: menu_item_class,
-                  data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true } %>
-          <% end %>
+          <% menu.with_item { add_note_item } %>
           <% menu.with_item do %>
             <%= tag.button "Move up", type: "button", disabled: first?, class: menu_item_class,
                   data: { move: "up", action: "click->admin--blocks#moveUp" } %>
@@ -77,6 +78,12 @@
           <% menu.with_item do %>
             <%= tag.button "Delete block…", type: "button", class: "#{menu_item_class} text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
           <% end %>
+        <% end %>
+      <% else %>
+        <%# A viewer who can only read the page: the same "⋯", with "Add note" as its
+            only item (the handoff's decision 6). %>
+        <%= render Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions", close_on_select: true) do |menu| %>
+          <% menu.with_item { add_note_item } %>
         <% end %>
       <% end %>
     <% end %>

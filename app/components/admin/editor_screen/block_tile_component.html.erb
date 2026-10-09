@@ -1,7 +1,5 @@
-<%# `data-notes-add`: without the menu below there is no "Add note" in it, so the notes
-    marker of a block without notes is shown at rest (see `Admin::BlockCardComponent#note_menu?`). %>
 <div id="<%= dom_id %>" class="admin-block-tile flex items-stretch" role="listitem" data-block-id="<%= block.id %>"
-     data-admin--blocks-target="tile" data-admin--section-target="tile" <%= tag.attributes(data: { notes_add: ("shown" unless editable?) }) %>>
+     data-admin--blocks-target="tile" data-admin--section-target="tile">
   <%# What the pointer drags the tile by (SortableJS `handle:` in `admin--blocks`). Not a
       control: see the component. %>
   <% if editable? %>
@@ -23,10 +21,7 @@
     <div class="flex shrink-0 items-center pr-1">
       <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <%# Always first: see the block card's menu. %>
-        <% menu.with_item do %>
-          <%= tag.button t(".add_note"), type: "button", class: menu_item_class,
-                data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true } %>
-        <% end %>
+        <% menu.with_item { add_note_item } %>
         <% menu.with_item do %>
           <%= tag.button t(".move_up"), type: "button", class: menu_item_class, data: { move: "up", action: "click->admin--blocks#moveUp" } %>
         <% end %>
@@ -54,5 +49,13 @@
       <% end %>
     </div>
     <%= render delete_dialog %>
+  <% else %>
+    <%# A viewer who can only read the page: the "⋯" with "Add note" as its only item
+        (the handoff's decision 6), and nothing else of an editor's tile. %>
+    <div class="flex shrink-0 items-center pr-1">
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% menu.with_item { add_note_item } %>
+      <% end %>
+    </div>
   <% end %>
 </div>

@@ -103,6 +103,12 @@ module Admin
 
       def note_key = ::Notes.key(block)
 
+      # "Add note": first in an editor's menu, and the only item of the menu
+      # a view-only tile has (see `Admin::BlockCardComponent#add_note_item`).
+      def add_note_item
+        tag.button(t(".add_note"), type: "button", class: menu_item_class, data: { action: "admin--notes#open", notes_key: note_key, notes_compose: true })
+      end
+
       def move_to_column = Admin::EditorScreen::MoveDialogComponent.trigger("column")
 
       def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS

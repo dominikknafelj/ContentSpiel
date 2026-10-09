@@ -53,17 +53,20 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "dialog form[action$='/content_blocks/#{@block.id}'] button[type=submit]", text: "Delete block", visible: :all
   end
 
-  # The notes marker is the one thing beside the face (notes spec §4.3, D3: a
-  # viewer who can only read the page writes notes), which is why the count
-  # here went from one child to two.
-  test "a view-only tile has its face and its notes marker and nothing else: no grip, no menu, no dialog" do
+  # Beside the face a view-only tile has what notes need and nothing of an
+  # editor's (notes spec §4.3, D3: a viewer who can only read the page writes
+  # notes; the handoff's decision 6: through a menu whose only item is "Add
+  # note"), which is why the count here is three.
+  test "a view-only tile has its face, its notes marker and a menu with Add note alone: no grip, no move, no dialog" do
     render_tile(editable: false)
 
     assert_selector ".admin-block-tile > .admin-block-tile__face"
-    assert_selector ".admin-block-tile > *", count: 2, visible: :all
+    assert_selector ".admin-block-tile > *", count: 3, visible: :all
     assert_selector ".admin-block-tile > div > [data-admin--notes-target=marker]", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
-    assert_no_selector "[role=menu]", visible: :all
+    assert_equal [ "Add note" ], menu_items
+    assert_selector "[role=menu] button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all
+    assert_no_selector "[data-move]", visible: :all
     assert_no_selector "dialog", visible: :all
   end
 
@@ -97,7 +100,6 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
   test "a tile carries a notes marker, for a viewer who can't edit too, and Add note first in its menu" do
     render_tile(editable: false)
     assert_selector "#content_block_#{@block.id} > div > #notes-marker-ContentBlock-#{@block.id}[data-notes-name='Image']"
-    assert_no_selector "button[data-notes-compose]", visible: :all
 
     render_tile
     assert_selector "#notes-marker-ContentBlock-#{@block.id}"
@@ -105,11 +107,12 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
 
-  test "the add-note control is shown at rest on a view-only tile, which has no menu, and not on an editable one" do
+  # The handoff's decision 6: at rest for nobody.
+  test "no tile marks its add-note control as shown at rest" do
     render_tile(editable: false)
-    assert_selector ".admin-block-tile[data-notes-add=shown] [data-admin--notes-target=marker]"
+    assert_no_selector "[data-notes-add]"
 
     render_tile
-    assert_selector ".admin-block-tile:not([data-notes-add]) [data-admin--notes-target=marker]"
+    assert_no_selector "[data-notes-add]"
   end
 end
