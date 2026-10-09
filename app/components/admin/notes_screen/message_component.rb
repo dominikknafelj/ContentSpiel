@@ -1,9 +1,11 @@
 module Admin
   module NotesScreen
-    # One message: who, when, "edited", the text, and a "⋯" menu with Edit (the
-    # author's) and Delete (the author's, and a moderator's: notes spec §3.4).
-    # Under the text, its reactions (`ReactionsComponent`). (Task 16 adds the
-    # files.)
+    # One message: who, when, "edited", the text, and a "⋯" menu with React
+    # (anyone's), Edit (the author's) and Delete (the author's, and a
+    # moderator's: notes spec §3.4).
+    # Under the text, its reactions (`ReactionsComponent`), which anyone who
+    # may read the thread gives: so the "⋯" menu is there for everyone while
+    # the thread is open, with "React" in it. (Task 16 adds the files.)
     #
     # THE MENU ASKS THE SERVER. Edit and Delete are links to the thread again
     # with `?edit=<id>` or `?delete=<id>` (`asked`), and the answer draws this
@@ -41,6 +43,19 @@ module Admin
       def own? = viewer.present? && message.author_id == viewer.id
 
       def deletable? = own? || listing.moderator?(viewer)
+
+      # A resolved thread takes no new reactions and shows the ones it has
+      # read-only; a message being edited keeps its chips, disabled
+      # (`ReactionsComponent`, the handoff's decisions 23 and 24).
+      def reactions_state
+        return :closed if thread.resolved?
+
+        editing? ? :disabled : :open
+      end
+
+      # "React" in the "⋯" menu: whoever may read the thread, while it is
+      # open and the message is not being edited.
+      def reactable? = viewer.present? && reactions_state == :open
 
       def key = "message-#{message.id}"
 

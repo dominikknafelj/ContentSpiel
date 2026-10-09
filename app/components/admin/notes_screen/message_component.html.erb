@@ -1,4 +1,8 @@
-<div id="<%= dom_id %>" class="flex flex-col gap-2 border-t border-line px-4 py-3.5" data-note-message="<%= message.id %>">
+<%# `group/note`: the add-reaction chip shows on hover or focus of its message.
+    `admin--note-reactions` places and closes the emoji set, and opens it for
+    the menu's "React". %>
+<div id="<%= dom_id %>" class="group/note flex flex-col gap-2 border-t border-line px-4 py-3.5" data-note-message="<%= message.id %>"
+     data-controller="admin--note-reactions" data-action="click@window->admin--note-reactions#outside">
   <div class="flex items-start gap-2">
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
       <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
@@ -7,12 +11,17 @@
       <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
       <%= content %>
     </p>
-    <% if deletable? %>
+    <% if deletable? || reactable? %>
       <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% if reactable? %>
+          <% menu.with_item do %><%= tag.button t(".react"), type: "button", class: "cursor-pointer text-sm text-ink", data: { note_react: message.id, action: "admin--note-reactions#open" } %><% end %>
+        <% end %>
         <% if own? %>
           <% menu.with_item do %><%= link_to t(".edit"), thread_path(edit: message.id), class: "text-sm text-ink no-underline", data: { note_edit: message.id, **frame_link } %><% end %>
         <% end %>
-        <% menu.with_item do %><%= link_to t(".delete"), thread_path(delete: message.id), class: "text-sm text-danger-ink no-underline", data: { note_delete: message.id, **frame_link } %><% end %>
+        <% if deletable? %>
+          <% menu.with_item do %><%= link_to t(".delete"), thread_path(delete: message.id), class: "text-sm text-danger-ink no-underline", data: { note_delete: message.id, **frame_link } %><% end %>
+        <% end %>
       <% end %>
     <% end %>
   </div>
@@ -23,11 +32,11 @@
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %></p>
   <% else %>
     <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users, viewer_id: viewer&.id) %>
-    <%# Below the text (handoff "Reaction chip"), and not while the message is
-        being edited: a press on a chip draws the thread again, without the
-        form. Its forms are siblings of everything here, inside no other form. %>
-    <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, type: type, view: view) %>
   <% end %>
+  <%# Below the text (handoff "Reaction chip"); under the edit form while the
+      message is being edited, and then disabled (the handoff's decision 23).
+      Its forms are siblings of everything here, inside no other form. %>
+  <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, type: type, view: view, state: reactions_state) %>
   <% if bare_failure %>
     <ul role="alert" class="text-[12px] text-danger-ink"><% bare_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
   <% end %>

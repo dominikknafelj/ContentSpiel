@@ -1,6 +1,8 @@
 module Admin
-  # A reaction on one message of one of the container's threads: a toggle of
-  # the viewer's own (`Notes::React`). The container was found through the
+  # A reaction on one message of one of the container's threads: the
+  # viewer's own, given or taken back (`Notes::React`). The form says which
+  # (`on`, read as a real boolean here: anything but a true value is "take it
+  # back"), so the same request sent twice ends in the same place. The container was found through the
   # read scope first (`NoteContainer#set_container`), then the thread among
   # the container's, then the message among the thread's: a message id of
   # another thread or another record is "This note is gone", never a
@@ -17,7 +19,7 @@ module Admin
     def create
       thread = container_threads.find_by(id: params[:thread_id]) or return gone!
       message = thread.messages.find_by(id: params[:id]) or return gone!
-      result = Notes::React.call(message, emoji: params[:emoji])
+      result = Notes::React.call(message, emoji: params[:emoji], on: ActiveModel::Type::Boolean.new.cast(params[:on].to_s) == true)
 
       if result.ok?
         redirect_to thread_path(thread, shown: message.id), status: :see_other

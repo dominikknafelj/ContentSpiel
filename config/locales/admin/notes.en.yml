@@ -41,6 +41,9 @@ en:
         # An emoji that is not one of the offered set (`Notes::EMOJI`): only a
         # forged request sends one.
         emoji: "That reaction isn't available."
+        # A reaction sent to a resolved thread, whose chips are read-only:
+        # only a forged or a stale request gets here.
+        resolved: "This thread is resolved. Reopen it to react."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
       # What the notes' scripts say. `mentions` is `admin--note-composer`'s
@@ -307,15 +310,55 @@ en:
           delete: "Delete"
           delete_question: "Delete this note?"
           delete_confirm: "Delete"
-        # A message's reaction chips. `chip` is one chip's name for a screen
-        # reader (its `title` holds who reacted); `add` names the chip that
-        # opens the set, `react_with` each emoji in it.
+          # The "⋯" menu's way to the emoji set, for touch (the add chip
+          # shows on hover or focus).
+          react: "React"
+        # A message's reaction chips. A chip's name for a screen reader says
+        # the emoji in words, how many, whether one is the viewer's, and who
+        # (its `title` shows the same names to a mouse). `add` names the chip
+        # that opens the set, `react_with` each emoji in it. `names` are the
+        # emoji of `Notes::EMOJI` in words, IN THAT ORDER, one for each
+        # (`test/components/admin/notes_screen/reactions_component_test.rb`).
         reactions:
           add: "Add a reaction"
-          react_with: "React with %{emoji}"
+          react_with: "React with %{name}"
           chip:
-            one: "%{emoji}, %{count} reaction"
-            other: "%{emoji}, %{count} reactions"
+            one: "%{name}, %{count} reaction, by %{people}"
+            other: "%{name}, %{count} reactions, by %{people}"
+          chip_mine:
+            one: "%{name}, %{count} reaction, yours"
+            other: "%{name}, %{count} reactions, yours among them, by %{people}"
+          names:
+            - "thumbs up"
+            - "thumbs down"
+            - "check mark"
+            - "cross mark"
+            - "red heart"
+            - "party popper"
+            - "folded hands"
+            - "eyes"
+            - "thinking face"
+            - "grinning face"
+            - "grinning face with sweat"
+            - "face with tears of joy"
+            - "smiling face with heart eyes"
+            - "face with open mouth"
+            - "crying face"
+            - "enraged face"
+            - "fire"
+            - "star"
+            - "light bulb"
+            - "question mark"
+            - "exclamation mark"
+            - "hourglass"
+            - "rocket"
+            - "pushpin"
+            - "memo"
+            - "link"
+            - "framed picture"
+            - "bug"
+            - "speech balloon"
+            - "waving hand"
         # A block's marker as the server draws it, before the script has the
         # counts: its name without notes, and what it reads while text is
         # selected in the block (`admin.notes.script.marker` are its names

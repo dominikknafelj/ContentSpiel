@@ -1,9 +1,20 @@
 module Notes
-  # Adds the actor's reaction to a message, or takes it back (a toggle;
-  # notes spec §3.5, decision D10). Needs the read right, like a reply:
-  # whoever may read the record may react (D3). An emoji that is not one of
-  # the set the composer and the chips offer (`Notes::EMOJI`) is refused, so
-  # a forged value is never stored and never drawn.
+  # Gives a message the actor's reaction, or takes it back (notes spec §3.5,
+  # decision D10). Needs the read right, like a reply: whoever may read the
+  # record may react (D3). An emoji that is not one of the set the composer
+  # and the chips offer (`Notes::EMOJI`) is refused, so a forged value is
+  # never stored and never drawn.
+  #
+  # THE CALLER SAYS WHICH (`on:`), it is not a blind toggle: a chip sends the
+  # state its press is meant to reach, so a POST that is sent twice, or a
+  # press in a tab that had not yet seen the reaction given in another, ends
+  # where the person meant instead of undoing itself. Asking for what is
+  # already so succeeds, writes nothing and signals nobody.
+  #
+  # A RESOLVED THREAD TAKES NO REACTION and gives none back (the handoff's
+  # decision 24: it is closed, and whoever wants to add something reopens
+  # it). Its chips are drawn read-only; this refusal is for the request that
+  # is sent all the same -- an ordinary failure, nothing written, no signal.
   #
   # It tells nobody: no delivery row, so nothing reaches an inbox, the
   # sidebar's count, a toast or the chime. It moves no date (the thread's
@@ -24,9 +35,10 @@ module Notes
 
     # audit: none (a reaction is an acknowledgement, not a change to content or to a note's text)
 
-    def initialize(message, emoji:, actor: Current.actor)
+    def initialize(message, emoji:, on:, actor: Current.actor)
       @message = message
       @emoji = emoji.to_s
+      @on = on ? true : false
       @actor = actor
     end
 
@@ -44,8 +56,12 @@ module Notes
         # Among the locked thread's own messages: never a message by its id alone.
         next :gone unless Message.where(id: @message.id, thread_id: current.id).exists?
 
+        next I18n.t("admin.notes.errors.resolved") if current.resolved?
+
         mine = Reaction.find_by(message_id: @message.id, user_id: actor_user.id, emoji: @emoji)
-        mine ? mine.destroy! : Reaction.create!(message_id: @message.id, user_id: actor_user.id, emoji: @emoji)
+        next @message if @on == mine.present?
+
+        @on ? Reaction.create!(message_id: @message.id, user_id: actor_user.id, emoji: @emoji) : mine.destroy!
         Signals.threads(current)
         @message
       end

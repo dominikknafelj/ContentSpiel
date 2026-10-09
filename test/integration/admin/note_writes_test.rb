@@ -236,7 +236,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_select "[data-note-actions] form[action$='/follow'] button", text: "Notify me"
   end
 
-  test "the menu of a message: Edit and Delete on one's own, Delete alone for a moderator, nothing for anyone else" do
+  test "the menu of a message: Edit and Delete on one's own, Delete alone for a moderator, React alone for anyone else" do
     reply = as(users(:reader)) { Notes::Reply.call(@thread, body: "Ask @[#{users(:two).id}]") }.record
     thread_url = "#{@base}/threads/#{@thread.id}"
 
@@ -247,7 +247,11 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       assert_select "a[data-note-edit][data-turbo-frame=notes][data-turbo-prefetch=false][href='#{thread_url}?edit=#{reply.id}']", text: "Edit"
       assert_select "a[data-note-delete][data-turbo-frame=notes][data-turbo-prefetch=false][href='#{thread_url}?delete=#{reply.id}']", text: "Delete"
     end
-    assert_select "#note-message-#{@thread.first_message.id} [role=menu]", count: 0
+    # Someone else's note: React, which is anyone's (the handoff's decision 24), and nothing else.
+    assert_select "#note-message-#{@thread.first_message.id} [role=menu]" do
+      assert_select "button[data-note-react]", text: "React"
+      assert_select "a, button", count: 1
+    end
     assert_select "#note-thread-#{@thread.id}-messages form[data-note-composer]", count: 0 # no edit form until one is asked for
 
     sign_in_as(users(:one)) # the owner moderates, and wrote neither

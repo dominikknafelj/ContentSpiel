@@ -11,7 +11,7 @@ class Notes::RemoveTest < ActiveSupport::TestCase
       Notes::Start.call(@other, body: "Elsewhere")
     end
     # A reaction on every message: it goes with its message (the foreign key).
-    as(users(:reader)) { Notes::Message.find_each { |note| Notes::React.call(note, emoji: "👍") } }
+    as(users(:reader)) { Notes::Message.find_each { |note| Notes::React.call(note, emoji: "👍", on: true) } }
   end
 
   def left = [ Notes::Thread.count, Notes::Message.count, Notes::Delivery.count, Notes::Follow.count, Notes::Reaction.count ]
@@ -42,7 +42,7 @@ class Notes::RemoveTest < ActiveSupport::TestCase
     as(users(:two)) do
       6.times do |index|
         note = Notes::Start.call(@block, body: "Note #{index}").record.first_message
-        Notes::EMOJI.first(3).each { |emoji| Notes::React.call(note, emoji: emoji) }
+        Notes::EMOJI.first(3).each { |emoji| Notes::React.call(note, emoji: emoji, on: true) }
       end
     end
     many = capture_sql { Notes::Remove.call(@page, with: [ @block ]) }.size

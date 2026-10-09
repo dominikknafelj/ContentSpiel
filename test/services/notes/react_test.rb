@@ -1,20 +1,54 @@
 require "test_helper"
 
 class Notes::ReactTest < ActiveSupport::TestCase
+  include ActionCable::TestHelper
+
   setup do
     @page = create_page(title: "Pricing")
     @thread = as(users(:two)) { Notes::Start.call(@page, body: "Shipped") }.record
     @note = @thread.first_message
   end
 
-  def react(emoji, as_user: users(:reader), on: @note) = as(as_user) { Notes::React.call(on, emoji: emoji) }
+  def react(emoji, as_user: users(:reader), to: @note, on: true) = as(as_user) { Notes::React.call(to, emoji: emoji, on: on) }
 
-  test "a reader reacts, and the same emoji again takes the reaction back" do
+  test "a reader reacts, and takes the reaction back" do
     assert react("👍").ok?
     assert_equal [ [ users(:reader).id, "👍" ] ], @note.reactions.pluck(:user_id, :emoji)
 
-    assert react("👍").ok?
+    assert react("👍", on: false).ok?
     assert_empty @note.reactions.reload
+  end
+
+  # Not a blind toggle: a request sent twice, or a press in a tab that had not
+  # seen the reaction given in another, ends where the person meant.
+  test "asking for what is already so succeeds, writes nothing and signals nobody" do
+    assert react("👍").ok?
+    row = @note.reactions.sole
+
+    assert_no_changes -> { Notes::Reaction.pluck(:id, :updated_at) } do
+      assert_no_broadcasts(Notes::Signals.record_stream("Page", @page.id)) { assert react("👍").ok? }
+    end
+    assert_equal row, @note.reactions.sole
+
+    assert react("👍", on: false).ok?
+    assert_no_broadcasts(Notes::Signals.record_stream("Page", @page.id)) { assert react("👍", on: false).ok? }
+    assert_empty @note.reactions.reload
+  end
+
+  test "a resolved thread takes no reaction and gives none back: a sentence, nothing written, no signal" do
+    react("👍")
+    as(users(:two)) { assert Notes::Resolve.call(@thread).ok? }
+    refused = [ I18n.t("admin.notes.errors.resolved") ]
+
+    assert_no_broadcasts(Notes::Signals.record_stream("Page", @page.id)) do
+      [ react("🎉"), react("👍", on: false), react("👍", as_user: users(:two)) ].each do |result|
+        assert_equal [ refused, false ], [ result.errors, result.denied? ]
+      end
+    end
+    assert_equal [ [ users(:reader).id, "👍" ] ], Notes::Reaction.pluck(:user_id, :emoji)
+
+    as(users(:two)) { assert Notes::Reopen.call(@thread).ok? }
+    assert react("🎉").ok?
   end
 
   test "several people and several emoji; a reaction tells nobody and is not audited" do
@@ -64,7 +98,7 @@ class Notes::ReactTest < ActiveSupport::TestCase
 
   test "deleting a message takes its reactions with it" do
     reply = as(users(:reader)) { Notes::Reply.call(@thread, body: "Seen") }.record
-    react("👀", on: reply)
+    react("👀", to: reply)
 
     assert as(users(:reader)) { Notes::DeleteMessage.call(reply) }.ok?
     assert_equal 0, Notes::Reaction.count
@@ -85,7 +119,7 @@ class Notes::ReactTest < ActiveSupport::TestCase
     gone = I18n.t("admin.notes.errors.gone.note")
     reply = as(users(:reader)) { Notes::Reply.call(@thread, body: "Seen") }.record
     Notes::Message.where(id: reply.id).delete_all
-    assert_equal [ gone ], react("👍", on: reply).errors
+    assert_equal [ gone ], react("👍", to: reply).errors
 
     Page.where(id: @page.id).update_all(trashed_at: Time.current)
     assert_equal [ gone ], react("👍").errors
@@ -94,7 +128,7 @@ class Notes::ReactTest < ActiveSupport::TestCase
     Notes::Thread.where(id: @thread.id).delete_all
     result = react("👍")
     assert_equal [ [ gone ], false ], [ result.errors, result.denied? ]
-    assert_equal [ gone ], react("👍", on: Notes::Message.new(body: "x")).errors
+    assert_equal [ gone ], react("👍", to: Notes::Message.new(body: "x")).errors
     assert_equal 0, Notes::Reaction.count
   end
 end

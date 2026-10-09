@@ -313,7 +313,7 @@ module ServiceCalls
     "Notes::React" => lambda {
       page = create_page(title: "Noted", published: false)
       note = note_on(page).first_message
-      { call: -> { Notes::React.call(note, emoji: "👍") }, permission: "pages.read", on: page, control_actor: users(:two),
+      { call: -> { Notes::React.call(note, emoji: "👍", on: true) }, permission: "pages.read", on: page, control_actor: users(:two),
         control_unaudited: "a reaction is an acknowledgement, not a change to content or to a note's text" }
     },
 

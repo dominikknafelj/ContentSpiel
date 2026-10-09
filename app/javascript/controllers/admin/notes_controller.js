@@ -241,11 +241,6 @@ export default class extends Controller {
     if (event.target.closest("turbo-frame") !== this.frameTarget) return
 
     this.inside = this.drawerTarget.contains(document.activeElement)
-    // A reaction is a toggle (handoff "Reaction chip"): whoever pressed a
-    // chip, or an emoji of the set, has the focus on that emoji's chip in the
-    // answer, not at the top of the thread.
-    const pressed = this.inside ? document.activeElement.closest("[data-note-reactions]") && document.activeElement : null
-    this.reacted = pressed ? { message: pressed.closest("[data-note-message]")?.dataset.noteMessage, emoji: pressed.dataset.reaction || pressed.value } : null
     this.fromList = this.frameTarget.querySelector("[data-notes-view='list']") !== null
     if (this.fromList) this.listScroll = this.scroller?.scrollTop ?? null
   }
@@ -260,8 +255,6 @@ export default class extends Controller {
     const pending = this.pending
     const inside = this.inside
     const fromList = this.fromList
-    const reacted = this.reacted
-    this.reacted = null
     this.pending = null
     this.inside = false
     this.fromList = false
@@ -276,7 +269,7 @@ export default class extends Controller {
       // again after a note was sent from it stays where it is. The list's
       // own position (`listScroll`) is kept until the list is back.
       if (fromList && this.scroller) this.scroller.scrollTop = 0
-      if (pending?.thread || pending?.focus || lost) this.focus((lost && this.reaction(view, reacted)) || view)
+      if (pending?.thread || pending?.focus || lost) this.focus(view)
       return
     }
 
@@ -289,17 +282,6 @@ export default class extends Controller {
       if (this.listScroll != null && this.scroller) this.scroller.scrollTop = this.listScroll
     }
     this.listScroll = null
-  }
-
-  // The chip of the emoji just pressed, in the thread as it is drawn now; the
-  // "Add a reaction" chip when that was the emoji's last reaction and its chip
-  // went; null when the message itself is no longer there. Compared as data,
-  // never built into a selector: the emoji is whatever the button held.
-  reaction(view, reacted) {
-    if (!reacted?.message) return null
-    const chips = [ ...view.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === reacted.message)?.querySelector("[data-note-reactions]")
-    if (!chips) return null
-    return [ ...chips.querySelectorAll("button[data-reaction]") ].find((chip) => chip.dataset.reaction === reacted.emoji) || chips.querySelector("summary")
   }
 
   // The block whose thread is showing (handoff: its card's border is accent

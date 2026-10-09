@@ -60,7 +60,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     # The record's stream only: a reaction never writes a delivery.
     "Notes::React" => -> {
       note = @thread.first_message
-      { actor: users(:reader), call: -> { Notes::React.call(note, emoji: "🎉") }, record: 1, people: {} }
+      { actor: users(:reader), call: -> { Notes::React.call(note, emoji: "🎉", on: true) }, record: 1, people: {} }
     },
     # The actor's own rows: nobody else is signalled.
     "Notes::SetFollowing" => -> {
@@ -303,7 +303,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
       as(users(:two)) do
         [ Notes::Reply.call(thread, body: "Late"), Notes::Resolve.call(thread), Notes::Pin.call(thread), Notes::EditMessage.call(message, body: "Late"),
           Notes::EditMessage.call(Notes::Message.new(body: "x"), body: "Late"), Notes::Start.call(ContentBlock.new, body: "Late"),
-          Notes::React.call(message, emoji: "👍"), Notes::React.call(Notes::Message.new(body: "x"), emoji: "👍") ].each do |result|
+          Notes::React.call(message, emoji: "👍", on: true), Notes::React.call(Notes::Message.new(body: "x"), emoji: "👍", on: true) ].each do |result|
           assert_not result.ok?
           assert_not result.denied?
         end
@@ -318,16 +318,22 @@ class Notes::SignalsTest < ActiveSupport::TestCase
   # (handoff "Reaction chip": reactions never go to the inbox): the record's
   # stream, given and taken back alike, and no person's -- not the author's,
   # not a follower's, not the mentioned.
-  test "a reaction signals its record, given and taken back, and no person; a refused emoji signals nobody" do
+  test "a reaction signals its record, given and taken back, and no person; one that changes nothing or is refused signals nobody" do
     thread = start
     threads = [ @record, { "kind" => "threads", "thread_id" => thread.id } ]
 
     as(users(:one)) do
       assert_no_difference -> { Notes::Delivery.count } do
-        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍").ok? }
-        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍").ok? }
+        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍", on: true).ok? }
+        # Asked for again: nothing changed, nobody is told.
+        assert_empty capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍", on: true).ok? }
+        assert_equal [ threads ], capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍", on: false).ok? }
+        assert_empty capture_signals { assert Notes::React.call(thread.first_message, emoji: "👍", on: false).ok? }
       end
-      assert_empty capture_signals { assert_not Notes::React.call(thread.first_message, emoji: "a secret").ok? }
+      assert_empty capture_signals { assert_not Notes::React.call(thread.first_message, emoji: "a secret", on: true).ok? }
+      # A resolved thread takes none: its own signal is Resolve's, and the refusal sends nothing.
+      assert Notes::Resolve.call(thread).ok?
+      assert_empty capture_signals { assert_not Notes::React.call(thread.first_message, emoji: "👍", on: true).ok? }
     end
   end
 

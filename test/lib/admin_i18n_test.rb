@@ -170,6 +170,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/reactions_component.rb
     app/components/admin/notes_screen/reactions_component.html.erb
     app/controllers/admin/note_reactions_controller.rb
+    app/javascript/controllers/admin/note_reactions_controller.js
     app/components/admin/notes_screen/thread_component.rb
     app/components/admin/notes_screen/thread_component.html.erb
     app/components/admin/notes_screen/thread_row_component.rb

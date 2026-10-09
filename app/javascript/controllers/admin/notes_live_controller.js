@@ -92,6 +92,27 @@ import { messages } from "i18n/messages"
 // `inbox` signal that follows must come back to this tab without an origin,
 // because the sidebar's count is outside the frame that GET redrew.
 //
+// THE ANSWER TO ONE OF THIS TAB'S OWN BUTTONS is the whole thread view (a
+// 303 to it, or the view again with its reason), and Turbo would draw it over
+// the frame: an edit form open on ANOTHER message would close and its text be
+// lost, the reply field be drawn again. So when a form of the thread was sent
+// (a reaction, Pin, Notify, Resolve or Reopen, a reply) and the answer is the
+// same thread's view, it is merged exactly as a live refresh is
+// (`turbo:before-frame-render` on the notes frame, `answered`): the messages
+// part is replaced around a message someone is working in, Resolve / Reopen
+// is swapped, the reply part is left alone -- unless the reply's own composer
+// is what was sent, whose part is then the answer's: empty after a note that
+// went through, or with the text and the reason after one that was refused.
+// No "NEW" divider for it: nothing arrived that this person did not just do.
+// The frame is drawn as it came, as before, when the answer is another view
+// (the list, another thread, "This note is gone"), when what was sent is the
+// form of the message being worked in (Save of an edit, the delete's
+// confirmation, a chip beside the question): its answer is that message as it
+// now is; and for a link (Edit, Delete, Cancel, Back), which asks for exactly
+// that. This is where the frame is, not where the cable is: the hook is on
+// the document, so it serves the drawer, the media panel and the notes page of
+// a record alike, with or without a socket.
+//
 // THE SOCKET. When it drops, CS Studio works as without push; when it is
 // back, every part is fetched once -- signals sent meanwhile were never
 // received. A session that ended has its socket closed by the server
@@ -288,6 +309,42 @@ export default class extends Controller {
     if (url?.pathname?.includes("/notes/")) fetchOptions.headers["X-Notes-Tab"] = TAB
   }
 
+  // `turbo:before-fetch-request` on the document, as `tag`: what the notes
+  // frame is about to be answered for. A form that was sent (the event's
+  // target; the redirect that follows is no second request here), or nothing
+  // for a link, whose answer is drawn as it comes.
+  asked(event) {
+    const frame = event.target.closest?.("turbo-frame#notes")
+    if (!frame) return
+    const sends = String(event.detail.fetchOptions?.method || "GET").toUpperCase() !== "GET"
+    if (!sends || !(event.target instanceof HTMLFormElement)) return void (this.sent = null)
+    // What has the focus is noted now: Turbo disables the button that was
+    // pressed for as long as its request is out, and a disabled button has
+    // lost the focus by the time the answer is drawn.
+    const view = frame.querySelector(":scope > [data-notes-view='thread']")
+    this.sent = { frame, form: event.target, held: view ? this.hold(view) : null }
+  }
+
+  // `turbo:before-frame-render` on the document: see "THE ANSWER TO ONE OF
+  // THIS TAB'S OWN BUTTONS" above.
+  answered(event) {
+    const frame = event.target
+    if (frame.id !== "notes") return
+    const sent = this.sent
+    this.sent = null
+    if (!sent || sent.frame !== frame) return
+
+    const view = frame.querySelector(":scope > [data-notes-view='thread']")
+    const answer = event.detail.newFrame.querySelector(":scope > [data-notes-view='thread']")
+    if (!view || !answer || answer.dataset.noteThread !== view.dataset.noteThread || view.querySelector("[data-note-gone]")) return
+    if (!view.querySelector(":scope > [data-note-part='messages']") || !view.querySelector(":scope > [data-note-part='reply']")) return
+    // The form of a message being worked in: that message is what the answer redraws.
+    if (sent.form.closest("[data-note-message]")?.querySelector("form[data-note-composer], [data-note-delete-question]")) return
+
+    const reply = sent.form.matches("[data-note-part='reply'] form[data-note-composer]")
+    event.detail.render = () => this.redrawThread(frame, view, answer, null, { own: true, reply, held: sent.held })
+  }
+
   // `admin--notes:opened`: a drawer that was closed while its record changed
   // is fetched now. A task later, when `admin--notes#show` has either left
   // the frame as it is or sent it somewhere (which `refresh` waits for, and
@@ -450,7 +507,11 @@ export default class extends Controller {
     this.give(view, held)
   }
 
-  redrawThread(frame, view, answer, url) {
+  // `own`: the answer to this tab's own button (`answered`), not a signal's
+  // fetch -- nothing in it "arrived". `reply`: the reply's composer is what
+  // was sent, so its part is the answer's. `held`: what had the focus when
+  // the button was pressed (`asked`).
+  redrawThread(frame, view, answer, url, { own = false, reply: sentReply = false, held: heldBefore = null } = {}) {
     const old = view.querySelector(":scope > [data-note-part='messages']")
     const reply = view.querySelector(":scope > [data-note-part='reply']")
     if (!old || !reply) return
@@ -463,23 +524,25 @@ export default class extends Controller {
     const scroller = this.scroller(view)
     const atBottom = nearBottom(scroller)
     const top = scroller.scrollTop
-    const held = this.hold(view)
+    const held = heldBefore || this.hold(view)
     const known = new Set([ ...old.querySelectorAll("[data-note-message]") ].map((message) => message.dataset.noteMessage))
     const next = document.importNode(answer.querySelector(":scope > [data-note-part='messages']"), true)
     const find = (id) => [ ...next.querySelectorAll("[data-note-message]") ].find((message) => message.dataset.noteMessage === id)
 
     const arrived = [ ...next.querySelectorAll("[data-note-message]") ].filter((message) => !known.has(message.dataset.noteMessage))
     // The set of emoji that is open under a message, to be open again.
-    const picking = old.querySelector("details[data-reaction-add][open]")?.closest("[data-note-message]")?.dataset.noteMessage
+    // (Not after this tab's own press: an emoji was picked from it.)
+    const picking = own ? null : old.querySelector("details[data-reaction-add][open]")?.closest("[data-note-message]")?.dataset.noteMessage
     // The very elements, in the place the answer gives their messages -- shown,
     // should that place now be among the folded ones; one whose message was
     // deleted meanwhile keeps its text at the end.
     busy.forEach((message) => {
       const twin = find(message.dataset.noteMessage)
       // Its chips are what others did, not what is being typed: the new ones.
+      // Not under an edit form, where they are drawn disabled and the answer's are not.
       const chips = message.querySelector("[data-note-reactions]")
       const chipsTwin = twin?.querySelector("[data-note-reactions]")
-      if (chips && chipsTwin && !chips.querySelector("details[open]")) chips.replaceWith(chipsTwin)
+      if (chips && chipsTwin && !chips.querySelector("details[open]") && !message.querySelector("form[data-note-composer]")) chips.replaceWith(chipsTwin)
       if (twin) twin.replaceWith(message)
       else next.append(message)
       message.closest("details")?.setAttribute("open", "")
@@ -488,7 +551,7 @@ export default class extends Controller {
     if (picking) find(picking)?.querySelector("details[data-reaction-add]")?.setAttribute("open", "")
     // The divider stays where it first stood while the thread is open.
     const first = old.querySelector("[data-note-new-divider]")?.nextElementSibling?.dataset.noteMessage
-    const mark = (first && find(first)) || arrived[0]
+    const mark = own ? null : (first && find(first)) || arrived[0]
     if (mark) {
       mark.closest("details")?.setAttribute("open", "")
       mark.before(this.divider())
@@ -498,13 +561,16 @@ export default class extends Controller {
     view.dataset.state = answer.dataset.state
     this.takeCounts(view, answer)
     this.settle(reply, answer)
+    const nextReply = sentReply && answer.querySelector(":scope > [data-note-part='reply']")
+    if (nextReply) reply.replaceWith(document.importNode(nextReply, true))
     this.give(view, held)
 
     // The reader at the bottom stays there, and so sees what arrived; anyone
     // else stays where they are and is told.
     scroller.scrollTop = atBottom ? scroller.scrollHeight : top
+    if (nextReply) return
     if (atBottom) reply.querySelector(":scope > [data-note-jump]")?.remove()
-    else if (arrived.length > 0) this.jump(view, reply, scroller, arrived.length)
+    else if (arrived.length > 0 && !own) this.jump(view, reply, scroller, arrived.length)
   }
 
   // The thread is no longer there: its GET answered the list. With nothing
@@ -644,6 +710,9 @@ export default class extends Controller {
       id: active.id || null,
       message: message && root.contains(message) ? message.dataset.noteMessage : null,
       index: message ? [ ...message.querySelectorAll(FOCUSABLE) ].indexOf(active) : -1,
+      // A reaction's chip, or an emoji of the set: by its emoji, since the
+      // chips before it may be others after the redraw.
+      reaction: active.closest("[data-note-reactions]") ? active.dataset.reaction || active.value || null : null,
       selection: typeof active.selectionStart === "number" ? [ active.selectionStart, active.selectionEnd, active.selectionDirection ] : null
     }
   }
@@ -658,12 +727,22 @@ export default class extends Controller {
     const target = (held.element.isConnected && held.element)
       || (held.control && CONTROLS.find(([ name ]) => name === held.control)[1](root))
       || (held.id && [ ...root.querySelectorAll("[id]") ].find((each) => each.id === held.id))
+      || (message && held.reaction && this.reaction(message, held.reaction))
       || (message && [ ...message.querySelectorAll(FOCUSABLE) ][held.index])
       || root.closest("[tabindex]")
     if (!target) return
 
     target.focus({ preventScroll: true })
     if (target === held.element && held.selection) target.setSelectionRange(...held.selection)
+  }
+
+  // The chip of an emoji in a message as it is drawn now; the "Add a
+  // reaction" chip when that emoji's last reaction went and its chip with it.
+  // Compared as data, never built into a selector: the emoji is whatever the
+  // button held.
+  reaction(message, emoji) {
+    const chips = message.querySelector("[data-note-reactions]")
+    return [ ...(chips?.querySelectorAll("button[data-reaction]:not([disabled])") || []) ].find((chip) => chip.dataset.reaction === emoji) || chips?.querySelector("summary")
   }
 
   // `admin--notes`, on the same element.
