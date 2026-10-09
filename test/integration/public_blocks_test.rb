@@ -202,6 +202,56 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_select "h1", 1
   end
 
+  # Which of two listings that both list the post its detail stands in for is
+  # the FIRST IN READING ORDER (`BlockOutline#reading_order`), never the one
+  # with the lowest `position`: a position is counted per container, so the
+  # listing in a column of the page's first section (position 5 in its
+  # column) is read before the top-level listing under it (position 1), and
+  # two of them can tie. Asked three times: an order the database happens to
+  # return must not decide it.
+  test "a post's permalink stands in for the first listing in reading order, in a column or not, on every request" do
+    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    section = blog.content_blocks.create!(block_type: :section, position: 0)
+    blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 4, body: rich_doc("Before the first listing"))
+    in_column = blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 5, settings: { "content_type" => "blog" })
+    top_level = blog.content_blocks.create!(block_type: :post_list, position: 1, settings: { "content_type" => "blog" })
+    assert_operator top_level.position, :<, in_column.position
+    post = create_post(title: "Listed twice")
+    other = create_post(title: "Another post")
+    PublicSite::Paths.sync_posts("blog")
+
+    3.times do
+      get "/blog/#{post.slug}"
+
+      assert_response :success
+      assert_select "h1", 1
+      assert_select "section.content-section .content-section__column:nth-child(1) h1", text: "Listed twice"
+      # The second listing is still a listing, under the section, with both posts.
+      assert_select "section.content-section a", text: other.title, count: 0
+      assert_includes response.body, other.title
+      assert_operator response.body.index("Before the first listing"), :<, response.body.index("<h1")
+      assert_operator response.body.index("<h1"), :<, response.body.rindex(other.title)
+    end
+  end
+
+  # The controller reads the reading order from an outline, and the view
+  # draws from the same one (`PublicPageRendering#assign_record` hands it
+  # over): a permalink builds one outline, as a page does.
+  test "a post's permalink builds one outline, the one its page is drawn from" do
+    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    section = blog.content_blocks.create!(block_type: :section, position: 0)
+    blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 1, position: 0, settings: { "content_type" => "blog" })
+    post = create_post(title: "Counted")
+    PublicSite::Paths.sync_posts("blog")
+    built = 0
+    original = BlockOutline.method(:new)
+
+    with_singleton_override(BlockOutline, :new, ->(*arguments) { built += 1; original.call(*arguments) }) { get "/blog/#{post.slug}" }
+
+    assert_select "section.content-section h1", text: "Counted"
+    assert_equal 1, built
+  end
+
   test "each layout renders its own grid class and one column element per column, an empty one kept" do
     { "one" => 1, "two" => 2, "three" => 3, "four" => 4, "one_two" => 2, "two_one" => 2 }.each do |layout, count|
       clear_blocks

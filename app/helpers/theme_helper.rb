@@ -134,6 +134,14 @@ module ThemeHelper
   # groups every block of the page. Kept on the view, never on the page: an
   # outline is a snapshot of the blocks as loaded, and a view lives exactly
   # as long as one render does.
+  #
+  # For a post's permalink the page's outline is already here when the view
+  # starts: `PublicPageRendering#assign_record` built it to find which
+  # listing the post stands in for, and assigned it to this same variable
+  # (a controller's instance variables are copied to its view). Renaming
+  # the variable here means renaming it there
+  # (`test/integration/public_blocks_test.rb`, "a post's permalink builds
+  # one outline, the one its page is drawn from").
   def block_outline(page)
     @block_outlines ||= {}
     @block_outlines[page] ||= BlockOutline.new(page.content_blocks)
