@@ -45,16 +45,25 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "#notes-list"
     assert_selector "#notes-open-count", text: "1"
     assert_selector "#notes-open[aria-label='Notes, 1 open']"
-    assert_selector "#notes-drawer > header", text: "1 OPEN"
+    # The thread's first row is the header now (the handoff's decision 11):
+    # the count of open threads stands beside "All notes".
+    assert_selector "#notes-drawer a[data-note-back]", text: /All notes\s*1/
     assert_equal @page, Notes::Thread.last.subject
     # The form that held the focus is gone with the list: the thread has it,
     # not the page behind the drawer.
     assert_eventually(message: "the focus left the drawer when the note was sent") { focus_in_drawer? }
     find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list a[data-note-row]", text: "Is this page ready?"
+    assert_selector "#notes-drawer > header", text: "1 OPEN"
     assert_eventually(message: "the focus left the drawer on the way back to the list") { focus_in_drawer? }
 
-    find("#notes-list a[data-note-row]").send_keys(:escape)
+    # A real key on a row focused by script. Cuprite's `send_keys` CLICKS an
+    # element that is not focused: that followed the row, and Escape then
+    # raced the thread's arrival -- when the frame had just replaced the row
+    # the focus was on <body> for a moment and the key closed nothing (the
+    # one failure of this test in a full run).
+    find("#notes-list a[data-note-row]").execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:escape)
 
     assert_no_selector "#notes-drawer"
     assert_selector "#notes-open[aria-expanded=false][aria-pressed=false]"
@@ -164,6 +173,63 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     within(reply) { press "Reopen" }
     assert_selector "#{reply} button[data-note-state=resolve]"
     assert thread.reload.open?
+  end
+
+  # The handoff's decision 11: while a thread is open the drawer's own header
+  # is hidden, and row 1 is "← All notes 4", the Notify link and Close.
+  test "a thread hides the drawer's header and has Close in its first row; Close there closes the drawer and gives the focus back; All notes brings the header back" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    as(users(:two)) { Notes::Start.call(@page, body: "And here") }
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-drawer > header button", text: "New note"
+    assert_selector "#notes-drawer button[aria-label='Close']", count: 1
+
+    find("#note-row-#{thread.id}").click
+
+    assert_selector "#note-thread-#{thread.id}"
+    assert_no_selector "#notes-drawer > header"
+    assert_no_selector "#notes-drawer button", text: "New note"
+    assert_selector "#notes-drawer a[data-note-back]", text: /All notes\s*2/
+    # One Close, row 1's: after the Notify link, at the row's right end.
+    assert_selector "#notes-drawer button[aria-label='Close']", count: 1
+    assert_selector "#note-thread-#{thread.id} button[data-note-close][aria-label='Close']"
+    edges = page.evaluate_script("[ 'a[data-note-back]', '[data-note-actions] form[action$=\"follow\"] button', 'button[data-note-close]' ].map((selector) => { const box = document.querySelector('#notes-drawer ' + selector).getBoundingClientRect(); return [ box.left, (box.top + box.bottom) / 2 ] })")
+    assert_operator edges[0][0], :<, edges[1][0]
+    assert_operator edges[1][0], :<, edges[2][0]
+    assert_in_delta edges[0][1], edges[2][1], 4, "Close is not on Back's row"
+    # The thread starts where the drawer does: no gap where the header was.
+    tops = page.evaluate_script("[ '#notes-drawer', 'a[data-note-back]' ].map((selector) => document.querySelector(selector).getBoundingClientRect().top)")
+    assert_operator tops[1] - tops[0], :<, 24
+
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-list"
+    assert_selector "#notes-drawer > header button", text: "New note"
+    assert_selector "#notes-drawer > header button[aria-label='Close']"
+
+    find("#note-row-#{thread.id}").click
+    assert_selector "#note-thread-#{thread.id}"
+    find("#notes-drawer button[data-note-close]").click
+
+    assert_no_selector "#notes-drawer"
+    assert_selector "#notes-open[aria-expanded=false][aria-pressed=false]"
+    assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
+    assert_no_selector "html[data-notes-open]"
+  end
+
+  test "below 1024px a thread keeps the sheet's header, whose Back to the page is the way out, and has no Close of its own" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    original = page.current_window.size
+    page.current_window.resize_to(900, 800)
+    open_editor("?notes=open&thread=#{thread.id}")
+
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    assert_selector "#notes-drawer > header button", text: "Back to Pricing"
+    assert_no_selector "#notes-drawer button[aria-label='Close']"
+    within("#notes-drawer > header") { press "Back to Pricing" }
+    assert_no_selector "#notes-drawer"
+  ensure
+    page.current_window.resize_to(*original)
   end
 
   test "the list is where it was left when a thread is closed again" do

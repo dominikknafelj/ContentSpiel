@@ -3,8 +3,9 @@
               notes_subject: ::Notes.key(thread.subject_type, thread.subject_id) } do %>
   <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
   <div id="<%= dom_id %>-messages" data-note-part="messages" class="flex flex-1 flex-col">
-    <%# Rows 1 and 2 (the handoff's decision 3). Row 1: back to the list, then
-        "Notify me" / "Stop notifying me". Row 2: what the thread is on, with
+    <%# Rows 1 and 2 (the handoff's decisions 3 and 11). Row 1: back to the list
+        with the number of open threads, then "Notify me" / "Stop notifying
+        me", then Close. Row 2: what the thread is on, with
         Pin on the right for someone who may pin. One grid of two rows, so
         that the two settings of the thread -- one at the end of each row --
         can stay the children of ONE element, `[data-note-actions]`
@@ -25,6 +26,14 @@
       <div class="contents" data-note-actions>
         <div class="col-start-2 row-start-1 flex items-center justify-end border-b border-line py-2.5 pl-2 pr-3">
           <%= button_to t(following? ? ".unfollow" : ".follow"), change_path(following? ? "unfollow" : "follow"), class: FOLLOW_CLASS, form: frame_form %>
+          <%# Close, the end of row 1 (the handoff's decision 11): the drawer's own
+              header is hidden while a thread is open, so this is the drawer's
+              Close -- the same action, the focus given back the same way. Shown
+              only in the editors' drawer from 1024px (`.admin-note-close`). %>
+          <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { note_close: true, action: "admin--notes#close" },
+                class: "admin-note-close ml-2 size-7 shrink-0 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" do %>
+            <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+          <% end %>
         </div>
         <%# Always there, for the row's line; empty for someone who may not pin. %>
         <div class="col-start-2 row-start-2 flex items-start justify-end border-b border-line py-2.5 pl-2 pr-3">

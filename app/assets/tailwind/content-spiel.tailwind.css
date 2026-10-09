@@ -462,6 +462,23 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-notes-marker--on-image[data-has-notes],
 .admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
 .admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
+/* THE THREAD VIEW'S HEADER (the handoff's decision 11). While a thread is the
+   drawer's view the drawer's own header -- the title, the count, "New note"
+   and Close -- is not shown, and the thread's first row is the header: "←
+   All notes 4", the Notify link and a Close of its own
+   (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
+   what the drawer's does. "New note" comes back with the list. Asked of the
+   frame's view, so the two can't both show or both hide. From 1024px only:
+   below it the notes are a sheet whose header holds "Back to <title>", the
+   one way back to the editor, so the sheet keeps its header over a thread
+   and the row's Close stays away. That Close is also shown nowhere but in
+   the drawer: the same thread view in the media panel and on a record's
+   notes page has no drawer to close. */
+.admin-note-close { display: none; }
+@media (min-width: 1024px) {
+  .admin-notes-drawer:has([data-notes-view="thread"]) > header { display: none; }
+  .admin-notes-drawer .admin-note-close { display: inline-flex; }
+}
 /* ONE "New note" in the drawer (the handoff's decision 4): its header's
    button is the way in, so the list's own link -- above the groups, and the
    empty state's action -- is not shown there, with the element that only

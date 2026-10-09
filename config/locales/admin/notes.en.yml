@@ -218,6 +218,8 @@ en:
         thread:
           # The arrow before it is an icon (`:arrow_left`), not part of the text.
           back: "All notes"
+          # Row 1's Close, the drawer's own while a thread is open.
+          close: "Close"
           # Under what the thread is on: "2 messages · started on DE".
           messages:
             one: "%{count} message"

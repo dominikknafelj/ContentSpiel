@@ -114,6 +114,9 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
       assert_select "[data-note-actions]", count: 1
       assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] button", text: "Stop notifying me"
       assert_select "[data-note-actions] > [class~='row-start-2'] form[action$='/pin'] button[aria-label=Pin]"
+      # Row 1 ends with Close, the drawer's own action (the handoff's decision 11).
+      assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] + button.admin-note-close[data-note-close][data-action='admin--notes#close'][aria-label=Close]"
+      assert_select "a[data-note-back]", text: /All notes\s*1/
       # Neither Resolve nor a reply field among what is read.
       assert_select "[data-note-state]", count: 0
     end

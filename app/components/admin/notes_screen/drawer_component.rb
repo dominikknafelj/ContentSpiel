@@ -21,10 +21,14 @@ module Admin
     # `#notes-counts` is the record's counts as the page loaded them; every
     # answer of the frame brings a newer copy.
     #
-    # Its header is the list's and the thread's alike: the title, how many are
-    # open (the number is an `admin--notes` `total`, like the header button's,
-    # so it follows the counts), "New note" -- a note on the record itself, no
-    # chooser -- and Close. The sheet has "Back to <title>" in Close's place.
+    # Its header is the LIST's: the title, how many are open (the number is
+    # an `admin--notes` `total`, like the header button's, so it follows the
+    # counts), "New note" -- a note on the record itself, no chooser -- and
+    # Close. While a thread is the view it is not shown, and the thread's
+    # first row is the header, with a Close of its own (the handoff's
+    # decision 11; the stylesheet's "THE THREAD VIEW'S HEADER"). The sheet has
+    # "Back to <title>" in Close's place, and keeps its header over a thread
+    # too: that button is the sheet's one way back to the editor.
     #
     # WHEN TO USE WHICH: the shell's left drawers (`admin--drawer`) are the
     # navigation at narrow widths, with a scrim; the media panel is a column
