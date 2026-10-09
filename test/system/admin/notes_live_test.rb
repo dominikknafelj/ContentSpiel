@@ -56,7 +56,9 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
 
   def focused?(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
 
-  def drawer_scroll = page.evaluate_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop")
+  # Where the open thread's messages are scrolled to: they are the one thing
+  # that scrolls under a thread in the drawer (the handoff's decision 35).
+  def drawer_scroll = page.evaluate_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop")
 
   # Counts the GETs this tab makes for notes from here on -- a live refresh
   # is one; a note the tab sends is a POST, whose redirect the browser follows
@@ -274,7 +276,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   test "a reader who is not at the bottom is not moved: a button says what arrived and leads there" do
     as(users(:two)) { 2.times { |index| Notes::Reply.call(@thread, body: ([ "A long line #{index}" ] * 40).join("\n")) } }
     open_thread
-    page.execute_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop = 0")
+    page.execute_script("document.querySelector('#notes-drawer [data-note-scroll]').scrollTop = 0")
     assert_equal 0, drawer_scroll
 
     reply_as_dana("Down here")
@@ -293,7 +295,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
 
     find("button[data-note-jump]").click
     assert_no_selector "button[data-note-jump]"
-    at_bottom = page.evaluate_script("(() => { const s = document.querySelector('#notes-drawer [data-notes-scroller]'); return s.scrollHeight - s.scrollTop - s.clientHeight < 2 })()")
+    at_bottom = page.evaluate_script("(() => { const s = document.querySelector('#notes-drawer [data-note-scroll]'); return s.scrollHeight - s.scrollTop - s.clientHeight < 2 })()")
     assert at_bottom, "the button did not lead to the bottom"
     assert_equal true, page.evaluate_script("document.activeElement.closest('#notes-drawer') !== null"), "the focus left the drawer with the button"
   end

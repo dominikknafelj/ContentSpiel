@@ -46,8 +46,9 @@ import { forgetDrafts } from "controllers/admin/note_composer_controller"
 //   field that is on screen. The field is not moved, not even within the
 //   list, so its text, its names, its open picker and the focus stay.
 // - The thread view: its `messages` part is replaced -- Back, the heading,
-//   Notify, Close and Pin are in it, and show a state someone else can
-//   change. A message with an open edit form or an open "Delete this note?"
+//   Notify, Close and Pin are in it (its two rows, which in the drawer stay
+//   at the top while the messages under them scroll: the handoff's decision
+//   35), and show a state someone else can change. A message with an open edit form or an open "Delete this note?"
 //   stays the element it is. The `reply` part is never replaced: only its
 //   Resolve / Reopen button and the empty form that button sends are swapped
 //   when the thread's state changed, so the button says what it now does.
@@ -368,17 +369,40 @@ export default class extends Controller {
     if (frame.id !== "notes") return
     const sent = this.sent
     this.sent = null
-    if (!sent || sent.frame !== frame) return
 
     const view = frame.querySelector(":scope > [data-notes-view='thread']")
     const answer = event.detail.newFrame.querySelector(":scope > [data-notes-view='thread']")
-    if (!view || !answer || answer.dataset.noteThread !== view.dataset.noteThread || view.querySelector("[data-note-gone]")) return
+    const same = Boolean(view && answer && answer.dataset.noteThread === view.dataset.noteThread)
+    // Drawn as it comes or merged, the same thread stays where it was read.
+    if (same) this.keepPlace(event, frame, view)
+    if (!sent || sent.frame !== frame) return
+    if (!same || view.querySelector("[data-note-gone]")) return
     if (!view.querySelector(":scope > [data-note-part='messages']") || !view.querySelector(":scope > [data-note-part='reply']")) return
     // The form of a message being worked in: that message is what the answer redraws.
     if (sent.form.closest("[data-note-message]")?.querySelector("form[data-note-composer], [data-note-delete-question]")) return
 
     const reply = sent.form.matches("[data-note-part='reply'] form[data-note-composer]")
     event.detail.render = () => this.redrawThread(frame, view, answer, null, { own: true, reply, held: sent.held })
+  }
+
+  // The same thread drawn again by Turbo itself (Edit, Delete or Cancel in a
+  // message's menu, a saved edit): where its messages have a scroller of
+  // their own (the drawer and the sheet, decision 35) that scroller is a new
+  // element afterwards and would start at its top, far from the message the
+  // person just pressed something on. Its place is put back inside the
+  // render, so nothing is painted in between. Where the thread is in the
+  // flow, what scrolls is outside the frame and stays by itself.
+  keepPlace(event, frame, view) {
+    const scroller = this.scroller(view)
+    if (!view.contains(scroller)) return
+
+    const top = scroller.scrollTop
+    const draw = event.detail.render
+    event.detail.render = (current, next) => {
+      draw(current, next)
+      const now = frame.querySelector(":scope > [data-notes-view='thread']")
+      if (now) this.scroller(now).scrollTop = top
+    }
   }
 
   // `admin--notes:opened`: a drawer that was closed while its record changed
@@ -620,11 +644,13 @@ export default class extends Controller {
     else this.give(view, held)
 
     // The reader at the bottom stays there, and so sees what arrived; anyone
-    // else stays where they are and is told.
-    scroller.scrollTop = atBottom ? scroller.scrollHeight : top
+    // else stays where they are and is told. Asked for again: the messages'
+    // own scroller is part of what was just replaced.
+    const now = this.scroller(view)
+    now.scrollTop = atBottom ? now.scrollHeight : top
     if (nextReply) return
     if (atBottom) reply.querySelector(":scope > [data-note-jump]")?.remove()
-    else if (arrived.length > 0 && !own) this.jump(view, reply, scroller, arrived.length)
+    else if (arrived.length > 0 && !own) this.jump(view, reply, arrived.length)
   }
 
   // The thread is no longer there: its GET answered the list. With nothing
@@ -649,10 +675,10 @@ export default class extends Controller {
     }
 
     const held = this.hold(view)
-    const rows = old.firstElementChild
-    ;[ ...old.children ].forEach((part) => { if (part !== rows) part.remove() })
+    const rows = old.querySelector(":scope > [data-note-rows]")
     rows?.querySelectorAll("[data-note-actions] form").forEach((form) => form.remove())
-    old.append(...editing)
+    // What is left under the rows: the edits that hold text, and nothing else.
+    old.querySelector(":scope > [data-note-scroll]")?.replaceChildren(...editing)
 
     const line = document.createElement("p")
     line.dataset.noteGone = ""
@@ -700,12 +726,18 @@ export default class extends Controller {
     return divider
   }
 
-  // "1 new message ↓", 12px above the reply field (the dock is `sticky`, so
+  // "1 new message ↓", 12px above the reply field (the dock is positioned, so
   // the button stands on it wherever the thread is scrolled to; 13px from the
   // dock's padding edge, which is 12px above the line on its top). It counts
   // what arrived since the reader was last at the bottom, and goes when they
   // are there again -- by pressing it or by scrolling.
-  jump(view, reply, scroller, count) {
+  //
+  // What scrolls is asked for each time (`scroller`): the messages' own
+  // scroller is replaced with every refresh, while this button, in the reply
+  // part, stays. So the scroll is heard on the document in the capture
+  // phase, which hears every scroller in it (a scroll does not bubble) and
+  // the window's too.
+  jump(view, reply, count) {
     let button = reply.querySelector(":scope > [data-note-jump]")
     const total = count + Number(button?.dataset.count || 0)
     if (!button) {
@@ -713,17 +745,16 @@ export default class extends Controller {
       button.type = "button"
       button.dataset.noteJump = ""
       button.className = "absolute bottom-full left-1/2 mb-[13px] -translate-x-1/2 cursor-pointer whitespace-nowrap rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink shadow-menu focus-visible:outline-2 focus-visible:outline-accent"
-      // The page scrolls where there is no drawer; its scroll is the window's.
-      const source = scroller === document.scrollingElement ? window : scroller
-      const watch = () => { if (!button.isConnected || nearBottom(scroller)) dismiss() }
+      const watch = () => { if (!button.isConnected || !view.isConnected || nearBottom(this.scroller(view))) dismiss() }
       const dismiss = () => {
-        source.removeEventListener("scroll", watch)
+        document.removeEventListener("scroll", watch, { capture: true })
         if (button.contains(document.activeElement)) view.focus({ preventScroll: true })
         button.remove()
       }
-      source.addEventListener("scroll", watch, { passive: true })
+      document.addEventListener("scroll", watch, { capture: true, passive: true })
       button.addEventListener("click", () => {
         if (button.contains(document.activeElement)) view.focus({ preventScroll: true })
+        const scroller = this.scroller(view)
         scroller.scrollTop = scroller.scrollHeight
         dismiss()
       })
@@ -748,7 +779,14 @@ export default class extends Controller {
     if (counts && element.isConnected) this.notes?.refreshCounts(counts)
   }
 
+  // What scrolls a view. A thread in the drawer or the sheet: its messages'
+  // own scroller, between the two rows and the composer (decision 35), which
+  // is so by the stylesheet and is asked of it. Anything else -- the list, a
+  // thread in the media panel or on a record's notes page: the drawer's
+  // body, or the page.
   scroller(view) {
+    const own = view.querySelector(":scope > [data-note-part='messages'] > [data-note-scroll]")
+    if (own && /auto|scroll/.test(window.getComputedStyle(own).overflowY)) return own
     return view.closest("[data-notes-scroller]") || document.scrollingElement
   }
 

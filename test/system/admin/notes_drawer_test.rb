@@ -307,6 +307,121 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "button[data-note-close]"
   end
 
+  # The handoff's decision 35: a thread's rows 1 and 2 stay at the top of the
+  # drawer and of the sheet; only the messages scroll, between them and the
+  # composer. Close and "All notes" are one click away wherever the reader is.
+  def long_thread
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "The first of many") }.record
+    # Long enough to scroll with the middle of the thread folded away.
+    as(users(:two)) { 4.times { |index| Notes::Reply.call(thread, body: ([ "A long line #{index}" ] * 60).join("\n")) } }
+    as(users(:one)) { Notes::MarkRead.call(thread: thread) }
+    thread
+  end
+
+  # Where an element stands, and whether it is what a press at its middle hits.
+  def in_view(selector)
+    page.evaluate_script(<<~JS)
+      (() => {
+        const element = document.querySelector(#{selector.to_json})
+        const box = element.getBoundingClientRect()
+        const hit = document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2)
+        return { top: box.top, bottom: box.bottom, hit: Boolean(hit) && (hit === element || element.contains(hit)) }
+      })()
+    JS
+  end
+
+  def scroll_messages_to_end(thread)
+    page.execute_script("const box = document.querySelector('#note-thread-#{thread.id}-messages [data-note-scroll]'); box.scrollTop = box.scrollHeight")
+    page.evaluate_script("document.querySelector('#note-thread-#{thread.id}-messages [data-note-scroll]').scrollTop")
+  end
+
+  test "in a long thread only the messages scroll: at their end All notes, the heading, Pin and Close are still in view and pressable" do
+    thread = long_thread
+    open_editor("?notes=open&thread=#{thread.id}")
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+
+    assert_operator scroll_messages_to_end(thread), :>, 200, "the messages did not scroll"
+    # The drawer's own body does not scroll under a thread.
+    assert_equal 0, page.evaluate_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop")
+    drawer_top = page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().top")
+    [ "#notes-drawer a[data-note-back]", "#notes-drawer button[data-note-close]", "#notes-drawer [data-note-actions] form[action$='/pin'] button", "#notes-drawer [data-note-rows] h3" ].each do |selector|
+      box = in_view(selector)
+      assert box["hit"], "#{selector} is not what a press on it reaches"
+      assert_operator box["top"] - drawer_top, :<, 110, "#{selector} is not in the two rows at the top"
+    end
+    # The last message is in view above the composer, which is at the bottom.
+    last = in_view("#note-message-#{thread.messages.order(:id).last.id}")
+    reply = in_view("#note-thread-#{thread.id}-reply textarea[name=body]")
+    assert reply["hit"]
+    assert_operator last["bottom"], :<=, page.evaluate_script("document.querySelector('#note-thread-#{thread.id}-reply').getBoundingClientRect().top") + 1
+    assert_in_delta page.evaluate_script("window.innerHeight"), page.evaluate_script("document.querySelector('#note-thread-#{thread.id}-reply').getBoundingClientRect().bottom"), 1
+
+    find("#notes-drawer button[data-note-close]").click
+    assert_no_selector "#notes-drawer"
+
+    find("#notes-open").click
+    find("#note-row-#{thread.id}").click if page.has_selector?("#notes-drawer #notes-list", wait: 2)
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    scroll_messages_to_end(thread)
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-drawer #notes-list"
+  end
+
+  test "below 1024px the sheet's thread keeps its row at the top too: All notes and Back to page are pressable at the end of the messages" do
+    thread = long_thread
+    original = page.current_window.size
+    page.current_window.resize_to(900, 800)
+    open_editor("?notes=open&thread=#{thread.id}")
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+
+    assert_operator scroll_messages_to_end(thread), :>, 200, "the messages did not scroll"
+    drawer_top = page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().top")
+    [ "#notes-drawer a[data-note-back]", "#notes-drawer button[data-note-leave]", "#notes-drawer [data-note-rows] h3" ].each do |selector|
+      box = in_view(selector)
+      assert box["hit"], "#{selector} is not what a press on it reaches"
+      assert_operator box["top"] - drawer_top, :<, 110, "#{selector} is not in the rows at the top"
+    end
+    assert in_view("#note-thread-#{thread.id}-reply textarea[name=body]")["hit"]
+
+    within("#note-thread-#{thread.id}") { press "Back to page" }
+    assert_no_selector "#notes-drawer"
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
+  # A press that draws the thread again (Edit in a message's menu) leaves the
+  # reader where they were: the messages are a new element after it.
+  test "Edit on a message far down a long thread leaves the messages where they were scrolled to" do
+    thread = long_thread
+    mine = as(users(:one)) { Notes::Reply.call(thread, body: "Mine, at the end") }.record
+    open_editor("?notes=open&thread=#{thread.id}")
+    assert_selector "#notes-drawer #note-thread-#{thread.id}"
+    at = scroll_messages_to_end(thread)
+
+    within("#note-message-#{mine.id}") do
+      find("button[aria-label='Note actions']").click
+      press "Edit"
+    end
+
+    assert_selector "#note-message-#{mine.id} form[data-note-composer]"
+    assert_operator page.evaluate_script("document.querySelector('#note-thread-#{thread.id}-messages [data-note-scroll]').scrollTop"), :>=, at - 4
+    assert in_view("#note-message-#{mine.id} form[data-note-composer] textarea")["hit"]
+  end
+
+  # Where the notes are in no drawer, the page (or the panel) is what
+  # scrolls, as before: the thread is in the flow.
+  test "on a record's notes page a long thread is in the page's flow: the page scrolls, not the messages" do
+    thread = long_thread
+    visit "/cs-studio/notes/page/#{@page.id}/threads/#{thread.id}"
+    await_admin_controllers
+    assert_selector "#note-thread-#{thread.id}"
+
+    box = "document.querySelector('#note-thread-#{thread.id}-messages [data-note-scroll]')"
+    assert_equal "visible", page.evaluate_script("getComputedStyle(#{box}).overflowY")
+    assert_operator page.evaluate_script("#{box}.getBoundingClientRect().height"), :>, page.evaluate_script("window.innerHeight"), "the messages are cut to the window"
+    assert_operator page.evaluate_script("document.scrollingElement.scrollHeight"), :>, page.evaluate_script("window.innerHeight")
+  end
+
   test "the list is where it was left when a thread is closed again" do
     as(users(:two)) { 30.times { |index| Notes::Start.call(@page, body: "Note #{index}") } }
     open_editor

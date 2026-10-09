@@ -495,6 +495,20 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (max-width: 1023px) {
   .admin-notes-drawer .admin-note-leave { display: inline-flex; }
 }
+/* A THREAD'S ROWS STAY, ITS MESSAGES SCROLL (the handoff's decision 35). In
+   the drawer and the sheet a thread fills the drawer's body exactly: its two
+   rows at the top, the composer at the bottom, and between them the one
+   thing that scrolls, `[data-note-scroll]` (the state, the quote, the
+   messages). The drawer's own scroller, which the list scrolls in, does not
+   scroll under a thread. By where the frame stands, like the rules around
+   this one: in the media panel and on a record's notes page the same thread
+   is in the flow of what scrolls there, and none of this applies.
+   `admin--notes-live#scroller` reads `overflow-y` to tell the two apart. */
+.admin-notes-drawer [data-notes-scroller]:has([data-notes-view="thread"]) { overflow: hidden; }
+.admin-notes-drawer turbo-frame#notes:has(> [data-notes-view="thread"]),
+.admin-notes-drawer [data-notes-view="thread"] { height: 100%; min-height: 0; }
+.admin-notes-drawer [data-note-part="messages"] { min-height: 0; }
+.admin-notes-drawer [data-note-scroll] { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 /* ONE "New note" in the drawer (the handoff's decision 4): its header's
    button is the way in, so the list's own link -- above the groups, and the
    empty state's action -- is not shown there, with the element that only

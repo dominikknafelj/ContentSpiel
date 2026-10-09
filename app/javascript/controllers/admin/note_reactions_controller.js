@@ -30,7 +30,11 @@ export default class extends Controller {
 
     const add = this.addTarget
     delete add.dataset.side
-    const scroller = this.element.closest("[data-notes-scroller]")
+    // The messages' own scroller where they have one (the drawer and the
+    // sheet, decision 35: it starts under the thread's two rows and clips
+    // the set), else the drawer's body.
+    const own = this.element.closest("[data-note-scroll]")
+    const scroller = own && /auto|scroll/.test(window.getComputedStyle(own).overflowY) ? own : this.element.closest("[data-notes-scroller]")
     const row = this.element.closest("[data-notes-view]")?.querySelector("a[data-note-back]")?.parentElement
     const ceiling = Math.max(scroller ? scroller.getBoundingClientRect().top : 0, row ? row.getBoundingClientRect().bottom : 0)
     if (add.getBoundingClientRect().top - ceiling < this.panelTarget.offsetHeight + GAP) {

@@ -13,9 +13,18 @@
         (`display: contents`: its children are the grid's items). They come
         second in the document, so the Tab order is Back, Notify, Pin. All of
         it is inside the part a refresh replaces: the buttons show a state
-        someone else can change. %>
-    <%# `-mb-px`: the first message draws a line above itself, and this one is that line. %>
-    <div class="-mb-px grid grid-cols-[minmax(0,1fr)_auto]">
+        someone else can change.
+        THE ROWS STAY, THE MESSAGES SCROLL (the handoff's decision 35). In the
+        drawer and in the sheet the two rows (`[data-note-rows]`) are fixed
+        at the top and what follows them (`[data-note-scroll]`: the state,
+        the quote, the messages) is a scroller of its own, between the rows
+        and the composer; so "All notes" and Close are one press away
+        wherever the reader is. That is the stylesheet's, by where the frame
+        stands (`.admin-notes-drawer`, content-spiel.tailwind.css): in the
+        media panel and on a record's notes page the thread is in the flow
+        of whatever scrolls there. `admin--notes-live` asks which of the two
+        it is (`scroller`). %>
+    <div class="grid shrink-0 grid-cols-[minmax(0,1fr)_auto]" data-note-rows>
       <div class="col-start-1 row-start-1 flex items-center border-b border-line py-2.5 pl-3">
         <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
               data: { note_back: true, turbo_frame: "notes", turbo_prefetch: false } do %>
@@ -62,6 +71,9 @@
         <p class="text-[13px] text-dim"><%= summary %></p>
       </div>
     </div>
+    <%# The rows' own line is the first message's too: a message that comes
+        first draws none above itself. %>
+    <div class="flex flex-col [&>[data-note-message]:first-child]:border-t-0" data-note-scroll>
     <%# What the thread's state is, in words; no line at all for a thread that
         is neither pinned nor resolved. %>
     <% if thread.pinned || thread.resolved? %>
@@ -91,6 +103,7 @@
       <% end %>
     <% end %>
     <% trailing.each do |record| %><%= render message(record) %><% end %>
+    </div>
   </div>
 
   <%# The reply, fixed at the bottom of the drawer (spec §4.2), with Resolve --
