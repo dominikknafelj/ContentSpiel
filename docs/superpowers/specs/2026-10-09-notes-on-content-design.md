@@ -2,7 +2,7 @@
 
 The first of four steps of "Collaboration on content" (roadmap, decided 2026-10-08): (1) notes, with live delivery — this spec; (2) presence; (3) live refresh of blocks changed by someone else, and edit reservations; (4) co-editing of rich text, only if 1–3 prove insufficient. Each step has its own spec, plan and PR. This is the binding spec for one implementation plan.
 
-**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** **The visual design is `Studio Notes.dc.html` in the Claude Design project "Content Spiel design system"** (every screen in light and dark, made inside the design system and accepted by the user on 2026-10-09; §4.5 lists what it settles). An earlier rough canvas, "Notes on content", is superseded and is not a reference.
+**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** **The visual design is `Studio Notes.dc.html` in the Claude Design project "Content Spiel design system"** (every screen in light and dark, made inside the design system and accepted by the user on 2026-10-09; §4.5 lists what it settles). Its written handoff, with tokens, classes, sizes and states per part, is `2026-10-09-notes-on-content-handoff.md` beside this file; the build follows it for the look and this spec for behaviour. An earlier rough canvas, "Notes on content", is superseded and is not a reference.
 
 ## 1. Purpose
 
@@ -85,7 +85,7 @@ User references follow the existing pattern: an author who is deleted leaves the
 ### 3.2 Mentions
 
 - In the body a mention is stored as a token, `@[<user id>]`, and rendered as the user's current display name. Renaming a user changes how old mentions read; deleting one renders "a deleted user".
-- The composer inserts the token from a picker. The picker lists only **users who may read the subject** (the same check as D3), by `display_name` with the email as a hint. This is a second place CS Studio lists users to someone without `users.manage`; like `Admin::UserSuggestionsController` it is not a directory: it needs two typed characters, returns at most eight rows, and answers only for a subject the asker may read.
+- The composer inserts the token from a picker. The picker lists only **users who may read the subject** (the same check as D3), by `display_name` with the email as a hint. This is a second place CS Studio lists users to someone without `users.manage`; like `Admin::UserSuggestionsController` it is not a directory: it returns at most six rows, and answers only for a subject the asker may read.
 - A token naming a user who may not read the subject is refused by the service ("… can't see this page"), so a mention never leaks a title or a quote through the inbox.
 
 ### 3.3 Who is told
@@ -147,7 +147,7 @@ Rules:
 
 - Validated like library images: the type is sniffed from the bytes (`Marcel`), never taken from the client. Allowed: PNG, JPEG, GIF, WEBP, PDF, plain text, CSV, and the Office and OpenDocument text, sheet and slide formats. SVG and HTML are refused. 10 MB each, 5 per message.
 - Uploaded with the message as one multipart form post. No direct upload.
-- Served by `Admin::NoteFilesController#show`: looks the thread up through the read scope, then sends the file with `Content-Disposition: attachment` for anything that is not one of the four image types, and `X-Content-Type-Options: nosniff` always. No Active Storage URL for a note's file is ever written into a page (D15). Inline images are shown through the same action, at most 320 px wide, without variants.
+- Served by `Admin::NoteFilesController#show`: looks the thread up through the read scope, then sends the file with `Content-Disposition: attachment` for anything that is not one of the four image types, and `X-Content-Type-Options: nosniff` always. No Active Storage URL for a note's file is ever written into a page (D15). Inline images are shown through the same action at the message's width (at most 368 px in the drawer), without variants; a click opens the image in a new tab through the same action. There is no lightbox.
 - Deleted with the message (`purge_later`).
 
 ### 3.7 What does not change
@@ -202,7 +202,7 @@ The emoji control is a small fixed set (about 30 common ones) in a popover; the 
 
 ### 4.5 Look
 
-- **Counts**: open threads are neutral meta-colour pills like the existing count badges. Accent is used for one meaning only: unread and addressed to the viewer (the dot on an inbox row, "new" on a thread row, the Dashboard badge in the sidebar, which is a filled accent pill and the one filled badge there).
+- **Counts**: open threads are neutral meta-colour pills like the existing count badges. A count turns accent when the viewer has an unread delivery on a thread it counts; each surface reads that in the same grouped query as its count or one beside it. Accent is used for one meaning only: unread and addressed to the viewer (the dot on an inbox row, "new" on a thread row, the Dashboard badge in the sidebar, which is a filled accent pill and the one filled badge there).
 - **People**: the existing actor pattern (round avatar, name).
 - **Quote**: a sunken block with a 1 px line on all sides; no coloured left border.
 - **"Written on German"**: the existing translation chip, shown only when the origin language differs from the current tab.
