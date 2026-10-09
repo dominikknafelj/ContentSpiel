@@ -78,6 +78,16 @@ module Admin
       # row at all.
       def used_ids = @used_ids ||= Media::Usage.where(media_asset_id: assets.map(&:id)).distinct.pluck(:media_asset_id).to_set
 
+      # Open notes per image on this page of the grid, one grouped query like
+      # `used_ids` (notes spec §4.4), and one beside it for the images with
+      # something unread for the viewer (§4.5). Not in the picker: choosing an
+      # image is not the place to read about it. `Notes::Counts` hides nothing
+      # itself: `assets` is a page of `Media::Search#results`, kept images
+      # only, on a screen `media.upload` gates.
+      def note_counts = @note_counts ||= pick? ? {} : ::Notes::Counts.by_container("Media::Asset", assets.map(&:id))
+
+      def note_unread = @note_unread ||= pick? ? Set.new : ::Notes::Counts.unread_among("Media::Asset", assets.map(&:id), Current.user)
+
       def grid_class
         pick? ? "grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6" : "grid grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] gap-3"
       end

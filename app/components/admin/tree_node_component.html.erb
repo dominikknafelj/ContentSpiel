@@ -44,6 +44,17 @@
               class: "shrink-0 font-cs-mono text-label text-meta" %>
       <% end %>
 
+      <%# Open notes on the page and its blocks (notes spec §4.4): the notes
+          pill at the tile's size, with its icon. Named like the markers
+          before it; the icon is decoration. %>
+      <% if open_notes.positive? %>
+        <%= tag.span data: { notes_marker: true, has_notes: true, unread: (true if notes_unread?) }, role: "img",
+              title: t(".open_notes", count: open_notes), aria: { label: t(".open_notes", count: open_notes) },
+              class: "admin-notes-marker admin-notes-marker--readonly admin-notes-marker--small" do %>
+          <%= helpers.render "admin/shared/icon", name: :message_square, size: "size-3" %><%= open_notes %>
+        <% end %>
+      <% end %>
+
       <% if child_count.positive? %>
         <%# `role="img"` and a label, like the translation markers: a bare "3" says nothing. %>
         <%= tag.span child_count, data: { child_count: true }, role: "img", aria: { label: pluralize(child_count, "subpage") },
@@ -64,7 +75,7 @@
       a context-only page (see the component's comment). %>
   <ul <%= tag.attributes("data-admin--tree-target": ("list" if drop_target?)) %> data-parent-id="<%= page.id %>" class="ml-4 flex flex-col gap-0.5 border-l border-line pl-2">
     <% children.each do |child| %>
-      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, selected: selected, locale: locale, url_options: url_options) %>
+      <%= render Admin::TreeNodeComponent.new(page: child, children_by_parent: children_by_parent, context_only_ids: context_only_ids, translation_counts: translation_counts, note_counts: note_counts, note_unread: note_unread, selected: selected, locale: locale, url_options: url_options) %>
     <% end %>
   </ul>
 </li>

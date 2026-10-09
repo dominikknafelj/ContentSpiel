@@ -38,6 +38,10 @@ module Admin
 
       def show_subject? = @show_subject
 
+      # One line in the drawer; in the media panel the first line isn't cut
+      # short (handoff, "Media panel Notes section"): the excerpt wraps there.
+      def excerpt_class = view == "media" ? "break-words" : "truncate"
+
       def subject_name = helpers.note_subject_name(listing.subject_of(thread), listing.container, type)
 
       # The row's last line: what it is on (a pinned or resolved row, which

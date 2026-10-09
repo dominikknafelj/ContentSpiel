@@ -766,6 +766,56 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_select "section.content-section .content-section__column:nth-child(2) img", 1
   end
 
+  # Notes follow their record into the trash (notes spec D12, §4.4): hidden
+  # with it, counted nowhere. The records are trashed AFTER their notes were
+  # written, as in life: `Notes::Start` refuses a record that is already in
+  # the trash (decision P6), so a note "on" the setup's trashed records would
+  # never exist and this test would pass with nothing hidden.
+  #
+  # `Notes::Counts.by_container` and `unread_among` hide nothing themselves:
+  # each list hands them the ids it is about to draw, which went through the
+  # read scope. The viewer is mentioned in every note, so a count that leaked
+  # would leak in accent too.
+  test "note counts in the posts list, the page tree and the media grid are for kept records only, and so are the media panel's notes" do
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
+    as(users(:two)) do
+      [ @kept_post, @gone_post, @kept_page, @gone_page, @kept_asset, @gone_asset ].each do |subject|
+        assert Notes::Start.call(subject, body: "For @[#{users(:one).id}]").ok?
+      end
+    end
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: Time.current) }
+    assert_equal 6, Notes::Thread.count # the trashed records keep their threads
+    assert_equal 6, Notes::Delivery.unread.where(user: users(:one)).count
+    sign_in_as users(:one)
+
+    get admin_posts_path
+    assert_select "tr#post_#{@kept_post.id} [data-notes-count][data-unread]", text: "1"
+    assert_select "[data-notes-count]", count: 1
+
+    get admin_page_path(@kept_page)
+    assert_select "#tree-column li[data-page-id='#{@kept_page.id}'] [data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column [data-notes-marker]", count: 1
+
+    get admin_media_path
+    assert_select "#media-asset-#{@kept_asset.id} [data-notes-chip][data-unread]", text: "1"
+    assert_select "[data-notes-chip]", count: 1
+
+    # The panel: a kept image's has its notes frame, a trashed image has no panel.
+    get admin_media_path(selected: @kept_asset.id)
+    assert_select "#media-panel #media-notes turbo-frame#notes[src='/cs-studio/notes/media/#{@kept_asset.id}?view=media']"
+    assert_select "#media-notes [data-admin--notes-target=total]", text: "1"
+    get admin_media_path(selected: @gone_asset.id)
+    assert_response :not_found
+    assert_select "#media-notes", count: 0
+
+    get "/cs-studio/notes/media/#{@kept_asset.id}", params: { view: "media" }
+    assert_response :success
+    get "/cs-studio/notes/media/#{@gone_asset.id}", params: { view: "media" }
+    assert_response :not_found
+    get "/cs-studio/notes/post/#{@gone_post.id}"
+    assert_response :not_found
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})

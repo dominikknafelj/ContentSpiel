@@ -11,7 +11,7 @@
       <strong class="truncate text-[13px] text-ink <%= unread? ? "font-semibold" : "font-medium" %>"><%= render Admin::UserNameComponent.new(user: author, user_id: first.author_id) %></strong>
       <span class="shrink-0 font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: first.created_at) %></span>
     </span>
-    <span class="truncate text-[13px] <%= unread? ? "text-ink" : "text-dim" %>"><%= excerpt %></span>
+    <span class="<%= excerpt_class %> text-[13px] <%= unread? ? "text-ink" : "text-dim" %>"><%= excerpt %></span>
     <% if meta.present? %>
       <span class="font-cs-mono text-[10px] uppercase tracking-[0.1em] text-meta"><%= meta %></span>
     <% end %>

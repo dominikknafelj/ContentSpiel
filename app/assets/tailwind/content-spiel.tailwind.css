@@ -401,6 +401,27 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: 10px; }
 .admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
 .admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
+/* The same pill where a LIST shows a record's open notes (notes spec §4.4):
+   the posts list's cell, a row of the page tree, a tile of the media grid.
+   There the server draws it with its number and `data-has-notes` (and
+   `data-unread`), so every rule above applies as it stands; what follows is
+   only what differs. `--readonly` is a count that is no control (a `span`
+   in the tree's row and on a tile, whose own link is the way in): no
+   pointer, no hover. `--small` is the tile's 18px size outside a section
+   tile (the tree's row). `--on-image` is the media tile's chip, 6px from the
+   image's top right corner: it needs the surface behind it to stay readable
+   over a photo, and unread keeps the border for the same reason. */
+.admin-notes-marker--readonly { cursor: inherit; }
+.admin-notes-marker--readonly:hover { background: transparent; color: var(--cs-meta); }
+.admin-notes-marker--small[data-has-notes] { height: 18px; padding: 0 6px; font-size: 10px; }
+.admin-notes-marker--on-image { position: absolute; top: 6px; right: 6px; }
+.admin-notes-marker--on-image[data-has-notes],
+.admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
+.admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
+/* The media panel shows the notes frame in the flow of a column, not in a
+   drawer with a scroller of its own: a thread's reply stays under its
+   messages instead of sticking to the bottom of whatever scrolls. */
+#media-notes [data-note-part="reply"] { position: static; }
 /* A block's delete dialog keeps its notes warning in the confirm dialog's
    details box, alone, hidden until the block has open notes: until then the
    box takes no room. Asked of the warning's own mark (`data-notes-alone`,

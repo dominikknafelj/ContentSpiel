@@ -13,6 +13,14 @@ module Admin
     # typing editor. The panel is narrower than 880px, so the translation pair
     # stacks on its own (`container-type` on the form).
     #
+    # Below "Used on" are the image's notes (notes spec §4.4): the same frame
+    # the editors' drawer shows, in place -- this screen has no drawer, so a
+    # thread opens where the list was. It stands OUTSIDE the autosave form:
+    # the frame brings forms of its own, a form cannot nest, and inside an
+    # `admin--autosave` form a note's field would be the image's. Anyone who
+    # may open the panel may read and write notes there (`media.upload`,
+    # `Admin::NoteContainer`), whether or not the image is theirs to edit.
+    #
     # `link_params` is the grid's own state (`q`, `filter`, `page`, symbol keys,
     # never `locale`, which `url_options` carries): every link out of the panel
     # (the language tabs, the close button) and the form's own URL keep it, so
@@ -66,6 +74,32 @@ module Admin
       def uploader? = asset.created_by_id.present?
 
       def uploader = asset.created_by
+
+      # The image's notes: `view: "media"` travels with every request of the
+      # frame, so a thread started here records where it was written;
+      # `thread` (a link from the inbox, `/media?selected=<id>&thread=<id>`)
+      # starts the frame on that thread's view instead of the list. Digits or
+      # nothing: it becomes a path segment.
+      def notes_path
+        options = { view: "media", **url_options }
+        thread = helpers.params[:thread].to_s[/\A\d+\z/]
+        thread ? helpers.admin_record_note_thread_path("media", asset.id, thread, **options) : helpers.admin_record_notes_path("media", asset.id, **options)
+      end
+
+      # The image's counts as the page loaded them (`#notes-counts`), which
+      # `admin--notes` on <body> reads; every answer of the frame brings a
+      # newer copy. Read here and not left to the frame, because that
+      # controller keeps the last counts it saw: the panel of the image chosen
+      # next would show the last image's number until its own frame had loaded.
+      def note_counts = @note_counts ||= ::Notes::Counts.for_container(asset, user: Current.user)
+
+      # "Notes · 2 open" (in mono capitals, the handoff's header). The number
+      # is an `admin--notes` `total`, like the one beside the drawer's title,
+      # so it follows a note added or resolved in the frame below.
+      def notes_open
+        total = note_counts.fetch("total").to_i
+        t(".notes_open_html", number: tag.span(total, hidden: total.zero?, data: { "admin--notes-target": "total" }))
+      end
 
       def status_id = "media-save-status"
 

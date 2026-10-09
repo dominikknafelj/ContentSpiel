@@ -399,6 +399,70 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "[data-upload-tile]", count: 1
   end
 
+  # Notes on an image (notes spec §4.4): this screen has no drawer, so the
+  # panel shows the notes frame in place, below "Used on" and outside the
+  # image's own autosaving form.
+  test "the panel takes a note on the image while its fields autosave beside it" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset
+    sign_in_via_form(users(:one))
+    visit "/cs-studio/media"
+    await_admin_controllers
+    click_tile(asset)
+
+    assert_selector "#media-panel #media-notes #notes-list"
+    assert_no_selector "#media-notes [data-admin--notes-target=total]"
+    # A link inside the notes frame: never promoted to a visit, clicked plainly.
+    find("#media-notes a[data-note-new-link]").click
+    find("#media-notes #notes-new textarea[name=body]").send_keys("Crop the left edge")
+    within("#media-notes #notes-new") { press "Add note" }
+
+    # The thread opens in place, where the list was; the header follows.
+    assert_selector "#media-notes [data-note-thread]", text: "Crop the left edge"
+    assert_selector "#media-notes h3", text: /NOTES\s+·\s+1 OPEN/i
+    assert_equal [ asset, "media" ], Notes::Thread.last.then { |thread| [ thread.subject, thread.origin_view ] }
+    assert_selector "#media-panel #media-title"
+    assert_writes_settled
+    # No drawer was opened for it, and the note wrote nothing of the image.
+    assert_no_selector "#notes-drawer", visible: :all
+
+    # The image's own form still saves, and the tile it draws again has the chip.
+    fill_in "Title", with: "Left edge"
+    assert_selector "#media-save-status", text: /SAVED/, wait: 5
+    assert_equal "Left edge", asset.reload.title
+    assert_selector "#media-asset-#{asset.id} [data-notes-chip]", text: "1"
+    assert_selector "#media-notes [data-note-thread]", text: "Crop the left edge"
+
+    # Back to the list, in place.
+    find("#media-notes a[data-note-back]").click
+    assert_selector "#media-notes #notes-list a[data-note-row]", text: "Crop the left edge"
+  end
+
+  test "a link to an image with a thread opens the panel on that thread, and the tile's chip is accent for the person addressed" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset
+    thread = as(users(:two)) { Notes::Start.call(asset, body: "For @[#{users(:one).id}]: too dark") }.record
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media"
+    await_admin_controllers
+    assert_selector "#media-asset-#{asset.id} [data-notes-chip][data-unread]", text: "1"
+    # On the image, 6px from its top right corner, on the surface colour.
+    box = page.evaluate_script(<<~JS)
+      (() => {
+        const chip = document.querySelector("#media-asset-#{asset.id} [data-notes-chip]").getBoundingClientRect()
+        const image = document.querySelector("#media-asset-#{asset.id} img").getBoundingClientRect()
+        return [ Math.round(chip.top - image.top), Math.round(image.right - chip.right), Math.round(chip.height) ]
+      })()
+    JS
+    assert_equal [ 6, 6, 20 ], box
+
+    visit "/cs-studio/media?selected=#{asset.id}&thread=#{thread.id}"
+    await_admin_controllers
+
+    assert_selector "#media-panel #media-notes #note-thread-#{thread.id}", text: "too dark"
+  end
+
   private
 
   def active_element_id = page.evaluate_script("document.activeElement && document.activeElement.id")

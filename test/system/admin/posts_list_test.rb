@@ -159,6 +159,24 @@ class Admin::PostsListSystemTest < ApplicationSystemTestCase
     assert_current_path(/translation=outdated/)
   end
 
+  # Notes spec §4.4: a row's open notes are a link into `#content` that opens
+  # the post with its drawer open.
+  test "a row's note count opens the post with its notes drawer open" do
+    as(users(:two)) { Notes::Start.call(@second, body: "For @[#{users(:one).id}]: check the date") }
+    visit admin_posts_path
+    await_admin_controllers
+
+    assert_selector "tr#post_#{@second.id} a[data-notes-count][data-unread]", text: "1"
+    assert_no_selector "tr#post_#{@first.id} [data-notes-count]"
+    # The pill: 20px high, in accent for the person the note is addressed to.
+    assert_equal 20, page.evaluate_script("Math.round(document.querySelector('tr#post_#{@second.id} a[data-notes-count]').getBoundingClientRect().height)")
+
+    click_frame_link { find("tr#post_#{@second.id} a[data-notes-count]").click }
+
+    assert_current_path(/\/posts\/#{@second.id}\?notes=open\z/)
+    assert_selector "#notes-drawer #notes-list a[data-note-row]", text: "check the date"
+  end
+
   test "the split button opens the New post dialog with the chosen type" do
     visit admin_posts_path
     await_admin_controllers

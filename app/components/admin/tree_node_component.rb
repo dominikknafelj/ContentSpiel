@@ -37,12 +37,23 @@ module Admin
   # shows "↻N" for N outdated fields and "○N" for N missing ones, summed over
   # the target languages and hidden at zero -- no box, never red; the tooltip
   # names the languages (handoff §10 B24).
+  #
+  # `note_counts` (`{ page_id => open threads on the page and its blocks }`)
+  # and `note_unread` (the page ids with something unread for the viewer)
+  # come down the same way (`Notes::Counts`, read once by the tree). A row
+  # with open notes shows the notes pill after the translation markers --
+  # neutral, accent only while something there is unread and addressed to
+  # the viewer, nothing at zero (notes spec §4.4, §4.5). It is no link of
+  # its own: the row's title opens the page, and its notes are one press on
+  # the header's button from there.
   class TreeNodeComponent < AdminComponent
-    def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_counts: {}, selected: nil, locale:, url_options: {}, root: false)
+    def initialize(page:, children_by_parent:, context_only_ids: Set.new, translation_counts: {}, note_counts: {}, note_unread: Set.new, selected: nil, locale:, url_options: {}, root: false)
       @page = page
       @children_by_parent = children_by_parent
       @context_only_ids = context_only_ids
       @translation_counts = translation_counts
+      @note_counts = note_counts
+      @note_unread = note_unread
       @selected = selected
       @locale = locale
       @url_options = url_options
@@ -109,8 +120,13 @@ module Admin
       translation_breakdown(kind).map { |code, n| "#{::Locales.name(code, native: true)}: #{n} #{kind}" }.join(" · ")
     end
 
+    # Always 0 for a context-only row: the tree reads no count for it.
+    def open_notes = note_counts.fetch(page.id, 0)
+
+    def notes_unread? = note_unread.include?(page.id)
+
     private
 
-    attr_reader :page, :children_by_parent, :context_only_ids, :translation_counts, :selected, :locale, :url_options
+    attr_reader :page, :children_by_parent, :context_only_ids, :translation_counts, :note_counts, :note_unread, :selected, :locale, :url_options
   end
 end

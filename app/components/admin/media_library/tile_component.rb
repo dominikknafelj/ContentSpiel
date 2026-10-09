@@ -28,6 +28,12 @@ module Admin
     # would (`Media::Asset#alt_text` with no override), so a blank per-use
     # override field can show what will actually be used.
     #
+    # `open_notes:` and `notes_unread:` are the caller's to say for the same
+    # reason (`GridComponent#note_counts`, `#note_unread`): the image's open
+    # notes as the notes pill on the image's top right corner, accent while
+    # something there is unread and addressed to the viewer, nothing at zero
+    # (notes spec §4.4, §4.5). Never in the picker, whose grid reads none.
+    #
     # `unused:` is the caller's to say, not read here: a grid answers it for a
     # whole page in one query (`GridComponent#used_ids`), which a per-tile
     # `asset.used?` would turn into one query per tile.
@@ -41,16 +47,22 @@ module Admin
 
       PICK_ACTIONS = "click->admin--media-select#select dblclick->admin--media-select#choose keydown->admin--media-select#key".freeze
 
-      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default)
+      def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0, notes_unread: false)
         @asset = asset
         @url = url
         @unused = unused
         @selected = selected
         @pick = pick
         @locale = locale
+        @open_notes = open_notes
+        @notes_unread = notes_unread
       end
 
       def pick? = @pick
+
+      def open_notes = @open_notes.to_i
+
+      def notes_unread? = @notes_unread ? true : false
 
       # The picker's tiles keep the id the picker's grid has always had (the
       # Media grid's own `media-asset-ID` is the autosave answer's target and
