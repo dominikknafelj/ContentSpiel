@@ -9,3 +9,28 @@ Rails.application.config.filter_parameters += [
   # :digest, which would also hide harmless digests. The :token entry no longer matches it.
   :lookup_digest
 ]
+
+# A note's text (notes spec, decision D14: it reaches no log). The notes forms
+# send it as `body` and `quote`, top-level names that say nothing by
+# themselves -- and a bare `:body` here would be wrong twice over: posts and
+# blocks have a `body` of their own, and `Audit::Snapshot.scrub` drops every
+# snapshot key this list matches, so their audit snapshots would lose it. So
+# the two names are filtered BY WHERE THEY ARRIVE: in a request to one of the
+# notes controllers (`admin/notes`, `admin/note_threads`,
+# `admin/note_messages`, ...), which is what the third argument holds. A
+# snapshot's keys are asked with no request around them and with `true` for a
+# value, and are never touched. `mention_names` is the composer's own field:
+# display names, which for a user without a name are email addresses.
+#
+# Not covered: the first line of a request's log ("Started GET ...") filters
+# each pair of the query string on its own, with nothing to say which
+# controller it is for, so a `?quote=` in a URL is logged there as it is.
+Rails.application.config.filter_parameters += [
+  :mention_names,
+  lambda do |key, value, params = nil|
+    next unless value.is_a?(String) && %w[body quote].include?(key.to_s)
+    next unless params.is_a?(Hash) && params["controller"].to_s.start_with?("admin/note")
+
+    value.replace("[FILTERED]")
+  end
+]

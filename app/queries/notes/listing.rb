@@ -50,6 +50,18 @@ module Notes
 
     def subject_of(thread) = subjects[Notes.key(thread.subject_type, thread.subject_id)]
 
+    # The record a key names, among this container's own (itself and, for a
+    # page, its blocks); nil for anything else. A form's `subject` is looked
+    # up here and nowhere else, so a key can never reach another record.
+    def subject_by_key(key) = subjects[key.to_s]
+
+    # May `actor` moderate this record's notes (delete someone else's, pin)?
+    # Asked once per listing, not once per message drawn.
+    def moderator?(actor, channel: Current.channel)
+      @moderator = Notes.moderator?(actor, container, channel: channel) unless defined?(@moderator)
+      @moderator
+    end
+
     # Everyone a loaded thread names: authors, the mentioned, who resolved it.
     def users
       @users ||= begin

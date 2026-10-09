@@ -1,21 +1,32 @@
 module Admin
   module NotesScreen
     # The thread view of the notes frame (notes spec §4.2): a Back link to the
-    # list, what the thread is on, its messages and -- from Task 6 -- the
-    # composer with Resolve, fixed at the bottom. It REPLACES the list in
-    # `turbo-frame#notes`, on every width.
+    # list, what the thread is on, its messages and the composer with Resolve,
+    # fixed at the bottom. It REPLACES the list in `turbo-frame#notes`, on
+    # every width.
     #
     # Two parts with ids of their own: `messages` (everything that is READ:
-    # state, quote, messages, and from Task 6 the thread's buttons) and
-    # `reply` (the field that is TYPED in). A live refresh replaces the first
-    # and never the second.
+    # state, quote, messages, and the buttons that show a state -- Pin and
+    # "Notify me", in `[data-note-actions]`) and `reply` (the field that is
+    # TYPED in, with Resolve or Reopen under it). A live refresh replaces the
+    # first and never the second.
+    #
+    # Every form here is an ordinary Turbo form that names the notes frame;
+    # none is an autosave form. `failed` is what a refused or failed write
+    # hands back (`Admin::NoteContainer#failed_form`): the form whose `key` it
+    # carries shows the reason and, where there is one, the text.
     #
     # A thread with more than three messages shows the first and the last two
     # and folds the rest into "Show N more" (a `<details>`, no script).
     class ThreadComponent < Admin::AdminComponent
       FOLD_ABOVE = 3
 
-      def initialize(thread:, listing:, viewer:, locale:, view:, type:, failed: nil)
+      # The classes of the two controls that are not a shared button (handoff
+      # "Thread view with Back"): "Notify me" reads as a link, Pin is an icon.
+      FOLLOW_CLASS = "cursor-pointer rounded-cs text-[12px] text-dim underline underline-offset-[3px] hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
+      PIN_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent".freeze
+
+      def initialize(thread:, listing:, viewer:, locale:, view:, type:, failed: nil, asked: {})
         @thread = thread
         @listing = listing
         @viewer = viewer
@@ -23,13 +34,14 @@ module Admin
         @view = view
         @type = type
         @failed = failed
+        @asked = asked || {}
       end
 
       def dom_id = "note-thread-#{thread.id}"
 
       private
 
-      attr_reader :thread, :listing, :viewer, :locale, :view, :type, :failed
+      attr_reader :thread, :listing, :viewer, :locale, :view, :type, :failed, :asked
 
       def messages = thread.messages.to_a
 
@@ -41,7 +53,8 @@ module Admin
 
       # The first message carries the "written on" chip, as its content.
       def message(record)
-        component = Admin::NotesScreen::MessageComponent.new(message: record, thread: thread, listing: listing, viewer: viewer, type: type, view: view, failed: failed)
+        component = Admin::NotesScreen::MessageComponent.new(message: record, thread: thread, listing: listing, viewer: viewer, type: type, view: view,
+          failed: failed, asked: asked)
         record == messages.first && written_on ? component.with_content(origin_chip) : component
       end
 
@@ -50,6 +63,32 @@ module Admin
       def frame_params = { view: (view unless view == "editor"), **helpers.admin_url_options }.compact
 
       def back_path = helpers.admin_record_notes_path(*args, **frame_params)
+
+      def change_path(change) = helpers.admin_change_record_note_thread_path(*args, thread, change, **frame_params)
+
+      def reply_path = helpers.admin_record_note_messages_path(*args, thread, **frame_params)
+
+      def mentions_path = helpers.admin_record_note_mentions_path(*args)
+
+      # Pin and unpin are the moderator's (notes spec §3.4); a resolved thread
+      # has no pin (a pinned thread is always open).
+      def pinnable? = !thread.resolved? && listing.moderator?(viewer)
+
+      def following? = listing.following?(thread, viewer)
+
+      def frame_form = { data: { turbo_frame: "notes" } }
+
+      def action_class(variant = :ghost) = "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
+
+      def key = "thread-#{thread.id}"
+
+      # A failure of one of this thread's own forms: the reply (it has the
+      # typed text) or one of the buttons (it has none).
+      def own_failure = (failed if failed && failed[:key] == key)
+
+      def reply_failure = (own_failure if own_failure && own_failure[:body].present?)
+
+      def button_failure = (own_failure if own_failure && own_failure[:body].blank?)
 
       def subject_name = helpers.note_subject_name(listing.subject_of(thread), listing.container, type)
 

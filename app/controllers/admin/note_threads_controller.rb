@@ -2,17 +2,68 @@ module Admin
   # One thread of a record's notes, always looked up among the container's
   # threads. `show` is the thread view of the notes frame; opening a thread
   # is what marks the viewer's deliveries of it read (notes spec §3.3) --
-  # through the service, as every write is.
+  # through the service, as every write is. `create` starts one, and `change`
+  # is its six buttons.
+  #
+  # Every write answers the frame: a 303 to the view the person should now
+  # see, or the same view again with its status (403, 422), the reason, and
+  # what was typed. A thread that is gone is the list with a sentence
+  # (`NoteContainer#gone!`), never a 404 inside the drawer.
   class NoteThreadsController < BaseController
     include NoteContainer
+
+    # The route's `change` segment, and what it asks for. Follow and unfollow
+    # are two segments, each with its literal: `Notes::SetFollowing` reads any
+    # truthy value as "follow", and a form's "false" or "0" is a truthy
+    # string, so nothing a request can send is handed to it.
+    CHANGES = {
+      "resolve" => ->(thread) { Notes::Resolve.call(thread) },
+      "reopen" => ->(thread) { Notes::Reopen.call(thread) },
+      "pin" => ->(thread) { Notes::Pin.call(thread) },
+      "unpin" => ->(thread) { Notes::Unpin.call(thread) },
+      "follow" => ->(thread) { Notes::SetFollowing.call(thread, following: true) },
+      "unfollow" => ->(thread) { Notes::SetFollowing.call(thread, following: false) }
+    }.freeze
 
     def show
       thread = container_threads.find(params[:id])
       mark_read(thread)
-      render_thread(thread)
+      render_thread(thread, asked: asked)
+    end
+
+    # A new thread on the record, or on one of its blocks (`subject`, a key).
+    # A key that names nothing of this record means the record itself: the
+    # form only ever sends keys the frame drew.
+    def create
+      subject = Notes::Listing.new(@container, viewer: Current.user).subject_by_key(params[:subject]) || @container
+      result = Notes::Start.call(subject, body: note_body, quote: params[:quote].to_s, origin_view: note_view, origin_locale: admin_locale)
+
+      if result.ok?
+        redirect_to thread_path(result.record), status: :see_other
+      else
+        render_list(status: failure_status(result), failed: failed_form("new", result, subject: params[:subject].to_s, quote: params[:quote].to_s))
+      end
+    end
+
+    def change
+      thread = container_threads.find_by(id: params[:id]) or return gone!
+      result = CHANGES.fetch(params[:change]).call(thread)
+
+      if result.ok?
+        redirect_to thread_path(thread), status: :see_other
+      else
+        answer_thread_failure(thread, result, key: "thread-#{thread.id}", body: "")
+      end
     end
 
     private
+
+    # `?edit=<message id>` and `?delete=<message id>`: what a message's "⋯"
+    # menu asks for, the thread again with that message's edit form, or its
+    # "Delete this note?", in place. Whether the viewer may is the
+    # component's question (`Admin::NotesScreen::MessageComponent`), and the
+    # service's when the form is sent; an id that names nothing draws nothing.
+    def asked = { edit: params[:edit].to_s.to_i, delete: params[:delete].to_s.to_i }
 
     # `Notes::MarkRead` on a thread takes the container's row lock (`FOR
     # UPDATE` on the page, post or image) before it writes, like every notes
@@ -32,9 +83,10 @@ module Admin
     # this GET changes rows -- the viewer's own read marks and nothing else,
     # and doing it twice changes nothing more. What it must not be is fetched
     # by anything but a person opening the thread: every link to it carries
-    # `data-turbo-prefetch="false"` (`Admin::NotesScreen::ThreadRowComponent`),
-    # or Turbo's hover prefetch would mark a row read that nobody opened. A
-    # new link to this action needs the same attribute.
+    # `data-turbo-prefetch="false"` (`Admin::NotesScreen::ThreadRowComponent`,
+    # and the "⋯" menu's Edit and Delete in `MessageComponent`), or Turbo's
+    # hover prefetch would mark a row read that nobody opened. A new link to
+    # this action needs the same attribute.
     def mark_read(thread)
       return unless Notes::Delivery.unread_on?(thread, Current.user)
 

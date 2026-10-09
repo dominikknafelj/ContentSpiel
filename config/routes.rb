@@ -291,6 +291,17 @@ Rails.application.routes.draw do
       get "resolved", to: "notes#resolved", as: :resolved_record_notes
       get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
       get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
+      # The writes (notes spec §3.5), each an ordinary Turbo form inside
+      # `turbo-frame#notes`. A thread's six changes share one action: the
+      # segment is the whole request, so nothing about it is read from a
+      # parameter (`Admin::NoteThreadsController::CHANGES`).
+      get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
+      post "threads", to: "note_threads#create", as: :record_note_threads
+      post "threads/:id/:change", to: "note_threads#change", as: :change_record_note_thread,
+        constraints: { id: /\d+/, change: /resolve|reopen|pin|unpin|follow|unfollow/ }
+      post "threads/:thread_id/messages", to: "note_messages#create", as: :record_note_messages, constraints: { thread_id: /\d+/ }
+      patch "threads/:thread_id/messages/:id", to: "note_messages#update", as: :record_note_message, constraints: { thread_id: /\d+/, id: /\d+/ }
+      delete "threads/:thread_id/messages/:id", to: "note_messages#destroy", constraints: { thread_id: /\d+/, id: /\d+/ }
     end
 
     # Quick draft (dashboard spec §4.1): a title and a content type, saved

@@ -36,6 +36,13 @@ en:
         not_yours: "Only the person who wrote a note can change it."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
+      # What `admin--note-composer` says (`messages_data` on the composer's form).
+      script:
+        mentions:
+          none: "Nobody by that name can see this."
+          count:
+            one: "%{count} person. Use the arrow keys and Enter."
+            other: "%{count} people. Use the arrow keys and Enter."
     components:
       notes_screen:
         list:
@@ -49,6 +56,15 @@ en:
             one: "Resolved (%{count})"
             other: "Resolved (%{count})"
           new: "New note"
+          # The field for a new note (`#notes-new`).
+          new_label: "Write a note"
+          add: "Add note"
+          new_on:
+            page: "New note on this page"
+            post: "New note on this post"
+            media: "New note on this image"
+          new_on_block: "New note on %{block}"
+          quoted: "Quoted"
           empty_title: "No notes yet"
           empty:
             page: "Ask a question about this page or one of its blocks."
@@ -76,5 +92,29 @@ en:
           show_more:
             one: "Show %{count} more"
             other: "Show %{count} more"
+          resolve: "Resolve"
+          reopen: "Reopen"
+          pin: "Pin"
+          unpin: "Unpin"
+          follow: "Notify me"
+          unfollow: "Stop notifying me"
+          reply: "Reply"
+          send_reply: "Reply"
         message:
           edited: "edited"
+          # The name of the "⋯" menu, for a screen reader.
+          actions: "Note actions"
+          edit: "Edit"
+          edit_label: "Edit your note"
+          save: "Save"
+          cancel: "Cancel"
+          delete: "Delete"
+          delete_question: "Delete this note?"
+          delete_confirm: "Delete"
+        composer:
+          people: "People you can mention"
+          emoji: "Emoji"
+          mention: "Mention someone"
+          send_hint: "Ctrl+Enter to send"
+          # The field's placeholder, from its label: "Reply…", "Write a note…".
+          placeholder: "%{label}…"

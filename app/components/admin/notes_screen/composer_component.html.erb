@@ -1,0 +1,41 @@
+<%= form_with url: url, method: method, class: "flex flex-col gap-2", data: form_data do %>
+  <% hidden.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
+  <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--note-composer-target": "names" } %>
+  <% if errors.any? %>
+    <ul role="alert" class="flex flex-col gap-0.5 text-[12px] text-danger-ink">
+      <% errors.each do |error| %><li><%= error %></li><% end %>
+    </ul>
+  <% end %>
+  <div class="relative rounded-cs border border-line-strong bg-surface focus-within:border-accent">
+    <%= label_tag field_id, label, class: "sr-only" %>
+    <%# It grows with its text up to 200px and then scrolls (`field-sizing`);
+        a browser without that keeps `rows` and scrolls from the start. %>
+    <%= text_area_tag "body", body, id: field_id, rows: rows, maxlength: ::Notes::Message::MAX_BODY, required: true, placeholder: t(".placeholder", label: label),
+          autocomplete: "off", aria: { autocomplete: "list", controls: "#{field_id}-people" },
+          class: "block max-h-[200px] min-h-[62px] w-full resize-none field-sizing-content rounded-cs bg-transparent px-2.5 py-[9px] text-sm leading-normal text-ink placeholder:text-meta focus:outline-none",
+          data: { "admin--note-composer-target": "field", action: "input->admin--note-composer#typed keydown->admin--note-composer#key blur->admin--note-composer#left" } %>
+    <%# The mention picker (handoff "Mention picker"): the menu panel, filled by the script, six rows at most. %>
+    <ul id="<%= field_id %>-people" role="listbox" hidden aria-label="<%= t(".people") %>" data-admin--note-composer-target="suggestions"
+        class="absolute left-0 z-30 w-[250px] max-w-full rounded-cs border border-line bg-surface p-1 shadow-menu <%= POPOVER_SIDE %>"></ul>
+    <p class="sr-only" role="status" aria-live="polite" data-admin--note-composer-target="status"></p>
+    <div class="flex items-center justify-between gap-2 border-t border-line px-1.5 py-1">
+      <%# The toolbar's controls, on the left (handoff "Composer"): emoji and the at-sign; Task 16 puts the paperclip before them, inside this group. %>
+      <div class="flex items-center gap-0.5" data-note-toolbar>
+        <details class="group relative" data-admin--note-composer-target="emoji">
+          <summary class="<%= TOOL_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
+          <div class="absolute left-0 z-30 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line bg-surface p-1 shadow-menu <%= POPOVER_SIDE %>">
+            <% ::Notes::EMOJI.each do |emoji| %>
+              <button type="button" class="cursor-pointer rounded-cs px-1 py-0.5 text-base hover:bg-sunken focus-visible:bg-sunken" data-emoji="<%= emoji %>" data-action="admin--note-composer#emoji"><%= emoji %></button>
+            <% end %>
+          </div>
+        </details>
+        <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".mention") %>" title="<%= t(".mention") %>"
+                data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign, size: "size-4" %></button>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-cs-mono text-[10px] text-meta" aria-hidden="true"><%= t(".send_hint") %></span>
+        <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", data: { "admin--note-composer-target": "submit" }) %>
+      </div>
+    </div>
+  </div>
+<% end %>

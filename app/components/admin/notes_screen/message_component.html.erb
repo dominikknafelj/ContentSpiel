@@ -1,10 +1,38 @@
 <div id="<%= dom_id %>" class="flex flex-col gap-2 border-t border-line px-4 py-3.5" data-note-message="<%= message.id %>">
-  <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
-    <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
-    <strong class="text-[13px] font-semibold text-ink"><%= render Admin::UserNameComponent.new(user: author, user_id: message.author_id) %></strong>
-    <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
-    <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
-    <%= content %>
-  </p>
-  <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users) %>
+  <div class="flex items-start gap-2">
+    <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+      <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
+      <strong class="text-[13px] font-semibold text-ink"><%= render Admin::UserNameComponent.new(user: author, user_id: message.author_id) %></strong>
+      <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
+      <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
+      <%= content %>
+    </p>
+    <% if deletable? %>
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% if own? %>
+          <% menu.with_item do %><%= link_to t(".edit"), thread_path(edit: message.id), class: "text-sm text-ink no-underline", data: { note_edit: message.id, **frame_link } %><% end %>
+        <% end %>
+        <% menu.with_item do %><%= link_to t(".delete"), thread_path(delete: message.id), class: "text-sm text-danger-ink no-underline", data: { note_delete: message.id, **frame_link } %><% end %>
+      <% end %>
+    <% end %>
+  </div>
+  <% if editing? %>
+    <% text, names = editable %>
+    <%= render Admin::NotesScreen::ComposerComponent.new(url: message_path, method: :patch, key: key, label: t(".edit_label"), submit: t(".save"),
+          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors)) %>
+    <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %></p>
+  <% else %>
+    <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users) %>
+  <% end %>
+  <% if bare_failure %>
+    <ul role="alert" class="text-[12px] text-danger-ink"><% bare_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
+  <% end %>
+  <% if confirming_delete? %>
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink" data-note-delete-question>
+      <span><%= t(".delete_question") %></span>
+      <%= button_to t(".delete_confirm"), message_path, method: :delete,
+            class: "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES.fetch(:danger_text)}", form: { data: { turbo_frame: "notes" } } %>
+      <%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, **frame_link } %>
+    </div>
+  <% end %>
 </div>

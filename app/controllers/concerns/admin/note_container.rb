@@ -54,12 +54,65 @@ module Admin
     end
 
     # One thread, in the list's place: what `show` answers, and what a
-    # refused or failed write on that thread answers.
-    def render_thread(thread, status: :ok, failed: nil)
+    # refused or failed write on that thread answers. `asked` names the one
+    # message whose edit form or delete question the view draws
+    # (`Admin::NoteThreadsController#asked`).
+    def render_thread(thread, status: :ok, failed: nil, asked: {})
       @listing = Notes::Listing.new(@container, viewer: Current.user)
       @thread = @listing.find(thread.id) or raise ActiveRecord::RecordNotFound
       @failed = failed
+      @asked = asked
       render "admin/notes/thread", status: status, layout: turbo_frame_request? ? false : "admin"
+    end
+
+    # --- writing (the forms of the frame) ------------------------------------
+
+    # How many names of the picker's map are read. A message may mention 20
+    # people (`Notes::Mentions::MAX`); the map can hold a few more, for names
+    # picked and then deleted from the text again.
+    MAX_MENTION_NAMES = 50
+
+    # The typed body with the names the picker inserted turned into tokens
+    # (`Notes::Mentions.tokenize`). `mention_names` comes from the browser and
+    # is used for nothing else: whom a note may mention is the service's check
+    # on the ids that result.
+    def note_body = Notes::Mentions.tokenize(params[:body].to_s, mention_names)
+
+    # `{ "Dana Smith" => 7 }`, from the form's JSON. Anything that is not a
+    # name with an id is left out, so what a failed form is drawn with again
+    # is that shape and nothing else.
+    def mention_names
+      names = JSON.parse(params[:mention_names].to_s)
+      return {} unless names.is_a?(Hash)
+
+      names.first(MAX_MENTION_NAMES).select { |name, id| name.present? && id.to_s.match?(/\A\d{1,18}\z/) }.to_h
+    rescue JSON::ParserError
+      {}
+    end
+
+    def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
+
+    # What a failed form gets back: its own key, what was typed, and why.
+    # Nothing here reads `result.record`: a notes service's failure has none
+    # ("This note is gone" for a record trashed or a thread removed a moment
+    # ago is a failure like any other).
+    def failed_form(key, result, **extra)
+      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, **extra }
+    end
+
+    # The thread (or what it was on) is no longer there: back to the list,
+    # which says so. Never a 404 inside the drawer.
+    def gone! = redirect_to(notes_path(notice: "gone"), status: :see_other)
+
+    # A refused or failed write on a thread (Review Focus 3). The thread is
+    # looked up again first: when the failure is that it went a moment ago
+    # (its block deleted, its last message deleted in another tab), there is
+    # no thread view left to draw the sentence in, and the list says it.
+    # Otherwise the thread again, with the reason in the form `key` names.
+    def answer_thread_failure(thread, result, key:, **extra)
+      return gone! unless container_threads.exists?(id: thread.id)
+
+      render_thread(thread, status: failure_status(result), failed: failed_form(key, result, **extra))
     end
   end
 end

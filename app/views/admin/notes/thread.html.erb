@@ -3,5 +3,5 @@
 <% content_for :title, t("admin.notes.index.title") %>
 <turbo-frame id="notes">
   <%= render Admin::NotesScreen::ThreadComponent.new(thread: @thread, listing: @listing, viewer: Current.user, locale: admin_locale,
-        view: note_view, type: params[:container_type], failed: @failed) %>
+        view: note_view, type: params[:container_type], failed: @failed, asked: @asked) %>
 </turbo-frame>
