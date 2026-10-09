@@ -190,6 +190,15 @@ module Admin
 
     def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
+    # The block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+    # spec §4.3): on a card of the list and on a translation tab's group
+    # card, for every viewer. Not on a panel -- the block's tile carries it,
+    # and two markers of one block would be two elements with one id -- and
+    # not on an unavailable block's card, which has one action.
+    def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+
+    def note_key = ::Notes.key(block)
+
     # A card of the list always has it (its menu opens it). A group card only
     # when the block is unavailable: the header's "Delete block…" is then the
     # one thing that opens it.

@@ -57,7 +57,10 @@ module Admin
     # tile and not of the lane: a lane's children are exactly its tiles.
     #
     # A viewer who can't edit may still open a tile: the form they get is the
-    # disabled one a view-only card shows. They get the face and nothing else.
+    # disabled one a view-only card shows. They get the face and the notes
+    # marker (notes spec §4.3, D3: who can read the page writes notes), and
+    # nothing else. "Add note" is the first item of the menu, for a viewer
+    # who has one.
     class BlockTileComponent < AdminComponent
       def initialize(page:, block:, locale:, url_options: {}, editable:, open: false)
         @page = page
@@ -93,6 +96,12 @@ module Admin
       def delete_dialog = Admin::EditorScreen::DeleteBlockDialogComponent.new(page: page, block: block, url_options: url_options)
 
       def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
+
+      # The block's notes marker (`Admin::NotesScreen::MarkerComponent`): on
+      # the tile, never on the block's form panel, and for every viewer.
+      def note_marker = Admin::NotesScreen::MarkerComponent.new(subject: block, name: label)
+
+      def note_key = ::Notes.key(block)
 
       def move_to_column = Admin::EditorScreen::MoveDialogComponent.trigger("column")
 

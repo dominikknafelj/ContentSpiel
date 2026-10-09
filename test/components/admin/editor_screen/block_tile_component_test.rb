@@ -22,7 +22,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     render_tile
 
     assert_selector "button[aria-haspopup='menu'][aria-label='Block actions']", text: "⋯"
-    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "Duplicate", "", "Delete block…" ], menu_items
+    assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "Duplicate", "", "Delete block…" ], menu_items
     assert_selector "[role=menu][data-action~='click->admin--menu#select']", visible: :all
     assert_selector "[role=menu] button[data-move='up'][data-action='click->admin--blocks#moveUp']", visible: :all
     assert_selector "[role=menu] button[data-move='down'][data-action='click->admin--blocks#moveDown']", visible: :all
@@ -53,11 +53,15 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_selector "dialog form[action$='/content_blocks/#{@block.id}'] button[type=submit]", text: "Delete block", visible: :all
   end
 
-  test "a view-only tile has its face and nothing else: no grip, no menu, no dialog" do
+  # The notes marker is the one thing beside the face (notes spec §4.3, D3: a
+  # viewer who can only read the page writes notes), which is why the count
+  # here went from one child to two.
+  test "a view-only tile has its face and its notes marker and nothing else: no grip, no menu, no dialog" do
     render_tile(editable: false)
 
     assert_selector ".admin-block-tile > .admin-block-tile__face"
-    assert_selector ".admin-block-tile > *", count: 1, visible: :all
+    assert_selector ".admin-block-tile > *", count: 2, visible: :all
+    assert_selector ".admin-block-tile > div > [data-admin--notes-target=marker]", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
     assert_no_selector "[role=menu]", visible: :all
     assert_no_selector "dialog", visible: :all
@@ -71,7 +75,7 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile(@block.reload)
 
-    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
+    assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
     assert_no_selector "form[action$='/duplicate']", visible: :all
     assert_selector "dialog#delete-block-#{@block.id}", visible: :all
   end
@@ -84,7 +88,20 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
 
     render_tile(@block.reload)
 
-    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
+    assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
     assert_no_selector "form[action$='/duplicate']", visible: :all
+  end
+
+  # Notes (notes spec §4.3): the marker is for everyone who can read the page;
+  # "Add note" in the menu is the path that needs no hover.
+  test "a tile carries a notes marker, for a viewer who can't edit too, and Add note first in its menu" do
+    render_tile(editable: false)
+    assert_selector "#content_block_#{@block.id} > div > #notes-marker-ContentBlock-#{@block.id}[data-notes-name='Image']"
+    assert_no_selector "button[data-notes-compose]", visible: :all
+
+    render_tile
+    assert_selector "#notes-marker-ContentBlock-#{@block.id}"
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{@block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{@block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{@block.id}']", visible: :all
   end
 end

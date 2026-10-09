@@ -37,6 +37,11 @@ import { messages } from "i18n/messages"
 // by a stream connects its marker and is filled like the rest, which is why
 // the server never renders a count into a card.
 //
+// THE ACTIVE BLOCK. While one thread is the drawer's view, the card or tile
+// of the block it is on carries `data-notes-active` (an accent border,
+// handoff "Block card marker"): `markActive`, after every load of the frame,
+// on close, and when a marker connects.
+//
 // A SELECTION. With text selected in a rich-text field, that block's marker
 // reads "Note on selection" and a press starts a note quoting the text (cut
 // to 500 characters; a copy, decision D4). The selection is noted at
@@ -90,7 +95,15 @@ export default class extends Controller {
     this.refreshCounts(JSON.parse(element.dataset.counts))
   }
 
-  markerTargetConnected() { this.schedulePaint() }
+  // A card or tile drawn by a stream (an add, a move, a duplicate, a
+  // section's lanes): its marker is filled from the counts this tab holds,
+  // and marked if its block's thread is the one showing. One that left takes
+  // its part of a delete dialog's sum with it.
+  markerTargetConnected() {
+    this.schedulePaint()
+    this.markActive()
+  }
+
   markerTargetDisconnected() { this.schedulePaint() }
   warningTargetConnected() { this.schedulePaint() }
   totalTargetConnected() { this.schedulePaint() }
@@ -133,6 +146,7 @@ export default class extends Controller {
 
     this.drawerTarget.hidden = true
     this.syncOpeners()
+    this.markActive()
     this.forget()
     this.trigger?.focus()
     this.returnTo = null
@@ -155,6 +169,7 @@ export default class extends Controller {
     if (!this.hasDrawerTarget || !this.isOpen) return
     this.drawerTarget.hidden = true
     this.syncOpeners()
+    this.markActive()
   }
 
   // `turbo:before-fetch-request` on the notes frame: its view is about to be
@@ -184,6 +199,7 @@ export default class extends Controller {
     this.inside = false
     this.fromList = false
     const view = this.frameTarget.querySelector("[data-notes-view]")
+    this.markActive()
     if (!view || !this.isOpen) return
 
     const lost = inside && !this.drawerTarget.contains(document.activeElement)
@@ -206,6 +222,20 @@ export default class extends Controller {
       if (this.listScroll != null && this.scroller) this.scroller.scrollTop = this.listScroll
     }
     this.listScroll = null
+  }
+
+  // The block whose thread is showing (handoff: its card's border is accent
+  // while the thread is open). One at a time; none in the list view or with
+  // the drawer closed. An attribute, taken back here: nothing a redrawn
+  // card could keep by mistake, and nothing Turbo's snapshot of the page
+  // keeps past the next editor's first load.
+  markActive() {
+    const view = this.isOpen ? this.frameTarget.querySelector("[data-notes-view='thread']") : null
+    const key = view?.dataset.notesSubject
+    this.markerTargets.forEach((marker) => {
+      const holder = marker.closest(".admin-block-tile, .admin-block-card")
+      holder?.toggleAttribute("data-notes-active", Boolean(key) && marker.dataset.notesKey === key)
+    })
   }
 
   get scroller() {
@@ -349,10 +379,14 @@ export default class extends Controller {
     })
 
     // A delete dialog's warning: the open notes on everything inside the card
-    // or tile it names (a section's own and its blocks').
+    // or tile it names (a section's own and its blocks'). The block's own key
+    // is read from that element's id, the markers' from the markers: a card
+    // without a marker (a block whose type is gone) still warns.
     this.warningTargets.forEach((warning) => {
       const within = document.getElementById(warning.dataset.notesWithin)
       const keys = new Set([ ...(within?.querySelectorAll("[data-admin--notes-target~='marker']") || []) ].map((marker) => marker.dataset.notesKey))
+      const own = within ? this.blockKey(within) : null
+      if (own) keys.add(own)
       const count = [ ...keys ].reduce((sum, key) => sum + (subjects[key] || 0), 0)
       warning.hidden = count === 0
       warning.textContent = count === 0 ? "" : text.t("notes.script.delete_warning", { count })

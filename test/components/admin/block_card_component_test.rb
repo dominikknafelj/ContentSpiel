@@ -39,7 +39,7 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     render_card(block, page: page)
 
     items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all)
-    assert_equal [ "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
+    assert_equal [ "Add note", "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
     assert_selector "[role=menu] [role=separator]", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
     assert_selector "[role=menu] form[action$='/duplicate']", visible: :all
@@ -286,5 +286,31 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     assert_raises(ArgumentError) { Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :tile) }
+  end
+
+  test "a card in the list carries a notes marker, for a viewer who can't edit too; an open panel carries none" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: false))
+    assert_selector "#notes-marker-ContentBlock-#{block.id}[data-notes-name='Rich text']"
+    assert_no_selector "button[data-notes-compose]"
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true, placement: :panel))
+    assert_no_selector "[data-admin--notes-target=marker]"
+
+    # A translation tab's group card has no tile to carry it, so it does.
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "de", editable: true, placement: :group))
+    assert_selector "#notes-marker-ContentBlock-#{block.id}"
+  end
+
+  test "Add note is the first item of the card's menu, and the delete dialog holds the warning the notes script fills" do
+    page = create_page(title: "Noted")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_inline(Admin::BlockCardComponent.new(page: page, block: block, locale: "en", editable: true))
+
+    assert_selector "[role=menu] > :first-child button[data-notes-key='ContentBlock-#{block.id}'][data-notes-compose][data-action='admin--notes#open']", visible: :all, text: "Add note"
+    assert_selector "#delete-block-#{block.id} p[hidden][data-admin--notes-target=warning][data-notes-within='content_block_#{block.id}']", visible: :all
   end
 end

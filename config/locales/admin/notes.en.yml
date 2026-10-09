@@ -63,7 +63,15 @@ en:
     components:
       # The editor header's Notes button. `components.en.yml` holds nothing of
       # the header's yet (it is not converted); these two merge into its scope.
+      # "Add note", first in the "⋯" menu of a block's card and of its tile in
+      # a section. Neither component's other strings live here
+      # (`components.en.yml` has the tile's; the card is not converted): these
+      # two merge into their scopes.
+      block_card:
+        add_note: "Add note"
       editor_screen:
+        block_tile:
+          add_note: "Add note"
         header:
           notes: "Notes"
           # The button's accessible name; `admin.notes.script.total` is the
@@ -148,6 +156,13 @@ en:
           delete: "Delete"
           delete_question: "Delete this note?"
           delete_confirm: "Delete"
+        # A block's marker as the server draws it, before the script has the
+        # counts: its name without notes, and what it reads while text is
+        # selected in the block (`admin.notes.script.marker` are its names
+        # in every state).
+        marker:
+          add: "Add a note on %{name}"
+          selection: "Note on selection"
         composer:
           people: "People you can mention"
           emoji: "Emoji"

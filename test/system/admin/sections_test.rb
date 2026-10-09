@@ -2070,7 +2070,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
 
     assert_selector tile(@left), text: "Unavailable type — gone/thing"
     find(menu_button(tile(@left))).click
-    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "Delete block…" ],
+    assert_equal [ "Add note", "Move up", "Move down", "Move to column…", "Move out of section", "Delete block…" ],
       page.all("#{tile(@left)} [role=menu] button").map(&:text)
 
     within(tile(@left)) { press "Delete block…" }

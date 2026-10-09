@@ -35,6 +35,24 @@ module Admin
 
       def dialog_id = self.class.dialog_id(block)
 
+      # The element that stands for the block (its card or its tile): the
+      # warning below counts the open notes of the markers inside it, and the
+      # block's own.
+      def within_id = ActionView::RecordIdentifier.dom_id(block)
+
+      # The dialog's warning about open notes (notes spec D12), for this
+      # dialog and for a section's: an empty, hidden paragraph that
+      # `admin--notes` fills and shows while what `within` names has open
+      # threads. The look is the warn alert's (`border-warn bg-warn-tint`).
+      # The server writes no number into it, for the reason a marker holds
+      # none (`Admin::NotesScreen::MarkerComponent`).
+      # `spacing:` is for a dialog that says something else above it.
+      NOTES_WARNING_CLASS = "rounded-cs border border-warn bg-warn-tint px-3 py-2 text-sm text-ink".freeze
+
+      def self.notes_warning_attributes(within, spacing: nil)
+        { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ], data: { "admin--notes-target": "warning", notes_within: within } }
+      end
+
       def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
 
       private

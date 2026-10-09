@@ -111,6 +111,9 @@
     <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
       <% dialog.with_details do %>
         <%= render self.class.delete_count(section: section, count: blocks.size) %>
+        <%# The open notes on the section's blocks, deleted with them (notes spec D12):
+            filled by `admin--notes` from the markers of the tiles inside this card. %>
+        <%= tag.p(**Admin::EditorScreen::DeleteBlockDialogComponent.notes_warning_attributes(dom_id, spacing: "mt-2")) %>
       <% end %>
       <% dialog.with_confirm_action do %>
         <%= form_with url: destroy_path, method: :delete do %>

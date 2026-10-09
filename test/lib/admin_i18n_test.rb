@@ -162,6 +162,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/counts_component.rb
     app/components/admin/notes_screen/list_component.rb
     app/components/admin/notes_screen/list_component.html.erb
+    app/components/admin/notes_screen/marker_component.rb
+    app/components/admin/notes_screen/marker_component.html.erb
     app/components/admin/notes_screen/message_component.rb
     app/components/admin/notes_screen/message_component.html.erb
     app/components/admin/notes_screen/thread_component.rb

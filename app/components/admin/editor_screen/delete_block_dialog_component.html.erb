@@ -1,4 +1,9 @@
 <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".title"), body: t(".body")) do |dialog| %>
+  <%# Filled by `admin--notes` while the block has open notes (notes spec D12): its
+      threads are deleted with it. Empty and hidden otherwise. %>
+  <% dialog.with_details do %>
+    <%= tag.p(**self.class.notes_warning_attributes(within_id)) %>
+  <% end %>
   <% dialog.with_confirm_action do %>
     <%= form_with url: destroy_path, method: :delete do %>
       <%= render Admin::ButtonComponent.new(label: t(".confirm"), variant: :danger, type: "submit") %>

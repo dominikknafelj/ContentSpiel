@@ -1,5 +1,6 @@
 <%= tag.div id: dom_id, tabindex: -1, class: "flex min-h-full flex-col focus:outline-none",
-      data: { notes_view: "thread", note_thread: thread.id, state: thread.state, notes_container: ::Notes.key(listing.container) } do %>
+      data: { notes_view: "thread", note_thread: thread.id, state: thread.state, notes_container: ::Notes.key(listing.container),
+              notes_subject: ::Notes.key(thread.subject_type, thread.subject_id) } do %>
   <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
   <div class="flex items-center gap-2 border-b border-line px-3 py-2.5">
     <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",

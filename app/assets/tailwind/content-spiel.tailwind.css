@@ -354,6 +354,49 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-section-errors:not(:has(p)) { display: none; }
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
+/* The tile of the block whose thread is open in the notes drawer
+   (`admin--notes#markActive`). Here and not a utility on the tile: the tile's
+   border is set by the rule above, which a utility does not outweigh. */
+.admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
+
+/* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
+   handoff "Block card marker" and "Section tile marker"). Four states, set by
+   `admin--notes` as attributes:
+   - at rest without notes it is in its place and not shown (the system draws
+     no count at zero);
+   - while the pointer is over its card or tile, or the focus is inside it,
+     it is the add-note control: a 24px square holding the icon (18px on a
+     tile, with a 12px icon);
+   - `data-has-notes`: a pill with the icon and the count, always shown
+     (20px high on a card, 18px on a tile); also while text is selected in the
+     block, when it reads "Note on selection";
+   - `data-unread` beside it: the pill in accent, the one meaning accent has
+     for a count (unread and addressed to the viewer).
+   A section's card is a card too, so "its card" is asked of the tile first
+   and of a card that is no section: the pointer over a section shows no
+   tile's control but the one it is on. Not shown by `opacity` is still in the
+   Tab order, which is the keyboard's way to it; nothing here moves, so there
+   is nothing to turn off for reduced motion. */
+.admin-notes-marker {
+  display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 4px;
+  width: 24px; height: 24px; border: 1px solid transparent; border-radius: var(--cs-radius);
+  color: var(--cs-meta); font-family: var(--cs-mono); font-size: 11px; line-height: 1; white-space: nowrap;
+  cursor: pointer; opacity: 0;
+}
+.admin-notes-marker:hover { background: var(--cs-sunken); color: var(--cs-ink); }
+.admin-notes-marker:focus-visible { outline: 2px solid var(--cs-accent); outline-offset: 1px; }
+.admin-notes-marker:focus-visible,
+.admin-notes-marker[data-has-notes],
+:is(.admin-block-tile, .admin-block-card:not(.admin-section-card)):is(:hover, :focus-within) .admin-notes-marker { opacity: 1; }
+.admin-notes-marker > span { display: inline-flex; align-items: center; }
+.admin-notes-marker > span[hidden],
+.admin-notes-marker:not([data-has-notes]) > .admin-notes-marker__open,
+.admin-notes-marker[data-has-notes] > .admin-notes-marker__add { display: none; }
+.admin-notes-marker[data-has-notes] { width: auto; height: 20px; padding: 0 7px; border-color: var(--cs-line-strong); border-radius: var(--cs-radius-pill); }
+.admin-notes-marker[data-has-notes][data-unread] { border-color: var(--cs-accent-tint); background: var(--cs-accent-tint); color: var(--cs-accent); }
+.admin-block-tile .admin-notes-marker { width: 18px; height: 18px; font-size: 10px; }
+.admin-block-tile .admin-notes-marker[data-has-notes] { width: auto; height: 18px; padding: 0 6px; }
+.admin-block-tile .admin-notes-marker__add > svg { width: 12px; height: 12px; }
 
 /* Drag pattern (handoff §9 A9), shared by the page tree and the block list
    (SortableJS `ghostClass`/`chosenClass`, and the keyboard path's picked
