@@ -72,5 +72,27 @@ module Admin
         render :edit, status: :unprocessable_entity
       end
     end
+
+    # The two Notes switches (notes spec §6.4, D18, D19): configuration, so
+    # an explicit Save that keeps the screen, like the name above it -- a
+    # stream with the toast for Turbo, so what the other two forms hold stays
+    # as typed, and the redirect without. Always `Current.user`: the request
+    # names nobody. A switch that is not sent is off. The new settings reach
+    # the scripts (`admin--notes-alert`, on <body>) with the next page.
+    def update_notifications
+      result = Users::UpdateNotifications.call(Current.user, sound: params[:notes_sound] == "1", desktop: params[:notes_desktop] == "1")
+      if result.ok?
+        if request.accepts.any? { |type| type.symbol == :turbo_stream }
+          render turbo_stream: toast_stream(t("admin.accounts.notes.saved"))
+        else
+          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.notes.saved")
+        end
+      else
+        forbidden_or(result) do
+          @notes_errors = result.errors
+          render :edit, status: :unprocessable_entity
+        end
+      end
+    end
   end
 end

@@ -53,7 +53,9 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "h1 + p", text: "You'll stay signed in here. Other sessions are signed out."
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
     assert_select "#profile-form .admin-save-bar a", text: "Forgot your current password?", count: 0
-    assert_select ".admin-save-bar", count: 2
+    assert_select "#notes-form .admin-save-bar a", text: "Forgot your current password?", count: 0
+    # One footer per form: the name, the Notes switches, the password.
+    assert_select ".admin-save-bar", count: 3
   end
 
   test "visiting the reset flow signed in signs nobody out" do
@@ -148,5 +150,67 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
   test "signed out, saving a name redirects to sign-in" do
     patch "/cs-studio/account/profile", params: { name: "Ada" }
     assert_redirected_to "/cs-studio/sign-in"
+  end
+
+  # --- the Notes switches (notes spec §6.4, D18, D19) ------------------------------
+
+  test "the account screen has the two Notes switches in a form of their own with a save bar, and saving keeps the screen" do
+    sign_in_as(users(:reader))
+    get "/cs-studio/account/password"
+
+    assert_select "form#notes-form[action='/cs-studio/account/notifications'][data-controller='admin--save-bar']" do
+      assert_select "h2", text: "Notes"
+      assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
+      assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
+      assert_select "label", text: "Play a sound when I'm mentioned"
+      assert_select "label", text: "Show a desktop notification when I'm mentioned"
+      # The permission is this browser's: drawn hidden, shown by the script.
+      assert_select "[data-controller='admin--notes-permission'] [hidden] button[type=button]:not([name])", text: "Allow in this browser"
+      assert_select "[data-controller='admin--notes-permission'] [hidden]", text: "Blocked in this browser. Change it in the site settings of your browser."
+      assert_select "[data-admin--save-bar-target=bar] button[type=submit][form=notes-form]", text: "Save"
+    end
+    assert_select "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false][data-admin--notes-alert-person-value='#{users(:reader).id}']"
+    # Changing the password draws the screen again: it waits for the name and for the switches.
+    assert_select "form#password-form[data-admin--save-bar-after-value='profile-form notes-form']"
+
+    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1" }, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
+
+    assert_response :ok
+    assert_select "turbo-stream[action=append][target=toasts]"
+    assert_match "Notification settings saved.", response.body
+    assert_equal [ false, true ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+
+    get "/cs-studio/account/password"
+    assert_select "input[name=notes_sound]:not([checked])"
+    assert_select "input[name=notes_desktop][checked]"
+    assert_select "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
+  end
+
+  test "without Turbo, saving the switches is a redirect back to the screen; a switch left out is off" do
+    sign_in_as(users(:reader))
+
+    patch "/cs-studio/account/notifications", params: { notes_desktop: "1" }
+
+    assert_redirected_to "/cs-studio/account/password"
+    assert_equal [ false, true ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+    follow_redirect!
+    assert_match "Notification settings saved.", response.body
+  end
+
+  # Only ever the signed-in person's own: the request names no user.
+  test "the switches are saved for whoever is signed in, whatever else the request names" do
+    sign_in_as(users(:two))
+
+    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1", id: users(:reader).id, user_id: users(:reader).id }
+
+    assert_equal [ false, true ], users(:two).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+    assert_equal [ true, false ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+  end
+
+  test "signed out, saving the switches redirects to sign-in and writes nothing" do
+    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1" }
+
+    assert_redirected_to "/cs-studio/sign-in"
+    assert User.where(notes_sound: false).or(User.where(notes_desktop: true)).none?
   end
 end

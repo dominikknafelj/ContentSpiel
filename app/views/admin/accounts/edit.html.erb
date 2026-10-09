@@ -4,14 +4,14 @@
     spec §5.1). A deliberate submit, never autosave, like the Users module's
     own forms.
 
-    Two forms, so two footers: each `Admin::SaveBarComponent` is the footer of
-    its own form and counts only that form's changes (one Leave prompt serves
-    both). Neither Save may throw away what the other form holds:
-    - "Save name" keeps the screen (a Turbo Stream answer, see the controller),
-      so the password fields stay as typed;
-    - "Change password" re-renders the screen, so it waits for the name:
-      while the name is unsaved it is locked, with "Save or cancel your
-      changes first." (`after:`, the D10 rule between two forms).
+    Three forms, so three footers: each `Admin::SaveBarComponent` is the
+    footer of its own form and counts only that form's changes (one Leave
+    prompt serves them all). No Save may throw away what another form holds:
+    - "Save name" and the Notes card's "Save" keep the screen (a Turbo Stream
+      answer, see the controller), so the other forms stay as they are;
+    - "Change password" re-renders the screen, so it waits for the other two:
+      while the name or a Notes switch is unsaved it is locked, with "Save or
+      cancel your changes first." (`after:`, the D10 rule between forms).
     The current password alone is nothing to save and is what a password
     manager fills in on load: it is not counted (`data-save-bar-ignore`), or
     every visit here would end in "Leave without saving?".
@@ -33,6 +33,7 @@
   <%= render Admin::ErrorSummaryComponent.new(errors: field_errors.presence || Array(@errors),
         field_ids: { current_password: "current_password", password: "password", password_confirmation: "password_confirmation" }) %>
   <%= render Admin::ErrorSummaryComponent.new(errors: Array(@profile_errors)) %>
+  <%= render Admin::ErrorSummaryComponent.new(errors: Array(@notes_errors)) %>
 
   <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8 max-w-[420px]",
         data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
@@ -44,7 +45,55 @@
     <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Save name") %>
   <% end %>
 
-  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
+  <%# Notes (notes spec §6.4, D18, D19; handoff "Account switches"): two
+      settings of the person's, saved with this form's own footer like any
+      configuration -- never autosaved, never through the write queue. A
+      hidden "0" ahead of each box makes an unticked switch submit;
+      `admin--save-bar` does not count a hidden input, so the box alone is.
+
+      The SETTING is the person's and follows them to every browser; the
+      PERMISSION to notify is this browser's. The row under the second switch
+      says which state that is in and, while it has not been asked, asks at
+      once, in the click, outside the save (`admin--notes-permission`): its
+      button is `type="button"` with no name, so it is no field of the form
+      and is never locked by it. Both lines are drawn hidden and the script
+      shows the one that applies; with the permission given, or in a browser
+      without notifications, neither. The check is made again whenever the
+      window is looked at again, since the permission is changed in the
+      browser's own settings, outside this page. %>
+  <%= form_with url: admin_account_notifications_path(**admin_url_options), method: :patch, id: "notes-form", class: "mb-8",
+        data: save_bar_form_data(dirty: Array(@notes_errors).any?) do %>
+    <section class="rounded-cs border border-line bg-surface" aria-labelledby="account-notes">
+      <div class="border-b border-line px-[18px] py-3.5">
+        <h2 id="account-notes" class="text-base font-semibold text-ink"><%= t("admin.accounts.notes.title") %></h2>
+        <p class="text-[13px] text-dim"><%= t("admin.accounts.notes.description") %></p>
+      </div>
+      <% { "notes_sound" => Current.user.notes_sound, "notes_desktop" => Current.user.notes_desktop }.each do |name, on| %>
+        <div class="border-b border-line px-[18px] py-3.5 last:border-b-0">
+          <label class="flex items-center justify-between gap-4 text-sm text-ink">
+            <span><%= t("admin.accounts.notes.#{name}") %></span>
+            <%= hidden_field_tag name, "0", id: nil %>
+            <%= check_box_tag name, "1", on, role: "switch", class: "cs-toggle" %>
+          </label>
+          <% if name == "notes_desktop" %>
+            <div role="status" data-controller="admin--notes-permission" data-state="unsupported"
+                 data-action="visibilitychange@document->admin--notes-permission#render focus@window->admin--notes-permission#render">
+              <div class="mt-2 flex items-center justify-between gap-3 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="ask" hidden>
+                <span><%= t("admin.accounts.notes.permission.ask") %></span>
+                <%= render Admin::ButtonComponent.new(label: t("admin.accounts.notes.permission.allow"), variant: :secondary, size: :small, type: "button",
+                      class: "shrink-0", data: { action: "admin--notes-permission#allow" }) %>
+              </div>
+              <p class="mt-2 rounded-cs bg-accent-tint px-3 py-2.5 text-[13px] text-ink" data-admin--notes-permission-target="blocked" hidden><%= t("admin.accounts.notes.permission.blocked") %></p>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </section>
+
+    <%= render Admin::SaveBarComponent.new(form_id: "notes-form", cancel_url: admin_root_path(**admin_url_options), save_label: t("admin.accounts.notes.save")) %>
+  <% end %>
+
+  <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form notes-form") do %>
     <div class="mb-4">
       <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
             autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>

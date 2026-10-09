@@ -91,6 +91,22 @@ en:
     # (`index`, the view's own lazy-lookup scope) and the dashboard's two
     # cards. `card.new` stands beside the card's title, in the small
     # upper-case label style.
+    # The account screen's "Notes" card (notes spec §6.4, handoff "Account
+    # switches"): two settings of the person's, and what this browser says
+    # about showing notifications. Read with full keys from
+    # `admin/accounts/edit.html.erb` and `Admin::AccountsController`.
+    accounts:
+      notes:
+        title: "Notes"
+        description: "What happens in this browser when someone mentions you in a note."
+        notes_sound: "Play a sound when I'm mentioned"
+        notes_desktop: "Show a desktop notification when I'm mentioned"
+        save: "Save"
+        saved: "Notification settings saved."
+        permission:
+          ask: "This browser has not been allowed to show notifications yet."
+          allow: "Allow in this browser"
+          blocked: "Blocked in this browser. Change it in the site settings of your browser."
     note_inbox:
       index:
         page_title: "Notes for you · CS Studio"
