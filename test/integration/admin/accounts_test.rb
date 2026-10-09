@@ -131,7 +131,8 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_equal "Ada <i>L</i>", users(:one).reload.name
     assert_select "turbo-stream[action=replace][target=account-identity]"
     assert_select "turbo-stream[action=append][target=toasts]"
-    assert_includes response.body, "Name saved."
+    assert_includes response.body, "Settings saved"
+    assert_not_includes response.body, "Settings saved."
     assert_includes response.body, "Ada &lt;i&gt;L&lt;/i&gt;"
     assert_not_includes response.body, "<i>L</i>"
   end
@@ -157,8 +158,15 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     get "/cs-studio/account/password"
 
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--save-bar']" do
-      assert_select "input[name=name]"
-      assert_select "h2", text: "Notes"
+      # Decisions 19 and 20: "Your account", then two cards of one width,
+      # Profile and Notes, and one footer under both, whose button is "Save".
+      assert_select "h2", text: "Your account"
+      assert_select "section.max-w-\\[560px\\]", count: 2
+      assert_select "section[aria-labelledby=account-profile] h3#account-profile", text: "Profile"
+      assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"
+      assert_select "section[aria-labelledby=account-profile] input[name=name]"
+      assert_select "section[aria-labelledby=account-notes] h3#account-notes", text: "Notes"
+      assert_select "section ~ [data-admin--save-bar-target=bar] button[type=submit]", text: "Save"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"

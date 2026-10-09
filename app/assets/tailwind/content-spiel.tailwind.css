@@ -472,7 +472,7 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    handoff's decision 17): below 1024px the notes are a sheet whose header
    holds "Back to <title>", the one way back to the editor, and that header
    is hidden over a thread too -- so there the row ends in a "Back to
-   <title>" of its own (`.admin-note-leave`, a text button) where the
+   page" of its own (`.admin-note-leave`, a text button) where the
    drawer's row has Close. One of the two, by the width; and neither is
    shown anywhere but in the drawer: the same thread view in the media panel
    and on a record's notes page has no drawer to close or leave. */

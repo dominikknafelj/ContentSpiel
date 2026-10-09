@@ -311,6 +311,20 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Notes for you"
   end
 
+  # A window that is no positive finite number would make a burst that never
+  # ends (NaN compares false with everything): the ten seconds stand in.
+  test "a burst's window that is not a positive number is ten seconds" do
+    stubbed_dashboard
+    page.execute_script("window.__windows = []; document.addEventListener('admin--notes-live:delivery', (event) => window.__windows.push(event.detail.burstMs))")
+
+    [ "soon", "0", "-5", "Infinity", "2500" ].each do |value|
+      burst_window(value)
+      await_settled(mention_me("With #{value}, @[#{users(:one).id}]"))
+    end
+
+    assert_equal [ 10_000, 10_000, 10_000, 10_000, 2500 ], page.evaluate_script("window.__windows")
+  end
+
   test "a burst goes on across a Turbo visit: the third note is counted on the next page, without a second chime" do
     stubbed_dashboard
     await_settled(mention_me("First, @[#{users(:one).id}]"))
@@ -480,7 +494,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     fill_in "Current password", with: "password"
     fill_in "New password", with: "a-new-long-password"
     fill_in "Confirm new password", with: "a-new-long-password"
-    assert_selector "#profile-form button[type=submit][disabled]", text: "Save name"
+    assert_selector "#profile-form button[type=submit][disabled]", text: /\ASave\z/
     assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
 
     find("#notes_desktop").click
@@ -493,7 +507,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel your changes first."
     assert_equal [ nil, true, false ], users(:one).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
 
-    within("#profile-form") { press "Save name" }
+    within("#profile-form") { press "Save" }
 
     assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes", wait: LIVE
     assert_no_selector "dialog#leave-dialog[open]"

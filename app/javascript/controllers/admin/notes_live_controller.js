@@ -178,6 +178,7 @@ let live = null
 // elements may be gone (dismissed, timed out, left behind by a visit);
 // removing one that is gone does nothing.
 const NAMED_TOASTS = 2
+const BURST_MS = 10000
 const burst = { last: 0, said: 0, named: [], summary: null }
 
 function endBurst() {
@@ -203,7 +204,7 @@ const nearBottom = (scroller) => scroller.scrollHeight - scroller.scrollTop - sc
 
 export default class extends Controller {
   static targets = [ "record" ]
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: 10000 } }
+  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: BURST_MS } }
 
   // Before the first target connects, which is before `connect`.
   initialize() {
@@ -734,11 +735,11 @@ export default class extends Controller {
   // delivery had been read is the one that judges and says it.
   announce(row) {
     const now = Date.now()
-    if (now - burst.last > this.burstMsValue) endBurst()
+    if (now - burst.last > this.burstWindow) endBurst()
     burst.last = now
 
     const shown = this.watching(row.thread_id)
-    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstMsValue }
+    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstWindow }
     document.dispatchEvent(new CustomEvent("admin--notes-live:delivery", { detail }))
     if (shown) return
 
@@ -750,6 +751,14 @@ export default class extends Controller {
     } else {
       this.summarise()
     }
+  }
+
+  // The length of a burst's window: `burstMs`, or the 10 seconds for
+  // anything that is not a positive finite number -- a NaN here would make a
+  // burst that never ends.
+  get burstWindow() {
+    const ms = this.burstMsValue
+    return Number.isFinite(ms) && ms > 0 ? ms : BURST_MS
   }
 
   // "You have 3 new notes": in the place of the burst's named toasts, and of

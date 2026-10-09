@@ -53,7 +53,7 @@ module Admin
     # shell, as the `_top` redirect did -- threw away whatever was typed into
     # it, after asking "Leave without saving?" about a save that had already
     # happened. The stream replaces the one thing a new name changes outside
-    # the field itself, the sidebar's account block, and says "Name saved.";
+    # the field itself, the sidebar's account block, and says "Settings saved";
     # the footer takes what it sent as its new baseline
     # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect. The
     # new settings reach the scripts (`admin--notes-alert`, on <body>) with
@@ -73,10 +73,10 @@ module Admin
         if request.accepts.any? { |type| type.symbol == :turbo_stream }
           render turbo_stream: [
             turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
-            toast_stream("Name saved.")
+            toast_stream(t("admin.accounts.saved"))
           ]
         else
-          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Name saved."
+          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.saved")
         end
       else
         @profile_errors = result.errors

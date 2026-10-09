@@ -131,7 +131,7 @@ class Admin::PromotionHoldSystemTest < ApplicationSystemTestCase
     JS
     within("#password-form") { press "Change password" }
 
-    assert_text "Name saved.", wait: 5
+    assert_text "Settings saved", wait: 5
     assert_equal false, page.evaluate_script("window.__heldAfterRefusal")
     assert_equal "Not held", users(:one).reload.name
   end

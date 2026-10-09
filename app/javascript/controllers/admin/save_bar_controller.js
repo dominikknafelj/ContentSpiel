@@ -462,7 +462,7 @@ export default class extends Controller {
   // from now on, and nothing is "submitting" any more. Mostly the answer then
   // replaces the form (a redirect, a frame render) and none of this is seen.
   // But a form can outlive its own save: an answer that keeps the screen (a
-  // Turbo Stream -- the account screen's "Save name"), or a redirect whose
+  // Turbo Stream -- the account screen's "Save"), or a redirect whose
   // visit the leave guard stopped for ANOTHER form and the editor chose
   // "Keep editing". Left `submitting` with the old baseline, such a form was
   // never guarded again and counted its saved values as changes.

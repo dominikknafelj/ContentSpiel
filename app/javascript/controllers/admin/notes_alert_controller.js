@@ -88,7 +88,7 @@ const done = new Set()
 const quiet = { last: 0, ms: 10000, chimed: false, notified: false }
 
 function arrival(ms) {
-  if (ms > 0) quiet.ms = ms
+  if (Number.isFinite(ms) && ms > 0) quiet.ms = ms
   const now = Date.now()
   if (now - quiet.last > quiet.ms) quiet.chimed = quiet.notified = false
   quiet.last = now

@@ -103,9 +103,18 @@ en:
     # The account screen's "Notes" card (notes spec §6.4, handoff "Account
     # switches"): two settings of the person's, and what this browser says
     # about showing notifications. Read with full keys from
-    # `admin/accounts/edit.html.erb`. (The card is part of the name's form:
-    # its footer and its toast are that form's.)
+    # `admin/accounts/edit.html.erb` and `Admin::AccountsController`. The
+    # card is one of two in the account screen's first form, "Your account"
+    # (the handoff's decisions 19 and 20): Profile, the name, and Notes, with
+    # one footer, whose button is "Save" and whose toast is the app's own
+    # "Settings saved" (no full stop, as on the Settings screen).
     accounts:
+      title: "Your account"
+      save: "Save"
+      saved: "Settings saved"
+      profile:
+        title: "Profile"
+        name: "Your name"
       notes:
         title: "Notes"
         description: "What happens in this browser when someone mentions you in a note."
@@ -263,8 +272,10 @@ en:
           # Row 1's Close, the drawer's own while a thread is open.
           close: "Close"
           # Row 1's way back to the editor in the sheet (below 1024px), where
-          # the sheet's own header is hidden while a thread is open.
-          leave: "Back to %{title}"
+          # the sheet's own header is hidden while a thread is open. These
+          # words for a page and a post alike, without the title (the
+          # handoff's decision 21).
+          leave: "Back to page"
           # Under what the thread is on: "2 messages · started on DE".
           messages:
             one: "%{count} message"

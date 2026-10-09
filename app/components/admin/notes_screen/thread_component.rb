@@ -25,6 +25,9 @@ module Admin
       # The classes of the two controls that are not a shared button (handoff
       # "Thread view with Back"): "Notify me" reads as a link, Pin is an icon.
       FOLLOW_CLASS = "cursor-pointer rounded-cs text-[12px] text-dim underline underline-offset-[3px] hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
+      # "Back to page", row 1's way out of the sheet (the handoff's decision
+      # 21): the Notify link's manner at 13px/500.
+      LEAVE_CLASS = "cursor-pointer items-center rounded-cs text-[13px] font-medium text-dim underline underline-offset-[3px] hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
       PIN_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent".freeze
 
       def initialize(thread:, listing:, viewer:, locale:, view:, type:, failed: nil, asked: {})
@@ -83,14 +86,10 @@ module Admin
 
       # Pin and unpin are the moderator's (notes spec §3.4); a resolved thread
       # has no pin (a pinned thread is always open).
-      # The record's title for "Back to <title>" (row 1, in the sheet below
-      # 1024px), as the drawer's own header words it; nil where the notes are
-      # in no drawer -- an image's, in the media panel.
-      def leave_title
-        return if type.to_s == "media"
-
-        Locales.read(listing.container, :title, locale: locale).presence || t("admin.components.notes_screen.drawer.untitled")
-      end
+      # Whether row 1 has "Back to page" (shown in the sheet below 1024px):
+      # not where the notes are in no drawer -- an image's, in the media
+      # panel.
+      def leave? = type.to_s != "media"
 
       def pinnable? = !thread.resolved? && listing.moderator?(viewer)
 

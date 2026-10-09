@@ -3,7 +3,7 @@ module Admin
     # Who is signed in, as the sidebar's account block says it: the display
     # name, then "email · role" on one line (handoff: "name, email and role").
     # Its own component, with an id, because it is the one part of the shell a
-    # save on the account screen changes: "Save name" answers with a Turbo
+    # save on the account screen changes: its "Save" answers with a Turbo
     # Stream that replaces just this (`Admin::AccountsController
     # #update_profile`), so the screen -- and whatever the password form
     # beside the name holds -- stays as it is.

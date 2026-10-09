@@ -10,7 +10,7 @@
     Notes switches (notes handoff, decision 13: preferences save the same
     way; a password change is a separate, secure step). Neither Save may
     throw away what the other form holds:
-    - "Save name" keeps the screen (a Turbo Stream answer, see the controller),
+    - "Save" keeps the screen (a Turbo Stream answer, see the controller),
       so the password fields stay as typed;
     - "Change password" re-renders the screen, so it waits for the first form:
       while the name or a Notes switch is unsaved it is locked, with "Save or
@@ -18,8 +18,12 @@
     The current password alone is nothing to save and is what a password
     manager fills in on load: it is not counted (`data-save-bar-ignore`), or
     every visit here would end in "Leave without saving?".
-    The name field comes first and is the narrow one (420px); the Notes card
-    under it and the password form are 560px. The password form is the 560px card of the mock, its footer carrying the "Forgot your
+    The first form is headed "Your account" and is two cards of one width
+    (560px), Profile (the name) and Notes, with the one footer under both
+    (notes handoff, decisions 19 and 20); the password form is 560px too.
+    Every string of the first form is a key (`admin.accounts`); the password
+    form's are still literals, which is why this file is not in the i18n
+    test's `CONVERTED` list. The password form is the 560px card of the mock, its footer carrying the "Forgot your
     current password?" link at the far end. The subtitle's promise is the
     service's own rule (`Users::OwnerProtection#end_sessions_after_password_
     change`: the acting session stays, the user's other sessions go). No
@@ -42,10 +46,17 @@
   <% profile = @profile_values || { name: Current.user.name, notes_sound: Current.user.notes_sound, notes_desktop: Current.user.notes_desktop } %>
   <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8",
         data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
-    <div class="mb-6 max-w-[420px]">
-      <%= label_tag "name", "Your name", class: setup_label_class %>
-      <%= text_field_tag "name", profile[:name], id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
-    </div>
+    <h2 class="mb-3 text-h2 text-ink"><%= t("admin.accounts.title") %></h2>
+
+    <section class="mb-4 max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-profile">
+      <div class="border-b border-line px-[18px] py-3.5">
+        <h3 id="account-profile" class="text-base font-semibold text-ink"><%= t("admin.accounts.profile.title") %></h3>
+      </div>
+      <div class="px-[18px] py-3.5">
+        <%= label_tag "name", t("admin.accounts.profile.name"), class: setup_label_class %>
+        <%= text_field_tag "name", profile[:name], id: "name", maxlength: 120, autocomplete: "name", class: setup_input_class %>
+      </div>
+    </section>
 
     <%# Notes (notes spec §6.4, D18, D19; handoff "Account switches" and
         decisions 13-16): two settings of the person's, saved with this
@@ -69,7 +80,7 @@
         whenever the window is looked at again. %>
     <section class="max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-notes">
       <div class="border-b border-line px-[18px] py-3.5">
-        <h2 id="account-notes" class="text-base font-semibold text-ink"><%= t("admin.accounts.notes.title") %></h2>
+        <h3 id="account-notes" class="text-base font-semibold text-ink"><%= t("admin.accounts.notes.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.notes.description") %></p>
       </div>
       <div class="border-b border-line px-[18px] py-3.5">
@@ -98,7 +109,7 @@
       </div>
     </section>
 
-    <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Save name") %>
+    <%= render Admin::SaveBarComponent.new(form_id: "profile-form", cancel_url: admin_root_path(**admin_url_options), save_label: t("admin.accounts.save")) %>
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>

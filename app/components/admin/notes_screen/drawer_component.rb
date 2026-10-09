@@ -26,9 +26,10 @@ module Admin
     # counts), "New note" -- a note on the record itself, no chooser -- and
     # Close. While a thread is the view it is not shown, and the thread's
     # first row is the header, with a Close of its own (the handoff's
-    # decision 11; the stylesheet's "THE THREAD VIEW'S HEADER"). The sheet has
-    # "Back to <title>" in Close's place, and keeps its header over a thread
-    # too: that button is the sheet's one way back to the editor.
+    # decisions 11 and 17; the stylesheet's "THE THREAD VIEW'S HEADER"). The
+    # sheet (below 1024px) has "Back to <title>" in Close's place, and its
+    # header is hidden over a thread as well: there the thread's first row
+    # ends in "Back to page", the same action, in Close's place.
     #
     # WHEN TO USE WHICH: the shell's left drawers (`admin--drawer`) are the
     # navigation at narrow widths, with a scrim; the media panel is a column

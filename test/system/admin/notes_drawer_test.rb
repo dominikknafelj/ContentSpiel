@@ -219,7 +219,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
 
   # The handoff's decision 17: below 1024px the sheet's header goes too while
   # a thread is open, and the thread's first row is all there is: "← All
-  # notes 4", the Notify link, and "Back to <title>" as a text button on the
+  # notes 4", the Notify link, and "Back to page" as a text button on the
   # right, which does what the sheet header's Back does.
   test "below 1024px a thread hides the sheet's header: its first row has All notes, Notify and Back to the page" do
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
@@ -233,7 +233,15 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-drawer #note-thread-#{thread.id}"
     assert_no_selector "#notes-drawer > header"
     assert_no_selector "#notes-drawer button[aria-label='Close']"
-    assert_selector "#notes-drawer button", text: "Back to Pricing", count: 1
+    assert_selector "#notes-drawer button", text: "Back to page", count: 1
+    # The words alone, in the Notify link's manner: no title, no arrow.
+    assert_no_selector "#notes-drawer button", text: "Back to Pricing"
+    leave = find("#notes-drawer button[data-note-leave]")
+    assert_equal "Back to page", leave.text
+    assert_no_selector "#notes-drawer button[data-note-leave] svg"
+    assert_equal [ "13px", "500", "underline" ], page.evaluate_script("(() => { const style = getComputedStyle(document.querySelector('#notes-drawer button[data-note-leave]')); return [ style.fontSize, style.fontWeight, style.textDecorationLine ] })()")
+    assert_equal page.evaluate_script("getComputedStyle(document.querySelector('#notes-drawer [data-note-actions] form[action$=\"follow\"] button')).color"),
+      page.evaluate_script("getComputedStyle(document.querySelector('#notes-drawer button[data-note-leave]')).color")
     # One row, in this order, the way back at its right end.
     boxes = page.evaluate_script("[ 'a[data-note-back]', '[data-note-actions] form[action$=\"follow\"] button', 'button[data-note-leave]' ].map((selector) => { const box = document.querySelector('#notes-drawer ' + selector).getBoundingClientRect(); return [ box.left, (box.top + box.bottom) / 2, box.right ] })")
     assert_operator boxes[0][0], :<, boxes[1][0]
@@ -257,7 +265,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     # button that opened the notes, as the sheet header's does.
     find("#note-row-#{thread.id}").click
     assert_selector "#note-thread-#{thread.id}"
-    within("#note-thread-#{thread.id}") { press "Back to Pricing" }
+    within("#note-thread-#{thread.id}") { press "Back to page" }
     assert_no_selector "#notes-drawer"
     assert_selector "#notes-open[aria-expanded=false][aria-pressed=false]"
     assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
@@ -277,7 +285,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     find("#note-row-#{thread.id}").click
     assert_selector "#note-thread-#{thread.id}"
 
-    within("#note-thread-#{thread.id}") { press "Back to Pricing" }
+    within("#note-thread-#{thread.id}") { press "Back to page" }
 
     assert_no_selector "#notes-drawer"
     assert_eventually(message: "the editor is not where it was") { page.evaluate_script("window.scrollY") == 300 }
@@ -291,11 +299,11 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     open_editor("?notes=open&thread=#{thread.id}")
     assert_selector "#notes-drawer #note-thread-#{thread.id} button[data-note-close]"
-    assert_no_selector "#notes-drawer button", text: "Back to Pricing"
+    assert_no_selector "#notes-drawer button", text: "Back to page"
 
     visit "/cs-studio/notes/page/#{@page.id}/threads/#{thread.id}"
     assert_selector "#note-thread-#{thread.id}"
-    assert_no_selector "button", text: "Back to Pricing"
+    assert_no_selector "button", text: "Back to page"
     assert_no_selector "button[data-note-close]"
   end
 
