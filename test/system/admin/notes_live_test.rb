@@ -64,17 +64,51 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   def watch_notes_fetches
     page.execute_script(<<~JS)
       window.__notesFetches = 0
+      window.__threadFetches = 0
       window.__deliveryStatus = null
       const original = window.fetch
       window.fetch = (...args) => {
         const url = String(args[0].url || args[0])
         const method = String(args[1]?.method || args[0].method || "GET").toUpperCase()
         if (method === "GET" && url.includes("/notes/")) window.__notesFetches += 1
+        if (method === "GET" && url.includes("/threads/")) window.__threadFetches += 1
         const answer = original(...args)
         if (url.includes("/notes/deliveries/")) answer.then((response) => { window.__deliveryStatus = response.status })
         return answer
       }
     JS
+  end
+
+  # The document as hidden (another tab in front), and seen again: what the
+  # page reads, `document.hidden`, and the event that says it changed.
+  def hide_document
+    page.execute_script(<<~JS)
+      window.__hidden = true
+      Object.defineProperty(document, "hidden", { get: () => window.__hidden, configurable: true })
+      Object.defineProperty(document, "visibilityState", { get: () => (window.__hidden ? "hidden" : "visible"), configurable: true })
+      document.dispatchEvent(new Event("visibilitychange"))
+    JS
+  end
+
+  def show_document = page.execute_script("window.__hidden = false; document.dispatchEvent(new Event('visibilitychange'))")
+
+  # The identifiers the tab's consumer is subscribed to, as [channel, type,
+  # id], sorted: one entry per subscription, so a second subscription to the
+  # same thing shows.
+  def subscriptions
+    page.evaluate_script("window.__consumer.subscriptions.subscriptions.map((each) => JSON.parse(each.identifier)).map((id) => [ id.channel, id.type || '', id.id || '' ])").sort_by(&:to_s)
+  end
+
+  # The person's subscription as the object it is now, and whether it still
+  # is: the document's subscriptions are shared by successive pages, so a
+  # visit neither unsubscribes nor subscribes again what both pages hear.
+  def keep_person_subscription = page.execute_script("window.__person = window.__consumer.subscriptions.subscriptions.find((each) => each.identifier.includes('PersonChannel'))")
+
+  def same_person_subscription? = page.evaluate_script("window.__consumer.subscriptions.subscriptions.filter((each) => each.identifier.includes('PersonChannel')).every((each) => each === window.__person)")
+
+  def turbo_visit(path)
+    page.execute_script("window.__visited = false; document.addEventListener('turbo:load', () => { window.__visited = true }, { once: true }); Turbo.visit(#{path.to_json})")
+    await_js("window.__visited === true", wait: LIVE)
   end
 
   # The tab's cable consumer, where a test can reach it.
@@ -184,19 +218,57 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_equal "Half a thou", reply_field.value
   end
 
-  # The ruling for the toast: no toast only while the person is looking. A tab
-  # that shows the thread but is not the focused window says it.
-  test "with the thread open in a tab that does not have the focus, the toast is raised" do
+  # "Looking at the thread" is one rule: it is open in this tab and the
+  # document is not hidden. The window's focus is not asked for, so two
+  # windows side by side both stay live.
+  test "a window that shows the thread without having the focus is refreshed like any other, with no toast" do
     open_thread
     page.execute_script("document.hasFocus = () => false")
-
     page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__shown = event.detail.shown })")
 
     reply_as_dana("Are you there, @[#{users(:one).id}]?")
 
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-new-divider] + [data-note-message]", text: "Are you there", wait: LIVE
+    await_js("window.__shown === true", wait: LIVE)
+    await_frames
+    assert_no_selector "#toasts .admin-toast"
+    assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.where(user: users(:one)).pluck(:read_at).all? }
+  end
+
+  # A hidden document (another tab in front, a minimised window): fetching the
+  # thread would read the note on the person's behalf. The counts and the
+  # toast only; the thread, and with it the read mark, when it is seen again.
+  test "a thread open in a hidden document is not fetched: the note stays unread and is told, and is read when the page is seen again" do
+    open_thread
+    hide_document
+    watch_notes_fetches
+    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__shown = event.detail.shown })")
+
+    reply_as_dana("While you were away, @[#{users(:one).id}]")
+
     assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing", wait: LIVE
     assert_equal false, page.evaluate_script("window.__shown")
-    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Are you there"
+    assert_selector "#sidebar-badge-dashboard", text: "1", wait: LIVE
+    # Every fetch the signals led to has been made (the delivery's is the
+    # last of them), and none was the thread's.
+    await_js("window.__deliveryStatus === 200", wait: LIVE)
+    assert_equal 0, page.evaluate_script("window.__threadFetches")
+    assert_no_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "While you were away"
+    assert_equal [ nil ], Notes::Delivery.where(user: users(:one)).pluck(:read_at)
+
+    # A second signal while hidden changes nothing about that.
+    reply_as_dana("Still away?")
+    assert_selector "#notes-open-count", text: "1"
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "the thread was not fetched" means anything
+    assert_equal 0, page.evaluate_script("window.__threadFetches")
+
+    show_document
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-new-divider] + [data-note-message]", text: "While you were away", wait: LIVE
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Still away?"
+    assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.where(user: users(:one)).pluck(:read_at).all? }
+    assert_no_selector "#sidebar-badge-dashboard", wait: LIVE
+    assert_equal 1, page.evaluate_script("window.__threadFetches")
   end
 
   test "a reader who is not at the bottom is not moved: a button says what arrived and leads there" do
@@ -456,5 +528,90 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_equal "connecting", page.evaluate_script("document.body.dataset.notesLive")
     # The page is as it was: nothing was replaced and nothing navigated.
     assert_selector "#notes-drawer #notes-list"
+  end
+
+  # --- across pages ------------------------------------------------------------------
+  # A Turbo visit replaces <body>, and with it the controller and its record
+  # targets, while the document and its one socket live on.
+
+  test "after a Turbo visit to another editor only that record is listened to, once" do
+    other = create_page(title: "About")
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    hold_consumer
+    keep_person_subscription
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+
+    turbo_visit "/cs-studio/pages/#{other.id}"
+    assert_selector "h1", text: "About"
+    await_notes_live
+    assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: this was no Turbo visit"
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", other.id.to_s ] ], subscriptions
+    assert same_person_subscription?, "the person's stream was subscribed to again by the new page"
+    assert_no_selector "#notes-open-count"
+    watch_notes_fetches
+
+    # The page that was left: nothing here hears it. The page that is here: its counts.
+    as(users(:two)) { Notes::Start.call(@page, body: "On the page that was left") }
+    as(users(:two)) { Notes::Start.call(other, body: "On this page") }
+
+    assert_selector "#notes-open-count", text: "1", wait: LIVE
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "one fetch" means no second one is on its way
+    assert_equal 1, page.evaluate_script("window.__notesFetches")
+    assert_selector "#notes-open-count", text: "1"
+  end
+
+  test "after a visit and Back the first record is listened to again, once, and the second no more" do
+    other = create_page(title: "About")
+    visit "/cs-studio/pages/#{@page.id}"
+    await_notes_live
+    hold_consumer
+    keep_person_subscription
+    turbo_visit "/cs-studio/pages/#{other.id}"
+    assert_selector "h1", text: "About"
+    await_notes_live
+
+    page.go_back
+    assert_selector "h1", text: "Pricing"
+    await_notes_live
+    assert_equal true, page.evaluate_script("Boolean(window.__consumer)"), "the document was replaced: Back was no Turbo restoration"
+    assert_equal [ [ "Notes::PersonChannel", "", "" ], [ "Notes::RecordChannel", "page", @page.id.to_s ] ], subscriptions
+    assert same_person_subscription?, "the person's stream was subscribed to again on the way"
+    assert_selector "#notes-open-count", text: "1"
+    watch_notes_fetches
+
+    as(users(:two)) { Notes::Start.call(other, body: "On the page that was left") }
+    as(users(:two)) { Notes::Start.call(@page, body: "On this page") }
+
+    assert_selector "#notes-open-count", text: "2", wait: LIVE
+    sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "one fetch" means no second one is on its way
+    assert_equal 1, page.evaluate_script("window.__notesFetches")
+  end
+
+  # A signal waits half a second before anything is fetched. A visit inside
+  # that window replaces the controller that was waiting: the next page's
+  # takes over what it was told. The signal is handed to the subscription by
+  # script, in the same task as the visit, so the visit is always inside the
+  # window.
+  test "a delivery signalled just before a visit raises its toast on the next page" do
+    as(users(:two)) { Notes::Start.call(@page, body: "Before you go, @[#{users(:one).id}]") }
+    delivery = Notes::Delivery.find_by!(user: users(:one))
+    visit "/cs-studio/tags"
+    await_notes_live
+    hold_consumer
+    page.execute_script("document.addEventListener('admin--notes-live:delivery', (event) => { window.__announced = (window.__announced || 0) + 1 })")
+
+    page.execute_script(<<~JS)
+      window.__visited = false
+      document.addEventListener("turbo:load", () => { window.__visited = true }, { once: true })
+      const person = window.__consumer.subscriptions.subscriptions.find((each) => each.identifier.includes("PersonChannel"))
+      person.received({ kind: "delivery", delivery_id: #{delivery.id}, reason: "mention" })
+      Turbo.visit("/cs-studio/posts")
+    JS
+    await_js("window.__visited === true", wait: LIVE)
+
+    assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing", wait: LIVE
+    assert_current_path "/cs-studio/posts"
+    assert_equal 1, page.evaluate_script("window.__announced")
   end
 end

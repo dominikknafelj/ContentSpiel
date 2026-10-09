@@ -17,11 +17,13 @@ import { messages } from "i18n/messages"
 //   signal may have reached someone who has since lost the right to read the
 //   record, and a refusal ends it there, with nothing said -- announced on
 //   `document` (`admin--notes-live:delivery`) and raised as a toast. No toast
-//   when the person is looking at that thread (it is the view of a notes
-//   frame of this tab, and the tab is visible and focused): the thread's own
-//   refresh shows the message and, being the thread's GET, reads the
-//   delivery. `inbox`: deliveries of theirs were read or removed elsewhere;
-//   only the count and the cards are fetched, and nothing is said.
+//   when the person is LOOKING AT that thread (`watching`, the one predicate:
+//   it is the view of a notes frame of this tab, and the document is not
+//   hidden -- the window's focus is not asked for, so two windows side by
+//   side both stay live): the thread's own refresh shows the message and,
+//   being the thread's GET, reads the delivery. `inbox`: deliveries of theirs
+//   were read or removed elsewhere; only the count and the cards are fetched,
+//   and nothing is said.
 // - `Notes::RecordChannel`, one per `record` target (an editor's drawer, the
 //   media panel's notes, the mind graph's card): a thread of that record
 //   changed, or went with a deleted block.
@@ -52,11 +54,19 @@ import { messages } from "i18n/messages"
 // - A drawer that is closed gets its counts only (`data-notes-counts-url`,
 //   handed to `admin--notes#refreshCounts`): fetching a thread is what marks
 //   it read, and nobody is reading a closed drawer. It is remembered as
-//   stale and fetched when it is opened again. A part that draws itself (the
-//   graph's card) hears `admin--notes-live:changed` on its element.
-// Signals in a burst are one fetch per part per 500 ms. A refresh is this
-// file's own `fetch`: it is no Turbo request, so it is never held by the
-// write queue and never enters it.
+//   stale and fetched when it is opened again. The same goes for a THREAD
+//   in a document that is hidden (another tab is in front, the window is
+//   minimised): its GET would read the note on the person's behalf, so it
+//   gets the counts, the toast is raised, the delivery stays unread, and the
+//   thread is fetched when the document is visible again (`visible`). A
+//   list is fetched hidden or not: reading a list reads nothing. A part that
+//   draws itself (the graph's card) hears `admin--notes-live:changed` on its
+//   element.
+// Signals in a burst are one fetch per part per 500 ms, and one request per
+// part is out at a time: a signal that comes while one is out leads to
+// exactly one more after it, so two answers can never land out of order. A
+// refresh is this file's own `fetch`: it is no Turbo request, so it is never
+// held by the write queue and never enters it.
 //
 // THIS TAB'S OWN WRITES. Every notes write the tab makes says which tab it is
 // (`X-Notes-Tab`: `tag`, on the frame's Turbo forms and "Mark all read"; the
@@ -130,6 +140,14 @@ function listen(params, listener) {
   return { entry, stop }
 }
 
+// What the person's stream has said and nobody has acted on yet: the
+// deliveries to announce, and whether the count and the cards are due. Beside
+// `pool`, not on the controller: a signal waits half a second before anything
+// is fetched, and a Turbo visit inside that window replaces <body> and the
+// controller with it. The next page's controller takes these over
+// (`connect`), so the toast is raised there.
+const pending = { deliveries: new Set(), due: false }
+
 // The last segment of the address a control's form posts to: "follow", "pin".
 const change = (control) => control.closest("form")?.getAttribute("action")?.split("?")[0].split("/").pop()
 
@@ -155,7 +173,6 @@ export default class extends Controller {
     this.records = new Map()
     this.timers = new Map()
     this.stale = new WeakSet()
-    this.deliveries = new Set()
     this.dropped = false
   }
 
@@ -170,6 +187,8 @@ export default class extends Controller {
     // A socket the server closed for good (the session ended; someone has
     // signed in again since) is opened again by the first page that asks.
     cable.getConsumer().then((consumer) => consumer.ensureActiveConnection())
+    // What the page before this one was told and had no time to act on.
+    if (pending.due) this.soon("person", () => this.inbox())
     this.sync()
   }
 
@@ -178,9 +197,9 @@ export default class extends Controller {
     this.person = null
     this.records.forEach((record) => record.stop())
     this.records.clear()
+    // The timers go; what the person's stream said stays (`pending`).
     this.timers.forEach((timer) => clearTimeout(timer))
     this.timers.clear()
-    this.deliveries.clear()
   }
 
   recordTargetConnected(element) {
@@ -239,6 +258,15 @@ export default class extends Controller {
     if (element) this.stale.delete(element)
   }
 
+  // `visibilitychange` on the document: a thread that changed while nobody
+  // could see it is fetched now, which is also what reads it.
+  visible() {
+    if (document.hidden) return
+    this.recordTargets.forEach((element) => {
+      if (this.stale.has(element) && !element.hidden) this.soon(element, async () => { if (this.stale.has(element)) await this.refresh(element, null) }, 0)
+    })
+  }
+
   // --- the socket -------------------------------------------------------------------
 
   // Whether every subscription of this page has been answered.
@@ -274,29 +302,51 @@ export default class extends Controller {
 
   // --- a record's notes -----------------------------------------------------------
 
+  // One request per part at a time. A signal that comes while one is out is
+  // not a second request beside it -- whose answer could land first and be
+  // drawn over by the older one -- but exactly one more, after it.
   async refresh(element, threadId) {
-    if (!element.isConnected) return
+    const record = this.records.get(element)
+    if (!record || !element.isConnected) return
+    if (record.out) return void (record.again = true)
+
+    record.out = true
+    try {
+      await this.fetchPart(element, record, threadId)
+    } finally {
+      record.out = false
+      const again = record.again
+      record.again = false
+      if (again && this.records.get(element) === record) this.soon(element, () => this.refresh(element, null), 0)
+    }
+  }
+
+  async fetchPart(element, record, threadId) {
     element.dispatchEvent(new CustomEvent("admin--notes-live:changed", { detail: { threadId } }))
 
     const frame = element.querySelector("turbo-frame#notes")
     // A frame that was never asked for anything (a drawer never opened) has
     // no view and no address: counts only.
     const view = frame?.hasAttribute("src") ? frame.querySelector("[data-notes-view]") : null
-    if (!view || element.hidden) {
+    // Nobody is looking: a closed drawer, or a thread in a hidden document.
+    // The counts, and the part again when someone is (`shown`, `visible`).
+    if (!view || element.hidden || (view.dataset.notesView === "thread" && document.hidden)) {
       if (view) this.stale.add(element)
       return this.refreshCounts(element)
     }
     // Turbo is fetching this frame (a row was followed, a note was sent):
     // its answer may be older than the signal. Once it is in.
-    if (frame.hasAttribute("busy")) return this.soon(element, () => this.refresh(element, threadId))
+    if (frame.hasAttribute("busy")) return void this.soon(element, () => this.refresh(element, threadId))
 
-    this.stale.delete(element)
     const response = await fetch(this.address(frame, view), { headers: { Accept: "text/html", "Turbo-Frame": "notes" } })
     // Signed out, the record out of reach: nothing to draw, and nothing said.
     const answer = response.ok ? new DOMParser().parseFromString(await response.text(), "text/html").querySelector("turbo-frame#notes > [data-notes-view]") : null
-    // Turbo drew the frame while this was out, from a request made later.
-    if (!answer || !element.isConnected || frame.querySelector("[data-notes-view]") !== view) return
+    // No answer to draw: a part that was stale stays stale. Or the answer is
+    // nobody's any more: the part left and came back (another subscription),
+    // or Turbo drew the frame while this was out, from a request made later.
+    if (!answer || this.records.get(element) !== record || !element.isConnected || frame.querySelector("[data-notes-view]") !== view) return
 
+    this.stale.delete(element)
     if (view.dataset.notesView === "list") this.redrawList(view, answer)
     else this.redrawThread(frame, view, answer, response.url)
   }
@@ -572,25 +622,35 @@ export default class extends Controller {
   // announced; the count and the cards are fetched once for all of them.
   addressed(signal) {
     if (signal?.kind === "delivery") {
-      if (Number.isInteger(signal.delivery_id)) this.deliveries.add(signal.delivery_id)
+      if (Number.isInteger(signal.delivery_id)) pending.deliveries.add(signal.delivery_id)
     } else if (signal?.kind !== "inbox" || signal.origin === TAB) {
       return
     }
+    pending.due = true
     this.soon("person", () => this.inbox())
   }
 
+  // Each delivery is taken off `pending` only as it is announced: a visit
+  // that replaces this controller in the middle leaves the rest, and the
+  // count, to the next page's.
   async inbox() {
-    const ids = [ ...this.deliveries ]
-    this.deliveries.clear()
+    pending.due = false
     await this.refreshInbox()
-    for (const id of ids) await this.announce(id)
+    for (const id of [ ...pending.deliveries ]) {
+      if (!this.person) return void (pending.due = true)
+      pending.deliveries.delete(id)
+      await this.announce(id)
+    }
   }
 
   // One delivery, read through the scoped endpoint before anything is said.
   // Not found or refused (the record left the viewer's scope, or went to the
   // trash): nothing.
   async announce(id) {
-    const row = await this.json(this.deliveryUrlValue.replace("__ID__", encodeURIComponent(id)))
+    // The address of delivery 0, with this one's id as its last segment.
+    const url = new URL(this.deliveryUrlValue, window.location.origin)
+    url.pathname = url.pathname.replace(/\/0$/, `/${encodeURIComponent(id)}`)
+    const row = await this.json(url.pathname + url.search)
     if (!row) return
 
     const shown = this.watching(row.thread_id)
@@ -599,10 +659,13 @@ export default class extends Controller {
     if (!shown) this.toast(row)
   }
 
-  // Whether the person is looking at that thread: it is the view of a notes
-  // frame that is on screen here, in a tab that is visible and has the focus.
+  // Whether the person is looking at that thread, THE ONE PREDICATE: it is
+  // the view of a notes frame that is open here, in a document that is not
+  // hidden. It is `detail.shown` of the delivery's event, what keeps the
+  // toast away, and -- its second half, in `fetchPart` -- what lets a thread
+  // be fetched at all. The window's focus is not part of it.
   watching(threadId) {
-    if (document.visibilityState !== "visible" || !document.hasFocus()) return false
+    if (document.hidden) return false
     return this.recordTargets.some((element) => {
       const view = element.hidden ? null : element.querySelector("turbo-frame#notes > [data-notes-view='thread']")
       return Boolean(view) && view.dataset.noteThread === String(threadId) && !view.querySelector("[data-note-gone]")

@@ -46,9 +46,13 @@
       record's notes (its `record` targets: an editor's drawer, the media
       panel's notes, the mind graph's card) are found wherever they are
       drawn. Its values are the addresses of the parts it fetches again when
-      a signal says something changed; `tag` writes this tab's id on its
-      notes writes, and `shown` and `fresh` tell it that a drawer was opened
-      and that the notes frame was loaded by Turbo itself.
+      a signal says something changed -- the delivery's is the address of
+      delivery 0, a placeholder the route accepts, whose last path segment
+      the script replaces with the id it was told (no text is searched for,
+      so no `ADMIN_PATH` can collide with it); `tag` writes this tab's id on
+      its notes writes, and `shown`, `fresh` and `visible` tell it that a
+      drawer was opened, that the notes frame was loaded by Turbo itself and
+      that the document can be seen again.
 
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
@@ -62,8 +66,8 @@
   <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes admin--notes-live" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
         data-admin--notes-live-unread-url-value="<%= admin_unread_notes_path %>" data-admin--notes-live-card-url-value="<%= admin_notes_card_path(**admin_url_options) %>"
         data-admin--notes-live-open-threads-url-value="<%= admin_open_note_threads_path(**admin_url_options) %>"
-        data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options).sub("/0", "/__ID__") %>"
-        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:before-fetch-request@document->admin--notes-live#tag admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh"
+        data-admin--notes-live-delivery-url-value="<%= admin_note_delivery_path(0, **admin_url_options) %>"
+        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected mousedown->admin--notes#release:capture admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened turbo:before-fetch-request@document->admin--notes-live#tag admin--notes:opened->admin--notes-live#shown turbo:frame-load@document->admin--notes-live#fresh visibilitychange@document->admin--notes-live#visible"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">

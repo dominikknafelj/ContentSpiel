@@ -98,7 +98,7 @@ class PublicJavascriptTest < ActionDispatch::IntegrationTest
     get "/cs-studio/tags"
 
     assert_response :success
-    assert_select "body[data-controller~='admin--notes-live'][data-admin--notes-live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes-live-delivery-url-value='/cs-studio/notes/deliveries/__ID__']"
+    assert_select "body[data-controller~='admin--notes-live'][data-admin--notes-live-unread-url-value='/cs-studio/notes/unread'][data-admin--notes-live-delivery-url-value='/cs-studio/notes/deliveries/0'][data-action~='visibilitychange@document->admin--notes-live#visible']"
     assert_select "template#toast-note-template", count: 1
     assert modulepreloads.any? { |href| href.include?("controllers/admin/notes_live_controller") }
   end
