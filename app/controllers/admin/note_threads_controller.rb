@@ -25,10 +25,23 @@ module Admin
       "unfollow" => ->(thread) { Notes::SetFollowing.call(thread, following: false) }
     }.freeze
 
+    # A thread that is not among the container's -- deleted since the link
+    # to it was made (an inbox row, `?thread=` on an editor or on the media
+    # panel), its block deleted, or a thread of another record -- is not a
+    # 404: this GET is the `src` of a lazy frame, where a 404 is "Content
+    # missing" and an error in the console. It is the list with "This note is
+    # gone", the answer the writes give (`gone!`). That goes for a thread
+    # removed between the lookup and the render too (`render_thread` raises
+    # then). Only the thread's absence is forgiven: the container was found
+    # first (`set_container`), so a record outside the read scope is still
+    # the 404, and an image without `media.upload` the 403, before any of
+    # this runs.
     def show
-      thread = container_threads.find(params[:id])
+      thread = container_threads.find_by(id: params[:id]) or return gone!
       mark_read(thread)
       render_thread(thread, asked: asked)
+    rescue ActiveRecord::RecordNotFound
+      gone!
     end
 
     # A new thread on the record, or on one of its blocks (`subject`, a key).
@@ -77,7 +90,7 @@ module Admin
     # was trashed or purged since the lookup above) changes nothing about
     # what this request shows: the container was found through the read
     # scope a moment ago, and `render_thread` looks the thread up again among
-    # the container's, answering 404 by itself when it is no longer there.
+    # the container's; when it is no longer there, `show` answers the list.
     #
     # A GET THAT WRITES. Opening a thread is what reads it (spec §3.3), so
     # this GET changes rows -- the viewer's own read marks and nothing else,

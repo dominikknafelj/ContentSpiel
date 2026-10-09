@@ -463,6 +463,23 @@ class Admin::MediaLibrarySystemTest < ApplicationSystemTestCase
     assert_selector "#media-panel #media-notes #note-thread-#{thread.id}", text: "too dark"
   end
 
+  test "a link to a thread that is gone opens the panel on the image's notes, with a sentence and no error" do
+    site_settings(:default).update!(setup_completed_at: Time.current)
+    asset = create_media_asset
+    kept, gone = as(users(:two)) { [ "Keep the sky", "Too dark" ].map { |body| Notes::Start.call(asset, body: body).record } }
+    stale = gone.id
+    gone.destroy!
+    sign_in_via_form(users(:one))
+
+    visit "/cs-studio/media?selected=#{asset.id}&thread=#{stale}"
+    await_admin_controllers
+
+    # The JavaScript error collector fails this test on "Content missing".
+    assert_selector "#media-panel #media-notes #notes-list [role=status]", text: "This note is gone"
+    assert_selector "#media-notes a#note-row-#{kept.id}", text: "Keep the sky"
+    assert_no_text "Content missing"
+  end
+
   private
 
   def active_element_id = page.evaluate_script("document.activeElement && document.activeElement.id")

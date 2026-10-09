@@ -127,7 +127,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     assert_equal 1, Notes::Delivery.unread.where(user: users(:reader)).count
   end
 
-  test "a thread purged while it is being opened is not found" do
+  test "a thread purged while it is being opened is gone: the list says so" do
     sign_in_as(users(:reader))
     mark_read = Notes::MarkRead.method(:call)
     thread_id = @thread.id
@@ -138,7 +138,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
 
     with_singleton_override(Notes::MarkRead, :call, purge_then_mark) { get "#{@base}/threads/#{@thread.id}", headers: frame }
 
-    assert_response :not_found
+    assert_redirected_to "#{@base}?notice=gone"
   end
 
   test "pinned rows come first and say what they are on; the resolved rows and the counts are fetched on their own" do
@@ -181,8 +181,10 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     end
 
     sign_in_as(users(:reader))
-    get "#{@base}/threads/#{elsewhere.id}" # a real thread, of another page
-    assert_response :not_found
+    # A real thread, of another page: among this page's it is gone, and the
+    # list says so (nothing of it is shown, and nothing is marked read).
+    get "#{@base}/threads/#{elsewhere.id}"
+    assert_redirected_to "#{@base}?notice=gone"
     get "/cs-studio/notes/page/999999999"
     assert_response :not_found
   end

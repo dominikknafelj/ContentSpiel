@@ -66,7 +66,13 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
     assert_select "#media-notes #notes-counts[data-admin--notes-target=counts]"
     # No drawer on this screen (the spec wins over the handoff's "Open in drawer").
     assert_select "aside#notes-drawer", count: 0
-    assert_select "#media-notes a", count: 0
+    # Asked of the frame's own answer: in the page above the frame is not loaded yet.
+    get "/cs-studio/notes/media/#{@asset.id}", params: { view: "media" }, headers: { "Turbo-Frame" => "notes" }
+    assert_response :success
+    assert_select "a[data-note-row]", count: 1
+    assert_select "a[href*='notes=open']", count: 0
+    assert_select "a, button", text: /open in drawer/i, count: 0
+    get "/cs-studio/media", params: { selected: @asset.id }
 
     # The panel is the image's autosaving form, and a form cannot nest: the
     # frame brings forms of its own, and inside an autosave form a note's
@@ -128,6 +134,108 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template span[data-notes-chip][data-unread]", text: "2"
+  end
+
+  # `PATCH /media/:id` is open to `media.manage` alone (`Media::Save`), the
+  # notes of an image to `media.upload` alone (`Admin::NoteContainer`): the
+  # tile such a save draws again says nothing about notes its reader may not open.
+  test "the tile an autosave draws for someone who may manage images but not open their notes has no count" do
+    group = access_control_groups(:branch_editors)
+    upload = AccessControl::Grant.create!(group: group, permission: "media.upload", scope: {})
+    # Mentioned while they could still open the library: unread, so a leak would be in accent.
+    as(users(:one)) { assert Notes::Start.call(@asset, body: "For @[#{users(:editor_branch).id}]").ok? }
+    assert_equal 1, Notes::Delivery.unread.where(user: users(:editor_branch)).count
+    upload.destroy!
+    AccessControl::Grant.create!(group: group, permission: "media.manage", scope: {})
+    sign_in_as(users(:editor_branch))
+
+    patch "/cs-studio/media/#{@asset.id}", params: { media_asset: { title: "Renamed" } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "Renamed", @asset.reload.title
+    assert_select "turbo-stream[target='media-asset-#{@asset.id}'] template li"
+    assert_select "[data-notes-chip]", count: 0
+    assert_select "[data-unread]", count: 0
+    assert_not_includes response.body, "open note"
+    get "/cs-studio/notes/media/#{@asset.id}"
+    assert_response :forbidden
+  end
+
+  # A context-only ancestor is drawn so the readable page has its path to the
+  # root; it shows nothing but its title. A count there would say something
+  # about a page the viewer may not open, in accent if they were once
+  # mentioned on it. The row's template draws no marker for such a row
+  # whatever it is handed, so the test also looks at what the tree ASKS
+  # `Notes::Counts` for: the ancestor's id is never among the ids, in either read.
+  test "the tree shows no count on a context-only ancestor, though the viewer has an unread mention there, and the readable child's own" do
+    child = create_page(title: "Plans", parent: @page)
+    group = access_control_groups(:branch_editors)
+    viewer = users(:editor_branch)
+    wide = AccessControl::Grant.create!(group: group, permission: "pages.read", scope: { "page_ids" => [ @page.id ] })
+    as(users(:one)) do
+      assert Notes::Start.call(@page, body: "For @[#{viewer.id}]").ok?
+      assert Notes::Start.call(child, body: "For @[#{viewer.id}] too").ok?
+    end
+    wide.destroy!
+    AccessControl::Grant.create!(group: group, permission: "pages.read", scope: { "page_ids" => [ child.id ] })
+    assert_equal 2, Notes::Delivery.unread.where(user: viewer).count
+    assert_operator Notes::Counts.by_container("Page", [ @page.id ]).fetch(@page.id), :>=, 1
+    assert_includes Notes::Counts.unread_among("Page", [ @page.id ], viewer), @page.id
+    sign_in_as(viewer)
+    asked = []
+    counts = Notes::Counts.method(:by_container)
+    unread = Notes::Counts.method(:unread_among)
+    recording_counts = ->(type, ids) { asked << [ :by_container, type, ids ] and counts.call(type, ids) }
+    recording_unread = ->(type, ids, user) { asked << [ :unread_among, type, ids ] and unread.call(type, ids, user) }
+
+    with_singleton_override(Notes::Counts, :by_container, recording_counts) do
+      with_singleton_override(Notes::Counts, :unread_among, recording_unread) { get "/cs-studio/pages/#{child.id}" }
+    end
+
+    assert_response :success
+    assert_equal [ [ :by_container, "Page", [ child.id ] ], [ :unread_among, "Page", [ child.id ] ] ], asked
+    assert_select "#tree-column li[data-page-id='#{@page.id}'][data-context-only]"
+    assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-notes-marker]", count: 0
+    assert_select "#tree-column li[data-page-id='#{@page.id}'] > div [data-unread]", count: 0
+    assert_select "#tree-column li[data-page-id='#{child.id}'] > div span[data-notes-marker][data-unread]", text: "1"
+    assert_select "#tree-column [data-notes-marker]", count: 1
+  end
+
+  # A link to a thread outlives the thread (it was deleted, its block was).
+  # The frame's GET then answers the list with a sentence, as a write does:
+  # a 404 inside a lazy frame is "Content missing" and an error in the console.
+  { "page" => -> { @page }, "post" => -> { @post }, "media" => -> { @asset } }.each do |type, record|
+    test "a thread that is gone answers the #{type}'s list with a sentence, not a 404" do
+      container = instance_exec(&record)
+      base = "/cs-studio/notes/#{type}/#{container.id}"
+      gone = Notes::Thread.find_by!(subject: container)
+      thread_path = "#{base}/threads/#{gone.id}"
+      gone.destroy!
+      query = type == "media" ? "?view=media" : ""
+
+      get "#{thread_path}#{query}", headers: { "Turbo-Frame" => "notes" }
+
+      assert_redirected_to "#{base}?notice=gone#{query.sub("?", "&")}"
+      follow_redirect!(headers: { "Turbo-Frame" => "notes" })
+      assert_response :success
+      assert_select "turbo-frame#notes #notes-list [role=status]", text: /This note is gone/
+
+      # A thread of another record is as gone as one that never was.
+      get "#{base}/threads/#{Notes::Thread.where.not(container: container).first!.id}#{query}", headers: { "Turbo-Frame" => "notes" }
+      assert_redirected_to "#{base}?notice=gone#{query.sub("?", "&")}"
+    end
+  end
+
+  test "only the thread's absence is forgiven: a record out of scope is still not found, an image without the media right still forbidden" do
+    @post.update!(trashed_at: Time.current)
+    get "/cs-studio/notes/post/#{@post.id}/threads/999999999", headers: { "Turbo-Frame" => "notes" }
+    assert_response :not_found
+    get "/cs-studio/notes/page/999999999/threads/1", headers: { "Turbo-Frame" => "notes" }
+    assert_response :not_found
+
+    sign_in_as(users(:reader))
+    get "/cs-studio/notes/media/#{@asset.id}/threads/999999999", headers: { "Turbo-Frame" => "notes" }
+    assert_response :forbidden
   end
 
   test "each list costs the same statements whatever the number of threads" do
