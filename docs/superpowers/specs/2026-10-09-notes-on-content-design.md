@@ -2,7 +2,7 @@
 
 The first of four steps of "Collaboration on content" (roadmap, decided 2026-10-08): (1) notes, with live delivery — this spec; (2) presence; (3) live refresh of blocks changed by someone else, and edit reservations; (4) co-editing of rich text, only if 1–3 prove insufficient. Each step has its own spec, plan and PR. This is the binding spec for one implementation plan.
 
-**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** Mockups: the Claude Design canvas "Notes on content" (three boards: the page editor with the drawer, the dashboard, the other surfaces).
+**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** **The visual design is `Studio Notes.dc.html` in the Claude Design project "Content Spiel design system"** (every screen in light and dark, made inside the design system and accepted by the user on 2026-10-09; §4.6 lists what it settles). An earlier rough canvas, "Notes on content", is superseded and is not a reference.
 
 ## 1. Purpose
 
@@ -129,7 +129,7 @@ Each is an `ApplicationService` with `authorize!(` and `record_event(`, listed i
 | `Notes::EditMessage` | Changes the author's own message; sets `edited_at`; recomputes mentions and writes deliveries for newly mentioned people only. |
 | `Notes::DeleteMessage` | Deletes a message, its files, reactions and deliveries; deletes the thread when it was the last one. |
 | `Notes::Resolve` / `Notes::Reopen` | Changes the state. |
-| `Notes::Pin` / `Notes::Unpin` | Changes the pin. A pinned thread stays open and is listed first. |
+| `Notes::Pin` / `Notes::Unpin` | Changes the pin. A pinned thread is listed first and is always open: resolving a thread unpins it, and a resolved thread can't be pinned. |
 | `Notes::React` | Adds or removes the actor's reaction (a toggle). |
 | `Notes::MarkRead` | Marks the actor's own deliveries read: one thread's, or all. |
 | `Notes::Follow` | Follows or unfollows a thread for the actor (D17). Needs the read right. |
@@ -160,17 +160,22 @@ Rules:
 
 ### 4.1 The component
 
-`Admin::NotesScreen::DrawerComponent`: an `<aside>` on the right edge of the content area, 400 px wide from 1024 px, the full width below. It overlays the content with the menu shadow; it has no scrim and is not modal, so the editor stays usable beside it. It is rendered once per screen, outside every autosave form, and holds a `<turbo-frame id="notes">` whose `src` is set when it first opens.
+`Admin::NotesScreen::DrawerComponent`: an `<aside>` on the right edge of the content area, 400 px wide from 1024 px. It follows the Media panel's pattern (surface background, a 1 px line on its left edge, no scrim, no page lock) and overlays the content with the menu shadow, the one stated exception to "shadows on menus and popovers only"; the editor stays usable beside it. Below 1024 px it is a full-screen sheet with a "Back to <title>" button. Nothing is designed below 768 px. It is rendered once per screen, outside every autosave form, and holds a `<turbo-frame id="notes">` whose `src` is set when it first opens.
 
 A Stimulus controller, `admin--notes`, opens and closes it, remembers "open" per browser in `localStorage` (a convenience only), moves focus into the drawer on open and back to the trigger on close, and closes on Escape when focus is inside. It is a `complementary` landmark labelled "Notes".
 
 ### 4.2 Content
 
-Top to bottom (board 1):
-1. Title "Notes", **New note** (a thread on the record itself), Close.
+The drawer has two views; an opened thread **replaces** the list (the design's layout 1b), on every width.
+
+**The list**, top to bottom:
+1. Title "Notes", **New note** (a thread on the record itself: no chooser), Close.
 2. **Pinned** threads.
-3. **Open** threads, grouped: the record's own first, then one group per block that has threads, in the page's display order (`BlockOutline`). A group's heading names the block the way its card does and, inside a section, its column.
+3. **Open** threads, grouped: the record's own first, then one group per block that has threads, in the page's display order (`BlockOutline`). A group's heading names the block the way its card does and, inside a section, its column. A row is the first message's author, time and first lines, the reply count, and "new" in accent when it holds an unread delivery for the viewer.
 4. **Resolved** (count), collapsed; loaded when opened.
+5. Empty: the shared empty state with "New note".
+
+**The thread**: a Back control to the list, the group heading, the messages, and, fixed at the bottom of the drawer, the composer with Resolve. The list keeps its scroll position for the way back.
 
 A thread shows its quote, its messages (author, time, "edited", "written on German" when the origin language differs from the current tab), files, reactions, a reply field, Resolve, and **Notify me** / **Stop notifying me** (D17). A thread with more than three messages shows the first and the last two with "Show 4 more".
 
@@ -181,7 +186,7 @@ The emoji control is a small fixed set (about 30 common ones) in a popover; the 
 ### 4.3 Openers
 
 - **Header**: `Admin::EditorScreen::HeaderComponent` gains a "Notes" button with the count of open threads, before Preview.
-- **Block card and section tile**: a marker in the card's header and on the tile. With open threads it is a pill with the count; without, a faint "add note" icon. Pressing it opens the drawer at that block's group, or with a new thread on that block ready to type.
+- **Block card and section tile**: a marker in the card's header and on the tile. With open threads it is a pill with the count, pressed to open the drawer at that block's group. Without, nothing is shown at rest (the system's rule: no count when it is zero); an add-note control appears on hover or keyboard focus of the card, and "Add note" is always in the block's ⋯ menu, so neither touch nor a test depends on hover. A section's own header shows no total: only its tiles count, so a thread is never counted twice.
 - **Quote**: with text selected in a rich-text field, the block's marker reads "Note on selection"; the selected text, cut to 500 characters, becomes the new thread's quote.
 - The translation tabs show the same threads (a thread is on the block, not on a language) with its origin language named.
 - A view-only viewer (read without edit) gets the drawer and can write notes: D3.
@@ -192,10 +197,19 @@ The emoji control is a small fixed set (about 30 common ones) in a popover; the 
 - **Media library**: the panel beside the grid (`Admin::MediaLibrary::PanelComponent`) gains a "Notes" section with the image's threads, rendered by the same thread components; no drawer on that screen. A tile shows a count chip beside `NO ALT` and `UNUSED`, read by the grid in one query.
 - **Posts list**: a "Notes" column with the open count as a link that opens the post with the drawer open (`?notes=open`).
 - **Page tree**: a row shows the open count of the page and its blocks together, beside the translation markers, read once for the whole tree.
-- **Mind graph**: the node of a post with open threads has a ring and a count; the card built by `mind_graph/card.js` shows the post's open threads (first message, author, reply count) and a field to start one. The graph's JSON gains `open_notes` per node, from one grouped query. Threads in the card are read as JSON from a new endpoint; the card writes them with `textContent` only.
+- **Mind graph**: the node of a post with open threads carries a small mono count badge on its top-left corner (no ring: a ring means selected, a corner dot means pinned); the card built by `mind_graph/card.js` shows the post's open threads (first message, author, reply count) and a field to start one. The graph's JSON gains `open_notes` per node, from one grouped query. Threads in the card are read as JSON from a new endpoint; the card writes them with `textContent` only.
 - **Trash**: a trashed record's notes are not shown anywhere and not counted.
 
-### 4.5 Strings
+### 4.5 Look
+
+- **Counts**: open threads are neutral meta-colour pills like the existing count badges. Accent is used for one meaning only: unread and addressed to the viewer (the dot on an inbox row, "new" on a thread row, the Dashboard badge in the sidebar, which is a filled accent pill and the one filled badge there).
+- **People**: the existing actor pattern (round avatar, name).
+- **Quote**: a sunken block with a 1 px line on all sides; no coloured left border.
+- **"Written on German"**: the existing translation chip, shown only when the origin language differs from the current tab.
+- **Emoji**: the emoji control is a Lucide icon, never a glyph. Reaction chips are drawn like tag chips (sunken, line border, the emoji and a mono count), with the accent tint for the viewer's own.
+- **Motion**: with reduced motion on, an animated GIF does not play by itself; it is a still tile with a Play control.
+
+### 4.6 Strings
 
 Every string is a key under `config/locales/admin/notes.en.yml`; the new components, controllers and scripts go on `CONVERTED` in `test/lib/admin_i18n_test.rb`. The header and the block card, which gain a button each, are not converted today; their new strings are keys all the same.
 
@@ -203,7 +217,7 @@ Every string is a key under `config/locales/admin/notes.en.yml`; the new compone
 
 - **Dashboard card "Notes for you"**: the viewer's deliveries, unread first, then newest; five rows and "All notes for you". A row says who did what ("Dana mentioned you"), the first 140 characters of the message, and where (type, title, block). It links to the record with the drawer open at the thread.
 - **"All notes for you"**: a full list at `<admin>/notes`, 50 a page, with "Mark all read".
-- **Dashboard card "Open threads"**: records the viewer may read that have open threads, most recently active first, five rows.
+- **Dashboard card "Open threads"**: records the viewer may read that have open threads, one row per record with its count, most recently active first, five rows.
 - **Sidebar**: the Dashboard entry shows the viewer's unread count. `Admin::Shell::SidebarComponent#badge_for`, hard-wired to Trash today, takes a count per entry. One `COUNT` per page load, narrowed by the read scope.
 
 `Dashboard::NotesForYou` and `Dashboard::OpenThreads` (`app/queries/dashboard/`) build on `AccessControl.scope` for pages and posts and on `holds?("media.upload")` for images, as `Dashboard::TranslationNeeds` does, and return rows of data; the components word them. Both are constant in the number of queries and both belong in `test/integration/trash_visibility_test.rb`.
@@ -239,10 +253,10 @@ Lists (posts list, page tree, media grid) are not live: their counts are fresh o
 
 ### 6.4 The chime, the toast and the desktop notification
 
-- **Toast**: the existing toast component, with the sentence and a link to the record with the drawer open at the thread. Not shown when that thread is already open in the same tab; the delivery is then marked read at once.
+- **Toast**: the existing inverted toast, bottom-centre, with the sentence and the action "Open" (the record with the drawer open at the thread), for 8 seconds like the Undo toast. Not shown when that thread is already open in the same tab; the delivery is then marked read at once.
 - **Chime** (D18): two short tones made with the Web Audio API; no file. Only for `mention`. With several tabs open, the tabs agree through a `BroadcastChannel` which one plays (the visible one, else the first to claim it). A browser that has not yet had a click in the tab stays silent; nothing is queued for later.
 - **Desktop notification** (D19): only when the tab is hidden or unfocused. Title "Dana mentioned you"; body: the record's title and the first 140 characters of the note, read through the scoped inbox endpoint. Clicking it focuses the tab and opens the thread. One per delivery across tabs, by the same agreement as the chime.
-- **Settings**: the account screen gains "Notes" with two switches, "Play a sound when I'm mentioned" (on) and "Show a desktop notification when I'm mentioned" (off). Turning the second on asks the browser for permission in that click; if the browser refuses, the switch goes back and says why. The setting is per person, the permission per browser: on another browser the account screen shows "Allow in this browser".
+- **Settings**: the account screen gains "Notes" with two switches, "Play a sound when I'm mentioned" (on) and "Show a desktop notification when I'm mentioned" (off). They save with the screen's save bar, as configuration does. "Allow in this browser" beside the second acts at once: it asks the browser for permission in that click and says so if the browser refuses. The setting is per person, the permission per browser: on another browser the account screen shows "Allow in this browser".
 
 ### 6.5 Deployment
 
