@@ -63,14 +63,16 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector "dialog", visible: :all
   end
 
-  # Sections spec §6: nothing of it can be read, so nothing of it is moved or
-  # copied from here -- it is deleted, or dragged out by its grip.
-  test "a tile of an unregistered type has Delete block… as its only action" do
+  # Sections spec §1 over §6: the tile keeps its grip, so the pointer can
+  # move it along its lane, to another column and out of the section -- and
+  # so can the keyboard. Nothing of it can be read, so it is not copied.
+  test "a tile of an unregistered type keeps every move and Delete block…, and has no Duplicate" do
     @block.update_column(:block_type, "gone/thing")
 
     render_tile(@block.reload)
 
-    assert_equal [ "Delete block…" ], menu_items
+    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
+    assert_no_selector "form[action$='/duplicate']", visible: :all
     assert_selector "dialog#delete-block-#{@block.id}", visible: :all
   end
 end

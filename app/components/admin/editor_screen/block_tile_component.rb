@@ -38,9 +38,12 @@ module Admin
     # `admin--blocks#refreshMoveState` says it, as the tile connects and after
     # every change of a lane.
     #
-    # A tile of a type that is no longer registered has "Delete block…" as its
-    # only item (spec §6): nothing of it can be read, so it is not copied, and
-    # the one way out of the section it has is the grip.
+    # A tile of a type that is no longer registered keeps the four moves and
+    # "Delete block…", and has no Duplicate: nothing of it can be read, so it
+    # is not copied. Spec §6 calls Delete its only action, and of what is done
+    # TO the block it is; but the tile keeps its grip, so the pointer moves it
+    # along its lane, to another column and out of the section, and spec §1
+    # gives the keyboard whatever the pointer has (review, fix round 1).
     #
     # THE BLOCK'S DELETE DIALOG IS IN THE TILE (`DeleteBlockDialogComponent`,
     # which says why it is not in the form's panel). It is a child of the

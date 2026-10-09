@@ -43,12 +43,16 @@
 
 <%# `data-messages`: the two sentences `admin--blocks` says itself (a block not
     moved because its form holds an unsaved edit; a refused move whose list was
-    not redrawn over unsaved text) and the two choices it writes into the Move
-    dialog. Here and not on <body>: only this screen's script asks for them. %>
+    not redrawn over unsaved text), the two choices it writes into the Move
+    dialog and what it announces after a move made from a menu. Here and not on
+    <body>: only this screen's script asks for them. %>
 <section class="admin-content-blocks mt-6" data-controller="admin--blocks"
      data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
      data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move", "components.editor_screen.section_card.reload_later",
-                                      "components.editor_screen.move_dialog.column", "components.editor_screen.move_dialog.section_column") %>">
+                                      "components.editor_screen.move_dialog.column", "components.editor_screen.move_dialog.section_column",
+                                      "components.editor_screen.block_moves.up", "components.editor_screen.block_moves.down",
+                                      "components.editor_screen.block_moves.column", "components.editor_screen.block_moves.into",
+                                      "components.editor_screen.block_moves.out", "components.editor_screen.block_moves.back") %>">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-h2 text-ink">Blocks</h2>
     <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>

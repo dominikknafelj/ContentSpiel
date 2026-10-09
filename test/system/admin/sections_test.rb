@@ -1640,12 +1640,20 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
   # A section's card is added and removed without the other cards being drawn
   # again, so it is the screen that says whether there is one to move into.
   test "Move into section… is enabled when the page gains a section and disabled when it loses its last" do
-    block = @page.content_blocks.create!(block_type: "image", position: 1)
-    open_editor
+    plain = create_page(title: "Gains a section")
+    block = plain.content_blocks.create!(block_type: "image", position: 0)
+    visit "/cs-studio/pages/#{plain.id}"
+    await_admin_controllers
     scope = "##{ActionView::RecordIdentifier.dom_id(block)}"
-    assert_selector "#{scope} button[data-move='into']:not([disabled])", visible: :all
+    assert_selector "#{scope} button[data-move='into'][disabled]", visible: :all
 
-    find("#{section_card} button[aria-label='Section actions']").click
+    within("#block-picker-end") { press "Section" }
+
+    assert_selector ".admin-section-card [data-admin--blocks-target='lane']", count: 2
+    assert_selector "#{scope} button[data-move='into']:not([disabled])", visible: :all
+    assert_writes_settled
+
+    find(".admin-section-card button[aria-label='Section actions']").click
     press "Delete section and its blocks…"
     within("dialog[open]") { press "Delete section" }
 
@@ -1812,5 +1820,99 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_field caption(@left), with: "Mine, refused"
     assert_equal @section.id, @left.reload.section_id
     assert_focus_on menu_button(tile(@left)), "the menu of the tile that was not moved"
+  end
+
+  # ---- Fix round 1 of the menu moves ----------------------------------------
+
+  def announced = page.evaluate_script("document.querySelector('[data-admin--blocks-target=\"announcer\"]').textContent")
+
+  # Spec §1: the grip moves an unavailable tile, so the menu does too.
+  test "a tile of an unregistered type is moved along its lane and out of its section from the keyboard" do
+    gone = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    gone.update_column(:block_type, "gone/thing")
+    open_editor
+
+    pick_by_keyboard(tile(gone), "Move up")
+
+    assert_eventually { @page.content_blocks.in_column(@section, 1).reorder(:position).ids == [ gone.id, @left.id ] }
+    assert_equal [ gone.id, @left.id ], tiles_in(1)
+    assert_focus_on menu_button(tile(gone)), "the unavailable tile's menu"
+    assert_writes_settled
+
+    pick_by_keyboard(tile(gone), "Move out of section")
+
+    assert_selector "#{card(gone)}.border-danger", text: "Unavailable type — gone/thing"
+    assert_writes_settled
+    assert_equal [ @section.id, gone.id ], @page.content_blocks.top_level.reorder(:position).ids
+    assert_nil gone.reload.section_id
+    assert_no_selector panel(gone), visible: :all
+    assert_equal [ @left.id ], tiles_in(1)
+    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks", exact_text: true
+  end
+
+  # The focus lands on a button every tile names the same, "Block actions":
+  # what moved and where is said in the live region, as the handle's keyboard
+  # path says it for a card.
+  test "a menu move is announced: which block, and where it went" do
+    below = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    open_editor
+
+    pick_by_keyboard(tile(@left), "Move down")
+    assert_equal "Image moved down. Position 2 of 2.", announced
+    assert_eventually { @page.content_blocks.in_column(@section, 1).reorder(:position).ids == [ below.id, @left.id ] }
+
+    pick_by_keyboard(tile(below), "Move to column…")
+    assert_focus_on "#move-block-destination", "the dialog's select"
+    keyboard.type(:tab, :tab, :enter)
+    assert_equal "Rich text moved to column 2. Position 2 of 2.", announced
+    assert_eventually { below.reload.section_column == 2 }
+    assert_writes_settled
+
+    pick_by_keyboard(tile(below), "Move out of section")
+    assert_equal "Rich text moved out of the section. Position 2 of 2.", announced
+    assert_selector card(below)
+    assert_writes_settled
+
+    pick_by_keyboard(card(below), "Move into section…")
+    assert_focus_on "#move-block-destination", "the dialog's select"
+    keyboard.type(:tab, :tab, :enter)
+    assert_equal "Rich text moved to column 1 of section 1. Position 2 of 2.", announced
+    assert_eventually { below.reload.section_column == 1 }
+    assert_writes_settled
+  end
+
+  test "a menu move that fails is announced as put back" do
+    open_editor
+    script_writes("fail")
+
+    pick_by_keyboard(tile(@left), "Move out of section")
+
+    assert_selector "#toasts .admin-toast[role=alert]", text: "Couldn't save the new order."
+    assert_order_eventually([ @left.id ]) { tiles_in(1) }
+    assert_writes_settled
+    assert_eventually { announced == "Image is back where it was." }
+  end
+
+  # A move along one container holds nothing and redraws nothing, so the end
+  # of its turn has no focus to give back: a person who has gone elsewhere
+  # while the request was out -- a click on the blank page -- stays there.
+  test "after Move up on a top-level card, a focus put elsewhere before the answer lands stays there" do
+    first = @page.content_blocks.create!(block_type: "image", position: 1)
+    second = @page.content_blocks.create!(block_type: "image", position: 2)
+    open_editor
+    script_writes("hold")
+
+    pick_by_keyboard(card(second), "Move up")
+    await_js "window.__release.length === 1"
+    assert focus_is_on("#{card(second)} .admin-block-card__handle"), "the moved card's handle has the focus at once"
+    page.execute_script("document.activeElement.blur()")
+    assert page.evaluate_script("document.activeElement === document.body")
+
+    page.execute_script("window.__release[0]()")
+    assert_selector "#content-blocks-status", text: "SAVED"
+    assert_writes_settled
+    await_frames # the move's turn has ended: what it would do to the focus is done
+    assert page.evaluate_script("document.activeElement === document.body"), "the focus was pulled back to the card"
+    assert_equal [ @section.id, second.id, first.id ], @page.content_blocks.top_level.reorder(:position).ids
   end
 end

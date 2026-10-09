@@ -189,6 +189,19 @@ en:
           move: "Move"
           column: "Column %{column}"
           section_column: "Section %{section} · column %{column}"
+        # What `admin--blocks` says in its live region after a move made
+        # from a "⋯" menu: the focus lands on a button every block names the
+        # same, so this is what tells a screen reader which block went where.
+        # `block` is the block's type as its card or tile shows it; the
+        # position is the block's place among the blocks of where it now is.
+        # `back` follows a move that was refused or failed.
+        block_moves:
+          up: "%{block} moved up. Position %{position} of %{count}."
+          down: "%{block} moved down. Position %{position} of %{count}."
+          column: "%{block} moved to column %{column}. Position %{position} of %{count}."
+          into: "%{block} moved to column %{column} of section %{section}. Position %{position} of %{count}."
+          out: "%{block} moved out of the section. Position %{position} of %{count}."
+          back: "%{block} is back where it was."
         # The confirmation behind every "Delete block…", in a card and in a
         # tile.
         delete_block_dialog:

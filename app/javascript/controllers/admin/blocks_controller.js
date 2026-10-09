@@ -47,7 +47,11 @@ import { messages } from "i18n/messages"
 // (`relocate`): a menu move is queued, held still, refused and put back
 // exactly as a drag is. What a menu move adds is the FOCUS (`focusMoved`):
 // the item that was picked is hidden with its menu, so without a rule the
-// focus would be on <body>, the top of the page for a keyboard user.
+// focus would be on <body>, the top of the page for a keyboard user. And it
+// SAYS what it did, in the live region the handle's keyboard path speaks in
+// (`relocate`): the focus lands on a button every block names the same
+// ("Block actions", on a card as on a tile), so the announcement is what
+// tells a screen reader which block went where.
 //
 // Duplicate and Delete need no controller action of their own -- both are
 // plain `button_to`/`form_with` submissions, and Turbo Drive already
@@ -392,7 +396,7 @@ export default class extends Controller {
     const items = this.itemsOf(item.parentElement)
     const index = items.indexOf(item)
     if (index <= 0) return
-    this.relocate(item, () => item.parentElement.insertBefore(item, items[index - 1]))
+    this.relocate(item, () => item.parentElement.insertBefore(item, items[index - 1]), "up")
   }
 
   moveDown(event) {
@@ -405,7 +409,7 @@ export default class extends Controller {
     // here -- the menu's own close on a pick stands back from a disabled
     // item, which is what Move down has just become on a block that is now
     // the last.
-    this.relocate(item, () => items[index + 1].after(item))
+    this.relocate(item, () => items[index + 1].after(item), "down")
   }
 
   // "Move to column…" on a tile and "Move into section…" on a card open the
@@ -432,6 +436,7 @@ export default class extends Controller {
     const text = messages(this.element)
 
     this.asking = item
+    this.askingSections = sections
     this.destinationTarget.replaceChildren(...lanes.map((lane) => {
       const option = document.createElement("option")
       option.value = lane.id
@@ -455,15 +460,19 @@ export default class extends Controller {
     this.destinationTarget.closest("dialog").close()
     if (!item?.isConnected || !this.laneTargets.includes(lane) || item.parentElement === lane) return
 
+    // Said as the choice read: "column 2" to a tile, which stays in its
+    // section, and "column 2 of section 1" to a card.
+    const within = item.matches('[data-admin--blocks-target="tile"]')
+    const section = this.askingSections.indexOf(lane.dataset.sectionId) + 1
     this.expand(lane.closest('[data-admin--blocks-target="card"]'))
-    this.relocate(item, () => lane.append(item))
+    this.relocate(item, () => lane.append(item), within ? "column" : "into", { column: lane.dataset.column, section })
   }
 
   // Out of its section: directly after the section's card in the page's list.
   moveOut(event) {
     const item = this.itemFor(event)
     const section = item.closest('[data-admin--blocks-target="card"]')
-    this.relocate(item, () => section.after(item))
+    this.relocate(item, () => section.after(item), "out")
   }
 
   // A MENU'S MOVE: the DOM move a drop would have made, then the same request
@@ -473,11 +482,21 @@ export default class extends Controller {
   // stays. A block that changes containers is then held still by `move`
   // (`hold`: inert until its answer is drawn), which takes the focus off
   // again, and gets it back when its turn has ended (`focusMoved`).
-  relocate(item, place) {
+  //
+  // `said` is which sentence announces it (`block_moves.<said>` in the locale
+  // file), spoken as the block moves -- as the keyboard path says "Dropped"
+  // when the card is dropped, not when the request is answered. Every one
+  // names the block and its place where it now is; `vars` adds what only the
+  // caller knows (the column, the section's number). A move that does not
+  // stand is then announced as put back (`sendMove`).
+  relocate(item, place, said, vars = {}) {
     const from = item.parentElement
     const before = this.snapshot()
     place()
     this.focusItem(item)
+    const items = this.itemsOf(item.parentElement)
+    this.announce(messages(this.element).t(`components.editor_screen.block_moves.${said}`,
+      { block: this.titleOf(item), position: items.indexOf(item) + 1, count: items.length, ...vars }))
     this.move(item, from, before, { focus: true })
   }
 
@@ -565,8 +584,9 @@ export default class extends Controller {
   // always did, and never waits on a form.
   //
   // `focus` is for a move made from a menu (`relocate`): when its turn has
-  // ended, however it ended, the block's element takes the focus if nothing
-  // has it (`focusMoved`). A drag is the pointer's and asks for none.
+  // ended, the block's element takes the focus back if the move took it away
+  // and nothing has it (`sendMove`, `focusMoved`). A drag is the pointer's
+  // and asks for none.
   //
   // THE ANSWER IS DRAWN BEFORE THE NEXT WRITE GOES, for a move that names a
   // section or changes containers (`streamsApplied`). Its answer changes what
@@ -594,7 +614,10 @@ export default class extends Controller {
     if (to !== this.listTarget || (from && from !== to)) this.sendHeldEdits()
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    await this.queueMove({ item, from, to, csrfToken, focus, stoodBack: false, held: from && from !== to ? this.hold(item) : [] })
+    // The block's name is read now, for a put-back's announcement: by then
+    // the element may be one the answer has replaced.
+    const title = focus ? this.titleOf(item) : null
+    await this.queueMove({ item, from, to, csrfToken, focus, title, stoodBack: false, held: from && from !== to ? this.hold(item) : [] })
   }
 
   // A BLOCK ON ITS WAY TO ANOTHER CONTAINER IS HELD STILL, from its drop
@@ -635,9 +658,18 @@ export default class extends Controller {
   // queued itself again (`takeTurn` answers "again"), it is counted off and
   // what it held still is let go -- in a `finally`, so a turn that throws
   // leaves neither a count that never reaches zero (`restoreTo` would then
-  // be kept for good) nor a block nobody can touch. A menu's move then says
-  // where the focus is (`focusMoved`) -- here, after the hold is let go: an
-  // inert element takes no focus.
+  // be kept for good) nor a block nobody can touch.
+  //
+  // A menu's move then gives the focus back (`focusMoved`) -- here, after the
+  // hold is let go: an inert element takes no focus. ONLY WHERE THE MOVE TOOK
+  // IT: a block that was held (it changed containers, and `inert` drops the
+  // focus) or whose move did not stand (`move.undone`: it was put back, or
+  // the list was redrawn around it). A move along one container that was
+  // saved touched the focus once, in `relocate`, and has nothing to give
+  // back: a person who has since clicked the blank page has the focus on
+  // <body> on purpose, and pulling it to the card's handle would scroll the
+  // page under them (review, fix round 1). A move that did not stand also
+  // says so, over the announcement `relocate` made of it.
   async sendMove(move, isCurrent) {
     let again = false
     try {
@@ -646,15 +678,19 @@ export default class extends Controller {
       if (!again) {
         this.settle(move)
         for (const element of move.held) element.inert = false
-        if (move.focus && move.item && isCurrent()) this.focusMoved(move.item)
+        if (move.focus && isCurrent()) {
+          if (move.held.length > 0 || move.undone) this.focusMoved(move.item)
+          if (move.undone) this.announce(messages(this.element).t("components.editor_screen.block_moves.back", { block: move.title }))
+        }
       }
     }
   }
 
   // WHERE THE FOCUS IS AFTER A MENU'S MOVE (sections spec §1: the menu is
   // the keyboard's path, so it must not end at the top of the page). When
-  // the move's turn has ended, the element that stands for the block NOW
-  // takes the focus, whatever the turn came to:
+  // the turn of a move that took the focus away has ended (`sendMove` says
+  // which), the element that stands for the block NOW takes it, whatever the
+  // turn came to:
   // - saved, between containers: the block was redrawn, a card for a tile or
   //   a tile for a card (`move_streams`), and that new element is the one;
   // - saved, to another lane of its section: the tile itself, free again;
@@ -727,6 +763,7 @@ export default class extends Controller {
       if (state !== "saved") {
         this.settle(move)
         if (isCurrent()) {
+          move.undone = true
           this.putBack()
           errorToast(messages(this.element).t("components.editor_screen.section_card.unsaved_move"), "toast-move-refused")
         }
@@ -770,6 +807,7 @@ export default class extends Controller {
       }
     }
 
+    move.undone = true
     this.putBack()
     if (answer.outcome !== "answered") orderErrorToast(answer.outcome, "toast-order-error")
     else if (structural) await streamsApplied()
@@ -1031,8 +1069,10 @@ export default class extends Controller {
     control?.focus()
   }
 
+  // A block's name as its element shows it: the title button of a card, the
+  // first line of a tile's face.
   titleOf(card) {
-    return card.querySelector("[data-action$='admin--blocks#toggle']")?.textContent.trim() || "block"
+    return card.querySelector("[data-action$='admin--blocks#toggle'], .admin-block-tile__face > span")?.textContent.trim() || "block"
   }
 
   positionOf(card) {
