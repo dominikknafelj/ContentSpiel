@@ -2,7 +2,7 @@
 
 The first of four sub-projects that grew out of the roadmap's "Block and type catalogue" (agreed with the user on 2026-10-08): (1) layout — this spec; (2) the built-in catalogue of blocks, content types and page types; (3) content types defined in the admin; (4) forms, with mail delivery. Each has its own spec, plan and PR. This is the binding spec for one implementation plan and one PR.
 
-**Status: design agreed, not built.**
+**Status: built** (plan `docs/superpowers/plans/2026-10-08-sections-layout.md`). Where the build left this text, §12 "As built" says so; the description of the code as it is lives in `docs/reference/content-blocks-and-types.md`.
 
 ## 1. Purpose
 
@@ -155,7 +155,7 @@ Nothing new: the content version and render cache cover a section as part of its
 - A move whose block is no longer where the caller thought, or whose section is gone, is refused and the list reloads.
 - An add into a column a concurrent layout change removed is refused with a message, and the view reloads.
 - A section whose type is no longer registered shows the "Unavailable type" card with its blocks listed under it, so they can be moved out or deleted.
-- A block of an unregistered type inside a section is an "Unavailable type" tile with Delete as its only action.
+- A block of an unregistered type inside a section is an "Unavailable type" tile with Delete as its only action. (As built it keeps its move items too: §12.)
 
 ## 7. Tests
 
@@ -191,3 +191,45 @@ The tile-and-open-form pattern is new and sits on autosave and the write queue, 
 - **Catalogue:** target is all three kinds of site (business, portfolio, editorial). Built-in content types suggested: event, person, project, beside blog; resume entry and now update move to an optional "personal site" starter set (to be confirmed). Page types become a registry (the structure review forbids new integer enums). Block designs need a real design pass (an artifact or design canvas, not the local companion).
 - **Admin-defined types:** the roadmap's "Custom content types and fields defined in the admin"; DB-backed definitions beside the code registry.
 - **Forms:** a form block; fields share the field builder of admin-defined types; submissions, spam protection without a third-party captcha, and mail delivery (not set up yet).
+
+## 12. As built
+
+Where the code differs from this spec or from the decisions of the plan (D1–D15) and its answers to the open questions (Q1–Q5), with the reason. The code is the authority; `docs/reference/content-blocks-and-types.md` and `docs/reference/save-rule-and-write-queue.md` describe it.
+
+**The questions the plan answered**
+
+- **Q1, §3.5 (MCP).** Not built. `app/mcp/` has no page or block tool at all, so "the block tools gain a section and a column" had nothing to extend; page and block tools are a new MCP surface with its own spec (a roadmap row).
+- **Q2, §3.3 ("one audit event").** A duplicated section is several events: `ContentBlocks::Duplicate` saves every copy through `ContentBlocks::Save` (a `block.created` each) and places the copy through `ContentBlocks::Reorder` (one `block.reordered`), so the image-choice rule, the usage rows and the translation state are decided in one place. A copy refused for want of permission re-records its `access.denied` outside the rolled-back transaction.
+- **Q3, §3.2 (the foreign key).** `Page` destroys the blocks in its sections first, in a `before_destroy` declared ahead of the association: `dependent: :destroy` goes in `position` order and would reach a section before the blocks in it.
+- **Q4, §5.1 ("a component does not know it is in a column").** The dispatch is one helper, `ThemeHelper#render_block`, used by the page view and by `Blocks::SectionComponent`. The image component is the one exception: it reads `block.section` for its `sizes`.
+- **Q5, §4.4 (Undo).** No Undo for a move into, out of or inside a section; the toast follows only a reorder of the page's own list (a roadmap row).
+
+**Data and services (§3)**
+
+- **The lock (D14) was widened three times.** D14 locked the page's row for structural writes only and left "a save of a block outside any section untouched". As built, every `ContentBlocks::Save`, `Destroy`, `Reorder` and `Duplicate` takes the page's row lock as the first statement of its transaction, and `Tags::Merge#repoint_blocks` and `Trash::Purge#purge_branch` lock their pages (in id order) before any block. Reason: a fold, a lift and the renumbering after one write other blocks' rows — top-level ones included — while holding the page's row, and every block-first writer on the same page (an ordinary autosave, which took the page's row only at `owner.touch`; the plain reorder; the tag merge; a page's destroy) could deadlock against them. "A page without sections edits exactly as today" therefore holds in behaviour, not in statements: each block write issues one more short `SELECT … FOR UPDATE`.
+- **The fold is decided from the rows (§3.3).** The spec reads as "a layout change to fewer columns moves the blocks"; comparing the layout before and after on the caller's object is wrong for a second tab's stale copy. The section is re-read under the lock, and every save of a container asks which blocks sit beyond its layout.
+- **The fold is its own audit event (D7).** D7 put `folded_block_ids` in the section's `block.updated`. That action coalesces, and a coalesced extension leaves `metadata` as first written, so the ids would be lost in the common flow. A save that folded is recorded with `coalesce: false` (`Audit.record` and `ApplicationService#record_event` gained the keyword); the append-only rules of the log were not widened.
+- **A section whose type is gone is deleted from its rows.** `ContentBlocks::Destroy` reads the blocks a block holds from the rows, not from `container?`, so such a section is deleted or lifted instead of raising on the foreign key.
+- **Reorder has four refusals**, `STALE`, `NO_COLUMN`, `NESTED` and `NOT_THE_LIST`; the controller reads every reorder parameter as one value or not at all, so a forged array or hash is a refusal, never an error. `Duplicate` re-reads its source under the lock and fails with `GONE`.
+- **`BlockOutline#sections`** (D1's list did not name it; the plan's first task built it) was removed: nothing called it.
+
+**The editor (§4, §6)**
+
+- **`section_lanes_stream` became `section_structure_streams`.** The plan's helper redrew the lanes alone. Three things on screen name a block's column — the lanes, each panel's heading and the header's counts — so they are redrawn together, and never a panel.
+- **The lanes are redrawn only when the number of columns changed, and the layout menu only when the layout changed.** A save of the background or the width used to replace both, which took the focus off a button someone had just reached and closed an open menu.
+- **§6, "the list reloads" after a refused move.** The server still answers a refused structural move with the whole list. The browser draws it only when no autosave form of the block list holds unsaved text; otherwise the block is put back, the alert gains "Reload once your unsaved text is safe" and nothing else changes. Reason: a refusal and a 409 have the same cause (a second editor), so they arrive together, and the 409 bar has promised that typed text stays. The cost: that screen stays behind the server until it is reloaded.
+- **§6, "the view reloads" after a refused add.** The section's structure is redrawn (`section_structure_streams`), not the view: a reload would discard every form.
+- **Six departures in the drag (D8's code as planned):** a move stands back once for an edit still queued behind it; the queue slot is held until a structural answer is drawn; a queued move whose element is no longer where it was put is dropped; the orders to go back to (`restoreTo`) are kept per container; over a section's card the list sorts a dragged block only from above or below the lanes (`besideSection`); a lane that was only moved with its card keeps its Sortable. Each has a system test in `test/system/admin/sections_test.rb`. Beyond those, the moved element and its panel are `inert` from a crossing move until its answer is drawn, and D8's "every form sends what it holds" also runs before a move along a lane.
+- **§6, an unavailable tile's "Delete as its only action".** It keeps Move up, Move down, "Move to column…" and "Move out of section" and has no Duplicate. Reason: it keeps its pointer grip, and §1 gives the keyboard whatever the pointer has; §6 was written before the grip existed on such a tile.
+- **§6, a section whose type is gone.** Its lanes are closed (one per stored column, taking no block, sorting nothing), since the server has no column of it; its tiles can be opened, edited, moved out and deleted, not moved along or copied. The card offers one action, "Delete block…", which deletes the section with its blocks; "Remove section, keep blocks" is not offered there although the service honours it.
+- **The delete dialog's home (§4.2).** A block's delete dialog is in its tile (or its card), not in its form's panel: a `<dialog>` inside a hidden element is not drawn.
+- **§4.3, §4.4.** A top-level card's "Move into section…" is drawn disabled and enabled in the browser while the page has a section a block can go into. A tile's Duplicate does not open the copy's form: §4.3's "opens at once" is for a block just added, and opening a copy would close the form that is open, which may be its source's, mid-edit.
+- **Menu moves are announced** in the block list's live region, and the focus rule after a menu move (the block's handle or ⋯; given back after a crossing move only if nothing else has the focus) is new against the spec, which was silent.
+
+**The public page (§5)**
+
+- **The container (D11).** The container-query container is the `<section>`, and a band's side padding moved to `.content-section__inner`: with the padding inside the measured box a content-width band measured 43rem and four columns could never be four across under the 44rem breakpoint.
+- **Token re-valuing (§5.3).** A band gives the `--th-*` tokens new values for everything inside it instead of restyling selectors, so blocks added later are right without a rule. In the tinted band `--th-meta` reads as `--th-dim` (plain meta is 4.32:1 on the light tinted band) and `--th-sunken` as `--th-surface`. The lowest contrast pair in use is 4.95:1.
+- **§5.5.** An empty column keeps its place while the columns sit side by side and is hidden while they are stacked, where it would be two gaps with nothing between them. A section holding only blocks that draw nothing renders nothing.
+- **§6 on the public side.** A section whose type is gone draws its blocks once each, stacked at the content width with no band; an unregistered block in a column is skipped.
+- **D13.** An image inside rich text in a column still asks for the content width (a roadmap row).
