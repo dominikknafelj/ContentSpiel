@@ -140,4 +140,41 @@ class PublicBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "hotwire"
     assert_select "article .cs-prose", text: /Body text/
   end
+
+  def section_with_texts(*columns, layout: "two")
+    section = @root.content_blocks.create!(block_type: :section, position: 5, settings: { "layout" => layout })
+    columns.each_with_index do |(column, text), index|
+      @root.content_blocks.create!(block_type: :rich_text, section: section, section_column: column, position: index, body: rich_doc(text))
+    end
+    section
+  end
+
+  test "a section renders its blocks once, inside it, column by column" do
+    @root.content_blocks.create!(block_type: :rich_text, position: 0, body: rich_doc("Before the band"))
+    section_with_texts([ 2, "Right text" ], [ 1, "Left text" ])
+    get "/"
+
+    assert_select "section.content-section", 1
+    assert_select "section.content-section .content-section__column", 2
+    assert_select ".cs-prose", 3
+    assert_operator response.body.index("Before the band"), :<, response.body.index("Left text")
+    assert_operator response.body.index("Left text"), :<, response.body.index("Right text")
+  end
+
+  test "a post's permalink shows the post in place of its listing when the listing sits in a column" do
+    blog = Page.create!(page_type: :standard, title: "Blog", slug: "blog", parent: @root, published_at: Time.current)
+    section = blog.content_blocks.create!(block_type: :section, position: 0)
+    blog.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 0, body: rich_doc("Beside the list"))
+    blog.content_blocks.create!(block_type: :post_list, section: section, section_column: 2, position: 0, settings: { "content_type" => "blog" })
+    post = create_post(title: "In a column")
+    other = create_post(title: "Another post")
+    PublicSite::Paths.sync_posts("blog")
+
+    get "/blog/#{post.slug}"
+
+    assert_response :success
+    assert_select "h1", text: "In a column"
+    assert_includes response.body, "Beside the list"
+    assert_not_includes response.body, other.title
+  end
 end
