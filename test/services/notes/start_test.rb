@@ -56,13 +56,42 @@ class Notes::StartTest < ActiveSupport::TestCase
   end
 
   # Review Focus 2.
+  # The refusal names nobody and is the same sentence, once, whether the id
+  # belongs to a user who can't read the page or to nobody: a forged
+  # `@[1] @[2] ...` must not answer with names, emails or which ids exist.
   test "a mention of someone who may not read the record is refused, and tells nobody" do
-    result = start(@page, body: "Look, @[#{@stranger.id}]")
+    other = User.create!(email_address: "other@example.com", name: "Otto Other", password: "a-long-password-1")
+    sentence = [ "Someone you mentioned can't see this page." ]
 
-    assert_equal [ "stranger@example.com can't see this page." ], result.errors
+    result = start(@page, body: "Look, @[#{@stranger.id}]")
+    assert_equal sentence, result.errors
     assert_not_predicate result, :denied?
+    assert_equal sentence, start(@page, body: "Look, @[999999999]").errors
+    assert_equal sentence, start(@page, body: "Look, @[#{@stranger.id}] @[#{other.id}] @[999999999] @[#{users(:two).id}]").errors
+    assert_equal sentence, start(@block, body: "Look, @[#{other.id}]").errors
     assert_equal [ 0, 0 ], [ Notes::Thread.count, Notes::Delivery.count ]
-    assert_equal [ "That person no longer exists." ], start(@page, body: "Look, @[999999999]").errors
+  end
+
+  test "the mention refusal is worded for a post and for an image, still naming nobody" do
+    assert_equal [ "Someone you mentioned can't see this post." ], start(create_post(title: "News"), body: "@[#{@stranger.id}]").errors
+    assert_equal [ "Someone you mentioned can't open the media library." ],
+      start(create_media_asset, as_user: users(:two), body: "@[#{@stranger.id}]").errors
+  end
+
+  test "more than twenty mentions are refused before anyone is looked up" do
+    tokens = ->(count) { Array.new(count) { |index| "@[#{900_000 + index}]" }.join(" ") }
+    result = nil
+
+    statements = capture_sql { result = start(@page, body: tokens.call(21)) }
+
+    assert_equal [ "A note can mention at most 20 people." ], result.errors
+    # The lookup of the mentioned is the one statement that reads users by a
+    # list of ids (the actor's own row is read by its id alone).
+    assert_empty statements.grep(/"users"\."id" IN \(/), "the mentioned ids were looked up"
+    assert_equal 0, Notes::Thread.count
+    # Twenty is allowed as far as the count goes: it reaches the access check.
+    assert_equal [ "Someone you mentioned can't see this page." ], start(@page, body: tokens.call(20)).errors
+    assert_not_empty capture_sql { start(@page, body: tokens.call(20)) }.grep(/"users"\."id" IN \(/)
   end
 
   test "a mention of a reader is delivered" do

@@ -25,7 +25,7 @@ module Notes
       return denied(Notes.read_key(container), container, message: I18n.t("admin.notes.errors.not_yours")) unless own?(@message)
 
       newly_mentioned = Mentions.ids(@body) - @message.mentioned_user_ids
-      errors = body_errors(@body) + mention_errors(newly_mentioned, container)
+      errors = body_errors(@body).presence || mention_errors(newly_mentioned, container)
       return failure(@message, errors) if errors.any?
 
       message = Message.transaction(requires_new: true) do

@@ -20,7 +20,7 @@ module Notes
       refused = read_refusal(container) { |key| authorize!(key, container) }
       return denied(refused, container) if refused
 
-      errors = body_errors(@body) + mention_errors(Mentions.ids(@body), container)
+      errors = body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)
       return failure(nil, errors) if errors.any?
 
       message = Thread.transaction(requires_new: true) do

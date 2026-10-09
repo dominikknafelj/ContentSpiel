@@ -12,11 +12,13 @@ en:
       errors:
         blank: "Write something first."
         too_long: "A note can be at most 4,000 characters."
-        mention_unknown: "That person no longer exists."
+        too_many_mentions: "A note can mention at most 20 people."
+        # Names nobody, and is the same for a user who doesn't exist: a
+        # mention can be typed by hand (`Notes::Authorization#mention_errors`).
         mention_cannot_read:
-          page: "%{name} can't see this page."
-          post: "%{name} can't see this post."
-          image: "%{name} can't open the media library."
+          page: "Someone you mentioned can't see this page."
+          post: "Someone you mentioned can't see this post."
+          image: "Someone you mentioned can't open the media library."
         gone:
           page: "This page is in the trash or was deleted."
           post: "This post is in the trash or was deleted."

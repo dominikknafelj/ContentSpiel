@@ -37,9 +37,13 @@ module Notes
 
     def own?(message) = actor_user.present? && message.author_id == actor_user.id
 
+    # What the text itself gets wrong, read from the text alone: no query. A
+    # service asks `mention_errors` only when this is empty, so a body with
+    # too many mentions is refused before anyone is looked up.
     def body_errors(body)
       return [ I18n.t("admin.notes.errors.blank") ] if body.blank?
       return [ I18n.t("admin.notes.errors.too_long") ] if body.length > Message::MAX_BODY
+      return [ I18n.t("admin.notes.errors.too_many_mentions") ] if Mentions.ids(body).size > Mentions::MAX
 
       []
     end
@@ -48,20 +52,26 @@ module Notes
     # who may read the record, or the inbox would show them a title and a
     # quote they are not allowed to see. Judged as that user would be judged
     # in CS Studio (`:admin`), whatever channel this call runs on.
+    #
+    # THE REFUSAL NAMES NOBODY. It is one sentence for the whole message,
+    # the same for one id or several, and the same for an id that belongs to
+    # no user: the token can be typed by hand, so a sentence with a name in
+    # it (or a different one for "no such user") would let anyone who may
+    # read one page list the names and emails of users who can't, and learn
+    # which ids exist, by sending `@[1] @[2] ...`.
     def mention_errors(user_ids, container)
       return [] if user_ids.empty?
 
-      users = User.where(id: user_ids).index_by(&:id)
-      user_ids.filter_map do |id|
-        user = users[id]
-        if user.nil?
-          I18n.t("admin.notes.errors.mention_unknown")
-        elsif !Notes.readable?(user, container, channel: :admin)
-          I18n.t("admin.notes.errors.mention_cannot_read.#{kind_of(container)}", name: user.display_name)
-        end
-      end.uniq
+      users = User.where(id: user_ids).to_a
+      return [] if users.size == user_ids.uniq.size && users.all? { |user| Notes.readable?(user, container, channel: :admin) }
+
+      [ I18n.t("admin.notes.errors.mention_cannot_read.#{kind_of(container)}") ]
     end
 
+    # Nil for a container in the trash or gone: every service that writes to
+    # an existing thread (`Reply`, `EditMessage`, `DeleteMessage`) then
+    # answers `gone("note")` and writes nothing, so none of them runs
+    # without this lock beside `Trash::Purge`.
     def lock_container(container) = container.class.kept.where(id: container.id).lock.pick(:id)
 
     def kind_of(record)

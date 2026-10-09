@@ -16,6 +16,12 @@ module Notes
     # It stays text.
     TOKEN = /@\[(\d{1,18})\]/
 
+    # How many different people one message may mention. A picker never gets
+    # near it; a forged body listing ids would otherwise make the service
+    # look every one of them up and judge each one's access. The services
+    # refuse a longer list before any of that (`Authorization#body_errors`).
+    MAX = 20
+
     def self.ids(body) = body.to_s.scan(TOKEN).flatten.map(&:to_i).uniq
 
     # The longest name first: "@Dana Smith" must not be read as "@Dana"

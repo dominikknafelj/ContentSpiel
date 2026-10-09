@@ -50,6 +50,17 @@ class Notes::ReplyTest < ActiveSupport::TestCase
     assert_equal 0, Notes::Message.count
   end
 
+  # One rule for a reply, an edit and a delete: a container in the trash
+  # takes no write to its notes.
+  test "a reply to a thread whose page is in the trash is the same ordinary failure, and writes nothing" do
+    @page.update!(trashed_at: Time.current)
+
+    assert_no_difference [ -> { Notes::Message.count }, -> { Notes::Delivery.count }, -> { Audit::Event.count } ] do
+      assert_equal [ "This note is gone: it was deleted, or what it was on was." ], reply.errors
+    end
+    assert_not_predicate reply, :denied?
+  end
+
   test "a stranger is refused" do
     stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
 

@@ -37,6 +37,15 @@ class Notes::EditMessageTest < ActiveSupport::TestCase
     assert_equal [ [ users(:two).id, "mention" ] ], Notes::Delivery.pluck(:user_id, :reason)
   end
 
+  test "an edit of a note whose page is in the trash is the same ordinary failure, and writes nothing" do
+    @page.update!(trashed_at: Time.current)
+
+    assert_no_difference -> { Audit::Event.count } do
+      assert_equal [ "This note is gone: it was deleted, or what it was on was." ], edit("First draft").errors
+    end
+    assert_equal [ "Frist draft", nil ], @message.reload.then { |message| [ message.body, message.edited_at ] }
+  end
+
   test "nobody edits another person's note, not even someone who may edit the page" do
     result = edit("Mine now", as_user: users(:two))
 

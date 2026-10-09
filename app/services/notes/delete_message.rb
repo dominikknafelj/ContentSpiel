@@ -5,7 +5,10 @@ module Notes
   # container's edit right (`Authorization#moderation_refusal`).
   #
   # A message someone else deleted a moment ago is a success with nothing
-  # recorded: the outcome the caller asked for is already there.
+  # recorded: the outcome the caller asked for is already there. A container
+  # in the trash (or purged) is NOT that case: like a reply and an edit, the
+  # delete answers "This note is gone" and writes nothing, so no notes write
+  # runs without the container's lock (`Authorization#lock_container`).
   # `note.deleted` is recorded before the delete, in its transaction.
   class DeleteMessage < ApplicationService
     include Authorization
@@ -25,8 +28,10 @@ module Notes
         return denied(refused, container, message: I18n.t("admin.notes.errors.delete_others")) if refused
       end
 
+      locked = true
       thread = Message.transaction(requires_new: true) do
-        lock_container(container)
+        next locked = false unless lock_container(container)
+
         message = Message.where(id: @message.id).lock.first
         current = Thread.where(id: @message.thread_id).lock.first
         next current unless message && current
@@ -43,7 +48,7 @@ module Notes
         end
       end
 
-      success(thread)
+      locked ? success(thread) : failure(nil, [ gone("note") ])
     end
   end
 end

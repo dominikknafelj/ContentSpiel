@@ -49,6 +49,27 @@ class Notes::DeleteMessageTest < ActiveSupport::TestCase
     assert delete(message, as_user: users(:author)).ok?
   end
 
+  # The one notes write that could otherwise run beside `Trash::Purge`
+  # without the container's lock.
+  test "a delete of a note whose page is in the trash is the same ordinary failure, and writes nothing" do
+    @page.update!(trashed_at: Time.current)
+
+    assert_no_difference [ -> { Notes::Message.count }, -> { Notes::Delivery.count }, -> { Audit::Event.count } ] do
+      result = delete(@reply, as_user: users(:two))
+      assert_equal [ "This note is gone: it was deleted, or what it was on was." ], result.errors
+      assert_not_predicate result, :denied?
+    end
+  end
+
+  test "the container's row is locked before the message and the thread are read" do
+    statements = capture_sql { delete(@reply, as_user: users(:two)) }
+    lock = statements.index { |sql| sql.include?(%(FROM "pages")) && sql.include?("FOR UPDATE") }
+    read = statements.index { |sql| sql.include?(%(FROM "note_messages")) && sql.include?("FOR UPDATE") }
+
+    assert lock && read, statements.join("\n")
+    assert_operator lock, :<, read
+  end
+
   test "a message already deleted is a success with nothing recorded" do
     stale = Notes::Message.find(@reply.id)
     @reply.destroy!
