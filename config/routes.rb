@@ -296,6 +296,11 @@ Rails.application.routes.draw do
       # segment is the whole request, so nothing about it is read from a
       # parameter (`Admin::NoteThreadsController::CHANGES`).
       get "mentions", to: "note_mentions#index", as: :record_note_mentions, defaults: { format: :json }
+      # The record's open threads as data, for the mind graph's card (notes
+      # spec §4.4). It shares its path with the POST below, which the card
+      # sends too, and has a name of its own because two routes can't share
+      # one: `admin_record_note_threads_data_path`.
+      get "threads", to: "note_threads#index", as: :record_note_threads_data, defaults: { format: :json }
       post "threads", to: "note_threads#create", as: :record_note_threads
       post "threads/:id/:change", to: "note_threads#change", as: :change_record_note_thread,
         constraints: { id: /\d+/, change: /resolve|reopen|pin|unpin|follow|unfollow/ }

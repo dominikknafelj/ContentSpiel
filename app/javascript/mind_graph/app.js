@@ -152,7 +152,7 @@ export function mount(element) {
   const dotClasses = JSON.parse(element.dataset.dotClasses)
   const card = createCard(cardElement, {
     text,
-    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl },
+    urls: { postFocus: element.dataset.postFocusUrl, tagFocus: element.dataset.tagFocusUrl, tagPosts: element.dataset.tagPostsUrl, postNotes: element.dataset.postNotesUrl },
     typeLabels: JSON.parse(element.dataset.typeLabels),
     dotClasses,
     buttonClasses: JSON.parse(element.dataset.buttonClasses),
@@ -163,6 +163,13 @@ export function mount(element) {
       if (state.selected < 0) return
       if (state.pinned.has(state.selected)) unpin([ state.selected ])
       else pin(state.selected)
+    },
+    // The card's notes arrive after the card was measured, and a note started
+    // there changes the node's badge: the card is measured and placed again,
+    // and the canvas redrawn.
+    onChange: () => {
+      measureCard()
+      requestDraw()
     }
   })
   // Escape closes the card from inside it too, not only from the canvas

@@ -131,6 +131,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/mind_graph_controller.js
     app/javascript/mind_graph/app.js
     app/javascript/mind_graph/card.js
+    app/javascript/mind_graph/card_notes.js
     app/javascript/mind_graph/node_list.js
     app/javascript/mind_graph/input.js
     app/javascript/mind_graph/renderer.js

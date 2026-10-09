@@ -49,10 +49,20 @@ class Admin::MindGraphLegendComponentTest < ViewComponent::TestCase
   # The mark of a node that stays where it was dropped (the round of
   # 2026-10-08): the canvas draws a small ink dot at the node's top-right, and
   # the legend names it.
-  test "names the pin mark, last" do
+  test "names the pin mark" do
     render_inline(Admin::MindGraphLegendComponent.new(content_types: []))
 
-    assert_selector "li:last-child[data-legend=pinned]", text: "Pinned"
+    assert_selector "li[data-legend=pinned]", text: "Pinned"
     assert_selector "[data-legend=pinned] circle.mg-key-pin"
+  end
+
+  # A post with open notes (notes spec §4.4): the canvas draws its count in a
+  # small badge at the node's top-left, opposite the pin, and the legend
+  # names it after the pin.
+  test "names the notes badge, last, after the pin" do
+    render_inline(Admin::MindGraphLegendComponent.new(content_types: []))
+
+    assert_selector "li[data-legend=pinned] + li:last-child[data-legend=notes]", text: "Open notes"
+    assert_selector "[data-legend=notes] rect.mg-key-notes"
   end
 end

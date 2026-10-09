@@ -19,8 +19,9 @@
 # farther ones, and among equals the better connected.
 #
 # Cost: three queries per depth level (the relations touching the frontier,
-# the frontier posts' tags, the frontier tags' posts) plus five whatever the
-# size -- never one per node.
+# the frontier posts' tags, the frontier tags' posts) plus six whatever the
+# size (one of them the nodes' open notes, in the builder) -- never one per
+# node.
 module PostGraph
   class Local
     def self.call(...) = new(...).call
@@ -44,7 +45,7 @@ module PostGraph
       tag_counts = PostTag.where(tag_id: @tags.keys, post_id: @readable).group(:tag_id).count
 
       kept = cut(post_ids, relations, tag_links)
-      graph = Builder.new(locale: @locale, url_for: @url_for)
+      graph = Builder.new(locale: @locale, url_for: @url_for, viewer: (@actor if @actor.is_a?(User)))
                      .call(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: tag_counts,
                            min_tag_edges: 1, keep_tag: (@focus.id if @focus.kind == "tag"))
       graph.merge(total: post_ids.size, shown: kept.size,

@@ -33,6 +33,25 @@ module Notes
       unread_for(Thread.unresolved.where(container_type: type, container_id: ids), user).distinct.pluck(:container_id).to_set
     end
 
+    # A graph's nodes: `{ container id => [ open threads, unread? ] }`, the
+    # count and what turns it accent in ONE grouped statement, because the
+    # mind graph reads it for up to 2,000 posts on every load and its cost
+    # is pinned (`test/queries/post_graph/`). `unread?` is whether one of
+    # those open threads holds a delivery `user` has not read: a second
+    # aggregate over the same groups, `COUNT(*) FILTER (WHERE the thread is
+    # one of the user's unread ones)`. Without a user it is false for all,
+    # and the statement is the plain count. A container with no open thread
+    # has no entry.
+    def self.open_and_unread(type, ids, user)
+      return {} if ids.empty?
+
+      open = Thread.unresolved.where(container_type: type, container_id: ids).group(:container_id)
+      return open.count.transform_values { |count| [ count, false ] } unless user
+
+      unread = SqlNodes.count_where(Thread.arel_table[:id].in(Delivery.unread.where(user_id: user.id).select(:thread_id).arel))
+      open.pluck(:container_id, Arel.star.count, unread).to_h { |id, count, mine| [ id, [ count, mine.positive? ] ] }
+    end
+
     def self.unread_for(threads, user) = threads.where(id: Delivery.unread.where(user_id: user.id).select(:thread_id))
     private_class_method :unread_for
   end

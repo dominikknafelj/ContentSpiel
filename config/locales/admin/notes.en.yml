@@ -60,7 +60,32 @@ en:
           count:
             one: "%{count} person. Use the arrow keys and Enter."
             other: "%{count} people. Use the arrow keys and Enter."
+    # The mind graph's selection card (`mind_graph/card_notes.js`): a post's
+    # open notes and the field that starts one. Served by the Mind graph's own
+    # `messages_data` call, beside the card's other strings in
+    # `mind_graph.en.yml`. The title is drawn in the small upper-case label
+    # style.
+    mind_graph:
+      script:
+        card:
+          notes:
+            title:
+              one: "%{count} open note"
+              other: "%{count} open notes"
+            label: "Write a note on this post"
+            add: "Add note"
+            replies:
+              one: "%{count} reply"
+              other: "%{count} replies"
+            more:
+              one: "+%{count} more"
+              other: "+%{count} more"
+            deleted_user: "a deleted user"
+            failed: "The notes couldn't be loaded or saved. Try again."
     components:
+      # The legend's swatch for a node's notes badge.
+      mind_graph_legend:
+        notes: "Open notes"
       # The editor header's Notes button. `components.en.yml` holds nothing of
       # the header's yet (it is not converted); these two merge into its scope.
       # "Add note", first in the "⋯" menu of a block's card and of its tile in

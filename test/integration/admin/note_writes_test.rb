@@ -422,4 +422,77 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
   ensure
     service.singleton_class.send(:remove_method, :call)
   end
+
+  test "a record's open threads as JSON for the mind graph's card: first message, author, replies, no markup" do
+    users(:two).update!(name: "Dana")
+    post_record = create_post(title: "Hello")
+    thread = as(users(:two)) { Notes::Start.call(post_record, body: "Ask @[#{users(:reader).id}] <b>now</b> " + ("x" * 200), origin_view: "mind_graph") }.record
+    as(users(:reader)) { Notes::Reply.call(thread, body: "On it") }
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/notes/post/#{post_record.id}/threads"
+
+    assert_response :success
+    assert_equal "application/json", response.media_type
+    body = response.parsed_body
+    assert_equal 1, body["open"]
+    row = body["threads"].first
+    assert_equal [ thread.id, "Dana", 1, false ], row.values_at("id", "author", "replies", "pinned")
+    assert_equal true, row["unread"] # the first message mentions the reader, and reading a list marks nothing read (P10)
+    assert_equal false, row["mine"] # Dana wrote it, not the reader
+    assert row["text"].start_with?("Ask @reader@example.com <b>now</b> x")
+    assert_operator row["text"].length, :<=, 140
+    assert_equal 1, Notes::Delivery.unread.where(user: users(:reader)).count, "reading the card's list marked a delivery read"
+  end
+
+  test "the card's JSON lists only open threads, pinned first, names a deleted author as nobody and says which are the viewer's own" do
+    post_record = create_post(title: "Hello")
+    gone = User.create!(email_address: "gone@example.com", password: "password-password", name: "Gone")
+    first = as(users(:two)) { Notes::Start.call(post_record, body: "First") }.record
+    pinned = as(users(:two)) { Notes::Start.call(post_record, body: "Pinned") }.record
+    as(users(:two)) { Notes::Pin.call(pinned) }
+    as(users(:two)) { Notes::Resolve.call(Notes::Start.call(post_record, body: "Done").record) }
+    own = as(users(:reader)) { Notes::Start.call(post_record, body: "Mine") }.record
+    Notes::Message.where(thread: first).update_all(author_id: gone.id)
+    gone.destroy!
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/notes/post/#{post_record.id}/threads"
+
+    body = response.parsed_body
+    assert_equal 3, body["open"]
+    assert_equal [ pinned.id, own.id, first.id ], body["threads"].map { |row| row["id"] }
+    assert_equal [ true, false, false ], body["threads"].map { |row| row["pinned"] }
+    assert_equal [ false, true, false ], body["threads"].map { |row| row["mine"] }
+    assert_nil body["threads"].last["author"]
+  end
+
+  test "the card's JSON is not found for a post outside the read scope, a trashed one and an id that names nothing" do
+    access_control_grants(:author_posts_read).update!(scope: { "own" => true })
+    access_control_grants(:author_posts_create).update!(scope: { "own" => true })
+    other = create_post(title: "Other")
+    as(users(:two)) { Notes::Start.call(other, body: "Not for the author") }
+    gone = create_post(title: "Gone")
+    gone.update_column(:trashed_at, Time.current)
+    sign_in_as(users(:author))
+
+    [ other.id, gone.id, 0 ].each do |id|
+      get "/cs-studio/notes/post/#{id}/threads"
+      assert_response :not_found
+      assert_not_includes response.body, "Not for the author"
+    end
+  end
+
+  test "a note is started over JSON, and a refusal is JSON too" do
+    post_record = create_post(title: "Hello")
+    sign_in_as(users(:reader))
+
+    post "/cs-studio/notes/post/#{post_record.id}/threads", params: { body: "From the graph", view: "mind_graph" }, headers: { "Accept" => "application/json" }
+    assert_response :created
+    assert_equal [ "mind_graph", post_record ], Notes::Thread.find(response.parsed_body["id"]).then { |thread| [ thread.origin_view, thread.subject ] }
+
+    post "/cs-studio/notes/post/#{post_record.id}/threads", params: { body: " " }, headers: { "Accept" => "application/json" }
+    assert_response :unprocessable_entity
+    assert_equal [ "Write something first." ], response.parsed_body["errors"]
+  end
 end

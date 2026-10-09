@@ -15,8 +15,9 @@
 # ids, so nothing here can count or name a post outside the scope -- or a
 # trashed one, which `AccessControl.scope` already leaves out.
 #
-# Cost: five queries whatever the size -- the readable ids with their
-# timestamps, the relations, the tag links, and the builder's two.
+# Cost: six queries whatever the size -- the readable ids with their
+# timestamps, the relations, the tag links, and the builder's three (the
+# posts, the tags' names, the posts' open notes).
 module PostGraph
   class Global
     def self.call(...) = new(...).call
@@ -40,7 +41,7 @@ module PostGraph
       tag_links.each { |tag_id, post_id| weight[post_id] += 1 if tag_counts[tag_id] >= MIN_TAGGED_POSTS }
 
       kept = weight.keys.sort_by { |id| [ -weight[id], -stamps[id].to_f, id ] }.first(@cap)
-      graph = Builder.new(locale: @locale, url_for: @url_for)
+      graph = Builder.new(locale: @locale, url_for: @url_for, viewer: (@actor if @actor.is_a?(User)))
                      .call(post_ids: kept, relations: relations, tag_links: tag_links, tag_counts: tag_counts, min_tag_edges: MIN_TAGGED_POSTS)
       graph.merge(total: weight.size, shown: kept.size, isolated: stamps.size - weight.size)
     end

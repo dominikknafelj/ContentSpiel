@@ -796,8 +796,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # In order (the design review of 2026-10-08): the type's dot, the type and
   # the status chip with Close at the end of the row; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
-  # and not underlined links.
-  test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons" do
+  # and not underlined links; then a post's notes (notes spec §4.4), before
+  # Close.
+  test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons, then its notes" do
     a = create_post(title: "Alpha", tags: %w[one two])
     b = create_post(title: "Beta", tags: %w[one two])
     PostRelation.create!(post: a, related_post: b)
@@ -810,7 +811,7 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     card = find("[data-mind-graph-card]")
     # Close is the last child, so Tab meets the actions before it; on screen
     # it stands in the card's top-right corner.
-    assert_equal %w[DIV H2 P DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
+    assert_equal %w[DIV H2 P DIV SECTION BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
     within(card) do
       assert_selector ":scope > div:first-child span[aria-hidden='true'].rounded-full", count: 2 # the type's dot, the status chip's
       assert_selector ":scope > button:last-child[data-mind-graph-card-close][aria-label='Close']"
@@ -1248,7 +1249,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     click_node(a.id)
     assert_selector "[data-mind-graph-card]", visible: :visible
 
-    drag_node(a.id, by: [ 60, 90 ], release: false)
+    # Away from the card, which stands on the node's right and, with a post's
+    # notes in it, reaches 126 px below the node's centre: the driver's mouse
+    # does not keep the canvas's pointer capture, so a move that ends over
+    # the card would never reach the canvas and no drag would begin.
+    drag_node(a.id, by: [ -60, 90 ], release: false)
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal a.id.to_s, graph["data-selected"], "the drag cleared the selection"
     page.driver.browser.mouse.up
@@ -1646,6 +1651,131 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert page.evaluate_script("window.searchSignals.every((signal) => signal.aborted)"), "the request was left open after the screen was left"
   end
 
+  # --- notes (notes spec §4.4) ------------------------------------------------
+
+  test "a post with open notes shows them in its card, and a note is started from the card" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates, @[#{users(:one).id}]") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
+    # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
+    assert_selector "[data-mind-graph-card-notes] h3", text: /1 open note/i
+    # The row leads into the post's editor with the drawer open at that thread.
+    thread = Notes::Thread.order(:id).last
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row] a[href$='/posts/#{a.id}?notes=open&thread=#{thread.id}']"
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("And the prices")
+      press "Add note"
+    end
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+    assert_selector "[data-mind-graph-card-notes] h3", text: /2 open notes/i
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_equal [ "mind_graph", a ], Notes::Thread.order(:id).last.then { |started| [ started.origin_view, started.subject ] }
+    # Listing a post's notes in the card read none of them (decision P10).
+    assert_equal 1, Notes::Delivery.unread.where(user: users(:one)).count
+  end
+
+  test "three notes in the card, then a link to the rest; a post without notes has only the field" do
+    a = create_post(title: "Alpha")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    as(users(:two)) { 5.times { |index| Notes::Start.call(a, body: "Note #{index}") } }
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 3
+    assert_selector "[data-mind-graph-card-notes] a[data-note-more][href$='/posts/#{a.id}?notes=open']", text: "+2 more"
+    # The notes arrive after the card was first measured: it is measured
+    # again, so it still stands whole inside the canvas.
+    card = element_box("[data-mind-graph-card]")
+    canvas = canvas_box
+    assert_operator card["bottom"], :<=, canvas[3] - 7, "the card with its notes reaches below the canvas"
+    assert_operator card["top"], :>=, canvas[1] + 7, "the card with its notes reaches above the canvas"
+
+    escape_on_canvas # the open card may stand over the other node
+    click_node(b.id)
+    assert_selector "[data-mind-graph-card-notes] textarea"
+    assert_no_selector "[data-mind-graph-card-notes] li"
+    assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
+  end
+
+  # A note's text and its author's name are a person's: written as text.
+  test "a note with markup in it is text in the card, and so is its author's name" do
+    users(:two).update!(name: "<img src=x onerror='window.pwned = 1'>")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "<img src=x onerror='window.pwned = 2'> see") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 2'> see"
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "<img src=x onerror='window.pwned = 1'>"
+    assert_no_selector "[data-mind-graph-card] img", visible: :all
+    assert_nil page.evaluate_script("window.pwned")
+  end
+
+  # A mention typed by hand of someone who may not read the post (Review
+  # Focus 2) is refused by the service; the card says why and keeps the text.
+  test "a note the server refuses is answered in the card, and what was typed stays in the field" do
+    stranger = User.create!(email_address: "stranger@example.com", password: "password-password", name: "Sam")
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("Ask @[#{stranger.id}]")
+      press "Add note"
+      assert_selector "[role=status]", text: "Someone you mentioned can't see this post."
+      assert_equal "Ask @[#{stranger.id}]", find("textarea").value
+      assert_no_selector "li"
+    end
+    assert_equal 0, Notes::Thread.count
+  end
+
+  # The badge is canvas pixels: the corner opposite the pin's holds something
+  # else once the post has an open note.
+  test "a post with an open note carries a badge on its top-left corner" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
+    assert_selector "[data-legend='notes']", text: "Open notes"
+  end
+
+  # A note started from the card is on the canvas at once: the node's badge
+  # is drawn from the count the card read back, with no reload.
+  test "a note started from the card puts the badge on its node" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+    click_node(a.id)
+    within("[data-mind-graph-card-notes]") do
+      find("textarea").send_keys("Check the dates")
+      press "Add note"
+    end
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 1
+
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge after a note was started from the card"
+  end
+
   private
 
   # What the endpoint answers for a site over the cap, cut down to two nodes:
@@ -1989,6 +2119,13 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   def pin_pixel(post)
     point = screen_position(post.id)
     pixel_at(point["x"] + 5.04, point["y"] - 5.04)
+  end
+
+  # The canvas's colour where a node's notes badge is: up and to the LEFT of
+  # the centre of a 7 px dot (the pin's corner is up and to the right).
+  def notes_badge_pixel(post)
+    point = screen_position(post.id)
+    pixel_at(point["x"] - 5.04, point["y"] - 5.04)
   end
 
   # The browser says the person prefers reduced motion inside the block, and

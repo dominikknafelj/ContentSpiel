@@ -11,7 +11,9 @@
 // tag's "2 posts"); then the actions, which LOOK like CS Studio's buttons and are what
 // they do: "Open post", "Focus" and a tag's "Show posts with this tag" lead
 // somewhere, so they are links; Pin / Unpin changes the graph, so it is a
-// button.
+// button. A post's card then has its open notes and a field to start one
+// (`card_notes.js`; notes spec §4.4): the fifth part, before Close. A tag has
+// no notes.
 //
 // Built with `textContent` and `href` only: a title or a tag's name is the
 // editor's text, whatever it contains. A URL comes from a template the server
@@ -22,16 +24,21 @@
 // (`buttonClasses`, `dotClasses`), so neither is copied here.
 //
 // `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses,
-// onClose, onPin })` answers `{ show(node, { pinned, pinnable }),
+// onClose, onPin, onChange })` answers `{ show(node, { pinned, pinnable }),
 // setPinned(pinned), hide() }` (`pinnable: false` leaves the Pin button out:
 // with no layout there is nothing to hold). `text` is `messages(element)`,
-// `urls` the three templates (`postFocus`, `tagFocus`, `tagPosts`), `typeLabels` a content type's human
+// `urls` the four templates (`postFocus`, `tagFocus`, `tagPosts`, and
+// `postNotes`, a post's notes as JSON), `typeLabels` a content type's human
 // name by its stored name, `onClose` what the Close button does (the app
-// clears the selection, which hides the card) and `onPin` what Pin / Unpin
-// does (the app pins or releases the node and says which with `setPinned`).
+// clears the selection, which hides the card), `onPin` what Pin / Unpin
+// does (the app pins or releases the node and says which with `setPinned`)
+// and `onChange` what the notes call when they arrived or one was added: the
+// card's height changed, and the node's count may have.
 //
 // The status chip is `Admin::StatusChipComponent`'s, class for class: a dot in
 // the status's token colour AND the word, so the colour is never the only cue.
+import { cardNotes } from "mind_graph/card_notes"
+
 const STATUS_DOTS = { draft: "bg-meta", scheduled: "bg-warn", live: "bg-ok" }
 // A URL template filled with one value: a function as the replacement, because
 // a string would have its `$&` and `$1` read as patterns. (`encodeURIComponent`
@@ -46,7 +53,7 @@ export const dotClass = (dotClasses, node) =>
   `h-[7px] w-[7px] shrink-0 rounded-full ${node.colour_index == null ? "border border-meta" : dotClasses[(node.colour_index - 1) % dotClasses.length]}`
 export const TAG_MARK = "h-2 w-2 shrink-0 border border-meta bg-surface"
 
-export function createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin }) {
+export function createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange }) {
   let pin = null
 
   const element = (tag, className, content) => {
@@ -130,7 +137,8 @@ export function createCard(container, { text, urls, typeLabels, dotClasses, butt
       actions(
         link(buttonClasses.primary, text.t("mind_graph.script.card.open_post"), node.url),
         link(buttonClasses.secondary, text.t("mind_graph.script.card.focus"), fill(urls.postFocus, "__ID__", node.id))
-      )
+      ),
+      cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", node.id), postUrl: node.url, onChange })
     ]
   }
 

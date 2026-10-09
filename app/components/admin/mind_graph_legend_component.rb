@@ -4,7 +4,7 @@ module Admin
   # registered type -- a legend of types you can't see is noise, and a type the
   # viewer can't read at all would be disclosed by it), then the shapes: "Tag",
   # "Draft or scheduled", "Retired type" when one is present, the two edge
-  # kinds, and "Pinned" (the mark of a node that stays where it was dropped). Server-rendered so it is text and a real dot component, not
+  # kinds, and "Pinned" (the mark of a node that stays where it was dropped) and "Open notes" (the count badge of a post with open notes). Server-rendered so it is text and a real dot component, not
   # something the graph's JS draws; the swatches are small inline SVGs using
   # the legend's own token classes (`.mg-*` in content-spiel.tailwind.css,
   # the same tokens `mind_graph/theme.js` hands the canvas), and each carries

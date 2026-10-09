@@ -461,6 +461,15 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal [ [ "page", @kept_page.id ], [ "post", @kept_post.id ] ].sort, response.parsed_body.map { |r| [ r["type"], r["id"] ] }.sort
 
     PostRelation.create!(post: @kept_post, related_post: @gone_post)
+    # The trashed post has an open note that mentions the viewer (notes spec
+    # §4.4): the graph counts it nowhere, in neutral or in accent, and the
+    # card's own JSON does not find the post. `Notes::Start` refuses a record
+    # that is already in the trash (decision P6), so the note is written
+    # first and the post trashed again after it.
+    @gone_post.update!(trashed_at: nil)
+    as(users(:one)) { assert Notes::Start.call(@gone_post, body: "A note").ok? }
+    as(users(:two)) { assert Notes::Start.call(@gone_post, body: "For @[#{users(:one).id}]").ok? }
+    @gone_post.update!(trashed_at: Time.current)
     # The page holds no graph data (it is a frame); a trashed post is no focus
     # for it either. The global graph leaves out a post with no connection, and
     # a relation to a trashed post is none -- so the kept post is seen through
@@ -476,11 +485,24 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/mind_graph/data"
     assert_not_includes response.parsed_body["nodes"].map { |n| n["id"] }, @gone_post.id
+    assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })
     assert_empty response.parsed_body["edges"]
     get "/cs-studio/mind_graph/data", params: { post: @gone_post.id }
     assert_response :not_found
+    get "/cs-studio/notes/post/#{@gone_post.id}/threads"
+    assert_response :not_found
+    assert_not_includes response.body, "A note"
     get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
     assert_equal [ @kept_post.id ], response.parsed_body["nodes"].map { |n| n["id"] }
+    # The kept post has no thread; the trashed one's are counted nowhere.
+    assert_equal [ [ 0, false ] ], response.parsed_body["nodes"].map { |node| node.values_at("open_notes", "unread_notes") }
+    # And a kept post's own note is counted, so the zero above is not the
+    # graph counting nothing at all.
+    as(users(:two)) { assert Notes::Start.call(@kept_post, body: "For @[#{users(:one).id}]").ok? }
+    get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }
+    assert_equal [ [ 1, true ] ], response.parsed_body["nodes"].map { |node| node.values_at("open_notes", "unread_notes") }
+    get "/cs-studio/notes/post/#{@kept_post.id}/threads"
+    assert_equal [ 1, 1 ], [ response.parsed_body["open"], response.parsed_body["threads"].size ]
     get "/cs-studio/mind_graph/search", params: { q: "gone" }
     assert_empty response.parsed_body
   end

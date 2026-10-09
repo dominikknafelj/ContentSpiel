@@ -510,3 +510,4 @@ a[data-pending-locked] { opacity: 0.5; cursor: not-allowed; }
 .mg-key-retired { fill: none; stroke: var(--cs-meta); stroke-width: 1.5; }
 .mg-key-pinned-node { fill: none; stroke: var(--cs-meta); stroke-width: 1; }
 .mg-key-pin { fill: var(--cs-ink); stroke: var(--cs-surface); stroke-width: 1.5; }
+.mg-key-notes { fill: var(--cs-surface); stroke: var(--cs-line-strong); stroke-width: 1; }

@@ -1,5 +1,5 @@
 // Draws one frame of the mind graph (mind graph canvas spec §4.3, §5.1).
-// Order: edges, nodes (each with its pin mark), labels, rings. Everything is in SCREEN pixels: the
+// Order: edges, nodes (each with its pin mark and its notes badge), labels, rings. Everything is in SCREEN pixels: the
 // camera moves a node's centre, and a node is the same size at every zoom.
 //
 // A node's mark carries two cues that never share a shape, exactly as
@@ -32,6 +32,13 @@
 // - PINNED (`pinned`, a Set of indexes): a small ink dot with a surface ring
 //   at the mark's top-right. It is drawn with the node, at the node's
 //   strength, whatever else the node is.
+// - WITH OPEN NOTES (`open_notes` above zero, a post only; notes spec §4.4):
+//   the count in a small mono badge at the mark's top-LEFT, opposite the pin,
+//   so a node can carry both. Not a ring: a ring means hovered, selected or
+//   focused. Drawn with the node, at the node's strength, and the same size at
+//   every zoom. Neutral, and in the accent tint with accent ink while those
+//   notes hold something unread for the viewer (`unread_notes`), the one
+//   meaning accent has in notes (§4.5).
 // - The focus of a local view: a dotted accent ring.
 // A tag's rings are squares, like its mark.
 //
@@ -49,13 +56,22 @@ const LABEL_HALO = 3
 const BACKING_X = 4
 const BACKING_HEIGHT = 18
 // How far outside the canvas an edge's end or a node's edge may be and still
-// count as on it: half the widest stroke, rounded up, and a node's rings.
+// count as on it: half the widest stroke, rounded up, and a node's rings and
+// its notes badge (which reaches furthest on the smallest mark: "99+" on a
+// 7px dot ends 13px beyond its edge).
 const EDGE_MARGIN = 2
-const NODE_MARGIN = 8
+const NODE_MARGIN = 13
 // A ring's distance from the mark's edge.
 const HOVER_RING = 2.5
 const SELECTED_RING = 4
 const FOCUS_RING = 5
+// A post with open notes (notes spec §4.4, handoff "Mind graph node badge"):
+// the count in a small pill on the mark's top-left corner. Half its height
+// (the handoff's 14px line), half a character's advance at 10px mono, and the
+// room beside the text (`px-1`).
+const NOTES_BADGE = 7
+const NOTES_CHARACTER = 3
+const NOTES_BADGE_PAD = 4
 
 // Four sizes by degree: small differences in size can't be read, so a hub is
 // one of four steps, not a point on a scale. A tag's is its half side.
@@ -112,6 +128,7 @@ export function draw(context, { width, height, ratio, camera, theme, nodes, edge
     if (nodes[index].kind === "tag") drawTag(context, theme, x(index), y(index), radii[index])
     else drawPost(context, theme, nodes[index], x(index), y(index), radii[index])
     if (pinned.has(index)) drawPin(context, theme, x(index), y(index), radii[index])
+    if (nodes[index].kind !== "tag" && (nodes[index].open_notes ?? 0) > 0) drawNotes(context, theme, nodes[index], x(index), y(index), radii[index])
   }
 
   context.textBaseline = "middle"
@@ -179,6 +196,34 @@ function drawPin(context, theme, x, y, radius) {
   context.strokeStyle = theme.surface
   context.lineWidth = 1.5
   context.stroke()
+}
+
+// A pill like the count badges of the lists: surface, a line, ink -- and the
+// accent tint with accent ink while the count holds something unread for the
+// viewer, the border kept, as the chip on a media tile. Never the only cue:
+// the node's card says the count in words and marks the unread rows. More
+// than ninety-nine reads "99+". `save` and `restore` keep the node's own
+// strength (`globalAlpha`) and leave the text settings as the labels expect
+// them.
+function drawNotes(context, theme, node, x, y, radius) {
+  const label = node.open_notes > 99 ? "99+" : String(node.open_notes)
+  const offset = radius * 0.72
+  const half = Math.max(NOTES_BADGE, NOTES_CHARACTER * label.length + NOTES_BADGE_PAD)
+  context.save()
+  context.setLineDash([])
+  context.beginPath()
+  context.roundRect(x - offset - half, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
+  context.fillStyle = node.unread_notes ? theme.accentTint : theme.surface
+  context.fill()
+  context.strokeStyle = theme.line
+  context.lineWidth = 1
+  context.stroke()
+  context.font = theme.countFont
+  context.textAlign = "center"
+  context.textBaseline = "middle"
+  context.fillStyle = node.unread_notes ? theme.accent : theme.ink
+  context.fillText(label, x - offset, y - offset + 0.5)
+  context.restore()
 }
 
 function drawTag(context, theme, x, y, half) {

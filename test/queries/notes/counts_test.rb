@@ -54,4 +54,25 @@ class Notes::CountsTest < ActiveSupport::TestCase
     assert_equal({ @page.id => 3 }, Notes::Counts.by_container("Page", [ @page.id, other.id ]))
     assert_empty capture_sql { assert_equal({}, Notes::Counts.by_container("Page", [])) }
   end
+
+  # The mind graph's read: the count and what turns it accent together.
+  test "open threads per container with whether they hold something unread for a user, in one query" do
+    other = create_page(title: "Quiet")
+    resolved = create_page(title: "Settled")
+    as(users(:two)) do
+      Notes::Start.call(@block, body: "For @[#{users(:reader).id}]")
+      Notes::Resolve.call(Notes::Start.call(resolved, body: "Was for @[#{users(:reader).id}]").record)
+    end
+    ids = [ @page.id, other.id, resolved.id ]
+    reader = users(:reader)
+    counts = nil
+
+    statements = capture_sql { counts = Notes::Counts.open_and_unread("Page", ids, reader) }
+
+    assert_equal({ @page.id => [ 4, true ] }, counts)
+    assert_equal 1, statements.size
+    assert_equal({ @page.id => [ 4, false ] }, Notes::Counts.open_and_unread("Page", ids, users(:two)))
+    assert_equal 1, capture_sql { assert_equal({ @page.id => [ 4, false ] }, Notes::Counts.open_and_unread("Page", ids, nil)) }.size
+    assert_empty capture_sql { assert_equal({}, Notes::Counts.open_and_unread("Page", [], reader)) }
+  end
 end

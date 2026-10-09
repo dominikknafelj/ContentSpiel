@@ -735,6 +735,56 @@ class Admin::MindGraphModulesSystemTest < ApplicationSystemTestCase
     assert_equal [ 1 ], hovered["ringWidths"]
   end
 
+  # Notes spec §4.4, handoff "Mind graph node badge": a post with open notes
+  # carries the count in a pill 14 px high at its mark's top-left (the pin is
+  # top-right), as wide as its text asks, neutral -- and in the accent tint
+  # with accent ink while those notes hold something unread for the viewer
+  # (§4.5). A tag has none, nor a post without notes; above ninety-nine it
+  # reads "99+". Read from what the renderer asks of a context that records.
+  test "renderer: a post with open notes carries its count in a badge at the top-left, in accent while something is unread" do
+    drawn = page.evaluate_async_script(<<~JS)
+      const done = arguments[arguments.length - 1]
+      import("mind_graph/renderer").then(({ draw, radiusFor }) => {
+        const round = (value) => Math.round(value * 1000) / 1000
+        const log = []
+        const set = {}
+        let badge = null
+        const context = new Proxy({}, {
+          get: (_, name) => {
+            if (name === "beginPath") return () => { badge = null }
+            if (name === "roundRect") return (...box) => { badge = box.map(round) }
+            if (name === "fill") return () => { if (badge) log.push(["pill", ...badge, set.fillStyle]) }
+            if (name === "stroke") return () => { if (badge) log.push(["line", set.strokeStyle, set.lineWidth]) }
+            if (name === "fillText") return (label, x, y) => { log.push(["text", label, round(x), round(y), set.fillStyle, set.font]) }
+            return () => {}
+          },
+          set: (_, name, value) => { set[name] = value; return true }
+        })
+        const nodes = [
+          { id: 0, kind: "post", degree: 1, colour_index: 1, status: "live", label: "", open_notes: 3, unread_notes: false },
+          { id: 1, kind: "post", degree: 1, colour_index: 1, status: "live", label: "", open_notes: 120, unread_notes: true },
+          { id: 2, kind: "post", degree: 1, colour_index: 1, status: "live", label: "", open_notes: 0, unread_notes: false },
+          { id: 3, kind: "tag", degree: 1, label: "", open_notes: 4 },
+          { id: 4, kind: "post", degree: 1, colour_index: 1, status: "live", label: "" }
+        ]
+        draw(context, {
+          width: 400, height: 100, ratio: 1, camera: { k: 1, tx: 0, ty: 0 },
+          theme: { ink: "ink", meta: "", surface: "surface", sunken: "", accent: "accent", line: "line", accentTint: "tint", categories: Array(6).fill("hue"), font: "", strongFont: "", countFont: "count" },
+          nodes, edges: [], positions: Float32Array.from([ 50, 50, 150, 50, 250, 50, 300, 50, 350, 50 ]),
+          radii: nodes.map(radiusFor), widths: nodes.map(() => 0), visibleNodes: nodes.map((_, index) => index), visibleEdges: [],
+          labels: [], selected: -1, neighbours: new Set(), focusIndex: -1, hovered: -1, pinned: new Set([ 0 ])
+        })
+        done(log)
+      }).catch((error) => done({ error: String(error) }))
+    JS
+    flunk "renderer: #{drawn["error"]}" if drawn.is_a?(Hash)
+
+    assert_equal [
+      [ "pill", 37.96, 37.96, 14, 14, 7, "surface" ], [ "line", "line", 1 ], [ "text", "3", 44.96, 45.46, "ink", "count" ],
+      [ "pill", 131.96, 37.96, 26, 14, 7, "tint" ], [ "line", "line", 1 ], [ "text", "99+", 144.96, 45.46, "accent", "count" ]
+    ], drawn
+  end
+
   test "renderer: a tag's ring is a square" do
     selected = renderer_calls(positions: [ 50, 50 ], edges: [], selected: 0, tags: [ 0 ])
 

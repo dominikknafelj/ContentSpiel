@@ -3,7 +3,8 @@ module Admin
   # threads. `show` is the thread view of the notes frame; opening a thread
   # is what marks the viewer's deliveries of it read (notes spec §3.3) --
   # through the service, as every write is. `create` starts one, and `change`
-  # is its six buttons.
+  # is its six buttons. `index` is the record's open threads as JSON, for the
+  # mind graph's card, which also starts a note through `create` in JSON.
   #
   # Every write answers the frame: a 303 to the view the person should now
   # see, or the same view again with its status (403, 422), the reason, and
@@ -24,6 +25,39 @@ module Admin
       "follow" => ->(thread) { Notes::SetFollowing.call(thread, following: true) },
       "unfollow" => ->(thread) { Notes::SetFollowing.call(thread, following: false) }
     }.freeze
+
+    # How much of a thread's first message the mind graph's card is sent.
+    EXCERPT = 140
+
+    # The record's open threads as data, for the mind graph's card (notes
+    # spec §4.4), which is built in the browser with `textContent` only: text
+    # and numbers, no markup. A mention reads as "@Name"; `author` is null
+    # for a user who is gone, and the card words that.
+    #
+    # Its own endpoint, not the frame's: the container was found through the
+    # read scope first (`set_container`), so a post outside the viewer's
+    # scope, a trashed one and an id that names nothing are the same bare
+    # 404, and nothing here redirects to the list. A GET that writes
+    # nothing: listing the threads marks no delivery read (opening one does,
+    # `show`).
+    def index
+      listing = Notes::Listing.new(@container, viewer: Current.user)
+      threads = listing.pinned + listing.groups.flat_map(&:threads)
+      render json: {
+        open: listing.open_count,
+        threads: threads.map do |thread|
+          first = thread.messages.first
+          { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
+            author: listing.users[first.author_id]&.display_name, replies: thread.messages.size - 1, pinned: thread.pinned,
+            # What turns the row's dot accent in the card (spec §4.5): one
+            # query for the whole listing (`Notes::Listing#unread?`).
+            unread: listing.unread?(thread, Current.user),
+            # The viewer's own avatar is the filled one, as in the drawer
+            # (`Admin::NotesScreen::AvatarComponent`).
+            mine: first.author_id.present? && first.author_id == Current.user&.id }
+        end
+      }
+    end
 
     # A thread that is not among the container's -- deleted since the link
     # to it was made (an inbox row, `?thread=` on an editor or on the media
@@ -50,6 +84,14 @@ module Admin
     def create
       subject = Notes::Listing.new(@container, viewer: Current.user).subject_by_key(params[:subject]) || @container
       result = Notes::Start.call(subject, body: note_body, quote: params[:quote].to_s, origin_view: note_view, origin_locale: admin_locale)
+      # The mind graph's card asks in JSON and is answered in kind: the new
+      # thread's id, or the reasons (403, 422). It reads the list again
+      # itself (`index`), so nothing of the thread is sent back.
+      if request.format.json?
+        return render(json: { id: result.record.id }, status: :created) if result.ok?
+
+        return render(json: { errors: result.errors }, status: failure_status(result))
+      end
 
       if result.ok?
         redirect_to thread_path(result.record), status: :see_other
