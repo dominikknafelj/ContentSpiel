@@ -796,9 +796,9 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   # In order (the design review of 2026-10-08): the type's dot, the type and
   # the status chip with Close at the end of the row; the title; the counts;
   # then the actions, which are CS Studio's buttons -- the primary one first --
-  # and not underlined links. A post's notes come after the actions in the
-  # document, so Tab meets "Open post" first, and are DRAWN above them, under
-  # the title and its counts (handoff, "Node card thread list").
+  # and not underlined links. A post's notes stand under the title and its
+  # counts and the actions follow them, in the document as on screen (the
+  # notes handoff's decision 12).
   test "the card reads top to bottom: kind and status, the title, the two counts, its notes, then its actions as buttons" do
     a = create_post(title: "Alpha", tags: %w[one two])
     b = create_post(title: "Beta", tags: %w[one two])
@@ -812,25 +812,27 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     card = find("[data-mind-graph-card]")
     # Close is the last child, so Tab meets the actions before it; on screen
     # it stands in the card's top-right corner.
-    assert_equal %w[DIV H2 P DIV SECTION BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
+    assert_equal %w[DIV H2 P SECTION DIV BUTTON], card.all(":scope > *").map(&:tag_name).map(&:upcase)
     within(card) do
       assert_selector ":scope > div:first-child span[aria-hidden='true'].rounded-full", count: 2 # the type's dot, the status chip's
       assert_selector ":scope > button:last-child[data-mind-graph-card-close][aria-label='Close']"
       assert_selector "h2", text: "Alpha"
       assert_text(/2 related\s*·\s*2 tags/i)
-      assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(4) > *").map(&:text)
-      assert_equal %w[A A BUTTON], all(":scope > div:nth-child(4) > *").map(&:tag_name).map(&:upcase)
+      assert_equal [ "Open post", "Focus", "Pin" ], all(":scope > div:nth-child(5) > *").map(&:text)
+      assert_equal %w[A A BUTTON], all(":scope > div:nth-child(5) > *").map(&:tag_name).map(&:upcase)
+      # No visual reordering: the row is drawn where it stands in the document.
+      assert_no_selector ":scope > [class~='order-1']"
     end
     # On screen: the counts, the notes, the actions.
     notes = element_box("[data-mind-graph-card] > section")
     assert_operator element_box("[data-mind-graph-card] > p")["bottom"], :<=, notes["top"], "the notes are not under the counts"
-    assert_operator notes["bottom"], :<=, element_box("[data-mind-graph-card] > div:nth-child(4)")["top"], "the actions are not under the notes"
+    assert_operator notes["bottom"], :<=, element_box("[data-mind-graph-card] > div:nth-child(5)")["top"], "the actions are not under the notes"
     close = element_box("[data-mind-graph-card-close]")
     box = element_box("[data-mind-graph-card]")
     assert_operator box["right"] - close["right"], :<, 12, "Close is not in the card's right corner"
     assert_operator close["top"] - box["top"], :<, 12, "Close is not in the card's top corner"
     styles = page.evaluate_script(<<~JS)
-      Array.from(document.querySelectorAll("[data-mind-graph-card] > div:nth-child(4) > *")).map((action) => {
+      Array.from(document.querySelectorAll("[data-mind-graph-card] > div:nth-child(5) > *")).map((action) => {
         const style = getComputedStyle(action)
         return { underlined: style.textDecorationLine !== "none", filled: style.backgroundColor, bordered: style.borderTopWidth }
       })
@@ -1994,9 +1996,11 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
   end
 
   # The keyboard's whole way: a row is reached by Tab (it is a button), Enter
-  # selects its node and hands the focus to the card, whose first stop is
-  # "Open post"; Escape gives the focus back to the row.
-  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it" do
+  # selects its node and hands the focus to the card; Tab then walks the card
+  # as it reads -- the note's field before "Open post" (the notes handoff's
+  # decision 12) -- Enter on the card opens the post, and Escape gives the
+  # focus back to the row.
+  test "the list is the keyboard path: Enter on a row opens the node's card and moves the focus to it, and Enter there opens the post" do
     a = create_post(title: "Alpha")
     PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
     visit admin_mind_graph_path
@@ -2011,15 +2015,50 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal a.id.to_s, graph["data-selected"]
     assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')"), "the focus did not move to the card"
     assert_equal "mind-graph-card-title", find("[data-mind-graph-card]")["aria-labelledby"], "the card is not named by its title"
+    # Tab meets the card in its reading order: the notes' field, then the actions.
+    assert_selector "[data-mind-graph-card] textarea"
     page.driver.browser.keyboard.type(:Tab)
-    assert_equal "Open post", page.evaluate_script("document.activeElement.textContent")
+    assert_equal "TEXTAREA", page.evaluate_script("document.activeElement.tagName")
+    stops = page.evaluate_script("Array.from(document.querySelectorAll('[data-mind-graph-card] :is(a[href], button, textarea)')).filter((stop) => !stop.disabled && stop.getClientRects().length > 0).map((stop) => stop.tagName === 'TEXTAREA' ? 'field' : stop.textContent.trim())")
+    assert_operator stops.index("field"), :<, stops.index("Open post")
+    assert_equal [ "Open post", "Focus", "Pin", "×" ], stops.last(4)
     page.driver.browser.keyboard.type(:Escape)
 
     assert_no_selector "[data-mind-graph-card]", visible: :visible
     assert_equal "Alpha", page.evaluate_script("document.activeElement.querySelector('span.truncate')?.textContent"), "the focus did not go back to the row"
 
+    # Enter on the row again, then Enter on the card: the post.
     page.driver.browser.keyboard.type(:Enter)
-    page.driver.browser.keyboard.type(:Tab)
+    assert page.evaluate_script("document.activeElement === document.querySelector('[data-mind-graph-card]')")
+    click_frame_link { page.driver.browser.keyboard.type(:Enter) }
+    assert_current_path admin_post_path(a)
+  end
+
+  # The notes handoff's decision 12: Enter on the selected node opens the post.
+  test "Enter on the canvas opens the selected post, does nothing with nothing selected, and stays a line break in the note's field" do
+    a = create_post(title: "Alpha", tags: %w[shared])
+    create_post(title: "Beta", tags: %w[shared])
+    visit admin_mind_graph_path
+    await_graph
+    canvas = CANVAS
+
+    # Nothing selected: nothing happens.
+    find(canvas).execute_script("this.focus()")
+    page.driver.browser.keyboard.type(:Enter)
+    await_frames
+    assert_current_path admin_mind_graph_path
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card] a", text: "Open post"
+    # In the note's field Enter is the field's own.
+    field = find("[data-mind-graph-card] textarea")
+    field.execute_script("this.focus()")
+    page.driver.browser.keyboard.type("One", :Enter, "Two")
+    await_frames
+    assert_equal "One\nTwo", field.value
+    assert_current_path admin_mind_graph_path
+
+    find(canvas).execute_script("this.focus()")
     click_frame_link { page.driver.browser.keyboard.type(:Enter) }
     assert_current_path admin_post_path(a)
   end

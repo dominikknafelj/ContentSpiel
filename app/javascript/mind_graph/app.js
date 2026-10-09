@@ -174,10 +174,18 @@ export function mount(element) {
   })
   // Escape closes the card from inside it too, not only from the canvas
   // (`input.js` hears the canvas's keys alone).
+  // Enter opens the selected post while the focus is on the card ITSELF,
+  // where the list hands it: on a control inside the card Enter is that
+  // control's own (a link, a button, a line break in the note's field).
   const cardKeydown = (event) => {
-    if (event.key !== "Escape" || event.ctrlKey || event.metaKey || event.altKey) return
-    event.preventDefault()
-    closeCard()
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.key === "Enter" && event.target === cardElement) {
+      event.preventDefault()
+      card.open()
+    } else if (event.key === "Escape") {
+      event.preventDefault()
+      closeCard()
+    }
   }
   cardElement.addEventListener("keydown", cardKeydown)
 
@@ -700,6 +708,8 @@ export function mount(element) {
       if (index >= 0) unpin([ index ])
     },
     onEscape: () => select(-1),
+    // Enter with a post selected opens it (the card's own "Open post").
+    onEnter: () => card.open(),
     onHover: hover,
     onPan: (dx, dy) => moveCamera(panBy(state.camera, dx, dy)),
     onZoom: (x, y, factor) => moveCamera(zoomAt(state.camera, x, y, factor))
