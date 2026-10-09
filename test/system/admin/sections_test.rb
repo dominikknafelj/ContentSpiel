@@ -841,6 +841,31 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_equal "Typed into the panel", card.reload.caption
   end
 
+  # A text block's form is an editor that boots again each time its card is
+  # moved in the DOM. Whatever it writes into its field as it does must not
+  # read as an edit nobody saved, or no text could ever be moved.
+  test "a text card and a text tile are moved between the list and a lane with their words, and nothing is saved over them" do
+    text = @page.content_blocks.create!(block_type: "rich_text", position: 1, body: rich_doc("Words that travel"))
+    stamp = text.updated_at
+    open_editor
+    assert_selector "#{tile(text)} .ProseMirror", text: "Words that travel"
+
+    drop_into(text, lane(2))
+
+    assert_selector "#{lane(2)} > .admin-block-tile[data-block-id='#{text.id}']", text: "Words that travel"
+    assert_no_selector "#toasts .admin-toast"
+    find(face(text)).click
+    assert_selector "#{panel(text)} .ProseMirror", text: "Words that travel"
+
+    drop_into(text, "#content-blocks-list")
+
+    assert_selector "#content-blocks-list > .admin-block-card[data-block-id='#{text.id}'] .ProseMirror", text: "Words that travel"
+    assert_no_selector "#toasts .admin-toast"
+    assert_writes_settled
+    assert_nil text.reload.section_id
+    assert_equal stamp, text.updated_at, "a move saved the block's form"
+  end
+
   test "a tile dropped in another section takes its form there" do
     other = @page.content_blocks.create!(block_type: "section", position: 1)
     open_editor
