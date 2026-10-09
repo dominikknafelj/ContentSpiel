@@ -2,8 +2,9 @@ module Admin
   module NotesScreen
     # The field a note is typed in (notes spec §4.2; handoff "Composer",
     # "Mention picker"): one bordered box holding a textarea and, under a
-    # line, its toolbar -- the emoji popover and the at-sign on the left, the
-    # send key's hint and the submit on the right. "@" opens the mention
+    # line, its toolbar -- the paperclip, the emoji popover and the at-sign
+    # on the left, the submit on the right (the send key is said by the
+    # submit's tooltip, see below). "@" opens the mention
     # picker. Enter adds a line; Ctrl/⌘+Enter sends (`admin--note-composer`).
     # An ordinary Turbo form inside the notes frame: it sends no base and is
     # no autosave form.

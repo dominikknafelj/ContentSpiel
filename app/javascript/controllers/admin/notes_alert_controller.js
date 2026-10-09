@@ -39,7 +39,7 @@ import { Turbo } from "@hotwired/turbo-rails"
 //   nothing.
 // - A tab that has heard DONE for a delivery never alerts for it, however
 //   late its own copy of the signal comes.
-// Without `BroadcastChannel` each tab decides alone.
+// Without `BroadcastChannel`, or where one cannot be made, each tab decides alone.
 // A LIMIT, known: a visible tab that is busy for longer than `AGREE_MS` (a
 // long task, a slow frame) cannot answer a claim in time. A hidden tab may
 // then chime and notify the desktop although CS Studio is in view.
@@ -103,7 +103,16 @@ const rooms = new Map()
 function join(name, listener) {
   let room = rooms.get(name)
   if (!room) {
-    room = { channel: new BroadcastChannel(name), listeners: new Set(), closed: false }
+    // The constructor can throw although the name exists (a document with an
+    // opaque origin): then there is no room, and the tab decides alone, as
+    // it does without `BroadcastChannel` -- never an error on <body>.
+    let channel
+    try {
+      channel = new BroadcastChannel(name)
+    } catch {
+      return null
+    }
+    room = { channel, listeners: new Set(), closed: false }
     room.channel.addEventListener("message", (event) => [ ...room.listeners ].forEach((each) => each(event.data)))
     room.leave = (leaving) => {
       room.listeners.delete(leaving)

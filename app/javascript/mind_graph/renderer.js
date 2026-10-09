@@ -218,7 +218,12 @@ function drawNotes(context, theme, node, x, y, radius) {
   context.save()
   context.setLineDash([])
   context.beginPath()
-  context.roundRect(right - half * 2, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
+  // A pill where the canvas can draw one; a plain rectangle where it can't
+  // (`roundRect` is newer than the rest of what is drawn here): a missing
+  // method would throw inside the draw and take the whole canvas with it,
+  // for every graph that has a note on any post.
+  if (typeof context.roundRect === "function") context.roundRect(right - half * 2, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2, NOTES_BADGE)
+  else context.rect(right - half * 2, y - offset - NOTES_BADGE, half * 2, NOTES_BADGE * 2)
   context.fillStyle = theme.surface
   context.fill()
   context.strokeStyle = theme.line

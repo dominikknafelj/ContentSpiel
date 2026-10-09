@@ -109,18 +109,32 @@ module Dashboard
       ids.empty? ? {} : ContentBlock.where(id: ids).index_by(&:id)
     end
 
+    # What a block that is NOT named is read for: its place among its page's
+    # blocks (`BlockOutline#reading_order`) and, for a section, its type.
+    # No body, caption, alt text or settings.
+    PLACE_COLUMNS = %i[id owner_type owner_id section_id section_column position block_type].freeze
+
     # What each of those blocks is called (`Notes::Heading`): its type, its
     # column, and its first words, its image's file name or its place on its
-    # page. A place and a section's type need the page's other blocks, so
+    # page. A place and a section's type need the page's OTHER blocks, so
     # those are read too -- one statement for all the pages together -- and
     # the file names of the image blocks in one pass; none of it when no row
     # is on a block.
+    #
+    # The other blocks are read for their place only (`PLACE_COLUMNS`): this
+    # runs on every dashboard load and for every toast, and it once loaded
+    # every block of every page on the inbox page whole, rich text in every
+    # language included. The blocks that are named were read whole already
+    # (`blocks_of`) and are not read again. One condition per kind of owner,
+    # joined by OR in the one statement: types and ids each in a list of
+    # their own would also match a pair nobody asked for.
     def headings_of(blocks)
       return Notes::Heading.new([], locale: @locale) if blocks.empty?
 
-      owners = blocks.map { |block| [ block.owner_type, block.owner_id ] }.uniq
-      rows = ContentBlock.where(owner_type: owners.map(&:first).uniq, owner_id: owners.map(&:last).uniq).to_a.index_by(&:id)
-      Notes::Heading.new(rows.merge(blocks.index_by(&:id)).values, locale: @locale).preload_images(blocks)
+      others = blocks.map { |block| [ block.owner_type, block.owner_id ] }.uniq.group_by(&:first)
+        .map { |type, pairs| ContentBlock.where(owner_type: type, owner_id: pairs.map(&:last)) }.reduce(:or)
+        .where.not(id: blocks.map(&:id)).select(*PLACE_COLUMNS).to_a
+      Notes::Heading.new(others + blocks, locale: @locale).preload_images(blocks)
     end
 
     def route(container, thread)

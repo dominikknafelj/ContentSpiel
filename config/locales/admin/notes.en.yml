@@ -128,10 +128,6 @@ en:
             one: "%{count} new message ↓"
             other: "%{count} new messages ↓"
           gone: "This thread was deleted"
-    # The inbox (notes spec §5): the full list at `<admin>/notes`
-    # (`index`, the view's own lazy-lookup scope) and the dashboard's two
-    # cards. `card.new` stands beside the card's title, in the small
-    # upper-case label style.
     # The account screen's "Notes" card (notes spec §6.4, handoff "Account
     # switches"): two settings of the person's, and what this browser says
     # about showing notifications. Read with full keys from
@@ -163,6 +159,10 @@ en:
           ask: "This browser has not been allowed to show notifications yet."
           allow: "Allow in this browser"
           blocked: "Blocked in this browser. Change it in the site settings of your browser."
+    # The inbox (notes spec §5): the full list at `<admin>/notes`
+    # (`index`, the view's own lazy-lookup scope) and the dashboard's two
+    # cards. `card.new` stands beside the card's title, in the small
+    # upper-case label style.
     note_inbox:
       index:
         page_title: "Notes for you · CS Studio"
@@ -213,8 +213,6 @@ en:
       # The legend's swatch for a node's notes badge.
       mind_graph_legend:
         notes: "Open notes"
-      # The editor header's Notes button. `components.en.yml` holds nothing of
-      # the header's yet (it is not converted); these two merge into its scope.
       # "Add note", first in the "⋯" menu of a block's card and of its tile in
       # a section. Neither component's other strings live here
       # (`components.en.yml` has the tile's; the card is not converted): these
@@ -224,6 +222,9 @@ en:
       editor_screen:
         block_tile:
           add_note: "Add note"
+        # The editor header's Notes button. `components.en.yml` holds nothing
+        # of the header's yet (it is not converted); these merge into its
+        # scope.
         header:
           notes: "Notes"
           # The page tree's drawer, where the notes column has folded the
@@ -292,7 +293,6 @@ en:
             post: "New note on this post"
             media: "New note on this image"
           new_on_block: "New note on %{block}"
-          quoted: "Quoted"
           empty_title: "No notes yet"
           empty:
             page: "Ask a question about this page or one of its blocks."
@@ -300,6 +300,10 @@ en:
             media: "Ask a question about this image."
           notices:
             gone: "This note is gone: it was deleted, or what it was on was."
+        # The label above the passage a note quotes, in the list's new-note
+        # field and at the top of a thread.
+        quote:
+          quoted: "Quoted"
         thread_row:
           new: "new"
           replies:
@@ -320,7 +324,6 @@ en:
             one: "%{count} message"
             other: "%{count} messages"
           started_on: "started on %{language}"
-          quoted: "Quoted"
           pinned: "Pinned"
           resolved_by: "Resolved by"
           written_on: "Written on %{language}"
@@ -349,8 +352,9 @@ en:
           # The "⋯" menu's way to the emoji set, for touch (the add chip
           # shows on hover or focus).
           react: "React"
-          # On a message whose edit was left without saving, and in its edit
-          # form once the text is put back (the handoff's decision 27).
+          # In the meta line of a message whose edit was left without saving,
+          # and nowhere else: also while its edit form is open again with the
+          # text put back (the handoff's decisions 27 and 29).
           unsaved: "Unsaved edit"
         # A message's files (handoff "Attachment row", "Inline image and
         # still GIF tile"). `file` is the kind of a file whose stored type is

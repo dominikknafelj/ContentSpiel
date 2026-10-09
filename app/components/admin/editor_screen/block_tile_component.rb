@@ -57,10 +57,11 @@ module Admin
     # tile and not of the lane: a lane's children are exactly its tiles.
     #
     # A viewer who can't edit may still open a tile: the form they get is the
-    # disabled one a view-only card shows. They get the face and the notes
-    # marker (notes spec §4.3, D3: who can read the page writes notes), and
-    # nothing else. "Add note" is the first item of the menu, for a viewer
-    # who has one.
+    # disabled one a view-only card shows. They get the face, the notes
+    # marker (notes spec §4.3, D3: who can read the page writes notes) and a
+    # "⋯" menu whose only item is "Add note" (the notes handoff's decision
+    # 6), and nothing else. For an editor "Add note" is the first item of
+    # the tile's menu.
     class BlockTileComponent < AdminComponent
       def initialize(page:, block:, locale:, url_options: {}, editable:, open: false)
         @page = page

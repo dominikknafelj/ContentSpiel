@@ -238,6 +238,8 @@ export default class extends Controller {
 
   // Before the first target connects, which is before `connect`.
   initialize() {
+    // How often Turbo has drawn each notes frame (`answered`).
+    this.draws = new WeakMap()
     this.records = new Map()
     this.timers = new Map()
     this.stale = new WeakSet()
@@ -369,6 +371,10 @@ export default class extends Controller {
     if (frame.id !== "notes") return
     const sent = this.sent
     this.sent = null
+    // Counted, drawn as it comes or merged: a live answer that was asked
+    // for before this one is older than what is about to be on screen
+    // (`fetchPart`).
+    this.draws.set(frame, (this.draws.get(frame) || 0) + 1)
 
     const view = frame.querySelector(":scope > [data-notes-view='thread']")
     const answer = event.detail.newFrame.querySelector(":scope > [data-notes-view='thread']")
@@ -382,7 +388,9 @@ export default class extends Controller {
     if (sent.form.closest("[data-note-message]")?.querySelector("form[data-note-composer], [data-note-delete-question]")) return
 
     const reply = sent.form.matches("[data-note-part='reply'] form[data-note-composer]")
-    event.detail.render = () => this.redrawThread(frame, view, answer, null, { own: true, reply, held: sent.held })
+    // Resolve or Reopen: the empty form beside the composer's.
+    const state = sent.form.matches("[data-note-part='reply'] > form:not([data-note-composer])")
+    event.detail.render = () => this.redrawThread(frame, view, answer, null, { own: true, reply, state, held: sent.held })
   }
 
   // The same thread drawn again by Turbo itself (Edit, Delete or Cancel in a
@@ -503,9 +511,19 @@ export default class extends Controller {
     // its answer may be older than the signal. Once it is in.
     if (frame.hasAttribute("busy")) return void this.soon(element, () => this.refresh(element, threadId))
 
+    const drawn = this.draws.get(frame) || 0
     const response = await fetch(this.address(frame, view), { headers: { Accept: "text/html", "Turbo-Frame": "notes" } })
     // Signed out, the record out of reach: nothing to draw, and nothing said.
     const answer = response.ok ? new DOMParser().parseFromString(await response.text(), "text/html").querySelector("turbo-frame#notes > [data-notes-view]") : null
+    // OLDER THAN WHAT IS ON SCREEN. `busy` was asked before the fetch only:
+    // while this was out the person sent a note, or pressed a button, and
+    // that answer has been drawn (a merged one leaves the view element in
+    // place, so the check below does not see it) or is on its way. This
+    // answer may have left before that write was saved; drawn, it would
+    // take the person's own note off the screen, and the tab ignores its
+    // own signal, so nothing would bring it back. Dropped, and asked for
+    // again: the signal that led here may be newer than the write.
+    if (frame.hasAttribute("busy") || (this.draws.get(frame) || 0) !== drawn) return void this.soon(element, () => this.refresh(element, threadId))
     // No answer to draw: a part that was stale stays stale. Or the answer is
     // nobody's any more: the part left and came back (another subscription),
     // or Turbo drew the frame while this was out, from a request made later.
@@ -528,9 +546,17 @@ export default class extends Controller {
       url.pathname = `${url.pathname}/threads/${encodeURIComponent(view.dataset.noteThread)}`
       url.searchParams.delete("edit")
       url.searchParams.delete("delete")
+      // The message a reaction was given to, which the answer to that press
+      // drew its fold open for: asked for again with every refresh it would
+      // open a fold the reader has closed since.
+      url.searchParams.delete("shown")
     } else {
       const subject = view.querySelector(":scope > #notes-new input[name='subject']")?.value
       if (subject && !url.searchParams.has("compose")) url.searchParams.set("compose", subject)
+      // "This note is gone" was said by the answer that brought the list; a
+      // refresh that asked with it again would put the status line back,
+      // and have it announced, with every signal.
+      url.searchParams.delete("notice")
     }
     return url.pathname + url.search
   }
@@ -569,9 +595,10 @@ export default class extends Controller {
 
   // `own`: the answer to this tab's own button (`answered`), not a signal's
   // fetch -- nothing in it "arrived". `reply`: the reply's composer is what
-  // was sent, so its part is the answer's. `held`: what had the focus when
+  // was sent, so its part is the answer's. `state`: Resolve or Reopen was
+  // sent, whose refusal is said in the composer (`refusal`). `held`: what had the focus when
   // the button was pressed (`asked`).
-  redrawThread(frame, view, answer, url, { own = false, reply: sentReply = false, held: heldBefore = null } = {}) {
+  redrawThread(frame, view, answer, url, { own = false, reply: sentReply = false, state: sentState = false, held: heldBefore = null } = {}) {
     const old = view.querySelector(":scope > [data-note-part='messages']")
     const reply = view.querySelector(":scope > [data-note-part='reply']")
     if (!old || !reply) return
@@ -635,6 +662,7 @@ export default class extends Controller {
     view.dataset.state = answer.dataset.state
     this.takeCounts(view, answer)
     this.settle(reply, answer)
+    if (sentState) this.refusal(reply, answer)
     const nextReply = sentReply && document.importNode(answer.querySelector(":scope > [data-note-part='reply']"), true)
     // The reply was sent from its part -- the field, or the button beside
     // it: the focus goes to the field of the part that takes its place.
@@ -709,6 +737,21 @@ export default class extends Controller {
     const formTwin = answer.querySelector(`[data-note-part='reply'] form[id="${CSS.escape(twin.getAttribute("form"))}"]`)
     if (form && formTwin) form.replaceWith(document.importNode(formTwin, true))
     button.replaceWith(document.importNode(twin, true))
+  }
+
+  // Resolve or Reopen was pressed, and the answer says in the composer
+  // whether it was refused (`ThreadComponent`: the sentence stands where the
+  // button does). The reply part is not replaced for it -- its field may
+  // hold text -- so the sentence alone is taken over: the answer's, in the
+  // place the composer has for one, or none when the press went through.
+  refusal(reply, answer) {
+    const form = reply.querySelector("form[data-note-composer]")
+    const twin = answer.querySelector("[data-note-part='reply'] form[data-note-composer]")
+    if (!form || !twin) return
+
+    form.querySelector(":scope > ul[role='alert']")?.remove()
+    const said = twin.querySelector(":scope > ul[role='alert']")
+    if (said) form.querySelector(":scope > input[name='mention_names']")?.after(document.importNode(said, true))
   }
 
   // The "NEW" divider (handoff): an accent line filling the row, then the

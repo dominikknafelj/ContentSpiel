@@ -121,6 +121,24 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     second&.close
   end
 
+  # `new BroadcastChannel` can throw although the name exists (an opaque
+  # origin). That is "no agreement between tabs", not an error on <body>:
+  # the tab decides alone, and a JavaScript error would fail this test.
+  test "where a BroadcastChannel cannot be made the tab decides alone: one chime, and no error" do
+    script = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument",
+      source: "window.BroadcastChannel = class { constructor() { throw new DOMException('refused', 'SecurityError') } }")
+    stubbed_dashboard
+    assert page.evaluate_script("(() => { try { new BroadcastChannel('x'); return false } catch (error) { return true } })()"), "the stub is not in place"
+
+    delivery = mention_me
+
+    await_settled(delivery)
+    assert_equal 2, tones
+    assert_selector "#toasts .admin-toast", text: "Dana mentioned you on Pricing"
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
+  end
+
   test "a tab that is looking at the thread keeps every tab quiet" do
     users(:one).update!(notes_desktop: true)
     visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"

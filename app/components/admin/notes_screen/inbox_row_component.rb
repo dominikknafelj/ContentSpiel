@@ -9,8 +9,9 @@ module Admin
     # The link is the record's editor with its notes open at the thread (for
     # an image, the Media screen with the image chosen). Following it is what
     # marks the row read, by the thread view's own rule; this component adds
-    # no other way. The link covers the whole row (`after:inset-0`), so the
-    # row is one target while its accessible name stays the sentence.
+    # no other way. The link IS the whole row: negative margins take it to
+    # the edges of the item that holds it (see the template), so the row is
+    # one target and its accessible name is what it says.
     #
     # Unread is said four ways, never by colour alone: the accent dot (the
     # one use of accent here: unread and addressed to the viewer), the name

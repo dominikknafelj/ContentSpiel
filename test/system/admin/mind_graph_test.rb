@@ -1864,6 +1864,30 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
   end
 
+  # `roundRect` is newer than the rest of what the canvas draws. Without it
+  # the badge is a plain rectangle, and the graph is drawn all the same: a
+  # throw inside the draw took the whole canvas down (and fails this test,
+  # as any JavaScript error does).
+  test "a browser without roundRect still draws the graph, and a noted post's badge as a rectangle" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    script = page.driver.browser.page.command("Page.addScriptToEvaluateOnNewDocument", source: "delete CanvasRenderingContext2D.prototype.roundRect")
+
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_equal "undefined", page.evaluate_script("typeof CanvasRenderingContext2D.prototype.roundRect")
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row]", text: "Check the dates"
+  ensure
+    page.driver.browser.page.command("Page.removeScriptToEvaluateOnNewDocument", identifier: script["identifier"]) if script
+  end
+
   # The badge is canvas pixels: the corner opposite the pin's holds something
   # else once the post has an open note.
   test "a post with an open note carries a badge on its top-left corner" do

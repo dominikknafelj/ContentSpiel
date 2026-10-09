@@ -37,7 +37,11 @@ class Notes::CountsTest < ActiveSupport::TestCase
 
     unread = Notes::Counts.for_container(@page, user: users(:reader))["unread"]
 
-    assert_equal [ "ContentBlock-#{@block.id}", "ContentBlock-#{other.id}", "Page-#{@page.id}" ], unread
+    # Sorted as the strings they are (so "ContentBlock-10" comes before
+    # "ContentBlock-9": the two ids here come from a sequence, and an
+    # expectation written in id order failed when they straddled a digit).
+    assert_equal [ "ContentBlock-#{@block.id}", "ContentBlock-#{other.id}", "Page-#{@page.id}" ].sort, unread
+    assert_equal unread.sort, unread
   end
 
   test "a delivery knows whether a thread holds something unread for a user, in one query" do

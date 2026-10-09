@@ -71,7 +71,10 @@ const QUERY = /(?:^|\s)@([^\s@]{0,40})$/
 const PREFIX = "cs-note-draft:"
 
 // The one place a draft's key is made: `cs-note-draft:<user id>:<form key>`,
-// the form key being "new", "thread-<id>" or, for an edit, "message-<id>".
+// the form key being `new-<container key>-<subject key>` for a new note (the
+// subject's is empty for the record itself: "new-Page-3-",
+// "new-Page-3-ContentBlock-12"), "thread-<id>" for a reply, "message-<id>"
+// for an edit and, in the mind graph's card, "graph-Post-<id>".
 export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
 
 // Every note draft of this tab is removed, except those of `person` (with no

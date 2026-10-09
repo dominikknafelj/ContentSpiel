@@ -21,6 +21,9 @@ module Notes
     STATES = %w[open resolved].freeze
     # Where the thread was started. Context only ("written on German"), never
     # used to decide where a thread appears.
+    # `list` is RESERVED: no surface sends it yet (the posts list and the
+    # page tree show counts and start no note); it stays so that a thread
+    # started from one later needs no migration of what the column allows.
     ORIGIN_VIEWS = %w[editor mind_graph media list].freeze
     MAX_QUOTE = 500
 
@@ -48,8 +51,6 @@ module Notes
     # Not `open`: `Kernel#open` is a method of every class.
     scope :unresolved, -> { where(state: "open") }
     scope :resolved, -> { where(state: "resolved") }
-    scope :pinned, -> { where(pinned: true) }
-    scope :unpinned, -> { where(pinned: false) }
 
     def open? = state == "open"
 

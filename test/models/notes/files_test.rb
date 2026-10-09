@@ -143,4 +143,18 @@ class Notes::FilesTest < ActiveSupport::TestCase
     assert_equal "a-b.txt", Notes::Files.stored_name("a/b.txt")
     assert_equal "png", Notes::Files.extension_of("#{"n" * 400}.PNG")
   end
+
+  # `File.extname` raises on a NUL byte ("path name contains null byte"),
+  # which Active Storage's sanitising leaves in: a forged multipart part was
+  # a 500. The byte is no part of any name.
+  test "a NUL byte in a file's name is dropped, never raised on" do
+    assert_equal "ab.txt", Notes::Files.stored_name("a\0b.txt")
+    assert_equal "txt", Notes::Files.extension_of("a\0b.t\0xt")
+    assert_equal "#{"n" * 251}.png", Notes::Files.stored_name("#{"n" * 400}\0.png")
+
+    # As a forged multipart part would name it.
+    plain = note_upload("plain words\n", "notes.txt", "text/plain")
+    upload = ActionDispatch::Http::UploadedFile.new(tempfile: plain.tempfile, filename: "no\0tes.txt", type: "text/plain")
+    assert_empty Notes::Files.errors_for([ upload ])
+  end
 end

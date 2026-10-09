@@ -43,6 +43,24 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_nil on_page
   end
 
+  # The page's other blocks are read for their place alone: no body, in any
+  # language, for a block the inbox does not name.
+  test "a block that is not named is read for its place only: no body, caption or alt column, and not the named blocks again" do
+    named = @page.content_blocks.create!(block_type: "rich_text", position: 5)
+    3.times { |index| @page.content_blocks.create!(block_type: "rich_text", position: 6 + index) }
+    mention(named)
+
+    statements = capture_sql { inbox.rows(limit: 50) }
+    others = statements.select { |sql| sql.include?(%("content_blocks"."owner_id")) }
+
+    assert_equal 1, others.size, statements.join("\n")
+    assert_no_match(/"content_blocks"\.\*|"body"|"caption"|"alt"|"translated_settings"|"translation_sources"/, others.first)
+    assert_match(/"content_blocks"\."id" (!=|NOT IN)/, others.first)
+    # And what it is read for still comes out: the block's place on its page.
+    row = inbox.rows(limit: 50).find { |each| each.block == named }
+    assert_operator row.heading.position, :>, 1
+  end
+
   test "rows on blocks cost the same statements for two blocks as for six, image blocks among them" do
     blocks = 6.times.map { |index| @page.content_blocks.create!(block_type: index.even? ? "image" : "rich_text", position: 1 + index, media_asset: (create_media_asset if index.even?)) }
     blocks.first(2).each { |block| mention(block) }

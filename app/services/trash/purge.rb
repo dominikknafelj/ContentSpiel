@@ -235,6 +235,14 @@ module Trash
     # deadlock, and nothing here rescues `ActiveRecord::Deadlocked`. This
     # way the purge takes its locks in the order it always did.
     #
+    # THE OTHER HALF IS STILL OPEN, and is older than notes: `Tags::Merge`
+    # takes a post's row and its `post_tags` rows in the opposite order to
+    # `Posts::Save`. A purge cannot take them in an order that agrees with
+    # both, so the purge of a trashed post that carries a tag, beside a
+    # merge of that tag, can still deadlock (a 500, nothing lost, a retry
+    # works). No order of this method's fixes it; it is a row of
+    # `docs/roadmap.md` and in `docs/reference/notes.md`, "Removal".
+    #
     # The right `Notes::Remove` asks again is answered for the destroyed
     # object as it was before: a `content_types` or `own` scope reads the
     # post's own attributes, an image's uploader its `created_by_id`,

@@ -56,6 +56,8 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       assert_select "h3 [data-note-subject-type]", text: "Rich text"
       assert_select "h3 [data-note-subject-words][class~='text-xs'][class~='text-dim'][class~='truncate']", text: "Block 1"
       assert_select "blockquote", text: "€49 a month"
+      assert_select "figure[data-note-quote] > figcaption", text: "Quoted"
+      assert_select "figure div figcaption", count: 0
       assert_select "#note-thread-#{@thread.id}-messages #note-message-#{@thread.first_message.id} [data-note-mention]", text: "@reader"
       assert_select "a[href='https://example.com']"
     end

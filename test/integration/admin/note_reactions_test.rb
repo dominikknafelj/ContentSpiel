@@ -55,6 +55,22 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_select "button[data-reaction='🎉']", count: 1
   end
 
+  # Only the form's own word gives a reaction. A boolean cast read every
+  # string that is not a false value as true, so `on=banana` gave one.
+  test "a forged value for on gives no reaction: only the word true does" do
+    %w[banana 1 TRUE yes on t].each do |forged|
+      post "#{@path}/messages/#{@note.id}/reactions", params: { emoji: "👍", on: forged }
+      assert_redirected_to "#{@path}?shown=#{@note.id}"
+      assert_empty Notes::Reaction.where(user: users(:reader)), "on=#{forged} gave a reaction"
+    end
+
+    post "#{@path}/messages/#{@note.id}/reactions", params: { emoji: "👍", on: "true" }
+    assert_equal [ "👍" ], Notes::Reaction.where(user: users(:reader)).pluck(:emoji)
+    # ... and anything else takes it back.
+    post "#{@path}/messages/#{@note.id}/reactions", params: { emoji: "👍", on: "banana" }
+    assert_empty Notes::Reaction.where(user: users(:reader))
+  end
+
   test "an emoji that was not offered is refused in the thread, under its message, and nothing is stored" do
     assert_no_difference -> { Notes::Reaction.count } do
       post "#{@path}/messages/#{@note.id}/reactions", params: { emoji: "<script>alert(1)</script>", on: "true" }, headers: frame

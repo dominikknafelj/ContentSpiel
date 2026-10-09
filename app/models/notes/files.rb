@@ -153,8 +153,11 @@ module Notes
 
     # The name a file is stored and served under: Active Storage's own
     # sanitising, and no longer than `MAX_NAME` with its ending kept.
+    # A NUL byte is taken out first: the sanitising leaves it in, and
+    # `File.extname` raises on one ("path name contains null byte"), which
+    # made a forged multipart part a 500.
     def stored_name(name)
-      name = ActiveStorage::Filename.new(name.to_s).sanitized
+      name = ActiveStorage::Filename.new(name.to_s.delete("\0")).sanitized
       return name if name.length <= MAX_NAME
 
       ending = File.extname(name).first(20)

@@ -67,14 +67,13 @@ module Admin
       # close each other, without a script.
       ADD_GROUP = "note-reaction-add".freeze
 
-      def initialize(message:, listing:, viewer:, type:, view:, state: :open, place: :row)
+      def initialize(message:, listing:, viewer:, view:, state: :open, place: :row)
         raise ArgumentError, "unknown reactions state #{state.inspect}" unless STATES.include?(state)
         raise ArgumentError, "unknown reactions place #{place.inspect}" unless PLACES.include?(place)
 
         @message = message
         @listing = listing
         @viewer = viewer
-        @type = type
         @view = view
         @state = state
         @place = place

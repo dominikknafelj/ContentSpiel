@@ -234,6 +234,32 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
   end
 
+  # Resolve stands beside Send, and a refusal of it is said there -- in the
+  # composer, which the answer otherwise leaves alone, typed text and all.
+  test "a refused Resolve says why in the composer and leaves a half-typed reply as it is; resolved after all, the sentence goes" do
+    open_in_drawer
+    reply_field.send_keys("Half a reply")
+    page.execute_script("window.__reply = document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')")
+    refusal = ApplicationService::Result.failure(nil, [ "This note is gone: it was deleted, or what it was on was." ])
+    original = Notes::Resolve.method(:call)
+    Notes::Resolve.define_singleton_method(:call) { |*, **| refusal }
+
+    within("#note-thread-#{@thread.id}-reply") { press "Resolve" }
+
+    assert_selector "#note-thread-#{@thread.id}-reply form[data-note-composer] ul[role=alert]", text: "This note is gone: it was deleted, or what it was on was."
+    assert_no_selector "#note-thread-#{@thread.id}-messages [role=alert]"
+    assert page.evaluate_script("window.__reply.isConnected && window.__reply.value === 'Half a reply'"), "the reply field was drawn again"
+
+    Notes::Resolve.define_singleton_method(:call, original)
+    within("#note-thread-#{@thread.id}-reply") { press "Resolve" }
+
+    assert_selector "#note-thread-#{@thread.id}[data-state=resolved]"
+    assert_no_selector "#note-thread-#{@thread.id}-reply form[data-note-composer] ul[role=alert]"
+    assert page.evaluate_script("window.__reply.isConnected && window.__reply.value === 'Half a reply'"), "the reply field was drawn again"
+  ensure
+    Notes::Resolve.define_singleton_method(:call, original) if original
+  end
+
   test "a reaction on another message leaves an open edit and a half-typed reply as they are" do
     open_in_drawer
     start_editing

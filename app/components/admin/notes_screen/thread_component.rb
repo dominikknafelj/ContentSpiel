@@ -84,13 +84,13 @@ module Admin
 
       def mentions_path = helpers.admin_record_note_mentions_path(*args)
 
-      # Pin and unpin are the moderator's (notes spec §3.4); a resolved thread
-      # has no pin (a pinned thread is always open).
       # Whether row 1 has "Back to page" (shown in the sheet below 1024px):
       # not where the notes are in no drawer -- an image's, in the media
       # panel.
       def leave? = type.to_s != "media"
 
+      # Pin and unpin are the moderator's (notes spec §3.4); a resolved thread
+      # has no pin (a pinned thread is always open).
       def pinnable? = !thread.resolved? && listing.moderator?(viewer)
 
       def following? = listing.following?(thread, viewer)
@@ -104,13 +104,19 @@ module Admin
       # The empty form Resolve / Reopen submits from inside the composer.
       def state_form_id = "#{dom_id}-state"
 
-      # A failure of one of this thread's own forms: the reply (it has the
-      # typed text) or one of the buttons (it has none).
+      # A failure of one of this thread's own forms, said WHERE THE BUTTON
+      # IS that was pressed (`failed[:form]`, the controller's word for it).
+      # The reply, and Resolve or Reopen beside its Send: in the composer --
+      # a reply of nothing but spaces has no text to tell it by, and in a
+      # long thread a sentence at the top is one nobody sees. Pin and
+      # Notify, in the two rows at the top: under those rows.
+      COMPOSER_FORMS = %w[reply resolve reopen].freeze
+
       def own_failure = (failed if failed && failed[:key] == key)
 
-      def reply_failure = (own_failure if own_failure && own_failure[:body].present?)
+      def reply_failure = (own_failure if own_failure && COMPOSER_FORMS.include?(own_failure[:form].to_s))
 
-      def button_failure = (own_failure if own_failure && own_failure[:body].blank?)
+      def button_failure = (own_failure unless reply_failure)
 
       # What the thread is on, as its group's heading in the list says it.
       def subject_heading

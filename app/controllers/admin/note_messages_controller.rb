@@ -17,7 +17,7 @@ module Admin
       if result.ok?
         redirect_to thread_path(@thread), status: :see_other
       else
-        answer_thread_failure(@thread, result, key: "thread-#{@thread.id}", gone: :reply_gone!)
+        answer_thread_failure(@thread, result, key: "thread-#{@thread.id}", gone: :reply_gone!, form: "reply")
       end
     end
 

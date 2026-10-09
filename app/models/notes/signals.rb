@@ -33,8 +33,9 @@ module Notes
   # A PUSH IS BEST EFFORT. A broadcast that fails (the cable's database is
   # away) is reported, logged and swallowed -- the log line holds the
   # signal's kind and the error's CLASS, never its message (a driver's
-  # message can quote what it was sending) and never the payload: the note is already committed, a tab
-  # that missed the signal shows it on its next load, and an exception here
+  # message can quote what it was sending) and never the payload: the note
+  # is already committed, a tab that missed the signal shows it on its next
+  # load, and an exception here
   # would turn a saved note into an error page and stop the callbacks queued
   # behind it in the same commit -- a deferred `PublicSite.bump_version!`
   # among them, when the signal is `Notes::Remove`'s inside a purge.

@@ -237,6 +237,8 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_select "#notes-new input[type=hidden][name=subject][value='ContentBlock-#{@block.id}']"
     assert_select "#notes-new input[type=hidden][name=quote][value='€49 a month']"
     assert_select "#notes-new blockquote", text: "€49 a month"
+    # The one drawing of a quote, the thread's too (`QuoteComponent`).
+    assert_select "#notes-new figure[data-note-quote] > figcaption", text: "Quoted"
 
     get @base, params: { compose: "ContentBlock-999999" }, headers: { "Turbo-Frame" => "notes" }
     assert_select "#notes-new input[name=subject][value='']"
@@ -358,6 +360,19 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal 1, @thread.messages.count
   end
 
+  # `required` lets a reply of spaces through; the service refuses it. The
+  # sentence belongs where the person pressed Send.
+  test "a reply of nothing but spaces is refused in the composer, not at the top of the thread" do
+    sign_in_as(users(:reader))
+
+    post "#{@base}/threads/#{@thread.id}/messages", params: { body: "   " }, headers: frame
+
+    assert_response :unprocessable_entity
+    assert_select "#note-thread-#{@thread.id}-reply form[data-note-composer] ul[role=alert]", text: "Write something first."
+    assert_select "#note-thread-#{@thread.id}-messages [role=alert]", count: 0
+    assert_equal 1, @thread.messages.count
+  end
+
   # Review Focus 3, the other half: the thread was there when the request
   # arrived and went while the service ran. A notes service's failure has no
   # record, and "gone" is a failure like any other.
@@ -377,9 +392,18 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_select "#note-thread-#{other.id}-reply [role=alert]", text: /This note is gone/
     assert_select "#note-thread-#{other.id}-reply textarea[name=body]", text: "Kept"
 
+    # Resolve stands in the composer's row, and so does its refusal: not at
+    # the top of the thread, where a reader far down would not see it.
     answering(Notes::Resolve, -> { gone }) { post "#{@base}/threads/#{other.id}/resolve", headers: frame }
     assert_response :unprocessable_entity
-    assert_select "#note-thread-#{other.id} [role=alert]", text: /This note is gone/
+    assert_select "#note-thread-#{other.id}-reply form[data-note-composer] ul[role=alert]", text: /This note is gone/
+    assert_select "#note-thread-#{other.id}-messages [role=alert]", count: 0
+
+    # Pin is in the rows at the top, and its refusal is said there.
+    answering(Notes::Pin, -> { gone }) { post "#{@base}/threads/#{other.id}/pin", headers: frame }
+    assert_response :unprocessable_entity
+    assert_select "#note-thread-#{other.id}-messages > ul[role=alert]", text: /This note is gone/
+    assert_select "#note-thread-#{other.id}-reply form[data-note-composer] ul[role=alert]", count: 0
 
     first = other.first_message
     answering(Notes::DeleteMessage, -> { gone }) { delete "#{@base}/threads/#{other.id}/messages/#{first.id}", headers: frame }

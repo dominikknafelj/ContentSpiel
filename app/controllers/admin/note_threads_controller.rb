@@ -107,7 +107,9 @@ module Admin
       if result.ok?
         redirect_to thread_path(thread), status: :see_other
       else
-        answer_thread_failure(thread, result, key: "thread-#{thread.id}", body: "")
+        # `form`: which of the thread's buttons was refused, so the sentence
+        # is drawn where that button stands (`ThreadComponent`).
+        answer_thread_failure(thread, result, key: "thread-#{thread.id}", body: "", form: params[:change])
       end
     end
 

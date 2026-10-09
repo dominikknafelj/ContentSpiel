@@ -409,6 +409,80 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     assert_no_selector "#notes-open-count"
   end
 
+  # The frame's address keeps what its last answer was asked with. A refresh
+  # must not ask with it again: `notice=gone` would announce "This note is
+  # gone" anew with every signal, and `shown=<id>` would open a fold the
+  # reader has closed.
+  test "a live refresh asks for the view without the notice and the shown message of the answer before it" do
+    gone = as(users(:two)) { Notes::Start.call(@page, body: "Going") }.record
+    gone_id = gone.id
+    gone.destroy!
+    visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{gone_id}"
+    await_notes_live
+    assert_selector "#notes-drawer #notes-list [role=status]", text: "This note is gone"
+    assert_match(/notice=gone/, page.evaluate_script("document.querySelector('#notes-drawer turbo-frame#notes').getAttribute('src')"))
+    page.execute_script("window.__asked = []; const original = window.fetch; window.fetch = (...args) => { window.__asked.push(String(args[0].url || args[0])); return original(...args) }")
+
+    as(users(:two)) { assert Notes::Start.call(@page, body: "A new one").ok? }
+
+    assert_selector "#notes-list a[data-note-row]", text: "A new one", wait: LIVE
+    assert_no_selector "#notes-drawer #notes-list [role=status]", text: "This note is gone"
+    assert_empty page.evaluate_script("window.__asked.filter((url) => /notice=|shown=/.test(url))")
+
+    # And a thread whose address says which message a reaction was given to.
+    find("#note-row-#{@thread.id}").click
+    assert_selector "#notes-drawer #note-thread-#{@thread.id}"
+    within("#note-message-#{@thread.first_message.id}") do
+      find("button[aria-label='Note actions']").click
+      press "React"
+      find("button[aria-label='React with thumbs up']").click
+    end
+    assert_selector "#note-message-#{@thread.first_message.id} button[data-reaction='👍'][data-mine]"
+    assert_eventually { page.evaluate_script("document.querySelector('#notes-drawer turbo-frame#notes').getAttribute('src')").include?("shown=") }
+    page.execute_script("window.__asked = []")
+
+    reply_as_dana("After the reaction")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "After the reaction", wait: LIVE
+    assert_equal 1, page.evaluate_script("window.__asked.filter((url) => url.includes('/threads/')).length")
+    assert_empty page.evaluate_script("window.__asked.filter((url) => /notice=|shown=/.test(url))")
+  end
+
+  # A live GET that left before this tab's own reply was saved and comes back
+  # after the reply's answer was drawn holds the OLDER thread. Drawn, it
+  # would take the reply off the screen again, and the tab ignores its own
+  # signal, so nothing would put it back. It is dropped, and asked for anew.
+  test "an older live answer is not drawn over this tab's own newer one" do
+    open_thread
+    # The next live GET of the thread is answered now and handed over later.
+    page.execute_script(<<~JS)
+      window.__gets = 0
+      const original = window.fetch
+      window.fetch = (...args) => {
+        const url = String(args[0].url || args[0])
+        const method = String(args[1]?.method || args[0].method || "GET").toUpperCase()
+        if (method !== "GET" || !url.includes("/threads/")) return original(...args)
+        window.__gets += 1
+        if (window.__gets > 1) return original(...args)
+        const answer = original(...args)
+        return new Promise((resolve) => { window.__release = () => resolve(answer) })
+      }
+    JS
+    reply_as_dana("Theirs")
+    assert_eventually(wait: LIVE, message: "the live refresh never left") { page.evaluate_script("typeof window.__release === 'function'") }
+
+    reply_field.send_keys("Mine, meanwhile")
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Mine, meanwhile"
+    page.execute_script("window.__release()")
+
+    # The stale answer is dropped and the thread fetched once more.
+    assert_eventually(wait: LIVE, message: "the thread was not asked for again") { page.evaluate_script("window.__gets") >= 2 }
+    await_frames
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Mine, meanwhile"
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Theirs"
+  end
+
   test "the tab that sent a note does not fetch it again, and the page is never refreshed" do
     open_thread
     page.execute_script("window.__stay = true")

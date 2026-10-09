@@ -6,7 +6,8 @@
     <%# Rows 1 and 2 (the handoff's decisions 3, 11 and 17). Row 1: back to the
         list with the number of open threads, then "Notify me" / "Stop
         notifying me", then the way out of the notes: Close in the drawer
-        (from 1024px), "Back to <title>" in the sheet (below it). Row 2: what the thread is on, with
+        (from 1024px), "Back to page" in the sheet (below it; decision 21).
+        Row 2: what the thread is on, with
         Pin on the right for someone who may pin. One grid of two rows, so
         that the two settings of the thread -- one at the end of each row --
         can stay the children of ONE element, `[data-note-actions]`
@@ -71,6 +72,12 @@
         <p class="text-[13px] text-dim"><%= summary %></p>
       </div>
     </div>
+    <%# A refusal of Pin or Notify, under the two rows their buttons are in
+        (and, like them, not scrolled away). A refused reply, Resolve or
+        Reopen is said in the composer. %>
+    <% if button_failure %>
+      <ul role="alert" class="shrink-0 border-b border-line px-4 py-2 text-[12px] text-danger-ink"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
+    <% end %>
     <%# The rows' own line is the first message's too: a message that comes
         first draws none above itself. %>
     <div class="flex flex-col [&>[data-note-message]:first-child]:border-t-0" data-note-scroll>
@@ -84,16 +91,8 @@
         <% end %>
       </p>
     <% end %>
-    <% if button_failure %>
-      <ul role="alert" class="px-4 pb-2 text-[12px] text-danger-ink"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
-    <% end %>
     <% if thread.quote.present? %>
-      <figure class="px-4 py-3.5">
-        <div class="flex flex-col gap-1 rounded-cs border border-line bg-sunken px-2.5 py-2">
-          <figcaption class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= t(".quoted") %></figcaption>
-          <blockquote class="whitespace-pre-wrap break-words text-[13px] leading-normal text-ink"><%= thread.quote %></blockquote>
-        </div>
-      </figure>
+      <div class="px-4 py-3.5"><%= render Admin::NotesScreen::QuoteComponent.new(quote: thread.quote) %></div>
     <% end %>
     <% leading.each do |record| %><%= render message(record) %><% end %>
     <% if folded.any? %>

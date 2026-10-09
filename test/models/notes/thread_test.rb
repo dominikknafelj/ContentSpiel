@@ -48,8 +48,6 @@ class Notes::ThreadTest < ActiveSupport::TestCase
 
     assert_equal [ open, pinned ].sort_by(&:id), Notes::Thread.where(container: @page).unresolved.order(:id).to_a
     assert_equal [ done ], Notes::Thread.where(container: @page).resolved.to_a
-    assert_equal [ pinned ], Notes::Thread.pinned.to_a
-    assert_equal [ open, done ].sort_by(&:id), Notes::Thread.unpinned.order(:id).to_a
   end
 
   test "deleting a thread's author leaves the thread; deleting the thread takes its messages and deliveries" do

@@ -19,7 +19,7 @@
       <%= content %>
     </p>
     <%# The way to the emoji set of a message nobody reacted to (decision 26). %>
-    <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, type: type, view: view, state: reactions_state, place: :meta) %>
+    <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, view: view, state: reactions_state, place: :meta) %>
     <% if deletable? || reactable? %>
       <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
         <% if reactable? %>
@@ -53,7 +53,7 @@
       reactions; under the edit form while the message is being edited, and
       then disabled (the handoff's decision 23). Its forms are siblings of
       everything here, inside no other form. %>
-  <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, type: type, view: view, state: reactions_state) %>
+  <%= render Admin::NotesScreen::ReactionsComponent.new(message: message, listing: listing, viewer: viewer, view: view, state: reactions_state) %>
   <% if bare_failure %>
     <ul role="alert" class="text-[12px] text-danger-ink"><% bare_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
   <% end %>
