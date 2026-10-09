@@ -53,6 +53,29 @@ module Notes
   # thread ids, one audit insert, one DELETE. `notes.removed` is recorded on
   # `record` with the ids only, and only when there was something to remove.
   #
+  # THE SIGNAL (`Notes::Signals`): one per CONTAINER that lost a thread, on
+  # that container's record stream, sent when the caller's transaction
+  # commits and not at all when it rolls back. It names the lowest thread id
+  # removed there; a tab fetches the whole list again whichever it names. No
+  # person is signalled: no delivery row is written. What that means for
+  # each caller:
+  #
+  # - `ContentBlocks::Destroy` (a block; a section with its blocks): the
+  #   threads are filed under the PAGE, which is still there and may be open
+  #   in an editor with its drawer -- one signal on the page's stream, so the
+  #   drawer drops the deleted block's group. This is the case it is for.
+  # - `Trash::Purge` of a page: one signal per page of the branch that had a
+  #   thread (its own or a block's). Nobody is left to hear it: a purged page
+  #   was in the trash, where no editor opens and `Notes::RecordChannel`
+  #   rejects a subscription, and a tab subscribed since before the trashing
+  #   fetches and gets a 404.
+  # - `Trash::Purge` of a post or an image: one signal on its stream, for
+  #   the same nobody.
+  #
+  # The purge's signals are sent all the same, by the one rule, because
+  # telling a gone record's stream costs a broadcast nobody receives and
+  # leaving it out would be a second rule to keep right.
+  #
   # It authorizes what its callers already did -- the item's delete right or
   # `trash.empty` for a page, post or image, the page's edit right for a
   # block -- so a refusal never happens on those paths (if it did, the
@@ -73,11 +96,13 @@ module Notes
       return denied(refused, @record) if refused
 
       Thread.transaction(requires_new: true) do
-        ids = threads_on([ @record, *@with ]).order(:id).pluck(:id)
-        next if ids.empty?
+        rows = threads_on([ @record, *@with ]).order(:id).pluck(:id, :container_type, :container_id)
+        next if rows.empty?
 
+        ids = rows.map(&:first)
         record_event("notes.removed", subject: @record, snapshot: nil, metadata: { "thread_ids" => ids })
         Thread.where(id: ids).delete_all # version: none (note tables only; no public page reads a note)
+        rows.uniq { |_id, type, container_id| [ type, container_id ] }.each { |id, type, container_id| Signals.threads_removed(type, container_id, id) }
       end
       success(@record)
     end

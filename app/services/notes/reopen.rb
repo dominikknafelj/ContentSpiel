@@ -1,6 +1,8 @@
 module Notes
   # Reopens a resolved thread (notes spec §3.5). Needs the read right; a
-  # thread that is open already is a success with nothing recorded.
+  # thread that is open already is a success with nothing recorded and
+  # nothing signalled. Otherwise it signals the record's stream, and every
+  # follower theirs (`Notes::Signals`).
   class Reopen < ApplicationService
     include Authorization
 
@@ -20,6 +22,7 @@ module Notes
         thread.update!(state: "open", resolved_at: nil, resolved_by: nil)
         Deliveries.for_state(thread, "reopened", actor_user: actor_user)
         record_event("note.reopened", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread))
+        Signals.threads(thread)
         thread
       end
       thread_answer(outcome, @thread)

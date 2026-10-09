@@ -8,6 +8,9 @@ module Notes
   #
   # Only the people the edit NEWLY mentions are checked and told: someone
   # mentioned before who has since lost access stays in the text.
+  #
+  # Signals the record's stream, and the newly mentioned theirs
+  # (`Notes::Signals`); an edit that changes nothing signals nobody.
   class EditMessage < ApplicationService
     include Authorization
 
@@ -38,6 +41,7 @@ module Notes
         current.update!(body: @body, edited_at: Time.current)
         Deliveries.for_edit(current, newly_mentioned: newly_mentioned, actor_user: actor_user)
         record_event("note.edited", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread, current))
+        Signals.threads(thread)
         current
       end
 

@@ -14,6 +14,7 @@ module Admin
 
     included do
       before_action :set_container
+      before_action :note_tab
       # The three notes views ask which surface they are drawn for.
       helper_method :note_view
     end
@@ -31,6 +32,14 @@ module Admin
           Media::Asset.kept.find(params[:container_id])
         end
     end
+
+    # Which tab this is (`X-Notes-Tab`, set by `admin--notes-live` on its
+    # notes requests): an id the tab made up, checked for shape
+    # (`Notes::Signals::TAB`) and used for nothing but being echoed in the
+    # record's signal, so the tab can tell its own change from someone
+    # else's. Anything else is dropped, not refused: the write is the
+    # person's either way.
+    def note_tab = Current.notes_tab = request.headers["X-Notes-Tab"].to_s[Notes::Signals::TAB]
 
     def container_threads = Notes::Thread.where(container: @container)
 

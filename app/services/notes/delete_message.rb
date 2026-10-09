@@ -10,6 +10,11 @@ module Notes
   # delete answers "This note is gone" and writes nothing, so no notes write
   # runs without the container's lock (`Authorization#lock_container`).
   # `note.deleted` is recorded before the delete, in its transaction.
+  #
+  # Signals the record's stream (`Notes::Signals`), whether the thread stays
+  # or goes with its last message; a message that was gone already signals
+  # nobody. The people whose inbox rows went with the message are not told:
+  # a person's stream says only that a row was written.
   class DeleteMessage < ApplicationService
     include Authorization
 
@@ -39,6 +44,7 @@ module Notes
         next current unless message && current
 
         record_event("note.deleted", subject: current.subject, snapshot: nil, metadata: note_metadata(current, message))
+        Signals.threads(current)
         message.destroy!
         newest = current.messages.reload.last
         if newest

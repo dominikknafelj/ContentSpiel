@@ -27,6 +27,10 @@ module Notes
   # A mentioned id whose user is gone follows nothing and is told nothing; a
   # follower who lost the right to read the record still gets the row, which
   # the inbox does not show (`Notes.readable_threads`).
+  #
+  # Every row written here, new or reused, signals its person's stream once
+  # the action has committed (`Notes::Signals.delivery`): an id and a reason,
+  # which the inbox's own scoped request then answers or doesn't.
   module Deliveries
     module_function
 
@@ -69,6 +73,7 @@ module Notes
       User.where(id: reasons.keys).order(:id).pluck(:id).map do |user_id|
         delivery = Delivery.find_or_initialize_by(user_id: user_id, message_id: message.id)
         delivery.update!(thread_id: message.thread_id, reason: reasons.fetch(user_id), read_at: nil)
+        Signals.delivery(delivery)
         delivery
       end
     end

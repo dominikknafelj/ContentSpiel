@@ -11,6 +11,9 @@ module Notes
   # purged a moment ago is an ordinary failure, and one deleted a moment
   # later finds this thread in `Notes::Remove`, which runs under the same
   # lock.
+  #
+  # Signals the record's stream once the write has committed, and each person
+  # told theirs (`Notes::Signals`, through `Notes::Deliveries.write`).
   class Start < ApplicationService
     include Authorization
 
@@ -40,6 +43,7 @@ module Notes
         created.update!(last_message_at: message.created_at)
         Deliveries.for_new_message(message, actor_user: actor_user)
         record_event("note.started", subject: @subject, snapshot: nil, metadata: note_metadata(created, message))
+        Signals.threads(created)
         created
       end
 

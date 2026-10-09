@@ -6,6 +6,9 @@ module Notes
   # The thread is re-read under the container's lock: one removed meanwhile
   # (its block deleted, its page purged, its last message deleted) is an
   # ordinary failure the drawer shows, never an exception.
+  #
+  # Signals the record's stream once (a reply that reopens is one change to
+  # one thread), and each person told theirs (`Notes::Signals`).
   class Reply < ApplicationService
     include Authorization
 
@@ -33,6 +36,7 @@ module Notes
         Deliveries.for_new_message(created, actor_user: actor_user)
         record_event("note.replied", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread, created))
         record_event("note.reopened", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread)) if reopened
+        Signals.threads(thread)
         created
       end
 

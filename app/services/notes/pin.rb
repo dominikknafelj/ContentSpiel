@@ -2,6 +2,8 @@ module Notes
   # Pins a thread: a standing note, listed first (decision D1). Moderation:
   # the container's edit right. A pinned thread is always open, so a resolved
   # one can't be pinned: it is reopened first, which tells its followers.
+  # Signals the record's stream (`Notes::Signals`) and no person: a pin is
+  # addressed to nobody.
   class Pin < ApplicationService
     include Authorization
 
@@ -21,6 +23,7 @@ module Notes
 
         thread.update!(pinned: true, pinned_at: Time.current, pinned_by: actor_user)
         record_event("note.pinned", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread))
+        Signals.threads(thread)
         thread
       end
       thread_answer(outcome, @thread)

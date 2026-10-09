@@ -3,7 +3,8 @@ module Notes
   # counted. Needs the read right. Two people resolving at once is one
   # resolve: the second finds it done under the lock and succeeds without an
   # event or a second round of deliveries. A pinned thread is always open, so
-  # resolving one unpins it in the same write.
+  # resolving one unpins it in the same write. Signals the record's stream,
+  # and every follower theirs (`Notes::Signals`); the no-op signals nobody.
   class Resolve < ApplicationService
     include Authorization
 
@@ -23,6 +24,7 @@ module Notes
         thread.update!(state: "resolved", resolved_at: Time.current, resolved_by: actor_user, pinned: false, pinned_at: nil, pinned_by: nil)
         Deliveries.for_state(thread, "resolved", actor_user: actor_user)
         record_event("note.resolved", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread))
+        Signals.threads(thread)
         thread
       end
       thread_answer(outcome, @thread)

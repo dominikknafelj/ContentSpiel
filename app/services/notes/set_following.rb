@@ -4,6 +4,9 @@ module Notes
   # constant is the record (`note_follows`), so the service has this name.
   # Needs the read right. A `false` row is an explicit unfollow, which
   # `Notes::Deliveries.follow` leaves alone until a new mention.
+  #
+  # Signals nobody (`Notes::Signals`): it changes only the actor's own row,
+  # and the tab that asked has the answer.
   class SetFollowing < ApplicationService
     include Authorization
 

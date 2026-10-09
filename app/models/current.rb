@@ -28,6 +28,12 @@ class Current < ActiveSupport::CurrentAttributes
   # of the grants that actor acts under. Cleared after any grant or
   # membership commits (see ActorGrants).
   attribute :access_grants
+
+  # The opaque id of the browser tab a notes request came from (the header
+  # `X-Notes-Tab`, read by `Admin::NoteContainer`). `Notes::Signals` echoes
+  # it in a record's signal so that tab can ignore its own echo; it is used
+  # for nothing else and is nil outside a notes request.
+  attribute :notes_tab
   delegate :user, to: :session, allow_nil: true
 
   # The site's settings row, loaded at most once per request (spec §6.1) --

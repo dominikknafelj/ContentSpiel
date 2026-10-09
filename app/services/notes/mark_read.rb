@@ -22,6 +22,9 @@ module Notes
   # tell (`Notes::Deliveries` reuses a row for a resolve), which the inbox
   # sorts and dates by (`Delivery.inbox_order`). Reading a row is not news,
   # and must not move it above what was read before it.
+  #
+  # Signals nobody (`Notes::Signals`): a person's stream says that a row was
+  # WRITTEN for them, and a read mark is no news to anyone else.
   class MarkRead < ApplicationService
     include Authorization
 

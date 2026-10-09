@@ -1,5 +1,6 @@
 module Notes
   # Takes a thread off the pinned list; it stays open. Moderation, like Pin.
+  # Signals the record's stream (`Notes::Signals`) and no person.
   class Unpin < ApplicationService
     include Authorization
 
@@ -18,6 +19,7 @@ module Notes
 
         thread.update!(pinned: false, pinned_at: nil, pinned_by: nil)
         record_event("note.unpinned", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread))
+        Signals.threads(thread)
         thread
       end
       thread_answer(outcome, @thread)
