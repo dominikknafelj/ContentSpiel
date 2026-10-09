@@ -16,9 +16,20 @@ module ContentBlocks
   # does too. Every save then refreshes the block's `media_usages` rows
   # (its image and its rich-text body's images) inside the transaction; an
   # image deleted in the meantime fails the save as "doesn't exist".
+  #
+  # Sections (sections spec §3.3). A NEW block may name the section and the
+  # 1-based column it goes into (`section_id`, `section_column`); it lands at
+  # the end of that column, and the model's placement rules answer a column
+  # the section doesn't have. Both keys are ignored for a block that exists:
+  # that one changes container only through `ContentBlocks::Reorder`. A
+  # section saved with a layout of fewer columns takes the blocks of the
+  # removed columns along into its last one (`#fold_removed_columns`), and
+  # says which in the event's `folded_block_ids`. Both of those, and any save
+  # of a section, take the page's row lock first (`Structure#lock_owner`).
   class Save < ApplicationService
     include OwnerPermissions
     include Media::Choosing
+    include Structure
 
     TRANSLATED = %i[caption alt body].freeze
 
@@ -39,8 +50,13 @@ module ContentBlocks
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = ContentBlock.transaction(requires_new: true) do
+        # Before anything is read or assigned: the new block's column is
+        # checked, and the section's stranded blocks are looked up, against
+        # rows no other structural write can change until this one commits.
+        lock_owner(@block.owner) if structural?
         assign
         @block.save || raise(ActiveRecord::Rollback)
+        folded = fold_removed_columns
         Media::UsageIndex.refresh(@block)
         # Editing a block is editing its owner (final fix wave, I3): bump
         # the owner's `updated_at` so everything ordered or labelled by it
@@ -63,7 +79,13 @@ module ContentBlocks
 
         created = @block.previously_new_record?
         changes = Audit::Snapshot.field_changes_for(@block)
-        record_event(created ? "block.created" : "block.updated", subject: @block, field_changes: changes) if created || changes.any?
+        # A fold is an event even when the save changed no field of the
+        # section itself (decision D7: no action of its own, the section's
+        # `block.updated` names the blocks that moved).
+        if created || changes.any? || folded.any?
+          record_event(created ? "block.created" : "block.updated", subject: @block, field_changes: changes,
+            metadata: (folded.any? ? { "folded_block_ids" => folded } : {}))
+        end
         true
       end
 
@@ -78,12 +100,25 @@ module ContentBlocks
 
     private
 
+    # A write that changes where blocks are, or could race one that does: a
+    # new block going into a section, and any save of a section (its layout
+    # may lose columns).
+    def structural?
+      @block.container? || @attributes[:section_id].present? ||
+        (@attributes[:block_type].present? && BlockTypes.find(@attributes[:block_type])&.capability?(:container)) || false
+    end
+
     def assign
       # `block_type` is assigned first: `settings`/`assign_settings` below
       # both need it to know which type's schema they're casting against.
       # `media_asset_id` is an image block's library image, already
       # checked by `#media_choice_result` (see the class comment).
       @block.assign_attributes(@attributes.slice(:block_type, :media_asset_id, :position))
+      # Where a block is, is said once, when it is made: a persisted block
+      # changes container only through `ContentBlocks::Reorder`, which checks
+      # where the caller thought it was. A form that echoes the two keys
+      # back on an ordinary save must not move anything.
+      @block.assign_attributes(@attributes.slice(:section_id, :section_column)) if @block.new_record?
 
       @block.assign_settings(@attributes[:settings], locale: Locales.default) if @attributes.key?(:settings)
 
@@ -99,7 +134,9 @@ module ContentBlocks
       assign_position
     end
 
-    # Appends to the end of the owner's existing blocks when no position was
+    # Appends to the end of the block's own container -- the page's top-level
+    # list, or one column of one section: `position` is counted per container
+    # (sections spec §3.1) -- when no position was
     # given, on create only: the admin's "add a block" row submits no
     # position at all, and a nil here would otherwise reach Postgres as a
     # raw not-null violation instead of landing in the right spot. Once a
@@ -108,7 +145,35 @@ module ContentBlocks
     def assign_position
       return unless @block.new_record? && @attributes[:position].nil?
 
-      @block.position = (@block.owner.content_blocks.maximum(:position) || -1) + 1
+      @block.position = (@block.owner.content_blocks.in_column(@block.section_id, @block.section_column).maximum(:position) || -1) + 1
+    end
+
+    # A layout with fewer columns (sections spec §3.3): the blocks of each
+    # removed column go to the end of the last remaining one, in column order.
+    # A layout change never deletes a block. Inside the save's transaction,
+    # under the owner's lock, so no block can arrive in a removed column
+    # between the read and the write.
+    #
+    # Decided from the rows, not from the layout this object had when it was
+    # loaded: a second tab's copy of the section may predate a widening (and
+    # a block added to the new column since), and its save writes the old
+    # layout back. Comparing "columns before" with "columns now" on that copy
+    # sees no change and would strand the block. So every save of a section
+    # asks which blocks sit beyond its layout -- one indexed query, none for
+    # any other block. A section whose type is gone has no columns to fold
+    # into (`column_count` 0) and is left as it is.
+    def fold_removed_columns
+      keep = @block.column_count
+      return [] unless keep.positive?
+
+      stranded = ContentBlock.where(section_id: @block.id, section_column: (keep + 1)..).reorder(:section_column, :position, :id).to_a
+      return [] if stranded.empty?
+
+      last = ContentBlock.in_column(@block.id, keep).maximum(:position) || -1
+      stranded.each_with_index do |block, index|
+        block.update_columns(section_column: keep, position: last + 1 + index) # version: none (the owner is touched below, and a live page's after_commit bumps)
+      end
+      stranded.map(&:id)
     end
   end
 end

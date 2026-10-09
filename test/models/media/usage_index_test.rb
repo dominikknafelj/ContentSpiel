@@ -41,6 +41,32 @@ class Media::UsageIndexTest < ActiveSupport::TestCase
     assert_equal [ [ asset.id, "ContentBlock", block.id, "block_image", nil ] ], usage_tuples(Media::Usage.where(owner: block))
   end
 
+  # An image block in a section's column is indexed, and protects its image,
+  # exactly as a top-level one (sections spec §7); deleting the section with
+  # its blocks is what releases it.
+  test "an image block created in a section's column has its block_image row until the section is deleted with it" do
+    page = create_page(title: "Columns")
+    asset = create_media_asset
+    section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" }, actor: nil).record
+    block = ContentBlocks::Save.call(ContentBlock.new(owner: page),
+      attributes: { block_type: "image", media_asset_id: asset.id, section_id: section.id, section_column: 2 }, actor: nil).record
+
+    assert_equal [ [ asset.id, "ContentBlock", block.id, "block_image", nil ] ], usage_tuples(Media::Usage.where(media_asset_id: asset.id))
+
+    # An image is trashed only once nothing kept uses it, so the page goes
+    # first -- the same steps as for a top-level image block or a hero.
+    assert_match(/\AThis image is used on /, Trash::Move.call(asset, actor: nil).errors.first)
+    assert Trash::Move.call(page, actor: nil).ok?
+    assert Trash::Move.call(asset.reload, actor: nil).ok?
+    refused = Trash::Purge.call(asset.reload, actor: nil)
+    assert_match(/\AThis image is used on /, refused.errors.first)
+    assert Media::Asset.exists?(asset.id)
+
+    assert ContentBlocks::Destroy.call(section, actor: nil).ok?
+    assert_empty Media::Usage.where(media_asset_id: asset.id)
+    assert Trash::Purge.call(asset.reload, actor: nil).ok?
+  end
+
   test "a rich-text post with images in two locales gives one row per (asset, locale)" do
     asset_a = create_media_asset
     asset_b = create_media_asset

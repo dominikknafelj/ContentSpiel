@@ -720,6 +720,34 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
     end
   end
 
+  # A listing block in a section's column is a listing block of its page
+  # (sections spec §7): created into the column, carried along by a fold and
+  # removed with its section, it gives and takes a post's address exactly as
+  # a top-level one does.
+  test "a listing block in a section's column gives a post its URL, through a fold and until the section is deleted" do
+    as_owner do
+      blog = service_page("Blog")
+      section = ok! ContentBlocks::Save.call(ContentBlock.new(owner: blog), attributes: { block_type: "section", settings: { "layout" => "three" } })
+      post = service_post("Hello")
+      assert_nil current(post)
+
+      listing = ok! ContentBlocks::Save.call(ContentBlock.new(owner: blog),
+        attributes: { block_type: "post_list", settings: { "content_type" => "blog" }, section_id: section.id, section_column: 3 })
+      assert_equal "/blog/hello", current(post)
+      assert_parity "creating a listing block in a column"
+
+      ok! ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one" } })
+      assert_equal [ section.id, 1 ], listing.reload.then { |block| [ block.section_id, block.section_column ] }
+      assert_equal "/blog/hello", current(post)
+      assert_parity "folding the section's columns"
+
+      ok! ContentBlocks::Destroy.call(section.reload)
+      assert_not ContentBlock.exists?(listing.id)
+      assert_nil current(post)
+      assert_parity "deleting the section with its blocks"
+    end
+  end
+
   # -- cost ---------------------------------------------------------------------
   #
   # Two sizes rather than a ceiling: a per-page cost hides comfortably under

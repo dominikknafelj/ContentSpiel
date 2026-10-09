@@ -158,4 +158,149 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert ContentBlocks::Destroy.call(block).ok?
     assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: block.id)
   end
+
+  def section_on(page, layout: "three")
+    ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => layout } }, actor: nil).record
+  end
+
+  def add_to(section, column, type: "rich_text")
+    ContentBlocks::Save.call(ContentBlock.new(owner: section.owner), attributes: { block_type: type, section_id: section.id, section_column: column }, actor: nil)
+  end
+
+  test "a new block goes to the end of the column it names" do
+    page = create_page(title: "Columns")
+    section = section_on(page)
+    first = add_to(section, 2).record
+    second = add_to(section, 2).record
+    other = add_to(section, 1).record
+
+    assert_equal [ [ section.id, 2, 0 ], [ section.id, 2, 1 ], [ section.id, 1, 0 ] ],
+      [ first, second, other ].map { |block| [ block.section_id, block.section_column, block.position ] }
+    assert_equal page, first.owner
+  end
+
+  test "a new top-level block is appended among the top-level blocks" do
+    page = create_page(title: "Top")
+    section = section_on(page)
+    3.times { add_to(section, 1) }
+    text = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil).record
+
+    assert_equal [ section, text ], page.content_blocks.top_level.reorder(:position).to_a
+    assert_equal 1, text.position
+  end
+
+  test "a column the section no longer has is refused and nothing is written" do
+    page = create_page(title: "Gone column")
+    section = section_on(page, layout: "two")
+
+    assert_no_difference -> { ContentBlock.count } do
+      result = add_to(section, 3)
+      assert_not result.ok?
+      assert_not result.denied?
+      assert_includes result.errors.to_sentence, "isn't a column of this section"
+    end
+  end
+
+  test "a section can't be created inside a section, and an existing block's section can't be changed through a save" do
+    page = create_page(title: "Rules")
+    section = section_on(page)
+    assert_not add_to(section, 1, type: "section").ok?
+
+    text = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil).record
+    assert ContentBlocks::Save.call(text, attributes: { section_id: section.id, section_column: 1 }, actor: nil).ok?
+    assert_nil text.reload.section_id
+  end
+
+  test "a layout with fewer columns moves the removed columns' blocks to the end of the last one, in column order" do
+    page = create_page(title: "Fold")
+    section = section_on(page, layout: "four")
+    keep = add_to(section, 2).record
+    third_a = add_to(section, 3).record
+    third_b = add_to(section, 3).record
+    fourth = add_to(section, 4).record
+
+    result = nil
+    assert_difference -> { Audit::Event.where(action: "block.updated").count }, 1 do
+      result = ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil)
+    end
+
+    assert result.ok?
+    assert_equal [ keep, third_a, third_b, fourth ], page.content_blocks.in_column(section, 2).reorder(:position).to_a
+    assert_equal [ 0, 1, 2, 3 ], page.content_blocks.in_column(section, 2).reorder(:position).pluck(:position)
+    assert_equal [ third_a.id, third_b.id, fourth.id ], Audit::Event.where(action: "block.updated").last.metadata["folded_block_ids"]
+    assert_equal 4, ContentBlock.where(section_id: section.id).count
+  end
+
+  test "a layout with as many or more columns moves nothing" do
+    page = create_page(title: "Widen")
+    section = section_on(page, layout: "two")
+    block = add_to(section, 2).record
+
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one_two" } }, actor: nil).ok?
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "four" } }, actor: nil).ok?
+    assert_equal [ 2, 0 ], block.reload.then { |b| [ b.section_column, b.position ] }
+  end
+
+  test "a save into a column needs the page's edit right like any block" do
+    page = create_page(title: "Rights", published: false)
+    section = section_on(page)
+    nobody = User.create!(email_address: "nobody-columns@example.com", password: "a long enough password")
+
+    result = as(nobody) { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 }) }
+
+    assert_predicate result, :denied?
+    assert_empty ContentBlock.where(section_id: section.id)
+  end
+
+  # The plan's review focus (decision D14): one tab folds a section to fewer
+  # columns while another adds into the last one. Both take the page's row
+  # lock first, so the add runs after the fold has committed and is judged
+  # against the layout as it then stands: refused with a message, and no
+  # block is left in a column the section does not have.
+  test "an add into a column that a fold has just removed is refused, and no block is left beyond the layout" do
+    page = create_page(title: "Two tabs")
+    section = section_on(page, layout: "three")
+    there = add_to(section, 3).record
+
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil).ok?
+    result = add_to(section, 3)
+
+    assert_not result.ok?
+    assert_equal [ "Section column isn't a column of this section" ], result.errors
+    assert_equal [ [ there.id, 2 ] ], ContentBlock.where(section_id: section.id).pluck(:id, :section_column)
+  end
+
+  # The other half of the same race: the second tab still holds the section
+  # as it was loaded before the first tab widened it and a block arrived in
+  # the new column. Its save writes the old, narrower layout; the fold is
+  # decided from the rows under the lock, not from what that stale object
+  # remembers, so the block comes along.
+  test "a section saved from a copy loaded before it was widened still folds what arrived since" do
+    page = create_page(title: "Stale tab")
+    section = section_on(page, layout: "two")
+    stale = ContentBlock.find(section.id)
+    assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "four" } }, actor: nil).ok?
+    arrived = add_to(section, 4).record
+
+    assert ContentBlocks::Save.call(stale, attributes: { settings: { "layout" => "two", "background" => "tinted" } }, actor: nil).ok?
+
+    assert_equal [ 2, 0 ], arrived.reload.then { |b| [ b.section_column, b.position ] }
+  end
+
+  test "a structural save locks the page's row before it writes, and a save outside a section takes no such lock" do
+    page = create_page(title: "Lock")
+    section = section_on(page)
+    locks = ->(statements) { statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) } }
+    first_write = ->(statements) { statements.index { |sql| sql.match?(/\A(INSERT INTO|UPDATE) "content_blocks"/) } }
+
+    into_column = capture_sql { assert add_to(section, 1).ok? }
+    layout = capture_sql { assert ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "two" } }, actor: nil).ok? }
+    new_section = capture_sql { section_on(page) }
+    outside = capture_sql { assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil).ok? }
+
+    [ into_column, layout, new_section ].each do |statements|
+      assert_operator locks.call(statements), :<, first_write.call(statements)
+    end
+    assert_nil locks.call(outside)
+  end
 end
