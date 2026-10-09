@@ -202,6 +202,11 @@ module ServiceCalls
       { call: -> { ContentBlocks::Destroy.call(block) }, permission: "pages.edit", on: block }
     },
 
+    "ContentBlocks::Duplicate" => lambda {
+      _page, section, = draft_page_with_section
+      { call: -> { ContentBlocks::Duplicate.call(section) }, permission: "pages.edit", on: section }
+    },
+
     "ContentBlocks::Reorder" => lambda {
       page, (first, second) = draft_page_with_blocks(count: 2)
       { call: -> { ContentBlocks::Reorder.call(page, [ second.id, first.id ]) }, permission: "pages.edit", on: page }
@@ -448,6 +453,13 @@ module ServiceCalls
       "a section with its blocks" => lambda {
         _page, section, = draft_page_with_section
         { call: -> { ContentBlocks::Destroy.call(section) }, permission: "pages.edit", on: section }
+      }
+    },
+    "ContentBlocks::Reorder" => {
+      "moving a block out of a section" => lambda {
+        page, section, (block,) = draft_page_with_section
+        { call: -> { ContentBlocks::Reorder.call(page, [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 3 } }) },
+          permission: "pages.edit", on: page }
       }
     },
     "Groups::Save" => {

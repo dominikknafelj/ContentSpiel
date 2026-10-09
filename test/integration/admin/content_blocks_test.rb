@@ -691,4 +691,58 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal "blog", block.settings["content_type"]
     assert_not block.translated_settings.key?("de")
   end
+
+  test "duplicating a section streams one card holding the copies of its blocks" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    assert_difference -> { @page.content_blocks.count }, 2 do
+      post "#{blocks_path}/#{section.id}/duplicate", as: :turbo_stream
+    end
+    assert_response :created
+    copy = @page.content_blocks.top_level.reorder(:position).last
+    assert_includes response.body, "section-#{copy.id}-lane-1"
+    assert_includes response.body, "block-#{copy.section_blocks.sole.id}-panel"
+  end
+
+  test "a reorder that names a column moves the block and a stale one is a 422" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 2, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ section.id, 2 ], block.reload.then { |b| [ b.section_id, b.section_column ] }
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::STALE
+  end
+
+  # Sections plan, Q5: the Undo toast restores the page's own order, which
+  # can't undo a move between containers.
+  test "a move between containers offers no Undo, and one inside a column neither" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    first = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ second.id, first.id ], section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "Undo"
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, first.id ], moved_from: { first.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "Undo"
+    assert_equal [ section, first ], @page.content_blocks.top_level.reorder(:position).to_a
+  end
+
+  test "a moved_from that is no hash is read as none, and a forged entry in one is a 422, never an error" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], moved_from: "x" }, as: :turbo_stream
+    assert_response :success
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], moved_from: { "0" => "x" } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::STALE
+  end
 end

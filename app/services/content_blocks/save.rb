@@ -78,12 +78,14 @@ module ContentBlocks
         # always took this row, at the touch; it only takes it earlier, so
         # two saves on one page queue here instead of there.
         #
-        # The writers that keep this order: this service,
-        # `ContentBlocks::Destroy`, the tag merge (`Tags::Merge
+        # The writers, all of which keep this order: this service,
+        # `ContentBlocks::Destroy`, `ContentBlocks::Reorder` (every call,
+        # the plain top-level order too -- it used to write block rows and
+        # then touch the page), `ContentBlocks::Duplicate` (before the
+        # saves and the reorder it runs), the tag merge (`Tags::Merge
         # #repoint_blocks`, which rewrites listing blocks) and the purge of
-        # a page (`Trash::Purge#purge_branch`, which deletes them). ONE
-        # writer does not yet: `ContentBlocks::Reorder` still writes block
-        # rows and then touches the page, until the task that reworks it.
+        # a page (`Trash::Purge#purge_branch`, which deletes them). A new
+        # writer of block rows takes the page's row first too.
         lock_owner(@block.owner)
         reread_container
         assign

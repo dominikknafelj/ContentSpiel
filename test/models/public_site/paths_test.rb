@@ -676,6 +676,18 @@ class PublicSite::PathsTest < ActiveSupport::TestCase
       ok! ContentBlocks::Reorder.call(news.reload, news.content_blocks.pluck(:id).reverse)
       assert_parity "reordering a page's blocks"
 
+      # A copy of a listing block lists the same posts from the same page, in
+      # a column as at the top level: no URL moves, and the rows agree.
+      copied = ok! ContentBlocks::Duplicate.call(news_block.reload)
+      assert_parity "duplicating a listing block"
+
+      band = ok! ContentBlocks::Save.call(ContentBlock.new(owner: news.reload), attributes: { block_type: "section" })
+      ok! ContentBlocks::Reorder.call(news.reload, [ copied.id ], section: band.id, column: 1, moved_from: { copied.id => { section_id: nil, column: nil } })
+      assert_parity "moving a listing block into a section"
+
+      ok! ContentBlocks::Duplicate.call(band.reload)
+      assert_parity "duplicating a section that holds a listing block"
+
       # -- tags ----------------------------------------------------------------
       ok! Tags::Rename.call(Tag.find_by!(name: "old"), name: "vintage")
       assert_equal "/writing/blog/old", current(old), "the block still names the old tag, so the post falls out of it"

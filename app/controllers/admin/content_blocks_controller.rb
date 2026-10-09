@@ -140,9 +140,24 @@ module Admin
     # stays), since unlike a drop the client's DOM isn't already in the
     # order the server now has; and it gets a plain confirmation with no
     # Undo of its own, so two orders can't be bounced between forever.
+    #
+    # One container per request (sections spec §3.3): `ids` is the complete
+    # new order of the page's own list or, with `section_id` and `column`,
+    # of one column of one section; `moved_from[<id>][section_id]` and
+    # `[column]` say where each block that comes from another container is
+    # expected to be (blank for the top level). They are handed on as they
+    # arrived -- ids, not attributes: the service casts every value to an
+    # integer and looks each up among this page's blocks. A block that is
+    # elsewhere, or a column that is gone, is a 422 with the service's
+    # message, told from a denial by `result.denied?`.
+    #
+    # No Undo for a request that names a section or moves a block (sections
+    # plan, Q5): the toast's Undo is a reorder of the page's own list back
+    # to `before`, which can't put a block back into the column it left and
+    # would be refused as soon as the list had gained or lost one.
     def reorder
       before = top_level_blocks.ids
-      result = ContentBlocks::Reorder.call(@page, params[:ids])
+      result = ContentBlocks::Reorder.call(@page, params[:ids], section: params[:section_id], column: params[:column], moved_from: moved_from_param)
       status_id = "content-blocks-status"
 
       state = if result.ok? then Admin::SaveStatusComponent.new(id: status_id, state: :saved, at: Time.current)
@@ -153,38 +168,29 @@ module Admin
       streams = [ turbo_stream.replace(status_id, state) ]
       if result.ok?
         streams.concat(page_base_streams)
-        streams.concat(reorder_undo_streams(before))
+        streams.concat(reorder_undo_streams(before)) unless params[:section_id].present? || moved_from_param.any?
       else
         streams << picker_error_stream(result.errors)
       end
       render turbo_stream: streams, status: (result.ok? ? :ok : failure_status(result))
     end
 
-    # Duplicate (spec §5.1): copies the type, its settings (both halves --
-    # untranslated and every locale's translations), every locale's
-    # caption/alt/body and the image reference (the copy shows the same
-    # library asset -- media library Task 4; nothing is copied, and the
-    # asset can't be deleted while either block uses it), then
-    # inserts the copy directly after the source the same way `create`'s
-    # own `after_id` does -- `after_id: source.id` here is always present,
+    # Duplicate (spec §5.1; sections spec §3.3): `ContentBlocks::Duplicate`
+    # makes the copy -- of a section, with every block in it -- and puts it
+    # directly after its source; what is copied is said there. The copy's
+    # card is inserted after the source's the same way `create`'s own
+    # `after_id` does -- `after_id: source.id` here is always present,
     # unlike `create`'s (which is only sometimes given), so this never
-    # falls back to appending at the end.
+    # falls back to appending at the end. A section's card comes with its
+    # lanes, tiles and forms (`card_for`).
     def duplicate
       source = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless source
 
-      copy = @page.content_blocks.new(block_type: source.block_type, settings: source.settings, translated_settings: source.translated_settings)
-      copy_translations(source, copy)
-
-      # The image reference goes in through the service (final fix wave,
-      # Minor 6), so it's saved in the same authorized, audited write -- and
-      # the `block.created` snapshot shows it.
-      attributes = source.media_asset_id ? { media_asset_id: source.media_asset_id } : {}
-      result = ContentBlocks::Save.call(copy, attributes: attributes)
+      result = ContentBlocks::Duplicate.call(source)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      reposition_after(copy, source.id)
-      render turbo_stream: [ *insertion_stream(copy.reload, source.id), *page_base_streams ], status: :created
+      render turbo_stream: [ *insertion_stream(result.record, source.id), *page_base_streams ], status: :created
     end
 
     private
@@ -294,6 +300,13 @@ module Admin
     # is no part of this order. A fresh query each time it is asked -- every
     # caller reads it after a service has written.
     def top_level_blocks = @page.content_blocks.top_level.reorder(:position, :id)
+
+    # `moved_from` as a plain hash, or none: a request may leave it out, and
+    # a forged one may send anything where the hash belongs.
+    def moved_from_param
+      moved = params[:moved_from]
+      moved.respond_to?(:to_unsafe_h) ? moved.to_unsafe_h : {}
+    end
 
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
@@ -447,39 +460,6 @@ module Admin
 
     def picker_error_stream(errors)
       turbo_stream.replace("content-blocks-alert", partial: "admin/shared/field_errors", locals: { id: "content-blocks-alert", messages: errors })
-    end
-
-    # Every locale's translated columns (`ContentBlocks::Save::TRANSLATED`
-    # -- fix round 1, same one source `TRANSLATED_COLUMNS` above derives
-    # from), copied literally (no fallback) from `source` onto `copy` --
-    # `Mobility.with_locale` is what both the reader and the writer need for
-    # a jsonb column (Locales.default note in `ContentBlocks::Save` explains
-    # why the writer side can't take a `locale:` keyword directly the way a
-    # jsonb reader can).
-    #
-    # `body` is the rich-text JSON document (tiptap spec §3.1), copied as
-    # data through `body_document`/`assign_body` rather than the Mobility
-    # reader/writer pair the other columns use: `assign_body` is the one
-    # writer that refuses a "nothing" value instead of silently deleting the
-    # locale (`HasRichTextBody#assign_body`). A document is copied verbatim, so a
-    # duplicate's body is exactly the source's, and duplicating a duplicate
-    # stays that way (the ActionText-era bug this method used to guard
-    # against -- a re-rendered `trix-content` wrapper nesting itself on
-    # every duplicate -- has no equivalent for plain JSON). A blank locale
-    # is skipped rather than copied as an empty document.
-    def copy_translations(source, copy)
-      Locales.enabled.each do |code|
-        Mobility.with_locale(code) do
-          ContentBlocks::Save::TRANSLATED.each do |column|
-            if column == :body
-              document = source.body_document(locale: code)
-              copy.assign_body(document, locale: code) unless document.blank?
-            else
-              copy.public_send("#{column}=", source.public_send(column))
-            end
-          end
-        end
-      end
     end
 
     # The Turbo Stream `update`/`destroy`/`duplicate` answer with for a

@@ -229,6 +229,22 @@ class PublicSite::VersionTest < ActiveSupport::TestCase
     assert_moves("deleting a live page's block") { ok(ContentBlocks::Destroy.call(second)) }
   end
 
+  # A move is written with `update_columns` and a duplicate through saves
+  # and a reorder: each touches the page, whose `after_commit` moves the
+  # version of a live one.
+  test "a live page's block moved between containers or duplicated moves, a draft's stays" do
+    [ [ create_page(title: "Live"), :assert_moves ], [ create_page(title: "Draft", published: false), :assert_stays ] ].each do |page, expectation|
+      block = block_on(page)
+      section = ok(ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" })).record
+
+      send(expectation, "moving a block into a column") do
+        ok(ContentBlocks::Reorder.call(page, [ block.id ], section: section.id, column: 1, moved_from: { block.id => { section_id: nil, column: nil } }))
+      end
+      send(expectation, "duplicating a block in a column") { ok(ContentBlocks::Duplicate.call(block.reload)) }
+      send(expectation, "duplicating a section") { ok(ContentBlocks::Duplicate.call(section.reload)) }
+    end
+  end
+
   # Without the services' owner touch: the block's own `after_commit`.
   test "a block of a live page saved or destroyed without its service moves, a draft's stays" do
     live = block_on(create_page(title: "Live"))

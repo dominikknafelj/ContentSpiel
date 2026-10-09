@@ -156,6 +156,40 @@ class TranslationStateParityTest < ActiveSupport::TestCase
     end
   end
 
+  # A duplicate writes blocks with every locale's text (`ContentBlocks::
+  # Duplicate`, through `ContentBlocks::Save`), and a move changes nothing a
+  # state is computed from: the page's rows agree with a fresh computation
+  # after each, for a block, for a section with its blocks, and when the
+  # source is outdated.
+  test "duplicating a block or a section, and moving a block between containers, keep the page's state in step" do
+    with_locales(%w[en de], default: "en")
+    state = ->(page) { Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale, :state).to_h }
+
+    as_owner do
+      page = create_page(title: "Copies", translations: { "de" => { title: "Kopien" } })
+      section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" }).record
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 },
+        translations: { "en" => { body: rich_doc("Text") } }).record
+      assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Text DE") } }).ok?
+
+      assert ContentBlocks::Duplicate.call(block).ok?
+      assert_parity page
+      assert ContentBlocks::Duplicate.call(section.reload).ok?
+      assert_parity page
+
+      assert ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("Text changed") } }).ok?
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      copy = ContentBlocks::Duplicate.call(block.reload).record
+      assert_parity page
+
+      assert ContentBlocks::Reorder.call(page, [ *page.content_blocks.top_level.reorder(:position).ids, copy.id ],
+        moved_from: { copy.id => { section_id: section.id, column: 1 } }).ok?
+      assert_nil copy.reload.section_id
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      assert_parity page
+    end
+  end
+
   test "purging a post removes its rows" do
     as_owner do
       post = create_post(title: "Hello")
