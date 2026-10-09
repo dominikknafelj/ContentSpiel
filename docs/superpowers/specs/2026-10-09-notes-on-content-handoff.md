@@ -213,3 +213,9 @@ Three more, on the combined account form:
 19. **Wording.** The combined form's button reads "Save" and its toast "Settings saved" (the wording the app already uses, with no full stop). The section title is "Your account", with no extra title per card.
 20. **Layout.** Two cards, Profile (the name) and Notes, inside one form at one shared width (560px), with the single save footer under both.
 21. **"Back to page" in the sheet's thread row** (below 1024px): the words "Back to page", 13px/500 `text-dim`, underlined like the Notify link, with no arrow and no title.
+
+Three more, on reactions:
+
+22. **Where the emoji set opens.** Above the chip by default; flipped below only when there is no room above inside the thread's scroll area (the same rule as the mind graph card's placement). It is clipped to the drawer's body and never lies over row 1.
+23. **Chips while a message is being edited.** They stay under the edit form, disabled (0.5 opacity, not clickable), until the edit is saved or cancelled.
+24. **The add-reaction chip.** At rest it shows on hover or keyboard focus of the message (`:focus-within`), and always when the message already has reactions; "React" is also always in the message's "⋯" menu, for touch. **A resolved thread** shows its reactions read-only and takes no new ones: it is closed, and whoever wants to add something reopens it.
