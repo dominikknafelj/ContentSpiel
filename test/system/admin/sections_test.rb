@@ -2090,7 +2090,7 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     open_editor
 
     assert_selector "#{section_card}.border-danger", text: "Unavailable type — gone/section"
-    assert_selector section_card, text: "Its blocks are kept. Move them out or delete them."
+    assert_selector section_card, text: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
     assert_equal [ @left.id ], tiles_in(1)
     assert_equal [ @right.id ], tiles_in(2)
     assert_no_selector "#{section_card} .admin-block-card__handle", visible: :all
@@ -2174,11 +2174,11 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_no_selector "dialog[open]"
   end
 
-  test "Delete block… on a section whose type is gone says how many blocks go with it, and deletes them" do
+  test "Delete section and its blocks… on a section whose type is gone says how many blocks go with it, and deletes them" do
     lose_the_sections_type
     open_editor
 
-    within("#{section_card} > div:first-child") { press "Delete block…" }
+    within("#{section_card} > div:first-child") { press "Delete section and its blocks…" }
 
     assert_selector "dialog[open]", text: "This also deletes the 2 blocks in it."
     within("dialog[open]") { press "Delete section" }
@@ -2186,5 +2186,58 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_no_selector section_card
     assert_no_selector ".admin-block-tile"
     assert_empty @page.content_blocks.reload
+  end
+
+  # The safe way out of a section nobody can read: the wrapper goes, what was
+  # in it stays, as cards where it stood and in the order it was read in.
+  test "Remove section, keep blocks on a section whose type is gone puts its blocks in its place as cards in reading order" do
+    above = @page.content_blocks.create!(block_type: "image", position: 0)
+    @section.update_columns(position: 1)
+    below_left = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    after = @page.content_blocks.create!(block_type: "image", position: 2)
+    lose_the_sections_type
+    open_editor
+
+    within("#{section_card} > div:first-child") { press "Remove section, keep blocks" }
+
+    assert_no_selector ".admin-section-card"
+    assert_no_text "Unavailable type"
+    assert_order_eventually([ above.id, @left.id, below_left.id, @right.id, after.id ]) { cards_in_list }
+    assert_selector "#content-blocks-list > .admin-block-card", count: 5
+    assert_no_selector ".admin-block-tile"
+    assert_writes_settled
+    assert_not ContentBlock.exists?(@section.id)
+    assert_equal [ above.id, @left.id, below_left.id, @right.id, after.id ], @page.content_blocks.top_level.reorder(:position, :id).ids
+    assert_equal [ nil ], @page.content_blocks.reload.map(&:section_id).uniq
+
+    # A lifted block is a card like any other: it saves on its own base.
+    fill_in id: caption(@left), with: "Kept, and edited as a card"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#block-#{@left.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    assert_equal "Kept, and edited as a card", @left.reload.caption
+    assert_no_text "CHANGED ELSEWHERE"
+  end
+
+  # The same rule as in a section's menu: the removal's answer replaces the
+  # blocks' forms, so it does not run over text that was refused.
+  test "Remove section, keep blocks on a section whose type is gone does not run while a form holds text that was refused" do
+    lose_the_sections_type
+    open_editor
+    find(face(@left)).click
+    travel 1.minute do
+      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
+    end
+    fill_in id: caption(@left), with: "Mine, refused"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#block-#{@left.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
+
+    within("#{section_card} > div:first-child") { press "Remove section, keep blocks" }
+
+    assert_selector "#toasts #toast-queue-hold[role=alert]", text: "Your last change wasn't saved, so this didn't run."
+    assert_selector "#{section_card}.border-danger"
+    assert_field caption(@left), with: "Mine, refused"
+    assert_equal @section.id, @left.reload.section_id
+    assert_selector "#{section_card} > div:first-child button:not([disabled])", text: "Remove section, keep blocks"
   end
 end

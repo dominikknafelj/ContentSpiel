@@ -284,12 +284,14 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     as(users(:one), channel: :admin) { render_card }
 
     assert_selector ".admin-section-card.border-danger[data-container][data-admin--blocks-target='card']", text: "Unavailable type — gone/section"
-    assert_selector ".admin-section-card", text: "Its blocks are kept. Move them out or delete them."
+    assert_selector ".admin-section-card", text: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
     assert_selector ".admin-block-tile", count: 2
     assert_selector "[data-admin--blocks-target='lane'][data-no-drop]", count: 2
     assert_no_selector "[data-admin--blocks-target='lane']:not([data-no-drop])", visible: :all
     assert_no_selector "form#section-#{@section.id}-form", visible: :all
-    assert_selector "button", text: "Delete block…", visible: :all
+    assert_selector "button[type='submit']", text: "Remove section, keep blocks", exact_text: true
+    assert_selector "button", text: "Delete section and its blocks…", exact_text: true
+    assert_no_selector "button", text: "Delete block…", exact_text: true
   end
 
   # A tile's lane says where its block really is: that is what a move out of
@@ -306,7 +308,11 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 2, visible: :all
   end
 
-  test "it has no handle, no menu and no settings; its one action opens the dialog that counts its blocks" do
+  # Its two actions are a section's two removals, under the menu's own words:
+  # the one that keeps the blocks is a form of its own, sent with
+  # `keep_blocks` and only on a settled screen (`admin--queue-hold`: its
+  # answer replaces the blocks' forms); the other opens the dialog.
+  test "it has no handle, no menu and no settings; its two actions are Remove section, keep blocks and the dialog that counts its blocks" do
     @section.update_columns(block_type: "gone/section")
     as(users(:one), channel: :admin) { render_card }
     header = "##{ActionView::RecordIdentifier.dom_id(@section)} > div:first-child"
@@ -315,10 +321,16 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button[aria-label='Section actions']", visible: :all
     assert_no_selector "select, [data-admin--section-target='layoutMenu']", visible: :all
     assert_no_selector "#section-#{@section.id}-summary", visible: :all
-    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete block…"
+    keep = "#{header} form[action$='/content_blocks/#{@section.id}'][data-controller='admin--queue-hold'][data-action='submit->admin--queue-hold#submit']"
+    assert_selector "#{keep} input[name='_method'][value='delete']", visible: :all
+    assert_selector "#{keep} input[name='keep_blocks'][value='1']", visible: :all
+    assert_selector "#{keep} button[type='submit']", text: "Remove section, keep blocks", exact_text: true
+    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", exact_text: true
+    assert_selector "#{header} button", count: 2
     assert_selector "dialog#delete-section-#{@section.id} #section-#{@section.id}-delete-count", text: "This also deletes the 2 blocks in it.", visible: :all
     assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] input[name='_method'][value='delete']", visible: :all
-    assert_no_selector "input[name='keep_blocks']", visible: :all
+    assert_no_selector "dialog input[name='keep_blocks']", visible: :all
+    assert_selector "input[name='keep_blocks']", count: 1, visible: :all
   end
 
   test "a viewer who can't edit sees the unavailable section and its tiles, and nothing that deletes" do
@@ -327,7 +339,10 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
 
     assert_selector ".admin-section-card.border-danger", text: "Unavailable type — gone/section"
     assert_selector ".admin-block-tile", count: 2
-    assert_no_selector "button", text: "Delete block…", visible: :all
+    assert_no_selector "button", text: "Remove section, keep blocks", visible: :all
+    assert_no_selector "button", text: "Delete section and its blocks…", visible: :all
+    assert_no_selector "input[name='keep_blocks']", visible: :all
+    assert_no_selector "form[data-controller='admin--queue-hold']", visible: :all
     assert_no_selector "dialog", visible: :all
     assert_no_selector ".admin-block-tile__grip", visible: :all
   end

@@ -2,11 +2,17 @@
       data: { block_id: section.id, container: "", "admin--blocks-target": "card", controller: "admin--section", action: "keydown.esc->admin--section#escape" } do %>
   <% if unavailable? %>
     <%# A section whose type is gone (see the component): the unavailable block card's
-        header and sentence, over the blocks it still holds. %>
-    <div class="flex items-center gap-2 p-3">
-      <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= t(".unavailable", type: section.block_type) %></span>
+        header and a sentence, over the blocks it still holds, and a section's own two
+        removals under their own names -- the one that keeps the blocks first. The header
+        wraps: on a narrow card the two buttons go under the type's name. %>
+    <div class="flex flex-wrap items-center gap-2 p-3">
+      <span class="min-w-48 flex-1 truncate text-sm font-semibold text-danger-ink"><%= t(".unavailable", type: section.block_type) %></span>
       <% if editable? %>
-        <%= render Admin::ButtonComponent.new(label: t(".delete_block"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+        <%= form_with url: destroy_path, method: :delete, data: settled_screen_data do %>
+          <%= hidden_field_tag :keep_blocks, 1, id: nil %>
+          <%= render Admin::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
+        <% end %>
+        <%= render Admin::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
     </div>
     <p class="px-3 pb-3 text-xs text-meta"><%= t(".unavailable_hint") %></p>

@@ -236,10 +236,12 @@ en:
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
           # A section whose type is no longer registered (sections spec §6):
-          # the unavailable block card's own words, over the blocks it holds.
+          # the unavailable block card's own heading, over the blocks it
+          # holds. Its two buttons are `remove_keep` and `delete` above, the
+          # menu's own words, and the sentence names all three ways out
+          # without promising that the blocks are safe from the second.
           unavailable: "Unavailable type — %{type}"
-          delete_block: "Delete block…"
-          unavailable_hint: "Its blocks are kept. Move them out or delete them."
+          unavailable_hint: "Its blocks are still here. Remove the section and keep them, move them out one by one, or delete it with them."
           # The toast of a block that was not moved between the list and a
           # column, or between sections, because its form holds an edit that
           # was not saved (`admin--blocks#move`): the move would redraw the

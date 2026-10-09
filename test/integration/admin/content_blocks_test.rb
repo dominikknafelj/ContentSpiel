@@ -529,8 +529,8 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(section)}']"
   end
 
-  # The card offers no "keep" for it; a request that asks anyway is honoured
-  # as for any section, and answered with the lifted blocks' cards.
+  # The card's "Remove section, keep blocks": honoured as for any section,
+  # and answered with the lifted blocks' cards.
   test "removing a section whose type is gone with its blocks kept answers with their cards" do
     section, first, third = gone_section
 
@@ -541,6 +541,23 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
       assert_equal [ first.id, third.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
     end
+  end
+
+  # The lifted blocks' cards are drawn from ONE outline of the page
+  # (`removal_streams`): the page's blocks are read the same number of times
+  # however many blocks the section held.
+  test "removing a section with its blocks kept reads the page's blocks as often for four blocks as for two" do
+    reads = [ 2, 4 ].map do |size|
+      section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+      size.times { |index| @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: index) }
+
+      statements = capture_sql { delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream }
+      assert_response :success
+      assert_select "turbo-stream[action=replace] template .admin-block-card[data-admin--blocks-target='card']", count: size
+      statements.count { |sql| sql.start_with?('SELECT "content_blocks".*') }
+    end
+
+    assert_equal reads.first, reads.last, "a read of content_blocks per lifted block"
   end
 
   test "a block is moved out of a section whose type is gone, and the section's delete dialog recounts" do

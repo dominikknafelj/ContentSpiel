@@ -515,9 +515,12 @@ module Admin
       return [ turbo_stream.remove(id), *panel_removal_streams(block), *section_count_streams(section) ] if section
       return [ turbo_stream.remove(id) ] if kept_ids.empty?
 
-      ordered = top_level_blocks.to_a
+      # One outline for all of them: `card_for` reads the page's blocks when
+      # it is handed none, which was once per lifted block.
+      outline = fresh_outline
+      ordered = outline.top_level
       cards = ordered.select { |lifted| kept_ids.include?(lifted.id) }.map do |lifted|
-        render_to_string(card_for(lifted, first: ordered.first == lifted, last: ordered.last == lifted))
+        render_to_string(card_for(lifted, first: ordered.first == lifted, last: ordered.last == lifted, outline: outline))
       end
       [ turbo_stream.replace(id, html: helpers.safe_join(cards)) ]
     end

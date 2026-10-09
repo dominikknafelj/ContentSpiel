@@ -38,17 +38,26 @@ module Admin
     # its blocks' rows; `self.draws?` asks the rows too, so it is still drawn
     # here and its blocks do not vanish from the editor. It is the
     # "Unavailable type" card: the danger border, the type's stored name, one
-    # sentence, and "Delete block…" as its only action -- the unavailable
-    # block card's own wording, opening the section's delete dialog, which
-    # says how many blocks go with it. No handle, no settings form and no
-    # menu: there is no layout to read a setting from, and a card nobody can
-    # read is not moved or copied (as an unavailable block's card is not).
-    # Its blocks are listed under it as tiles, in lanes that take nothing
+    # sentence, and a section's own two removals as two buttons, under the
+    # words the "⋯" menu has for them. "Remove section, keep blocks" comes
+    # first and is the safe one: the wrapper nobody can read goes, the texts
+    # and pictures in it take its place as cards (`ContentBlocks::Destroy`
+    # decides from the rows, so it lifts the blocks of a section whose type
+    # is gone as it does any section's); it runs only on a settled screen,
+    # for the reason given under THE "⋯" MENU below. "Delete section and its
+    # blocks…" opens the section's delete dialog, which says how many blocks
+    # go with it. The card must not say "Delete block…" as an unavailable
+    # BLOCK's card does: this one holds other blocks, and a person whose
+    # plugin was removed would be one press and one confirmation away from
+    # deleting a band of content under a label that names one block. The
+    # sentence under the header names the ways out and promises nothing the
+    # second button undoes. No handle, no settings form and no menu: there
+    # is no layout to read a setting from, and a card nobody can read is not
+    # moved or copied (as an unavailable block's card is not). Its blocks are
+    # listed under it as tiles, in lanes that take nothing
     # (`SectionLanesComponent`), each tile with its form and its own menu: so
-    # they are opened, edited, deleted, or moved out one by one, which is how
-    # they are kept. "Remove section, keep blocks" is not offered here on
-    # purpose -- the service would do it (`ContentBlocks::Destroy` decides
-    # from the rows) -- because the brief for this card names one action.
+    # they can also be opened, edited, deleted, or moved out one by one. A
+    # viewer who can't edit sees the card and its tiles and neither button.
     #
     # THE SECTION'S OWN SETTINGS ARE A FORM IN THE HEADER (spec §4.1): layout,
     # background and width, where a block card has its fields in its body. It
@@ -86,7 +95,7 @@ module Admin
     # block in the section's place (`Admin::ContentBlocksController
     # #removal_streams`), and the panels' forms go with the section's card.
     # A row is never lost by it; what a form holds and has not saved would
-    # be. So its `button_to` carries `admin--queue-hold`, as the editor
+    # be. So its form carries `admin--queue-hold`, as the editor
     # header's actions do: the press first waits until the write queue is
     # EMPTY (`drained()` -- an edit inside its debounce is sent, and so is one
     # typed while the block's save was on the wire, whose follow-up the
@@ -214,7 +223,8 @@ module Admin
 
       def delete_dialog_id = "delete-section-#{section.id}"
 
-      # On the form of "Remove section, keep blocks": see the class comment.
+      # On the form of "Remove section, keep blocks", in the menu and on the
+      # card of a section whose type is gone: see the class comment.
       def settled_screen_data = { controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }
 
       def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
