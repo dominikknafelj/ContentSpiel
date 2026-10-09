@@ -28,16 +28,17 @@ module ContentBlocks
   # decision D14): a block added to it by another tab meanwhile is either in
   # the list read below or waits and is refused its vanished section.
   #
-  # So does the delete of a block that sits in a section (fix round 1), for
-  # the order of locks: every write that touches a block in a section takes
-  # the page's row and then the block's (`ContentBlocks::Save
-  # #locks_owner_first?` has the deadlock this avoids), and the column it
-  # leaves is renumbered under the same lock a fold into that column holds.
+  # So does every other delete (fix rounds 1 and 2), for the order of
+  # locks: every write to a page's blocks takes the page's row and then
+  # block rows (`ContentBlocks::Save#call` has the deadlock this avoids --
+  # a lift and a renumbering write top-level blocks under that lock, so a
+  # top-level block's delete is no exception). The column a block leaves is
+  # renumbered under the same lock a fold into that column holds.
   #
   # Positions are counted per container, so the gap a deleted block leaves
   # in a section's column, and the one a section leaves at the top level,
-  # are closed. A top-level block that isn't a section is deleted as it
-  # always was, lock-free and with its gap left.
+  # are closed. A top-level block that isn't a section still leaves its gap,
+  # as it always did.
   class Destroy < ApplicationService
     include OwnerPermissions
     include Structure
@@ -53,7 +54,7 @@ module ContentBlocks
       return denied(refused, @block) if refused
 
       destroyed = ContentBlock.transaction do
-        lock_owner(@block.owner) if @block.container? || @block.section_id
+        lock_owner(@block.owner)
         # `reload`: read under the lock, whatever the caller had loaded.
         inside = @block.container? ? @block.section_blocks.reload.to_a : []
         metadata = {}
@@ -88,11 +89,14 @@ module ContentBlocks
     # column 2's -- and everything after them moves down. The section itself
     # still stands at this point; it goes right after, and the positions are
     # closed up once it has. (It is written too, with the nils it already
-    # has: one loop for the whole top level.)
+    # has: one loop for the whole top level.) A row already where it belongs
+    # -- the blocks before the section -- isn't written: fewer rows held.
     def lift(inside)
       top = @block.owner.content_blocks.top_level.reorder(:position, :id).to_a
       at = top.index(@block)
       (top[0...at] + inside + top[at..]).each_with_index do |block, index|
+        next if block.section_id.nil? && block.position == index
+
         block.update_columns(section_id: nil, section_column: nil, position: index) # version: none (the owner is touched below, and a live page's after_commit bumps)
       end
     end

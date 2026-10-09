@@ -24,12 +24,10 @@ module ContentBlocks
   # that one changes container only through `ContentBlocks::Reorder`. A
   # section saved with a layout of fewer columns takes the blocks of the
   # removed columns along into its last one (`#fold_removed_columns`), and
-  # says which in the event's `folded_block_ids`. Both of those, any save
-  # of a section and any save of a block that sits in one take the page's
-  # row lock first (`#locks_owner_first?`), and a section is then re-read
-  # from its row before anything is assigned (`#reread_container`). A save
-  # of a top-level block that is no section does neither: it is the same
-  # statements as before sections existed.
+  # says which in the event's `folded_block_ids`. EVERY save takes the
+  # page's row lock first (`Structure#lock_owner`, the comment in `#call`
+  # says why), and a section is then re-read from its row before anything
+  # is assigned (`#reread_container`).
   class Save < ApplicationService
     include OwnerPermissions
     include Media::Choosing
@@ -54,13 +52,35 @@ module ContentBlocks
       # `requires_new`: see `Pages::Save` -- a nested call's FK refusal
       # (rescued below) mustn't abort the caller's transaction.
       saved = ContentBlock.transaction(requires_new: true) do
-        # Before anything is read or assigned: the new block's column is
-        # checked, and the section's stranded blocks are looked up, against
-        # rows no other structural write can change until this one commits.
-        if locks_owner_first?
-          lock_owner(@block.owner)
-          reread_container
-        end
+        # The owner's row lock, the first statement of every save -- of a
+        # block in a section, of a section, of a top-level block, new or
+        # not. Two reasons.
+        #
+        # What is read under it is what the other writer committed: the new
+        # block's column is checked, and the section's stranded blocks are
+        # looked up, against rows no other write to this page's blocks can
+        # change until this one commits.
+        #
+        # And there is ONE order of locks for every write to a page's
+        # blocks: the page's row, then block rows (fix rounds 1 and 2). A
+        # fold, a lift, a section's delete and the renumbering that follows
+        # one go page-first and then write other blocks' rows -- the blocks
+        # in the section, and for a lift and a renumbering the top-level
+        # blocks around it. A save used to go the other way: its own row,
+        # then the page's at the `owner.touch` below. A tab typing in block
+        # X while another removed a section and kept its blocks would each
+        # hold what the other waits for, and Postgres ends one of them with
+        # `ActiveRecord::Deadlocked`, a 500. "A top-level block is written
+        # by no structural write" was the mistake of fix round 1: a lift
+        # and a renumbering write exactly those. So no save is exempt.
+        #
+        # It costs one short query and no new waiting: this transaction
+        # always took this row, at the touch; it only takes it earlier, so
+        # two saves on one page queue here instead of there.
+        # (`ContentBlocks::Reorder` still writes block rows first; that is
+        # its rework's to change.)
+        lock_owner(@block.owner)
+        reread_container
         assign
         @block.save || raise(ActiveRecord::Rollback)
         folded = fold_removed_columns
@@ -113,24 +133,6 @@ module ContentBlocks
     end
 
     private
-
-    # Two reasons, one lock. A write that changes where blocks are, or could
-    # race one that does, must see what the other committed: a new block
-    # going into a section, and any save of a section (its layout may lose
-    # columns). And the ORDER of locks (fix round 1): a fold, a lift and a
-    # section's delete take the page's row and then write the rows of the
-    # blocks in the section, while an ordinary save writes the block's own
-    # row and takes the page's last (the owner's touch below). One tab typing
-    # in a block in column 3 while another folds or deletes its section
-    # would each hold what the other waits for, and Postgres ends one of
-    # them with `ActiveRecord::Deadlocked`, a 500. So every save of a block
-    # that sits in a section takes the page's row first too, although it
-    # moves nothing. A top-level block that is no section is written by no
-    # structural write, so its save keeps its old order and takes no lock.
-    def locks_owner_first?
-      @block.container? || @block.section_id.present? || @attributes[:section_id].present? ||
-        (@attributes[:block_type].present? && BlockTypes.find(@attributes[:block_type])&.capability?(:container)) || false
-    end
 
     # A section is judged as its row stands under the lock, not as the
     # caller's object was loaded before it (fix round 1). A second tab's copy

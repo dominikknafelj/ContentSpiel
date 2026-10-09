@@ -10,8 +10,17 @@ module ContentBlocks
     # three, started together, both pass their checks and leave a block in a
     # column the section no longer has. `pick`, not `owner.lock!`: the
     # caller's page object, with whatever it has preloaded, is left alone.
-    # A save of a block outside any section never comes here.
+    #
+    # Every `ContentBlocks::Save` and `Destroy` takes it, as the first
+    # statement of its transaction, whatever the block: the page's row, then
+    # block rows, is the one order of locks for a page's blocks
+    # (`ContentBlocks::Save#call` has the deadlock a second order made).
+    #
+    # An owner that isn't saved yet has no row to lock, and nobody else can
+    # be writing its blocks: nil, and no query.
     def lock_owner(owner)
+      return unless owner.persisted?
+
       owner.class.where(id: owner.id).lock.pick(:id)
     end
 

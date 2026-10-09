@@ -398,7 +398,7 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     assert_equal [ "This block no longer exists" ], result.errors
   end
 
-  test "a structural save locks the page's row before it writes, and a save outside a section takes no such lock" do
+  test "a save that creates a block locks the page's row before it writes, in a section or at the top level" do
     page = create_page(title: "Lock")
     section = section_on(page)
     locks = ->(statements) { statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) } }
@@ -409,19 +409,20 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     new_section = capture_sql { section_on(page) }
     outside = capture_sql { assert ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil).ok? }
 
-    [ into_column, layout, new_section ].each do |statements|
+    [ into_column, layout, new_section, outside ].each do |statements|
       assert_operator locks.call(statements), :<, first_write.call(statements)
+      assert_equal 0, statements.index { |sql| !sql.match?(/SAVEPOINT|BEGIN/) }.then { |first| locks.call(statements) - first }, "the lock is the transaction's first statement"
     end
-    assert_nil locks.call(outside)
   end
 
-  # The lock order (fix round 1). A fold, a lift and a section's delete take
-  # the page's row and then write the rows of the blocks in the section; an
-  # ordinary save of one of those blocks used to write its own row and then
+  # The lock order (fix rounds 1 and 2). A fold, a lift and a section's
+  # delete take the page's row and then write block rows -- the blocks in
+  # the section, and (a lift, the renumbering after a delete) the top-level
+  # blocks around it. An ordinary save used to write its own row and then
   # take the page's (the owner's touch). Two tabs doing one each could wait
   # on each other until Postgres aborted one. So the page's row comes first
-  # for any block in a section; a top-level block's save is as it was.
-  test "an ordinary save of a block in a section locks the page's row before its own, and a top-level block's takes no such lock" do
+  # for every block's save, wherever the block is.
+  test "an ordinary save of a block locks the page's row before its own, in a section and at the top level" do
     page = create_page(title: "Lock order")
     section = section_on(page)
     inside = add_to(section, 3).record
@@ -431,10 +432,27 @@ class ContentBlocks::SaveTest < ActiveSupport::TestCase
     in_section = capture_sql { assert ContentBlocks::Save.call(inside, translations: typing, actor: nil).ok? }
     top_level = capture_sql { assert ContentBlocks::Save.call(outside, translations: typing, actor: nil).ok? }
 
-    lock = in_section.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
-    write = in_section.index { |sql| sql.start_with?('UPDATE "content_blocks"') }
-    assert_operator lock, :<, write
-    assert_empty top_level.grep(/FROM "(pages|content_blocks)".*FOR UPDATE/m)
-    assert_equal 1, top_level.count { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    [ in_section, top_level ].each do |statements|
+      lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+      write = statements.index { |sql| sql.start_with?('UPDATE "content_blocks"') }
+      assert_operator lock, :<, write
+      assert_equal 1, statements.count { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+      assert_equal 1, statements.count { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    end
+  end
+
+  # A block handed over with a page that isn't saved yet has no row to lock:
+  # the save goes on as it always did (the page is saved with its block).
+  test "a block of a page that is not saved yet is saved without a lock query, as before" do
+    page = Page.new(parent: root_page, title: "Unsaved owner")
+    statements = nil
+
+    result = nil
+    assert_difference -> { Page.count } => 1, -> { ContentBlock.count } => 1 do
+      statements = capture_sql { result = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }, actor: nil) }
+    end
+
+    assert result.ok?, result.errors.inspect
+    assert_empty statements.grep(/FROM "pages".*FOR UPDATE/m)
   end
 end

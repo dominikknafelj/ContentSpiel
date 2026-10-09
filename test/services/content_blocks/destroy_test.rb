@@ -67,18 +67,31 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     read = statements.index { |sql| sql.match?(/FROM "content_blocks".*"section_id" = /m) }
 
     assert_operator lock, :<, read
-    assert_nil capture_sql { assert ContentBlocks::Destroy.call(@before, actor: nil).ok? }.index { |sql| sql.include?("FOR UPDATE") }
   end
 
-  # The same order as every other write that touches a block in a section
-  # (fix round 1): the page's row, then the block's. It also keeps the
+  # The same order as every other write of a block (fix rounds 1 and 2):
+  # the page's row, then the block's. A lift and the renumbering after a
+  # section's delete write top-level blocks under that lock, so a top-level
+  # block's delete takes it first too; in a section it also keeps the
   # renumbering of the column from racing a fold into it.
-  test "a delete of a block in a section locks the page's row before it deletes the block" do
-    statements = capture_sql { assert ContentBlocks::Destroy.call(@left_a, actor: nil).ok? }
-    lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
-    delete = statements.index { |sql| sql.start_with?('DELETE FROM "content_blocks"') }
+  test "a delete of a block locks the page's row before it deletes the block, in a section and at the top level" do
+    [ @left_a, @before ].each do |block|
+      statements = capture_sql { assert ContentBlocks::Destroy.call(block, actor: nil).ok? }
+      lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+      delete = statements.index { |sql| sql.start_with?('DELETE FROM "content_blocks"') }
 
-    assert_operator lock, :<, delete
+      assert_operator lock, :<, delete
+      assert_equal 1, statements.count { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    end
+  end
+
+  test "a lift writes only the rows that move: the blocks before the section are left alone" do
+    statements = capture_sql { assert ContentBlocks::Destroy.call(@section, keep_blocks: true, actor: nil).ok? }
+
+    # The three lifted blocks, the section pushed behind them and the block
+    # after it; then that last one again when the section's gap is closed.
+    assert_equal 6, statements.count { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    assert_equal [ @before, @left_a, @left_b, @right, @after ], @page.content_blocks.top_level.reorder(:position).to_a
   end
 
   test "a section's delete is refused whole for an actor without the page's edit right" do
