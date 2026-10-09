@@ -730,6 +730,22 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal "Gone post", @gone_post.reload.title
   end
 
+  test "a page with a filled section is trashed, restored and purged with its blocks" do
+    page = create_page(title: "Banded")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: create_media_asset)
+    Media::UsageIndex.refresh(inside)
+
+    assert Trash::Move.call(page, actor: nil).ok?
+    assert Trash::Restore.call(page.reload, actor: nil).ok?
+    assert_equal [ section.id, 2 ], inside.reload.then { |block| [ block.section_id, block.section_column ] }
+
+    assert Trash::Move.call(page.reload, actor: nil).ok?
+    assert Trash::Purge.call(page.reload, actor: nil).ok?
+    assert_empty ContentBlock.where(id: [ section.id, inside.id ])
+    assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: inside.id)
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})
