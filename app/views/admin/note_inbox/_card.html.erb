@@ -9,7 +9,7 @@
     (`_top`): the sidebar's count, outside this frame, changes with it. %>
 <%= tag.turbo_frame id: "notes-for-you", class: "contents" do %>
   <%= render Admin::DashboardScreen::CardComponent.new(title: t("admin.note_inbox.card.title"), id: "dashboard-notes-for-you",
-        empty: t("admin.note_inbox.card.empty"), link: [ admin_notes_path(**admin_url_options), t("admin.note_inbox.card.all") ]) do |card| %>
+        empty: t("admin.note_inbox.card.empty")) do |card| %>
     <% if unread.positive? %>
       <% card.with_badge do %>
         <%= tag.span t("admin.note_inbox.card.new", count: unread), class: "font-cs-mono text-label uppercase tracking-mono text-accent", data: { notes_new: true } %>
@@ -21,6 +21,12 @@
     <% end %>
     <% rows.each do |row| %>
       <% card.with_row { render Admin::NotesScreen::InboxRowComponent.new(row: row) } %>
+    <% end %>
+    <%# The way to the same rows as a page, in words at the foot of the card
+        (handoff "Inbox row": "All notes for you →"), not the header's arrow. %>
+    <% card.with_footer do %>
+      <%= link_to t("admin.note_inbox.card.all_html", arrow: tag.span("→", aria: { hidden: true })), admin_notes_path(**admin_url_options),
+            class: "text-ink hover:underline", data: { turbo_frame: "_top", notes_all: true } %>
     <% end %>
   <% end %>
 <% end %>

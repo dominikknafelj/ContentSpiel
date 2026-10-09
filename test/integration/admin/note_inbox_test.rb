@@ -13,16 +13,31 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     get "/cs-studio"
 
     assert_select "turbo-frame#notes-for-you section[aria-labelledby=dashboard-notes-for-you]" do
-      assert_select "[data-delivery][data-unread] a[href='/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}'][data-turbo-frame=_top]", text: "Dana mentioned you"
-      assert_select "p", text: /Ready, @reader@example.com\?/
-      assert_select "p", text: /Page · Pricing/
-      assert_select "a[href='/cs-studio/notes'][aria-label='All notes for you']"
+      # The whole row is one link (handoff "Inbox row"), with the handoff's hover.
+      assert_select "li > a[data-delivery][data-unread][href='/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
+        assert_select "[data-inbox-sentence]", text: "Dana mentioned you"
+        assert_select "[data-inbox-excerpt]", text: /Ready, @reader@example.com\?/
+        assert_select "[data-inbox-where]", text: "Page · Pricing"
+      end
+      assert_select "li a a", count: 0
+      # "All notes for you →" in words at the foot of the card (the handoff's
+      # footer), not an arrow in its header.
+      assert_select "footer a[href='/cs-studio/notes'][data-turbo-frame=_top]", text: "All notes for you →"
+      assert_select "header a", count: 0
       # Unread is said in words too, and counted in the card's header.
       assert_select "[data-delivery][data-unread] .sr-only", text: "Unread"
       assert_select "header [data-notes-new]", text: "1 new"
     end
     assert_select "turbo-frame#notes-open-threads section[aria-labelledby=dashboard-open-threads]" do
-      assert_select "a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-frame=_top]", text: "Pricing"
+      # One link, the whole row: the title, then "type · last author · time"
+      # led by the type's marker (square for a page), and the neutral pill.
+      assert_select "li > a[href='/cs-studio/pages/#{@page.id}?notes=open'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
+        assert_select "span", text: "Pricing"
+        assert_select "[data-type-marker=square][class~='bg-meta'][class~='size-1.5']", count: 1
+        assert_select "span", text: /\APage · Dana · /
+        assert_select "time"
+      end
+      assert_select "li a", count: 1
       assert_select "li .admin-notes-marker[data-has-notes]:not([data-unread])", text: "1"
       assert_select "header [data-notes-total]", text: "1"
     end
@@ -41,12 +56,28 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
       assert_select "[data-delivery][data-unread]", count: 0
       # The block as the list's group heading names it (the handoff's
       # decision 8): its type, then -- it is empty -- its place on the page.
-      assert_select "p", text: "Page · Pricing · Rich text · Block 1"
+      assert_select "[data-inbox-where]", text: "Page · Pricing · Rich text · Block 1"
       assert_select "[class*=accent]", count: 0
       assert_select "[data-notes-new]", count: 0
       assert_select "form[action='/cs-studio/notes/read']", count: 0
     end
     assert_select "#sidebar-badge-dashboard[hidden]", text: ""
+  end
+
+  test "an Open threads row on a post is led by a round marker in the type's colour, and one on an image by a square" do
+    sign_in_as(users(:two))
+    post_record = create_post(title: "Hello")
+    asset = create_media_asset
+    as(users(:two)) { [ post_record, asset ].each { |record| assert Notes::Start.call(record, body: "A note").ok? } }
+
+    get "/cs-studio/notes/open_threads"
+
+    assert_select "a[data-open-thread-row=post]" do
+      assert_select "[data-type-marker=round][class~='rounded-full'][class*='cat-'][class~='size-1.5']", count: 1
+      assert_select "span", text: /\A#{ContentTypes.find(post_record.content_type).label} · Dana · /
+    end
+    assert_select "a[data-open-thread-row=media] [data-type-marker=square][class~='bg-meta']", count: 1
+    assert_select "a[data-open-thread-row=media] span", text: /\AImage · Dana · /
   end
 
   test "each part is fetched on its own" do
@@ -55,7 +86,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "#sidebar", count: 0
 
     get "/cs-studio/notes/open_threads"
-    assert_select "turbo-frame#notes-open-threads a", text: "Pricing"
+    assert_select "turbo-frame#notes-open-threads a[data-open-thread-row=page]", text: /\APricing/
     assert_select "#sidebar", count: 0
 
     get "/cs-studio/notes/unread"

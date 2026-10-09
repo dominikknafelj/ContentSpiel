@@ -25,6 +25,24 @@ class Dashboard::OpenThreadsTest < ActiveSupport::TestCase
     assert_equal 3, open_threads.total
   end
 
+  # Handoff "Open threads row": "type · last author · time".
+  test "a row names who wrote last among the record's open threads, a resolved thread's reply not counted, and nobody once the author's id is gone" do
+    on_page = note(@page)
+    travel_to(1.minute.from_now) { as(users(:one)) { Notes::Reply.call(note(@block), body: "Later, on a block") } }
+    done = travel_to(2.minutes.from_now) { note(@page) }
+    travel_to(3.minutes.from_now) { as(users(:reader)) { Notes::Reply.call(done, body: "Last, but on a thread that is then resolved") } }
+    as(users(:two)) { Notes::Resolve.call(done) }
+    gone = User.create!(email_address: "gone@example.com", password: "a-long-password-1")
+    travel_to(4.minutes.from_now) { on_post = note(@post); Notes::Message.create!(thread: on_post, author_id: gone.id, body: "Bye", created_at: 5.minutes.from_now) }
+    Notes::Message.where(author_id: gone.id).update_all(author_id: nil) # version: none (a test's own setup: what the foreign key does when the author is deleted)
+
+    by_record = open_threads.rows.index_by(&:record)
+
+    assert_equal [ users(:one), users(:one).id ], by_record[@page].then { |row| [ row.last_author, row.last_author_id ] }
+    assert_equal [ nil, nil ], by_record[@post].then { |row| [ row.last_author, row.last_author_id ] }
+    assert on_page.reload.open?
+  end
+
   test "an image's row leads to the Media screen with the image chosen, for someone who may open the library" do
     asset = create_media_asset
     note(asset)

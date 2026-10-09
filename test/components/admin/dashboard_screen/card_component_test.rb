@@ -41,4 +41,19 @@ class Admin::DashboardScreen::CardComponentTest < ViewComponent::TestCase
     assert_selector "header > div:first-child", text: /Notes for you\s*3 new\s*\z/
     assert_selector "header", text: /Notes for you\s*3 new\s*Mark all read\s*→/
   end
+
+  # The notes inbox's way on, in words under the rows (notes handoff, "Inbox
+  # row": the footer), for a card that passes no `link:`.
+  test "a footer stands under the rows, and a card without one has none" do
+    render_inline Admin::DashboardScreen::CardComponent.new(title: "Notes for you", id: "n", empty: "None") do |card|
+      card.with_row { "A row" }
+      card.with_footer { "All notes for you →" }
+    end
+
+    assert_selector "section > ul + footer", text: "All notes for you →"
+    assert_no_selector "header a"
+
+    render_inline Admin::DashboardScreen::CardComponent.new(title: "Drafts", id: "d", empty: "None") { |card| card.with_row { "A row" } }
+    assert_no_selector "footer"
+  end
 end

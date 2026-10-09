@@ -82,7 +82,9 @@ en:
       card:
         title: "Notes for you"
         empty: "No notes for you."
-        all: "All notes for you"
+        # The card's footer link; the arrow is decoration, hidden from a
+        # screen reader.
+        all_html: "All notes for you %{arrow}"
         mark_all_read: "Mark all read"
         new:
           one: "%{count} new"

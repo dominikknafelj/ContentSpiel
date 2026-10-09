@@ -25,11 +25,12 @@ module Admin
       slot < 6 ? FILLED[slot] : RINGS[slot - 6]
     end
 
-    private
-
     # An unregistered type (a plugin that was removed) has no index: a
-    # neutral ring and the raw stored name, never an error.
+    # neutral ring and the raw stored name, never an error. Public, with
+    # `label`: a row that draws the mark at its own size beside other words
+    # (the dashboard's Open threads) asks for the two and draws them itself.
     def mark = @definition ? mark_class(@definition.colour_index) : "border border-meta"
+
     def label = @definition ? @definition.label : @name
   end
 end

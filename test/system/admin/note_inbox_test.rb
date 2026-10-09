@@ -91,6 +91,15 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     assert_equal 0, Notes::Delivery.unread.where(user: @me).count
   end
 
+  test "a row of Notes for you is one link as wide as its card" do
+    mention(@page)
+    open_dashboard
+
+    widths = page.evaluate_script("[ 'section', 'li > a[data-delivery]' ].map((selector) => document.querySelector('turbo-frame#notes-for-you ' + selector).getBoundingClientRect().width)")
+    assert_in_delta widths[0], widths[1], 2
+    assert_selector "turbo-frame#notes-for-you footer a", text: "All notes for you →"
+  end
+
   test "Open threads lists a record once with its count in the neutral pill and opens its notes" do
     mention(@page)
     mention(@block)
@@ -99,7 +108,12 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     within "turbo-frame#notes-open-threads" do
       assert_selector "li", count: 1
       assert_selector "li .admin-notes-marker[data-has-notes]:not([data-unread])", text: "2"
-      press "Pricing"
+      # The whole row is the link: as wide as the card, and it holds the pill.
+      widths = page.evaluate_script("[ 'section', 'li > a' ].map((selector) => document.querySelector('turbo-frame#notes-open-threads ' + selector).getBoundingClientRect().width)")
+      assert_in_delta widths[0], widths[1], 2
+      assert_selector "li > a .admin-notes-marker"
+      assert_selector "li > a", text: /Page · Dana · /
+      find("li > a").click
     end
 
     assert_current_path(/\/pages\/#{@page.id}\?notes=open\z/)
@@ -110,11 +124,12 @@ class Admin::NoteInboxSystemTest < ApplicationSystemTestCase
     thread = mention(@page)
     open_dashboard
 
-    find("turbo-frame#notes-for-you a[aria-label='All notes for you']").click
+    # The footer's link, in words (the handoff's footer), not the header's arrow.
+    within("turbo-frame#notes-for-you footer") { click_link "All notes for you" }
 
     assert_current_path "/cs-studio/notes"
     assert_selector "h1", text: "Notes for you"
-    assert_selector "[data-delivery][data-unread] a[href$='?notes=open&thread=#{thread.id}']", text: "Dana mentioned you"
+    assert_selector "a[data-delivery][data-unread][href$='?notes=open&thread=#{thread.id}']", text: "Dana mentioned you"
     # The sidebar's Dashboard entry is not the current one here, and still counts.
     assert_selector "#sidebar-badge-dashboard", text: "1"
 

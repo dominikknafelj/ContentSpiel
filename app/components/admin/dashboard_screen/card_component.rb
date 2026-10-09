@@ -17,13 +17,17 @@ module Admin
     # Two optional slots in the header, for the notes cards (notes spec §5):
     # `badge` stands beside the title (a count: "3 new", a total) and
     # `action` before the "→" ("Mark all read"). A card that fills neither is
-    # drawn exactly as before.
+    # drawn exactly as before. `footer` is a line under the rows, for a card
+    # whose way to the fuller list is said in words there ("All notes for
+    # you →") instead of by the header's arrow; a card passes one or the
+    # other.
     class CardComponent < Admin::AdminComponent
       LIMIT = 5
 
       renders_many :rows
       renders_one :badge
       renders_one :action
+      renders_one :footer
 
       def initialize(title:, id:, empty:, link: nil, hint: nil, limit: LIMIT)
         @limit = limit

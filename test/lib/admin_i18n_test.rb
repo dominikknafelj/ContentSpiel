@@ -171,6 +171,7 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/notes_screen/thread_component.html.erb
     app/components/admin/notes_screen/thread_row_component.rb
     app/components/admin/notes_screen/thread_row_component.html.erb
+    app/components/admin/notes_screen/subject_component.rb
     app/views/admin/notes/index.html.erb
     app/views/admin/notes/thread.html.erb
     app/views/admin/notes/resolved.html.erb
