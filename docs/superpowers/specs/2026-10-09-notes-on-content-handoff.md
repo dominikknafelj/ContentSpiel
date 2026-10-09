@@ -225,3 +225,8 @@ Three more, the same evening:
 25. **The account page.** Its h1 is "Your account" (the extra h2 of item 19 goes: it would repeat the h1). Then the Profile and Notes cards with their one save footer. Below them a third card, "Password", holding its own form with its own "Change password" button and the sentence about sessions directly under the card's title. The sidebar's entry reads "Your account", and the name and avatar block above it links to the same page.
 26. **The add-reaction control on a message without reactions** sits in the message's meta line: a 24×24 smile icon in `text-meta`, just left of the "⋯" menu, shown on hover or focus of the message. It costs no row at rest. Once a message has reactions, the add chip stands at the end of its chip row and stays visible.
 27. **Switching edits.** One edit form at a time. The text of an edit you leave is kept as a local draft; reopening that message's Edit restores it, and a 12px `text-meta` note "Unsaved edit" stands on the message until the edit is saved or cancelled.
+
+Two confirmations:
+
+28. **The meta-line reaction control** is a 24×24 control holding the 16px smile icon (the composer's toolbar size), as built.
+29. **"Unsaved edit"** stands in the message's meta line only. While the edit form is open with the restored text there is no line above the field: that space is for errors.
