@@ -117,6 +117,7 @@ module Admin
 
       attributes, translations = split_block_params(block)
       stored_asset_id = block.media_asset_id
+      layout_before = stored_layout(block)
       columns_before = block.column_count
       result = ContentBlocks::Save.call(block, attributes: attributes, translations: { admin_locale => translations })
 
@@ -136,7 +137,7 @@ module Admin
       end
       streams << refused if refused
       streams << tile_summary_stream(result) if block.section_id
-      streams.concat(section_save_streams(result.record, columns_before)) if block.container? && result.ok?
+      streams.concat(section_save_streams(result.record, layout_before: layout_before, columns_before: columns_before)) if block.container? && result.ok?
       streams.concat(page_base_streams) if result.ok?
 
       render turbo_stream: streams, status: autosave_status(result)
@@ -438,25 +439,45 @@ module Admin
     end
 
     # What a saved section's answer adds to the status line, the error slots
-    # and the base every block's save gets (`update`).
+    # and the base every block's save gets (`update`). Each part only when
+    # the save changed what it shows, because each is something a person may
+    # be using when the answer lands: a save of the background is sent as the
+    # select is left, and where the person went from it may well be the
+    # layout menu or a tile.
     #
-    # The layout menu, always: which choice is the current one, and the
-    # diagram on its button, follow what was saved. The menu only -- the
-    # hidden input the pick was written into is the form's own and is left
-    # alone, as every field of a saved form is.
+    # The layout menu, when the stored layout changed: which choice is the
+    # current one, and the diagram on its button, follow what was saved. Not
+    # otherwise (fix round 1 of the section's controls): replaced by a save
+    # of the background, the menu's button lost the focus someone had just
+    # Shift+Tabbed onto it -- to <body>, since nothing was picked for
+    # `admin--section` to carry the focus over from -- and a menu just opened
+    # by pointer was swapped for a closed one. The menu only -- the hidden
+    # input the pick was written into is the form's own and is left alone,
+    # as every field of a saved form is.
     #
-    # The structure, only when the number of columns changed. A save of the
+    # The structure, when the number of columns changed. A save of the
     # background, of the width or of a layout with as many columns ("one
-    # third, two thirds" for "two thirds, one third") moves no block, and
-    # the lanes it would redraw are tiles a person may have the focus on, a
-    # menu open in or be dragging. `columns_before` is the section's count as
-    # this request loaded it, which the stale-save guard has just vouched
-    # for; the count after is read from the saved record.
-    def section_save_streams(section, columns_before)
-      streams = [ turbo_stream.replace(Admin::EditorScreen::SectionLayoutMenuComponent.dom_id(section), Admin::EditorScreen::SectionCardComponent.layout_menu(section: section)) ]
+    # third, two thirds" for "two thirds, one third", which does change the
+    # menu) moves no block, and the lanes it would redraw are tiles a person
+    # may have the focus on, a menu open in or be dragging.
+    #
+    # Both "before"s are the section as this request loaded it, which the
+    # stale-save guard has just vouched for; the "after"s are read from the
+    # saved record.
+    def section_save_streams(section, layout_before:, columns_before:)
+      streams = []
+      if stored_layout(section) != layout_before
+        streams << turbo_stream.replace(Admin::EditorScreen::SectionLayoutMenuComponent.dom_id(section), Admin::EditorScreen::SectionCardComponent.layout_menu(section: section))
+      end
       streams.concat(section_structure_streams(section)) if section.column_count != columns_before
       streams
     end
+
+    # A section's layout as its type reads it -- the schema's default where
+    # the row stores none, as a section just made does, so that section's
+    # first save of a background is no change of layout. Nil for a block
+    # that has none.
+    def stored_layout(block) = block.container? ? block.settings_object(locale: ::Locales.default)&.layout : nil
 
     # The two counts of a section's card, after a write that changed how many
     # blocks it holds (an add into a column, a delete out of one) or how many

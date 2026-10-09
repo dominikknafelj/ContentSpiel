@@ -234,12 +234,26 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal %w[two tinted full], section.reload.settings.values_at("layout", "background", "width")
     assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
     assert_select "turbo-stream[target$='-panel-title']", count: 0
+    # Nor the layout menu: it may be open, or its button hold the focus.
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
 
     patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "one_two", background: "tinted", width: "full" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
 
     assert_response :success
     assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
     assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--section-layout-param='one_two'][aria-current='true']"
+  end
+
+  test "the first save of a section that stores no settings yet is no change of layout" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    section.update_column(:settings, {})
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "tinted", width: "content" } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "tinted", section.reload.settings["background"]
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
+    assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
   end
 
   test "a section's setting the registry doesn't know is refused into its own error slot, and nothing is redrawn" do

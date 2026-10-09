@@ -492,6 +492,76 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_selector "#section-#{@section.id}-lanes[data-mark='kept']"
   end
 
+  # The layout menu is replaced only by a save that changed the layout. A
+  # save of the background would otherwise take the menu away under whoever
+  # went on to it: by keyboard the focused button is replaced and the focus
+  # falls to <body>; by pointer the menu just opened is swapped for a closed
+  # one.
+  test "a background save leaves the layout menu alone: Shift+Tab onto its button keeps the focus there" do
+    open_editor
+    page.execute_script("document.getElementById(#{"section-#{@section.id}-layout-menu".to_json}).dataset.mark = 'kept'")
+
+    select "Tinted", from: "block-#{@section.id}-background"
+    # Leaving the select for the Layout button is what sends the save.
+    page.execute_script("document.querySelector(#{layout_button.to_json}).focus()")
+
+    assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    await_frames
+    assert_equal "tinted", @section.reload.settings["background"]
+    assert_selector "#section-#{@section.id}-layout-menu[data-mark='kept']"
+    assert_equal true, focus_is_on(layout_button)
+  end
+
+  test "a background save that lands while the layout menu is open leaves it open" do
+    open_editor
+
+    select "Tinted", from: "block-#{@section.id}-background"
+    find(layout_button).click
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+
+    assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    await_frames
+    assert_equal "tinted", @section.reload.settings["background"]
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+    assert_selector "#{layout_button}[aria-expanded='true']"
+  end
+
+  # A layout save that was refused leaves the form holding the layout that
+  # was picked and the menu showing the one the section has. Picking it
+  # again is asking again, not "no change".
+  test "picking a layout again after its save was refused sends it again" do
+    open_editor
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch
+      window.__writes = 0
+      window.fetch = (url, options = {}) => {
+        if ((options.method || "GET").toUpperCase() === "GET") return originalFetch(url, options)
+        window.__writes += 1
+        if (window.__writes > 1) return originalFetch(url, options)
+        return Promise.resolve(new Response("", { status: 422, headers: { "Content-Type": "text/vnd.turbo-stream.html" } }))
+      }
+    JS
+
+    find(layout_button).click
+    find("button[data-admin--section-layout-param='one']").click
+    # Not `assert_writes_settled`: a form whose save failed is not settled.
+    assert_eventually(message: "the layout was never sent") { page.evaluate_script("window.__writes") == 1 }
+    assert_no_selector "#{section_card} [role=menu]"
+    assert_equal "two", @section.reload.settings["layout"]
+
+    # The pick alone, with the menu closed: opening the menu moves the focus
+    # inside the form, and a form whose save failed sends again on that by
+    # itself -- which is not the rule this is about.
+    page.execute_script("document.querySelector(#{"#{section_card} button[data-admin--section-layout-param='one']".to_json}).click()")
+
+    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_writes_settled
+    assert_equal 2, page.evaluate_script("window.__writes")
+    assert_equal "one", @section.reload.settings["layout"]
+  end
+
   test "Remove section, keep blocks turns the tiles into cards in reading order" do
     open_editor
     find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Section actions']").click

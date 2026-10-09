@@ -85,20 +85,32 @@ export default class extends Controller {
   // The item pressed is in a menu that closes on the pick (`admin--menu
   // #select`, which runs after this on the same click), and a hidden button
   // cannot keep the focus: it goes to the menu's button here, whether or not
-  // anything is sent. A pick of the layout the section already has sends
-  // nothing and replaces nothing. One that is sent is answered with a new
-  // menu, so the menu the pick was made in is remembered (`pickedIn`) for
+  // anything is sent.
+  //
+  // "No change" is a pick of the layout the section HAS -- the choice the
+  // menu marks as current, which is what the server last saved -- while the
+  // form holds it too. The input alone does not say: after a layout save
+  // that was refused (no permission, an invalid answer) it still holds the
+  // layout that was picked, and the menu the one the section has. Picking
+  // the refused layout again is then asking again, and picking the current
+  // one puts the form back to what is stored; both write the input and
+  // send, which a form whose last save failed always does.
+  //
+  // A pick that is sent and saved is answered with a new menu, so the menu
+  // the pick was made in is remembered (`pickedIn`) for
   // `layoutMenuTargetConnected` to carry the focus over from. The element,
   // not a flag: a save that is refused brings no menu, and a flag left set
   // would claim the focus for a menu that never comes.
   chooseLayout(event) {
-    const form = this.element.querySelector("form[id$='-form']")
+    const layout = event.params.layout
+    const form = event.currentTarget.closest("form")
     const input = form?.querySelector("input[name='block[settings][layout]']")
     const menu = event.currentTarget.closest("[data-admin--section-target='layoutMenu']")
     menu?.querySelector("[aria-haspopup=menu]")?.focus()
-    if (!input || input.value === event.params.layout) return
+    const current = event.currentTarget.getAttribute("aria-current") === "true"
+    if (!input || (current && input.value === layout)) return
 
-    input.value = event.params.layout
+    input.value = layout
     this.pickedIn = menu
     this.application.getControllerForElementAndIdentifier(form, "admin--autosave")?.saveNow()
   }
