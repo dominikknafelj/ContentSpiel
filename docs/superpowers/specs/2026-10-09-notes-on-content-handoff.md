@@ -238,3 +238,11 @@ Five more, on files and the account page:
 32. **A small image** is shown at its natural size up to the full message width, left-aligned; it is never enlarged.
 33. **Chosen files lost on leaving.** When a draft comes back and files had been chosen with it, a line above the field says "Choose the files again: press-kit.pdf, about.png" (12px `text-meta`, the names listed); it clears once files are chosen or the note is sent.
 34. **Save footers on the account page.** A footer that belongs to one card sits inside that card, under a `border-t border-line` and within the card's padding: a "contained" variant of the shared footer, which itself stays unchanged. The Password card's footer goes inside it. Profile and Notes share one form, so their single footer stays under both cards.
+
+Five last ones, when the build was complete:
+
+35. **A thread's rows 1 and 2 stay fixed** at the top of the drawer (and of the sheet); only the messages scroll, between them and the composer. (Close and "All notes" are always one click away; Pin and the heading say which thread this is. The two rows take about 100px, which a full-height column can spare.)
+36. **A person without a name** is shown in a note by the part of their email address before the at sign: in a mention's chip and on a message's author line. The mention picker still shows the full address on its second line. A name set later shows in existing mentions, since a mention points at the person.
+37. **A very small picture.** A GIF and a still image have a minimum tile of 120×90, the picture centred at its natural size on the placeholder ground, so a GIF's label and Play control always fit.
+38. **The account page's address** is `/account`; `/account/password` redirects there, and `#password` is the anchor of the Password card.
+39. **`notes=open` in the address** follows the drawer: opening adds it (with `thread=ID` when a thread is open) and closing removes it, by `history.replaceState`, so the address says what is on screen, a reload keeps the view, and Back still leaves the page.
