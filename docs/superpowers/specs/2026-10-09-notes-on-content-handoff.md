@@ -219,3 +219,9 @@ Three more, on reactions:
 22. **Where the emoji set opens.** Above the chip by default; flipped below only when there is no room above inside the thread's scroll area (the same rule as the mind graph card's placement). It is clipped to the drawer's body and never lies over row 1.
 23. **Chips while a message is being edited.** They stay under the edit form, disabled (0.5 opacity, not clickable), until the edit is saved or cancelled.
 24. **The add-reaction chip.** At rest it shows on hover or keyboard focus of the message (`:focus-within`), and always when the message already has reactions; "React" is also always in the message's "⋯" menu, for touch. **A resolved thread** shows its reactions read-only and takes no new ones: it is closed, and whoever wants to add something reopens it.
+
+Three more, the same evening:
+
+25. **The account page.** Its h1 is "Your account" (the extra h2 of item 19 goes: it would repeat the h1). Then the Profile and Notes cards with their one save footer. Below them a third card, "Password", holding its own form with its own "Change password" button and the sentence about sessions directly under the card's title. The sidebar's entry reads "Your account", and the name and avatar block above it links to the same page.
+26. **The add-reaction control on a message without reactions** sits in the message's meta line: a 24×24 smile icon in `text-meta`, just left of the "⋯" menu, shown on hover or focus of the message. It costs no row at rest. Once a message has reactions, the add chip stands at the end of its chip row and stays visible.
+27. **Switching edits.** One edit form at a time. The text of an edit you leave is kept as a local draft; reopening that message's Edit restores it, and a 12px `text-meta` note "Unsaved edit" stands on the message until the edit is saved or cancelled.
