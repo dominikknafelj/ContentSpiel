@@ -45,6 +45,17 @@
   --th-ph-a: #dddbd3;
   --th-ph-b: #c9c7bd;
   --th-shadow-menu: 0 12px 32px rgba(20,20,23,0.12);
+  /* A section's bands (sections spec §5.3, `sections.css`). `tinted` is the
+     sunken surface; `strong` is the page inverted, so it carries its own
+     three text colours: body, dimmed, and link. Against the strong band they
+     are 16.7:1, 11.0:1 and 9.9:1 here (16.3:1, 8.1:1 and 6.4:1 in the dark
+     block below); `test/integration/design_tokens_test.rb` holds every one
+     at 4.5:1 or better. */
+  --th-band-tinted: var(--th-sunken);
+  --th-band-strong: var(--th-ink);
+  --th-on-band-strong: var(--th-paper);
+  --th-on-band-strong-dim: #c9c8c2;
+  --th-on-band-strong-accent: oklch(0.80 0.09 250);
 }
 
 [data-theme="dark"] {
@@ -72,6 +83,13 @@
   --th-ph-a: #2a2b2f;
   --th-ph-b: #1c1d20;
   --th-shadow-menu: 0 12px 32px rgba(0,0,0,0.5);
+  /* The bands again: the dark page inverted is this block's ink as the band
+     and its paper as the text. */
+  --th-band-tinted: var(--th-sunken);
+  --th-band-strong: #ededee;
+  --th-on-band-strong: #0f1012;
+  --th-on-band-strong-dim: #45464b;
+  --th-on-band-strong-accent: oklch(0.45 0.12 250);
 }
 
 :root {

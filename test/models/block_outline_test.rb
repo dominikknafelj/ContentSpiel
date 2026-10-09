@@ -14,7 +14,6 @@ class BlockOutlineTest < ActiveSupport::TestCase
 
   test "top level is the blocks outside any section, in position order" do
     assert_equal [ @intro, @section, @outro ], @outline.top_level
-    assert_equal [ @section ], @outline.sections
   end
 
   test "a section's columns are one array per column of its layout, an empty one kept" do

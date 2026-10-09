@@ -1,0 +1,120 @@
+/* Sections (sections spec §5): a band holding a grid of columns, drawn by
+   Blocks::SectionComponent as
+
+     section.content-section.content-section--<background>.content-section--<width>
+       div.content-section__inner
+         div.content-section__grid.content-section__grid--<layout>
+           div.content-section__column  (one per column, in reading order)
+
+   No script: the grid, the bands and the breakpoints are all here. Colours
+   are theme tokens only (tokens.css), never a literal
+   (test/integration/design_tokens_test.rb).
+
+   Breakpoints follow the section's OWN width (container queries), not the
+   window's: the same section is narrow in a narrow layout and wide in a wide
+   one, and a theme that puts the page in a sidebar layout gets the right
+   answer without touching this file. Below 30rem every layout is one column,
+   in reading order -- which is the document's order, column 1's blocks and
+   then column 2's. From 30rem the columns sit side by side, four of them two
+   by two; from 44rem four are four across.
+
+   The container is the SECTION, and what a query measures is its content box.
+   The band's side padding is therefore on the inner element, not on the
+   section, so that a tinted or strong band measures the same as a plain one:
+   the content column is 46rem, and with the padding inside the measured box
+   a band would be 43rem and its four columns would never get past two by
+   two. A full-width band keeps its (much larger) padding on the section,
+   where it is what brings the content box back to the content column, so it
+   measures 46rem as well. */
+.content-section { margin-block: 2.5rem; container-type: inline-size; }
+.content-section__grid { display: grid; gap: 2rem; grid-template-columns: minmax(0, 1fr); }
+/* `min-width: 0` (and `minmax(0, ...)` above): a grid item is otherwise as
+   wide as its longest unbreakable content, and a code block or a long URL
+   would push its column out of the band. With it, the code block scrolls
+   inside its column (`.cs-prose pre`). */
+.content-section__column { min-width: 0; }
+/* A block's own vertical margin would double inside a grid cell's gap. */
+.content-section__column > :first-child { margin-top: 0; }
+.content-section__column > :last-child { margin-bottom: 0; }
+/* And one level down, at the top only: a text that opens with a heading
+   brings the heading's 1.6em of space above it (`.cs-prose h2`), which at the
+   top of a column made a band's top padding visibly deeper than its bottom
+   one and set a column that starts with a heading lower than its neighbour
+   that starts with a paragraph. */
+.content-section__column > :first-child > :first-child { margin-top: 0; }
+
+/* An empty column keeps its place (spec §5.5) -- while there is a place to
+   keep. Stacked, it would be an empty row: two gaps with nothing between
+   them. The component writes a column's tags closed up, so `:empty` matches
+   one with no block. */
+@container (width < 30rem) {
+  .content-section__column:empty { display: none; }
+}
+@container (min-width: 30rem) {
+  .content-section__grid--two, .content-section__grid--four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .content-section__grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .content-section__grid--one_two { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+  .content-section__grid--two_one { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+}
+@container (min-width: 44rem) {
+  .content-section__grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Bands. A band has padding above and below, and beside its content when it
+   stays inside the content column. */
+.content-section--tinted, .content-section--strong { padding-block: 2.5rem; }
+.content-section--tinted > .content-section__inner,
+.content-section--strong > .content-section__inner { padding-inline: 1.5rem; }
+
+/* The blocks in a band are drawn by components that know nothing of it and
+   colour themselves with the theme's tokens (`text-meta`, `border-line`,
+   `.cs-prose a`, ...). So a band doesn't restyle them selector by selector:
+   it gives the tokens they read a new value for everything inside it, and a
+   block added later is right without a rule here.
+
+   Tinted is the sunken surface. Ink, dim and the accent stay readable on it
+   (4.5:1 or better in both themes); `meta` does not in the light theme
+   (4.3:1), so it reads as `dim` here. A code block's own sunken background
+   would vanish into the band, so it takes the surface. */
+.content-section--tinted {
+  background: var(--th-band-tinted);
+  --th-meta: var(--th-dim);
+  --th-sunken: var(--th-surface);
+}
+/* Strong is the page inverted, with its own three text colours. `color` is
+   set as well as the ink token because the text colour a block inherits was
+   computed on <body>, before the token changed. Lines and the code block's
+   background are the band's text colour thinned out, as the page's own are
+   its ink thinned out. */
+.content-section--strong {
+  background: var(--th-band-strong);
+  color: var(--th-on-band-strong);
+  --th-ink: var(--th-on-band-strong);
+  --th-dim: var(--th-on-band-strong-dim);
+  --th-meta: var(--th-on-band-strong-dim);
+  --th-accent: var(--th-on-band-strong-accent);
+  --th-accent-hover: var(--th-on-band-strong);
+  --th-line: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
+  --th-line-strong: color-mix(in srgb, var(--th-on-band-strong) 24%, transparent);
+  --th-sunken: color-mix(in srgb, var(--th-on-band-strong) 12%, transparent);
+  --th-surface: color-mix(in srgb, var(--th-on-band-strong) 6%, transparent);
+}
+
+/* `content` keeps the band inside the content column; `full` runs it edge to
+   edge and puts the content back on the page's content width. The content
+   column is centred in the window, so from the column's edge to the window's
+   is half the window less half the column on each side: `50vw - 50%`. The
+   negative margin takes the band out by that much, and the same amount of
+   padding brings its content box back to where it was -- a percentage in a
+   margin and in a padding are both of the containing block's width, so the
+   two cancel exactly. The content then lines up with the page's, so the
+   inner element's own side padding goes. `100vw` includes a classic
+   scrollbar's width, which <body> clips (`overflow-x-clip` in
+   layouts/application.html.erb). */
+.content-section--full { margin-inline: calc(50% - 50vw); padding-inline: calc(50vw - 50%); }
+.content-section--full > .content-section__inner { padding-inline: 0; }
+
+/* Adjacent sections with the same background join without a gap: their
+   margins collapse to one 2.5rem, which this takes back. */
+.content-section--tinted + .content-section--tinted,
+.content-section--strong + .content-section--strong { margin-top: -2.5rem; }

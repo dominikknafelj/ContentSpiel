@@ -59,8 +59,10 @@
 
     The dispatch itself is `ThemeHelper#render_block`. Only the top-level
     blocks are walked here: a section renders the blocks in it through the
-    same helper (`Blocks::SectionComponent`), so each block is drawn once. %>
-<% BlockOutline.new(@page.content_blocks).top_level.each do |block| %><%= render_block(block) %><% end %>
+    same helper (`Blocks::SectionComponent`), so each block is drawn once.
+    The outline is the page's one (`ThemeHelper#block_outline`), which the
+    sections ask too. %>
+<% block_outline(@page).top_level.each do |block| %><%= render_block(block) %><% end %>
 <%# The tree is otherwise reachable only by typing an exact URL -- this is what
     makes clicking from a page down into its children possible at all.
     Published only, matching every other public listing on this site, and
