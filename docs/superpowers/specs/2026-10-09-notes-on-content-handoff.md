@@ -207,3 +207,9 @@ Six more, after live delivery was built:
 16. **The "Allow in this browser" button** is the shared small secondary button (14px/600), not the 12px/500 given above.
 17. **Small screens.** Over a thread the sheet's header is hidden too, and there is one row: "← All notes 4", the Notify link, and "Back to <title>" as a text button on the right.
 18. **Several notes at once.** The first two notes of a burst (within about 10 s) get their own toasts. From the third, they are replaced by one toast, "You have 3 new notes", whose Open goes to the inbox; its count updates as more arrive and its 8 s timer restarts. The sound plays once per burst.
+
+Three more, on the combined account form:
+
+19. **Wording.** The combined form's button reads "Save" and its toast "Settings saved" (the wording the app already uses, with no full stop). The section title is "Your account", with no extra title per card.
+20. **Layout.** Two cards, Profile (the name) and Notes, inside one form at one shared width (560px), with the single save footer under both.
+21. **"Back to page" in the sheet's thread row** (below 1024px): the words "Back to page", 13px/500 `text-dim`, underlined like the Notify link, with no arrow and no title.
