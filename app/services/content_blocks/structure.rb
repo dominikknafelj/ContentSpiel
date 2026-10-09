@@ -15,8 +15,11 @@ module ContentBlocks
     # takes it, as the first statement of its transaction, whatever the
     # block: the page's row, then block rows, is the order of locks for a
     # page's blocks (`ContentBlocks::Save#call` has the deadlock a second
-    # order made, and the list of writers that keep it: these four, and
-    # `Tags::Merge` and `Trash::Purge`, which lock their pages themselves).
+    # order made, and the list of writers that keep it: these four;
+    # `Translations::Confirm`, which includes this module for a block's
+    # field, because it writes the block's row and then the page's
+    # `translation_states` rows; and `Tags::Merge`, `Trash::Purge` and
+    # `RichText::ActionTextImport`, which lock their pages themselves).
     # Asking again inside the same transaction -- a duplicate's saves and
     # its reorder do -- is one short query for a lock already held.
     #

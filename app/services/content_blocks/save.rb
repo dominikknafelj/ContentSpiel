@@ -83,9 +83,24 @@ module ContentBlocks
         # the plain top-level order too -- it used to write block rows and
         # then touch the page), `ContentBlocks::Duplicate` (before the
         # saves and the reorder it runs), the tag merge (`Tags::Merge
-        # #repoint_blocks`, which rewrites listing blocks) and the purge of
-        # a page (`Trash::Purge#purge_branch`, which deletes them). A new
-        # writer of block rows takes the page's row first too.
+        # #repoint_blocks`, which rewrites listing blocks), the purge of
+        # a page (`Trash::Purge#purge_branch`, which deletes them),
+        # `Translations::Confirm` for a block's field, and the one-off
+        # `RichText::ActionTextImport` for a block's body.
+        #
+        # WHAT THE PAGE'S ROW STANDS FOR is every row a write to one of the
+        # page's blocks may go on to write: the page itself (the touch),
+        # the other blocks (a fold, a lift, a renumbering, a reorder) and
+        # the page's DERIVED rows -- its `translation_states`, which
+        # `Translations::StateIndex.refresh` upserts for the owner whatever
+        # block was written. That last one is how `Translations::Confirm`
+        # was missed at first: it writes a block's row and never the page's,
+        # so "block rows and the page's row" did not name it, yet it wrote
+        # the block and then the state rows while a delete or a duplicate
+        # held the state rows and went on to the block. So the rule is not
+        # about the `pages` row: a new writer of a block's row that writes,
+        # in the same transaction, ANY other row of that page -- the page,
+        # another block, a state row -- takes the page's row first.
         lock_owner(@block.owner)
         reread_container
         assign

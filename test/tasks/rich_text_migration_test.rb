@@ -66,6 +66,21 @@ class RichTextMigrationTest < ActiveSupport::TestCase
     end
   end
 
+  # The import writes a block's row and then its page's stored state: the
+  # page's row first, as every writer of a page's blocks (the lock tests in
+  # `test/services/content_blocks/`). A post is its own first row.
+  test "a block's row is imported under its page's row lock, and a post's with no lock" do
+    block_row = capture_sql { run_import([ row(@block, "<p>Hello</p>") ]) }
+    post_row = capture_sql { run_import([ row(@post, "<p>Hello</p>") ]) }
+
+    lock = block_row.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    write = block_row.index { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    assert lock, "no lock on the page's row"
+    assert_operator lock, :<, write
+    assert_empty post_row.grep(/FOR UPDATE/)
+    assert_equal rich_doc("Hello"), @block.reload.body_document(locale: "en").to_h
+  end
+
   test "reports unmapped fragments with the record and locale they came from" do
     output = run_import([ row(@post, "<p>Keep <u>this</u></p>") ])
 

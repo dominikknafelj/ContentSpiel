@@ -126,6 +126,14 @@ module RichText
       # `Media::Asset`s, and a row that then fails must not leave them behind
       # as orphans no document references.
       outcome = ActiveRecord::Base.transaction do
+        # A block's row is written below and then its page's
+        # `translation_states` rows: the page's row is locked first, the one
+        # order of locks for a write to a page's blocks (`ContentBlocks
+        # ::Save#call`), so an import run while editors work cannot deadlock
+        # against a section's delete or duplicate on the same page. The same
+        # statement as `ContentBlocks::Structure#lock_owner`, written out:
+        # this is a model, and takes nothing from a service.
+        record.owner.class.where(id: record.owner_id).lock.pick(:id) if record.is_a?(ContentBlock) && record.owner
         document, unmapped = RichText::Document.from_html(row["body"], record: record, locale: locale, youtube_video_id: @source.method(:youtube_video_id))
         errors = document.validate
         raise RowFailed, "the converted document is invalid: #{errors.to_sentence}" if errors.any?
