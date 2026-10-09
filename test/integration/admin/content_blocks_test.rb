@@ -71,6 +71,26 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "tile-summary"
   end
 
+  # A block in a section is two elements, its tile and its form's panel
+  # (sections spec §4.3). An unavailable block's panel has "Delete block…",
+  # so the panel can be the very thing on screen when its block is deleted.
+  test "deleting a block in a section removes its tile and its panel, and a block outside one only its card" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    delete "#{blocks_path}/#{inside.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(inside.id)
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(inside)}']"
+    assert_select "turbo-stream[action=remove][target='block-#{inside.id}-panel']"
+
+    delete "#{blocks_path}/#{outside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=remove]", count: 1
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(outside)}']"
+  end
+
   test "the page editor draws a section as a card of lanes with every block's form under them, and only on the default language's tab" do
     section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
     inside = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)

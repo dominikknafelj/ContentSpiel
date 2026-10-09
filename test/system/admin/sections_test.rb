@@ -259,6 +259,31 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_no_selector panel(list)
   end
 
+  # An unavailable block's panel has the block's one action, "Delete block…",
+  # so the block is deleted from inside the form that is open. The panel goes
+  # with the tile: left behind it would stay open with no tile to close it
+  # from. With it gone no form is open, and the next tile opens as the first.
+  test "deleting an unavailable block from its open panel removes its tile and the panel, and no form is left open" do
+    gone = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    gone.update_column(:block_type, "gone/thing")
+    open_editor
+    find(face(gone)).click
+    assert_selector panel(gone), text: "Unavailable type — gone/thing"
+
+    within(panel(gone)) { press "Delete block…" }
+    within("dialog[open]") { press "Delete block" }
+
+    assert_no_selector tile(gone)
+    assert_no_selector panel(gone), visible: :all
+    assert_no_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']"
+    assert_not ContentBlock.exists?(gone.id)
+
+    find(face(@left)).click
+
+    assert_selector panel(@left)
+    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 1
+  end
+
   test "a collapsed section is its one header line, and expands to its lanes again" do
     open_editor
     press "Section"

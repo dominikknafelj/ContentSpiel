@@ -117,7 +117,7 @@ module Admin
       result = ContentBlocks::Destroy.call(block)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), *page_base_streams ]
+      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), *panel_removal_streams(block), *page_base_streams ]
     end
 
     # Drag reorder or Move up/down (spec §6.1): the client already knows
@@ -274,6 +274,17 @@ module Admin
     def tile_summary_stream(result)
       turbo_stream.replace(Admin::EditorScreen::TileSummaryComponent.dom_id(result.record),
         Admin::EditorScreen::TileSummaryComponent.new(block: result.record, locale: admin_locale, invalid: !result.ok? && !result.denied?))
+    end
+
+    # A block in a section is two elements (sections spec §4.3): its tile,
+    # which has the block's `dom_id` and is what `destroy` removes like a
+    # card, and its form's panel under the lanes. The panel goes with it --
+    # and it can be the very thing on screen: an unavailable block's panel
+    # has "Delete block…" in it. Left behind it would stay open with no tile
+    # to close it from, its Delete answering 410. `admin--section` needs no
+    # telling: the open form is whichever panel is showing, and none is.
+    def panel_removal_streams(block)
+      block.section_id ? [ turbo_stream.remove(Admin::BlockCardComponent.panel_id(block)) ] : []
     end
 
     # The page's own list (sections spec §3.1): the blocks outside any
