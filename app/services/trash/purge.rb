@@ -46,11 +46,12 @@ module Trash
   #
   # The notes on what is purged go with it (notes spec D12): `Notes::Remove`
   # is called once, for the page with its branch and all their blocks, for
-  # the post or for the image, in this transaction and BEFORE anything is
-  # destroyed (`#purge_branch` says why), under the row lock of every
-  # container whose threads go -- the branch's pages, or the post's or the
-  # image's own row (`#lock_record`). A trashed record keeps its notes;
-  # only this removes them.
+  # the post or for the image, in this transaction. For a page it runs
+  # BEFORE anything is destroyed, under the branch's row locks
+  # (`#purge_branch` says why); for a post and an image it runs AFTER the
+  # destroy, whose own lock on the row is the one that matters
+  # (`#remove_notes`). A trashed record keeps its notes; only this removes
+  # them.
   class Purge < ApplicationService
     include ItemPermissions
 
@@ -136,9 +137,16 @@ module Trash
 
       # The threads on these pages and their blocks (notes spec D12):
       # polymorphic like the usage rows below, so removed by hand, once for
-      # the branch. Before any page is destroyed: `Notes::Remove` asks this
-      # purge's own right again, and a `pages.delete` scoped to a branch is
-      # matched against the page's closure rows, which its destroy deletes.
+      # the branch, under the locks just taken. Before any page is
+      # destroyed, as a rule and not because today's code would fail
+      # otherwise: `Notes::Remove` asks this purge's own right again, and a
+      # `pages.delete` scoped to a branch is matched against the page's
+      # closure rows, which its destroy deletes. The object in hand still
+      # answers afterwards, but only because Active Record keeps its
+      # `self_and_ancestor_ids` from this purge's first check; a copy of
+      # the page read afresh is refused once the rows are gone (both are
+      # pinned in `test/services/trash/purge_test.rb`). Asked first, the
+      # answer does not depend on that.
       # (`content_blocks.to_a` loads the very objects the loop below reads
       # again and the destroy goes on to destroy.)
       remove_notes(with: (pages - [ @record ]) + pages.flat_map { |page| page.content_blocks.to_a })
@@ -185,9 +193,8 @@ module Trash
     end
 
     def purge_post
-      lock_record
-      remove_notes
       @record.destroy || raise(ActiveRecord::Rollback)
+      remove_notes
       # A destroyed owner's `media_usages` rows go with it (media library
       # design spec §5.1) -- `refresh` computes none for a destroyed record.
       Media::UsageIndex.refresh(@record)
@@ -200,30 +207,40 @@ module Trash
         @record.errors.add(:base, @record.in_use_message(actor:))
         raise ActiveRecord::Rollback
       end
-      lock_record
-      remove_notes
       @record.destroy || raise(ActiveRecord::Rollback)
+      remove_notes
       Translations::StateIndex.remove(@record)
       true
     end
 
-    # The post's or the image's own row, held from here to the commit. It is
-    # the first lock every notes service takes (`Notes::Authorization#
-    # lock_container`), so a note written beside this purge has committed
-    # and is found by `Notes::Remove`, or waits here and finds the record
-    # gone. A trashed record takes no note, which keeps most of them out
-    # anyway; this closes what is left -- a record restored in another tab
-    # after this purge loaded it, and a note started on it at once, whose
-    # thread would otherwise be written between `Notes::Remove`'s read and
-    # the destroy and outlive the record. Row first, then what hangs on it
-    # (the destroy deletes a post's join rows before the post), which is
-    # the way round `Tags::Merge` takes them too: it touches a carrying post
-    # before it deletes that post's `post_tags` row. A page needs none of
-    # its own: `#purge_branch` holds the branch.
-    def lock_record = @record.class.where(id: @record.id).lock.pick(:id)
-
-    # A refusal there (none is expected: it asks the right this purge was
-    # just given) rolls the whole purge back, like any refusal further down.
+    # The threads on `@record` and on what goes with it, through
+    # `Notes::Remove`. A refusal there (none is expected: it asks the right
+    # this purge was just given) rolls the whole purge back, like any refusal
+    # further down.
+    #
+    # A POST AND AN IMAGE: AFTER THE DESTROY, and with no lock taken for it.
+    # The destroy's DELETE holds the record's row to the commit, and that
+    # row is the first lock every notes service takes, read through `kept`
+    # (`Notes::Authorization#lock_container`, the same statement for a post
+    # and for an image). So a note started beside this purge -- on a record
+    # restored in another tab after the purge had loaded it; a trashed one
+    # takes no note at all -- either committed before the destroy got the
+    # row, and its thread is found by the removal that follows, or waits on
+    # the row and then finds none ("This post is in the trash or was
+    # deleted."). No thread is left behind. A row lock taken BEFORE the
+    # destroy would do the same and was tried: it turns the purge's order
+    # round to the post's row and then its join rows, while `Posts::Save`
+    # writes `post_tags` first (`@post.tags =`) and the post after, so a
+    # save that changes tags beside a purge of the same post could
+    # deadlock, and nothing here rescues `ActiveRecord::Deadlocked`. This
+    # way the purge takes its locks in the order it always did.
+    #
+    # The right `Notes::Remove` asks again is answered for the destroyed
+    # object as it was before: a `content_types` or `own` scope reads the
+    # post's own attributes, an image's uploader its `created_by_id`,
+    # `trash.empty` and an owner no record at all. Only a page's branch
+    # scope reads rows the destroy deletes, which is why a page goes the
+    # other way round (`#purge_branch`).
     def remove_notes(with: [])
       Notes::Remove.call(@record, with: with, actor: actor).ok? || raise(ActiveRecord::Rollback)
     end

@@ -17,8 +17,10 @@ module Notes
   # - `Trash::Purge` of a page: every page of the branch, locked in id order
   #   (`#purge_branch`) before anything of it is deleted. A block's threads
   #   are filed under its page, so that covers the blocks too.
-  # - `Trash::Purge` of a post or an image: that row (`#lock_record`), taken
-  #   for this call alone.
+  # - `Trash::Purge` of a post or an image: the row its destroy has just
+  #   deleted, held by that DELETE to the commit. No lock is taken ahead of
+  #   the destroy (`Trash::Purge#remove_notes` has the deadlock with
+  #   `Posts::Save` that one would open).
   #
   # So a note being written beside the delete either committed before and is
   # removed here, or waits for the container's row and finds it gone ("This
@@ -35,12 +37,17 @@ module Notes
   # so it has either finished or not begun when this runs, and the two can
   # not hold what the other waits for.
   #
-  # `Trash::Purge` calls it BEFORE it destroys anything: the check below asks
-  # the purge's own right again, and a `pages.delete` scoped to a branch is
-  # matched against the page's closure rows, which the destroy deletes --
-  # asked afterwards it would refuse the person the purge had just allowed.
-  # `ContentBlocks::Destroy` calls it after the block is gone: a block's right
-  # is its page's, and the page is still there.
+  # WHEN IT IS CALLED. For a page, `Trash::Purge` calls it BEFORE it destroys
+  # anything: the check below asks the purge's own right again, and a
+  # `pages.delete` scoped to a branch is matched against the page's closure
+  # rows, which the destroy deletes. The very object the purge checked still
+  # answers afterwards (Active Record keeps the ancestor ids it read for
+  # that first check), so the purge would not in fact be refused; a page
+  # read afresh would be, and asking first depends on neither. For a post
+  # and an image `Trash::Purge` calls it AFTER the destroy: every way of
+  # holding their delete right is read from the object in memory or from no
+  # record at all. `ContentBlocks::Destroy` calls it after the block is
+  # gone: a block's right is its page's, and the page is still there.
   #
   # Constant in statements whatever the number of threads: one read of the
   # thread ids, one audit insert, one DELETE. `notes.removed` is recorded on

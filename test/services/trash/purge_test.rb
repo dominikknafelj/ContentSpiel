@@ -413,24 +413,71 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert_equal 1, statements.count { |sql| sql.start_with?('DELETE FROM "note_threads"') }
   end
 
-  # A post and an image have no lock of their own in a purge but this one:
-  # the row every notes service takes first (`Notes::Authorization#
-  # lock_container`), held before the threads are read.
-  test "a post's and an image's row is locked before their notes are removed, and those before the record" do
-    { create_post(title: "Noted", published: false) => "posts", create_media_asset => "media_assets" }.each do |record, table|
+  # A post and an image go the other way round from a page: destroyed first,
+  # then their notes removed. The destroy's own lock on the row is what a
+  # note being started waits on, and the purge takes no row lock of its own
+  # -- one taken before the destroy would meet `Posts::Save`, which writes a
+  # post's join rows before the post, the wrong way round.
+  test "a post and an image are deleted before their notes are touched, and the purge locks neither row itself" do
+    { create_post(title: "Noted", published: false, tags: %w[one]) => "posts", create_media_asset => "media_assets" }.each do |record, table|
       as(users(:two)) { Notes::Start.call(record, body: "A note") }
       assert Trash::Move.call(record).ok?
       record.reload
 
       statements = capture_sql { assert Trash::Purge.call(record).ok? }
 
-      order = [
-        statements.index { |sql| sql.include?(%(FROM "#{table}")) && sql.include?("FOR UPDATE") },
-        statements.index { |sql| sql.include?('FROM "note_threads"') },
-        statements.index { |sql| sql.start_with?('DELETE FROM "note_threads"') },
-        statements.index { |sql| sql.start_with?(%(DELETE FROM "#{table}")) }
-      ]
-      assert_equal order.compact.sort, order, "#{table}: #{order.inspect}"
+      deleted = statements.index { |sql| sql.start_with?(%(DELETE FROM "#{table}")) }
+      first_note = statements.index { |sql| sql.include?('"note_threads"') }
+      assert_operator deleted, :<, first_note, table
+      assert_equal 1, statements.count { |sql| sql.start_with?('DELETE FROM "note_threads"') }
+      assert_empty statements.select { |sql| sql.include?(%(FROM "#{table}")) && sql.include?("FOR UPDATE") }, table
+    end
+  end
+
+  def notes_left = [ Notes::Thread.count, Notes::Message.count, Notes::Follow.count, Notes::Delivery.count ]
+
+  def member_with(email, grants)
+    user = User.create!(email_address: email, password: "a-long-enough-password")
+    group = AccessControl::Group.create!(name: "Group of #{email}")
+    grants.each { |permission, scope| AccessControl::Grant.create!(group: group, permission: permission, scope: scope) }
+    AccessControl::Membership.create!(user: user, group: group)
+    user
+  end
+
+  # `Notes::Remove` asks the purge's right again of the post or image the
+  # purge has just destroyed. Every way of holding that right is read from
+  # the object in memory (the content type, the author, the uploader) or
+  # from no record at all, so each of these still answers as it did before.
+  test "a purged post takes its notes for the owner, an Admin, a holder scoped to its type and their own, and a trash.empty holder" do
+    scoped = member_with("scoped@example.com", "posts.read" => {}, "posts.create" => {},
+      "posts.delete" => { "content_types" => [ "blog" ], "own" => true })
+    emptier = member_with("emptier@example.com", "trash.empty" => {})
+
+    [ users(:one), users(:two), scoped, emptier ].each do |actor|
+      post = as(actor == scoped ? scoped : users(:one)) { create_post(title: "Noted #{actor.id}", published: false) }
+      as(users(:two)) { Notes::Start.call(post, body: "A note, @[#{users(:reader).id}]") }
+      assert Trash::Move.call(post).ok?
+
+      result = as(actor) { Trash::Purge.call(post.reload) }
+
+      assert result.ok?, "#{actor.email_address}: #{result.errors.to_sentence}"
+      assert_equal [ 0, 0, 0, 0, 0 ], [ *notes_left, Post.where(id: post.id).count ], actor.email_address
+    end
+    assert_equal 0, Audit::Event.where(action: "access.denied", user: [ users(:one), users(:two), scoped ]).count
+  end
+
+  test "a purged image takes its notes for the owner, an Admin, its uploader, and a trash.empty holder" do
+    emptier = member_with("emptier@example.com", "trash.empty" => {})
+
+    [ users(:one), users(:two), users(:author), emptier ].each do |actor|
+      asset = actor == users(:author) ? upload_by(actor) : create_media_asset
+      as(users(:two)) { Notes::Start.call(asset, body: "A note, @[#{users(:author).id}]") }
+      assert Trash::Move.call(asset).ok?
+
+      result = as(actor) { Trash::Purge.call(asset.reload) }
+
+      assert result.ok?, "#{actor.email_address}: #{result.errors.to_sentence}"
+      assert_equal [ 0, 0, 0, 0, 0 ], [ *notes_left, Media::Asset.where(id: asset.id).count ], actor.email_address
     end
   end
 
