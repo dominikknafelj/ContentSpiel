@@ -19,4 +19,17 @@
   <meta name="turbo-prefetch" content="false">
 <% end %>
 
-<%= render Admin::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options) %>
+<%# The post's open notes (notes spec §4.3): two queries for the header's
+    number and whether it holds something unread for the viewer. Here in the
+    view, because every way this screen is rendered needs them. %>
+<% note_counts = Notes::Counts.for_container(@post, user: Current.user) %>
+
+<%= render Admin::PostFormComponent.new(post: @post, locale: admin_locale, url_options: admin_url_options, open_notes: note_counts.fetch("total")) %>
+
+<%# The notes drawer (notes spec §4.1): once per screen, after everything
+    else and outside every form -- the post's form above is closed. `?notes=open`
+    (a link from the inbox, the posts list) opens it on load, at `?thread=`
+    when there is one. %>
+<%= render Admin::NotesScreen::DrawerComponent.new(container: @post, counts: note_counts,
+      title: Locales.read(@post, :title, locale: admin_locale).presence || t("admin.components.notes_screen.drawer.untitled"),
+      open: params[:notes] == "open", thread: params[:thread], url_options: admin_url_options) %>

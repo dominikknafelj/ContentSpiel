@@ -1,0 +1,41 @@
+<%# `top-(--admin-top-offset)`: under the shell's top bar wherever there is
+    one (below 1280px), so its buttons stay in reach and a shell drawer can be
+    opened from the sheet. `z-20`: over the editor's sticky header, under the
+    shell's scrim and drawers. While it is open the editor's header keeps its
+    actions clear of it (`.admin-notes-drawer` and `--admin-notes-width` in
+    content-spiel.tailwind.css). Escape is heard here and nowhere wider: it
+    closes the drawer only while the focus is inside it. %>
+<%= tag.aside id: "notes-drawer", hidden: true, tabindex: -1, aria: { label: t(".title") },
+      class: "admin-notes-drawer fixed inset-x-0 bottom-0 top-(--admin-top-offset) z-20 flex flex-col bg-surface focus:outline-none lg:left-auto lg:w-(--admin-notes-width) lg:border-l lg:border-line lg:shadow-menu",
+      data: { "admin--notes-target": "drawer", src: src, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes#close" } do %>
+  <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3 lg:py-3.5">
+    <%# The sheet's way back, below 1024px only (handoff "Full-screen sheet"). %>
+    <%= tag.button type: "button", class: "mr-1 inline-flex cursor-pointer items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[13px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent lg:hidden",
+          data: { action: "admin--notes#close" } do %>
+      <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %><span class="max-w-[40vw] truncate"><%= t(".back", title: title) %></span>
+    <% end %>
+    <h2 class="text-[15px] font-semibold text-ink"><%= t(".title") %></h2>
+    <%# Nothing at zero (the system's rule for a count): the number hides
+        itself, and the line with it. %>
+    <p class="font-cs-mono text-[11px] uppercase text-meta has-[[hidden]]:hidden"><%= open_count %></p>
+    <div class="ml-auto flex items-center gap-1">
+      <%= render Admin::ButtonComponent.new(label: t(".new"), variant: :secondary, size: :small, type: "button", data: { action: "admin--notes#compose" }) %>
+      <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { action: "admin--notes#close" },
+            class: "inline-flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent max-lg:hidden" do %>
+        <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+      <% end %>
+    </div>
+  </header>
+  <%# The one scroller of the drawer: the list's position in it is what
+      `admin--notes` keeps for the way back from a thread, and a thread's
+      reply sticks to its bottom. `overscroll-contain`: the editor underneath
+      stays where it is when the list reaches its end. The frame is centred
+      and at most 720px wide, which only the sheet is wide enough to show. %>
+  <div class="flex min-h-0 flex-1 justify-center overflow-y-auto overscroll-contain" data-notes-scroller>
+    <%= tag.turbo_frame id: "notes", class: "block min-h-full w-full max-w-[720px]",
+          data: { "admin--notes-target": "frame", action: "turbo:frame-load->admin--notes#loaded turbo:before-fetch-request->admin--notes#leaving" } do %>
+      <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".loading") %></p>
+    <% end %>
+  </div>
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: counts, id: "notes-counts") %>
+<% end %>

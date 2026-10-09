@@ -13,6 +13,10 @@ import { Controller } from "@hotwired/stimulus"
 // the breakpoint the attribute is simply never set (no drawer exists), so
 // nothing here has to know about widths. The scrim is shown while any panel
 // is open and closes them on click.
+//
+// The editors' notes drawer (`admin--notes`) is the one other drawer, on the
+// right: opening a panel here says so (`admin--drawer:opened`) and that one
+// closes; when that one opens, these stand aside (`standAside`).
 export default class extends Controller {
   static targets = [ "panel", "scrim", "trigger" ]
 
@@ -37,6 +41,8 @@ export default class extends Controller {
     // on the page it covers.
     const first = panel.querySelector("a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])")
     ;(first || panel).focus({ preventScroll: true })
+    // The notes drawer hears this and makes room (`admin--notes#shellOpened`).
+    this.dispatch("opened")
   }
 
   close(panel, { refocus = false } = {}) {
@@ -73,6 +79,10 @@ export default class extends Controller {
   // Navigation never keeps a drawer open and never steals focus into the
   // page that is about to be replaced.
   visiting() { this.closeAll({ refocus: false }) }
+
+  // The notes drawer opened (`admin--notes:opened`): a shell drawer makes
+  // room. The focus is the notes drawer's, so it is not handed back here.
+  standAside() { this.closeAll({ refocus: false }) }
 
   get anyOpen() { return this.panelTargets.some((panel) => panel.hasAttribute("data-open")) }
 

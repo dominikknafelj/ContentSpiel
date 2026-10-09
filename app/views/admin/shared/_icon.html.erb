@@ -53,6 +53,10 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" /></svg>
 <% when :check %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5" /></svg>
+<% when :message_square %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></svg>
+<% when :x %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M18 6 6 18M6 6l12 12" /></svg>
 <% else
   raise ArgumentError, "unknown admin icon #{name.inspect}"
 end %>

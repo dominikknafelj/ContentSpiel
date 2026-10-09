@@ -29,6 +29,13 @@
       selector. `admin--drawer` joins `admin--dialog` on <body> -- both
       listen at the document level, and the existing dialog actions stay.
 
+      `admin--notes` is on <body> for the same reason as `admin--dialog`: the
+      editor header's Notes button, the markers on the block cards and the
+      notes drawer are far apart in the document. The two drawer controllers
+      tell each other when one opens (`admin--notes:opened`,
+      `admin--drawer:opened`), so the notes drawer and a shell drawer are
+      never open together.
+
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
       read it via `closest` without a server round trip.
@@ -38,8 +45,8 @@
       the pending-lock hint -- `Admin::MessagesHelper`,
       `app/javascript/i18n/messages.js`); a script that finds no nearer
       `data-messages` reads these. %>
-  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
-        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded"
+  <body data-controller="admin--dialog admin--drawer admin--command-palette admin--fragment-links admin--file-drop-guard admin--notes" data-admin--command-palette-url-value="<%= admin_jump_path(**admin_url_options) %>"
+        data-action="mousedown->admin--dialog#remember click->admin--dialog#backdrop keydown.esc@window->admin--drawer#closeAll turbo:before-visit@document->admin--drawer#visiting turbo:frame-load@document->admin--drawer#frameLoaded selectionchange@document->admin--notes#selected admin--notes:opened->admin--drawer#standAside admin--drawer:opened->admin--notes#shellOpened"
         data-admin-locale="<%= admin_locale %>" data-messages="<%= admin_script_messages %>" class="min-h-screen bg-paper font-cs text-ink scheme-light dark:scheme-dark">
     <%= render Admin::Shell::TopBarComponent.new(tree: content_for?(:tree)) %>
     <div class="admin-shell<%= " admin-shell--tree" if content_for?(:tree) %>">

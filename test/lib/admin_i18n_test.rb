@@ -180,6 +180,9 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/controllers/admin/note_composer_controller.js
     app/controllers/admin/note_messages_controller.rb
     app/controllers/admin/note_mentions_controller.rb
+    app/components/admin/notes_screen/drawer_component.rb
+    app/components/admin/notes_screen/drawer_component.html.erb
+    app/javascript/controllers/admin/notes_controller.js
   ].freeze
 
   PLACEHOLDER = "".freeze

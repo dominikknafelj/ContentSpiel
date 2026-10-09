@@ -36,15 +36,52 @@ en:
         not_yours: "Only the person who wrote a note can change it."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
-      # What `admin--note-composer` says (`messages_data` on the composer's form).
+      # What the notes' scripts say. `mentions` is `admin--note-composer`'s
+      # (`messages_data` on the composer's form); the rest is `admin--notes`',
+      # which lives on <body>, so they are <body>'s
+      # (`Admin::MessagesHelper::SCRIPT_MESSAGES`): the header button's name,
+      # a marker's name in each of its three states, and the sentence a
+      # block's delete dialog adds.
       script:
+        total:
+          one: "Notes, %{count} open"
+          other: "Notes, %{count} open"
+        marker:
+          add: "Add a note on %{name}"
+          open:
+            one: "%{count} open note on %{name}"
+            other: "%{count} open notes on %{name}"
+          selection: "Add a note on the selected text in %{name}"
+        delete_warning:
+          one: "It has %{count} open note, which is deleted with it."
+          other: "It has %{count} open notes, which are deleted with it."
         mentions:
           none: "Nobody by that name can see this."
           count:
             one: "%{count} person. Use the arrow keys and Enter."
             other: "%{count} people. Use the arrow keys and Enter."
     components:
+      # The editor header's Notes button. `components.en.yml` holds nothing of
+      # the header's yet (it is not converted); these two merge into its scope.
+      editor_screen:
+        header:
+          notes: "Notes"
+          # The button's accessible name; `admin.notes.script.total` is the
+          # same sentence for the script that keeps it current.
+          notes_label:
+            one: "Notes, %{count} open"
+            other: "Notes, %{count} open"
       notes_screen:
+        drawer:
+          title: "Notes"
+          # Beside the title: "4 open". `%{number}` is the element the script
+          # rewrites as the count changes, so the sentence has one form.
+          open_html: "%{number} open"
+          new: "New note"
+          close: "Close"
+          loading: "Loading notes…"
+          back: "Back to %{title}"
+          untitled: "(untitled)"
         list:
           pinned: "Pinned"
           open:

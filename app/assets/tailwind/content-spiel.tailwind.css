@@ -115,6 +115,21 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (min-width: 1024px) { body:not(:has(.admin-shell__sidebar[data-open])) .admin-shell__scrim { display: none; } }
 @media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
 
+/* The editors' notes drawer (`Admin::NotesScreen::DrawerComponent`, notes spec
+   §4.1) lies OVER the right edge of the content, from the window's top, 400px
+   wide from 1024px. The editor's sticky header ends under it, and the right
+   end of that header is where Preview, Publish, the save status and the
+   Notes button itself are: while the drawer is open the header keeps its
+   contents clear of it, so the button that opened the drawer can close it
+   and still shows that it is pressed. Only the header moves; the blocks
+   below stay as wide as they were (a block's marker sits beside its name,
+   on the left, for the same reason). Below 1024px the drawer is a sheet over
+   the whole editor and nothing has to make room. */
+:root { --admin-notes-width: 400px; }
+@media (min-width: 1024px) {
+  #content:has(.admin-notes-drawer:not([hidden])) .admin-editor-header { padding-right: calc(var(--admin-notes-width) + 1.75rem); }
+}
+
 /* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */
 .admin-dialog { max-height: 85vh; width: calc(100vw - 32px); margin: auto; }

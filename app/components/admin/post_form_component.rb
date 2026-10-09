@@ -13,10 +13,13 @@ module Admin
   class PostFormComponent < AdminComponent
     ID_PREFIX = "post"
 
-    def initialize(post:, locale:, url_options: {})
+    # `open_notes` is the header's (its Notes button): the post's open-thread
+    # count from the screen that also draws the notes drawer, or nil for none.
+    def initialize(post:, locale:, url_options: {}, open_notes: nil)
       @post = post
       @locale = locale
       @url_options = url_options
+      @open_notes = open_notes
     end
 
     def save_status_id = "post-save-status"
