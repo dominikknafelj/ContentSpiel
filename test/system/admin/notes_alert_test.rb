@@ -243,6 +243,111 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_equal 2, tones
   end
 
+  # A browser that cannot make the sound at all: nothing is heard, and the
+  # rest goes on -- the notification, the agreement, the tab's own word.
+  test "an AudioContext that cannot be made stops neither the notification nor the settling" do
+    users(:one).update!(notes_desktop: true)
+    stubbed_dashboard
+    page.execute_script("window.AudioContext = class { constructor() { throw new Error('no audio device') } }")
+    hide_document
+
+    delivery = mention_me
+
+    await_settled(delivery)
+    assert_equal [ { "id" => delivery, "chimed" => false, "notified" => true } ], page.evaluate_script("window.__settled")
+    assert_equal 1, notified.size
+  end
+
+  # --- several notes at once (the handoff's decision 18) ---------------------------
+
+  def named_toasts = all("#toasts .admin-toast[data-note-toast=one]").map(&:text)
+
+  # The window of a burst, for the page in front of the test: both scripts
+  # read it from this one value (the alert takes it from the delivery's
+  # event), at the moment a delivery is announced.
+  def burst_window(milliseconds) = page.execute_script("document.body.setAttribute('data-admin--notes-live-burst-ms-value', '#{milliseconds}')")
+
+  test "two notes at once are two named toasts and one chime; from the third one toast counts them, and the next burst starts over" do
+    users(:one).update!(notes_desktop: true)
+    stubbed_dashboard
+    hide_document
+
+    await_settled(mention_me("First, @[#{users(:one).id}]"))
+    await_settled(mention_me("Second, @[#{users(:one).id}]"))
+
+    assert_selector "#toasts .admin-toast[data-note-toast=one]", text: "Dana mentioned you on Pricing", count: 2
+    assert_no_selector "#toasts .admin-toast[data-note-toast=many]"
+    # One chime and one notification for the burst: the first mention's.
+    assert_equal [ 2, 1 ], [ tones, notified.size ]
+
+    await_settled(mention_me("Third, @[#{users(:one).id}]"))
+
+    assert_selector "#toasts .admin-toast[data-note-toast=many]", text: "You have 3 new notes", count: 1
+    assert_no_selector "#toasts .admin-toast[data-note-toast=one]"
+    assert_selector "#toasts .admin-toast", count: 1
+    assert_selector "#toasts .admin-toast[data-note-toast=many] > span[aria-hidden=true][class~='bg-accent']:first-child"
+    assert_equal [ 2, 1 ], [ tones, notified.size ]
+    page.execute_script("window.__many = document.querySelector('#toasts .admin-toast[data-note-toast=many]')")
+
+    await_settled(mention_me("Fourth, @[#{users(:one).id}]"))
+
+    assert_selector "#toasts .admin-toast[data-note-toast=many]", text: "You have 4 new notes", count: 1
+    assert_selector "#toasts .admin-toast", count: 1
+    # Put up again, not rewritten: its eight seconds started over.
+    assert_equal false, page.evaluate_script("window.__many.isConnected")
+    assert_equal [ 2, 1 ], [ tones, notified.size ]
+
+    # The window has passed (here: it is made a millisecond long, and the
+    # next delivery comes later than that): a new burst, named and heard.
+    burst_window(1)
+    await_settled(mention_me("Later, @[#{users(:one).id}]"))
+
+    assert_selector "#toasts .admin-toast[data-note-toast=one]", text: "Dana mentioned you on Pricing", count: 1
+    assert_equal [ 4, 2 ], [ tones, notified.size ]
+
+    # "Open" on the one toast for several leads to the inbox.
+    within("#toasts .admin-toast[data-note-toast=many]") { press "Open" }
+    assert_current_path "/cs-studio/notes"
+    assert_selector "h1", text: "Notes for you"
+  end
+
+  test "a burst goes on across a Turbo visit: the third note is counted on the next page, without a second chime" do
+    stubbed_dashboard
+    await_settled(mention_me("First, @[#{users(:one).id}]"))
+    await_settled(mention_me("Second, @[#{users(:one).id}]"))
+    assert_equal 2, tones
+
+    page.execute_script("window.__visited = false; document.addEventListener('turbo:load', () => { window.__visited = true }, { once: true }); Turbo.visit('/cs-studio/tags')")
+    await_js("window.__visited === true", wait: LIVE)
+    await_notes_live
+
+    await_settled(mention_me("Third, @[#{users(:one).id}]"))
+
+    assert_selector "#toasts .admin-toast[data-note-toast=many]", text: "You have 3 new notes", count: 1
+    assert_no_selector "#toasts .admin-toast[data-note-toast=one]"
+    assert_equal 2, tones
+  end
+
+  test "a note the person is looking at is not counted among the toasts of a burst" do
+    visit "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}"
+    await_notes_live
+    assert_selector "#notes-drawer [data-notes-view=thread]"
+    stub_alerts
+    find("#note-thread-#{@thread.id}-reply textarea[name=body]").click
+
+    as(users(:two)) { Notes::Reply.call(@thread, body: "Here, @[#{users(:one).id}]") }
+    await_settled(newest_delivery)
+    assert_no_selector "#toasts .admin-toast"
+    await_settled(mention_me("First, @[#{users(:one).id}]"))
+    await_settled(mention_me("Second, @[#{users(:one).id}]"))
+
+    # Two were said, so two are named; and the one seen arriving made no
+    # sound, so the first that was not seen did.
+    assert_selector "#toasts .admin-toast[data-note-toast=one]", count: 2
+    assert_no_selector "#toasts .admin-toast[data-note-toast=many]"
+    assert_equal 2, tones
+  end
+
   # --- the desktop notification ----------------------------------------------------
 
   test "with no tab in view one tab of two puts the mention on the desktop, and a click on it opens the thread" do
@@ -308,10 +413,36 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     JS
   end
 
+  test "the permission line stands only while the desktop switch is on, as it is in the page" do
+    visit "/cs-studio/account/password"
+    await_admin_controllers
+    browser_says("default")
+    # Off, as stored: the browser's state is known, and nothing is said.
+    assert_selector "#{permission_row}[data-state=default]"
+    assert_no_text "This browser has not been allowed"
+
+    find("#notes_desktop").click
+    assert_selector "#{permission_row} [data-admin--notes-permission-target=ask][class~='bg-accent-tint']", text: "This browser has not been allowed to show notifications yet."
+    assert_selector "#{permission_row} button", text: "Allow in this browser"
+
+    find("#notes_desktop").click
+    assert_no_text "This browser has not been allowed"
+    assert_no_selector "#{permission_row} button"
+
+    browser_says("denied")
+    assert_no_text "Blocked in this browser."
+    find("#notes_desktop").click
+    # Blocked is the one warn-toned line, and has no button.
+    assert_selector "#{permission_row} [data-admin--notes-permission-target=blocked][class~='bg-warn-tint'][class~='border-warn']", text: "Blocked in this browser."
+    assert_no_selector "#{permission_row} button"
+    assert_equal false, users(:one).reload.notes_desktop
+  end
+
   test "Allow in this browser asks at once, and a browser that refuses says so" do
     visit "/cs-studio/account/password"
     await_admin_controllers
     browser_says("default", asked: "denied")
+    find("#notes_desktop").click
     assert_selector "#{permission_row}[data-state=default]", text: "This browser has not been allowed to show notifications yet."
 
     press "Allow in this browser"
@@ -319,8 +450,8 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     assert_selector "#{permission_row}[data-state=denied]", text: "Blocked in this browser. Change it in the site settings of your browser."
     assert_no_selector "#{permission_row} button"
     assert_equal 1, page.evaluate_script("window.__asked")
-    # Asking the browser is no change of the form's, and saved nothing.
-    assert_selector "#notes-form .admin-save-bar", text: "No unsaved changes"
+    # Asking the browser saved nothing: the switch is still the one change.
+    assert_selector "#profile-form .admin-save-bar", text: "1 unsaved change"
     assert_equal false, users(:one).reload.notes_desktop
   end
 
@@ -328,42 +459,46 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     visit "/cs-studio/account/password"
     await_admin_controllers
     browser_says("default", asked: "granted")
+    find("#notes_desktop").click
 
     press "Allow in this browser"
 
-    assert_selector "#{permission_row}[data-state=granted]", visible: :all
+    assert_selector "#{permission_row}[data-state=granted]"
     assert_no_selector "#{permission_row} button"
     assert_no_text "Blocked in this browser."
 
     page.execute_script("delete window.Notification; window.dispatchEvent(new Event('focus'))")
-    assert_selector "#{permission_row}[data-state=unsupported]", visible: :all
+    assert_selector "#{permission_row}[data-state=unsupported]"
     assert_no_text "This browser has not been allowed"
   end
 
-  test "the two switches are saved with their own footer, keep what the other forms hold, and reach the next page" do
+  # The handoff's decision 13: the name and the switches are one form.
+  test "the name and the two switches are saved by one footer, keep what the password form holds, and reach the next page" do
     visit "/cs-studio/account/password"
     await_admin_controllers
+    assert_selector ".admin-save-bar", count: 2
     fill_in "Current password", with: "password"
     fill_in "New password", with: "a-new-long-password"
     fill_in "Confirm new password", with: "a-new-long-password"
-    assert_selector "#notes-form button[type=submit][disabled]", text: "Save"
+    assert_selector "#profile-form button[type=submit][disabled]", text: "Save name"
     assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
 
     find("#notes_desktop").click
     find("#notes_sound").click
+    fill_in "Your name", with: "Olive"
 
-    assert_selector "#notes-form .admin-save-bar", text: "2 unsaved changes"
+    assert_selector "#profile-form .admin-save-bar", text: "3 unsaved changes"
     # Changing the password would draw the screen again, over the switches.
     assert_selector "#password-form button[type=submit][disabled]", text: "Change password"
     assert_selector "#password-form .admin-save-bar [role=status]", text: "Save or cancel your changes first."
-    assert_equal [ true, false ], users(:one).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+    assert_equal [ nil, true, false ], users(:one).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
 
-    within("#notes-form") { press "Save" }
+    within("#profile-form") { press "Save name" }
 
-    assert_selector "#toasts .admin-toast", text: "Notification settings saved.", wait: LIVE
+    assert_selector "#profile-form .admin-save-bar", text: "No unsaved changes", wait: LIVE
     assert_no_selector "dialog#leave-dialog[open]"
-    assert_equal [ false, true ], users(:one).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
-    assert_selector "#notes-form .admin-save-bar", text: "No unsaved changes"
+    assert_equal [ "Olive", false, true ], users(:one).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
+    assert_equal 1, Audit::Event.where(action: "user.updated", subject: users(:one)).count
     assert_selector "#password-form button[type=submit]:not([disabled])", text: "Change password"
     assert_equal "a-new-long-password", find_field("New password").value
     assert_equal [ true, false ], [ find("#notes_desktop").checked?, find("#notes_sound").checked? ]

@@ -40,9 +40,13 @@ module Admin
       end
     end
 
-    # "Your name" (design pass spec §5.1): the one profile field. Not
-    # `Users::Save` -- that needs `users.manage`; `Users::UpdateProfile` is
-    # open to every user for their own account only.
+    # "Your name" (design pass spec §5.1) and the two Notes switches (notes
+    # spec §6.4, D18, D19): one form, one footer, one save (notes handoff,
+    # decision 13). Not `Users::Save` -- that needs `users.manage`;
+    # `Users::UpdateProfile` is open to every user for their own account
+    # only, and it is always `Current.user`: the request names nobody. A
+    # switch the request does not send is left as it is (the form always
+    # sends both, a hidden "0" ahead of each box).
     #
     # A success answers Turbo with a STREAM, not a redirect: the screen has a
     # second form (the password), and re-rendering the screen -- or the whole
@@ -51,9 +55,16 @@ module Admin
     # happened. The stream replaces the one thing a new name changes outside
     # the field itself, the sidebar's account block, and says "Name saved.";
     # the footer takes what it sent as its new baseline
-    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect.
+    # (`admin--save-bar#submitEnded`). Without Turbo it is the redirect. The
+    # new settings reach the scripts (`admin--notes-alert`, on <body>) with
+    # the next page.
+    #
+    # A refusal draws the screen again with what was sent in the form
+    # (`@profile_values`) and the account as it is STORED everywhere else:
+    # the service leaves the refused values on the record, and the sidebar's
+    # name and <body>'s settings must not show what was never saved.
     def update_profile
-      result = Users::UpdateProfile.call(Current.user, name: params[:name])
+      result = Users::UpdateProfile.call(Current.user, name: params[:name], notes_sound: switch(:notes_sound), notes_desktop: switch(:notes_desktop))
       if result.ok?
         # Decided by "does the client take a stream", not `respond_to`: the
         # name is saved by now, and a client that accepts neither format must
@@ -69,30 +80,15 @@ module Admin
         end
       else
         @profile_errors = result.errors
+        @profile_values = Current.user.slice(:name, :notes_sound, :notes_desktop).symbolize_keys
+        Current.user.restore_attributes
         render :edit, status: :unprocessable_entity
       end
     end
 
-    # The two Notes switches (notes spec §6.4, D18, D19): configuration, so
-    # an explicit Save that keeps the screen, like the name above it -- a
-    # stream with the toast for Turbo, so what the other two forms hold stays
-    # as typed, and the redirect without. Always `Current.user`: the request
-    # names nobody. A switch that is not sent is off. The new settings reach
-    # the scripts (`admin--notes-alert`, on <body>) with the next page.
-    def update_notifications
-      result = Users::UpdateNotifications.call(Current.user, sound: params[:notes_sound] == "1", desktop: params[:notes_desktop] == "1")
-      if result.ok?
-        if request.accepts.any? { |type| type.symbol == :turbo_stream }
-          render turbo_stream: toast_stream(t("admin.accounts.notes.saved"))
-        else
-          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.notes.saved")
-        end
-      else
-        forbidden_or(result) do
-          @notes_errors = result.errors
-          render :edit, status: :unprocessable_entity
-        end
-      end
-    end
+    private
+
+    # A switch as the form sends it: "1" on, anything else off, absent nil.
+    def switch(name) = params.key?(name) ? params[name] == "1" : nil
   end
 end

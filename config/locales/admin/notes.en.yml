@@ -77,6 +77,12 @@ en:
           open: "Open"
           # Quoted: a bare `on` is YAML's word for true.
           "on": "%{sentence} on %{title}"
+          # From the third note of a burst (the handoff's decision 18): one
+          # toast for all of them, whose "Open" leads to the inbox. It
+          # starts at 3; `one` is there because a count needs both forms.
+          many:
+            one: "You have %{count} new note"
+            other: "You have %{count} new notes"
         # What a live refresh writes into an open thread: the divider above
         # the first message that arrived, the button that leads down to what
         # arrived below the screen, and the line above a reply whose thread
@@ -94,15 +100,14 @@ en:
     # The account screen's "Notes" card (notes spec §6.4, handoff "Account
     # switches"): two settings of the person's, and what this browser says
     # about showing notifications. Read with full keys from
-    # `admin/accounts/edit.html.erb` and `Admin::AccountsController`.
+    # `admin/accounts/edit.html.erb`. (The card is part of the name's form:
+    # its footer and its toast are that form's.)
     accounts:
       notes:
         title: "Notes"
         description: "What happens in this browser when someone mentions you in a note."
         notes_sound: "Play a sound when I'm mentioned"
         notes_desktop: "Show a desktop notification when I'm mentioned"
-        save: "Save"
-        saved: "Notification settings saved."
         permission:
           ask: "This browser has not been allowed to show notifications yet."
           allow: "Allow in this browser"
@@ -254,6 +259,9 @@ en:
           back: "All notes"
           # Row 1's Close, the drawer's own while a thread is open.
           close: "Close"
+          # Row 1's way back to the editor in the sheet (below 1024px), where
+          # the sheet's own header is hidden while a thread is open.
+          leave: "Back to %{title}"
           # Under what the thread is on: "2 messages · started on DE".
           messages:
             one: "%{count} message"

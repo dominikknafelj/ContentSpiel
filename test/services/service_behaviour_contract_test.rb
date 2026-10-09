@@ -53,8 +53,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
     Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::MarkRead Notes::Pin Notes::Remove Notes::Reopen Notes::Reply Notes::Resolve
     Notes::SetFollowing Notes::Start Notes::Unpin Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
-    Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdateNotifications
-    Users::UpdatePassword Users::UpdateProfile
+    Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze
 
   # The app's own services: classes defined under app/, not the throwaway

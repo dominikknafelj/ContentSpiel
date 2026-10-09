@@ -136,7 +136,10 @@
         like Undo. `admin--notes-live` clones it and writes in the sentence,
         the accent dot and where "Open" leads; inert here, like the template
         above. "Open" is a GET, the one toast action that is: it opens a
-        record's notes and writes nothing. %>
+        record's notes and writes nothing. As drawn here it leads to the inbox,
+        which is where the one toast for several notes at once goes ("You have
+        3 new notes", the handoff's decision 18); a named toast gets its own
+        address written in. %>
     <template id="toast-note-template"><%= render Admin::ToastComponent.new(message: t("admin.notes.script.toast.placeholder"), kind: :undo,
           action: { label: t("admin.notes.script.toast.open"), url: admin_notes_path, method: :get }) %></template>
 

@@ -217,19 +217,86 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "html[data-notes-open]"
   end
 
-  test "below 1024px a thread keeps the sheet's header, whose Back to the page is the way out, and has no Close of its own" do
+  # The handoff's decision 17: below 1024px the sheet's header goes too while
+  # a thread is open, and the thread's first row is all there is: "← All
+  # notes 4", the Notify link, and "Back to <title>" as a text button on the
+  # right, which does what the sheet header's Back does.
+  test "below 1024px a thread hides the sheet's header: its first row has All notes, Notify and Back to the page" do
     thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
     original = page.current_window.size
     page.current_window.resize_to(900, 800)
-    open_editor("?notes=open&thread=#{thread.id}")
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-drawer > header button", text: "Back to Pricing"
+    find("#note-row-#{thread.id}").click
 
     assert_selector "#notes-drawer #note-thread-#{thread.id}"
-    assert_selector "#notes-drawer > header button", text: "Back to Pricing"
+    assert_no_selector "#notes-drawer > header"
     assert_no_selector "#notes-drawer button[aria-label='Close']"
-    within("#notes-drawer > header") { press "Back to Pricing" }
+    assert_selector "#notes-drawer button", text: "Back to Pricing", count: 1
+    # One row, in this order, the way back at its right end.
+    boxes = page.evaluate_script("[ 'a[data-note-back]', '[data-note-actions] form[action$=\"follow\"] button', 'button[data-note-leave]' ].map((selector) => { const box = document.querySelector('#notes-drawer ' + selector).getBoundingClientRect(); return [ box.left, (box.top + box.bottom) / 2, box.right ] })")
+    assert_operator boxes[0][0], :<, boxes[1][0]
+    assert_operator boxes[1][0], :<, boxes[2][0]
+    assert_in_delta boxes[0][1], boxes[1][1], 4, "Notify is not on Back's row"
+    assert_in_delta boxes[0][1], boxes[2][1], 4, "Back to the page is not on Back's row"
+    # (The sheet's frame is centred and at most 720px wide.)
+    frame_right = page.evaluate_script("document.querySelector('#notes-drawer turbo-frame#notes').getBoundingClientRect().right")
+    assert_operator frame_right - boxes[2][2], :<, 24
+    # The thread starts where the sheet does: no gap where the header was.
+    tops = page.evaluate_script("[ '#notes-drawer', 'a[data-note-back]' ].map((selector) => document.querySelector(selector).getBoundingClientRect().top)")
+    assert_operator tops[1] - tops[0], :<, 24
+
+    # "All notes" brings the sheet's header back with the list.
+    find("#notes-drawer a[data-note-back]").click
+    assert_selector "#notes-list"
+    assert_selector "#notes-drawer > header button", text: "Back to Pricing"
+    assert_selector "#notes-drawer > header button", text: "New note"
+
+    # "Back to <title>" in the row leaves for the editor, the focus on the
+    # button that opened the notes, as the sheet header's does.
+    find("#note-row-#{thread.id}").click
+    assert_selector "#note-thread-#{thread.id}"
+    within("#note-thread-#{thread.id}") { press "Back to Pricing" }
     assert_no_selector "#notes-drawer"
+    assert_selector "#notes-open[aria-expanded=false][aria-pressed=false]"
+    assert_equal "notes-open", page.evaluate_script("document.activeElement.id")
   ensure
     page.current_window.resize_to(*original)
+  end
+
+  test "below 1024px leaving a thread for the editor puts the editor back where it was scrolled to" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    8.times { |index| @page.content_blocks.create!(block_type: "rich_text", position: index + 1) }
+    original = page.current_window.size
+    page.current_window.resize_to(900, 800)
+    open_editor
+    page.execute_script("window.scrollTo(0, 300)")
+    assert_eventually(message: "the editor did not scroll") { page.evaluate_script("window.scrollY") == 300 }
+    find("#notes-open").execute_script("this.click()") # press_by_script: a native click would scroll the button into view and move the page this test measures
+    find("#note-row-#{thread.id}").click
+    assert_selector "#note-thread-#{thread.id}"
+
+    within("#note-thread-#{thread.id}") { press "Back to Pricing" }
+
+    assert_no_selector "#notes-drawer"
+    assert_eventually(message: "the editor is not where it was") { page.evaluate_script("window.scrollY") == 300 }
+  ensure
+    page.current_window.resize_to(*original)
+  end
+
+  # From 1024px the row's own way back to the page is not shown (Close is),
+  # and neither is it where there is no drawer at all.
+  test "Back to the page stands only in the sheet: not in the drawer from 1024px, not on a record's notes page" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    open_editor("?notes=open&thread=#{thread.id}")
+    assert_selector "#notes-drawer #note-thread-#{thread.id} button[data-note-close]"
+    assert_no_selector "#notes-drawer button", text: "Back to Pricing"
+
+    visit "/cs-studio/notes/page/#{@page.id}/threads/#{thread.id}"
+    assert_selector "#note-thread-#{thread.id}"
+    assert_no_selector "button", text: "Back to Pricing"
+    assert_no_selector "button[data-note-close]"
   end
 
   test "the list is where it was left when a thread is closed again" do

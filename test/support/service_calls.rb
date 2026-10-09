@@ -41,7 +41,7 @@
 # `own:` changes), `own:` (the call made on that user's record) and
 # `own_event:` (the audit action it records).
 module ServiceCalls
-  # The five services open to any signed-in user for their OWN record.
+  # The four services open to any signed-in user for their OWN record.
   # `manager_may:` is what a holder of the right to manage others (the Admin
   # group) gets when acting on someone else's record: the call, or a refusal
   # (`Users::UpdateProfile`'s anyone else goes through `Users::Save`, even
@@ -50,8 +50,7 @@ module ServiceCalls
     "ApiTokens::Issue" => { manager_may: true, reason: "any signed-in user may issue a token for themselves; anyone else needs tokens.manage" },
     "ApiTokens::Revoke" => { manager_may: true, reason: "any signed-in user may revoke their own token; anyone else needs tokens.manage" },
     "Users::UpdatePassword" => { manager_may: true, reason: "any signed-in user may change their own password; anyone else needs users.manage" },
-    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name; anyone else's goes through Users::Save" },
-    "Users::UpdateNotifications" => { manager_may: false, reason: "any signed-in user may change their own notification settings; nobody may change someone else's" }
+    "Users::UpdateProfile" => { manager_may: false, reason: "any signed-in user may change their own name and notes settings; anyone else's name goes through Users::Save, and nobody changes someone else's settings" }
   }.freeze
 
   # The two bulk services answer with their own result (no `denied?`): an id
@@ -482,15 +481,6 @@ module ServiceCalls
       { call: -> { Users::UpdateProfile.call(target, name: "Renamed") }, permission: "users.manage", on: target,
         control_actor: target,
         owner: mine, own: -> { Users::UpdateProfile.call(mine, name: "Me") }, own_event: "user.updated" }
-    },
-
-    # User-only rule, like `Users::UpdateProfile` above.
-    "Users::UpdateNotifications" => lambda {
-      target = stranger_target
-      mine = stranger_target(email: "mine@example.com")
-      { call: -> { Users::UpdateNotifications.call(target, sound: false, desktop: true) }, permission: "users.manage", on: target,
-        control_actor: target,
-        owner: mine, own: -> { Users::UpdateNotifications.call(mine, sound: false, desktop: true) }, own_event: "user.updated" }
     },
 
     # The two bulk services: see OWN_RESULT. `ids` are real posts.

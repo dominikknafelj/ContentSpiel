@@ -4,18 +4,24 @@ import { Controller } from "@hotwired/stimulus"
 // handoff "Account switches"). The SETTING is the person's and is saved with
 // the form; the PERMISSION is this browser's, and this shows which of three
 // states it is in (`data-state` on the element says which):
-// - `default`, not asked yet: an info line with "Allow in this browser",
-//   which asks at once, in the click, as browsers require;
+// - `default`, not asked yet: an accent-toned info line with "Allow in this
+//   browser", which asks at once, in the click, as browsers require;
 // - `granted`: nothing;
-// - `denied`: a line saying where to change it, and no button -- a browser
-//   that was told no does not ask again.
+// - `denied`: a warn-toned line saying where to change it, and no button --
+//   a browser that was told no does not ask again.
 // A browser without notifications (`unsupported`) shows nothing.
+//
+// ONLY WHILE THE SWITCH IS ON (handoff decision 14). The permission matters
+// to someone who wants the notification: the lines follow the desktop switch
+// as it stands in the page, saved or not, so turning it on shows the line at
+// once and turning it off takes it away. `data-state` says the browser's
+// state either way.
 //
 // The permission is changed outside this page too (the browser's site
 // settings, another tab's prompt), so the state is read again whenever the
 // window is looked at again (`render`, on `visibilitychange` and `focus`).
 export default class extends Controller {
-  static targets = [ "ask", "blocked" ]
+  static targets = [ "switch", "ask", "blocked" ]
 
   connect() {
     this.render()
@@ -36,7 +42,8 @@ export default class extends Controller {
   render() {
     const state = "Notification" in window ? window.Notification.permission : "unsupported"
     this.element.dataset.state = state
-    this.askTarget.hidden = state !== "default"
-    this.blockedTarget.hidden = state !== "denied"
+    const wanted = this.switchTarget.checked
+    this.askTarget.hidden = !wanted || state !== "default"
+    this.blockedTarget.hidden = !wanted || state !== "denied"
   }
 }

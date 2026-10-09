@@ -468,16 +468,22 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    All notes 4", the Notify link and a Close of its own
    (`.admin-note-close`, `Admin::NotesScreen::ThreadComponent`), which does
    what the drawer's does. "New note" comes back with the list. Asked of the
-   frame's view, so the two can't both show or both hide. From 1024px only:
-   below it the notes are a sheet whose header holds "Back to <title>", the
-   one way back to the editor, so the sheet keeps its header over a thread
-   and the row's Close stays away. That Close is also shown nowhere but in
-   the drawer: the same thread view in the media panel and on a record's
-   notes page has no drawer to close. */
-.admin-note-close { display: none; }
+   frame's view, so the two can't both show or both hide. AT EVERY WIDTH (the
+   handoff's decision 17): below 1024px the notes are a sheet whose header
+   holds "Back to <title>", the one way back to the editor, and that header
+   is hidden over a thread too -- so there the row ends in a "Back to
+   <title>" of its own (`.admin-note-leave`, a text button) where the
+   drawer's row has Close. One of the two, by the width; and neither is
+   shown anywhere but in the drawer: the same thread view in the media panel
+   and on a record's notes page has no drawer to close or leave. */
+.admin-note-close,
+.admin-note-leave { display: none; }
+.admin-notes-drawer:has([data-notes-view="thread"]) > header { display: none; }
 @media (min-width: 1024px) {
-  .admin-notes-drawer:has([data-notes-view="thread"]) > header { display: none; }
   .admin-notes-drawer .admin-note-close { display: inline-flex; }
+}
+@media (max-width: 1023px) {
+  .admin-notes-drawer .admin-note-leave { display: inline-flex; }
 }
 /* ONE "New note" in the drawer (the handoff's decision 4): its header's
    button is the way in, so the list's own link -- above the groups, and the

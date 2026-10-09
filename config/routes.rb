@@ -238,8 +238,6 @@ Rails.application.routes.draw do
     get "account/password", to: "accounts#edit", as: :account_password
     patch "account/password", to: "accounts#update"
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
-    # The two Notes switches (notes spec §6.4): the person's own, like the name.
-    patch "account/notifications", to: "accounts#update_notifications", as: :account_notifications
 
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
     # tokens. No `:new`/`:show` -- "Create token" is one button on the list

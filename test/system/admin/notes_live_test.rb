@@ -205,7 +205,7 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     await_js("Boolean(window.__delivery)", wait: LIVE)
     delivery = Notes::Delivery.find_by!(user: users(:one))
     assert_equal({ "id" => delivery.id, "reason" => "mention", "sentence" => "Dana mentioned you", "title" => "Pricing", "excerpt" => "One more thing, @one@example.com",
-      "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "threadId" => @thread.id, "shown" => true }, page.evaluate_script("window.__delivery"))
+      "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "threadId" => @thread.id, "shown" => true, "burstMs" => 10_000 }, page.evaluate_script("window.__delivery"))
     await_frames
     assert_no_selector "#toasts .admin-toast"
     assert_no_selector "#sidebar-badge-dashboard", wait: LIVE

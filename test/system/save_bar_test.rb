@@ -537,13 +537,12 @@ class SaveBarSystemTest < ApplicationSystemTestCase
     assert_selector ".admin-save-bar button[type=submit]", text: /\ASave user\z/
   end
 
-  test "the account forms each keep their own footer and share one Leave prompt" do
+  test "the two account forms each keep their own footer and share one Leave prompt" do
     sign_in_via_form(@owner)
     visit admin_account_password_path
     await_admin_controllers
 
-    # The name, the Notes switches (notes spec §6.4), the password.
-    assert_selector ".admin-save-bar", count: 3
+    assert_selector ".admin-save-bar", count: 2
     assert_selector ".admin-save-bar button[type=submit][disabled]", text: "Save name"
 
     fill_in "Your name", with: "Someone New"
@@ -556,8 +555,8 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
     # One under each form, never covering each other.
     rects = page.evaluate_script("Array.from(document.querySelectorAll('.admin-save-bar')).map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.bottom] })")
-    assert_equal 3, rects.size
-    rects.sort_by(&:first).each_cons(2) { |above, below| assert_operator above.last, :<=, below.first + 1 }
+    first, second = rects.sort_by(&:first)
+    assert_operator first.last, :<=, second.first + 1
 
     within("nav[aria-label='Modules']") { click_link "Posts" }
     assert_selector "dialog#leave-dialog[open]"

@@ -40,6 +40,18 @@ import { Turbo } from "@hotwired/turbo-rails"
 // - A tab that has heard DONE for a delivery never alerts for it, however
 //   late its own copy of the signal comes.
 // Without `BroadcastChannel` each tab decides alone.
+// A LIMIT, known: a visible tab that is busy for longer than `AGREE_MS` (a
+// long task, a slow frame) cannot answer a claim in time. A hidden tab may
+// then chime and notify the desktop although CS Studio is in view.
+//
+// ONCE PER BURST (the handoff's decision 18). Several notes at once make one
+// sound: within a burst -- deliveries within `burstMs` (10 s) of the one
+// before, `admin--notes-live`'s clock, handed over as `detail.burstMs` --
+// only the first mention that would chime does, and only the first that
+// would notify the desktop does. DONE says whether its tab chimed and
+// notified, so every tab knows the burst has had its sound whichever of
+// them made it; the burst ends `burstMs` after the last thing this tab heard
+// of one (a delivery of its own, or another tab's word).
 //
 // What the tabs have said is kept beside the controller, not on it: a Turbo
 // visit replaces <body> and this controller with it, and a decision that was
@@ -69,6 +81,18 @@ const TAB = Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byt
 // deliveries someone has finished with.
 const claims = new Map()
 const done = new Set()
+
+// The burst as this tab knows it (see "ONCE PER BURST"): when it last heard
+// of a delivery, how long a burst's window is, and whether the burst has had
+// its chime and its notification -- from this tab or, by DONE, another.
+const quiet = { last: 0, ms: 10000, chimed: false, notified: false }
+
+function arrival(ms) {
+  if (ms > 0) quiet.ms = ms
+  const now = Date.now()
+  if (now - quiet.last > quiet.ms) quiet.chimed = quiet.notified = false
+  quiet.last = now
+}
 
 // The channels of this document, one per name, shared by successive <body>s
 // and closed a task after the last listener left: a visit's old controller
@@ -117,7 +141,18 @@ function shut(audio) {
 // Whether a chime was asked for. Nothing before a click in this tab; and a
 // context the browser holds back (no way to ask about a click here) is given
 // a second to start, then closed -- never left to sound at the next click.
+// A browser that cannot make the sound at all (no audio device, a context
+// too many: the constructor throws) makes none, and that is all: the
+// notification and the tabs' agreement go on (`decide`).
 function chime() {
+  try {
+    return sound()
+  } catch {
+    return false
+  }
+}
+
+function sound() {
   const Context = window.AudioContext || window.webkitAudioContext
   if (!Context) return false
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return false
@@ -192,6 +227,7 @@ export default class extends Controller {
   // `admin--notes-live:delivery` on the document.
   delivery(event) {
     const delivery = event.detail
+    arrival(delivery.burstMs)
     if (delivery.reason !== "mention" || !(this.soundValue || this.desktopValue) || done.has(delivery.id)) return this.settled(delivery.id)
     // Claimed already, on another tab's word (`heard`): that decision stands
     // or is still to come, and says so itself.
@@ -202,9 +238,14 @@ export default class extends Controller {
 
   heard(message) {
     if (message?.type === "done") {
+      arrival()
       done.add(message.id)
       claims.delete(message.id)
+      // The burst has had its sound, whoever made it.
+      if (message.chimed) quiet.chimed = true
+      if (message.notified) quiet.notified = true
     } else if (message?.type === "claim" && !done.has(message.id)) {
+      arrival()
       note(message)
       // In view, with this tab's own copy still to come: it counts now.
       if (!document.hidden && !claims.get(message.id).has(TAB)) this.claim(message.id, message.thread, this.watching(message.thread), null)
@@ -231,13 +272,14 @@ export default class extends Controller {
 
     done.add(id)
     claims.delete(id)
-    this.say({ type: "done", id })
-    if (watched) return this.settled(id)
-
-    const chimed = this.soundValue && chime()
-    // Only with no tab in view, so only ever by a tab that claimed from its
-    // own delivery -- a visible tab is the only one that claims without.
-    const notified = this.desktopValue && !held.some((claim) => claim.visible) && Boolean(mine.delivery) && notify(mine.delivery)
+    // Each once per burst. The notification only with no tab in view, so
+    // only ever by a tab that claimed from its own delivery -- a visible tab
+    // is the only one that claims without.
+    const chimed = !watched && this.soundValue && !quiet.chimed && chime()
+    const notified = !watched && this.desktopValue && !quiet.notified && !held.some((claim) => claim.visible) && Boolean(mine.delivery) && notify(mine.delivery)
+    if (chimed) quiet.chimed = true
+    if (notified) quiet.notified = true
+    this.say({ type: "done", id, chimed, notified })
     this.settled(id, { chimed, notified })
   }
 

@@ -53,9 +53,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "h1 + p", text: "You'll stay signed in here. Other sessions are signed out."
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
     assert_select "#profile-form .admin-save-bar a", text: "Forgot your current password?", count: 0
-    assert_select "#notes-form .admin-save-bar a", text: "Forgot your current password?", count: 0
-    # One footer per form: the name, the Notes switches, the password.
-    assert_select ".admin-save-bar", count: 3
+    assert_select ".admin-save-bar", count: 2
   end
 
   test "visiting the reset flow signed in signs nobody out" do
@@ -152,33 +150,39 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/cs-studio/sign-in"
   end
 
-  # --- the Notes switches (notes spec §6.4, D18, D19) ------------------------------
+  # --- the Notes switches (notes spec §6.4, D18, D19; handoff decision 13) ----------
 
-  test "the account screen has the two Notes switches in a form of their own with a save bar, and saving keeps the screen" do
+  test "the name and the two Notes switches are one form with one footer, and saving keeps the screen" do
     sign_in_as(users(:reader))
     get "/cs-studio/account/password"
 
-    assert_select "form#notes-form[action='/cs-studio/account/notifications'][data-controller='admin--save-bar']" do
+    assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--save-bar']" do
+      assert_select "input[name=name]"
       assert_select "h2", text: "Notes"
       assert_select "input[type=checkbox][name=notes_sound][role=switch][checked]"
       assert_select "input[type=checkbox][name=notes_desktop][role=switch]:not([checked])"
       assert_select "label", text: "Play a sound when I'm mentioned"
       assert_select "label", text: "Show a desktop notification when I'm mentioned"
-      # The permission is this browser's: drawn hidden, shown by the script.
+      # The permission is this browser's: both lines are drawn hidden, and
+      # the script shows one while the switch is on.
+      assert_select "[data-controller='admin--notes-permission'] input[name=notes_desktop][data-admin--notes-permission-target=switch]"
       assert_select "[data-controller='admin--notes-permission'] [hidden] button[type=button]:not([name])", text: "Allow in this browser"
       assert_select "[data-controller='admin--notes-permission'] [hidden]", text: "Blocked in this browser. Change it in the site settings of your browser."
-      assert_select "[data-admin--save-bar-target=bar] button[type=submit][form=notes-form]", text: "Save"
+      assert_select "[data-admin--save-bar-target=bar]", count: 1
     end
+    assert_select "form#notes-form", count: 0
     assert_select "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false][data-admin--notes-alert-person-value='#{users(:reader).id}']"
-    # Changing the password draws the screen again: it waits for the name and for the switches.
-    assert_select "form#password-form[data-admin--save-bar-after-value='profile-form notes-form']"
+    # Changing the password draws the screen again: it waits for that one form.
+    assert_select "form#password-form[data-admin--save-bar-after-value='profile-form']"
 
-    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1" }, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
+    patch "/cs-studio/account/profile", params: { name: "Ada", notes_sound: "0", notes_desktop: "1" }, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
 
     assert_response :ok
     assert_select "turbo-stream[action=append][target=toasts]"
-    assert_match "Notification settings saved.", response.body
-    assert_equal [ false, true ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
+    assert_select "turbo-stream[action=replace][target=account-identity]"
+    assert_equal [ "Ada", false, true ], users(:reader).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
+    # One press, one write, one event.
+    assert_equal 1, Audit::Event.where(action: "user.updated", subject: users(:reader)).count
 
     get "/cs-studio/account/password"
     assert_select "input[name=notes_sound]:not([checked])"
@@ -186,29 +190,44 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
   end
 
-  test "without Turbo, saving the switches is a redirect back to the screen; a switch left out is off" do
+  test "a request that sends no switch leaves both as they are" do
+    users(:reader).update!(notes_sound: false, notes_desktop: true)
     sign_in_as(users(:reader))
 
-    patch "/cs-studio/account/notifications", params: { notes_desktop: "1" }
+    patch "/cs-studio/account/profile", params: { name: "Ada" }
 
     assert_redirected_to "/cs-studio/account/password"
-    assert_equal [ false, true ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
-    follow_redirect!
-    assert_match "Notification settings saved.", response.body
+    assert_equal [ "Ada", false, true ], users(:reader).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
+  end
+
+  test "a refused name writes neither the name nor a switch, and the form comes back with what was sent" do
+    sign_in_as(users(:reader))
+
+    patch "/cs-studio/account/profile", params: { name: "a" * 121, notes_sound: "0", notes_desktop: "1" }
+
+    assert_response :unprocessable_entity
+    assert_equal [ nil, true, false ], users(:reader).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
+    assert_select "form#profile-form[data-admin--save-bar-dirty-value=true]" do
+      assert_select "input[name=name][value='#{"a" * 121}']"
+      assert_select "input[name=notes_sound]:not([checked])"
+      assert_select "input[name=notes_desktop][checked]"
+    end
+    # The rest of the page is drawn from what is stored, not from what was refused.
+    assert_select "body[data-admin--notes-alert-sound-value=true][data-admin--notes-alert-desktop-value=false]"
   end
 
   # Only ever the signed-in person's own: the request names no user.
   test "the switches are saved for whoever is signed in, whatever else the request names" do
     sign_in_as(users(:two))
 
-    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1", id: users(:reader).id, user_id: users(:reader).id }
+    patch "/cs-studio/account/profile", params: { name: "Dana", notes_sound: "0", notes_desktop: "1", id: users(:reader).id, user_id: users(:reader).id }
 
     assert_equal [ false, true ], users(:two).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
     assert_equal [ true, false ], users(:reader).reload.then { |user| [ user.notes_sound, user.notes_desktop ] }
   end
 
   test "signed out, saving the switches redirects to sign-in and writes nothing" do
-    patch "/cs-studio/account/notifications", params: { notes_sound: "0", notes_desktop: "1" }
+    patch "/cs-studio/account/profile", params: { name: "Ada", notes_sound: "0", notes_desktop: "1" }
 
     assert_redirected_to "/cs-studio/sign-in"
     assert User.where(notes_sound: false).or(User.where(notes_desktop: true)).none?

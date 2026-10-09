@@ -24,6 +24,17 @@ import { messages } from "i18n/messages"
 //   being the thread's GET, reads the delivery. `inbox`: deliveries of theirs
 //   were read or removed elsewhere; only the count and the cards are fetched,
 //   and nothing is said.
+//   SEVERAL AT ONCE (the handoff's decision 18). A BURST is deliveries
+//   announced within `burstMs` (10 s) of the one before; it ends that long
+//   after the last. The first two that are said in a burst get their own
+//   toasts; from the third, those named toasts are taken away and ONE toast
+//   stands for the burst, "You have 3 new notes", whose "Open" leads to the
+//   inbox; with each further one it is put up again with the new count, so
+//   its 8 seconds start over. Every delivery is still announced by itself
+//   (`admin--notes-live:delivery`), with `detail.burstMs`, the length of the
+//   window, so that `admin--notes-alert` counts its once-per-burst chime by
+//   the same clock. The burst is kept beside the controller (`burst`), like
+//   `pending`: it outlives a Turbo visit.
 // - `Notes::RecordChannel`, one per `record` target (an editor's drawer, the
 //   media panel's notes, the mind graph's card): a thread of that record
 //   changed, or went with a deleted block.
@@ -157,6 +168,18 @@ function listen(params, listener) {
 const pending = { deliveries: new Set(), due: false, person: null }
 let live = null
 
+// The burst of deliveries being announced (see "SEVERAL AT ONCE"): when the
+// last one was announced, how many of it were said in a toast, the named
+// toasts that are its first two, and the one toast that replaced them. The
+// elements may be gone (dismissed, timed out, left behind by a visit);
+// removing one that is gone does nothing.
+const NAMED_TOASTS = 2
+const burst = { last: 0, said: 0, named: [], summary: null }
+
+function endBurst() {
+  Object.assign(burst, { last: 0, said: 0, named: [], summary: null })
+}
+
 // The last segment of the address a control's form posts to: "follow", "pin".
 const change = (control) => control.closest("form")?.getAttribute("action")?.split("?")[0].split("/").pop()
 
@@ -166,6 +189,7 @@ const change = (control) => control.closest("form")?.getAttribute("action")?.spl
 const CONTROLS = [
   [ "back", (root) => root.querySelector("a[data-note-back]") ],
   [ "close", (root) => root.querySelector("button[data-note-close]") ],
+  [ "leave", (root) => root.querySelector("button[data-note-leave]") ],
   [ "notify", (root) => [ ...root.querySelectorAll("[data-note-actions] form button") ].find((button) => [ "follow", "unfollow" ].includes(change(button))) ],
   [ "pin", (root) => [ ...root.querySelectorAll("[data-note-actions] form button") ].find((button) => [ "pin", "unpin" ].includes(change(button))) ],
   [ "state", (root) => root.querySelector("button[data-note-state]") ]
@@ -175,7 +199,7 @@ const nearBottom = (scroller) => scroller.scrollHeight - scroller.scrollTop - sc
 
 export default class extends Controller {
   static targets = [ "record" ]
-  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String }
+  static values = { unreadUrl: String, cardUrl: String, openThreadsUrl: String, deliveryUrl: String, person: String, burstMs: { type: Number, default: 10000 } }
 
   // Before the first target connects, which is before `connect`.
   initialize() {
@@ -203,6 +227,7 @@ export default class extends Controller {
       pending.deliveries.clear()
       pending.due = false
       pending.person = this.personValue
+      endBurst()
     }
     live = this
     if (pending.due || pending.deliveries.size > 0) this.soon("person", () => this.inbox())
@@ -697,10 +722,40 @@ export default class extends Controller {
   // In one task, with no `await`: the controller that was live when the
   // delivery had been read is the one that judges and says it.
   announce(row) {
+    const now = Date.now()
+    if (now - burst.last > this.burstMsValue) endBurst()
+    burst.last = now
+
     const shown = this.watching(row.thread_id)
-    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown }
+    const detail = { id: row.id, reason: row.reason, sentence: row.sentence, title: row.title, excerpt: row.excerpt, url: row.url, threadId: row.thread_id, shown, burstMs: this.burstMsValue }
     document.dispatchEvent(new CustomEvent("admin--notes-live:delivery", { detail }))
-    if (!shown) this.toast(row)
+    if (shown) return
+
+    // The first two of a burst by name; from the third, one toast for all.
+    burst.said += 1
+    if (burst.said <= NAMED_TOASTS) {
+      const toast = this.toast(row)
+      if (toast) burst.named.push(toast)
+    } else {
+      this.summarise()
+    }
+  }
+
+  // "You have 3 new notes": in the place of the burst's named toasts, and of
+  // itself when the count grows -- a new element, so its 8 seconds start
+  // again (`admin--toast` counts from when it connects). "Open" is the
+  // template's own, which leads to the inbox.
+  summarise() {
+    burst.named.forEach((toast) => toast.remove())
+    burst.named = []
+    burst.summary?.remove()
+
+    const toast = this.blankToast()
+    if (!toast) return
+    toast.dataset.noteToast = "many"
+    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.many", { count: burst.said })
+    document.getElementById("toasts").append(toast)
+    burst.summary = toast
   }
 
   // Whether the person is looking at that thread, THE ONE PREDICATE: it is
@@ -746,21 +801,30 @@ export default class extends Controller {
     return response.json()
   }
 
-  // The layout's `#toast-note-template`, filled: an accent dot (accent means
-  // "for you"), "Dana mentioned you on Pricing" and "Open". The action is a
-  // GET form, whose query a browser rebuilds from its fields: the URL's
-  // parameters go in as hidden fields.
-  toast(row) {
-    const template = document.getElementById("toast-note-template")
-    const region = document.getElementById("toasts")
-    const toast = template?.content.firstElementChild?.cloneNode(true)
-    if (!toast || !region) return
+  // The layout's `#toast-note-template` with an accent dot before its
+  // sentence (accent means "for you"), not yet in the page; nothing where
+  // there is no template or no region to put it in.
+  blankToast() {
+    const toast = document.getElementById("toast-note-template")?.content.firstElementChild?.cloneNode(true)
+    if (!toast || !document.getElementById("toasts")) return null
 
-    toast.querySelector("span").textContent = messages(this.element).t("notes.script.toast.on", { sentence: row.sentence, title: row.title })
     const dot = document.createElement("span")
     dot.className = "size-1.5 shrink-0 rounded-full bg-accent"
     dot.setAttribute("aria-hidden", "true")
     toast.prepend(dot)
+    return toast
+  }
+
+  // One delivery's toast: "Dana mentioned you on Pricing" and "Open". The
+  // action is a GET form, whose query a browser rebuilds from its fields:
+  // the URL's parameters go in as hidden fields. Answers the element.
+  toast(row) {
+    const toast = this.blankToast()
+    const region = document.getElementById("toasts")
+    if (!toast) return null
+
+    toast.dataset.noteToast = "one"
+    toast.querySelector("span:not([aria-hidden])").textContent = messages(this.element).t("notes.script.toast.on", { sentence: row.sentence, title: row.title })
 
     const form = toast.querySelector("form")
     const target = new URL(row.url, window.location.origin)
@@ -773,5 +837,6 @@ export default class extends Controller {
       form.append(field)
     })
     region.append(toast)
+    return toast
   }
 }

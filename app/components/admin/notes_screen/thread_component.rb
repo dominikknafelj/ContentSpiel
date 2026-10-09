@@ -82,6 +82,15 @@ module Admin
 
       # Pin and unpin are the moderator's (notes spec §3.4); a resolved thread
       # has no pin (a pinned thread is always open).
+      # The record's title for "Back to <title>" (row 1, in the sheet below
+      # 1024px), as the drawer's own header words it; nil where the notes are
+      # in no drawer -- an image's, in the media panel.
+      def leave_title
+        return if type.to_s == "media"
+
+        Locales.read(listing.container, :title, locale: locale).presence || t("admin.components.notes_screen.drawer.untitled")
+      end
+
       def pinnable? = !thread.resolved? && listing.moderator?(viewer)
 
       def following? = listing.following?(thread, viewer)

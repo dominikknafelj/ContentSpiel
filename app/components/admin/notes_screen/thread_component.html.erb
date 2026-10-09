@@ -3,9 +3,10 @@
               notes_subject: ::Notes.key(thread.subject_type, thread.subject_id) } do %>
   <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
   <div id="<%= dom_id %>-messages" data-note-part="messages" class="flex flex-1 flex-col">
-    <%# Rows 1 and 2 (the handoff's decisions 3 and 11). Row 1: back to the list
-        with the number of open threads, then "Notify me" / "Stop notifying
-        me", then Close. Row 2: what the thread is on, with
+    <%# Rows 1 and 2 (the handoff's decisions 3, 11 and 17). Row 1: back to the
+        list with the number of open threads, then "Notify me" / "Stop
+        notifying me", then the way out of the notes: Close in the drawer
+        (from 1024px), "Back to <title>" in the sheet (below it). Row 2: what the thread is on, with
         Pin on the right for someone who may pin. One grid of two rows, so
         that the two settings of the thread -- one at the end of each row --
         can stay the children of ONE element, `[data-note-actions]`
@@ -33,6 +34,18 @@
           <%= tag.button type: "button", title: t(".close"), aria: { label: t(".close") }, data: { note_close: true, action: "admin--notes#close" },
                 class: "admin-note-close ml-2 size-7 shrink-0 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent" do %>
             <%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %>
+          <% end %>
+          <%# The sheet's way back to the editor (the handoff's decision 17):
+              below 1024px the sheet's header is hidden over a thread too, so
+              its "Back to <title>" stands here, as a text button -- the same
+              action, the focus and the editor's scroll given back the same
+              way. Shown only in the sheet (`.admin-note-leave`); not drawn
+              where the notes are no drawer at all (the media panel). %>
+          <% if leave_title %>
+            <%= tag.button type: "button", data: { note_leave: true, action: "admin--notes#close" },
+                  class: "admin-note-leave ml-3 cursor-pointer items-center rounded-cs px-2 py-1 text-[13px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent" do %>
+              <span class="max-w-[32vw] truncate"><%= t(".leave", title: leave_title) %></span>
+            <% end %>
           <% end %>
         </div>
         <%# Always there, for the row's line; empty for someone who may not pin. %>
