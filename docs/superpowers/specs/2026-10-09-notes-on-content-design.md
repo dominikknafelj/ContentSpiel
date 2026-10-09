@@ -218,7 +218,7 @@ Every string is a key under `config/locales/admin/notes.en.yml`; the new compone
 
 ## 8. Risk
 
-- **Size.** This is the largest sub-project since the editor: four tables, eleven services, a new drawer, and markers on six surfaces. If the plan comes out longer than sections (11 tasks), the cut line is clean: reactions and files (D9, D10, §3.6) can be a second PR without changing anything in the first.
+- **Size.** This is the largest sub-project since the editor: four tables, eleven services, a new drawer, and markers on six surfaces. It ships as one PR all the same (the user's decision, 2026-10-09: the app is not in production). The plan orders the work so that reactions and files (D9, D10, §3.6) come last and nothing before them depends on them.
 - **The drawer is a new pattern** beside the shell's left drawers and the media panel. It gets its own component and controller, and the reference doc says when to use which.
 - **Counts on every list** are where a slow query hides. Each surface reads its counts in one grouped query, pinned by a test.
 - **File serving** is the first authenticated read of an upload in the app. It must not become a general way to read blobs: it takes a message's attachment id, never a blob key.
