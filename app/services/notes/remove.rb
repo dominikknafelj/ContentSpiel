@@ -50,15 +50,19 @@ module Notes
   # gone: a block's right is its page's, and the page is still there.
   #
   # Constant in statements whatever the number of threads: one read of the
-  # thread ids, one audit insert, one DELETE. `notes.removed` is recorded on
+  # thread ids, one of the people told, one audit insert, one DELETE. `notes.removed` is recorded on
   # `record` with the ids only, and only when there was something to remove.
   #
   # THE SIGNAL (`Notes::Signals`): one per CONTAINER that lost a thread, on
   # that container's record stream, sent when the caller's transaction
   # commits and not at all when it rolls back. It names the lowest thread id
-  # removed there; a tab fetches the whole list again whichever it names. No
-  # person is signalled: no delivery row is written. What that means for
-  # each caller:
+  # removed there; a tab fetches the whole list again whichever it names.
+  # And one `inbox` signal per PERSON who had a delivery on any removed
+  # thread (read before the delete), so their count goes down in open tabs.
+  # A bulk removal therefore broadcasts (containers that had a thread) +
+  # (people who had a delivery there) times, whatever the number of threads,
+  # at the price of one more read. What the record's signal means for each
+  # caller:
   #
   # - `ContentBlocks::Destroy` (a block; a section with its blocks): the
   #   threads are filed under the PAGE, which is still there and may be open
@@ -100,9 +104,12 @@ module Notes
         next if rows.empty?
 
         ids = rows.map(&:first)
+        # Read before the delete, whose cascade takes the rows.
+        told = Delivery.where(thread_id: ids).distinct.pluck(:user_id)
         record_event("notes.removed", subject: @record, snapshot: nil, metadata: { "thread_ids" => ids })
         Thread.where(id: ids).delete_all # version: none (note tables only; no public page reads a note)
         rows.uniq { |_id, type, container_id| [ type, container_id ] }.each { |id, type, container_id| Signals.threads_removed(type, container_id, id) }
+        told.each { |user_id| Signals.inbox(user_id) }
       end
       success(@record)
     end

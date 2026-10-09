@@ -1,6 +1,8 @@
 require "test_helper"
 
 class SessionsTest < ActionDispatch::IntegrationTest
+  include ActionCable::TestHelper
+
   setup do
     @user = User.create!(email_address: "admin@example.com", password: "password12345")
   end
@@ -75,5 +77,22 @@ class SessionsTest < ActionDispatch::IntegrationTest
     destroyed = Audit::Event.find_by!(action: "session.destroyed")
     assert_equal @user, destroyed.actor
     assert_equal @user, destroyed.subject
+  end
+
+  # A WebSocket is authenticated once, at connect: signing out disconnects
+  # the user's cable (`Session#disconnect_cable`), and the cookie's session
+  # is no session any more.
+  test "signing out disconnects the user's cable and nobody else's" do
+    other = User.create!(email_address: "other@example.com", password: "password12345")
+    other.sessions.create!
+    post admin_sign_in_url, params: { email_address: "admin@example.com", password: "password12345" }
+    session = @user.sessions.sole
+
+    delete admin_sign_out_url
+
+    assert_not Session.exists?(session.id)
+    assert_equal [ { "type" => "disconnect", "reconnect" => true } ],
+      broadcasts("action_cable/#{@user.to_gid_param}").map { |payload| ActiveSupport::JSON.decode(payload) }
+    assert_empty broadcasts("action_cable/#{other.to_gid_param}")
   end
 end

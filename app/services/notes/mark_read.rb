@@ -23,8 +23,10 @@ module Notes
   # sorts and dates by (`Delivery.inbox_order`). Reading a row is not news,
   # and must not move it above what was read before it.
   #
-  # Signals nobody (`Notes::Signals`): a person's stream says that a row was
-  # WRITTEN for them, and a read mark is no news to anyone else.
+  # Signals the ACTOR'S OWN stream, once per call that marked at least one
+  # row (`Notes::Signals.inbox`, no ids), so the count in their other tabs
+  # goes down; a read mark is no news to anyone else, and a call that found
+  # nothing unread signals nobody.
   class MarkRead < ApplicationService
     include Authorization
 
@@ -49,7 +51,8 @@ module Notes
       marked = Delivery.transaction(requires_new: true) do
         next false if @names_record && !lock_container(@container)
 
-        unread_rows.update_all(read_at: Time.current) # version: none (note_deliveries is a person's inbox; no public page reads it)
+        count = unread_rows.update_all(read_at: Time.current) # version: none (note_deliveries is a person's inbox; no public page reads it)
+        Signals.inbox(actor_user.id) if count.positive?
         true
       end
 

@@ -13,8 +13,10 @@ module Notes
   #
   # Signals the record's stream (`Notes::Signals`), whether the thread stays
   # or goes with its last message; a message that was gone already signals
-  # nobody. The people whose inbox rows went with the message are not told:
-  # a person's stream says only that a row was written.
+  # nobody. Each person whose inbox row goes with the message is told once
+  # that their inbox got smaller (`Notes::Signals.inbox`, no ids) -- also
+  # when the thread goes with it: a thread's last message holds every
+  # delivery the thread has left.
   class DeleteMessage < ApplicationService
     include Authorization
 
@@ -45,6 +47,9 @@ module Notes
 
         record_event("note.deleted", subject: current.subject, snapshot: nil, metadata: note_metadata(current, message))
         Signals.threads(current)
+        # Read before the destroy, whose cascade takes the rows: the people
+        # whose inbox is about to lose a line.
+        Delivery.where(message_id: message.id).distinct.pluck(:user_id).each { |user_id| Signals.inbox(user_id) }
         message.destroy!
         newest = current.messages.reload.last
         if newest

@@ -23,7 +23,7 @@ class ApplicationCable::ConnectionTest < ActionCable::Connection::TestCase
 
   test "a session that was ended, and an id that is not signed, are no session" do
     session = users(:reader).sessions.create!
-    cookies[:session_id] = session.id
+    cookies[:session_id] = session.id.to_s
     assert_reject_connection { connect }
 
     cookies.signed[:session_id] = session.id

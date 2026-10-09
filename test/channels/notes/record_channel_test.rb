@@ -10,8 +10,12 @@ class Notes::RecordChannelTest < ActionCable::Channel::TestCase
     @stranger = User.create!(email_address: "stranger@example.com", password: "a-long-password-1")
   end
 
+  # A connection as the cable makes it: the user as loaded at connect, and
+  # the session it was opened with.
+  def connect_as(user) = stub_connection(current_user: user, session_id: user.sessions.create!.id)
+
   test "a reader subscribes to a record they may read" do
-    stub_connection current_user: users(:reader)
+    connect_as users(:reader)
 
     subscribe type: "page", id: @page.id
     assert subscription.confirmed?
@@ -24,14 +28,14 @@ class Notes::RecordChannelTest < ActionCable::Channel::TestCase
   end
 
   test "a stranger, a trashed record, an unknown one and a junk type are rejected alike" do
-    stub_connection current_user: @stranger
+    connect_as @stranger
     [ [ "page", @page.id ], [ "post", @post.id ], [ "media", @asset.id ] ].each do |type, id|
       subscribe type: type, id: id
       assert subscription.rejected?, type
       assert_empty subscription.streams
     end
 
-    stub_connection current_user: users(:one)
+    connect_as users(:one)
     @page.update!(trashed_at: Time.current)
     @post.update!(trashed_at: Time.current)
     @asset.update!(trashed_at: Time.current)
@@ -51,7 +55,7 @@ class Notes::RecordChannelTest < ActionCable::Channel::TestCase
     child = create_page(title: "Plans", parent: @page)
     group = access_control_groups(:branch_editors)
     group.grants.create!(permission: "pages.read", scope: { "page_ids" => [ @page.id ] })
-    stub_connection current_user: users(:editor_branch)
+    connect_as users(:editor_branch)
 
     subscribe type: "page", id: other.id
     assert subscription.rejected?
@@ -70,8 +74,49 @@ class Notes::RecordChannelTest < ActionCable::Channel::TestCase
     end
   end
 
+  # `current_user` is a snapshot from connect, and `AccessControl` reads the
+  # owner flag off the object it is given: the channel reads the user again.
+  test "someone who was owner at connect and is demoted since is judged by their grants" do
+    post = create_post(title: "Hello again")
+    owner = User.create!(email_address: "second-owner@example.com", password: "a-long-password-1", owner: true)
+    connected = User.find(owner.id)
+    connect_as connected
+    subscribe type: "page", id: @page.id
+    assert subscription.confirmed?
+
+    User.where(id: owner.id).update_all(owner: false)
+    assert connected.owner?, "the connection's own copy still says owner"
+
+    [ [ "page", @page.id ], [ "post", post.id ], [ "media", @asset.id ] ].each do |type, id|
+      subscribe type: type, id: id
+      assert subscription.rejected?, type
+      assert_empty subscription.streams
+    end
+
+    AccessControl::Membership.create!(user: owner, group: access_control_groups(:read_only))
+    AccessControl::ActorGrants.reset!
+    subscribe type: "page", id: @page.id
+    assert_has_stream "notes:record:Page-#{@page.id}"
+    subscribe type: "media", id: @asset.id
+    assert subscription.rejected?
+  end
+
+  test "a user deleted since the socket connected, and an ended session, are rejected" do
+    connected = User.find(users(:two).id)
+    connect_as connected
+    Session.where(user_id: connected.id).destroy_all
+    subscribe type: "page", id: @page.id
+    assert subscription.rejected?
+
+    connect_as connected
+    assert Users::Destroy.call(users(:two), actor: nil).ok?
+    subscribe type: "page", id: @page.id
+    assert subscription.rejected?
+    assert_empty subscription.streams
+  end
+
   test "the media library's right opens an image's stream" do
-    stub_connection current_user: users(:two)
+    connect_as users(:two)
 
     subscribe type: "media", id: @asset.id
 

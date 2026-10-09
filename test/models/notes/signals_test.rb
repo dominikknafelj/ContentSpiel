@@ -15,11 +15,14 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
   # What a payload may hold, and the closed set each value comes from: with
   # these there is no key a text, a title or a name could travel in.
-  KEYS = { "delivery" => %w[kind delivery_id reason], "threads" => %w[kind thread_id origin] }.freeze
-  STREAMS = { "delivery" => /\Anotes:person:\d+\z/, "threads" => /\Anotes:record:(Page|Post|MediaAsset)-\d+\z/ }.freeze
+  KEYS = { "delivery" => %w[kind delivery_id reason], "inbox" => %w[kind origin], "threads" => %w[kind thread_id origin] }.freeze
+  ID = { "delivery" => "delivery_id", "threads" => "thread_id" }.freeze
+  STREAMS = { "delivery" => /\Anotes:person:\d+\z/, "inbox" => /\Anotes:person:\d+\z/,
+    "threads" => /\Anotes:record:(Page|Post|MediaAsset)-\d+\z/ }.freeze
 
   # One entry per notes service: who calls it, the call, how many signals the
-  # record's stream gets and which person is told with which reason. Each is
+  # record's stream gets, which person is told with which reason, and whose
+  # inbox got smaller (`inbox`, default nobody's). Each is
   # built on `@thread`: started by `users(:two)`, mentioning `users(:reader)`,
   # so both follow it.
   CASES = {
@@ -38,7 +41,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     },
     "Notes::DeleteMessage" => -> {
       reply = as(users(:reader)) { Notes::Reply.call(@thread, body: "A secret to delete") }.record
-      { actor: users(:reader), call: -> { Notes::DeleteMessage.call(reply) }, record: 1, people: {} }
+      { actor: users(:reader), call: -> { Notes::DeleteMessage.call(reply) }, record: 1, people: {}, inbox: [ :two ] }
     },
     "Notes::Resolve" => -> {
       { actor: users(:reader), call: -> { Notes::Resolve.call(@thread) }, record: 1, people: { two: "resolved" } }
@@ -54,17 +57,17 @@ class Notes::SignalsTest < ActiveSupport::TestCase
       as(users(:two)) { assert Notes::Pin.call(@thread).ok? }
       { actor: users(:two), call: -> { Notes::Unpin.call(@thread) }, record: 1, people: {} }
     },
-    # The actor's own rows: nobody is signalled.
+    # The actor's own rows: nobody else is signalled.
     "Notes::SetFollowing" => -> {
       { actor: users(:reader), call: -> { Notes::SetFollowing.call(@thread, following: false) }, record: 0, people: {} }
     },
     "Notes::MarkRead" => -> {
-      { actor: users(:reader), call: -> { Notes::MarkRead.call(thread: @thread) }, record: 0, people: {} }
+      { actor: users(:reader), call: -> { Notes::MarkRead.call(thread: @thread) }, record: 0, people: {}, inbox: [ :reader ] }
     },
     # Not a person's action on a note: it runs on a record in the trash too
     # (that is where a purge finds it), so it has no "gone" answer to check.
     "Notes::Remove" => -> {
-      { actor: users(:two), call: -> { Notes::Remove.call(@page) }, record: 1, people: {}, answers_gone: false }
+      { actor: users(:two), call: -> { Notes::Remove.call(@page) }, record: 1, people: {}, inbox: [ :reader ], answers_gone: false }
     }
   }.freeze
 
@@ -94,7 +97,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     assert_includes KEYS.keys, kind, payload.inspect
     assert_match STREAMS.fetch(kind), stream
     assert_empty payload.keys - KEYS.fetch(kind), payload.inspect
-    assert_kind_of Integer, payload[kind == "delivery" ? "delivery_id" : "thread_id"], payload.inspect
+    assert_kind_of Integer, payload[ID.fetch(kind)], payload.inspect if ID.key?(kind)
     assert_includes Notes::Delivery::REASONS, payload["reason"] if kind == "delivery"
     assert_match Notes::Signals::TAB, payload["origin"] if payload.key?("origin")
     assert_no_match(/secret|Dana|example\.com/i, payload.to_json)
@@ -163,6 +166,9 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
       signals.each { |stream, payload| assert_ids_only(stream, payload) }
       on_record, on_people = signals.partition { |stream, _payload| stream == @record }
+      on_inbox, on_people = on_people.partition { |_stream, payload| payload["kind"] == "inbox" }
+      inboxes = prepared.fetch(:inbox, []).map { |user| [ Notes::Signals.person_stream(users(user).id), { "kind" => "inbox", "origin" => TAB } ] }
+      assert_equal inboxes.sort, on_inbox.sort
       assert_equal prepared.fetch(:record), on_record.size
       on_record.each do |_stream, payload|
         assert_equal [ "threads", TAB ], payload.values_at("kind", "origin")
@@ -227,8 +233,12 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     signals.each { |stream, payload| assert_ids_only(stream, payload) }
     assert_equal 9, sent(@record).size # start, reply, edit, resolve, reopen, delete, pin, unpin, remove
     # start: reader (mention). reply: two. edit: one (mention), who follows
-    # from then on. resolve: two and one. reopen: two and one.
-    assert_equal 7, signals.size - 9
+    # from then on. resolve: two and one. reopen: two and one. Then the
+    # inboxes that got smaller: two's and one's (the deleted reply, which
+    # told one and mentioned the other), and reader's, two's and one's (the
+    # removed thread).
+    assert_equal [ 7, 5 ], signals.reject { |stream, _| stream == @record }.partition { |_, payload| payload["kind"] == "delivery" }.map(&:size)
+    assert_equal 12, signals.size - 9
     assert_equal signals.size, [ @record, @reader, @two, Notes::Signals.person_stream(users(:one).id) ].sum { |stream| sent(stream).size }
   end
 
@@ -298,20 +308,47 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     assert_empty signals
   end
 
-  test "following and reading signal nobody" do
+  test "following signals nobody; reading tells the reader's own tabs once per call that read something" do
     thread = start
+    other = create_page(title: "Another secret", published: false)
+    3.times { start(other) }
+    inbox = [ @reader, { "kind" => "inbox" } ]
 
-    signals = capture_signals do
+    following = capture_signals do
       as(users(:reader)) do
         Notes::SetFollowing.call(thread, following: false)
         Notes::SetFollowing.call(thread, following: true)
-        Notes::MarkRead.call(thread: thread)
-        Notes::MarkRead.call(container: @page)
-        Notes::MarkRead.call
       end
     end
+    assert_empty following
 
-    assert_empty signals
+    as(users(:reader)) do
+      assert_equal [ inbox ], capture_signals { Notes::MarkRead.call(thread: thread) }
+      assert_empty capture_signals { Notes::MarkRead.call(thread: thread) }
+      assert_empty capture_signals { Notes::MarkRead.call(container: @page) }
+      # Three rows, one signal.
+      assert_equal [ inbox ], capture_signals { Notes::MarkRead.call }
+      assert_empty capture_signals { Notes::MarkRead.call }
+    end
+  end
+
+  test "deleting a message tells each person whose inbox row went with it, once, and nobody when there was none" do
+    thread = start
+    reply = as(users(:reader)) { Notes::Reply.call(thread, body: "For @[#{users(:one).id}]") }.record
+    quiet = as(users(:two)) { Notes::Reply.call(thread, body: "Nobody new") }.record
+    Notes::Delivery.where(message: quiet).delete_all
+
+    silent = capture_signals { as(users(:two)) { assert Notes::DeleteMessage.call(quiet).ok? } }
+    assert_equal [ @record ], silent.map(&:first)
+
+    signals = capture_signals { as(users(:reader)) { assert Notes::DeleteMessage.call(reply).ok? } }
+    assert_equal [ [ Notes::Signals.person_stream(users(:one).id), { "kind" => "inbox" } ], [ @two, { "kind" => "inbox" } ] ].sort,
+      signals.reject { |stream, _| stream == @record }.sort
+
+    # The thread goes with its last message, and its reader's row with it.
+    last = capture_signals { as(users(:two)) { assert Notes::DeleteMessage.call(thread.first_message).ok? } }
+    assert_equal [ [ @reader, { "kind" => "inbox" } ], [ @record, { "kind" => "threads", "thread_id" => thread.id } ] ].sort_by(&:first), last.sort_by(&:first)
+    assert_equal 0, Notes::Thread.count
   end
 
   # --- Notes::Remove, in each of its callers' cases --------------------------
@@ -328,7 +365,9 @@ class Notes::SignalsTest < ActiveSupport::TestCase
       end
     end
 
-    assert_equal [ [ @record, { "kind" => "threads", "thread_id" => threads.first.id } ] ], signals
+    # The page's drawer, and the reader, whose two rows on the block's
+    # threads are gone: told once.
+    assert_equal [ [ @record, { "kind" => "threads", "thread_id" => threads.first.id } ], [ @reader, { "kind" => "inbox" } ] ], signals
     assert_equal [ threads.last.id ], Notes::Thread.where(container: @page).ids
   end
 
@@ -362,7 +401,7 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
     signals = capture_signals { assert as(users(:two)) { ContentBlocks::Destroy.call(section.reload) }.ok? }
 
-    assert_equal [ @record ], signals.map(&:first)
+    assert_equal [ @record, @reader ], signals.map(&:first)
     signals.each { |stream, payload| assert_ids_only(stream, payload) }
   end
 
@@ -382,7 +421,10 @@ class Notes::SignalsTest < ActiveSupport::TestCase
 
     streams = [ @record, Notes::Signals.record_stream("Page", child.id), Notes::Signals.record_stream("Post", post.id),
       Notes::Signals.record_stream("Media::Asset", asset.id) ]
-    assert_equal streams.sort, signals.map(&:first).sort
+    # The records, and the reader once per purge that took rows of theirs
+    # (the page branch: four threads, one signal; the post).
+    assert_equal (streams + [ @reader, @reader ]).sort, signals.map(&:first).sort
+    assert_equal [ { "kind" => "inbox" } ], signals.select { |stream, _| stream == @reader }.map(&:last).uniq
     signals.each { |stream, payload| assert_ids_only(stream, payload) }
     assert_equal 0, Notes::Thread.count
   end
@@ -399,6 +441,9 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     subscriber = Class.new { define_method(:report) { |error, **| reported << error.message } }.new
     Rails.error.subscribe(subscriber)
     after_signals = false
+    log = StringIO.new
+    logger = ActiveSupport::Logger.new(log)
+    Rails.logger.broadcast_to(logger)
 
     result = nil
     ActiveRecord::Base.transaction do
@@ -409,8 +454,14 @@ class Notes::SignalsTest < ActiveSupport::TestCase
     assert result.ok?
     assert_equal 1, Notes::Thread.where(container: @page).count
     assert_equal [ "the cable is down" ] * 2, reported
+    # The log says that it happened and to which kind, never what the error
+    # said (a driver's message can quote what it was sending) nor a payload.
+    lines = log.string.lines.grep(/Notes signal not sent/)
+    assert_equal [ "Notes signal not sent (delivery): IOError", "Notes signal not sent (threads): IOError" ], lines.map(&:strip)
+    assert_no_match(/cable is down|thread_id|delivery_id|\d/, lines.join)
     assert after_signals, "a failed signal stopped the callbacks queued behind it"
   ensure
     Rails.error.unsubscribe(subscriber) if subscriber
+    Rails.logger.stop_broadcasting_to(logger) if logger
   end
 end

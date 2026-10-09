@@ -8,10 +8,13 @@ module Notes
   # and fails for a service that has no case there.
   #
   # Two streams. A PERSON's: "a delivery row was written for you" -- the
-  # inbox, the sidebar's count, the toast, the chime. A RECORD's: "a thread
-  # of this page, post or image changed" -- the list or the thread showing
-  # it, and the count markers. `origin` on the second is the opaque id of the
-  # browser tab whose request made the change (`Current.notes_tab`), so that
+  # inbox, the sidebar's count, the toast, the chime -- and "your inbox got
+  # smaller" (`inbox`: rows of yours were read in another tab, or went with
+  # a deleted note), which names nothing at all: the tab asks for its count
+  # again. A RECORD's: "a thread of this page, post or image changed" -- the
+  # list or the thread showing it, and the count markers. `origin`, on a
+  # record's signal and on `inbox`, is the opaque id of the browser tab
+  # whose request made the change (`Current.notes_tab`), so that
   # tab does not fetch again what its own answer already showed it. It comes
   # from the client, so it is echoed only in the shape `TAB` allows -- an id
   # a tab made up, never a sentence -- and checked here as well as where the
@@ -28,7 +31,9 @@ module Notes
   # the thread may be deleted and `Current` reset.
   #
   # A PUSH IS BEST EFFORT. A broadcast that fails (the cable's database is
-  # away) is reported and swallowed: the note is already committed, a tab
+  # away) is reported, logged and swallowed -- the log line holds the
+  # signal's kind and the error's CLASS, never its message (a driver's
+  # message can quote what it was sending) and never the payload: the note is already committed, a tab
   # that missed the signal shows it on its next load, and an exception here
   # would turn a saved note into an error page and stop the callbacks queued
   # behind it in the same commit -- a deferred `PublicSite.bump_version!`
@@ -47,6 +52,12 @@ module Notes
       later(person_stream(delivery.user_id), { kind: "delivery", delivery_id: delivery.id, reason: delivery.reason })
     end
 
+    # This person's inbox holds fewer rows, or fewer unread ones, than a
+    # moment ago. No ids: there may be no row left to name.
+    def inbox(user_id)
+      later(person_stream(user_id), { kind: "inbox", origin: origin }.compact)
+    end
+
     # A thread of its container changed.
     def threads(thread) = threads_removed(thread.container_type, thread.container_id, thread.id)
 
@@ -61,7 +72,8 @@ module Notes
       ActiveRecord.after_all_transactions_commit do
         ActionCable.server.broadcast(stream, payload)
       rescue StandardError => error
-        Rails.error.report(error, handled: true, context: { stream: stream })
+        Rails.logger.warn("Notes signal not sent (#{payload[:kind]}): #{error.class}")
+        Rails.error.report(error, handled: true)
       end
       nil
     end
