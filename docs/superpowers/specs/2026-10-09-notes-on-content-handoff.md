@@ -230,3 +230,11 @@ Two confirmations:
 
 28. **The meta-line reaction control** is a 24×24 control holding the 16px smile icon (the composer's toolbar size), as built.
 29. **"Unsaved edit"** stands in the message's meta line only. While the edit form is open with the restored text there is no line above the field: that space is for errors.
+
+Five more, on files and the account page:
+
+30. **The send hint** leaves the composer's row: the shortcut is in the Send button's tooltip ("Send (⌘↵)" or "Send (Ctrl+Enter)") and its `aria-keyshortcuts`.
+31. **Pause on a playing GIF** stays bottom-right, 6px inset.
+32. **A small image** is shown at its natural size up to the full message width, left-aligned; it is never enlarged.
+33. **Chosen files lost on leaving.** When a draft comes back and files had been chosen with it, a line above the field says "Choose the files again: press-kit.pdf, about.png" (12px `text-meta`, the names listed); it clears once files are chosen or the note is sent.
+34. **Save footers on the account page.** A footer that belongs to one card sits inside that card, under a `border-t border-line` and within the card's padding: a "contained" variant of the shared footer, which itself stays unchanged. The Password card's footer goes inside it. Profile and Notes share one form, so their single footer stays under both cards.
