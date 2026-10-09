@@ -1,0 +1,20 @@
+<%= link_to path, id: "note-row-#{thread.id}",
+      class: "grid grid-cols-[24px_1fr_8px] items-start gap-2.5 border-b border-line px-4 py-[9px] text-left no-underline hover:bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+      data: { note_row: thread.id, unread: (true if unread?), turbo_frame: "notes" } do %>
+  <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: first.author_id, viewer: viewer, size: :row) %>
+  <span class="flex min-w-0 flex-col gap-0.5">
+    <span class="flex items-baseline gap-2">
+      <strong class="truncate text-[13px] text-ink <%= unread? ? "font-semibold" : "font-medium" %>"><%= render Admin::UserNameComponent.new(user: author, user_id: first.author_id) %></strong>
+      <span class="shrink-0 font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: first.created_at) %></span>
+    </span>
+    <span class="truncate text-[13px] <%= unread? ? "text-ink" : "text-dim" %>"><%= excerpt %></span>
+    <% if meta.present? %>
+      <span class="font-cs-mono text-[10px] uppercase tracking-[0.1em] text-meta"><%= meta %></span>
+    <% end %>
+  </span>
+  <% if thread.pinned %>
+    <span class="mt-1 justify-self-end text-meta"><%= helpers.render "admin/shared/icon", name: :pin, size: "size-3" %></span>
+  <% elsif unread? %>
+    <span class="mt-1.5 size-[7px] justify-self-end rounded-full bg-accent" aria-hidden="true"></span>
+  <% end %>
+<% end %>

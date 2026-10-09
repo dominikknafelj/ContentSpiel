@@ -1,0 +1,7 @@
+<%# One thread, in the list's place (notes spec §4.2): the same frame id, so
+    following a row replaces the list and Back replaces the thread. %>
+<% content_for :title, t("admin.notes.index.title") %>
+<turbo-frame id="notes">
+  <%= render Admin::NotesScreen::ThreadComponent.new(thread: @thread, listing: @listing, viewer: Current.user, locale: admin_locale,
+        view: note_view, type: params[:container_type], failed: @failed) %>
+</turbo-frame>

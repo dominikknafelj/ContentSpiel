@@ -156,6 +156,25 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/delete_block_dialog_component.rb
     app/components/admin/editor_screen/delete_block_dialog_component.html.erb
     app/javascript/controllers/admin/section_controller.js
+    app/components/admin/notes_screen/avatar_component.rb
+    app/components/admin/notes_screen/body_component.rb
+    app/components/admin/notes_screen/body_component.html.erb
+    app/components/admin/notes_screen/counts_component.rb
+    app/components/admin/notes_screen/list_component.rb
+    app/components/admin/notes_screen/list_component.html.erb
+    app/components/admin/notes_screen/message_component.rb
+    app/components/admin/notes_screen/message_component.html.erb
+    app/components/admin/notes_screen/thread_component.rb
+    app/components/admin/notes_screen/thread_component.html.erb
+    app/components/admin/notes_screen/thread_row_component.rb
+    app/components/admin/notes_screen/thread_row_component.html.erb
+    app/views/admin/notes/index.html.erb
+    app/views/admin/notes/thread.html.erb
+    app/views/admin/notes/resolved.html.erb
+    app/controllers/admin/notes_controller.rb
+    app/controllers/admin/note_threads_controller.rb
+    app/controllers/concerns/admin/note_container.rb
+    app/helpers/admin/note_paths_helper.rb
   ].freeze
 
   PLACEHOLDER = "".freeze

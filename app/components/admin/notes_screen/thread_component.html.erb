@@ -1,0 +1,45 @@
+<%= tag.div id: dom_id, tabindex: -1, class: "flex min-h-full flex-col focus:outline-none",
+      data: { notes_view: "thread", note_thread: thread.id, state: thread.state, notes_container: ::Notes.key(listing.container) } do %>
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
+  <div class="flex items-center gap-2 border-b border-line px-3 py-2.5">
+    <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
+          data: { note_back: true, turbo_frame: "notes" } do %>
+      <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
+      <span><%= t(".back") %></span>
+      <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>
+    <% end %>
+  </div>
+  <div class="flex items-start justify-between gap-3 border-b border-line py-2.5 pl-4 pr-3">
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <h3 class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= subject_name %></h3>
+      <p class="text-[13px] text-dim"><%= summary %></p>
+    </div>
+  </div>
+
+  <div id="<%= dom_id %>-messages" data-note-part="messages" class="flex flex-1 flex-col">
+    <% if thread.pinned || thread.resolved? %>
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-3 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
+        <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
+        <% if thread.resolved? %>
+          <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::UserNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
+        <% end %>
+      </p>
+    <% end %>
+    <% if thread.quote.present? %>
+      <figure class="px-4 py-3.5">
+        <div class="flex flex-col gap-1 rounded-cs border border-line bg-sunken px-2.5 py-2">
+          <figcaption class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= t(".quoted") %></figcaption>
+          <blockquote class="whitespace-pre-wrap break-words text-[13px] leading-normal text-ink"><%= thread.quote %></blockquote>
+        </div>
+      </figure>
+    <% end %>
+    <% leading.each do |record| %><%= render message(record) %><% end %>
+    <% if folded.any? %>
+      <details class="border-t border-line">
+        <summary class="cursor-pointer px-4 py-2.5 text-[13px] text-dim hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><%= t(".show_more", count: folded.size) %></summary>
+        <% folded.each do |record| %><%= render message(record) %><% end %>
+      </details>
+    <% end %>
+    <% trailing.each do |record| %><%= render message(record) %><% end %>
+  </div>
+<% end %>

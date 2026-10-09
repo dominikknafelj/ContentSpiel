@@ -38,6 +38,14 @@ when :dashboard %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5 shrink-0" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="6.5" /><path stroke-linecap="round" d="M16 16l4.5 4.5" /></svg>
 <% when :translations %>
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5 shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h9M7.5 3v2M10 5c-.8 3.6-3.2 6.4-6 8M5.5 8.5c1.2 2 2.9 3.6 5 4.5" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 21l4.5-10 4.5 10M13.6 17.5h5.8" /></svg>
+<%# The notes' icons (notes handoff "Conventions": Lucide, 1.5px stroke).
+    They are drawn at more than one size -- 16px beside "All notes", 12px on
+    a pinned row -- so these branches take the size as a local, `size:`, a
+    Tailwind `size-*` class; without it they are `size-5` like the rest. %>
+<% when :arrow_left %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="m12 19-7-7 7-7M19 12H5" /></svg>
+<% when :pin %>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="<%= local_assigns.fetch(:size, "size-5") %> shrink-0" aria-hidden="true" focusable="false"><path stroke-linecap="round" stroke-linejoin="round" d="M12 17v5M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></svg>
 <% else
   raise ArgumentError, "unknown admin icon #{name.inspect}"
 end %>

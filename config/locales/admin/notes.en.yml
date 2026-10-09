@@ -9,6 +9,14 @@
 en:
   admin:
     notes:
+      index:
+        title: "Notes · CS Studio"
+      # What a thread is on when it is on the record itself: its group's
+      # heading in the list, and the heading of its thread view.
+      subject:
+        page: "This page"
+        post: "This post"
+        media: "This image"
       errors:
         blank: "Write something first."
         too_long: "A note can be at most 4,000 characters."
@@ -28,3 +36,45 @@ en:
         not_yours: "Only the person who wrote a note can change it."
         delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."
         pin_resolved: "Reopen this note before pinning it."
+    components:
+      notes_screen:
+        list:
+          pinned: "Pinned"
+          open:
+            one: "Open · %{count}"
+            other: "Open · %{count}"
+          none_open: "No open notes."
+          more: "Show more"
+          resolved:
+            one: "Resolved · %{count}"
+            other: "Resolved · %{count}"
+          new: "New note"
+          empty_title: "No notes yet"
+          empty:
+            page: "Ask a question about this page or one of its blocks."
+            post: "Ask a question about this post."
+            media: "Ask a question about this image."
+          notices:
+            gone: "This note is gone: it was deleted, or what it was on was."
+        thread_row:
+          new: "new"
+          replies:
+            one: "%{count} reply"
+            other: "%{count} replies"
+        thread:
+          # The arrow before it is an icon (`:arrow_left`), not part of the text.
+          back: "All notes"
+          # Under what the thread is on: "2 messages · started on DE".
+          messages:
+            one: "%{count} message"
+            other: "%{count} messages"
+          started_on: "started on %{language}"
+          quoted: "Quoted"
+          pinned: "Pinned"
+          resolved_by: "Resolved by"
+          written_on: "Written on %{language}"
+          show_more:
+            one: "Show %{count} more"
+            other: "Show %{count} more"
+        message:
+          edited: "edited"

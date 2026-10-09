@@ -1,0 +1,10 @@
+<div id="<%= dom_id %>" class="flex flex-col gap-2 border-t border-line px-4 py-3.5" data-note-message="<%= message.id %>">
+  <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
+    <strong class="text-[13px] font-semibold text-ink"><%= render Admin::UserNameComponent.new(user: author, user_id: message.author_id) %></strong>
+    <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
+    <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
+    <%= content %>
+  </p>
+  <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users) %>
+</div>

@@ -1,0 +1,50 @@
+<div id="notes-list" class="flex flex-col" data-notes-view="list" data-notes-container="<%= key %>">
+  <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
+
+  <% if notice %>
+    <p role="status" class="mx-4 mt-3 rounded-cs border border-line bg-sunken px-3 py-2 text-[13px] text-ink"><%= t(".notices.#{notice}") %></p>
+  <% end %>
+
+  <% if empty? && compose.nil? && failed.nil? %>
+    <%= render Admin::EmptyStateComponent.new(title: t(".empty_title"), description: t(".empty.#{type}")) do |empty_state| %>
+      <% empty_state.with_action do %>
+        <%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes" } %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if listing.pinned.any? %>
+    <section id="notes-pinned" aria-labelledby="notes-pinned-title" class="flex flex-col">
+      <h3 id="notes-pinned-title" class="px-4 pb-1.5 pt-4 font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= t(".pinned") %></h3>
+      <% listing.pinned.each do |record| %><%= render row(record, show_subject: true) %><% end %>
+    </section>
+  <% end %>
+
+  <% unless empty? %>
+    <%# The section's name is for a screen reader: on screen each group's own
+        heading says what its rows are on, and the header says how many are
+        open (handoff "Group heading"). %>
+    <section id="notes-open" aria-labelledby="notes-open-title" class="flex flex-col">
+      <h3 id="notes-open-title" class="sr-only"><%= t(".open", count: listing.open_count) %></h3>
+      <% if listing.open_count.zero? %>
+        <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".none_open") %></p>
+      <% end %>
+      <% listing.groups.each do |group| %>
+        <section id="notes-group-<%= group.key %>" data-notes-group="<%= group.key %>" tabindex="-1" class="flex flex-col focus:outline-none">
+          <h4 class="px-4 pb-1.5 pt-4 font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= group_title(group) %></h4>
+          <% group.threads.each do |record| %><%= render row(record) %><% end %>
+        </section>
+      <% end %>
+      <% if listing.more? %>
+        <p class="px-4 py-3.5"><%= link_to t(".more"), more_path, class: setup_secondary_link_class, data: { turbo_frame: "notes" } %></p>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if listing.resolved_count.positive? %>
+    <details id="notes-resolved-section">
+      <summary class="cursor-pointer px-4 py-3.5 text-[13px] text-dim hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><%= t(".resolved", count: listing.resolved_count) %></summary>
+      <%= tag.turbo_frame id: "notes-resolved", src: resolved_path, loading: "lazy" %>
+    </details>
+  <% end %>
+</div>

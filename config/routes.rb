@@ -279,6 +279,20 @@ Rails.application.routes.draw do
     # and "Recent activity", open to every signed-in user. The Pages module -- the tree and its own editor -- lives at
     # its own `/pages` (`resources :pages` above), no longer at the root.
     root to: "dashboard#show"
+    # Notes on content (notes spec §3.4, §4). Everything about one record's
+    # notes hangs under that record -- `/notes/page/3`, `/notes/post/8`,
+    # `/notes/media/5` -- so a controller finds the container through the read
+    # scope first and a thread only among that container's: a thread is never
+    # found by its id alone. Each part of the notes UI has its own GET here
+    # (the list, one thread, the resolved ones, the counts), which is what a
+    # live signal asks the browser to fetch again.
+    scope "notes/:container_type/:container_id", constraints: { container_type: /page|post|media/, container_id: /\d+/ } do
+      get "", to: "notes#index", as: :record_notes
+      get "resolved", to: "notes#resolved", as: :resolved_record_notes
+      get "counts", to: "notes#counts", as: :record_note_counts, defaults: { format: :json }
+      get "threads/:id", to: "note_threads#show", as: :record_note_thread, constraints: { id: /\d+/ }
+    end
+
     # Quick draft (dashboard spec §4.1): a title and a content type, saved
     # through `Posts::Save` as an unpublished post, then opened in the
     # post editor.
