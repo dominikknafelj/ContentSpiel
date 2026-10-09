@@ -20,6 +20,20 @@ module Notes
     # `Notes::Remove` runs no callback).
     has_many :reactions, -> { order(:created_at, :id) }, class_name: "Notes::Reaction", foreign_key: :message_id, inverse_of: :message
 
+    # The message's files (notes spec D9, §3.6; `Notes::Files` has the rules
+    # and is the one place that attaches them). READ ONLY THROUGH
+    # `Admin::NoteFilesController`: never `url`, `rails_blob_path`, a signed
+    # id or a variant of one (decision D15) -- Active Storage's read URLs are
+    # public to whoever holds one. On a storage service of their own, which
+    # those public routes refuse (`Notes::Files::SERVICE`).
+    #
+    # Whoever deletes a message removes its files first, in its transaction
+    # (`Notes::Files.remove`: `Notes::DeleteMessage`, `Notes::Remove`), so
+    # the rows go with the note and the bytes when the delete has committed.
+    # Active Storage's own `dependent: :purge_later` stays as the net under a
+    # destroy that did not come that way (a console).
+    has_many_attached :files, service: Files::SERVICE
+
     # Of the messages in the relation, only the newest of each CONTAINER (the
     # page, post or image whose screen lists the thread), as its container
     # and its author: `DISTINCT ON (container_type, container_id)`, so

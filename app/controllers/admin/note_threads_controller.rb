@@ -83,7 +83,7 @@ module Admin
     # form only ever sends keys the frame drew.
     def create
       subject = Notes::Listing.new(@container, viewer: Current.user).subject_by_key(params[:subject]) || @container
-      result = Notes::Start.call(subject, body: note_body, quote: params[:quote].to_s, origin_view: note_view, origin_locale: admin_locale)
+      result = Notes::Start.call(subject, body: note_body, files: note_files, quote: params[:quote].to_s, origin_view: note_view, origin_locale: admin_locale)
       # The mind graph's card asks in JSON and is answered in kind: the new
       # thread's id, or the reasons (403, 422). It reads the list again
       # itself (`index`), so nothing of the thread is sent back.

@@ -12,6 +12,11 @@ module Notes
   # `users`, so that query grows in rows, not in number. The list reads no
   # reactions: it draws none.
   #
+  # And one more for the files of all its messages, with their blobs
+  # (`files_of`): one joined read whatever the number of messages and of
+  # files, asked the first time a message's files are drawn. The list reads
+  # no files either.
+  #
   # Open threads are grouped by what they are on: the record itself first,
   # then one group per block, in the order the page shows its blocks
   # (`BlockOutline#reading_order`). Pinned threads are listed apart, first.
@@ -57,7 +62,14 @@ module Notes
 
     # One thread of this container, or nil: never a thread by its id alone.
     # With its messages' reactions, which only the thread view draws.
-    def find(id) = load(scope.where(id: id), reactions: true).first
+    def find(id) = load(scope.where(id: id), reactions: true).first.tap { |thread| (@found ||= []) << thread if thread }
+
+    # A message's files, oldest first, each with its blob: those of a thread
+    # `find` read (the thread view). Empty for a message of a thread that was
+    # only listed -- never a query per message. `ActiveStorage::Attachment`
+    # rows as data: what a file is called, what it is and how big; the bytes
+    # are `Admin::NoteFilesController`'s to send.
+    def files_of(message) = files.fetch(message.id, [])
 
     # A message's reactions, in the order they were given: those `find` read
     # with the thread. Empty for a message of a thread that was listed, not
@@ -129,6 +141,16 @@ module Notes
     end
 
     def loaded = (@loaded || open_threads)
+
+    # `{ message id => attachments }` for the threads `find` answered: one
+    # statement, the blobs joined in.
+    def files
+      @files ||= begin
+        ids = Array(@found).flat_map { |thread| thread.messages.map(&:id) }
+        attachments = ActiveStorage::Attachment.where(record_type: Message.polymorphic_name, name: "files", record_id: ids)
+        ids.empty? ? {} : attachments.eager_load(:blob).order(:id).group_by(&:record_id)
+      end
+    end
 
     # `{ key => record }` in display order: the container, then a page's
     # blocks as the page shows them.

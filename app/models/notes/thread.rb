@@ -30,8 +30,10 @@ module Notes
     belongs_to :resolved_by, class_name: "User", optional: true
     belongs_to :pinned_by, class_name: "User", optional: true
     # Oldest first: the order a thread is read in. `dependent: :destroy` so a
-    # message's own callbacks run (its files are purged, Task 16); the
-    # deliveries and reactions go by their foreign keys.
+    # message's own callbacks run; the deliveries and reactions go by their
+    # foreign keys. A message's files are removed by whoever deletes it,
+    # before the delete (`Notes::Files.remove`): `Notes::DeleteMessage`, and
+    # `Notes::Remove`, which deletes threads with one DELETE and no callback.
     has_many :messages, -> { order(:created_at, :id) }, class_name: "Notes::Message", foreign_key: :thread_id,
       inverse_of: :thread, dependent: :destroy
 

@@ -54,6 +54,8 @@ import { messages } from "i18n/messages"
 //   their message, and in a message that stays the element it is (a delete
 //   question is open) the chips alone are swapped. The set of emoji someone
 //   has open under a message ("Add a reaction") is open afterwards too.
+//   A message's files are the very elements that were there (a picture is
+//   not fetched again, a GIF that plays goes on playing).
 //   Whatever had the focus has it afterwards (the same element, or the same
 //   control of the new markup), and the scroll position stays -- unless the
 //   reader was at the bottom, who stays at the bottom. Messages that arrived
@@ -61,8 +63,13 @@ import { messages } from "i18n/messages"
 //   where it first stood until the thread is left; a reader who is not at
 //   the bottom gets "1 new message ↓" above the reply field and nothing
 //   moves.
+// - A composer is never replaced by a refresh, and that goes for one that
+//   holds CHOSEN FILES and no text as for one that holds text: the thread's
+//   reply part and the list's new-note field are left where they are (a
+//   file field's files cannot be put back by a script).
 // - A thread that is gone (its GET answers the list, "This note is gone")
-//   while its reply field or an edit holds text: the text stays, with "This
+//   while its reply field or an edit holds text, or its reply field holds
+//   chosen files: the text stays, with "This
 //   thread was deleted" above the field, and everything that would send it
 //   to a thread that is not there is switched off. Without typed text the
 //   frame goes to the list.
@@ -562,6 +569,17 @@ export default class extends Controller {
       else next.append(message)
       message.closest("details")?.setAttribute("open", "")
     })
+    // A message's files never change (they are fixed when it is written), so
+    // the very elements are kept in the place the answer gives them: a
+    // picture is not fetched again for every refresh (its address is never
+    // cached, `Admin::NoteFilesController`), and a GIF someone set playing
+    // goes on playing. A message being worked in was moved whole, above.
+    old.querySelectorAll("[data-note-message]").forEach((message) => {
+      if (busy.includes(message)) return
+      const kept = message.querySelector(":scope > [data-note-files]")
+      const place = kept && find(message.dataset.noteMessage)?.querySelector(":scope > [data-note-files]")
+      if (place) place.replaceWith(kept)
+    })
     if (old.querySelector("details[data-note-fold]")?.open) next.querySelector("details[data-note-fold]")?.setAttribute("open", "")
     if (picking) find(picking)?.querySelector("details[data-reaction-add]")?.setAttribute("open", "")
     // The divider stays where it first stood while the thread is open.
@@ -604,7 +622,10 @@ export default class extends Controller {
     if (view.querySelector("[data-note-gone]")) return
 
     const editing = busy.filter((message) => [ ...message.querySelectorAll("textarea") ].some((field) => field.value !== field.defaultValue))
-    if (!reply.querySelector("textarea")?.value && editing.length === 0) {
+    // Chosen files are typed work too: a field that holds some is kept, even
+    // with no text beside them.
+    const files = reply.querySelector("input[type='file']")?.files.length > 0
+    if (!reply.querySelector("textarea")?.value && !files && editing.length === 0) {
       const list = new URL(url, window.location.origin)
       frame.src = list.pathname + list.search
       return

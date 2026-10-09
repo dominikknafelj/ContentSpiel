@@ -1,6 +1,7 @@
 module Notes
-  # Deletes one message with its deliveries (and, once they exist, its
-  # reactions and files); the thread goes with its last message (notes spec
+  # Deletes one message with its deliveries, its reactions and its files
+  # (`Notes::Files.remove`: the rows in this transaction, the stored bytes
+  # only once it has committed); the thread goes with its last message (notes spec
   # §3.5). Your own message needs the read right; someone else's needs the
   # container's edit right (`Authorization#moderation_refusal`).
   #
@@ -50,6 +51,9 @@ module Notes
         # Read before the destroy, whose cascade takes the rows: the people
         # whose inbox is about to lose a line.
         Delivery.where(message_id: message.id).distinct.pluck(:user_id).each { |user_id| Signals.inbox(user_id) }
+        # Its files, before the destroy: the rows here, the bytes once this
+        # has committed (`Notes::Files.remove`).
+        Files.remove(Message.where(id: message.id))
         message.destroy!
         newest = current.messages.reload.last
         if newest

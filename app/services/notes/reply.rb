@@ -7,14 +7,18 @@ module Notes
   # (its block deleted, its page purged, its last message deleted) is an
   # ordinary failure the drawer shows, never an exception.
   #
+  # FILES (`files:`) as in `Notes::Start`: checked by their bytes first
+  # (`Notes::Files`), and one refused file refuses the reply.
+  #
   # Signals the record's stream once (a reply that reopens is one change to
   # one thread), and each person told theirs (`Notes::Signals`).
   class Reply < ApplicationService
     include Authorization
 
-    def initialize(thread, body:, actor: Current.actor)
+    def initialize(thread, body:, files: [], actor: Current.actor)
       @thread = thread
       @body = body.to_s.strip
+      @files = Array(files)
       @actor = actor
     end
 
@@ -23,7 +27,7 @@ module Notes
       refused = read_refusal(container) { |key| authorize!(key, container) }
       return denied(refused, container) if refused
 
-      errors = body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)
+      errors = (body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)) + Files.errors_for(@files)
       return failure(nil, errors) if errors.any?
 
       message = Thread.transaction(requires_new: true) do
@@ -32,6 +36,7 @@ module Notes
 
         reopened = thread.resolved?
         created = thread.messages.create!(author: actor_user, body: @body)
+        Files.attach(created, @files)
         thread.update!(last_message_at: created.created_at, **(reopened ? { state: "open", resolved_at: nil, resolved_by: nil } : {}))
         Deliveries.for_new_message(created, actor_user: actor_user)
         record_event("note.replied", subject: thread.subject, snapshot: nil, metadata: note_metadata(thread, created))

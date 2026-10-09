@@ -28,12 +28,26 @@ Rails.application.config.filter_parameters += [
 # notes GET carries is the passage a new note quotes, and its name in a URL is
 # therefore `note_quote`, a bare entry here. It collides with no model
 # attribute (a thread's column is `quote`), so no audit snapshot changes.
+#
+# A NOTE'S FILE NAMES (D14 again). Rails logs an uploaded file as the
+# `ActionDispatch::Http::UploadedFile` it is, and that object's `inspect`
+# holds the name the file had on the person's machine twice: as
+# `@original_filename`, and inside `@headers` (the part's
+# `Content-Disposition: form-data; ...; filename="..."`). The same lambda
+# masks both for a request to a notes controller. It is handed a COPY of the
+# upload (`ActiveSupport::ParameterFilter` dups a value before it calls a
+# block), so the upload the controller reads keeps its name; the temporary
+# file's own path is Rack's and holds no more than the extension.
 Rails.application.config.filter_parameters += [
   :mention_names, :note_quote,
   lambda do |key, value, params = nil|
-    next unless value.is_a?(String) && %w[body quote].include?(key.to_s)
     next unless params.is_a?(Hash) && params["controller"].to_s.start_with?("admin/note")
 
-    value.replace("[FILTERED]")
+    if value.is_a?(String) && %w[body quote].include?(key.to_s)
+      value.replace("[FILTERED]")
+    elsif value.is_a?(ActionDispatch::Http::UploadedFile)
+      value.original_filename = "[FILTERED]"
+      value.headers = "[FILTERED]"
+    end
   end
 ]

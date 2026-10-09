@@ -99,14 +99,24 @@ module Admin
       {}
     end
 
+    # The files sent with a note (notes spec §3.6): the parts of the form's
+    # one file field, as one multipart post. Only what Rails itself made of
+    # an uploaded part is a file -- a string or a hash a request puts under
+    # the same name is not, and is dropped. What each file IS, and whether
+    # it may be attached, is the service's question (`Notes::Files`).
+    def note_files = Array(params[:files]).grep(ActionDispatch::Http::UploadedFile)
+
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
     # What a failed form gets back: its own key, what was typed, and why.
     # Nothing here reads `result.record`: a notes service's failure has none
     # ("This note is gone" for a record trashed or a thread removed a moment
-    # ago is a failure like any other).
+    # ago is a failure like any other). `files_lost`: the form was sent with
+    # files, and the form drawn again cannot hold them -- a browser never
+    # gives a file field its files back -- so the form says to attach them
+    # again, whatever the note was refused for.
     def failed_form(key, result, **extra)
-      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, **extra }
+      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, files_lost: note_files.any?, **extra }
     end
 
     # The thread (or what it was on) is no longer there: back to the list,

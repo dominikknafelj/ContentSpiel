@@ -37,7 +37,25 @@ import { messages } from "i18n/messages"
 //   enabled (without this script the field's own `required` says so), and a
 //   draft put back on connect enables it again.
 //
-// Text goes into the page with `textContent` only: a name is a person's.
+// - FILES (notes spec §3.6; `files`, on every form but an edit's). The
+//   paperclip opens the form's one file field, and what is chosen travels
+//   with the note as one multipart post. The chosen files are the file
+//   field's own -- a `DataTransfer` rebuilds its list when one is added or
+//   removed, so several rounds of choosing add up -- and the rows above the
+//   field only show them, each cloned from the server's `<template>` with a
+//   remove button. A sixth file, and one over the limit, are refused here in
+//   a line under the rows, before anything is sent; the server checks the
+//   same again, and what a file IS only the server can tell. A DRAFT HOLDS
+//   TEXT ONLY: a script cannot put a file back into a file field, so chosen
+//   files are gone when the form is drawn again -- after a note that went
+//   through, as they should be, and after one that was refused, which is
+//   why the form that comes back says to attach them again. While a note
+//   with files is on its way the one-send guard holds for as long as the
+//   upload takes: `out` is set at the press and cleared at
+//   `turbo:submit-end`, however long that is.
+//
+// Text goes into the page with `textContent` only: a name is a person's,
+// and a file's name is whatever its owner called it.
 const QUERY = /(?:^|\s)@([^\s@]{0,40})$/
 const PREFIX = "cs-note-draft:"
 
@@ -49,7 +67,7 @@ const ROWS = 6
 const LOOKUP_DELAY_MS = 150
 
 export default class extends Controller {
-  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "unsaved" ]
+  static targets = [ "field", "names", "suggestions", "status", "emoji", "submit", "unsaved", "files", "chosen", "fileError", "row" ]
   static values = { key: String, mentionsUrl: String, user: String, edit: Boolean }
 
   connect() {
@@ -153,6 +171,65 @@ export default class extends Controller {
     this.out = false
     this.refresh()
     if (event.detail.success) this.forget()
+  }
+
+  // --- files --------------------------------------------------------------------
+
+  browse() {
+    this.filesTarget.click()
+  }
+
+  // `change` on the file field: what was just picked, added to what was
+  // chosen before. What does not fit is left out and said.
+  filesChosen() {
+    const text = messages(this.element)
+    const limit = Number(this.filesTarget.dataset.maxCount)
+    const bytes = Number(this.filesTarget.dataset.maxBytes)
+    const all = [ ...(this.kept || []), ...this.filesTarget.files ]
+    const fitting = all.filter((file) => file.size <= bytes)
+    const errors = all.filter((file) => file.size > bytes).map((file) => text.t("notes.script.files.too_big", { name: file.name }))
+    if (fitting.length > limit) errors.push(text.t("notes.script.files.too_many", { count: limit }))
+    this.setFiles(fitting.slice(0, limit))
+    this.fileErrorTarget.textContent = errors.join(" ")
+    this.fileErrorTarget.hidden = errors.length === 0
+  }
+
+  removeFile(event) {
+    const index = Number(event.currentTarget.dataset.index)
+    this.setFiles(this.kept.filter((_file, at) => at !== index))
+    this.fileErrorTarget.hidden = true
+    this.fileErrorTarget.textContent = ""
+    // The row with the focus is gone: the next one's button, or the field.
+    const next = this.chosenTarget.querySelectorAll("button")[Math.min(index, this.kept.length - 1)]
+    ;(next || this.fieldTarget).focus()
+  }
+
+  // The file field's list and the rows that show it, from one array.
+  setFiles(files) {
+    const text = messages(this.element)
+    this.kept = files
+    const transfer = new DataTransfer()
+    files.forEach((file) => transfer.items.add(file))
+    this.filesTarget.files = transfer.files
+    this.chosenTarget.replaceChildren(...files.map((file, index) => {
+      const row = this.rowTarget.content.firstElementChild.cloneNode(true)
+      row.querySelector("[data-name]").textContent = file.name
+      row.querySelector("[data-facts]").textContent = this.facts(file)
+      const remove = row.querySelector("button")
+      remove.dataset.index = index
+      remove.setAttribute("aria-label", text.t("notes.script.files.remove", { name: file.name }))
+      return row
+    }))
+    this.chosenTarget.hidden = files.length === 0
+  }
+
+  // "PDF · 1.2 MB", as a sent file's row says it -- but the kind is only the
+  // name's ending here, a guess the row shows until the server has looked
+  // at the bytes.
+  facts(file) {
+    const ending = /\.([A-Za-z0-9]{1,5})$/.exec(file.name)?.[1].toUpperCase()
+    const size = file.size < 1048576 ? `${Math.max(1, Math.round(file.size / 1024))} KB` : `${(file.size / 1048576).toFixed(1)} MB` // i18n-ok: unit symbols, written the same in every language CS Studio has
+    return [ ending, size ].filter(Boolean).join(" · ")
   }
 
   // --- the mention picker -----------------------------------------------------

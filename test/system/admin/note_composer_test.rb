@@ -1,8 +1,11 @@
 require "application_system_test_case"
+require "support/note_files_helper"
 
 # The composer on its own (notes spec §4.2), on the notes page of a record --
 # the same frame the drawer shows.
 class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
+  include NoteFilesHelper # erases what the files test stores
+
   setup do
     site_settings(:default).update!(setup_completed_at: Time.current)
     users(:two).update!(name: "Dana Example")
@@ -149,5 +152,23 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
     assert_equal "Ask @", field.value
     assert_selector "#notes-new [role=listbox] [role=option]", maximum: 6
     assert_selector "#notes-new [role=listbox] [role=option][aria-selected=true]", count: 1
+  end
+
+  test "chosen files are listed above the field with their size, one can be removed, and the note is sent with the rest" do
+    open_notes
+    # `set` on the field itself: `attach_file` called on an element looks for a file field INSIDE it.
+    find("#notes-new input[type=file]", visible: :all).set([ file_fixture("tiny.png").to_s, file_fixture("small.gif").to_s ])
+
+    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 2
+    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", text: /tiny\.png\s*PNG · 1 KB/
+    # The remove button is an icon; its name is its `aria-label`, which `press` does not read.
+    find("#notes-new [data-admin--note-composer-target=chosen] button[aria-label='Remove small.gif']").click
+    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 1
+
+    field.send_keys("With a file")
+    within("#notes-new") { press "Add note" }
+
+    assert_selector "[data-note-thread] [data-note-files] img[alt='tiny.png']"
+    assert_equal [ "tiny.png" ], Notes::Message.last.files.map { |file| file.filename.to_s }
   end
 end

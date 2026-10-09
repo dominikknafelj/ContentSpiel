@@ -1,6 +1,9 @@
 require "test_helper"
+require "support/note_files_helper"
 
 class Notes::RemoveTest < ActiveSupport::TestCase
+  include NoteFilesHelper
+
   setup do
     @page = create_page(title: "Pricing", published: false)
     @block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
@@ -48,6 +51,33 @@ class Notes::RemoveTest < ActiveSupport::TestCase
     many = capture_sql { Notes::Remove.call(@page, with: [ @block ]) }.size
 
     assert_equal one, many
+  end
+
+  test "removing a record's notes removes their files, in the same number of statements for one file as for many" do
+    file = -> { fixture_upload("tiny.png", name: "shot.png", declared: "image/png") }
+    quiet = create_page(title: "One file", published: false)
+    as(users(:two)) do
+      Notes::Start.call(quiet, body: "One", files: [ file.call ])
+      3.times { Notes::Start.call(@block, body: "Many", files: [ file.call, file.call ]) }
+    end
+    keys = note_file_keys
+
+    one = capture_sql { Notes::Remove.call(quiet) }
+    many = capture_sql { Notes::Remove.call(@page, with: [ @block ]) }
+
+    assert_equal one.size, many.size
+    assert_equal [ 1, 1 ], [ many.count { |sql| sql.start_with?('DELETE FROM "active_storage_attachments"') }, many.count { |sql| sql.start_with?('DELETE FROM "active_storage_blobs"') } ]
+    # The files' rows go while the messages still say whose they are.
+    assert_operator many.index { |sql| sql.start_with?('DELETE FROM "active_storage_blobs"') }, :<, many.index { |sql| sql.start_with?('DELETE FROM "note_threads"') }
+    assert_equal [ 0, 0 ], [ ActiveStorage::Attachment.where(record_type: "Notes::Message").count, note_blobs.count ]
+    assert_empty keys.select { |key| stored?(key) }
+  end
+
+  test "notes without files cost one read more and no delete of a file" do
+    statements = capture_sql { Notes::Remove.call(@other) }
+
+    assert_equal 1, statements.count { |sql| sql.include?('"active_storage_blobs"') }
+    assert_empty statements.grep(/\ADELETE FROM "active_storage/)
   end
 
   test "a block's notes go with the right to edit its page; a reader is refused and nothing is removed" do

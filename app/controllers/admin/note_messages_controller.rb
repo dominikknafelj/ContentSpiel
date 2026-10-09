@@ -11,7 +11,7 @@ module Admin
     before_action :set_thread
 
     def create
-      result = Notes::Reply.call(@thread, body: note_body)
+      result = Notes::Reply.call(@thread, body: note_body, files: note_files)
 
       if result.ok?
         redirect_to thread_path(@thread), status: :see_other

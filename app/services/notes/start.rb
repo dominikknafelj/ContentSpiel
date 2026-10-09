@@ -12,14 +12,20 @@ module Notes
   # later finds this thread in `Notes::Remove`, which runs under the same
   # lock.
   #
+  # FILES (`files:`, uploaded files: anything with `tempfile` and
+  # `original_filename`) are checked by what their bytes are before anything
+  # is written (`Notes::Files`). One refused file refuses the note: nothing
+  # is saved, nothing stored, nobody told. Their names are in no audit event.
+  #
   # Signals the record's stream once the write has committed, and each person
   # told theirs (`Notes::Signals`, through `Notes::Deliveries.write`).
   class Start < ApplicationService
     include Authorization
 
-    def initialize(subject, body:, quote: nil, origin_view: "editor", origin_locale: nil, actor: Current.actor)
+    def initialize(subject, body:, files: [], quote: nil, origin_view: "editor", origin_locale: nil, actor: Current.actor)
       @subject = subject
       @body = body.to_s.strip
+      @files = Array(files)
       @quote = quote.to_s.strip.first(Thread::MAX_QUOTE).presence
       @origin_view = Thread::ORIGIN_VIEWS.include?(origin_view.to_s) ? origin_view.to_s : "editor"
       @origin_locale = Locales.enabled?(origin_locale) ? origin_locale.to_s : nil
@@ -31,7 +37,7 @@ module Notes
       refused = read_refusal(container) { |key| authorize!(key, container) }
       return denied(refused, container) if refused
 
-      errors = body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)
+      errors = (body_errors(@body).presence || mention_errors(Mentions.ids(@body), container)) + Files.errors_for(@files)
       return failure(nil, errors) if errors.any?
 
       thread = Thread.transaction(requires_new: true) do
@@ -40,6 +46,7 @@ module Notes
         created = Thread.create!(subject: @subject, quote: @quote, origin_view: @origin_view, origin_locale: @origin_locale,
           created_by: actor_user, last_message_at: Time.current)
         message = created.messages.create!(author: actor_user, body: @body)
+        Files.attach(message, @files)
         created.update!(last_message_at: message.created_at)
         Deliveries.for_new_message(message, actor_user: actor_user)
         record_event("note.started", subject: @subject, snapshot: nil, metadata: note_metadata(created, message))

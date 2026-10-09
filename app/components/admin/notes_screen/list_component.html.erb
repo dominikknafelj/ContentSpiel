@@ -16,7 +16,7 @@
       <% end %>
       <%= render Admin::NotesScreen::ComposerComponent.new(url: threads_path, key: "new-#{key}-#{compose_key}", label: t(".new_label"), submit: t(".add"),
             mentions_url: mentions_path, rows: 3, hidden: { subject: compose_key, quote: quote.to_s },
-            body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors)) %>
+            body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors), files_lost: failed_new&.dig(:files_lost)) %>
     </section>
   <% elsif !empty? %>
     <%# Not shown inside the editors' drawer, whose header has the one "New

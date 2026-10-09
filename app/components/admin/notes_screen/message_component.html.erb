@@ -34,13 +34,19 @@
   </div>
   <% if editing? %>
     <% text, names = editable %>
+    <%# `files: false`: an edit changes the text; the files stay as they were written. %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: message_path, method: :patch, key: key, label: t(".edit_label"), submit: t(".save"),
-          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), unsaved: t(".unsaved")) %>
+          mentions_url: mentions_path, body: text, names: names, errors: edit_failure&.dig(:errors), unsaved: t(".unsaved"), files: false) %>
     <%# Cancel gives the edit up: its draft goes with it. %>
     <p><%= link_to t(".cancel"), thread_path, class: cancel_class, data: { note_cancel: true, action: "admin--note-unsaved#forget", **frame_link } %></p>
   <% else %>
     <%= render Admin::NotesScreen::BodyComponent.new(body: message.body, users: listing.users, viewer_id: viewer&.id) %>
   <% end %>
+  <%# The message's files, under its text (and under the edit form while the
+      text is being edited: they are not part of an edit). A direct child of
+      the message, by this name: a live refresh keeps the very element
+      (`admin--notes-live`), so a picture is not fetched again. %>
+  <%= render Admin::NotesScreen::FilesComponent.new(message: message, listing: listing) %>
   <%# Below the text (handoff "Reaction chip"), for a message that has
       reactions; under the edit form while the message is being edited, and
       then disabled (the handoff's decision 23). Its forms are siblings of

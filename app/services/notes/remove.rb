@@ -49,8 +49,11 @@ module Notes
   # record at all. `ContentBlocks::Destroy` calls it after the block is
   # gone: a block's right is its page's, and the page is still there.
   #
-  # Constant in statements whatever the number of threads: one read of the
-  # thread ids, one of the people told, one audit insert, one DELETE. `notes.removed` is recorded on
+  # Constant in statements whatever the number of threads and of files: one
+  # read of the thread ids, one of the people told, one audit insert, one read
+  # of the files (and two DELETEs when there are any, `Notes::Files.remove`),
+  # one DELETE. A purge that rolls back keeps every file where it was: the
+  # stored bytes are erased only after the outermost commit. `notes.removed` is recorded on
   # `record` with the ids only, and only when there was something to remove.
   #
   # THE SIGNAL (`Notes::Signals`): one per CONTAINER that lost a thread, on
@@ -107,6 +110,10 @@ module Notes
         # Read before the delete, whose cascade takes the rows.
         told = Delivery.where(thread_id: ids).distinct.pluck(:user_id)
         record_event("notes.removed", subject: @record, snapshot: nil, metadata: { "thread_ids" => ids })
+        # The files of the messages about to go (notes spec §3.6), while the
+        # messages still say whose they are: the cascade below runs no
+        # callback. Rows now, stored bytes when the caller has committed.
+        Files.remove(Message.where(thread_id: ids))
         Thread.where(id: ids).delete_all # version: none (note tables only; no public page reads a note)
         rows.uniq { |_id, type, container_id| [ type, container_id ] }.each { |id, type, container_id| Signals.threads_removed(type, container_id, id) }
         told.each { |user_id| Signals.inbox(user_id) }

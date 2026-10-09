@@ -20,6 +20,14 @@
 # The *read* side (blob redirects, representations, `GET /disk/...`) stays
 # public -- public pages embed those URLs.
 #
+# One kind of blob is NOT public on the read side (notes spec D15): the files
+# of notes, which live on a storage service of their own (`notes`,
+# `config/storage.yml`). Every read controller refuses a blob of that service
+# (`ActiveStorageNoteFilesRefusal`); a note's file is read only through
+# `Admin::NoteFilesController`. The concern goes into each concrete
+# controller, not their base classes: a callback added to a parent after its
+# child was loaded does not reach the child.
+#
 # In `to_prepare` so a code reload in development re-applies it to the
 # freshly loaded controller classes; the `include?` guards keep a repeated
 # run from stacking callbacks.
@@ -29,5 +37,10 @@ Rails.application.config.to_prepare do
   unless ActiveStorage::DiskController.include?(ActiveStorageWriteAuthentication)
     ActiveStorage::DiskController.include(ActiveStorageWriteAuthentication)
     ActiveStorage::DiskController.allow_unauthenticated_access only: :show
+  end
+
+  [ ActiveStorage::Blobs::RedirectController, ActiveStorage::Blobs::ProxyController, ActiveStorage::Representations::RedirectController,
+    ActiveStorage::Representations::ProxyController, ActiveStorage::DiskController ].each do |controller|
+    controller.include(ActiveStorageNoteFilesRefusal) unless controller.include?(ActiveStorageNoteFilesRefusal)
   end
 end

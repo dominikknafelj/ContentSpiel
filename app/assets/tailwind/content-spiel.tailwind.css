@@ -405,6 +405,16 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    border is set by the rule above, which a utility does not outweigh. */
 .admin-block-tile[data-notes-active] { border-color: var(--cs-accent); }
 
+/* A picture in a note (`Admin::NotesScreen::FilesComponent`; handoff "Inline
+   image and still GIF tile"). Its box shows the placeholder gradient until
+   the picture is there, and behind a picture that is partly transparent.
+   A GIF's Play / Pause is shown with reduced motion only (the component's
+   `motion-reduce:` classes): centred over the still, and in the corner while
+   the picture plays (`data-playing`), so it does not lie over what moves. */
+.admin-note-picture { background: linear-gradient(135deg, var(--cs-ph-a), var(--cs-ph-b)); }
+.admin-note-gif-button { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.admin-note-gif-button[data-playing="true"] { top: auto; left: auto; right: 6px; bottom: 6px; transform: none; }
+
 /* A block's notes marker (`Admin::NotesScreen::MarkerComponent`, notes
    handoff "Block card marker" and "Section tile marker"). Four states, set by
    `admin--notes` as attributes:

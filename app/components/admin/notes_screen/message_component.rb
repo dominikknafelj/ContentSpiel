@@ -5,7 +5,8 @@ module Admin
     # moderator's: notes spec §3.4).
     # Under the text, its reactions (`ReactionsComponent`), which anyone who
     # may read the thread gives: so the "⋯" menu is there for everyone while
-    # the thread is open, with "React" in it. (Task 16 adds the files.)
+    # the thread is open, with "React" in it. Between the text and the
+    # reactions, its files (`FilesComponent`).
     #
     # THE MENU ASKS THE SERVER. Edit and Delete are links to the thread again
     # with `?edit=<id>` or `?delete=<id>` (`asked`), and the answer draws this

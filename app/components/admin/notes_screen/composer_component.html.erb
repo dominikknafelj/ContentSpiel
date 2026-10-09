@@ -1,4 +1,4 @@
-<%= form_with url: url, method: method, class: "flex flex-col gap-2", data: form_data do %>
+<%= form_with url: url, method: method, multipart: files?, class: "flex flex-col gap-2", data: form_data do %>
   <% hidden.each do |name, value| %><%= hidden_field_tag name, value, id: nil %><% end %>
   <%= hidden_field_tag "mention_names", names.to_json, id: nil, data: { "admin--note-composer-target": "names" } %>
   <% if unsaved %>
@@ -8,7 +8,26 @@
   <% if errors.any? %>
     <ul role="alert" class="flex flex-col gap-0.5 text-[12px] text-danger-ink">
       <% errors.each do |error| %><li><%= error %></li><% end %>
+      <% if files_lost? %><li data-note-files-lost><%= t(".attach_again") %></li><% end %>
     </ul>
+  <% end %>
+  <% if files? %>
+    <%# The chosen files, above the field (handoff "Composer"): attachment
+        rows the script fills from the template below, and the line that
+        says why a file was not taken. %>
+    <ul class="flex flex-col gap-2" hidden aria-label="<%= t(".chosen") %>" data-admin--note-composer-target="chosen"></ul>
+    <p class="text-[12px] text-danger-ink" role="alert" hidden data-admin--note-composer-target="fileError"></p>
+    <template data-admin--note-composer-target="row">
+      <li class="<%= file_row::ROW_CLASS %>" data-note-chosen>
+        <%= helpers.render "admin/shared/icon", name: :file_text, size: "size-4" %>
+        <span class="flex min-w-0 flex-col">
+          <span class="<%= file_row::NAME_CLASS %>" data-name></span>
+          <span class="<%= file_row::FACTS_CLASS %>" data-facts></span>
+        </span>
+        <button type="button" class="<%= file_row::ROW_BUTTON_CLASS %> cursor-pointer hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                data-action="admin--note-composer#removeFile"><%= helpers.render "admin/shared/icon", name: :x, size: "size-4" %></button>
+      </li>
+    </template>
   <% end %>
   <div class="relative rounded-cs border border-line-strong bg-surface focus-within:border-accent">
     <%= label_tag field_id, label, class: "sr-only" %>
@@ -23,8 +42,16 @@
         class="absolute left-0 z-30 w-[250px] max-w-full rounded-cs border border-line bg-surface p-1 shadow-menu <%= POPOVER_SIDE %>"></ul>
     <p class="sr-only" role="status" aria-live="polite" data-admin--note-composer-target="status"></p>
     <div class="flex items-center justify-between gap-2 border-t border-line px-1.5 py-1">
-      <%# The toolbar's controls, on the left (handoff "Composer"): emoji and the at-sign; Task 16 puts the paperclip before them, inside this group. %>
+      <%# The toolbar's controls, on the left (handoff "Composer"): the paperclip, emoji and the at-sign. %>
       <div class="flex items-center gap-0.5" data-note-toolbar>
+        <% if files? %>
+          <%# The field is the form's own and is opened by the button: it is out
+              of sight and out of the Tab order, and the button carries its name. %>
+          <%= file_field_tag "files[]", id: "#{field_id}-files", multiple: true, class: "sr-only", tabindex: -1, aria: { hidden: true },
+                data: { "admin--note-composer-target": "files", action: "change->admin--note-composer#filesChosen", max_count: ::Notes::Files::MAX_COUNT, max_bytes: ::Notes::Files::MAX_BYTES } %>
+          <button type="button" class="<%= TOOL_CLASS %>" aria-label="<%= t(".attach") %>" title="<%= t(".attach_title") %>"
+                  data-note-attach data-action="admin--note-composer#browse"><%= helpers.render "admin/shared/icon", name: :paperclip, size: "size-4" %></button>
+        <% end %>
         <details class="group relative" data-admin--note-composer-target="emoji">
           <summary class="<%= TOOL_CLASS %> list-none group-open:bg-sunken group-open:text-ink [&::-webkit-details-marker]:hidden" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile, size: "size-4" %></summary>
           <div class="<%= EMOJI_PANEL_CLASS %> left-0 <%= POPOVER_SIDE %>">

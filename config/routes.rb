@@ -325,6 +325,12 @@ Rails.application.routes.draw do
       # A reaction on one message: a toggle of the viewer's own (notes spec D10).
       post "threads/:thread_id/messages/:id/reactions", to: "note_reactions#create", as: :record_note_message_reactions,
         constraints: { thread_id: /\d+/, id: /\d+/ }
+      # A file of one message (notes spec D15, §3.6): the ONLY address a
+      # note's file has. Its id is an attachment's, looked up among that
+      # message's, of that thread, of this record -- never a blob's key or a
+      # signed id, and no Active Storage URL of one is ever rendered.
+      get "threads/:thread_id/messages/:message_id/files/:id", to: "note_files#show", as: :record_note_file,
+        constraints: { thread_id: /\d+/, message_id: /\d+/, id: /\d+/ }
     end
 
     # Quick draft (dashboard spec §4.1): a title and a content type, saved
