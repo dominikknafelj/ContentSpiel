@@ -14,8 +14,8 @@ en:
       # What a thread is on when it is on the record itself: its group's
       # heading in the list, and the heading of its thread view.
       subject:
-        page: "This page"
-        post: "This post"
+        page: "Whole page"
+        post: "Whole post"
         media: "This image"
       errors:
         blank: "Write something first."
@@ -46,8 +46,8 @@ en:
           none_open: "No open notes."
           more: "Show more"
           resolved:
-            one: "Resolved · %{count}"
-            other: "Resolved · %{count}"
+            one: "Resolved (%{count})"
+            other: "Resolved (%{count})"
           new: "New note"
           empty_title: "No notes yet"
           empty:

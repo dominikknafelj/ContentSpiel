@@ -8,11 +8,13 @@ module Notes
     # One record's screen: the header's total and each marker's own number.
     # `unread` is the keys whose open threads hold a delivery `user` has not
     # read: what turns that count accent, the one meaning accent has here
-    # (spec §4.5). A second query beside the first, and only for a user.
+    # (spec §4.5). A second query beside the first, and only for a user. The
+    # keys are sorted, so the same state is the same payload every time: a
+    # tab can compare two answers as text.
     def self.for_container(container, user: nil)
       open = Thread.unresolved.where(container: container)
       by_subject = open.group(:subject_type, :subject_id).count
-      unread = user ? unread_for(open, user).distinct.pluck(:subject_type, :subject_id).map { |type, id| Notes.key(type, id) } : []
+      unread = user ? unread_for(open, user).distinct.pluck(:subject_type, :subject_id).map { |type, id| Notes.key(type, id) }.sort : []
       { "total" => by_subject.values.sum, "subjects" => by_subject.to_h { |(type, id), count| [ Notes.key(type, id), count ] }, "unread" => unread }
     end
 

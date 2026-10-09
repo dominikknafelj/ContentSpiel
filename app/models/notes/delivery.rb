@@ -18,5 +18,13 @@ module Notes
     validates :reason, inclusion: { in: REASONS }
 
     scope :unread, -> { where(read_at: nil) }
+
+    # Does `thread` hold a delivery `user` has not read? One EXISTS (the
+    # thread's rows by `thread_id`, or the user's unread ones by `user_id,
+    # read_at`: both are indexed), no query without a user. What opening a thread asks
+    # before it marks anything read (`Admin::NoteThreadsController#show`).
+    def self.unread_on?(thread, user)
+      user.present? && unread.exists?(user_id: user.id, thread_id: thread.id)
+    end
   end
 end

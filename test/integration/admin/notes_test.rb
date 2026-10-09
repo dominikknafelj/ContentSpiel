@@ -23,7 +23,13 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
 
     assert_response :ok
     assert_select "turbo-frame#notes #notes-list[data-notes-view=list][data-notes-container='Page-#{@page.id}']"
-    assert_select "section#notes-group-ContentBlock-#{@block.id} a#note-row-#{@thread.id}[data-note-row][data-unread][href='#{@base}/threads/#{@thread.id}']" do
+    # `#notes-open` is the editor header's button (the stable ids table): the
+    # section of open threads has an id of its own.
+    assert_select "#notes-open", count: 0
+    assert_select "section#notes-open-list[aria-labelledby=notes-open-list-title] h3#notes-open-list-title"
+    # Following a row marks it read, so a hover must not fetch it (Turbo's prefetch).
+    assert_select "a#note-row-#{@thread.id}[data-turbo-prefetch=false]"
+    assert_select "section#notes-open-list section#notes-group-ContentBlock-#{@block.id} a#note-row-#{@thread.id}[data-note-row][data-unread][href='#{@base}/threads/#{@thread.id}']" do
       assert_select "strong", text: "two@example.com"
       assert_select "span", text: /Is €49 right, @reader@example.com\?/
       assert_select "[data-note-replies]", text: "1 reply"
@@ -146,8 +152,10 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     assert_select "section#notes-pinned a#note-row-#{@thread.id}", text: /Rich text/
     assert_select "details#notes-resolved-section turbo-frame#notes-resolved[loading=lazy][src='#{@base}/resolved']"
 
+    assert_select "details#notes-resolved-section summary", text: "Resolved (1)"
+
     get "#{@base}/resolved"
-    assert_select "turbo-frame#notes-resolved a[data-note-row][data-turbo-frame=notes]", text: /Done and dusted/
+    assert_select "turbo-frame#notes-resolved a[data-note-row][data-turbo-frame=notes][data-turbo-prefetch=false]", text: /Done and dusted/
 
     get "#{@base}/counts"
     assert_equal({ "total" => 1, "subjects" => { "ContentBlock-#{@block.id}" => 1 }, "unread" => [ "ContentBlock-#{@block.id}" ] }, response.parsed_body)
@@ -204,5 +212,62 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     get @base, headers: frame
 
     assert_equal one, capture_sql { get @base, headers: frame }.size
+  end
+
+  # Later tasks add work per message (edit forms, reactions, files): these are
+  # the tests that catch an N+1 there.
+  test "a thread costs the same statements with two messages as with twelve, with nothing unread and with something unread" do
+    thread_url = "#{@base}/threads/#{@thread.id}"
+    reply = ->(count) { as(users(:two)) { count.times { |index| Notes::Reply.call(@thread, body: "Reply #{index} for @[#{users(:reader).id}] and @[#{users(:one).id}]") } } }
+    reply.call(1)
+
+    sign_in_as(users(:two)) # the author of every message: nothing is delivered to them
+    get thread_url, headers: frame
+    quiet = capture_sql { get thread_url, headers: frame }.size
+    sign_in_as(users(:reader)) # mentioned in every message
+    unread = capture_sql { get thread_url, headers: frame }.size
+    assert_operator unread, :>, quiet
+
+    reply.call(10)
+    assert_equal 12, @thread.messages.count
+
+    sign_in_as(users(:two))
+    get thread_url, headers: frame
+    assert_equal quiet, capture_sql { get thread_url, headers: frame }.size
+    assert_select "[data-note-message]", count: 12
+    sign_in_as(users(:reader))
+    assert_equal unread, capture_sql { get thread_url, headers: frame }.size
+    assert_empty Notes::Delivery.unread.where(user: users(:reader), thread: @thread)
+  end
+
+  test "the resolved rows cost the same statements for one thread as for eight" do
+    resolve = lambda do |count|
+      as(users(:reader)) do
+        count.times { |index| Notes::Resolve.call(Notes::Reply.call(Notes::Start.call([ @page, @block ][index % 2], body: "Done #{index}").record, body: "Yes @[#{users(:two).id}]").record.thread) }
+      end
+    end
+    resolve.call(1)
+    sign_in_as(users(:two))
+    get "#{@base}/resolved"
+    one = capture_sql { get "#{@base}/resolved" }.size
+    assert_select "a[data-note-row]", count: 1
+
+    resolve.call(7)
+
+    assert_equal one, capture_sql { get "#{@base}/resolved" }.size
+    assert_select "a[data-note-row]", count: 8
+  end
+
+  test "the record's own group is headed Whole page, Whole post or This image" do
+    post = create_post(title: "News")
+    asset = create_media_asset
+    as(users(:two)) { [ @page, post, asset ].each { |record| Notes::Start.call(record, body: "On the record itself") } }
+    sign_in_as(users(:two))
+
+    { "page/#{@page.id}" => [ "Page-#{@page.id}", "Whole page" ], "post/#{post.id}" => [ "Post-#{post.id}", "Whole post" ],
+      "media/#{asset.id}" => [ "MediaAsset-#{asset.id}", "This image" ] }.each do |path, (key, heading)|
+      get "/cs-studio/notes/#{path}", headers: frame
+      assert_select "section#notes-group-#{key} h4", text: heading
+    end
   end
 end

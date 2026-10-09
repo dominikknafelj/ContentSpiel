@@ -8,7 +8,7 @@ module Admin
     def note_args(container) = [ TYPES.fetch(container.class.polymorphic_name), container.id ]
 
     # What a thread is on, as its group's heading says it: the record itself
-    # ("This page"), or the block the way its card names it -- with its column
+    # ("Whole page"), or the block the way its card names it -- with its column
     # inside a section (`Admin::EditorScreen::PanelTitleComponent`'s own key).
     # A block has no name of its own in this CMS, so its type is its name.
     def note_subject_name(record, container, type)

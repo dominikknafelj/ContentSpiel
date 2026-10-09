@@ -1,6 +1,10 @@
+<%# `turbo_prefetch: false`: following this link marks the viewer's deliveries
+    of the thread read (`Admin::NoteThreadsController#show`), and Turbo fetches
+    a link on hover unless told not to -- a pointer passing over the list
+    would clear "new" from rows nobody opened. %>
 <%= link_to path, id: "note-row-#{thread.id}",
       class: "grid grid-cols-[24px_1fr_8px] items-start gap-2.5 border-b border-line px-4 py-[9px] text-left no-underline hover:bg-paper focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
-      data: { note_row: thread.id, unread: (true if unread?), turbo_frame: "notes" } do %>
+      data: { note_row: thread.id, unread: (true if unread?), turbo_frame: "notes", turbo_prefetch: false } do %>
   <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: first.author_id, viewer: viewer, size: :row) %>
   <span class="flex min-w-0 flex-col gap-0.5">
     <span class="flex items-baseline gap-2">

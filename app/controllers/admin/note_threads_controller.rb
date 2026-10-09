@@ -27,9 +27,16 @@ module Admin
     # what this request shows: the container was found through the read
     # scope a moment ago, and `render_thread` looks the thread up again among
     # the container's, answering 404 by itself when it is no longer there.
+    #
+    # A GET THAT WRITES. Opening a thread is what reads it (spec §3.3), so
+    # this GET changes rows -- the viewer's own read marks and nothing else,
+    # and doing it twice changes nothing more. What it must not be is fetched
+    # by anything but a person opening the thread: every link to it carries
+    # `data-turbo-prefetch="false"` (`Admin::NotesScreen::ThreadRowComponent`),
+    # or Turbo's hover prefetch would mark a row read that nobody opened. A
+    # new link to this action needs the same attribute.
     def mark_read(thread)
-      user = Current.user
-      return unless user && Notes::Delivery.unread.exists?(user_id: user.id, thread_id: thread.id)
+      return unless Notes::Delivery.unread_on?(thread, Current.user)
 
       Notes::MarkRead.call(thread: thread)
     end

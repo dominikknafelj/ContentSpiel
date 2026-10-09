@@ -31,6 +31,23 @@ class Notes::CountsTest < ActiveSupport::TestCase
     assert_empty capture_sql { assert_empty Notes::Counts.unread_among("Page", [ @page.id ], nil) }
   end
 
+  test "the unread keys come in one order, whatever order the rows are found in" do
+    other = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    as(users(:two)) { [ other, @page, @block ].each { |subject| Notes::Start.call(subject, body: "For @[#{users(:reader).id}]") } }
+
+    unread = Notes::Counts.for_container(@page, user: users(:reader))["unread"]
+
+    assert_equal [ "ContentBlock-#{@block.id}", "ContentBlock-#{other.id}", "Page-#{@page.id}" ], unread
+  end
+
+  test "a delivery knows whether a thread holds something unread for a user, in one query" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "For @[#{users(:reader).id}]") }.record
+
+    assert_equal 1, capture_sql { assert Notes::Delivery.unread_on?(thread, users(:reader)) }.size
+    assert_not Notes::Delivery.unread_on?(thread, users(:two))
+    assert_empty capture_sql { assert_not Notes::Delivery.unread_on?(thread, nil) }
+  end
+
   test "open threads per container, for a list" do
     other = create_page(title: "Quiet")
 

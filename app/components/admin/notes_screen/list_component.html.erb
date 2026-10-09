@@ -23,9 +23,10 @@
   <% unless empty? %>
     <%# The section's name is for a screen reader: on screen each group's own
         heading says what its rows are on, and the header says how many are
-        open (handoff "Group heading"). %>
-    <section id="notes-open" aria-labelledby="notes-open-title" class="flex flex-col">
-      <h3 id="notes-open-title" class="sr-only"><%= t(".open", count: listing.open_count) %></h3>
+        open (handoff "Group heading"). Its id is `notes-open-list`:
+        `#notes-open` is the editor header's button (the plan's stable ids). %>
+    <section id="notes-open-list" aria-labelledby="notes-open-list-title" class="flex flex-col">
+      <h3 id="notes-open-list-title" class="sr-only"><%= t(".open", count: listing.open_count) %></h3>
       <% if listing.open_count.zero? %>
         <p class="px-4 py-3.5 text-[13px] text-meta"><%= t(".none_open") %></p>
       <% end %>
