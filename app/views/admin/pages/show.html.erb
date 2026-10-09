@@ -57,7 +57,9 @@
   <p id="block-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
   <p data-admin--blocks-target="announcer" aria-live="assertive" class="sr-only"></p>
   <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
-    <% blocks = @page.content_blocks.to_a %>
+    <%# The page's own list is its top-level blocks (sections spec §3.1); a
+        block in a section's column is not a card of this list. %>
+    <% blocks = BlockOutline.new(@page.content_blocks).top_level %>
     <% blocks.each_with_index do |block, index| %>
       <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
     <% end %>

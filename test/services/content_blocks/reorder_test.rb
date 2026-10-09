@@ -23,4 +23,16 @@ class ContentBlocks::ReorderTest < ActiveSupport::TestCase
     assert result.ok?
     assert_equal [ 1, 2, 0 ], [ a.reload.position, b.reload.position, c.reload.position ]
   end
+
+  test "the page's own order lists its top-level blocks only" do
+    page = create_page(title: "Page")
+    text = page.content_blocks.create!(block_type: :rich_text, position: 0)
+    section = page.content_blocks.create!(block_type: :section, position: 1)
+    inside = page.content_blocks.create!(block_type: :rich_text, section: section, section_column: 1, position: 0)
+
+    assert ContentBlocks::Reorder.call(page, [ section.id, text.id ], actor: nil).ok?
+    assert_equal [ section, text ], page.content_blocks.top_level.reorder(:position).to_a
+    assert_equal [ section.id, 1, 0 ], inside.reload.then { |block| [ block.section_id, block.section_column, block.position ] }
+    assert_not ContentBlocks::Reorder.call(page, [ section.id, text.id, inside.id ], actor: nil).ok?
+  end
 end

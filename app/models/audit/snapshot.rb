@@ -155,7 +155,11 @@ module Audit
         # attachment, and so is an image block's `media_asset_id` (plain
         # `record.attributes`, the `else` branch below): the library asset
         # itself is what a version restore finds again, by id.
-        record.attributes.merge("content_block_ids" => record.content_blocks.reorder(:position, :id).ids)
+        #
+        # The block ids are in reading order (`BlockOutline`): each top-level
+        # block followed by the blocks in it, column by column. For a page
+        # without sections that is the same list as before, by `position`.
+        record.attributes.merge("content_block_ids" => BlockOutline.new(record.content_blocks.reorder(:position, :id)).reading_order.map(&:id))
       when User
         { "id" => record.id, "email_address" => record.email_address, "name" => record.name, "owner" => record.owner, "group_ids" => record.group_ids.sort }
       when AccessControl::Group

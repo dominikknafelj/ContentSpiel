@@ -21,12 +21,15 @@ module ContentBlocks
       refused = owner_refusal(@page) { |key| authorize!(key, @page) }
       return denied(refused, @page) if refused
 
-      blocks = @page.content_blocks.index_by(&:id)
+      # "This page's blocks" is its top-level list (sections spec §3.1): a
+      # block in a section's column is ordered among that column's blocks, so
+      # an order naming one is refused like any order naming a stranger.
+      blocks = @page.content_blocks.top_level.index_by(&:id)
       unless blocks.keys.to_set == @ordered_ids.to_set
         return failure(@page, [ "The new order must list exactly this page's blocks" ])
       end
 
-      before = @page.content_blocks.reorder(:position, :id).ids
+      before = @page.content_blocks.top_level.reorder(:position, :id).ids
 
       # `update_columns`, not `update`/`save`: block order doesn't affect any
       # URL (unlike a page's position, which the canonical-post-page ranking

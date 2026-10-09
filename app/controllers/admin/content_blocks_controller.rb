@@ -140,7 +140,7 @@ module Admin
     # order the server now has; and it gets a plain confirmation with no
     # Undo of its own, so two orders can't be bounced between forever.
     def reorder
-      before = @page.content_blocks.reorder(:position, :id).ids
+      before = top_level_blocks.ids
       result = ContentBlocks::Reorder.call(@page, params[:ids])
       status_id = "content-blocks-status"
 
@@ -235,7 +235,7 @@ module Admin
     def reorder_undo_streams(before)
       return [ blocks_list_stream, toast_stream("Order restored.") ] if params[:undo].present?
 
-      after = @page.content_blocks.reload.reorder(:position, :id).ids
+      after = top_level_blocks.ids
       return [] if after == before
 
       [ toast_stream("Block order changed.", kind: :undo, action: {
@@ -248,10 +248,18 @@ module Admin
     # has Move up disabled and the last Move down (`first:`/`last:`), as on a
     # page load.
     def blocks_list_stream
-      blocks = @page.content_blocks.reload.order(:position).to_a
+      blocks = top_level_blocks.to_a
       cards = blocks.each_with_index.map { |block, index| render_to_string(block_card_component(block, first: index.zero?, last: index == blocks.size - 1)) }
       turbo_stream.update("content-blocks-list", html: helpers.safe_join(cards))
     end
+
+    # The page's own list (sections spec §3.1): the blocks outside any
+    # section, which is what the block list shows as cards, what "first" and
+    # "last" are counted among and what a reorder of the page names. A block
+    # in a section's column has its `position` counted in that column, so it
+    # is no part of this order. A fresh query each time it is asked -- every
+    # caller reads it after a service has written.
+    def top_level_blocks = @page.content_blocks.top_level.reorder(:position, :id)
 
     def failure_status(result) = result.denied? ? :forbidden : :unprocessable_entity
 
@@ -359,7 +367,7 @@ module Admin
     def reposition_after(block, after_id)
       return if after_id.blank?
 
-      ordered = @page.content_blocks.reload.order(:position).pluck(:id)
+      ordered = top_level_blocks.ids
       ordered.delete(block.id)
       index = ordered.index(after_id.to_i)
       ordered.insert(index ? index + 1 : ordered.length, block.id) # version: none (Array#insert, no SQL)
@@ -379,7 +387,7 @@ module Admin
     # change. (Re-rendering a neighbour would also throw away whatever its
     # editors held, an unsaved field included.)
     def insertion_stream(block, after_id)
-      ordered = @page.content_blocks.reload.order(:position).to_a
+      ordered = top_level_blocks.to_a
       after_block = after_id.present? ? ordered.find { |candidate| candidate.id == after_id.to_i } : nil
       card = block_card_component(block, first: ordered.first&.id == block.id, last: ordered.last&.id == block.id)
 
