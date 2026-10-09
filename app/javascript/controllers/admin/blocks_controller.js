@@ -169,7 +169,12 @@ export default class extends Controller {
   laneTargetConnected(lane) {
     if (this.laneSortables.has(lane)) return
 
-    this.laneSortables.set(lane, Sortable.create(lane, this.sortableOptions((to, _from, dragged) => this.accepts(to.el, dragged))))
+    // `sort: false` for a lane that takes nothing (`closed`): its tiles are
+    // dragged OUT of it, and not along it.
+    this.laneSortables.set(lane, Sortable.create(lane, {
+      ...this.sortableOptions((to, _from, dragged) => this.accepts(to.el, dragged)),
+      sort: !this.closed(lane)
+    }))
     this.moveStateObserver.observe(lane, { childList: true })
     this.refreshMoveState([ lane ])
   }
@@ -188,8 +193,36 @@ export default class extends Controller {
   // (`data-container`, `Admin::EditorScreen::SectionCardComponent`), not the
   // type's name. The server refuses the same move
   // (`ContentBlocks::Reorder::NESTED`).
-  accepts(_lane, dragged) {
-    return !dragged.hasAttribute("data-container")
+  //
+  // And a closed lane accepts nothing (`closed`).
+  accepts(lane, dragged) {
+    return !dragged.hasAttribute("data-container") && !this.closed(lane)
+  }
+
+  // A LANE THAT TAKES NOTHING (sections spec §6): a lane of a section whose
+  // type is no longer registered, marked `data-no-drop` by
+  // `Admin::EditorScreen::SectionLanesComponent`. Such a section has no
+  // layout, so the server has no column of it to put a block in -- not even
+  // the column a block is already in: an order of one of its lanes is
+  // refused like a drop into it (`ContentBlocks::Reorder::NO_COLUMN`). The
+  // lane is there to show the blocks the section still holds and to say
+  // where each really is when it is moved OUT, which is the one move its
+  // tiles have. So every way into a closed lane, or along it, is shut here
+  // and not left to the refusal, which would redraw the whole list:
+  // - no drop into it (`accepts`) and no sorting inside it (`sort: false`
+  //   in `laneTargetConnected`);
+  // - a tile in it has Move up, Move down and "Move to column…" disabled
+  //   (`refreshMoveState`), and "Move out of section" not;
+  // - it is no choice of the Move dialog, its section is not counted among
+  //   the sections the dialog numbers, and it does not enable a card's
+  //   "Move into section…" (`openLanes`, `askWhere`).
+  closed(container) {
+    return container.hasAttribute("data-no-drop")
+  }
+
+  // The lanes a block can be moved into.
+  openLanes() {
+    return this.laneTargets.filter((lane) => !this.closed(lane))
   }
 
   // Whether the LIST may put the dragged block before or after the card
@@ -352,12 +385,15 @@ export default class extends Controller {
   //   other card being drawn again, so only the screen can say.
   // - "Move to column…" (a tile's) needs another column in its own section:
   //   disabled in a section of one column.
+  // - In a closed lane (`closed`) nothing moves along it or to another
+  //   column: all three are disabled, whatever the tile's place.
   // The lanes are asked of the page as it is (`laneTargets` is a query), so
   // the answer is right whichever of a section's parts arrived first.
   refreshMoveState(containers = this.containers()) {
-    const lanes = this.laneTargets
+    const lanes = this.openLanes()
     for (const container of containers) {
       const items = this.itemsOf(container)
+      const stuck = this.closed(container)
       const columns = lanes.filter((lane) => lane.dataset.sectionId === container.dataset.sectionId).length
       items.forEach((item, index) => {
         const own = (move) => Array.from(item.querySelectorAll(`[data-move="${move}"]`))
@@ -366,8 +402,8 @@ export default class extends Controller {
           const button = own(move)
           if (button) button.disabled = disabled
         }
-        set("up", index === 0)
-        set("down", index === items.length - 1)
+        set("up", stuck || index === 0)
+        set("down", stuck || index === items.length - 1)
         set("into", lanes.length === 0)
         set("column", columns < 2)
       })
@@ -422,6 +458,9 @@ export default class extends Controller {
   //   section has no name of its own, so it is told from the others by its
   //   place: the sections are numbered as they stand in the page's list, top
   //   to bottom, which is what the person sees beside the dialog.
+  // Only lanes that take a block are offered, and only sections that have
+  // one are numbered (`closed`): a section whose type is gone reads
+  // "Unavailable type" on the screen, not "Section", and is not counted.
   // A choice's value is its lane's id, looked up again when Move is pressed.
   //
   // This only FILLS the dialog and notes whose move it is. Showing it is
@@ -431,8 +470,9 @@ export default class extends Controller {
   askWhere(event) {
     const item = this.itemFor(event)
     const own = item.closest('[data-admin--blocks-target="lane"]')
-    const lanes = own ? this.laneTargets.filter((lane) => lane.dataset.sectionId === own.dataset.sectionId && lane !== own) : this.laneTargets
-    const sections = this.cardTargets.filter((card) => card.hasAttribute("data-container")).map((card) => card.dataset.blockId)
+    const open = this.openLanes()
+    const lanes = own ? open.filter((lane) => lane.dataset.sectionId === own.dataset.sectionId && lane !== own) : open
+    const sections = this.cardTargets.filter((card) => open.some((lane) => card.contains(lane))).map((card) => card.dataset.blockId)
     const text = messages(this.element)
 
     this.asking = item
@@ -458,7 +498,7 @@ export default class extends Controller {
     const lane = document.getElementById(this.destinationTarget.value)
     this.asking = null
     this.destinationTarget.closest("dialog").close()
-    if (!item?.isConnected || !this.laneTargets.includes(lane) || item.parentElement === lane) return
+    if (!item?.isConnected || !this.openLanes().includes(lane) || item.parentElement === lane) return
 
     // Said as the choice read: "column 2" to a tile, which stays in its
     // section, and "column 2 of section 1" to a card.
@@ -604,6 +644,10 @@ export default class extends Controller {
     // answer of an earlier move has just replaced, handed over by a drag that
     // was holding it.
     if (!to) return
+    // A tile picked up and let go in its own closed lane: it is where it was
+    // (the lane sorts nothing), and the lane has no order the server takes
+    // (`closed`).
+    if (this.closed(to)) return
     if (before) {
       this.restoreTo ||= new Map()
       for (const [ container, items ] of before) {

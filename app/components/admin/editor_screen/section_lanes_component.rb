@@ -23,6 +23,22 @@ module Admin
     # CSS (`.admin-section-lanes`), and the column count reaches the
     # stylesheet as the custom property `--lanes`.
     #
+    # A SECTION WHOSE TYPE IS GONE HAS NO LAYOUT TO READ COLUMNS FROM (spec §6;
+    # `closed?`, its `column_count` is 0) and still holds blocks, each with
+    # the column it was stored in. Its lanes are those columns: one per
+    # distinct `section_column` among its blocks, in order. A tile must stand
+    # in the lane of the column its block really is in, because that is what
+    # a move out of the section sends as where the block came from
+    # (`moved_from`, which `ContentBlocks::Reorder` checks against the row);
+    # one lane for all of them would announce a column the block is not in
+    # and every move out would be refused as stale. Each such lane carries
+    # `data-no-drop` and has no "+": nothing is added to a section that isn't
+    # one, by a drop or by the picker -- the server would refuse both
+    # (`Reorder::NO_COLUMN`, `ContentBlock#section_rules`) -- and
+    # `admin--blocks` reads the attribute to offer no move that ends in one,
+    # not even along the lane itself. What is left is what the card's
+    # sentence says: move the blocks out, or delete them.
+    #
     # The element is `admin--section`'s `lanes` target: it is replaced as a
     # whole when the section's columns change under this screen (`Admin
     # ::ContentBlocksController#section_structure_streams`), and the script
@@ -45,7 +61,18 @@ module Admin
       def lane_id(column) = self.class.lane_id(section, column)
 
       # `[[1, blocks], [2, blocks], ...]`, the column numbers 1-based as stored.
-      def lanes = outline.columns(section).each_with_index.map { |blocks, index| [ index + 1, blocks ] }
+      # For a section without a layout, the columns its blocks are stored in
+      # (`blocks_in` is sorted by column, so the groups are in order).
+      def lanes
+        return outline.blocks_in(section).group_by(&:section_column).to_a if closed?
+
+        outline.columns(section).each_with_index.map { |blocks, index| [ index + 1, blocks ] }
+      end
+
+      # No layout, so no column takes a block: see the class comment.
+      def closed? = section.column_count.zero?
+
+      def picker? = editable && !closed?
 
       def column_label(column) = t(".column", number: column)
 

@@ -1,6 +1,16 @@
-<div id="<%= dom_id %>" data-block-id="<%= section.id %>" data-container data-admin--blocks-target="card"
-     data-controller="admin--section" data-action="keydown.esc->admin--section#escape"
-     class="admin-block-card admin-section-card rounded-cs border border-line-strong bg-sunken">
+<%= tag.div id: dom_id, class: [ "admin-block-card admin-section-card rounded-cs border bg-sunken", (unavailable? ? "border-danger" : "border-line-strong") ],
+      data: { block_id: section.id, container: "", "admin--blocks-target": "card", controller: "admin--section", action: "keydown.esc->admin--section#escape" } do %>
+  <% if unavailable? %>
+    <%# A section whose type is gone (see the component): the unavailable block card's
+        header and sentence, over the blocks it still holds. %>
+    <div class="flex items-center gap-2 p-3">
+      <span class="flex-1 truncate text-sm font-semibold text-danger-ink"><%= t(".unavailable", type: section.block_type) %></span>
+      <% if editable? %>
+        <%= render Admin::ButtonComponent.new(label: t(".delete_block"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+      <% end %>
+    </div>
+    <p class="px-3 pb-3 text-xs text-meta"><%= t(".unavailable_hint") %></p>
+  <% else %>
   <%# The header wraps: on a narrow card the three controls go under the name. The name
       and the count keep a width of their own, so it is the controls that move and not
       the count that is squeezed away. %>
@@ -75,6 +85,7 @@
       <% end %>
     <% end %>
   </div>
+  <% end %>
 
   <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 px-3 pb-3">
     <%= render lanes %>
@@ -102,4 +113,4 @@
       <% end %>
     <% end %>
   <% end %>
-</div>
+<% end %>

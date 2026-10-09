@@ -27,8 +27,8 @@
         <% menu.with_item do %>
           <%= tag.button t(".move_out"), type: "button", class: menu_item_class, data: { move: "out", action: "click->admin--blocks#moveOut" } %>
         <% end %>
-        <%# Not for a type that is no longer registered: nothing of it can be read to copy. %>
-        <% unless unavailable? %>
+        <%# Not always: see `duplicate?`. %>
+        <% if duplicate? %>
           <% menu.with_item do %>
             <%= button_to t(".duplicate"), duplicate_path, method: :post, class: menu_item_class %>
           <% end %>

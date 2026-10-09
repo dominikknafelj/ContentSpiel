@@ -442,6 +442,134 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}[data-admin--blocks-target='card']"
   end
 
+  # Sections spec §4.5. Until the translation view was built a translation tab
+  # showed none of a section's blocks; now it lists them under a heading.
+  test "on a translation tab a section is a group: a heading and each block's card with its form, no lanes" do
+    with_locales(%w[en de], default: "en") do
+      section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+      right = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, caption: "Right original")
+      left = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+      outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+      get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+
+      assert_response :success
+      assert_select "#content-blocks-list > *", count: 2
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--blocks-target='card'] > h3", text: "Section"
+      assert_equal [ left.id, right.id ], css_select(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
+      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--autosave'] .admin-translation-pair", text: /Right original/
+      assert_select ".admin-block-tile, [data-admin--blocks-target='lane'], [data-admin--section-target]", count: 0
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card'] .admin-block-card__handle"
+    end
+  end
+
+  # What a stream draws on a translation tab is what the page load draws
+  # (`card_for`): a section added there, and the list an Undo re-renders.
+  test "a section streamed in on a translation tab is its group, on an add and in an Undo's list" do
+    with_locales(%w[en de], default: "en") do
+      section = @page.content_blocks.create!(block_type: "section", position: 0)
+      inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+      other = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+      patch "#{blocks_path}/reorder", params: { locale: "de", ids: [ section.id, other.id ], undo: 1 }, as: :turbo_stream
+      assert_response :success
+      assert_select "turbo-stream[action=update][target='content-blocks-list'] template" do
+        assert_select ".admin-section-group##{ActionView::RecordIdentifier.dom_id(section)} > ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-card"
+        assert_select ".admin-section-card, .admin-block-tile", count: 0
+      end
+
+      post blocks_path, params: { locale: "de", block: { block_type: "section" } }, as: :turbo_stream
+      assert_response :success
+      added = @page.content_blocks.top_level.reorder(:position).last
+      assert_select "turbo-stream[action=append][target='content-blocks-list'] template .admin-section-group##{ActionView::RecordIdentifier.dom_id(added)}"
+    end
+  end
+
+  # ---- A section whose type is gone (sections spec §6) ----------------------
+
+  def gone_section
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    first = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    third = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+    section.update_columns(block_type: "gone/section")
+    [ section, first, third ]
+  end
+
+  test "a section whose type is gone is the Unavailable type card with its blocks as tiles in closed lanes" do
+    section, first, third = gone_section
+
+    get "/cs-studio/pages/#{@page.id}"
+
+    assert_response :success
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card.border-danger", text: /Unavailable type — gone\/section/
+    assert_select "#section-#{section.id}-lane-1[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(first)}.admin-block-tile"
+    assert_select "#section-#{section.id}-lane-3[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(third)}.admin-block-tile"
+    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--autosave']"
+    assert_select "[id^='block-picker-#{section.id}-']", count: 0
+  end
+
+  test "once it holds nothing, a section whose type is gone is the plain Unavailable type card" do
+    section, first, third = gone_section
+    [ first, third ].each(&:destroy!)
+
+    get "/cs-studio/pages/#{@page.id}"
+
+    assert_select ".admin-section-card", count: 0
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card.border-danger", text: /Unavailable type — gone\/section/
+  end
+
+  test "deleting a section whose type is gone deletes its blocks and removes its card" do
+    section, = gone_section
+
+    assert_difference -> { ContentBlock.count }, -3 do
+      delete "#{blocks_path}/#{section.id}", as: :turbo_stream
+    end
+
+    assert_response :success
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(section)}']"
+  end
+
+  # The card offers no "keep" for it; a request that asks anyway is honoured
+  # as for any section, and answered with the lifted blocks' cards.
+  test "removing a section whose type is gone with its blocks kept answers with their cards" do
+    section, first, third = gone_section
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ first.id, third.id ], @page.content_blocks.top_level.reorder(:position).ids
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
+      assert_equal [ first.id, third.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
+    end
+  end
+
+  test "a block is moved out of a section whose type is gone, and the section's delete dialog recounts" do
+    section, first, third = gone_section
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, third.id ], moved_from: { third.id => { section_id: section.id, column: 3 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_nil third.reload.section_id
+    assert_equal section.id, first.reload.section_id
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(third)}'] template .admin-block-card[data-admin--blocks-target='card']"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count'] template", text: "This also deletes the 1 block in it."
+  end
+
+  # Why its lanes are closed in the browser (`data-no-drop`): the server has
+  # no column of it to put a block in, not even the one a block is in.
+  test "nothing is moved into or along a column of a section whose type is gone" do
+    section, first, = gone_section
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id, outside.id ], section_id: section.id, column: 1, moved_from: { outside.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "That section or column no longer exists"
+
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id ], section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_nil outside.reload.section_id
+  end
+
   test "an Undo of a reorder re-renders a section as its card, tiles and forms included" do
     section = @page.content_blocks.create!(block_type: "section", position: 0)
     inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)

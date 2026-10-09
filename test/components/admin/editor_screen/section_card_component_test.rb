@@ -259,9 +259,76 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-lanes[data-columns='1'][style*='--lanes: 1']"
   end
 
-  test "a section is drawn as this card on the default language's tab only, and a plain block never" do
-    assert Admin::EditorScreen::SectionCardComponent.draws?(@section, locale: "en")
-    assert_not Admin::EditorScreen::SectionCardComponent.draws?(@section, locale: "de")
-    assert_not Admin::EditorScreen::SectionCardComponent.draws?(@text, locale: "en")
+  # One rule for the page view and for a card streamed in (`Admin
+  # ::ContentBlocksController#card_for`): a top-level block is drawn as a
+  # section when it is a container, or holds blocks although its type is gone.
+  test "a block is drawn as a section when it is a container or still holds blocks, and a plain block never" do
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    section = outline.top_level.first
+    assert Admin::EditorScreen::SectionCardComponent.draws?(section, outline: outline)
+    assert_not Admin::EditorScreen::SectionCardComponent.draws?(@text, outline: outline)
+
+    @section.update_columns(block_type: "gone/section")
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    assert Admin::EditorScreen::SectionCardComponent.draws?(outline.top_level.first, outline: outline)
+
+    [ @text, @image ].each(&:destroy!)
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    assert_not Admin::EditorScreen::SectionCardComponent.draws?(outline.top_level.first, outline: outline)
+  end
+
+  # ---- A section whose type is gone (sections spec §6) ----------------------
+
+  test "a section whose type is gone is the Unavailable type card with its blocks listed under it" do
+    @section.update_columns(block_type: "gone/section")
+    as(users(:one), channel: :admin) { render_card }
+
+    assert_selector ".admin-section-card.border-danger[data-container][data-admin--blocks-target='card']", text: "Unavailable type — gone/section"
+    assert_selector ".admin-section-card", text: "Its blocks are kept. Move them out or delete them."
+    assert_selector ".admin-block-tile", count: 2
+    assert_selector "[data-admin--blocks-target='lane'][data-no-drop]", count: 2
+    assert_no_selector "[data-admin--blocks-target='lane']:not([data-no-drop])", visible: :all
+    assert_no_selector "form#section-#{@section.id}-form", visible: :all
+    assert_selector "button", text: "Delete block…", visible: :all
+  end
+
+  # A tile's lane says where its block really is: that is what a move out of
+  # the section names as where the block came from (`moved_from`).
+  test "its lanes are the columns its blocks are stored in, each closed to drops and with no picker" do
+    @section.update_columns(block_type: "gone/section")
+    as(users(:one), channel: :admin) { render_card }
+
+    assert_selector "#section-#{@section.id}-lanes[data-columns='2']"
+    assert_selector "#section-#{@section.id}-lane-1[data-column='1'][data-section-id='#{@section.id}'] > ##{ActionView::RecordIdentifier.dom_id(@text)}"
+    assert_selector "#section-#{@section.id}-lane-3[data-column='3'] > ##{ActionView::RecordIdentifier.dom_id(@image)}"
+    assert_no_selector "#section-#{@section.id}-lane-2", visible: :all
+    assert_no_selector "[id^='block-picker-']", visible: :all
+    assert_selector "#section-#{@section.id}-panels > [data-admin--section-target='panel']", count: 2, visible: :all
+  end
+
+  test "it has no handle, no menu and no settings; its one action opens the dialog that counts its blocks" do
+    @section.update_columns(block_type: "gone/section")
+    as(users(:one), channel: :admin) { render_card }
+    header = "##{ActionView::RecordIdentifier.dom_id(@section)} > div:first-child"
+
+    assert_no_selector ".admin-block-card__handle", visible: :all
+    assert_no_selector "button[aria-label='Section actions']", visible: :all
+    assert_no_selector "select, [data-admin--section-target='layoutMenu']", visible: :all
+    assert_no_selector "#section-#{@section.id}-summary", visible: :all
+    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete block…"
+    assert_selector "dialog#delete-section-#{@section.id} #section-#{@section.id}-delete-count", text: "This also deletes the 2 blocks in it.", visible: :all
+    assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] input[name='_method'][value='delete']", visible: :all
+    assert_no_selector "input[name='keep_blocks']", visible: :all
+  end
+
+  test "a viewer who can't edit sees the unavailable section and its tiles, and nothing that deletes" do
+    @section.update_columns(block_type: "gone/section")
+    as(users(:reader), channel: :admin) { render_card }
+
+    assert_selector ".admin-section-card.border-danger", text: "Unavailable type — gone/section"
+    assert_selector ".admin-block-tile", count: 2
+    assert_no_selector "button", text: "Delete block…", visible: :all
+    assert_no_selector "dialog", visible: :all
+    assert_no_selector ".admin-block-tile__grip", visible: :all
   end
 end

@@ -70,7 +70,13 @@ module Admin
   #   -- so the server only asks, and the script takes the mark off as it
   #   opens. A panel shown by the markup would be a second open form;
   # - `:group` is a plain card with neither handle nor menu, for a block
-  #   listed under a section's heading in the translation view (spec §4.5).
+  #   listed under a section's heading in the translation view (spec §4.5,
+  #   `Admin::EditorScreen::SectionGroupComponent`). It has the block's
+  #   `dom_id`, as there is no tile on that tab, and its form is the same
+  #   autosave form with the same ids. Nothing in it opens a delete dialog,
+  #   so it carries none -- except for a block whose type is gone, whose one
+  #   action is "Delete block…" wherever it is drawn (spec §6) and which has
+  #   no tile here to hold the dialog for it.
   class BlockCardComponent < AdminComponent
     PLACEMENTS = %i[list panel group].freeze
 
@@ -184,7 +190,10 @@ module Admin
 
     def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
 
-    def delete_dialog? = editable? && !panel?
+    # A card of the list always has it (its menu opens it). A group card only
+    # when the block is unavailable: the header's "Delete block…" is then the
+    # one thing that opens it.
+    def delete_dialog? = editable? && (list? || (!panel? && unavailable?))
 
     # "Move into section…" (sections spec §4.4): for a card of the page's own
     # list that is no container -- a section never holds a section. See the

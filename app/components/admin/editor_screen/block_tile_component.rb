@@ -45,6 +45,13 @@ module Admin
     # along its lane, to another column and out of the section, and spec §1
     # gives the keyboard whatever the pointer has (review, fix round 1).
     #
+    # In a section whose own type is gone (spec §6) the tile is drawn the
+    # same and `admin--blocks` disables what cannot be done there -- Move up,
+    # Move down and "Move to column…", since that section has no column the
+    # server would take a block into (`admin--blocks#closed`). "Move out of
+    # section" and "Delete block…" are what is left, and no Duplicate
+    # (`duplicate?`).
+    #
     # THE BLOCK'S DELETE DIALOG IS IN THE TILE (`DeleteBlockDialogComponent`,
     # which says why it is not in the form's panel). It is a child of the
     # tile and not of the lane: a lane's children are exactly its tiles.
@@ -72,6 +79,14 @@ module Admin
       def editable? = @editable
 
       def unavailable? = block.definition.nil?
+
+      # Whether the menu offers Duplicate. Not for a type that is no longer
+      # registered: nothing of it can be read to copy. And not in a section
+      # whose own type is gone (spec §6): a copy goes into its source's
+      # column, and that section has no column left to take one
+      # (`ContentBlock#section_rules`), so the item could only fail. Its
+      # blocks are moved out or deleted, as its card says.
+      def duplicate? = !unavailable? && block.section&.container?
 
       def duplicate_path = helpers.duplicate_admin_page_content_block_path(page, block, **url_options)
 

@@ -158,7 +158,9 @@ module Admin
     # page's own list where the section stood ("Remove section, keep
     # blocks"); without it they go with the section, which the dialog in
     # front of that request has said, with their number. The parameter means
-    # nothing for a block that holds none.
+    # nothing for a block that holds none -- which is asked of the rows, as
+    # the service asks it: a section whose type is gone is no `container?`
+    # and is still emptied or lifted (`ContentBlocks::Destroy`).
     #
     # The blocks a kept section held are read before the service runs, to
     # know whose cards to draw afterwards: once lifted, nothing in a row says
@@ -172,7 +174,7 @@ module Admin
 
       section = block.section
       keep_blocks = params[:keep_blocks].present?
-      kept_ids = block.container? && keep_blocks ? block.section_blocks.ids : []
+      kept_ids = keep_blocks ? block.section_blocks.ids : []
       result = ContentBlocks::Destroy.call(block, keep_blocks: keep_blocks)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
@@ -461,7 +463,10 @@ module Admin
     # would be the second element with its id.
     def move_streams(origins)
       outline = fresh_outline
-      sections = outline.sections.index_by(&:id)
+      # Every top-level block by id, not only the containers: a block moved
+      # out of a section whose type is gone left a card that still counts
+      # its blocks, in its delete dialog (spec §6).
+      sections = outline.top_level.index_by(&:id)
       top_level = outline.top_level
       touched = []
 
@@ -642,16 +647,19 @@ module Admin
       Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: first, last: last)
     end
 
-    # The card of a top-level block, as the page view draws it: a section's
-    # card -- lanes, tiles and every form of the blocks in it -- for a
-    # container, the block's own card otherwise (`SectionCardComponent
-    # .draws?` is the one rule for both). `outline:` is for a caller that
-    # draws several cards; without it the page's blocks are read once more,
-    # after whatever the action wrote.
+    # The card of a top-level block, as the page view draws it: for a block
+    # that holds blocks, a section's card -- lanes, tiles and every form of
+    # the blocks in it -- or, on a translation tab, the group of their cards
+    # (`SectionCardComponent.for`); the block's own card otherwise
+    # (`SectionCardComponent.draws?` is the one rule for both, asked of the
+    # outline: a section whose type is gone still holds its blocks).
+    # `outline:` is for a caller that draws several cards; without it the
+    # page's blocks are read once more, after whatever the action wrote.
     def card_for(block, first:, last:, outline: nil)
-      return block_card_component(block, first: first, last: last) unless Admin::EditorScreen::SectionCardComponent.draws?(block, locale: admin_locale)
+      outline ||= fresh_outline
+      return block_card_component(block, first: first, last: last) unless Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline)
 
-      Admin::EditorScreen::SectionCardComponent.new(page: @page, section: block, outline: outline || fresh_outline,
+      Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline,
         locale: admin_locale, url_options: admin_url_options, first: first, last: last)
     end
 

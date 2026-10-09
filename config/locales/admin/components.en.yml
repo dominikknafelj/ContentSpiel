@@ -235,6 +235,11 @@ en:
           delete_title: "Delete this section?"
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
+          # A section whose type is no longer registered (sections spec §6):
+          # the unavailable block card's own words, over the blocks it holds.
+          unavailable: "Unavailable type — %{type}"
+          delete_block: "Delete block…"
+          unavailable_hint: "Its blocks are kept. Move them out or delete them."
           # The toast of a block that was not moved between the list and a
           # column, or between sections, because its form holds an edit that
           # was not saved (`admin--blocks#move`): the move would redraw the
@@ -272,6 +277,12 @@ en:
             other: "%{count} blocks"
         section_lanes:
           column: "Column %{number}"
+        # A section on a translation tab (sections spec §4.5): a heading over
+        # its blocks' cards. `unavailable` is the heading of one whose type
+        # is no longer registered.
+        section_group:
+          heading: "Section"
+          unavailable: "Unavailable type — %{type}"
 
       # The Mind graph's legend. The content types' own names come from the
       # registry (`Admin::ContentTypeDotComponent`); these are the shapes.

@@ -138,6 +138,8 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/theme.js
     app/components/admin/editor_screen/section_card_component.rb
     app/components/admin/editor_screen/section_card_component.html.erb
+    app/components/admin/editor_screen/section_group_component.rb
+    app/components/admin/editor_screen/section_group_component.html.erb
     app/components/admin/editor_screen/section_summary_component.rb
     app/components/admin/editor_screen/section_layout_menu_component.rb
     app/components/admin/editor_screen/section_layout_menu_component.html.erb

@@ -75,4 +75,16 @@ class Admin::EditorScreen::BlockTileComponentTest < ViewComponent::TestCase
     assert_no_selector "form[action$='/duplicate']", visible: :all
     assert_selector "dialog#delete-block-#{@block.id}", visible: :all
   end
+
+  # Sections spec §6. A copy goes into its source's column, and a section
+  # whose type is gone has no column left to take one: the save would be
+  # refused, so the item that could only fail is not offered.
+  test "a tile in a section whose type is gone has no Duplicate" do
+    @section.update_column(:block_type, "gone/section")
+
+    render_tile(@block.reload)
+
+    assert_equal [ "Move up", "Move down", "Move to column…", "Move out of section", "", "Delete block…" ], menu_items
+    assert_no_selector "form[action$='/duplicate']", visible: :all
+  end
 end

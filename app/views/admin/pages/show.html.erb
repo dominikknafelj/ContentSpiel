@@ -69,15 +69,18 @@
   <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
     <%# The page's own list is its top-level blocks (sections spec §3.1); a
         block in a section's column is not a card of this list but a tile of
-        its section's card, which draws it and its form (spec §4.1-§4.3). The
+        its section's card, which draws it and its form (spec §4.1-§4.3) -- or,
+        on a translation tab, a card in its section's group (spec §4.5):
+        `SectionCardComponent.for` picks. A section is whatever holds blocks
+        (`draws?`), so one whose type is gone still shows them (spec §6). The
         outline is built once, from the blocks the controller preloaded, and
-        handed to every section card. `Admin::ContentBlocksController#card_for`
+        handed to every section. `Admin::ContentBlocksController#card_for`
         draws the same card for a stream. %>
     <% outline = BlockOutline.new(@page.content_blocks) %>
     <% blocks = outline.top_level %>
     <% blocks.each_with_index do |block, index| %>
-      <% if Admin::EditorScreen::SectionCardComponent.draws?(block, locale: admin_locale) %>
-        <%= render Admin::EditorScreen::SectionCardComponent.new(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
+        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% else %>
         <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
       <% end %>

@@ -28,10 +28,27 @@ module Admin
     # section's card from a block's without asking for a type by name: the
     # code asks `container?` (`self.draws?`), the markup says the answer.
     #
-    # On a translation tab a section is not drawn by this component yet
-    # (`self.draws?`): it is the plain block card it was before sections had
-    # an editor, until the translation view of the sections plan gives it its
-    # own shape (spec §4.5).
+    # ON A TRANSLATION TAB A SECTION IS NOT THIS CARD but a heading over its
+    # blocks' cards (spec §4.5, `SectionGroupComponent`): `self.for` is the
+    # one door to both, so the page view and a card streamed in
+    # (`Admin::ContentBlocksController#card_for`) cannot draw different things.
+    #
+    # A SECTION WHOSE TYPE IS GONE (spec §6, `unavailable?`) -- a removed
+    # plugin's container, say -- is no `container?` any more and still holds
+    # its blocks' rows; `self.draws?` asks the rows too, so it is still drawn
+    # here and its blocks do not vanish from the editor. It is the
+    # "Unavailable type" card: the danger border, the type's stored name, one
+    # sentence, and "Delete block…" as its only action -- the unavailable
+    # block card's own wording, opening the section's delete dialog, which
+    # says how many blocks go with it. No handle, no settings form and no
+    # menu: there is no layout to read a setting from, and a card nobody can
+    # read is not moved or copied (as an unavailable block's card is not).
+    # Its blocks are listed under it as tiles, in lanes that take nothing
+    # (`SectionLanesComponent`), each tile with its form and its own menu: so
+    # they are opened, edited, deleted, or moved out one by one, which is how
+    # they are kept. "Remove section, keep blocks" is not offered here on
+    # purpose -- the service would do it (`ContentBlocks::Destroy` decides
+    # from the rows) -- because the brief for this card names one action.
     #
     # THE SECTION'S OWN SETTINGS ARE A FORM IN THE HEADER (spec §4.1): layout,
     # background and width, where a block card has its fields in its body. It
@@ -87,11 +104,23 @@ module Admin
       # layout (`SectionLayoutMenuComponent`).
       def self.layout_menu(section:) = Admin::EditorScreen::SectionLayoutMenuComponent.new(section: section)
 
-      # Whether a top-level block is drawn as a section card: a container, on
-      # the default language's tab. The page view and `Admin
-      # ::ContentBlocksController#card_for` both ask here, so a card streamed
-      # in is the card a page load would draw.
-      def self.draws?(block, locale:) = block.container? && locale.to_s == ::Locales.default
+      # Whether a top-level block is drawn as a section: a container, or a
+      # block that still holds blocks although its type is no longer a
+      # container's (a section whose type is gone, spec §6) -- asked of the
+      # rows the outline was built from, never of the type's name. The page
+      # view and `Admin::ContentBlocksController#card_for` both ask here, so
+      # a card streamed in is the card a page load would draw.
+      def self.draws?(block, outline:) = block.container? || outline.blocks_in(block).any?
+
+      # What draws a section on this tab: this card on the default language's,
+      # where structure is edited, and the plain group of its blocks' cards
+      # on a translation tab (spec §4.5). `options` are the card's own
+      # (`first:`, `last:`, `editable:`, `url_options:`); the group takes what
+      # it needs of them.
+      def self.for(page:, section:, outline:, locale:, **options)
+        component = locale.to_s == ::Locales.default ? self : Admin::EditorScreen::SectionGroupComponent
+        component.new(page: page, section: section, outline: outline, locale: locale, **options)
+      end
 
       def initialize(page:, section:, outline:, locale:, url_options: {}, first: false, last: false, editable: nil)
         @page = page
@@ -115,6 +144,9 @@ module Admin
       def first? = @first
 
       def last? = @last
+
+      # The section's type is no longer registered: see the class comment.
+      def unavailable? = section.definition.nil?
 
       # ---- The settings form: every id is the block card's (see the class comment).
 
