@@ -56,6 +56,19 @@ class Admin::NotesDrawerTest < ActionDispatch::IntegrationTest
     assert_drawer_outside_every_form
   end
 
+  # The handoff's decision 9: the stylesheet shows it from 1280px while the
+  # notes column has folded the tree away.
+  test "the page editor's breadcrumb row starts with the tree drawer's Pages button, and the post editor has none" do
+    sign_in_as(users(:two))
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_select "header.admin-editor-header button.admin-editor-header__tree[aria-controls=tree-column][aria-expanded=false][aria-label='Open page tree'][data-action='admin--drawer#toggle'][data-admin--drawer-name-param=tree][data-admin--drawer-target=trigger]", text: "Pages ▾", count: 1
+    assert_select "header.admin-editor-header button.admin-editor-header__tree + nav[aria-label=Breadcrumb]"
+
+    get "/cs-studio/posts/#{@post.id}"
+    assert_select ".admin-editor-header__tree", count: 0
+  end
+
   test "a thread that is not a number does not travel, and without ?notes=open the drawer stays shut" do
     sign_in_as(users(:two))
 

@@ -95,7 +95,8 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
   end
 
   # (c) The 768-1023px pattern, at a width where the tree is otherwise a
-  # column: the same element, button and drawer.
+  # column: the same element, button and drawer. Below 1280px the button is
+  # the top bar's.
   test "at 1024px the page tree folds into the Pages drawer while the notes are open, opens from it beside them, and is a column again when they close" do
     at_width(1024) do
       open_editor
@@ -125,10 +126,80 @@ class Admin::NotesColumnSystemTest < ApplicationSystemTestCase
     end
   end
 
+  # The handoff's decision 9: from 1280px there is no top bar, and the button
+  # stands at the start of the page editor's breadcrumb row while notes are
+  # open. The same drawer, beside the modules sidebar.
+  { 1280 => 560, 1440 => 720 }.each do |width, room|
+    test "at #{width}px the tree folds while the notes are open: Pages in the breadcrumb row opens it beside the sidebar, Escape and picking a page close it, and closing the notes brings the column back" do
+      other = create_page(title: "Other", published: false)
+      at_width(width) do
+        open_editor
+        tree_button = ".admin-editor-header button[aria-controls='tree-column']"
+        assert_selector "#tree-column"
+        assert_no_selector tree_button
+        assert_no_selector ".admin-top-bar"
+
+        open_notes
+
+        assert_no_selector "#tree-column"
+        assert_selector "#{tree_button}[aria-expanded=false]", text: "Pages"
+        content = box(".admin-content-blocks")
+        assert_operator content[2] - content[0], :>, room, "the content column is #{content[2] - content[0]}px wide"
+        # The content starts beside the sidebar, and the button leads the breadcrumb.
+        assert_in_delta 240, box(".admin-shell__main")[0], 1
+        assert_operator box(tree_button)[2], :<=, box(".admin-editor-header nav")[0]
+
+        find(tree_button).click
+        assert_selector "#tree-column[data-open]"
+        assert_selector "#{tree_button}[aria-expanded=true]", visible: :all
+        assert_selector ".admin-shell__scrim"
+        tree = box("#tree-column")
+        assert_equal [ 240, 512 ], [ tree[0], tree[2] ].map(&:round), "the drawer stands beside the sidebar, where the tree's column was"
+        assert_selector "#notes-drawer #notes-list"
+
+        page.driver.browser.keyboard.type(:escape)
+        assert_no_selector "#tree-column"
+        assert_no_selector ".admin-shell__scrim"
+        assert_selector "#notes-drawer #notes-list"
+        assert_eventually(message: "the focus did not go back to the Pages button") { page.evaluate_script("document.activeElement.getAttribute('aria-controls')") == "tree-column" }
+
+        # Picking a page navigates and closes the drawer; the notes stay open
+        # (remembered), so the tree is still folded on the page that opens.
+        find(tree_button).click
+        assert_selector "#tree-column[data-open]"
+        click_frame_link { within("#tree-column") { click_link "Other" } }
+        assert_current_path "/cs-studio/pages/#{other.id}"
+        assert_no_selector "#tree-column"
+        assert_selector "#notes-drawer #notes-list[data-notes-container='Page-#{other.id}']"
+        assert_selector "#{tree_button}[aria-expanded=false]"
+
+        find("#notes-drawer button[aria-label='Close']").click
+        assert_no_selector "#notes-drawer"
+        assert_selector "#tree-column"
+        assert_no_selector tree_button
+        assert_in_delta 512, box(".admin-shell__main")[0], 1
+      end
+    end
+  end
+
+  test "the post editor has no Pages button: it has no tree" do
+    post = create_post(title: "Hello")
+    at_width(1280) do
+      visit "/cs-studio/posts/#{post.id}"
+      await_admin_controllers
+      find("#notes-open").click
+      assert_selector "#notes-drawer #notes-list"
+
+      assert_no_selector "button[aria-controls='tree-column']", visible: :all
+      content = box("form.admin-translation-form")
+      assert_operator content[2], :<=, box("#notes-drawer")[0]
+    end
+  end
+
   # (d) The pair's breakpoint is its form's width, so the column narrowing the
   # content is all it takes.
   test "a translation pair stacks, the original first, when the notes column leaves its form under 880px" do
-    at_width(1700) do
+    at_width(1500) do
       open_editor("?locale=de")
       assert_selector "[data-block-id='#{@block.id}'] .ProseMirror"
       form = "[data-block-id='#{@block.id}'] form.admin-translation-form"

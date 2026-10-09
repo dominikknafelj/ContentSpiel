@@ -3,6 +3,19 @@
 <%= tag.header class: "admin-editor-header sticky top-(--admin-top-offset) z-10 -mx-6 -mt-6 mb-6 border-b border-line bg-paper px-7 pt-4",
       data: { record_type: type, record_id: record.id } do %>
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+    <%# "Pages ▾" (the notes handoff's decision 9): the page tree's drawer while
+        the notes column has folded the tree away and there is no top bar to
+        hold the button, so from 1280px with notes open and at no other time
+        (`.admin-editor-header__tree` in content-spiel.tailwind.css). The same
+        drawer, panel and controller as the top bar's button
+        (`admin--drawer#toggle`, `aria-controls`). A page's editor only: a
+        post's screen has no tree. %>
+    <div class="flex min-w-0 items-center gap-1.5">
+    <% if page? %>
+      <%= tag.button t(".tree"), type: "button", class: "admin-editor-header__tree -ml-2 shrink-0 cursor-pointer rounded-cs px-2 py-1 text-sm text-ink hover:bg-sunken",
+            aria: { label: t(".tree_label"), controls: "tree-column", expanded: "false" },
+            data: { action: "admin--drawer#toggle", admin__drawer_name_param: "tree", admin__drawer_target: "trigger" } %>
+    <% end %>
     <nav aria-label="Breadcrumb" class="min-w-0 truncate text-[12px] text-meta">
       <% breadcrumb.each do |label, url| %>
         <% if url %>
@@ -13,6 +26,7 @@
         <span aria-hidden="true" class="px-0.5">/</span>
       <% end %>
     </nav>
+    </div>
 
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       <%= render Admin::SaveStatusComponent.new(id: save_status_id, state: :idle, live: live?) %>

@@ -136,6 +136,11 @@ en:
           add_note: "Add note"
         header:
           notes: "Notes"
+          # The page tree's drawer, where the notes column has folded the
+          # tree away and there is no top bar (the top bar's own button
+          # reads the same).
+          tree: "Pages ▾"
+          tree_label: "Open page tree"
           # The button's accessible name; `admin.notes.script.total` is the
           # same sentence for the script that keeps it current.
           notes_label:

@@ -143,25 +143,36 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    `admin--notes` owns it from then on (`setOpen`); a screen without a drawer
    never matches.
 
-   THE PAGE TREE FOLDS while the column is there, the way it does below
-   1024px: the same element, the same `data-open`, the same "Pages ▾" button
-   of the top bar, `admin--drawer` and the scrim -- these rules only add a
-   second condition to the ones above. From 1024px to 1279px, where the top
-   bar and its button exist. */
+   THE PAGE TREE FOLDS while the column is there, at every width from 1024px,
+   the way it does below 1024px: the same element, the same `data-open`,
+   `admin--drawer` and the scrim -- these rules only add a second condition
+   to the ones above. What opens it is a "Pages ▾" button: from 1024px to
+   1279px the top bar's own, and from 1280px, where there is no top bar, the
+   one at the start of the page editor's breadcrumb row
+   (`.admin-editor-header__tree`, `Admin::EditorScreen::HeaderComponent`,
+   shown only then). From 1280px the drawer stands BESIDE the modules
+   sidebar, where the tree's column was (`left: 15rem`), and fades in rather
+   than slides: a slide would cross the sidebar. */
 :root { --admin-notes-width: 400px; }
+.admin-editor-header__tree { display: none; }
 @media (min-width: 1024px) {
   :root[data-notes-open] body:has(#notes-drawer) .admin-shell__main { padding-right: calc(1.5rem + var(--admin-notes-width)); }
   :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header { margin-right: calc(-1.5rem - var(--admin-notes-width)); }
   .admin-notes-drawer { top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); }
-}
-@media (min-width: 1024px) and (max-width: 1279px) {
+
   :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
-  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: var(--admin-top-offset); bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
   :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
   :root[data-notes-open] body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
   /* The scrim of the folded tree: the two rules above hide it from 1024px
-     unless the modules sidebar is the open drawer. */
+     unless the modules sidebar is the open drawer, and at all from 1280px. */
   :root[data-notes-open] body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
+}
+@media (min-width: 1280px) {
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: 15rem minmax(0, 1fr); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { left: 15rem; transform: none; opacity: 0; transition: opacity 0.15s var(--cs-ease), visibility 0s linear 0.15s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { opacity: 1; transition: opacity 0.15s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header__tree { display: inline-block; }
 }
 @media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
