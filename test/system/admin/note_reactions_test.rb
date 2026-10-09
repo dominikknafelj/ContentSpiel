@@ -74,7 +74,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{set}[open] button[name=emoji]", count: Notes::EMOJI.size
     emoji("thumbs up").click
 
-    assert_selector "#{chips} button[data-reaction='👍'][data-mine][aria-pressed=true][title='#{users(:one).display_name}']", text: /👍\s*1/
+    assert_selector "#{chips} button[data-reaction='👍'][data-mine][aria-pressed=true][title='#{Notes.name_of(users(:one))}']", text: /👍\s*1/
     assert_no_selector "#{set}[open]"
     assert_eventually(message: "the focus did not go to the new chip") { focused?("#{chips} button[data-reaction='👍']") }
     # After the first reaction the add chip stands at the end of the chip row, on show; the meta line has none.
@@ -138,7 +138,7 @@ class Admin::NoteReactionsSystemTest < ApplicationSystemTestCase
     watch_thread_fetches
     find("#{chips} button[data-reaction='🎉']").click
 
-    assert_selector "#{chips} button[data-reaction='🎉'][data-mine][title='Dana, #{users(:one).display_name}']", text: /🎉\s*2/
+    assert_selector "#{chips} button[data-reaction='🎉'][data-mine][title='Dana, #{Notes.name_of(users(:one))}']", text: /🎉\s*2/
     sleep 0.8 # sleep: the coalescing window (500 ms) must have passed before "the thread was not fetched" means anything
     assert_equal 0, page.evaluate_script("window.__threadFetches") # no GET: the answer to the tab's own POST drew the chip
   end

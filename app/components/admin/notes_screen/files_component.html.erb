@@ -3,12 +3,15 @@
     <% name = attachment.blob.filename.to_s %>
     <% if gif?(attachment) %>
       <%= tag.div class: PICTURE_BOX_CLASS, data: { note_gif: true, controller: "admin--note-gif" } do %>
-        <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
+        <%# The link is the picture's own size, and the still lies over
+            exactly that: on a tile larger than a small GIF (decision 37) a
+            canvas over the whole tile would stretch the frame. %>
+        <%= link_to path(attachment), target: "_blank", rel: "noopener", class: "relative block min-w-0 max-w-full focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
               title: t(".open", name: name), data: { turbo: false } do %>
           <%= image_tag path(attachment), alt: name, loading: "lazy", class: "#{PICTURE_CLASS} motion-reduce:opacity-0",
                 data: { "admin--note-gif-target": "moving", action: "load->admin--note-gif#paint" } %>
+          <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--note-gif-target="still"></canvas>
         <% end %>
-        <canvas class="pointer-events-none absolute inset-0 hidden size-full motion-reduce:block" aria-hidden="true" data-admin--note-gif-target="still"></canvas>
         <%# Centred over the still; in the corner while the picture plays, so it does not lie over it. %>
         <%= tag.button type: "button", data: { playing: "false", action: "admin--note-gif#toggle", "admin--note-gif-target": "button", play: t(".play"), pause: t(".pause") },
               class: "admin-note-gif-button absolute hidden cursor-pointer items-center gap-1.5 rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent motion-reduce:inline-flex" do %>

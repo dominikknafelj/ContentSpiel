@@ -18,6 +18,12 @@ module Admin
     # accepted. The placeholder gradient is the box's background, seen behind
     # a picture that is partly transparent.
     #
+    # A VERY SMALL PICTURE (the handoff's decision 37). The tile of a GIF and
+    # of a still image is at least 120×90, border included; a picture smaller
+    # than that stands centred in it at its own size, on the placeholder
+    # ground, so a GIF's label and its Play control always fit. A larger
+    # picture is its own tile, as before.
+    #
     # A GIF moves. Without reduced motion it plays, like any image. With it,
     # the tile shows a STILL: the picture itself is drawn invisible
     # (`motion-reduce:opacity-0`, so it keeps the tile's shape) and
@@ -31,8 +37,8 @@ module Admin
       NAME_CLASS = "truncate text-[13px] text-ink".freeze
       FACTS_CLASS = "truncate font-cs-mono text-[10px] text-meta".freeze
       ROW_BUTTON_CLASS = "flex size-7 items-center justify-center rounded-cs".freeze
-      PICTURE_BOX_CLASS = "admin-note-picture relative block w-fit max-w-full self-start overflow-hidden border border-line".freeze
-      PICTURE_CLASS = "block h-auto w-auto max-w-full".freeze
+      PICTURE_BOX_CLASS = "admin-note-picture relative flex min-h-[90px] w-fit min-w-[120px] max-w-full items-center justify-center self-start overflow-hidden border border-line".freeze
+      PICTURE_CLASS = "block h-auto w-auto min-w-0 max-w-full".freeze
 
       def initialize(message:, listing:)
         @message = message

@@ -9,7 +9,7 @@
     <span class="flex min-w-0 items-center gap-1.5 text-xs text-meta">
       <%# Round in the type's category colour for a post, square in meta for a page and an image: a shape as well as a colour, and the word beside it. %>
       <span class="size-1.5 shrink-0 <%= marker_class %>" aria-hidden="true" data-type-marker="<%= post? ? "round" : "square" %>"></span>
-      <span class="truncate"><%= type_name %><% if author? %> · <%= render Admin::UserNameComponent.new(user: row.last_author, user_id: row.last_author_id) %><% end %> · <%= render Admin::TimeAgoComponent.new(time: row.at) %></span>
+      <span class="truncate"><%= type_name %><% if author? %> · <%= render Admin::NotesScreen::PersonNameComponent.new(user: row.last_author, user_id: row.last_author_id) %><% end %> · <%= render Admin::TimeAgoComponent.new(time: row.at) %></span>
     </span>
   </span>
   <%# `role="img"` and a label, like the page tree's: a bare "2" says nothing. %>

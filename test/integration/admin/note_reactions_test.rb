@@ -88,7 +88,7 @@ class Admin::NoteReactionsTest < ActionDispatch::IntegrationTest
     assert_equal one.size, many.size
     assert_equal 1, many.grep(/FROM "note_reactions"/).size
     assert_equal 2, many.grep(/FROM "users"/).size
-    assert_select "button[data-reaction='#{Notes::EMOJI.first}'][title='#{users(:one).display_name}']"
+    assert_select "button[data-reaction='#{Notes::EMOJI.first}'][title='#{Notes.name_of(users(:one))}']"
   end
 
   test "the list reads no reactions" do

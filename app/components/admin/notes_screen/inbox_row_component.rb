@@ -40,7 +40,7 @@ module Admin
         return t(".#{row.reason}.nobody") unless somebody?
         return t(".#{row.reason}.deleted") unless row.by
 
-        t(".#{row.reason}.somebody_html", name: tag.strong(row.by.display_name, class: row.unread ? "font-semibold" : "font-medium"))
+        t(".#{row.reason}.somebody_html", name: tag.strong(::Notes.name_of(row.by), class: row.unread ? "font-semibold" : "font-medium"))
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich

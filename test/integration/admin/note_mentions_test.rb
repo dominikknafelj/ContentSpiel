@@ -11,11 +11,13 @@ class Admin::NoteMentionsTest < ActionDispatch::IntegrationTest
 
   def suggest(q) = get("/cs-studio/notes/page/#{@page.id}/mentions", params: { q: q }) && response.parsed_body
 
+  # Someone without a name is the part of their address before the at sign
+  # (the handoff's decision 36), and the whole address is still the hint.
   test "it lists users who may read the record, by name with the email as a hint, owners included" do
     users(:two).update!(name: "Dana Example")
 
     assert_equal [ { "id" => users(:two).id, "label" => "Dana Example", "hint" => "two@example.com" } ], suggest("dana")
-    assert_equal [ { "id" => users(:one).id, "label" => "one@example.com" } ], suggest("one@")
+    assert_equal [ { "id" => users(:one).id, "label" => "one", "hint" => "one@example.com" } ], suggest("one@")
   end
 
   test "someone who may not read the record is never offered" do

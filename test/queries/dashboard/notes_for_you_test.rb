@@ -21,7 +21,7 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     row = inbox.rows.first
 
     assert_equal [ "mention", users(:two), "page", "Pricing", @block, true, thread.id ], [ row.reason, row.by, row.kind, row.title, row.block, row.unread, row.thread_id ]
-    assert row.excerpt.start_with?("Is @reader@example.com sure about this")
+    assert row.excerpt.start_with?("Is @reader sure about this")
     assert_operator row.excerpt.length, :<=, 140
     assert_equal [ :admin_page_path, [ @page.id ], { notes: "open", thread: thread.id } ], [ row.route.name, row.route.args, row.route.params ]
   end

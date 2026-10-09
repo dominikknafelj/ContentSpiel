@@ -30,8 +30,8 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     # Following a row marks it read, so a hover must not fetch it (Turbo's prefetch).
     assert_select "a#note-row-#{@thread.id}[data-turbo-prefetch=false]"
     assert_select "section#notes-open-list section#notes-group-ContentBlock-#{@block.id} a#note-row-#{@thread.id}[data-note-row][data-unread][href='#{@base}/threads/#{@thread.id}']" do
-      assert_select "strong", text: "two@example.com"
-      assert_select "span", text: /Is €49 right, @reader@example.com\?/
+      assert_select "strong", text: "two"
+      assert_select "span", text: /Is €49 right, @reader\?/
       assert_select "[data-note-replies]", text: "1 reply"
       assert_select "[data-note-new]", text: "new"
     end
@@ -56,7 +56,7 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       assert_select "h3 [data-note-subject-type]", text: "Rich text"
       assert_select "h3 [data-note-subject-words][class~='text-xs'][class~='text-dim'][class~='truncate']", text: "Block 1"
       assert_select "blockquote", text: "€49 a month"
-      assert_select "#note-thread-#{@thread.id}-messages #note-message-#{@thread.first_message.id} [data-note-mention]", text: "@reader@example.com"
+      assert_select "#note-thread-#{@thread.id}-messages #note-message-#{@thread.first_message.id} [data-note-mention]", text: "@reader"
       assert_select "a[href='https://example.com']"
     end
     assert_select "span[data-admin--notes-target=counts]"

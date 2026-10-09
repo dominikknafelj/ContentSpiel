@@ -18,7 +18,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
       # The whole row is one link (handoff "Inbox row"), with the handoff's hover.
       assert_select "li > a[data-delivery][data-unread][href='/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}'][data-turbo-frame=_top][class~='hover:bg-paper']", count: 1 do
         assert_select "[data-inbox-sentence]", text: "Dana mentioned you"
-        assert_select "[data-inbox-excerpt]", text: /Ready, @reader@example.com\?/
+        assert_select "[data-inbox-excerpt]", text: /Ready, @reader\?/
         assert_select "[data-inbox-where]", text: "Page · Pricing"
       end
       assert_select "li a a", count: 0
@@ -227,7 +227,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     get "/cs-studio/notes/deliveries/#{delivery.id}"
 
     assert_equal({ "id" => delivery.id, "reason" => "mention", "sentence" => "Dana mentioned you", "title" => "Pricing",
-      "excerpt" => "Ready, @reader@example.com?", "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "thread_id" => @thread.id }, response.parsed_body)
+      "excerpt" => "Ready, @reader?", "url" => "/cs-studio/pages/#{@page.id}?notes=open&thread=#{@thread.id}", "thread_id" => @thread.id }, response.parsed_body)
 
     sign_in_as(users(:two))
     get "/cs-studio/notes/deliveries/#{delivery.id}"

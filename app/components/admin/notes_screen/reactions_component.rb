@@ -101,7 +101,7 @@ module Admin
 
       # "Dana, Jonas", in the order they reacted. A reaction goes with its
       # user (the foreign key), so everyone named here exists.
-      def people(reactions) = reactions.filter_map { |reaction| listing.users[reaction.user_id]&.display_name }.join(", ")
+      def people(reactions) = reactions.filter_map { |reaction| listing.users[reaction.user_id]&.then { |user| ::Notes.name_of(user) } }.join(", ")
 
       # The emoji in words ("thumbs up"): the locale file's list, in the
       # set's own order.

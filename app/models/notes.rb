@@ -25,6 +25,18 @@ module Notes
   EMOJI = %w[👍 👎 ✅ ❌ ❤️ 🎉 🙏 👀 🤔 😀 😅 😂 😍 😮 😢 😡 🔥 ⭐ 💡 ❓ ❗ ⏳ 🚀 📌 📝 🔗 🖼️ 🐛 💬 👋].freeze
 
   class << self
+    # What a NOTE calls a person (the handoff's decision 36): their name,
+    # and for someone without one the part of their email address before the
+    # at sign -- "dana" for dana@example.com. The whole address in a
+    # mention's chip and on an author line said more than a note needs to,
+    # to everyone who may read the record. THE ONE PLACE for it: the notes
+    # components (`Admin::NotesScreen::PersonNameComponent`), a mention's
+    # text (`Notes::Mentions.display`), the inbox, the toast, the mention
+    # picker and the mind graph's card all ask here. `User#display_name`,
+    # which the rest of CS Studio uses, is not changed. A name set later
+    # shows everywhere at once: a mention is a token with the person's id.
+    def name_of(user) = user.name.presence || user.email_address.to_s.split("@").first.presence || user.email_address
+
     # The record whose screen lists a thread on `subject`: a block's owner (a
     # page today), anything else itself. A block that moves between a
     # section's columns keeps its page, so its threads need no update.

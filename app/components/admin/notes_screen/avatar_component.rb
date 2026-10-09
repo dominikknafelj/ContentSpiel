@@ -23,10 +23,10 @@ module Admin
       private
 
       # The first letters of the first two words of whatever names the person
-      # (`Admin::UserNameComponent`: the name, else the email, else "a deleted
-      # user").
+      # in a note (`PersonNameComponent`: the name, else the part of the
+      # email address before the at sign, else "a deleted user").
       def initials
-        Admin::UserNameComponent.new(user: @user, user_id: @user_id).label.to_s.split.first(2).map { |word| word[0] }.join
+        Admin::NotesScreen::PersonNameComponent.new(user: @user, user_id: @user_id).label.to_s.split.first(2).map { |word| word[0] }.join
       end
 
       def own? = @viewer.present? && @user.present? && @user.id == @viewer.id

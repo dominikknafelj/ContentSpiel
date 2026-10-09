@@ -35,7 +35,8 @@ module Notes
       end
     end
 
-    # `[text, { display name => id }]`. A token whose user is not in
+    # `[text, { name => id }]`, the name as a note says it (`Notes.name_of`:
+    # the same one the picker inserts). A token whose user is not in
     # `users_by_id` (deleted since) is left as it is, so saving the edit
     # doesn't turn it into loose text.
     def self.display(body, users_by_id)
@@ -44,8 +45,9 @@ module Notes
         user = users_by_id[Regexp.last_match(1).to_i]
         next token unless user
 
-        names[user.display_name] = user.id
-        "@#{user.display_name}"
+        name = Notes.name_of(user)
+        names[name] = user.id
+        "@#{name}"
       end
       [ text, names ]
     end

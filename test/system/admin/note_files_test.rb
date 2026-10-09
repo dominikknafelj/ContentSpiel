@@ -220,20 +220,51 @@ class Admin::NoteFilesSystemTest < ApplicationSystemTestCase
     assert_operator middles.max - middles.min, :<=, 2, middles.inspect
   end
 
-  # The handoff's decision 32.
-  test "a small picture is shown at its natural size, left-aligned, and a large one at the message's width" do
+  # The handoff's decisions 32 and 37: a picture is never enlarged, and a very
+  # small one stands centred, at its own size, on a tile of at least 120×90.
+  test "a small picture is shown at its natural size, centred on a 120×90 tile at the left, and a large one at the message's width" do
     as(users(:two)) { assert Notes::Reply.call(@thread, body: "Two pictures", files: [ fixture_upload("tiny.png"), fixture_upload("wide.png") ]).ok? }
     open_thread
-    box = ->(alt) { page.evaluate_script("(() => { const img = document.querySelector(#{"[data-note-files] img[alt='#{alt}']".to_json}); const files = img.closest('[data-note-files]').getBoundingClientRect(); const r = img.getBoundingClientRect(); const b = img.closest('a').getBoundingClientRect(); return [img.naturalWidth, Math.round(r.width), Math.round(r.height), Math.round(b.left - files.left), Math.round(b.width), Math.round(files.width)] })()") }
+    box = ->(alt) { page.evaluate_script("(() => { const img = document.querySelector(#{"[data-note-files] img[alt='#{alt}']".to_json}); const files = img.closest('[data-note-files]').getBoundingClientRect(); const r = img.getBoundingClientRect(); const b = img.closest('a').getBoundingClientRect(); return [img.naturalWidth, Math.round(r.width), Math.round(r.height), Math.round(b.left - files.left), Math.round(b.width), Math.round(files.width), Math.round(b.height), (r.left + r.right) / 2 - (b.left + b.right) / 2, (r.top + r.bottom) / 2 - (b.top + b.bottom) / 2] })()") }
     assert_eventually(message: "the pictures never loaded") { box.call("tiny.png").first.positive? && box.call("wide.png").first.positive? }
 
-    natural, width, _height, left, frame, = box.call("tiny.png")
-    assert_equal [ natural, 0, natural + 2 ], [ width, left, frame ] # its own size, at the left, in a box with a 1px border
+    natural, width, height, left, frame, _message, frame_height, off_x, off_y = box.call("tiny.png")
+    assert_equal [ natural, natural ], [ width, height ] # its own size: never enlarged
+    assert_equal [ 0, 120, 90 ], [ left, frame, frame_height ] # the tile, at the left
+    assert_in_delta 0, off_x, 0.6, "the picture is not centred across its tile"
+    assert_in_delta 0, off_y, 0.6, "the picture is not centred down its tile"
+    assert_match(/gradient/, page.evaluate_script("getComputedStyle(document.querySelector(\"[data-note-files] img[alt='tiny.png']\").closest('a')).backgroundImage"))
 
-    natural, width, height, left, _frame, message = box.call("wide.png")
+    natural, width, height, left, frame, message, = box.call("wide.png")
     assert_operator natural, :>, message
-    assert_equal [ message - 2, 0 ], [ width, left ]
+    assert_equal [ message - 2, 0, message ], [ width, left, frame ]
     assert_in_delta 2000.0 / 3000, height.to_f / width, 0.01 # its own aspect ratio
+  end
+
+  # A GIF smaller than the tile (100×80): its label, and with reduced motion
+  # its still and Play, all fit on the 120×90 tile, the still exactly over
+  # the picture.
+  test "a small GIF stands centred on a 120×90 tile, with room for its label and its Play control" do
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "A loop", files: [ fixture_upload("small.gif", name: "loop.gif") ]).ok? }
+    reduce_motion(true)
+    open_thread
+    tile = "#note-thread-#{@thread.id}-messages [data-note-gif]"
+    assert_selector "#{tile} button", text: "Play"
+    assert_eventually(message: "the still was never painted") { page.evaluate_script("document.querySelector(#{"#{tile} canvas".to_json}).width") == 100 }
+    rect = ->(selector) { page.evaluate_script("(() => { const r = document.querySelector(#{tile.to_json} + #{selector.to_json}).getBoundingClientRect(); return [ r.left, r.top, r.right, r.bottom ] })()") }
+
+    box, picture, still, button, label = [ "", " img", " canvas", " button", " > span" ].map { |selector| rect.call(selector) }
+    assert_equal [ 120, 90 ], [ (box[2] - box[0]).round, (box[3] - box[1]).round ]
+    assert_equal [ 100, 80 ], [ (picture[2] - picture[0]).round, (picture[3] - picture[1]).round ]
+    assert_in_delta (box[0] + box[2]) / 2, (picture[0] + picture[2]) / 2, 0.6
+    assert_in_delta (box[1] + box[3]) / 2, (picture[1] + picture[3]) / 2, 0.6
+    picture.zip(still).each { |a, b| assert_in_delta a, b, 0.6, "the still does not lie exactly over the picture" }
+    [ button, label ].each do |part|
+      assert part[0] >= box[0] && part[1] >= box[1] && part[2] <= box[2] && part[3] <= box[3], "a control reaches out of the tile: #{part} in #{box}"
+    end
+    assert_operator button[3], :<=, label[1], "Play lies over the label"
+  ensure
+    reduce_motion(false)
   end
 
   # Notes spec §6.3: what is typed is never replaced by a refresh, and chosen

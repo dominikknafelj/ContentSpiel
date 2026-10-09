@@ -7,7 +7,7 @@
   <div class="flex items-start gap-2">
     <p class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
       <%= render Admin::NotesScreen::AvatarComponent.new(user: author, user_id: message.author_id, viewer: viewer, size: :message) %>
-      <strong class="text-[13px] font-semibold text-ink"><%= render Admin::UserNameComponent.new(user: author, user_id: message.author_id) %></strong>
+      <strong class="text-[13px] font-semibold text-ink"><%= render Admin::NotesScreen::PersonNameComponent.new(user: author, user_id: message.author_id) %></strong>
       <span class="font-cs-mono text-[11px] text-meta"><%= render Admin::TimeAgoComponent.new(time: message.created_at) %></span>
       <% if message.edited_at %><span class="text-[12px] text-meta">· <%= t(".edited") %></span><% end %>
       <%# "Unsaved edit" (the handoff's decisions 27 and 29): shown by the

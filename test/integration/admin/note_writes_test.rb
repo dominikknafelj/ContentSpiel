@@ -543,7 +543,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal [ thread.id, "Dana", 1, false ], row.values_at("id", "author", "replies", "pinned")
     assert_equal true, row["unread"] # the first message mentions the reader, and reading a list marks nothing read (P10)
     assert_equal false, row["mine"] # Dana wrote it, not the reader
-    assert row["text"].start_with?("Ask @reader@example.com <b>now</b> x")
+    assert row["text"].start_with?("Ask @reader <b>now</b> x")
     assert_operator row["text"].length, :<=, 140
     assert_equal 1, Notes::Delivery.unread.where(user: users(:reader)).count, "reading the card's list marked a delivery read"
   end

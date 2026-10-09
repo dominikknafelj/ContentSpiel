@@ -80,7 +80,7 @@
       <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
         <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
         <% if thread.resolved? %>
-          <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::UserNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
+          <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::NotesScreen::PersonNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
         <% end %>
       </p>
     <% end %>

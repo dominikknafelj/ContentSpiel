@@ -78,7 +78,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
       visit "/cs-studio"
       await_admin_controllers
       assert_selector "#sidebar-badge-dashboard", text: "1"
-      within("turbo-frame#notes-for-you") { press "one@example.com mentioned you" }
+      within("turbo-frame#notes-for-you") { press "one mentioned you" }
 
       messages = "#note-thread-#{thread.id}-messages"
       reply = "#note-thread-#{thread.id}-reply"

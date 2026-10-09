@@ -48,7 +48,7 @@ module Admin
         threads: threads.map do |thread|
           first = thread.messages.first
           { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
-            author: listing.users[first.author_id]&.display_name, replies: thread.messages.size - 1, pinned: thread.pinned,
+            author: listing.users[first.author_id]&.then { |user| Notes.name_of(user) }, replies: thread.messages.size - 1, pinned: thread.pinned,
             # What turns the row's dot accent in the card (spec §4.5): one
             # query for the whole listing (`Notes::Listing#unread?`).
             unread: listing.unread?(thread, Current.user),

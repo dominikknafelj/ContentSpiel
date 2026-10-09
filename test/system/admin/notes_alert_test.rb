@@ -380,7 +380,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
     within_window(second) { await_settled(delivery) }
     raised = notified + within_window(second) { notified }
     # The inbox's sentence, then the record's title and the note's first line.
-    assert_equal [ { "title" => "Dana mentioned you", "body" => "Pricing\nOver to you, @one@example.com" } ], raised
+    assert_equal [ { "title" => "Dana mentioned you", "body" => "Pricing\nOver to you, @one" } ], raised
     assert_equal 2, tones + within_window(second) { tones }
 
     by = notified.any? ? page.current_window : second

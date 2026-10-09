@@ -80,7 +80,7 @@ module Admin
       return I18n.t("#{scope}.nobody") unless row.by || row.by_id
       return I18n.t("#{scope}.deleted") unless row.by
 
-      I18n.t("#{scope}.somebody_html", name: row.by.display_name)
+      I18n.t("#{scope}.somebody_html", name: Notes.name_of(row.by))
     end
 
     def inbox = @inbox ||= Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale)
