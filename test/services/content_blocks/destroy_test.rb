@@ -149,6 +149,25 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     assert_equal [ page ], Notes::Thread.all.map(&:subject)
   end
 
+  # The order (`docs/reference/notes.md`, "Removal"): the page's row lock,
+  # which every notes service takes first too; then the block; then its
+  # notes, removed by a `Notes::Remove` that asks the page's edit right of a
+  # page that is still there. Statement order only.
+  test "a block's notes are removed after the block is deleted, under the page's lock" do
+    page = create_page(title: "Noted", published: false)
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    as(users(:two)) { Notes::Start.call(block, body: "A note") }
+
+    statements = capture_sql { assert ContentBlocks::Destroy.call(block).ok? }
+
+    lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    deleted = statements.index { |sql| sql.start_with?('DELETE FROM "content_blocks"') }
+    first_note = statements.index { |sql| sql.include?('"note_threads"') }
+    assert_operator lock, :<, deleted
+    assert_operator deleted, :<, first_note
+    assert_equal 1, statements.count { |sql| sql.start_with?('DELETE FROM "note_threads"') }
+  end
+
   test "deleting a section with its blocks deletes the notes of each" do
     page, section, = noted_section
 
