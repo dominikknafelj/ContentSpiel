@@ -1050,6 +1050,138 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_nil @right.reload.section_id
   end
 
+  RELOAD_LATER = "Something on this page changed elsewhere. Reload once your unsaved text is safe.".freeze
+
+  # Fix round 1. A refusal's list replaces every form on the screen, and a
+  # form paused by a 409 holds the only copy of what was typed -- which its
+  # bar has promised stays. A 409 and a refused move have one cause, a second
+  # editor on the page, so the two meet. Then the list is NOT drawn: the block
+  # goes back, the reason is said with a line about reloading, and nothing
+  # else on the screen changes.
+  test "a refused move does not redraw the list while another block's form holds text that was refused" do
+    open_editor
+    find(face(@right)).click
+    travel 1.minute do
+      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@right, translations: { "en" => { caption: "Theirs" } }) }
+    end
+    fill_in id: caption(@right), with: "Mine, refused"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#block-#{@right.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
+    page.execute_script("document.querySelector(#{tile(@section).to_json}).__same = true")
+    # Moved behind this screen's back: the drop says it comes from column 1.
+    ContentBlock.where(id: @left.id).update_all(section_column: 2, position: 1) # version: none (a test's own stale screen)
+
+    drop_into(@left, "#content-blocks-list")
+
+    assert_selector "#content-blocks-alert", text: ContentBlocks::Reorder::STALE
+    assert_selector "#content-blocks-alert", text: RELOAD_LATER
+    assert_order_eventually([ @left.id ]) { tiles_in(1) }
+    assert_equal [ @section.id ], cards_in_list
+    await_frames # a list drawn after all would be in the page by now: Turbo draws a stream on the next frame
+    assert_equal true, page.evaluate_script("document.querySelector(#{tile(@section).to_json}).__same"), "the list was redrawn"
+    assert_field caption(@right), with: "Mine, refused"
+    assert_selector "#block-#{@right.id}-save-status", text: "CHANGED ELSEWHERE"
+    assert_equal "Theirs", @right.reload.caption
+    assert_equal false, page.evaluate_script("document.querySelector(#{tile(@left).to_json}).inert")
+  end
+
+  # The same for text typed into another form while the move was on the wire:
+  # what counts is what the forms hold when the answer arrives.
+  test "a refused move does not redraw the list over text typed while its request was out, and that text is then saved" do
+    open_editor
+    find(face(@right)).click
+    ContentBlock.where(id: @left.id).update_all(section_column: 2, position: 1) # version: none (a test's own stale screen)
+    script_writes("hold")
+
+    drop_into(@left, "#content-blocks-list")
+    await_js "typeof window.__release[0] === 'function'"
+    page.execute_script("document.querySelector(#{tile(@section).to_json}).__same = true")
+    fill_in id: caption(@right), with: "Typed while the move was out"
+    page.execute_script("window.__release[0]()")
+
+    assert_selector "#content-blocks-alert", text: ContentBlocks::Reorder::STALE
+    assert_selector "#content-blocks-alert", text: RELOAD_LATER
+    assert_order_eventually([ @left.id ]) { tiles_in(1) }
+    page.execute_script("document.activeElement.blur()")
+    assert_writes_settled
+    assert_equal true, page.evaluate_script("document.querySelector(#{tile(@section).to_json}).__same"), "the list was redrawn"
+    assert_field caption(@right), with: "Typed while the move was out"
+    assert_equal "Typed while the move was out", @right.reload.caption
+  end
+
+  # Fix round 1. A block whose move between containers is on the wire is
+  # about to be replaced by its answer. Grabbed again before that, the drag
+  # held an element the answer took out of the document, and the card that
+  # came stayed wherever the pointer had it. So the block and its form are
+  # inert from the drop until its answer is drawn.
+  test "a block whose move is on the wire can't be grabbed again, nor its form typed into, until the answer is drawn" do
+    open_editor
+    find(face(@left)).click
+    script_writes("hold")
+
+    drop_into(@left, lane(2))
+    await_js "typeof window.__release[0] === 'function'"
+    assert_equal [ true, true ], page.evaluate_script("[ document.querySelector(#{tile(@left).to_json}).inert, document.querySelector(#{panel(@left).to_json}).inert ]")
+
+    mouse = drag_to("#{tile(@left)} .admin-block-tile__grip", lane(1))
+    await_frames # a drag that began would have put its clone on <body> by now: SortableJS makes it on the first move past its tolerance
+    assert_no_selector "body > .admin-drag-fallback"
+    mouse.up
+    page.execute_script("window.__release[0]()")
+
+    assert_eventually { @left.reload.section_column == 2 }
+    assert_writes_settled
+    assert_equal [ false, false ], page.evaluate_script("[ document.querySelector(#{tile(@left).to_json}).inert, document.querySelector(#{panel(@left).to_json}).inert ]")
+    assert_equal [ @right.id, @left.id ], tiles_in(2)
+    assert_equal 1, page.evaluate_script("window.__writes.length")
+  end
+
+  test "a block is free again after its move failed, and a move of an element that has left the page is no error" do
+    open_editor
+    script_writes("fail")
+
+    drop_into(@left, "#content-blocks-list")
+
+    assert_selector "#toasts .admin-toast[role=alert]", text: "Couldn't save the new order"
+    assert_order_eventually([ @left.id ]) { tiles_in(1) }
+    assert_equal [ false, false ], page.evaluate_script("[ document.querySelector(#{tile(@left).to_json}).inert, document.querySelector(#{panel(@left).to_json}).inert ]")
+
+    queued = page.evaluate_script(<<~JS)
+      (() => {
+        const controller = #{blocks_controller}
+        const item = document.querySelector(#{tile(@left).to_json})
+        const from = item.parentElement
+        const before = controller.snapshot()
+        item.remove()
+        controller.move(item, from, before)
+        from.append(item)
+        return controller.reordersQueued
+      })()
+    JS
+    assert_equal 0, queued
+    assert_equal 1, page.evaluate_script("window.__writes.length")
+  end
+
+  # The keyboard path steps a card among the LIST's cards. A card resting in
+  # a lane, between its drop and its answer, is a card too, but no neighbour.
+  test "a card stepped by the keyboard passes the list's cards only, while another rests in a lane" do
+    first = @page.content_blocks.create!(block_type: "image", position: 1)
+    second = @page.content_blocks.create!(block_type: "image", position: 2)
+    open_editor
+    script_writes("hold")
+
+    drop_into(first, lane(1))
+    await_js "typeof window.__release[0] === 'function'"
+    find("#{tile(second)} .admin-block-card__handle").send_keys(:space, :up)
+    assert_equal [ second.id, @section.id ], cards_in_list
+    find("#{tile(second)} .admin-block-card__handle").send_keys(:space)
+    page.execute_script("window.__release[0]()")
+
+    assert_writes_settled
+    assert_equal [ second.id, @section.id ], @page.content_blocks.top_level.reorder(:position).ids
+    assert_equal @section.id, first.reload.section_id
+  end
+
   # A move queued behind one that was refused was made on the screen the
   # refusal has just replaced: its lane is no longer in the page, and what it
   # would send is an order nobody is looking at.
@@ -1320,5 +1452,6 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     await_js slot_in(lane(2))
     mouse.up
     assert_eventually { @left.reload.section_column == 2 }
+    assert_writes_settled
   end
 end

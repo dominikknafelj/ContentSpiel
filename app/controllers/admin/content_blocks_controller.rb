@@ -226,7 +226,10 @@ module Admin
     #   where it was dragged from, the column is gone -- and how far behind
     #   is not known here, so nothing less than the list puts it right. That
     #   replaces every form on the screen, as an Undo's answer does;
-    #   `admin--blocks#move` has had each send what it held first.
+    #   `admin--blocks#move` has had each send what it held first, and does
+    #   not draw the list at all while a form holds text that is not saved
+    #   (`#renderKeepingForms`) -- which only the browser can know, so the
+    #   list is sent regardless.
     # The page's own order refused is answered as it always was, with the
     # reason alone: the browser puts its cards back, and they are still the
     # page's.

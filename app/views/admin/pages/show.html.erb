@@ -41,12 +41,13 @@
     `Admin::ContentBlocksController#render_gone`/`#picker_error_stream`. %>
 <div id="content-blocks-alert"></div>
 
-<%# `data-messages`: the one sentence `admin--blocks` says itself (a block not
-    moved because its form holds an unsaved edit). Here and not on <body>: only
-    this screen's script asks for it. %>
+<%# `data-messages`: the two sentences `admin--blocks` says itself (a block not
+    moved because its form holds an unsaved edit; a refused move whose list was
+    not redrawn over unsaved text). Here and not on <body>: only this screen's
+    script asks for them. %>
 <section class="admin-content-blocks mt-6" data-controller="admin--blocks"
      data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
-     data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move") %>">
+     data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move", "components.editor_screen.section_card.reload_later") %>">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-h2 text-ink">Blocks</h2>
     <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>

@@ -187,9 +187,16 @@ export default class extends Controller {
   // into the list on the way. So over a section's card the list only does
   // what the pointer's place says:
   // - above the lanes (the header): the block may go BEFORE the section;
-  // - below them (the open form, the lower edge): AFTER it;
+  // - below them, in the card's lower edge: AFTER it;
   // - level with them: nothing. A lane the pointer is over takes the block
   //   itself, being asked first; between lanes it stays where it is.
+  // This is asked only where the list's Sortable has made the section's card
+  // its target, which is not everywhere inside it: with the pointer over a
+  // tile or over an open form SortableJS takes that element -- the nearest
+  // one with `data-block-id` -- for the target, finds it is no child of the
+  // list and does nothing, without asking. So an open form is a place where
+  // a dragged block simply stays, and of what lies below the lanes only the
+  // card's own edge sorts.
   // A section's card being dragged is sorted as any card is (no lane takes
   // it, `accepts`), and so is a block over a collapsed section, which has no
   // lanes on screen.
@@ -459,6 +466,10 @@ export default class extends Controller {
   async move(item, from, before = null) {
     this.refreshMoveState()
     const to = item ? item.parentElement : this.listTarget
+    // An element that is in no container has no order to send: one the
+    // answer of an earlier move has just replaced, handed over by a drag that
+    // was holding it.
+    if (!to) return
     if (before) {
       this.restoreTo ||= new Map()
       for (const [ container, items ] of before) {
@@ -469,7 +480,25 @@ export default class extends Controller {
     if (to !== this.listTarget || (from && from !== to)) this.sendHeldEdits()
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    await this.queueMove({ item, from, to, csrfToken, stoodBack: false })
+    await this.queueMove({ item, from, to, csrfToken, stoodBack: false, held: from && from !== to ? this.hold(item) : [] })
+  }
+
+  // A BLOCK ON ITS WAY TO ANOTHER CONTAINER IS HELD STILL, from its drop
+  // until its answer is drawn or it is put back: the element and, for a
+  // tile, its form's panel are made `inert` (after the forms were told to
+  // send, so a field that loses the focus to it has been read). Its answer
+  // replaces both. Grabbed again in the meantime -- the pointer is still on
+  // the grip -- the second drag held an element the answer then took out of
+  // the document: that drag's move had nothing to send, and the card the
+  // answer drew stayed wherever the old tile happened to be, an order the
+  // server never took. And words typed into the form in that moment went
+  // with the form. `sendMove` lets go in a `finally`, whatever the turn came
+  // to; an element the answer replaced is gone, and its successor was never
+  // held.
+  hold(item) {
+    const held = [ item, document.getElementById(`block-${item.dataset.blockId}-panel`) ].filter(Boolean)
+    for (const element of held) element.inert = true
+    return held
   }
 
   // The page's own order, sent as it is: what the keyboard path's drop asks
@@ -479,24 +508,54 @@ export default class extends Controller {
     return this.move(null, null, before && new Map([ [ this.listTarget, before ] ]))
   }
 
+  // The queue lets the next write go whatever a task does (`enqueue`
+  // releases in a `finally`), so nothing here is caught to keep it alive --
+  // and nothing is swallowed: an error is reported where the system tests'
+  // collector and a developer's console see it.
   queueMove(move) {
-    return enqueue((isCurrent) => this.sendMove(move, isCurrent), { generation: this.generation }).catch(() => {})
+    return enqueue((isCurrent) => this.sendMove(move, isCurrent), { generation: this.generation })
+      .catch((error) => console.error(error))
   }
 
-  // One move's turn in the queue (see `move`).
+  // One move's turn in the queue, and its bookkeeping: unless the move has
+  // queued itself again (`takeTurn` answers "again"), it is counted off and
+  // what it held still is let go -- in a `finally`, so a turn that throws
+  // leaves neither a count that never reaches zero (`restoreTo` would then
+  // be kept for good) nor a block nobody can touch.
   async sendMove(move, isCurrent) {
+    let again = false
+    try {
+      again = (await this.takeTurn(move, isCurrent)) === "again"
+    } finally {
+      if (!again) {
+        this.settle(move)
+        for (const element of move.held) element.inert = false
+      }
+    }
+  }
+
+  // Counts a move off, once: `takeTurn` does it as soon as the answer is in,
+  // because what it does next depends on whether another move still waits.
+  settle(move) {
+    if (move.settled) return
+    move.settled = true
+    this.reordersQueued -= 1
+  }
+
+  async takeTurn(move, isCurrent) {
     const { item, to, csrfToken } = move
     // The element is no longer where this move put it. It was put back (an
-    // earlier request failed, or its own form was not saved), it was moved on
-    // by a later drop -- whose own request sends where it is now -- or the
-    // screen it was made on has been redrawn (a refusal's list, a section's
-    // lanes: new elements, and these are out of the document). Either way
-    // there is no order of this move's left to send; sending the container
-    // as it is would announce an arrival that is not in it. And when nothing
-    // else waits, what the screen shows is what stays: the orders remembered
-    // are of elements that may be gone.
+    // earlier request failed, or its own form was not saved); it was dropped
+    // again, into another container, before this request went -- that drop's
+    // own request sends where it is now, announced from where the server has
+    // it (`origin` below); or the screen it was made on has been redrawn (a
+    // refusal's list, a section's lanes: new elements, and these are out of
+    // the document). Either way there is no order of this move's left to
+    // send; sending the container as it is would announce an arrival that is
+    // not in it. And when nothing else waits, what the screen shows is what
+    // stays: the orders remembered are of elements that may be gone.
     if (!to.isConnected || (item && item.parentElement !== to)) {
-      this.reordersQueued -= 1
+      this.settle(move)
       if (this.reordersQueued === 0) this.restoreTo = null
       return
     }
@@ -517,10 +576,10 @@ export default class extends Controller {
         this.formOf(item).saveNow()
         // Not awaited: it runs after this task has given up its turn.
         this.queueMove(move)
-        return
+        return "again"
       }
       if (state !== "saved") {
-        this.reordersQueued -= 1
+        this.settle(move)
         if (isCurrent()) {
           this.putBack()
           errorToast(messages(this.element).t("components.editor_screen.section_card.unsaved_move"), "toast-move-refused")
@@ -543,14 +602,18 @@ export default class extends Controller {
         moved_from: crossing ? { [item.dataset.blockId]: this.placeOf(origin) } : {}
       })
     })
-    this.reordersQueued -= 1
+    this.settle(move)
     // The page was replaced while the request was on its way: its cards,
     // its base field and its toast region are gone.
     if (!isCurrent()) return
 
+    // Asked as the answer arrives, before anything of it is drawn: see
+    // `renderKeepingForms`.
+    const keepForms = answer.outcome === "answered" && !answer.ok && this.formsHoldText()
     if (answer.outcome === "answered") {
       syncBases(answer.text, [ this.constructor.pageBaseId ])
-      Turbo.renderStreamMessage(answer.text)
+      if (keepForms) this.renderKeepingForms(answer.text)
+      else Turbo.renderStreamMessage(answer.text)
       if (answer.ok) {
         this.restoreTo = this.reordersQueued > 0 ? this.taken(to, sent) : null
         if (crossing) {
@@ -564,6 +627,67 @@ export default class extends Controller {
     this.putBack()
     if (answer.outcome !== "answered") orderErrorToast(answer.outcome, "toast-order-error")
     else if (structural) await streamsApplied()
+    if (keepForms) this.sayReloadLater()
+  }
+
+  // A REFUSAL'S LIST IS NOT DRAWN OVER TEXT THAT IS ONLY ON THIS SCREEN. A
+  // refused move that named a section is answered with the whole list as the
+  // server has it (`Admin::ContentBlocksController#reorder`: the screen was
+  // behind), and that replaces every form. A form paused by a 409 holds the
+  // one copy of what was typed, and its bar has said in so many words that
+  // the text stays to be copied; a 409 and a refused move have the same
+  // cause, a second editor on this page, so the two arrive together. The
+  // same for a save that was refused or is being retried, and for words
+  // typed into any form while this move was on the wire -- which is why it
+  // is asked when the answer arrives, not when the move was made.
+  //
+  // So while any form here holds text the server does not have
+  // (`formsHoldText`), the answer is drawn WITHOUT its list: the status line
+  // and the reason, as the server said them. The block goes back where it
+  // was (`putBack`, as after every refusal), a line under the reason says to
+  // reload once the text is safe, and nothing else on the screen changes.
+  // The screen stays behind until then -- a move made from it may be refused
+  // again -- which is the lesser harm. The server sends the list either way;
+  // it cannot know what the forms hold.
+  //
+  // The list's stream is stopped as Turbo is about to draw it
+  // (`turbo:before-stream-render`, which every stream of the answer
+  // dispatches inside `renderStreamMessage`'s own append, so the listener
+  // is there for exactly this answer's).
+  renderKeepingForms(text) {
+    const keepList = (event) => {
+      if (event.target.getAttribute("target") === this.listTarget.id) event.preventDefault()
+    }
+    document.addEventListener("turbo:before-stream-render", keepList)
+    try {
+      Turbo.renderStreamMessage(text)
+    } finally {
+      document.removeEventListener("turbo:before-stream-render", keepList)
+    }
+  }
+
+  // Whether any autosave form of the block list holds text the server does
+  // not: a form that did not end clean (`admin--autosave#clean`: paused,
+  // refused, invalid, offline), or one with an edit still to be sent or
+  // answered. The questions the write queue asks of a form (`settled()` in
+  // `autosave/queue_core.js`), put to the forms a redrawn list would replace.
+  formsHoldText() {
+    return Array.from(this.element.querySelectorAll("form[data-controller~='admin--autosave']"))
+      .map((form) => this.application.getControllerForElementAndIdentifier(form, "admin--autosave"))
+      .some((form) => form && (!form.clean() || form.outstanding() || !form.unchanged()))
+  }
+
+  // The line under a refusal's reason whose list was not drawn. Written into
+  // the alert the answer has just drawn (its turn in the queue is held until
+  // then), in the alert's own markup: a copy of the reason's line with the
+  // sentence in it. The next answer that writes the alert takes it away.
+  sayReloadLater() {
+    const reason = document.querySelector("#content-blocks-alert > p")
+    if (!reason) return
+
+    const line = reason.cloneNode(true)
+    line.lastElementChild.textContent = messages(this.element).t("components.editor_screen.section_card.reload_later")
+    reason.after(line)
   }
 
   // `restoreTo` after the server took `sent` as the order of `to`, while
@@ -694,17 +818,20 @@ export default class extends Controller {
     if (this.picked && this.picked !== card) this.cancel(this.picked, { refocus: false })
     this.picked = card
     this.originNext = card.nextElementSibling
-    this.orderBeforePick = this.cardTargets.slice()
+    this.orderBeforePick = this.itemsOf(this.listTarget)
     card.dataset.picked = "true"
     card.classList.add("admin-drag-chosen")
     this.announce(`Picked up ${this.titleOf(card)}. ${this.positionOf(card)}`)
   }
 
-  // Swaps with the neighbouring card in `cardTargets`' own order, as Move
-  // up/down does (never raw DOM siblings -- see `moveUp`).
+  // Swaps with the neighbouring card in the list's own order, as Move
+  // up/down does (never raw DOM siblings -- see `moveUp`). The list's items,
+  // not every `card` target: a card resting in a lane between its drop and
+  // its answer is one too, and is no child of the list to step past.
   step(card, direction) {
-    const index = this.cardTargets.indexOf(card)
-    const neighbour = this.cardTargets[index + direction]
+    const cards = this.itemsOf(this.listTarget)
+    const index = cards.indexOf(card)
+    const neighbour = cards[index + direction]
     if (!neighbour) return
     this.listTarget.insertBefore(card, direction < 0 ? neighbour : neighbour.nextElementSibling)
     // A DOM move blurs the focused handle; put focus back so the next key
@@ -753,7 +880,8 @@ export default class extends Controller {
   }
 
   positionOf(card) {
-    return `Position ${this.cardTargets.indexOf(card) + 1} of ${this.cardTargets.length}.`
+    const cards = this.itemsOf(this.listTarget)
+    return `Position ${cards.indexOf(card) + 1} of ${cards.length}.`
   }
 
   announce(message) {

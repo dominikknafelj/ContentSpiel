@@ -197,6 +197,10 @@ en:
           # was not saved (`admin--blocks#move`): the move would redraw the
           # form.
           unsaved_move: "Reload or fix this block before moving it."
+          # Under the reason of a refused move whose answer did not redraw
+          # the list, because a form on the screen holds text that is not
+          # saved (`admin--blocks#renderKeepingForms`).
+          reload_later: "Something on this page changed elsewhere. Reload once your unsaved text is safe."
         # The layout menu in a section's header: `name` is the button's
         # accessible name, `label` the word on it beside the diagram, and
         # each layout's name is what a screen reader gets for its diagram.
