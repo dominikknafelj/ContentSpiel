@@ -92,6 +92,8 @@ module Notes
   class Remove < ApplicationService
     include Trash::ItemPermissions
 
+    # lock: none (the caller holds the row of every container whose threads go; see "THE LOCK IS THE CALLER'S" above)
+
     def initialize(record, with: [], actor: Current.actor)
       @record = record
       @with = Array(with)
