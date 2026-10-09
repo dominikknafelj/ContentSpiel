@@ -2,42 +2,55 @@
       data: { notes_view: "thread", note_thread: thread.id, state: thread.state, notes_container: ::Notes.key(listing.container),
               notes_subject: ::Notes.key(thread.subject_type, thread.subject_id) } do %>
   <%= render Admin::NotesScreen::CountsComponent.new(counts: listing.counts) %>
-  <div class="flex items-center gap-2 border-b border-line px-3 py-2.5">
-    <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
-          data: { note_back: true, turbo_frame: "notes" } do %>
-      <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
-      <span><%= t(".back") %></span>
-      <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>
-    <% end %>
-  </div>
-  <div class="flex items-start justify-between gap-3 border-b border-line py-2.5 pl-4 pr-3">
-    <div class="flex min-w-0 flex-col gap-0.5">
-      <h3 class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= subject_name %></h3>
-      <p class="text-[13px] text-dim"><%= summary %></p>
-    </div>
-  </div>
-
   <div id="<%= dom_id %>-messages" data-note-part="messages" class="flex flex-1 flex-col">
-    <%# What the thread's state is, and the two buttons that show one: they are
-        in the part a refresh replaces, so they read right after someone else
-        pins the thread. %>
-    <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 pl-4 pr-3">
-      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
+    <%# Rows 1 and 2 (the handoff's decision 3). Row 1: back to the list, then
+        "Notify me" / "Stop notifying me". Row 2: what the thread is on, with
+        Pin on the right for someone who may pin. One grid of two rows, so
+        that the two settings of the thread -- one at the end of each row --
+        can stay the children of ONE element, `[data-note-actions]`
+        (`display: contents`: its children are the grid's items). They come
+        second in the document, so the Tab order is Back, Notify, Pin. All of
+        it is inside the part a refresh replaces: the buttons show a state
+        someone else can change. %>
+    <%# `-mb-px`: the first message draws a line above itself, and this one is that line. %>
+    <div class="-mb-px grid grid-cols-[minmax(0,1fr)_auto]">
+      <div class="col-start-1 row-start-1 flex items-center border-b border-line py-2.5 pl-3">
+        <%= link_to back_path, class: "inline-flex items-center gap-1.5 rounded-cs px-2 py-1 text-[13px] font-medium text-ink no-underline hover:bg-sunken focus-visible:outline-2 focus-visible:outline-accent",
+              data: { note_back: true, turbo_frame: "notes" } do %>
+          <%= helpers.render "admin/shared/icon", name: :arrow_left, size: "size-4" %>
+          <span><%= t(".back") %></span>
+          <% if listing.open_count.positive? %><span class="font-cs-mono text-[11px] text-meta"><%= listing.open_count %></span><% end %>
+        <% end %>
+      </div>
+      <div class="contents" data-note-actions>
+        <div class="col-start-2 row-start-1 flex items-center justify-end border-b border-line py-2.5 pl-2 pr-3">
+          <%= button_to t(following? ? ".unfollow" : ".follow"), change_path(following? ? "unfollow" : "follow"), class: FOLLOW_CLASS, form: frame_form %>
+        </div>
+        <%# Always there, for the row's line; empty for someone who may not pin. %>
+        <div class="col-start-2 row-start-2 flex items-start justify-end border-b border-line py-2.5 pl-2 pr-3">
+          <% if pinnable? %>
+            <%= button_to change_path(thread.pinned ? "unpin" : "pin"), class: "#{PIN_CLASS} #{thread.pinned ? "bg-sunken text-ink" : "text-dim"}",
+                  title: t(thread.pinned ? ".unpin" : ".pin"), aria: { label: t(thread.pinned ? ".unpin" : ".pin") }, form: frame_form do %>
+              <%= helpers.render "admin/shared/icon", name: :pin, size: "size-4" %>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+      <div class="col-start-1 row-start-2 flex min-w-0 flex-col gap-0.5 border-b border-line py-2.5 pl-4">
+        <h3 class="font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= subject_name %></h3>
+        <p class="text-[13px] text-dim"><%= summary %></p>
+      </div>
+    </div>
+    <%# What the thread's state is, in words; no line at all for a thread that
+        is neither pinned nor resolved. %>
+    <% if thread.pinned || thread.resolved? %>
+      <p class="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 pt-2.5 font-cs-mono text-[10px] uppercase tracking-mono text-meta">
         <% if thread.pinned %><span data-note-badge="pinned"><%= t(".pinned") %></span><% end %>
         <% if thread.resolved? %>
           <span data-note-badge="resolved"><%= t(".resolved_by") %> <%= render Admin::UserNameComponent.new(user: resolver, user_id: thread.resolved_by_id) %></span>
         <% end %>
       </p>
-      <div class="flex items-center gap-2" data-note-actions>
-        <%= button_to t(following? ? ".unfollow" : ".follow"), change_path(following? ? "unfollow" : "follow"), class: FOLLOW_CLASS, form: frame_form %>
-        <% if pinnable? %>
-          <%= button_to change_path(thread.pinned ? "unpin" : "pin"), class: "#{PIN_CLASS} #{thread.pinned ? "bg-sunken text-ink" : "text-dim"}",
-                title: t(thread.pinned ? ".unpin" : ".pin"), aria: { label: t(thread.pinned ? ".unpin" : ".pin") }, form: frame_form do %>
-            <%= helpers.render "admin/shared/icon", name: :pin, size: "size-4" %>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
+    <% end %>
     <% if button_failure %>
       <ul role="alert" class="px-4 pb-2 text-[12px] text-danger-ink"><% button_failure[:errors].each do |error| %><li><%= error %></li><% end %></ul>
     <% end %>
@@ -59,16 +72,24 @@
     <% trailing.each do |record| %><%= render message(record) %><% end %>
   </div>
 
-  <%# The reply and Resolve, fixed at the bottom of the drawer (spec §4.2). %>
+  <%# The reply, fixed at the bottom of the drawer (spec §4.2), with Resolve --
+      Reopen on a resolved thread -- in the composer's own bottom row, 8px to
+      the left of Send (the handoff's decision 3: it ends a conversation, so it
+      sits where one finishes writing). Its form is a form of its own BESIDE
+      the reply's, never inside it (forms can't nest), and empty: the button
+      stands in the composer and names it (`form=`). %>
   <div id="<%= dom_id %>-reply" data-note-part="reply" class="sticky bottom-0 flex flex-col gap-2 border-t border-line bg-surface px-4 pb-4 pt-3">
+    <%= form_with url: change_path(thread.resolved? ? "reopen" : "resolve"), id: state_form_id, class: "hidden", data: { turbo_frame: "notes" } do %><% end %>
     <%= render Admin::NotesScreen::ComposerComponent.new(url: reply_path, key: key, label: t(".reply"), submit: t(".send_reply"), mentions_url: mentions_path,
-          body: reply_failure&.dig(:body).to_s, names: reply_failure&.dig(:names) || {}, errors: reply_failure&.dig(:errors)) %>
-    <%# A form of its own beside the reply's, never inside it (forms can't nest). %>
-    <% if thread.resolved? %>
-      <%= button_to t(".reopen"), change_path("reopen"), class: action_class(:secondary), form: { class: "self-start", **frame_form } %>
-    <% else %>
-      <%= button_to change_path("resolve"), class: action_class(:secondary), form: { class: "self-start", **frame_form } do %>
-        <%= helpers.render "admin/shared/icon", name: :check, size: "size-3" %><span><%= t(".resolve") %></span>
+          body: reply_failure&.dig(:body).to_s, names: reply_failure&.dig(:names) || {}, errors: reply_failure&.dig(:errors)) do |composer| %>
+      <% composer.with_secondary do %>
+        <%= tag.button type: "submit", form: state_form_id, class: action_class(:secondary), data: { note_state: thread.resolved? ? "reopen" : "resolve" } do %>
+          <% if thread.resolved? %>
+            <%= t(".reopen") %>
+          <% else %>
+            <%= helpers.render "admin/shared/icon", name: :check, size: "size-3" %><span><%= t(".resolve") %></span>
+          <% end %>
+        <% end %>
       <% end %>
     <% end %>
   </div>

@@ -34,6 +34,7 @@
       </div>
       <div class="flex items-center gap-2">
         <span class="font-cs-mono text-[10px] text-meta" aria-hidden="true"><%= t(".send_hint") %></span>
+        <%= secondary %>
         <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit", data: { "admin--note-composer-target": "submit" }) %>
       </div>
     </div>

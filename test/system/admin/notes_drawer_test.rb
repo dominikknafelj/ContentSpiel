@@ -17,10 +17,11 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
   end
 
-  # "New note" in the drawer's own header. The empty list offers one too (the
-  # shared empty state's action), so the button is asked for where it is.
+  # "New note" is the drawer's header's, and the one in the drawer (the
+  # handoff's decision 4): the list's own link, and its empty state's, are
+  # not shown there, so it is pressed without saying where.
   def press_new_note
-    within("#notes-drawer > header") { press "New note" }
+    within("#notes-drawer") { press "New note" }
   end
 
   def focus_in_drawer? = page.evaluate_script("document.activeElement.closest('#notes-drawer') !== null")
@@ -103,6 +104,66 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     await_admin_controllers
     assert_selector "#notes-open[aria-pressed=false]"
     assert_no_selector "#notes-drawer"
+  end
+
+  test "the drawer has one New note, its header's: the list's own link and the empty state's are not shown in it" do
+    open_editor
+    find("#notes-open").click
+    assert_selector "#notes-list .admin-empty-state", text: "No notes yet"
+    assert_selector "#notes-drawer button", text: "New note", count: 1
+    assert_no_selector "#notes-drawer a[data-note-new-link]"
+    assert_selector "#notes-drawer a[data-note-new-link]", visible: :hidden, count: 1
+
+    press_new_note
+    find("#notes-new textarea[name=body]").send_keys("First")
+    within("#notes-new") { press "Add note" }
+    assert_selector "#notes-drawer [data-notes-view=thread]", text: "First"
+    find("#notes-drawer a[data-note-back]").click
+
+    assert_selector "#notes-list a[data-note-row]", text: "First"
+    assert_selector "#notes-drawer button", text: "New note", count: 1
+    assert_no_selector "#notes-drawer a[data-note-new-link]"
+    assert_selector "#notes-drawer a[data-note-new-link]", visible: :hidden, count: 1
+
+    # The record's notes page is the same list without a drawer: it keeps its link.
+    visit "/cs-studio/notes/page/#{@page.id}"
+    assert_selector "#notes-list a[data-note-new-link]", text: "New note"
+  end
+
+  # The handoff's decision 3: Resolve stands in the composer's row, to the
+  # left of Send, and Reopen takes its place; Pin ends row 2.
+  test "Resolve is pressed beside Send and Reopen stands where it was; Notify and Pin are in the two rows above the messages" do
+    thread = as(users(:two)) { Notes::Start.call(@block, body: "Look here") }.record
+    open_editor("?notes=open&thread=#{thread.id}")
+    assert_selector "#note-thread-#{thread.id}"
+
+    boxes = lambda do |*selectors|
+      selectors.map { |selector| page.evaluate_script("(() => { const box = document.querySelector(#{selector.to_json}).getBoundingClientRect(); return [ box.left, box.top, box.right, box.bottom ] })()") }
+    end
+    reply = "#note-thread-#{thread.id}-reply"
+    state, send = boxes.call("#{reply} button[data-note-state=resolve]", "#{reply} button[type=submit]:not([form])")
+    assert_in_delta 8, send[0] - state[2], 1, "Resolve stands 8px to the left of Send"
+    assert_in_delta (state[1] + state[3]) / 2, (send[1] + send[3]) / 2, 2, "on Send's line"
+    back, notify, pin, first = boxes.call("a[data-note-back]", "[data-note-actions] form[action$='/follow'] button", "[data-note-actions] button[aria-label=Pin]", "#note-message-#{thread.first_message.id}")
+    assert_in_delta (back[1] + back[3]) / 2, (notify[1] + notify[3]) / 2, 3, "Notify me is on Back's row"
+    assert_operator pin[1], :>=, back[3], "Pin is on the row below"
+    assert_operator pin[3], :<=, first[1] + 1, "and above the messages"
+    assert_operator pin[2], :>, notify[0], "at the right end"
+
+    find("#{reply} textarea[name=body]").send_keys("Still typing")
+    within(reply) { press "Resolve" }
+
+    assert_selector "#{reply} button[data-note-state=reopen]", text: "Reopen"
+    assert_no_selector "#{reply} button[data-note-state=resolve]"
+    assert thread.reload.resolved?
+    reopen, send = boxes.call("#{reply} button[data-note-state=reopen]", "#{reply} button[type=submit]:not([form])")
+    assert_in_delta 8, send[0] - reopen[2], 1, "Reopen stands where Resolve was"
+    # What was typed is still the reply's draft.
+    assert_equal "Still typing", find("#{reply} textarea[name=body]").value
+
+    within(reply) { press "Reopen" }
+    assert_selector "#{reply} button[data-note-state=resolve]"
+    assert thread.reload.open?
   end
 
   test "the list is where it was left when a thread is closed again" do

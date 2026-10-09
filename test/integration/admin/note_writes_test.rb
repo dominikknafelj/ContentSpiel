@@ -103,6 +103,55 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_select "#note-thread-#{@thread.id}-reply form[data-controller='admin--note-composer'][data-turbo-frame=notes] textarea[name=body]"
   end
 
+  # The handoff's decision 3: where a thread's controls stand.
+  test "Notify me ends row 1 and Pin row 2, both in the part a refresh replaces; Resolve stands in the composer's row before Send, and Reopen in its place" do
+    sign_in_as(users(:two))
+
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+
+    assert_select "#note-thread-#{@thread.id}-messages" do
+      assert_select "a[data-note-back]", text: /All notes/
+      assert_select "[data-note-actions]", count: 1
+      assert_select "[data-note-actions] > [class~='row-start-1'] form[action$='/unfollow'] button", text: "Stop notifying me"
+      assert_select "[data-note-actions] > [class~='row-start-2'] form[action$='/pin'] button[aria-label=Pin]"
+      # Neither Resolve nor a reply field among what is read.
+      assert_select "[data-note-state]", count: 0
+    end
+    # Back, then Notify, then the heading with Pin: the order in the document.
+    body = response.body
+    assert_operator body.index("data-note-back"), :<, body.index("/unfollow")
+    assert_operator body.index("/unfollow"), :<, body.index("/pin")
+    assert_select "#note-thread-#{@thread.id}-reply" do
+      # An empty form of its own, beside the reply's; the button names it.
+      assert_select "form#note-thread-#{@thread.id}-state[action$='/resolve'][data-turbo-frame=notes]"
+      assert_select "form#note-thread-#{@thread.id}-state button", count: 0
+      assert_select "form[data-note-composer] button[type=submit][form='note-thread-#{@thread.id}-state'][data-note-state=resolve][class~='border-line-strong']", text: "Resolve"
+      assert_select "form[data-note-composer] button[form] + button[type=submit]:not([form])", text: "Reply"
+    end
+
+    post "#{@base}/threads/#{@thread.id}/resolve", headers: frame
+    follow_redirect!(headers: frame)
+
+    assert_select "#note-thread-#{@thread.id}-reply" do
+      assert_select "form#note-thread-#{@thread.id}-state[action$='/reopen']"
+      assert_select "form[data-note-composer] textarea[name=body]"
+      assert_select "form[data-note-composer] button[type=submit][form='note-thread-#{@thread.id}-state'][data-note-state=reopen]", text: "Reopen"
+      assert_select "form[data-note-composer] button[form] + button[type=submit]:not([form])", text: "Reply"
+    end
+    # A resolved thread has no pin, and says who resolved it.
+    assert_select "[data-note-actions] form[action$='/pin']", count: 0
+    assert_select "#note-thread-#{@thread.id}-messages [data-note-badge=resolved]"
+  end
+
+  test "in a thread a mention of the viewer is the accent chip and anybody else's the sunken one" do
+    as(users(:reader)) { Notes::Reply.call(@thread, body: "Ask @[#{users(:two).id}] or @[#{users(:one).id}]") }
+    sign_in_as(users(:two))
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+
+    assert_select "[data-note-mention=viewer][class~='bg-accent-tint']", text: "@Dana", count: 1
+    assert_select "[data-note-mention=other][class~='bg-sunken']", count: 1
+  end
+
   # Review Focus 3.
   test "a reply to a thread whose block was deleted meanwhile comes back to the frame saying so" do
     on_block = as(users(:two)) { Notes::Start.call(@block, body: "About this block") }.record

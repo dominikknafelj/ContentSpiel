@@ -6,10 +6,11 @@ module Admin
     # every width.
     #
     # Two parts with ids of their own: `messages` (everything that is READ:
-    # state, quote, messages, and the buttons that show a state -- Pin and
-    # "Notify me", in `[data-note-actions]`) and `reply` (the field that is
-    # TYPED in, with Resolve or Reopen under it). A live refresh replaces the
-    # first and never the second.
+    # the two rows at the top -- Back and "Notify me", then what the thread is
+    # on and Pin, the two settings in `[data-note-actions]` -- the state, the
+    # quote and the messages) and `reply` (the field that is TYPED in, with
+    # Resolve or Reopen in its bottom row beside Send). A live refresh
+    # replaces the first and never the second.
     #
     # Every form here is an ordinary Turbo form that names the notes frame;
     # none is an autosave form. `failed` is what a refused or failed write
@@ -90,6 +91,9 @@ module Admin
       def action_class(variant = :ghost) = "#{Admin::ButtonComponent::SMALL_CLASS} #{Admin::ButtonComponent::VARIANT_CLASSES.fetch(variant)}"
 
       def key = "thread-#{thread.id}"
+
+      # The empty form Resolve / Reopen submits from inside the composer.
+      def state_form_id = "#{dom_id}-state"
 
       # A failure of one of this thread's own forms: the reply (it has the
       # typed text) or one of the buttons (it has none).

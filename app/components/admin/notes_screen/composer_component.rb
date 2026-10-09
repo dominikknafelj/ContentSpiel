@@ -16,7 +16,13 @@ module Admin
     # The two popovers open below the box, and above it in the thread's reply
     # dock (`[data-note-part=reply]`, which sits at the bottom of the drawer
     # where there is no room below): `POPOVER_SIDE`.
+    #
+    # `secondary` is a control drawn in the bottom row, 8px to the left of the
+    # submit: the thread's Resolve / Reopen, which belongs to a form of its
+    # own and names it with `form=` (this component only gives it the place).
     class ComposerComponent < Admin::AdminComponent
+      renders_one :secondary
+
       POPOVER_SIDE = "top-full mt-1.5 [[data-note-part=reply]_&]:top-auto [[data-note-part=reply]_&]:bottom-full [[data-note-part=reply]_&]:mb-1.5 [[data-note-part=reply]_&]:mt-0".freeze
       TOOL_CLASS = "flex size-7 cursor-pointer items-center justify-center rounded-cs text-dim hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-accent".freeze
 
