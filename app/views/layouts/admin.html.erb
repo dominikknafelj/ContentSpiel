@@ -6,6 +6,23 @@
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
     <%= render "shared/theme_head" %>
+    <%# The notes drawer as this browser left it (`admin--notes` remembers
+        "open" in `localStorage`), said on <html> before anything is painted:
+        from 1024px an open drawer is a column of the editor, and the
+        stylesheet lays the page out with it from the first paint
+        (`data-notes-open` in content-spiel.tailwind.css) instead of narrowing
+        the editor when the script connects. A link with `?notes=open` asks
+        for the same. It lays out nothing on a screen without a drawer, and
+        `admin--notes` corrects it the moment the drawer connects. Guarded
+        like the theme's: `localStorage` can throw. %>
+    <%= javascript_tag nonce: true do %>
+      (function () {
+        var open = false;
+        try { open = localStorage.getItem("cs-notes-open") === "1"; } catch (e) {}
+        if (/[?&]notes=open(&|$)/.test(window.location.search)) open = true;
+        if (open) document.documentElement.setAttribute("data-notes-open", "");
+      })();
+    <% end %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags "admin" %>
     <%# Per-screen head tags: `turbo-cache-control: no-cache` on the API
@@ -34,7 +51,8 @@
       notes drawer are far apart in the document. The two drawer controllers
       tell each other when one opens (`admin--notes:opened`,
       `admin--drawer:opened`), so the notes drawer and a shell drawer are
-      never open together.
+      never open together -- but for the page tree folded beside the notes
+      column, which is opened from it (`admin--notes#shellOpened`).
 
       `data-admin-locale` carries the editing language onto <body> (rather
       than one data attribute per component) so any Stimulus controller can
@@ -72,7 +90,7 @@
 
       <%# `p-6` stays on <main>: the save bar (`sticky bottom-0 -mx-6`) is
           sized against it. %>
-      <main class="min-w-0 p-6">
+      <main class="admin-shell__main min-w-0 p-6">
         <turbo-frame id="content" data-turbo-action="advance">
           <%# A frame request's response keeps only this frame, so the flash
               it carries is rendered here (as bare toasts that `admin--toast`

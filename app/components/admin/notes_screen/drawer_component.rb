@@ -1,17 +1,19 @@
 module Admin
   module NotesScreen
-    # The notes drawer of an editor (notes spec §4.1): an `<aside>` on the
-    # right edge of the content area, 400px wide from 1024px. It follows the
-    # Media panel's pattern -- surface background, a 1px line on its left
-    # edge, no scrim, no page lock -- and lies OVER the content with the menu
-    # shadow, the one stated exception to "shadows on menus and popovers
-    # only". Below 1024px it is a full-screen sheet under the top bar with
-    # "Back to <title>" (nothing is designed below 768px). The editor beside
-    # it stays usable. Rendered once per screen, inside `#content` (a frame
-    # navigation to another record replaces it) and OUTSIDE EVERY FORM: the
-    # frame brings forms of its own, forms can't nest, and inside an
-    # `admin--autosave` form a note's field would be the record's.
-    # `hidden` until `admin--notes` opens it.
+    # The notes drawer of an editor (notes spec §4.1; the handoff's decision 1
+    # of 2026-10-09): from 1024px a 400px COLUMN to the right of the content
+    # and below the editor's sticky header -- surface background, a 1px line
+    # on its left edge, no shadow, no scrim, no page lock. It takes its room
+    # from the content column, so nothing of the editor is under it, and the
+    # page tree folds into its drawer while it is open (both in
+    # content-spiel.tailwind.css, "The editors' notes drawer"). Below 1024px
+    # it is a full-screen sheet under the top bar with "Back to <title>"
+    # (nothing is designed below 768px). The editor beside it stays usable.
+    # Rendered once per screen, inside `#content` (a frame navigation to
+    # another record replaces it) and OUTSIDE EVERY FORM: the frame brings
+    # forms of its own, forms can't nest, and inside an `admin--autosave` form
+    # a note's field would be the record's. `hidden` until `admin--notes`
+    # opens it.
     #
     # It holds the notes frame empty: the controller sets the frame's `src`
     # (`data-src`, plus the thread or the block to start on) when the drawer

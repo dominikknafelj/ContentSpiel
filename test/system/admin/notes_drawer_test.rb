@@ -67,10 +67,10 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
 
     assert_no_selector ".admin-shell__scrim", visible: true
     assert_equal false, page.evaluate_script("document.querySelector('.admin-content-blocks').inert")
-    # The header keeps its actions clear of the drawer: the button that
-    # opened it is still there to be pressed, and shows that it is.
-    assert_operator page.evaluate_script("document.querySelector('#notes-open').getBoundingClientRect().right"), :<=,
-      page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().left")
+    # The drawer starts below the header: the button that opened it is still
+    # there to be pressed, and shows that it is.
+    assert_operator page.evaluate_script("document.querySelector('#notes-open').getBoundingClientRect().bottom"), :<=,
+      page.evaluate_script("document.querySelector('#notes-drawer').getBoundingClientRect().top")
     # Escape belongs to the drawer only while the focus is inside it.
     page.execute_script("document.querySelector('.admin-content-blocks [contenteditable=true]').focus()")
     page.driver.browser.keyboard.type(:escape)

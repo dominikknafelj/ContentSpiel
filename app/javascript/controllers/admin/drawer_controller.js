@@ -15,8 +15,12 @@ import { Controller } from "@hotwired/stimulus"
 // is open and closes them on click.
 //
 // The editors' notes drawer (`admin--notes`) is the one other drawer, on the
-// right: opening a panel here says so (`admin--drawer:opened`) and that one
-// closes; when that one opens, these stand aside (`standAside`).
+// right: opening a panel here says so (`admin--drawer:opened`, with the
+// panel's name) and that one closes; when that one opens, these stand aside
+// (`standAside`). While the notes are a column beside the editor the page
+// tree is folded into its drawer at widths where it otherwise is a column
+// (content-spiel.tailwind.css, "THE PAGE TREE FOLDS"): the same panel, the
+// same `data-open`, nothing here knows.
 export default class extends Controller {
   static targets = [ "panel", "scrim", "trigger" ]
 
@@ -41,8 +45,9 @@ export default class extends Controller {
     // on the page it covers.
     const first = panel.querySelector("a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex='-1'])")
     ;(first || panel).focus({ preventScroll: true })
-    // The notes drawer hears this and makes room (`admin--notes#shellOpened`).
-    this.dispatch("opened")
+    // The notes drawer hears this and makes room (`admin--notes#shellOpened`),
+    // unless it is a column and this is the page tree folded beside it.
+    this.dispatch("opened", { detail: { name: panel.dataset.drawer } })
   }
 
   close(panel, { refocus = false } = {}) {

@@ -19,6 +19,16 @@ import { messages } from "i18n/messages"
 // notes showing. A shell drawer opening closes this one, and this one opening
 // tells the shell's to stand aside (`admin--notes:opened`).
 //
+// FROM 1024PX THE DRAWER IS A COLUMN beside the editor and below its sticky
+// header (content-spiel.tailwind.css, "The editors' notes drawer"). Two things
+// of that layout are this controller's: `data-notes-open` on <html>, which is
+// what the stylesheet reads to make the room and fold the page tree (set with
+// the drawer's own `hidden` in `setOpen`, and before the first paint by the
+// layout's head script from what is remembered here), and the height of the
+// editor's header, under which the column starts (`measure`, kept current by
+// a ResizeObserver: a "Changed elsewhere" bar or a wrapped row makes the
+// header taller).
+//
 // THE FOCUS stays where the person put it. The frame's answers move it only
 // when an opener asked (a press on the header's button, a marker, a link with
 // `?notes=open`), or when it was inside the drawer as the request left and the
@@ -81,13 +91,25 @@ export default class extends Controller {
   // -- a press, or a link with `?notes=open`. The choice stays remembered
   // for a wider window.
   drawerTargetConnected(drawer) {
+    this.header = document.querySelector(".admin-editor-header")
+    if (this.header && "ResizeObserver" in window) {
+      this.headerObserver = new ResizeObserver(() => this.measure())
+      this.headerObserver.observe(this.header)
+    }
+
     if (drawer.dataset.openOnLoad === "true") this.show({ thread: drawer.dataset.thread || null })
     else if (this.remembered && this.beside) this.show({ focus: false })
+    // What the head script said from memory, where nothing opens after all
+    // (a narrow window that was widened since would keep the empty room).
+    else this.setOpen(false)
   }
 
   // The editor was replaced (another record in `#content`, another screen):
   // what was asked of the old drawer is nobody's any more.
   drawerTargetDisconnected() {
+    this.headerObserver?.disconnect()
+    this.headerObserver = null
+    this.header = null
     this.pending = null
     this.returnTo = null
     this.listScroll = null
@@ -158,8 +180,7 @@ export default class extends Controller {
     // An Escape something inside already used (a menu's).
     if (event?.type === "keydown" && event.defaultPrevented) return
 
-    this.drawerTarget.hidden = true
-    this.syncOpeners()
+    this.setOpen(false)
     this.markActive()
     this.forget()
     this.trigger?.focus()
@@ -200,11 +221,14 @@ export default class extends Controller {
 
   // A shell drawer opened (`admin--drawer:opened`): this one makes room, and
   // the focus is the shell drawer's. Not a "Close": the choice stays
-  // remembered.
-  shellOpened() {
+  // remembered. The exception is the page tree while the notes are a column:
+  // the tree is a drawer there BECAUSE the notes are open (the stylesheet
+  // folds it), so closing them for it would put the tree back as a column
+  // under the pointer that asked for the drawer.
+  shellOpened(event) {
     if (!this.hasDrawerTarget || !this.isOpen) return
-    this.drawerTarget.hidden = true
-    this.syncOpeners()
+    if (event?.detail?.name === "tree" && this.beside) return
+    this.setOpen(false)
     this.markActive()
   }
 
@@ -325,8 +349,7 @@ export default class extends Controller {
     this.pending = { thread, group, compose, focus }
 
     const wasOpen = this.isOpen
-    this.drawerTarget.hidden = false
-    this.syncOpeners()
+    this.setOpen(true)
     this.remember()
     if (!wasOpen) this.dispatch("opened")
 
@@ -340,6 +363,23 @@ export default class extends Controller {
     if (there && frame.querySelector("[data-notes-view]")) this.loaded()
     else if (there) frame.reload()
     else frame.src = next
+  }
+
+  // The drawer shown or not, and with it what the stylesheet lays the page
+  // out by (`data-notes-open` on <html>: the room for the column, the folded
+  // page tree). One place, so the two can't disagree.
+  setOpen(open) {
+    if (open) this.measure()
+    this.drawerTarget.hidden = !open
+    document.documentElement.toggleAttribute("data-notes-open", open)
+    this.syncOpeners()
+  }
+
+  // Where the column starts: under the editor's sticky header, whose height
+  // is whatever its rows come to. Written on the drawer, read by its `top`.
+  measure() {
+    if (!this.hasDrawerTarget || !this.header?.isConnected) return
+    this.drawerTarget.style.setProperty("--admin-editor-header-height", `${this.header.getBoundingClientRect().height}px`)
   }
 
   // A frame's `src` as a path and query: Turbo writes the whole URL there

@@ -116,19 +116,54 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 @media (prefers-reduced-motion: reduce) { .admin-shell__sidebar, .admin-shell__tree { transition: none; } }
 
 /* The editors' notes drawer (`Admin::NotesScreen::DrawerComponent`, notes spec
-   §4.1) lies OVER the right edge of the content, from the window's top, 400px
-   wide from 1024px. The editor's sticky header ends under it, and the right
-   end of that header is where Preview, Publish, the save status and the
-   Notes button itself are: while the drawer is open the header keeps its
-   contents clear of it, so the button that opened the drawer can close it
-   and still shows that it is pressed. Only the header moves; the blocks
-   below stay as wide as they were (a block's marker sits beside its name,
-   on the left, for the same reason). Below 1024px the drawer is a sheet over
-   the whole editor and nothing has to make room. */
+   §4.1 and the handoff's decision 1 of 2026-10-09). From 1024px it is a 400px
+   COLUMN to the right of the content and BELOW the editor's sticky header:
+   the header spans both, nothing of the editor is under the drawer, and the
+   drawer scrolls by itself while the content scrolls with the page. Below
+   1024px it is a sheet over the whole editor and none of this applies.
+
+   HOW THE COLUMN IS MADE. The shell's grid is not given a fourth track: the
+   drawer is rendered inside `#content` (a frame navigation replaces it with
+   its editor), and a grid item of `.admin-shell` it is not. Instead the room
+   is taken out of the content column -- `<main>` pads its right side by the
+   drawer's width -- the header's negative margin grows by the same amount so
+   it still reaches the window's edge, and the drawer is fixed in the room
+   that was made, from the header's bottom edge to the window's. The header
+   is stuck to `--admin-top-offset` at every scroll position, so its bottom
+   edge is that plus its height, which `admin--notes` measures and keeps
+   current (`--admin-editor-header-height`, on the drawer: a notice bar or a
+   wrapped row makes the header taller). No shadow: it is beside the content,
+   not over it.
+
+   WHAT SAYS "OPEN". `data-notes-open` on <html>, together with a drawer in
+   the page. On <html> and not read from the drawer's own `hidden`: the
+   layout's head script sets it before the first paint when this browser
+   remembers the drawer as open, so the page is laid out with the column from
+   the start and the editor does not change width when the script connects.
+   `admin--notes` owns it from then on (`setOpen`); a screen without a drawer
+   never matches.
+
+   THE PAGE TREE FOLDS while the column is there, the way it does below
+   1024px: the same element, the same `data-open`, the same "Pages ▾" button
+   of the top bar, `admin--drawer` and the scrim -- these rules only add a
+   second condition to the ones above. From 1024px to 1279px, where the top
+   bar and its button exist. */
 :root { --admin-notes-width: 400px; }
 @media (min-width: 1024px) {
-  #content:has(.admin-notes-drawer:not([hidden])) .admin-editor-header { padding-right: calc(var(--admin-notes-width) + 1.75rem); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__main { padding-right: calc(1.5rem + var(--admin-notes-width)); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-editor-header { margin-right: calc(-1.5rem - var(--admin-notes-width)); }
+  .admin-notes-drawer { top: calc(var(--admin-top-offset) + var(--admin-editor-header-height, 0px)); }
 }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell--tree { grid-template-columns: minmax(0, 1fr); }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { position: fixed; z-index: 40; top: 3rem; bottom: 0; left: 0; width: 17rem; overflow-y: auto; transform: translateX(-100%); visibility: hidden; transition: transform 0.2s var(--cs-ease), visibility 0s linear 0.2s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree[data-open] { transform: none; visibility: visible; transition: transform 0.2s var(--cs-ease), visibility 0s; }
+  :root[data-notes-open] body:has(#notes-drawer) .admin-top-bar__tree { display: inline-block; }
+  /* The scrim of the folded tree: the two rules above hide it from 1024px
+     unless the modules sidebar is the open drawer. */
+  :root[data-notes-open] body:has(#notes-drawer):has(.admin-shell__tree[data-open]) .admin-shell__scrim:not([hidden]) { display: block; }
+}
+@media (prefers-reduced-motion: reduce) { :root[data-notes-open] body:has(#notes-drawer) .admin-shell__tree { transition: none; } }
 
 /* Admin::DialogComponent: a native <dialog> needs real CSS for its backdrop
    and max sizes (widths mirror Admin::DialogComponent::WIDTHS). */

@@ -1,12 +1,15 @@
-<%# `top-(--admin-top-offset)`: under the shell's top bar wherever there is
-    one (below 1280px), so its buttons stay in reach and a shell drawer can be
-    opened from the sheet. `z-20`: over the editor's sticky header, under the
-    shell's scrim and drawers. While it is open the editor's header keeps its
-    actions clear of it (`.admin-notes-drawer` and `--admin-notes-width` in
-    content-spiel.tailwind.css). Escape is heard here and nowhere wider: it
-    closes the drawer only while the focus is inside it. %>
+<%# Below 1024px a sheet: `top-(--admin-top-offset)`, under the shell's top
+    bar, so its buttons stay in reach and a shell drawer can be opened from
+    the sheet; `z-20`, over the editor's sticky header, under the shell's
+    scrim and drawers. From 1024px a column beside the editor and below its
+    header: its `top` is the stylesheet's there (`.admin-notes-drawer` in
+    content-spiel.tailwind.css, which also makes the room for it), it has a
+    line on its left and no shadow, and it lies under the header's layer
+    (`lg:z-[5]`), so a menu the header opens is drawn over it. Escape is
+    heard here and nowhere wider: it closes the drawer only while the focus
+    is inside it. %>
 <%= tag.aside id: "notes-drawer", hidden: true, tabindex: -1, aria: { label: t(".title") },
-      class: "admin-notes-drawer fixed inset-x-0 bottom-0 top-(--admin-top-offset) z-20 flex flex-col bg-surface focus:outline-none lg:left-auto lg:w-(--admin-notes-width) lg:border-l lg:border-line lg:shadow-menu",
+      class: "admin-notes-drawer fixed inset-x-0 bottom-0 top-(--admin-top-offset) z-20 flex flex-col bg-surface focus:outline-none lg:left-auto lg:z-[5] lg:w-(--admin-notes-width) lg:border-l lg:border-line",
       data: { "admin--notes-target": "drawer", src: src, key: key, open_on_load: open?, thread: thread, action: "keydown.esc->admin--notes#close" } do %>
   <header class="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-line px-4 py-3 lg:py-3.5">
     <%# The sheet's way back, below 1024px only (handoff "Full-screen sheet"). %>
