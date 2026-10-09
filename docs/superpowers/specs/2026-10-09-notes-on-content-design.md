@@ -2,7 +2,7 @@
 
 The first of four steps of "Collaboration on content" (roadmap, decided 2026-10-08): (1) notes, with live delivery — this spec; (2) presence; (3) live refresh of blocks changed by someone else, and edit reservations; (4) co-editing of rich text, only if 1–3 prove insufficient. Each step has its own spec, plan and PR. This is the binding spec for one implementation plan.
 
-**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** **The visual design is `Studio Notes.dc.html` in the Claude Design project "Content Spiel design system"** (every screen in light and dark, made inside the design system and accepted by the user on 2026-10-09; §4.6 lists what it settles). An earlier rough canvas, "Notes on content", is superseded and is not a reference.
+**Status: design, agreed with the user on 2026-10-09; amended the same day (live delivery, the mention sound, desktop notifications and following a thread moved into this step: D16–D20, §6).** **The visual design is `Studio Notes.dc.html` in the Claude Design project "Content Spiel design system"** (every screen in light and dark, made inside the design system and accepted by the user on 2026-10-09; §4.5 lists what it settles). An earlier rough canvas, "Notes on content", is superseded and is not a reference.
 
 ## 1. Purpose
 
