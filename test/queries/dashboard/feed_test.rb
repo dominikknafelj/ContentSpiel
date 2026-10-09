@@ -151,6 +151,20 @@ class Dashboard::FeedTest < ActiveSupport::TestCase
     assert_not_includes f.going_live_next, outside
   end
 
+  test "a note on my draft by someone else does not take it off my drafts, and one by me does not put theirs on mine" do
+    mine = as(users(:two)) { create_post(title: "Mine", published: false) }
+    theirs = as(users(:one)) { create_post(title: "Theirs", published: false) }
+    travel_to(1.minute.from_now) do
+      as(users(:one)) { Notes::Start.call(mine, body: "A question") }
+      as(users(:two)) { Notes::Start.call(theirs, body: "A question") }
+    end
+
+    drafts = Dashboard::Feed.new(actor: users(:two), channel: :admin).drafts
+
+    assert_includes drafts, mine
+    assert_not_includes drafts, theirs
+  end
+
   private
 
   def rich_text_doc(text) = { "type" => "doc", "content" => [ { "type" => "paragraph", "content" => [ { "type" => "text", "text" => text } ] } ] }

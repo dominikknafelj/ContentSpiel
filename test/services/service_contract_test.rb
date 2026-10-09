@@ -41,7 +41,7 @@ class ServiceContractTest < ActiveSupport::TestCase
   end
 
   test "there are services to check" do
-    assert_operator services.size, :>=, 33
+    assert_operator services.size, :>=, 37
   end
 
   test "every service authorizes and records an event" do

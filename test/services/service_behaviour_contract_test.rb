@@ -50,7 +50,7 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   EXPECTED_SERVICES = %w[
     AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
     ContentBlocks::Save Groups::Destroy Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
-    Media::Upload Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
+    Media::Upload Notes::DeleteMessage Notes::EditMessage Notes::Reply Notes::Start Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
     Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile
   ].freeze

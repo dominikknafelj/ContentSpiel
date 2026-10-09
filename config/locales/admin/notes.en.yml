@@ -1,0 +1,27 @@
+# Notes on content (docs/reference/i18n.md): everything a person reads about
+# notes. `admin.notes.errors` are the sentences the `Notes::` services answer
+# with; later tasks add `admin.notes.script` (what the scripts say),
+# `admin.notes.index` and `admin.note_inbox` (the views' own lazy-lookup
+# scopes) and `admin.components.notes_screen` (the components).
+#
+# Each shape of a sentence is a whole sentence of its own, one per kind of
+# record, never glued from a noun: a translator can reorder it.
+en:
+  admin:
+    notes:
+      errors:
+        blank: "Write something first."
+        too_long: "A note can be at most 4,000 characters."
+        mention_unknown: "That person no longer exists."
+        mention_cannot_read:
+          page: "%{name} can't see this page."
+          post: "%{name} can't see this post."
+          image: "%{name} can't open the media library."
+        gone:
+          page: "This page is in the trash or was deleted."
+          post: "This post is in the trash or was deleted."
+          image: "This image is in the trash or was deleted."
+          block: "This block was deleted."
+          note: "This note is gone: it was deleted, or what it was on was."
+        not_yours: "Only the person who wrote a note can change it."
+        delete_others: "Only the person who wrote a note, or someone who can edit what it is on, can delete it."

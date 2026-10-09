@@ -168,6 +168,14 @@ module ServiceCalls
     end
 
     def png_upload = Rack::Test::UploadedFile.new(file_fixture("tiny.png"), "image/png")
+
+    # A thread on `subject` with its first message, written by `by` (a user
+    # who may read it): what the notes services act on.
+    def note_on(subject, by: users(:one), body: "A question")
+      result = as(by) { Notes::Start.call(subject, body: body) }
+      assert result.ok?, result.errors.to_sentence
+      result.record
+    end
   end
 
   FACTORIES = {
@@ -267,6 +275,32 @@ module ServiceCalls
     "Media::Upload" => lambda {
       file = png_upload
       { call: -> { Media::Upload.call(file: file) }, permission: "media.upload", on: Media::Asset }
+    },
+
+    # A message someone else wrote: deleting it is moderation, which the
+    # trusted actor may; the stranger is refused for the read right first.
+    "Notes::DeleteMessage" => lambda {
+      page = create_page(title: "Noted", published: false)
+      message = note_on(page).first_message
+      { call: -> { Notes::DeleteMessage.call(message) }, permission: "pages.read", on: page }
+    },
+
+    # Only its author may edit a message, so the control runs as the author.
+    "Notes::EditMessage" => lambda {
+      page = create_page(title: "Noted", published: false)
+      message = note_on(page, by: users(:one)).first_message
+      { call: -> { Notes::EditMessage.call(message, body: "Reworded") }, permission: "pages.read", on: page, control_actor: users(:one) }
+    },
+
+    "Notes::Reply" => lambda {
+      page = create_page(title: "Noted", published: false)
+      thread = note_on(page)
+      { call: -> { Notes::Reply.call(thread, body: "An answer") }, permission: "pages.read", on: page }
+    },
+
+    "Notes::Start" => lambda {
+      page = create_page(title: "Noted", published: false)
+      { call: -> { Notes::Start.call(page, body: "A question") }, permission: "pages.read", on: page }
     },
 
     "Pages::Move" => lambda {

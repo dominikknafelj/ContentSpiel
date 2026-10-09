@@ -65,4 +65,12 @@ class Audit::ChangeSinceTest < ActiveSupport::TestCase
 
     assert_nil change
   end
+
+  test "a note is not a change to the record" do
+    page = create_page(title: "Pricing")
+    base = page.reload.updated_at
+    travel_to(1.minute.from_now) { as(users(:two)) { Notes::Start.call(page, body: "A question") } }
+
+    assert_nil Audit::ChangeSince.for(page, since: base, viewer: users(:one))
+  end
 end

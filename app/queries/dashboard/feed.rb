@@ -29,8 +29,11 @@ module Dashboard
     # record as its subject -- and it coalesces -- so without this a user
     # merely *refused* on someone else's page would take it over as "mine".
     # The LATERAL join excludes exactly this list. (`Dashboard::Activity`
-    # never lists the action either: it only lists content events.)
-    NOT_A_CHANGE = %w[access.denied].freeze
+    # never lists the action either: it only lists content events.) A note's
+    # events have the page, post or block as their subject too, and are no
+    # change to it either (notes spec §3.5): "Mine" and "Changed by"
+    # (`Audit::ChangeSince` reads this list) ignore them.
+    NOT_A_CHANGE = (%w[access.denied] + Audit::Sentence::NOTE_VERBS.keys).freeze
 
     # The LATERAL subquery `#with_newest_event` joins, as a table to read its
     # columns from: `newest.newest_user_id`, `newest.newest_at`.
