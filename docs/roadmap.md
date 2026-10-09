@@ -252,7 +252,9 @@ From the staff review unless noted. What must happen before a deploy is in "Befo
 
 | Item | Priority | Ref |
 |---|---|---|
-| After a block or a section is deleted the focus falls to `<body>`, the top of the page for a keyboard user (`Admin::ContentBlocksController#removal_streams`, `admin/blocks_controller.js`): move it to the neighbouring block | Could | Sections |
+| After a block or a section is deleted, or a section is removed with its blocks kept, the focus falls to `<body>`, the top of the page for a keyboard user (`Admin::ContentBlocksController#removal_streams`, `admin/blocks_controller.js`): move it to the neighbouring block, or to the first of the kept blocks' cards | Could | Sections |
+| From a section's ⋯ menu, "Remove section, keep blocks" shows no waiting state while the write queue drains (up to 10 s on a slow connection, `DRAIN_LIMIT_MS`): the menu closes on the press, so the busy look `admin--queue-hold` gives the button is in a closed menu, and the focus is left at the top of the page meanwhile | Could | Sections |
+| A queue drain that passes its 10 s limit is reported as unclean, so the toast says "Your last change wasn't saved" when the save is only slow (`admin/queue_hold_controller.js`, `drained()`'s `timedOut`; also met by the editor header's actions): say that it is still saving and offer to try again | Could | Sections |
 | A section's Layout button does not say which layout is current, and the six diagrams in its menu have no visible name (`Admin::EditorScreen::SectionLayoutMenuComponent`) | Could | Sections |
 
 ## Known gaps (interim states)
@@ -340,6 +342,8 @@ Left by the sections sub-project (spec §12).
 - An image inside a rich-text block in a column is requested at the content width: the rich-text render is cached by document digest and can't vary by where the block sits. Only an image block's `sizes` follows its column.
 - A tile in a section's lane has no pick-up-and-arrows keyboard drag; every one of its moves is in its ⋯ menu.
 - A duplicated section is several audit events (a `block.created` per copy and one `block.reordered`), not one.
+- "Remove section, keep blocks" is refused while ANY form on the screen holds unsaved text, not only one inside the section, and the toast does not say which form (`admin/queue_hold_controller.js` asks `settled()` and `drained()` of the whole screen). The fix is to ask only the forms inside the section's card.
+- Text typed into a form of the section after "Remove section, keep blocks" was pressed, while the removal's request is on the wire, is lost with the form: the section's card is not held `inert` during the removal as a moved block and its form are (`admin--blocks`' `hold`).
 
 ### Accepted as they are
 
