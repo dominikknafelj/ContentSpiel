@@ -26,6 +26,34 @@ class Dashboard::NotesForYouTest < ActiveSupport::TestCase
     assert_equal [ :admin_page_path, [ @page.id ], { notes: "open", thread: thread.id } ], [ row.route.name, row.route.args, row.route.params ]
   end
 
+  # The handoff's decision 8: a row on a block carries what the block is called.
+  test "a row on a block carries its heading: the type, the column in a section, and the first words, the file name or the place" do
+    @block.assign_body(rich_doc("Our prices start at forty nine euros a month."), locale: :en)
+    @block.save!
+    section = @page.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "two" })
+    image = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: create_media_asset)
+    mention(@page)
+    mention(image)
+    mention(@block)
+
+    on_text, on_image, on_page = inbox.rows.map(&:heading)
+
+    assert_equal [ "Rich text", nil, nil, "Our prices start at forty nine…" ], on_text.to_h.values_at(:type, :section, :column, :words)
+    assert_equal [ "Image", "Section", 2, "tiny.png", 3 ], on_image.to_h.values_at(:type, :section, :column, :file_name, :position)
+    assert_nil on_page
+  end
+
+  test "rows on blocks cost the same statements for two blocks as for six, image blocks among them" do
+    blocks = 6.times.map { |index| @page.content_blocks.create!(block_type: index.even? ? "image" : "rich_text", position: 1 + index, media_asset: (create_media_asset if index.even?)) }
+    blocks.first(2).each { |block| mention(block) }
+    few = capture_sql { inbox.rows(limit: 50) }.size
+
+    blocks.drop(2).each { |block| mention(block) }
+
+    assert_equal few, capture_sql { inbox.rows(limit: 50) }.size
+    assert_equal 3, inbox.rows(limit: 50).count { |row| row.heading.file_name == "tiny.png" }
+  end
+
   test "a post and an image lead to their own screens" do
     on_post = mention(@post)
     on_asset = mention(@asset)

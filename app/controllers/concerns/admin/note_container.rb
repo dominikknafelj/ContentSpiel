@@ -47,7 +47,7 @@ module Admin
     # The list: what `index` answers, and what a refused or failed new note
     # answers with its own status, the typed text kept (`failed`).
     def render_list(status: :ok, failed: nil, notice: nil)
-      @listing = Notes::Listing.new(@container, limit: params[:limit], viewer: Current.user)
+      @listing = Notes::Listing.new(@container, limit: params[:limit], viewer: Current.user, locale: admin_locale)
       @failed = failed
       @notice = notice
       render "admin/notes/index", status: status, layout: turbo_frame_request? ? false : "admin"
@@ -58,7 +58,7 @@ module Admin
     # message whose edit form or delete question the view draws
     # (`Admin::NoteThreadsController#asked`).
     def render_thread(thread, status: :ok, failed: nil, asked: {})
-      @listing = Notes::Listing.new(@container, viewer: Current.user)
+      @listing = Notes::Listing.new(@container, viewer: Current.user, locale: admin_locale)
       @thread = @listing.find(thread.id) or raise ActiveRecord::RecordNotFound
       @failed = failed
       @asked = asked

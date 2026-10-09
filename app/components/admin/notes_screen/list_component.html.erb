@@ -52,7 +52,7 @@
       <% end %>
       <% listing.groups.each do |group| %>
         <section id="notes-group-<%= group.key %>" data-notes-group="<%= group.key %>" tabindex="-1" class="flex flex-col focus:outline-none">
-          <h4 class="px-4 pb-1.5 pt-4 font-cs-mono text-[10px] uppercase tracking-mono text-meta"><%= group_title(group) %></h4>
+          <%= render group_heading(group) %>
           <% group.threads.each do |record| %><%= render row(record) %><% end %>
         </section>
       <% end %>

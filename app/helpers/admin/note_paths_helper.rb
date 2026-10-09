@@ -7,15 +7,24 @@ module Admin
 
     def note_args(container) = [ TYPES.fetch(container.class.polymorphic_name), container.id ]
 
-    # What a thread is on, as its group's heading says it: the record itself
-    # ("Whole page"), or the block the way its card names it -- with its column
-    # inside a section (`Admin::EditorScreen::PanelTitleComponent`'s own key).
-    # A block has no name of its own in this CMS, so its type is its name.
-    def note_subject_name(record, container, type)
-      return t("admin.notes.subject.#{type}") if record.nil? || record == container
+    # What a thread is on, as the mono label of its group's heading says it
+    # (the handoff's decision 8): the record itself ("Whole page"), or the
+    # block's type -- "Rich text", and inside a section "Section › Column 2 ·
+    # Rich text". `name` is a `Notes::Heading::Name`, or nil for the record
+    # itself. A block has no name of its own in this CMS, so its type is its
+    # label and `note_subject_detail` is what tells two of a type apart.
+    def note_subject_label(name, type)
+      return t("admin.notes.subject.#{type}") if name.nil?
 
-      label = record.definition&.label || record.block_type
-      record.section_id ? t("admin.components.editor_screen.panel_title.title", type: label, column: record.section_column) : label
+      name.section ? t("admin.notes.subject.in_section", section: name.section, column: name.column, type: name.type) : name.type
+    end
+
+    # The block's first words, its image's file name, or its place on the
+    # page for a block with neither ("Block 3"). Nil for the record itself.
+    def note_subject_detail(name)
+      return if name.nil?
+
+      name.words.presence || name.file_name.presence || t("admin.notes.subject.block", position: name.position)
     end
   end
 end

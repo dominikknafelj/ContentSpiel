@@ -39,7 +39,9 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#notes-for-you" do
       assert_select "[data-delivery]", count: 2
       assert_select "[data-delivery][data-unread]", count: 0
-      assert_select "p", text: /Page · Pricing · Rich text/
+      # The block as the list's group heading names it (the handoff's
+      # decision 8): its type, then -- it is empty -- its place on the page.
+      assert_select "p", text: "Page · Pricing · Rich text · Block 1"
       assert_select "[class*=accent]", count: 0
       assert_select "[data-notes-new]", count: 0
       assert_select "form[action='/cs-studio/notes/read']", count: 0

@@ -43,7 +43,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#{marker(@text)}[data-has-notes] [data-notes-count]", text: "1"
     assert_selector "#notes-open-count", text: "1"
     assert_selector "#notes-drawer [data-note-thread]", text: "Shorter, please"
-    assert_selector "#notes-drawer [data-note-thread] h3", text: "RICH TEXT"
+    assert_selector "#notes-drawer [data-note-thread] h3 [data-note-subject-type]", text: "RICH TEXT"
     assert_equal "1", find(marker(@text)).evaluate_script("getComputedStyle(this).opacity")
     assert_equal @text, Notes::Thread.last.subject
   end
@@ -65,7 +65,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#{marker(@inside)}[data-has-notes][aria-label='1 open note on Image']"
     find(marker(@inside)).click
 
-    assert_selector "#notes-group-ContentBlock-#{@inside.id} h4", text: "IMAGE · COLUMN 1"
+    assert_selector "#notes-group-ContentBlock-#{@inside.id} h4 [data-note-subject-type]", text: "SECTION › COLUMN 1 · IMAGE"
     assert_eventually(message: "the group never took the focus") { page.evaluate_script("document.activeElement.id") == "notes-group-ContentBlock-#{@inside.id}" }
   end
 
@@ -319,7 +319,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
       press "Add note"
     end
 
-    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON IMAGE · COLUMN 1"
+    assert_selector "#notes-drawer #notes-new h3", text: "NEW NOTE ON SECTION › COLUMN 1 · IMAGE"
     find("#notes-new textarea[name=body]").send_keys("Wrong picture")
     within("#notes-new") { press "Add note" }
 

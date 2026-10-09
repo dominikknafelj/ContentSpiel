@@ -44,13 +44,14 @@ module Admin
       end
 
       # "Page · Pricing", and for a note on a block "Page · Pricing · Rich
-      # text" -- the block named as its card names it, with its column inside
-      # a section (`Admin::NotePathsHelper#note_subject_name`).
+      # text · Our prices start at…": the block as the list's group heading
+      # names it, its type and then its first words, its image's file name or
+      # its place on the page (`row.heading`, a `Notes::Heading::Name`).
       def where
         place = t(".where.#{row.kind}", title: row.title || t(".untitled"))
-        return place unless row.block
+        return place unless row.heading
 
-        t(".where.block", place: place, block: helpers.note_subject_name(row.block, nil, row.kind))
+        t(".where.block", place: place, block: [ helpers.note_subject_label(row.heading, row.kind), helpers.note_subject_detail(row.heading) ].compact.join(" · "))
       end
 
       # `admin_url_options` is a controller helper, absent when a component

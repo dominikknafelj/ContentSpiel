@@ -17,6 +17,10 @@ en:
         page: "Whole page"
         post: "Whole post"
         media: "This image"
+        # A block in a section's column: "Section › Column 2 · Rich text".
+        in_section: "%{section} › Column %{column} · %{type}"
+        # A block with no text and no image, by its place on the page.
+        block: "Block %{position}"
       errors:
         blank: "Write something first."
         too_long: "A note can be at most 4,000 characters."

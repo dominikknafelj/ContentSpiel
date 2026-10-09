@@ -28,7 +28,7 @@
       threads are open. Each is a frame of its own that its own GET answers
       again (`Admin::NoteInboxController`). The unread number is the
       sidebar's (`notes_badge_count`): asked once for both. %>
-  <%= render "admin/note_inbox/card", rows: Dashboard::NotesForYou.new(actor: Current.actor).rows, unread: notes_badge_count %>
+  <%= render "admin/note_inbox/card", rows: Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale).rows, unread: notes_badge_count %>
   <%= render "admin/note_inbox/open_threads", open_threads: Dashboard::OpenThreads.new(actor: Current.actor) %>
 
   <%= render Admin::DashboardScreen::CardComponent.new(title: "Your drafts", id: "dashboard-drafts", empty: (quick_create.render? ? "No drafts — start one above." : "No drafts."),

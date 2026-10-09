@@ -44,6 +44,6 @@ module Admin
 
     private
 
-    def inbox = @inbox ||= Dashboard::NotesForYou.new(actor: Current.actor)
+    def inbox = @inbox ||= Dashboard::NotesForYou.new(actor: Current.actor, locale: admin_locale)
   end
 end

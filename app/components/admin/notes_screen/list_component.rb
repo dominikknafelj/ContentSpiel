@@ -33,7 +33,11 @@ module Admin
         Admin::NotesScreen::ThreadRowComponent.new(thread: record, listing: listing, viewer: viewer, type: type, view: view, show_subject: show_subject)
       end
 
-      def group_title(group) = helpers.note_subject_name(group.subject, container, type)
+      # A group's heading: the record itself, or the block as `Notes::Heading`
+      # names it.
+      def group_heading(group)
+        Admin::NotesScreen::SubjectComponent.new(name: listing.heading_of(group.subject), type: type, level: :h4, class: "px-4 pb-1.5 pt-4")
+      end
 
       def empty? = listing.open_count.zero? && listing.resolved_count.zero?
 
@@ -74,7 +78,7 @@ module Admin
 
         # The block as its group's heading names it, column included: plain
         # text, escaped once by the template.
-        t(".new_on_block", block: helpers.note_subject_name(compose_subject, container, type))
+        t(".new_on_block", block: helpers.note_subject_label(listing.heading_of(compose_subject), type))
       end
 
       def threads_path = helpers.admin_record_note_threads_path(*helpers.note_args(container), **frame_params)

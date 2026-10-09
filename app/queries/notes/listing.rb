@@ -3,7 +3,8 @@ module Notes
   # constant number of queries: the open threads with their messages (two),
   # the counts (one grouped, one for the resolved), the people named (one),
   # the viewer's follows (one) and, for a page, its blocks (one, for the
-  # order of the groups). The resolved threads are read only when asked for.
+  # order of the groups and for what each block is called). The resolved
+  # threads are read only when asked for.
   #
   # Open threads are grouped by what they are on: the record itself first,
   # then one group per block, in the order the page shows its blocks
@@ -18,9 +19,12 @@ module Notes
 
     attr_reader :container
 
-    def initialize(container, limit: PAGE, viewer: nil)
+    # `locale` is the language being read (the editor's tab): a block is
+    # named by the first words of its text in it (`heading_of`).
+    def initialize(container, limit: PAGE, viewer: nil, locale: nil)
       @container = container
       @viewer = viewer
+      @locale = locale
       @limit = limit.to_s.match?(/\A\d+\z/) ? limit.to_i.clamp(PAGE, MAX) : PAGE
     end
 
@@ -49,6 +53,19 @@ module Notes
     def find(id) = load(scope.where(id: id)).first
 
     def subject_of(thread) = subjects[Notes.key(thread.subject_type, thread.subject_id)]
+
+    # What a block is called where a note names it (`Notes::Heading::Name`):
+    # its type, its column, and its first words, its image's file name or its
+    # place on the page. Nil for the record itself, which a component words
+    # ("Whole page"). Read from the blocks this listing has loaded for the
+    # order of its groups, so it costs nothing per block and nothing per
+    # thread; the file names of the image blocks that the loaded threads are
+    # on are read together, once, the first time one is asked for.
+    def heading_of(subject)
+      return unless subject.is_a?(ContentBlock)
+
+      headings.preload_images([ subject, *loaded.filter_map { |thread| subject_of(thread) } ].grep(ContentBlock)).for(subject)
+    end
 
     # The record a key names, among this container's own (itself and, for a
     # page, its blocks); nil for anything else. A form's `subject` is looked
@@ -103,9 +120,15 @@ module Notes
     def subjects
       @subjects ||= begin
         records = [ container ]
-        records.concat(BlockOutline.new(container.content_blocks).reading_order) if container.is_a?(Page)
+        records.concat(BlockOutline.new(blocks).reading_order) if container.is_a?(Page)
         records.to_h { |record| [ Notes.key(record), record ] }
       end
     end
+
+    # A page's blocks, read once: the order of the groups and every block's
+    # name come from these rows.
+    def blocks = @blocks ||= container.is_a?(Page) ? container.content_blocks.to_a : []
+
+    def headings = @headings ||= Heading.new(blocks, locale: @locale)
   end
 end

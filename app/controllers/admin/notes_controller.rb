@@ -12,7 +12,7 @@ module Admin
     end
 
     def resolved
-      @listing = Notes::Listing.new(@container, limit: params[:limit], viewer: Current.user)
+      @listing = Notes::Listing.new(@container, limit: params[:limit], viewer: Current.user, locale: admin_locale)
       render :resolved, layout: false
     end
 

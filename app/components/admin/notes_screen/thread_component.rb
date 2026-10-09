@@ -103,7 +103,10 @@ module Admin
 
       def button_failure = (own_failure if own_failure && own_failure[:body].blank?)
 
-      def subject_name = helpers.note_subject_name(listing.subject_of(thread), listing.container, type)
+      # What the thread is on, as its group's heading in the list says it.
+      def subject_heading
+        Admin::NotesScreen::SubjectComponent.new(name: listing.heading_of(listing.subject_of(thread)), type: type, level: :h3)
+      end
 
       # "2 messages · started on DE": the line under what the thread is on.
       def summary

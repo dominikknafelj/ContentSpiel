@@ -21,16 +21,20 @@ module Dashboard
   # Constant in queries whatever the number of rows: the page of deliveries
   # with their messages and threads (three), the people named (one), and one
   # read per kind of record the page's rows are on (pages, posts, images,
-  # blocks).
+  # blocks), and for rows on blocks one more for their pages' other blocks,
+  # plus the stored files of the image blocks among them (`headings_of`).
   class NotesForYou
     EXCERPT = 140
     KINDS = { "Page" => "page", "Post" => "post", "Media::Asset" => "media" }.freeze
 
-    Row = Data.define(:id, :reason, :by, :by_id, :excerpt, :kind, :title, :block, :route, :unread, :at, :thread_id)
+    Row = Data.define(:id, :reason, :by, :by_id, :excerpt, :kind, :title, :block, :heading, :route, :unread, :at, :thread_id)
 
-    def initialize(actor:, channel: Current.channel)
+    # `locale` is the language a block's first words are read in (the
+    # editing language of the screen that shows the rows).
+    def initialize(actor:, channel: Current.channel, locale: nil)
       @actor = actor
       @channel = channel
+      @locale = locale
       @user = actor.is_a?(ApiToken) ? actor.user : actor
     end
 
@@ -60,6 +64,7 @@ module Dashboard
       users = people(deliveries)
       containers = records(threads.map { |thread| [ thread.container_type, thread.container_id ] })
       blocks = blocks_of(threads)
+      headings = headings_of(blocks.values)
       deliveries.filter_map do |delivery|
         thread = delivery.thread
         container = containers[[ thread.container_type, thread.container_id ]] or next
@@ -67,7 +72,7 @@ module Dashboard
         Row.new(id: delivery.id, reason: delivery.reason, by: users[by_id], by_id: by_id,
           excerpt: Notes::Mentions.display(delivery.message.body, users).first.truncate(EXCERPT),
           kind: KINDS.fetch(thread.container_type), title: container.title.presence,
-          block: (blocks[thread.subject_id] if thread.subject_type == "ContentBlock"),
+          block: (block = (blocks[thread.subject_id] if thread.subject_type == "ContentBlock")), heading: (headings.for(block) if block),
           route: route(container, thread), unread: delivery.read_at.nil?, at: delivery.updated_at, thread_id: thread.id)
       end
     end
@@ -102,6 +107,20 @@ module Dashboard
     def blocks_of(threads)
       ids = threads.select { |thread| thread.subject_type == "ContentBlock" }.map(&:subject_id).uniq
       ids.empty? ? {} : ContentBlock.where(id: ids).index_by(&:id)
+    end
+
+    # What each of those blocks is called (`Notes::Heading`): its type, its
+    # column, and its first words, its image's file name or its place on its
+    # page. A place and a section's type need the page's other blocks, so
+    # those are read too -- one statement for all the pages together -- and
+    # the file names of the image blocks in one pass; none of it when no row
+    # is on a block.
+    def headings_of(blocks)
+      return Notes::Heading.new([], locale: @locale) if blocks.empty?
+
+      owners = blocks.map { |block| [ block.owner_type, block.owner_id ] }.uniq
+      rows = ContentBlock.where(owner_type: owners.map(&:first).uniq, owner_id: owners.map(&:last).uniq).to_a.index_by(&:id)
+      Notes::Heading.new(rows.merge(blocks.index_by(&:id)).values, locale: @locale).preload_images(blocks)
     end
 
     def route(container, thread)

@@ -42,7 +42,8 @@ module Admin
       # short (handoff, "Media panel Notes section"): the excerpt wraps there.
       def excerpt_class = view == "media" ? "break-words" : "truncate"
 
-      def subject_name = helpers.note_subject_name(listing.subject_of(thread), listing.container, type)
+      # The type's label alone: this line is the row's small mono one.
+      def subject_name = helpers.note_subject_label(listing.heading_of(listing.subject_of(thread)), type)
 
       # The row's last line: what it is on (a pinned or resolved row, which
       # stands outside its group), the replies, "new". Nothing when it has

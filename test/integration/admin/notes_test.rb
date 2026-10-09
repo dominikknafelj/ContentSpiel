@@ -51,7 +51,10 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#notes #notes-list", count: 0
     assert_select "turbo-frame#notes #note-thread-#{@thread.id}[data-notes-view=thread][data-state=open]" do
       assert_select "a[data-note-back][href='#{@base}']"
-      assert_select "h3", text: "Rich text"
+      # The type as the label, then what tells the block from others of its
+      # type: an empty one's place on the page (the handoff's decision 8).
+      assert_select "h3 [data-note-subject-type]", text: "Rich text"
+      assert_select "h3 [data-note-subject-words][class~='text-xs'][class~='text-dim'][class~='truncate']", text: "Block 1"
       assert_select "blockquote", text: "€49 a month"
       assert_select "#note-thread-#{@thread.id}-messages #note-message-#{@thread.first_message.id} [data-note-mention]", text: "@reader@example.com"
       assert_select "a[href='https://example.com']"
@@ -258,6 +261,51 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
 
     assert_equal one, capture_sql { get "#{@base}/resolved" }.size
     assert_select "a[data-note-row]", count: 8
+  end
+
+  # The handoff's decision 8.
+  test "a group is headed by the block's type and its first words in the tab's language, an image's file name, or its place on the page" do
+    with_locales(%w[en de], default: "en") do
+      @block.assign_body(rich_doc("Our prices start at forty nine euros a month."), locale: :en)
+      @block.assign_body(rich_doc("Unsere Preise beginnen hier"), locale: :de)
+      @block.save!
+      section = @page.content_blocks.create!(block_type: "section", position: 1, settings: { "layout" => "two" })
+      image = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: create_media_asset)
+      empty = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+      as(users(:two)) { [ image, empty, @page ].each { |subject| Notes::Start.call(subject, body: "A note") } }
+      sign_in_as(users(:two))
+
+      get @base, headers: frame
+
+      heading = ->(record) { "section#notes-group-#{Notes.key(record)} h4" }
+      assert_select "#{heading.call(@block)} [data-note-subject-type][class~='font-cs-mono'][class~='uppercase']", text: "Rich text"
+      assert_select "#{heading.call(@block)} [data-note-subject-words][class~='text-xs'][class~='text-dim'][class~='truncate']", text: "Our prices start at forty nine…"
+      assert_select "#{heading.call(image)} [data-note-subject-type]", text: "Section › Column 2 · Image"
+      assert_select "#{heading.call(image)} [data-note-subject-words]", text: "tiny.png"
+      assert_select "#{heading.call(empty)} [data-note-subject-type]", text: "Section › Column 1 · Rich text"
+      assert_select "#{heading.call(empty)} [data-note-subject-words]", text: "Block 3"
+      # The record itself has its words and nothing after them.
+      assert_select "#{heading.call(@page)} [data-note-subject-type]", text: "Whole page"
+      assert_select "#{heading.call(@page)} [data-note-subject-words]", count: 0
+
+      get @base, params: { locale: "de" }, headers: frame
+      assert_select "#{heading.call(@block)} [data-note-subject-words]", text: "Unsere Preise beginnen hier"
+    end
+  end
+
+  test "the list costs the same statements whatever the number of blocks with notes, image blocks among them" do
+    images = 4.times.map { |index| @page.content_blocks.create!(block_type: "image", position: 1 + index, media_asset: create_media_asset) }
+    texts = 4.times.map { |index| @page.content_blocks.create!(block_type: "rich_text", position: 5 + index) }
+    as(users(:reader)) { [ images.first, texts.first ].each { |block| Notes::Start.call(block, body: "One") } }
+    sign_in_as(users(:two))
+    get @base, headers: frame
+    few = capture_sql { get @base, headers: frame }.size
+
+    as(users(:reader)) { (images.drop(1) + texts.drop(1)).each { |block| 2.times { Notes::Start.call(block, body: "More") } } }
+    get @base, headers: frame
+
+    assert_equal few, capture_sql { get @base, headers: frame }.size
+    assert_select "h4 [data-note-subject-words]", text: "tiny.png", count: 4
   end
 
   test "the record's own group is headed Whole page, Whole post or This image" do
