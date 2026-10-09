@@ -101,6 +101,46 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
     assert_equal "", field.value
   end
 
+  # `sessionStorage` belongs to the tab, not to the session: without this the
+  # last person's unsent note text and the names of the files they chose
+  # stayed readable in the tab, under their id, until it was closed.
+  def draft_keys = page.evaluate_script("Object.keys(window.sessionStorage).filter((name) => name.startsWith('cs-note-draft:'))")
+
+  test "signing out removes every note draft from the tab, and the next person finds none" do
+    open_notes
+    field.send_keys("Not for the next person")
+    assert_eventually { draft_keys == [ "cs-note-draft:#{users(:one).id}:new-Page-#{@page.id}-" ] }
+
+    press "Sign out"
+    assert_selector "input[name=email_address]"
+    assert_empty draft_keys
+
+    sign_in_via_form(users(:two))
+    open_notes
+    assert_empty draft_keys
+    assert_equal "", field.value
+  end
+
+  # A session that ended without the button (it expired, it was ended from
+  # another tab): the next page a different person loads here clears what is
+  # not theirs, and leaves their own.
+  test "a page loaded for another person removes the drafts that are not theirs and keeps their own" do
+    open_notes
+    field.send_keys("Mine alone")
+    own = "cs-note-draft:#{users(:one).id}:new-Page-#{@page.id}-"
+    assert_eventually { draft_keys == [ own ] }
+    page.execute_script("window.sessionStorage.setItem('cs-note-draft:424242:thread-7', JSON.stringify({ body: 'Someone else', names: {}, files: [ 'secret.pdf' ] }))")
+    page.execute_script("window.sessionStorage.setItem('unrelated', 'kept')")
+
+    open_notes
+
+    assert_equal [ own ], draft_keys
+    assert_equal "Mine alone", field.value
+    assert_equal "kept", page.evaluate_script("window.sessionStorage.getItem('unrelated')")
+  ensure
+    page.execute_script("try { window.sessionStorage.removeItem('unrelated') } catch (error) {}")
+  end
+
   test "the submit is disabled while the field is empty" do
     open_notes
     assert_selector "#notes-new button[type=submit][disabled]", text: "Add note"

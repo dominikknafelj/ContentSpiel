@@ -164,4 +164,63 @@ class Admin::NoteEditDraftsSystemTest < ApplicationSystemTestCase
     assert_selector "#note-message-#{@first.id}", text: "Saved elsewhere"
     assert_no_selector unsaved(@first)
   end
+
+  # An open edit is MOVED into the thread's new messages part by every live
+  # refresh and every merged answer to one of the tab's own buttons, and a
+  # moved element's controller connects again. It once took the text typed so
+  # far as "what the form was drawn with" there: one more keystroke that left
+  # the field as it was then removed the draft, and the edit was left with
+  # nothing kept and nothing said. The baseline is the saved text the server
+  # drew, whatever happens to the element.
+  test "an edit whose thread was refreshed by someone's reply is still an unsaved edit: left, its text is kept and said" do
+    open_thread
+    edit_and_type
+
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "Meanwhile").ok? }
+    assert_selector "[data-note-message]", text: "Meanwhile", wait: LIVE
+    assert_equal "My first, changed", find(field(@first)).value
+    find(field(@first)).send_keys("x", :backspace)
+    assert_not_nil draft(@first), "the draft was dropped although the field still differs from the saved text"
+
+    menu(@second, "Edit")
+
+    assert_selector field(@second)
+    assert_selector unsaved(@first), text: "Unsaved edit"
+    assert_not_nil draft(@first)
+    menu(@first, "Edit")
+    assert_equal "My first, changed", find(field(@first)).value
+  end
+
+  test "an edit whose thread was redrawn by this tab's own Pin is still an unsaved edit: left, its text is kept and said" do
+    open_thread
+    edit_and_type
+
+    find("[data-note-actions] button[aria-label='Pin']").click
+    assert_selector "[data-note-badge=pinned]"
+    assert_equal "My first, changed", find(field(@first)).value
+    find(field(@first)).send_keys("x", :backspace)
+    assert_not_nil draft(@first), "the draft was dropped although the field still differs from the saved text"
+
+    menu(@second, "Edit")
+
+    assert_selector field(@second)
+    assert_selector unsaved(@first), text: "Unsaved edit"
+    menu(@first, "Edit")
+    assert_equal "My first, changed", find(field(@first)).value
+  end
+
+  # Typing the SAVED text back is still what removes an edit's draft, after a
+  # refresh as before one.
+  test "after a refresh, typing the saved text back into an edit leaves no draft" do
+    open_thread
+    menu(@first, "Edit")
+    find(field(@first)).send_keys("!")
+    assert_not_nil draft(@first)
+
+    as(users(:two)) { assert Notes::Reply.call(@thread, body: "Meanwhile").ok? }
+    assert_selector "[data-note-message]", text: "Meanwhile", wait: LIVE
+    find(field(@first)).send_keys(:backspace)
+
+    assert_nil draft(@first)
+  end
 end

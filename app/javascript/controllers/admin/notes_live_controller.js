@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { cable } from "@hotwired/turbo-rails"
 import { messages } from "i18n/messages"
+import { forgetDrafts } from "controllers/admin/note_composer_controller"
 
 // Live delivery of notes (notes spec §6). Lives on <body>. A signal over the
 // cable says only THAT something changed (`Notes::Signals`: a kind and ids);
@@ -262,6 +263,8 @@ export default class extends Controller {
       pending.person = this.personValue
       endBurst()
     }
+    // The tab's note drafts are this person's or nobody's (`forgetDrafts`).
+    forgetDrafts(this.personValue)
     live = this
     if (pending.due || pending.deliveries.size > 0) this.soon("person", () => this.inbox())
     this.sync()
@@ -306,6 +309,20 @@ export default class extends Controller {
     clearTimeout(this.timers.get(element))
     this.timers.delete(element)
     this.sync()
+  }
+
+  // `submit` on the sidebar's Sign out form: the tab's note drafts go with the
+  // session. When the document actually goes (`pagehide`), not at the press:
+  // with unsaved content the browser asks "Leave site?" first, and a person
+  // who stays must find their half-typed note where it was. If they stay,
+  // the next key or pointer press takes the intent back, so a later reload,
+  // which is meant to keep drafts, removes nothing.
+  signingOut() {
+    const clear = () => forgetDrafts()
+    const stay = () => window.removeEventListener("pagehide", clear)
+    window.addEventListener("pagehide", clear, { once: true })
+    document.addEventListener("pointerdown", stay, { once: true, capture: true })
+    document.addEventListener("keydown", stay, { once: true, capture: true })
   }
 
   // `turbo:before-fetch-request` on the document: this tab's notes WRITES say

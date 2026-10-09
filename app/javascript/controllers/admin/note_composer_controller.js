@@ -14,7 +14,9 @@ import { messages } from "i18n/messages"
 //   when the form is drawn again: the drawer is closed and reopened, the frame
 //   is fetched again, the screen is left and come back to. It is dropped when
 //   the form's own submit succeeds. Unsent note text never raises the leave
-//   guard, which is about content.
+//   guard, which is about content. It does not outlive the person either:
+//   signing out removes every draft from the tab, and a page loaded for
+//   someone else removes what is not theirs (`forgetDrafts`).
 // - AN EDIT THAT WAS LEFT (the handoff's decision 27; `edit`). An edit form
 //   opens filled with the saved text, so "put back into an empty field"
 //   never applied to it and its draft was stored and then lost. For an edit
@@ -69,6 +71,26 @@ const PREFIX = "cs-note-draft:"
 // The one place a draft's key is made: `cs-note-draft:<user id>:<form key>`,
 // the form key being "new", "thread-<id>" or, for an edit, "message-<id>".
 export const draftKey = (user, key) => `${PREFIX}${user}:${key}`
+
+// Every note draft of this tab is removed, except those of `person` (with no
+// person: all of them). `sessionStorage` belongs to the TAB and outlives the
+// session: the person in the key keeps the next one's forms from showing the
+// last one's text, but the text, and the names of the files chosen with it,
+// would stay readable in the tab until it is closed -- and a note's text is
+// kept out of every log for a reason. So `admin--notes-live` calls this when
+// the person signs out (all), and when a page loads for someone (all but
+// theirs: a session can end without the button). A draft is a convenience;
+// a failure here is the same as having none.
+export function forgetDrafts(person = null) {
+  try {
+    const own = person ? draftKey(person, "") : null
+    Object.keys(window.sessionStorage)
+      .filter((name) => name.startsWith(PREFIX) && !(own && name.startsWith(own)))
+      .forEach((name) => window.sessionStorage.removeItem(name))
+  } catch {
+    // Nothing to forget.
+  }
+}
 const APPLE = /mac|iphone|ipad|ipod/i
 const ROWS = 6
 // A lookup waits for a pause in the typing, not for every letter.
@@ -80,12 +102,23 @@ export default class extends Controller {
 
   connect() {
     this.names = this.parse(this.namesTarget.value)
-    // What the form was drawn with: for an edit, the text a draft is measured against.
-    this.drawn = this.fieldTarget.value
+    // What the SERVER drew the form with: for an edit, the saved text a draft
+    // is measured against. The field's `defaultValue`, never its `value`:
+    // this runs again whenever the element is MOVED (an open edit is moved
+    // into the thread's new messages part by every live refresh and every
+    // merged answer, `admin--notes-live#redrawThread`), and a baseline read
+    // from `value` there was the text typed so far -- from then on the edit
+    // looked unchanged, its draft was removed by the next keystroke that
+    // left the field as it was, and "Unsaved edit" no longer protected it.
+    this.drawn = this.fieldTarget.defaultValue
     // The files a form drawn again no longer holds: the server's, after a refusal.
     this.lost = this.hasLostTarget ? this.list(this.lostTarget.dataset.names) : []
     const draft = this.stored()
-    if (draft && (this.editValue ? draft.body !== this.drawn : !this.drawn)) {
+    // A draft is put back into a field as the server drew it, never over one
+    // that already holds typing (the moved element again: what is in the
+    // field is newer than anything stored).
+    const untouched = this.fieldTarget.value === this.drawn
+    if (draft && untouched && (this.editValue ? draft.body !== this.drawn : !this.drawn)) {
       this.fieldTarget.value = draft.body
       this.names = { ...draft.names, ...this.names }
       this.namesTarget.value = JSON.stringify(this.names)
