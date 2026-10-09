@@ -222,6 +222,26 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#section-#{@section.id}-lane-3[role='list'][data-section-id='#{@section.id}'][data-column='3']"
   end
 
+  # Plan D9: a tile is dragged by the pointer only. Its grip is no button and
+  # is hidden from a screen reader, which would otherwise be offered a control
+  # the keyboard can't work; the keyboard's moves are in the tile's menu.
+  test "a tile has a grip to drag it by, before its face, that is no control" do
+    as(users(:one), channel: :admin) { render_card }
+
+    tile = "##{ActionView::RecordIdentifier.dom_id(@image)}"
+    assert_selector "#{tile} > span.admin-block-tile__grip[aria-hidden='true']:first-child", visible: :all
+    assert_no_selector "#{tile} > .admin-block-tile__grip[tabindex], #{tile} > button.admin-block-tile__grip", visible: :all
+    assert_selector "#{tile} > .admin-block-tile__grip + button.admin-block-tile__face"
+  end
+
+  test "a viewer who can't edit the page gets a tile with no grip" do
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+
+    assert_no_selector ".admin-block-tile__grip", visible: :all
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(@image)} > button.admin-block-tile__face"
+  end
+
   test "the panels are in reading order, column by column" do
     late = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
     render_card

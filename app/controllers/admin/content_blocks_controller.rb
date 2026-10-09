@@ -215,6 +215,22 @@ module Admin
     # to `before`, which can't put a block back into the column it left and
     # would be refused as soon as the list had gained or lost one.
     #
+    # What such a request -- a STRUCTURAL one -- is answered with instead
+    # (sections spec §4.4, §6):
+    # - saved: each block that changed containers in its new shape
+    #   (`move_streams`). The browser has moved the element already; what it
+    #   cannot do is turn a card into a tile and a form under the lanes, or
+    #   back;
+    # - refused, and not for want of permission: the whole list as it is now
+    #   (`blocks_list_stream`). The screen was behind -- the block is not
+    #   where it was dragged from, the column is gone -- and how far behind
+    #   is not known here, so nothing less than the list puts it right. That
+    #   replaces every form on the screen, as an Undo's answer does;
+    #   `admin--blocks#move` has had each send what it held first.
+    # The page's own order refused is answered as it always was, with the
+    # reason alone: the browser puts its cards back, and they are still the
+    # page's.
+    #
     # Every parameter is read through `one_value` or `moved_from_param`: a
     # forged `section_id[]=1` is an array where an id belongs, and the
     # service casts what it is handed with `to_i`.
@@ -222,6 +238,7 @@ module Admin
       before = top_level_blocks.ids
       section_id = one_value(params[:section_id])
       origins = moved_from_param
+      structural = section_id.present? || origins.any?
       result = ContentBlocks::Reorder.call(@page, ordered_ids_param, section: section_id, column: one_value(params[:column]), moved_from: origins)
       status_id = "content-blocks-status"
 
@@ -233,9 +250,10 @@ module Admin
       streams = [ turbo_stream.replace(status_id, state) ]
       if result.ok?
         streams.concat(page_base_streams)
-        streams.concat(reorder_undo_streams(before)) unless section_id.present? || origins.any?
+        streams.concat(structural ? move_streams(origins) : reorder_undo_streams(before))
       else
         streams << picker_error_stream(result.errors)
+        streams << blocks_list_stream if structural && !result.denied?
       end
       render turbo_stream: streams, status: (result.ok? ? :ok : failure_status(result))
     end
@@ -370,10 +388,73 @@ module Admin
     # the service has just allowed this actor the write.
     def tile_streams(block, open: false)
       section = block.section
-      panel = Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
-      tile = Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, open: open)
-      [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel),
-        turbo_stream.append(Admin::EditorScreen::SectionLanesComponent.lane_id(section, block.section_column), tile) ]
+      [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel_component(block, open: open)),
+        turbo_stream.append(Admin::EditorScreen::SectionLanesComponent.lane_id(section, block.section_column), tile_component(block, open: open)) ]
+    end
+
+    def panel_component(block, open: false)
+      Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
+    end
+
+    def tile_component(block, open: false)
+      Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, open: open)
+    end
+
+    # Each block a saved reorder moved between containers, in its new shape
+    # (sections spec §4.4; plan D8), and the count of every section that
+    # gained or lost one. `origins` is the request's `moved_from`, which the
+    # service has just found true: where each block was.
+    #
+    # - A card that went into a column becomes a tile, and its form a panel
+    #   under that section's lanes.
+    # - A tile that left its section becomes a card of the list, told whether
+    #   it is the first or the last as on a page load; its panel goes.
+    # - A tile that went to another section stays a tile, but its panel goes
+    #   from the one section to the other.
+    # - A tile that changed lanes inside its section keeps both. Only its
+    #   panel's heading is rewritten, which names the column.
+    #
+    # THE BROWSER HAS ALREADY MOVED THE ELEMENT (`admin--blocks#move`), so the
+    # `replace` of the block's `dom_id` lands where it was dropped, and
+    # nothing here says a position.
+    #
+    # THE ONE PLACE A FORM IS REPLACED BY A MOVE. Everything else that redraws
+    # part of a section leaves its panels alone (`section_structure_streams`),
+    # because a form holds what is typed and its place in the write queue. A
+    # form can't be kept here: a card's is inside the card, a panel's is under
+    # the lanes of the section it left. So the browser sends what the form
+    # holds before the move, and doesn't send the move at all for a form that
+    # did not end clean; the forms drawn here are new ones, with the block's
+    # base as it is now -- which a move leaves alone
+    # (`ContentBlocks::Reorder` writes with `update_columns`).
+    #
+    # The old panel is removed first in every case but the last: for a card
+    # the stream finds none, and a panel appended before the old one left
+    # would be the second element with its id.
+    def move_streams(origins)
+      outline = fresh_outline
+      sections = outline.sections.index_by(&:id)
+      top_level = outline.top_level
+      touched = []
+
+      streams = outline.reading_order.select { |block| origins.key?(block.id.to_s) }.flat_map do |block|
+        from = origins.dig(block.id.to_s, "section_id").presence&.to_i
+        touched.push(from, block.section_id)
+        dom = ActionView::RecordIdentifier.dom_id(block)
+        old_panel = turbo_stream.remove(Admin::BlockCardComponent.panel_id(block))
+
+        if from == block.section_id
+          [ turbo_stream.update(Admin::BlockCardComponent.panel_title_id(block), Admin::EditorScreen::PanelTitleComponent.new(block: block)) ]
+        elsif block.section_id
+          [ old_panel,
+            turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(block.section), panel_component(block)),
+            turbo_stream.replace(dom, tile_component(block)) ]
+        else
+          [ old_panel, turbo_stream.replace(dom, card_for(block, first: top_level.first == block, last: top_level.last == block, outline: outline)) ]
+        end
+      end
+
+      streams + touched.compact.uniq.filter_map { |id| sections[id] }.flat_map { |section| section_count_streams(section, count: outline.blocks_in(section).size) }
     end
 
     # What leaves the screen with a deleted block: a top-level card; a tile
@@ -510,7 +591,7 @@ module Admin
     # out, and a forged one may send anything where the hash belongs, where
     # an entry's does, or where one of its two ids does (`one_value`). An
     # entry that is no hash names no place, which is what the service reads
-    # as "the top level".
+    # as "the top level" -- and what `move_streams` reads from the same hash.
     def moved_from_param
       moved = params[:moved_from]
       return {} unless moved.respond_to?(:to_unsafe_h)

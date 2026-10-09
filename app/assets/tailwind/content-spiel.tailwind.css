@@ -309,7 +309,8 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
    the editor sits beside the page tree, so the window's width says little
    about the room a section has. `--lanes` is the section's column count, set
    on the lanes element by `Admin::EditorScreen::SectionLanesComponent`. A
-   lane keeps a minimum height so an empty column still has a place on screen.
+   lane keeps a minimum height so an empty column still has a place on screen
+   -- and under the pointer: it is what a block is dropped into (`admin--blocks`).
    The open tile -- the one whose form is showing under the lanes -- is marked
    by its border, read from the face's own `aria-expanded`, so the look cannot
    drift from what `admin--section` tells a screen reader. */

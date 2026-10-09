@@ -299,13 +299,15 @@ class ApplicationSystemTestCase < ActionDispatch::SystemTestCase
   # only looks at what is under the pointer on its own 50 ms timer, so a pointer
   # that jumps is never seen on the way; each step rests for longer than a tick.
   # The caller asserts what it expects mid-drag, calls `await_drag_slot` and
-  # releases with `mouse.up`. Returns the mouse.
-  def drag_pointer(from_x, from_y, to_y)
+  # releases with `mouse.up`. Returns the mouse. `to_x:` is for a drag that
+  # also crosses to another column (a section's lanes); left out, the pointer
+  # walks straight down or up.
+  def drag_pointer(from_x, from_y, to_y, to_x: from_x)
     mouse = page.driver.browser.mouse
     mouse.move(x: from_x, y: from_y)
     mouse.down
     6.times do |step|
-      mouse.move(x: from_x, y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
+      mouse.move(x: from_x + ((to_x - from_x) * (step + 1) / 6.0), y: from_y + ((to_y - from_y) * (step + 1) / 6.0))
       sleep 0.08 # sleep: SortableJS samples the pointer on a 50 ms timer of its own; the pointer rests one tick plus margin per step
     end
     mouse

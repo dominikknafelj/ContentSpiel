@@ -192,6 +192,11 @@ en:
           delete_title: "Delete this section?"
           delete_body: "Blocks don’t go to the trash. This can’t be undone."
           delete_confirm: "Delete section"
+          # The toast of a block that was not moved between the list and a
+          # column, or between sections, because its form holds an edit that
+          # was not saved (`admin--blocks#move`): the move would redraw the
+          # form.
+          unsaved_move: "Reload or fix this block before moving it."
         # The layout menu in a section's header: `name` is the button's
         # accessible name, `label` the word on it beside the diagram, and
         # each layout's name is what a screen reader gets for its diagram.

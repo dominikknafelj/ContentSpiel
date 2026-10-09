@@ -16,10 +16,18 @@ module Admin
     # while its form is to be shown at once (a block just added): the script
     # opens the panel, and the tile must not say "collapsed" in between.
     #
-    # `page:`, `url_options:` and `editable:` are what the tile's own controls
-    # will need (a grip, a menu: later tasks of the sections plan). Today the
-    # tile has none, and a viewer who can't edit may still open it: the form
-    # they get is the disabled one a view-only card shows.
+    # THE GRIP IS FOR THE POINTER ONLY (sections plan, D9): a `<span>` hidden
+    # from a screen reader, not the `<button>` a card's handle is. A card's
+    # handle is also its keyboard path (Space, arrows, Space), which moves a
+    # card along one list; a tile's moves are along its lane, to another
+    # column and out of the section, and those are items of the tile's menu,
+    # where each has a name. A focusable grip beside the face would be a
+    # second stop on every tile for a control the keyboard can't work. Only
+    # for a viewer who can edit, as a card's handle is.
+    #
+    # `page:` and `url_options:` are what the tile's menu will need (a later
+    # task of the sections plan). A viewer who can't edit may still open a
+    # tile: the form they get is the disabled one a view-only card shows.
     class BlockTileComponent < AdminComponent
       def initialize(page:, block:, locale:, url_options: {}, editable:, open: false)
         @page = page
@@ -37,6 +45,8 @@ module Admin
       def panel_id = Admin::BlockCardComponent.panel_id(block)
 
       def open? = @open
+
+      def editable? = @editable
 
       private
 

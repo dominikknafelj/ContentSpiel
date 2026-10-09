@@ -1078,6 +1078,112 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_includes response.body, ContentBlocks::Reorder::STALE
   end
 
+  # --- A move's answer (sections plan, Task 7; spec §4.4, D8) ------------------
+
+  test "a move into a column answers with the tile and its panel in place of the card, and no Undo" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-tile"
+    assert_includes response.body, %(target="section-#{section.id}-panels")
+    assert_includes response.body, "1 block"
+    assert_not_includes response.body, "Undo"
+  end
+
+  test "a move out of a section answers with the card in place of the tile and removes the panel" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="remove" target="block-#{block.id}-panel")
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-card"
+    assert_includes response.body, "0 blocks"
+  end
+
+  # The card a block becomes is the list's own: told whether it is the first
+  # or the last, as on a page load.
+  test "the card of a block moved out to the end of the list has Move down disabled" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    card = Nokogiri::HTML5.fragment(response.body).at_css(%(turbo-stream[target="#{ActionView::RecordIdentifier.dom_id(block)}"] template))
+    assert card.at_css("button[data-move='down'][disabled]"), "Move down is not disabled on the last card"
+    assert card.at_css("button[data-move='up']:not([disabled])"), "Move up is disabled on a card that is not the first"
+  end
+
+  test "a move between lanes of one section rewrites only the panel's heading" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 2, moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, "Image · column 2"
+    assert_not_includes response.body, %(target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_not_includes response.body, %(target="block-#{block.id}-panel")
+  end
+
+  test "a move from one section to another takes the form along and recounts both" do
+    from = @page.content_blocks.create!(block_type: "section", position: 0)
+    to = @page.content_blocks.create!(block_type: "section", position: 1)
+    block = @page.content_blocks.create!(block_type: "image", section: from, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: to.id, column: 2, moved_from: { block.id => { section_id: from.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="remove" target="block-#{block.id}-panel")
+    assert_includes response.body, %(action="append" target="section-#{to.id}-panels")
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, %(target="section-#{from.id}-summary")
+    assert_includes response.body, %(target="section-#{to.id}-summary")
+  end
+
+  test "a refused move answers 422 with the reason and the whole list as the server has it" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 3, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::NO_COLUMN
+    assert_includes response.body, %(action="update" target="content-blocks-list")
+  end
+
+  # The page's own order refused (a block deleted elsewhere) is as it was:
+  # the reason, and the cards are put back by the browser. And a denial is
+  # no fault of the screen's, so it redraws nothing.
+  test "a refused order of the page's own list, and a denied move, answer without the list" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id, 0 ] }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_not_includes response.body, %(target="content-blocks-list")
+
+    sign_in_as(users(:reader))
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :forbidden
+    assert_not_includes response.body, %(target="content-blocks-list")
+  end
+
+  test "a top-level reorder still offers Undo" do
+    a = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    b = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ b.id, a.id ] }, as: :turbo_stream
+
+    assert_includes response.body, "Undo"
+  end
+
   # Task 4's review: `section_id[]=1` and its kind reached `to_i` as an array
   # or a hash -- a 500. Whatever is not one value is read as none.
   test "a forged reorder whose section, column, ids or origin is not one value is answered, never an error" do
@@ -1100,5 +1206,19 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     end
     assert_equal order, @page.content_blocks.top_level.reorder(:position).ids
     assert_nil block.reload.section_id
+  end
+
+  # The service reads an origin that is no hash as "the top level", and so
+  # must the answer that then draws the moved block.
+  test "a move whose origin is no hash is the move of a top-level block, drawn as one" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => "x" } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ section.id, 1 ], block.reload.then { |b| [ b.section_id, b.section_column ] }
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-tile"
   end
 end
