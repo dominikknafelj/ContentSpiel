@@ -55,7 +55,12 @@ module Admin
 
       # The passage the new note quotes (decision D4): from the failed form, or
       # from the URL the opener built. A copy, cut to the column's length.
-      def quote = (failed_new ? failed_new[:quote] : helpers.params[:quote]).to_s.strip.first(::Notes::Thread::MAX_QUOTE).presence
+      #
+      # In the URL its name is `note_quote`, never `quote`: a GET's query
+      # string is written to the log, and `note_quote` is a name that can be
+      # filtered there wherever it appears (`config/initializers/
+      # filter_parameter_logging.rb`). The form then posts it as `quote`.
+      def quote = (failed_new ? failed_new[:quote] : helpers.params[:note_quote]).to_s.strip.first(::Notes::Thread::MAX_QUOTE).presence
 
       # What the new note is on: the block the URL (or the failed form) names,
       # when it is one of this record's; otherwise the record itself.

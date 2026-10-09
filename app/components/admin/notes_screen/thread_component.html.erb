@@ -50,10 +50,10 @@
     <% end %>
     <% leading.each do |record| %><%= render message(record) %><% end %>
     <% if folded.any? %>
-      <details class="border-t border-line">
+      <%= tag.details class: "border-t border-line", open: fold_open?, data: { note_fold: true } do %>
         <summary class="cursor-pointer px-4 py-2.5 text-[13px] text-dim hover:text-ink focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><%= t(".show_more", count: folded.size) %></summary>
         <% folded.each do |record| %><%= render message(record) %><% end %>
-      </details>
+      <% end %>
     <% end %>
     <% trailing.each do |record| %><%= render message(record) %><% end %>
   </div>

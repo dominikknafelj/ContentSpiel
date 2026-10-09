@@ -51,6 +51,15 @@ module Admin
 
       def trailing = messages.size > FOLD_ABOVE ? messages.last(2) : []
 
+      # "Show N more" is drawn open when one of the messages in it is the one
+      # being acted on: its edit form or its "Delete this note?" was asked
+      # for, or its own write was just refused. Closed, the answer to Edit or
+      # Delete would be drawn where nobody sees it, and the press would seem
+      # to have done nothing.
+      def fold_open?
+        folded.any? { |record| asked.values_at(:edit, :delete).include?(record.id) || (failed && failed[:key] == "message-#{record.id}") }
+      end
+
       # The first message carries the "written on" chip, as its content.
       def message(record)
         component = Admin::NotesScreen::MessageComponent.new(message: record, thread: thread, listing: listing, viewer: viewer, type: type, view: view,

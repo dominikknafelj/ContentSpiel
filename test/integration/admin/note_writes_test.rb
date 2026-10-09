@@ -137,7 +137,7 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
   test "the new-note form is on the record, or on the block the URL names, with the quote" do
     sign_in_as(users(:reader))
 
-    get @base, params: { compose: "ContentBlock-#{@block.id}", quote: "€49 a month" }, headers: { "Turbo-Frame" => "notes" }
+    get @base, params: { compose: "ContentBlock-#{@block.id}", note_quote: "€49 a month" }, headers: { "Turbo-Frame" => "notes" }
 
     assert_select "#notes-new input[type=hidden][name=subject][value='ContentBlock-#{@block.id}']"
     assert_select "#notes-new input[type=hidden][name=quote][value='€49 a month']"
@@ -313,8 +313,80 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert_equal "[FILTERED]", request.filtered_parameters["body"]
     patch "#{@base}/threads/#{thread.id}/messages/#{thread.messages.last.id}", params: { body: "A third thought" }
     assert_equal "[FILTERED]", request.filtered_parameters["body"]
-    get @base, params: { compose: "Page-#{@page.id}", quote: "€49 a month" }
-    assert_equal "[FILTERED]", request.filtered_parameters["quote"]
+  end
+
+  # The passage a GET carries to the new-note form is in the URL, and Rails
+  # writes the URL on the "Started GET" line with each pair of the query
+  # string filtered on its own (`request.filtered_path`): no controller to
+  # scope by. So the GET's name is `note_quote`, filtered wherever it appears.
+  test "the quote a GET carries is note_quote, masked on the request's logged path and parameters; ?quote= on that GET is ignored" do
+    sign_in_as(users(:reader))
+
+    get @base, params: { compose: "ContentBlock-#{@block.id}", note_quote: "€49 a month" }, headers: frame
+    assert_equal "#{@base}?compose=ContentBlock-#{@block.id}&note_quote=[FILTERED]", request.filtered_path
+    assert_equal "[FILTERED]", request.filtered_parameters["note_quote"]
+    assert_not_includes request.filtered_path, "49"
+    assert_select "#notes-new input[type=hidden][name=quote][value='€49 a month']"
+    assert_select "#notes-new blockquote", text: "€49 a month"
+
+    get @base, params: { compose: "ContentBlock-#{@block.id}", quote: "€49 a month" }, headers: frame
+    assert_select "#notes-new input[type=hidden][name=quote][value='']"
+    assert_select "#notes-new blockquote", count: 0
+  end
+
+  test "a draft is kept per person: the composer is handed the signed-in user's id" do
+    sign_in_as(users(:reader))
+
+    get @base, params: { compose: "Page-#{@page.id}" }, headers: frame
+    assert_select "#notes-new form[data-admin--note-composer-user-value='#{users(:reader).id}']"
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+    assert_select "#note-thread-#{@thread.id}-reply form[data-admin--note-composer-user-value='#{users(:reader).id}']"
+  end
+
+  test "Edit, Delete or a refused edit of a message folded into Show more opens the fold" do
+    replies = as(users(:reader)) { 4.times.map { |index| Notes::Reply.call(@thread, body: "Reply #{index}").record } }
+    folded = replies.first # five messages: the first and the last two show, the second and third are folded
+    thread_url = "#{@base}/threads/#{@thread.id}"
+    fold = "#note-thread-#{@thread.id}-messages details[data-note-fold]"
+    sign_in_as(users(:reader))
+
+    get thread_url, headers: frame
+    assert_select "#{fold} #note-message-#{folded.id}"
+    assert_select "#{fold}[open]", count: 0
+
+    get thread_url, params: { edit: folded.id }, headers: frame
+    assert_select "#{fold}[open] #note-message-#{folded.id} form[data-note-composer='message-#{folded.id}']"
+
+    get thread_url, params: { delete: folded.id }, headers: frame
+    assert_select "#{fold}[open] #note-message-#{folded.id} [data-note-delete-question]"
+
+    patch "#{thread_url}/messages/#{folded.id}", params: { body: "x" * 4001 }, headers: frame
+    assert_response :unprocessable_entity
+    assert_select "#{fold}[open] #note-message-#{folded.id} form[data-note-composer='message-#{folded.id}'] [role=alert]"
+
+    get thread_url, params: { edit: replies.last.id }, headers: frame # not a folded one
+    assert_select "#{fold}[open]", count: 0
+  end
+
+  # A message is looked up among THIS thread's, never by its id alone.
+  test "a message of another thread, of this record or of another the actor reads, is a 303 to the list saying gone on edit and delete, and nothing is written" do
+    sibling = as(users(:reader)) { Notes::Start.call(@block, body: "Same record") }.record.first_message
+    other = create_page(title: "Other")
+    elsewhere = as(users(:reader)) { Notes::Start.call(other, body: "Other record") }.record.first_message
+    sign_in_as(users(:reader)) # the author of both, so only the lookup stands in the way
+
+    [ sibling, elsewhere ].each do |foreign|
+      patch "#{@base}/threads/#{@thread.id}/messages/#{foreign.id}", params: { body: "Rewritten" }
+      assert_response :see_other
+      assert_redirected_to "#{@base}?notice=gone"
+      delete "#{@base}/threads/#{@thread.id}/messages/#{foreign.id}"
+      assert_response :see_other
+      assert_redirected_to "#{@base}?notice=gone"
+
+      assert_equal [ foreign.body, nil ], foreign.reload.then { |record| [ record.body, record.edited_at ] }
+    end
+    assert_equal [ "Same record", "Other record" ], [ sibling, elsewhere ].map { |record| record.reload.body }
+    assert_equal 1, @thread.messages.count
   end
 
   # ...and by nothing else: `body` is a post's and a block's own attribute.

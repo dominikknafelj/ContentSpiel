@@ -5,7 +5,12 @@ import { messages } from "i18n/messages"
 // `Admin::NotesScreen::ComposerComponent` draws.
 //
 // - Enter adds a line; Ctrl/⌘+Enter sends the form.
-// - What is typed is kept per form (`key`) in `sessionStorage` and put back
+// - Ctrl/⌘+Enter sends ONCE: a held key (`event.repeat`) and a second press
+//   while the first submit is still out are ignored, and the submit button is
+//   disabled for as long, or the same note would be saved twice.
+// - What is typed is kept per person and per form (`user`, `key`) in
+//   `sessionStorage` -- which belongs to the tab, so without the person in the
+//   key the next one to sign in there would get this one's unsent text -- and put back
 //   when the form is drawn again: the drawer is closed and reopened, the frame
 //   is fetched again, the screen is left and come back to. It is dropped when
 //   the form's own submit succeeds. Unsent note text never raises the leave
@@ -23,10 +28,12 @@ import { messages } from "i18n/messages"
 const QUERY = /(?:^|\s)@([^\s@]{0,40})$/
 const PREFIX = "cs-note-draft:"
 const ROWS = 6
+// A lookup waits for a pause in the typing, not for every letter.
+const LOOKUP_DELAY_MS = 150
 
 export default class extends Controller {
   static targets = [ "field", "names", "suggestions", "status", "emoji", "submit" ]
-  static values = { key: String, mentionsUrl: String }
+  static values = { key: String, mentionsUrl: String, user: String }
 
   connect() {
     this.names = this.parse(this.namesTarget.value)
@@ -40,23 +47,30 @@ export default class extends Controller {
   }
 
   disconnect() {
+    clearTimeout(this.lookupTimer)
     this.aborter?.abort()
   }
 
   typed() {
     this.store()
     this.refresh()
-    this.lookUp()
+    this.scheduleLookUp()
   }
 
   refresh() {
-    if (this.hasSubmitTarget) this.submitTarget.disabled = this.fieldTarget.value.trim() === ""
+    if (this.hasSubmitTarget) this.submitTarget.disabled = this.out || this.fieldTarget.value.trim() === ""
   }
 
   key(event) {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
+      if (event.repeat || this.out) return
+
       this.closeSuggestions()
+      // Marked out here, not only on `turbo:submit-start`: a second press in
+      // the same task comes before anything of the first has started. An
+      // invalid form submits nothing, so it marks nothing.
+      if (this.element.checkValidity()) this.sending()
       this.element.requestSubmit()
       return
     }
@@ -107,16 +121,42 @@ export default class extends Controller {
     this.typed()
   }
 
+  // `turbo:submit-start` on the form (a press on the button comes this way):
+  // a submit is out until its `turbo:submit-end`.
+  sending() {
+    this.out = true
+    this.refresh()
+  }
+
   // `turbo:submit-end` on the form: a note that went through leaves no draft.
   sent(event) {
+    this.out = false
+    this.refresh()
     if (event.detail.success) this.forget()
   }
 
   // --- the mention picker -----------------------------------------------------
 
+  // What is being looked for: the text after an "@" that ends at the caret,
+  // "" for a bare "@", null when the caret is not in a mention.
+  get query() {
+    const typed = this.fieldTarget.value.slice(0, this.fieldTarget.selectionStart).match(QUERY)
+    return typed ? typed[1] : null
+  }
+
+  // No mention at the caret closes the list at once; a lookup waits
+  // `LOOKUP_DELAY_MS` for the typing to pause, and each letter starts the
+  // wait again.
+  scheduleLookUp() {
+    clearTimeout(this.lookupTimer)
+    this.aborter?.abort()
+    if (this.query == null || !this.mentionsUrlValue) return this.closeSuggestions()
+
+    this.lookupTimer = setTimeout(() => this.lookUp(), LOOKUP_DELAY_MS)
+  }
+
   async lookUp() {
-    const before = this.fieldTarget.value.slice(0, this.fieldTarget.selectionStart)
-    const query = before.match(QUERY)?.[1]
+    const query = this.query
     this.aborter?.abort()
     if (query == null || !this.mentionsUrlValue) return this.closeSuggestions()
 
@@ -126,7 +166,11 @@ export default class extends Controller {
       url.searchParams.set("q", query)
       const response = await fetch(url, { headers: { Accept: "application/json" }, signal: this.aborter.signal })
       if (!response.ok) return this.closeSuggestions()
-      this.show(await response.json())
+      const people = await response.json()
+      // An answer for what is no longer being asked (the text moved on while
+      // it was on its way) is dropped: the lookup for the new text shows.
+      if (this.query !== query) return
+      this.show(people)
     } catch (error) {
       if (error.name !== "AbortError") this.closeSuggestions()
     }
@@ -214,7 +258,7 @@ export default class extends Controller {
   // convenience, so every failure is the same as having none.
 
   get storageKey() {
-    return PREFIX + this.keyValue
+    return `${PREFIX}${this.userValue}:${this.keyValue}`
   }
 
   stored() {

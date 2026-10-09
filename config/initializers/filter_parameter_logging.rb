@@ -22,11 +22,14 @@ Rails.application.config.filter_parameters += [
 # value, and are never touched. `mention_names` is the composer's own field:
 # display names, which for a user without a name are email addresses.
 #
-# Not covered: the first line of a request's log ("Started GET ...") filters
-# each pair of the query string on its own, with nothing to say which
-# controller it is for, so a `?quote=` in a URL is logged there as it is.
+# The first line of a request's log ("Started GET ...") is another matter: it
+# filters each pair of the query string on its own, with nothing to say which
+# controller it is for, so the lambda can't reach it. The one piece of text a
+# notes GET carries is the passage a new note quotes, and its name in a URL is
+# therefore `note_quote`, a bare entry here. It collides with no model
+# attribute (a thread's column is `quote`), so no audit snapshot changes.
 Rails.application.config.filter_parameters += [
-  :mention_names,
+  :mention_names, :note_quote,
   lambda do |key, value, params = nil|
     next unless value.is_a?(String) && %w[body quote].include?(key.to_s)
     next unless params.is_a?(Hash) && params["controller"].to_s.start_with?("admin/note")

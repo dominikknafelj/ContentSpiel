@@ -69,6 +69,35 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
     assert_equal "Good👍", field.value
   end
 
+  test "two quick presses of Ctrl+Enter, the second a held key, make one note" do
+    open_notes
+    field.send_keys("Once")
+    # Both in one script task: nothing of the first submit has come back yet.
+    page.execute_script(<<~JS)
+      const field = document.querySelector("#notes-new textarea[name=body]")
+      const press = (repeat) => field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", ctrlKey: true, repeat, bubbles: true, cancelable: true }))
+      press(false); press(false); press(true)
+    JS
+
+    assert_selector "[data-note-thread]", text: "Once"
+    assert_writes_settled
+    assert_equal [ 1, 1 ], [ Notes::Thread.count, Notes::Message.count ]
+  end
+
+  test "a draft is stored under the signed-in person's id" do
+    open_notes
+    field.send_keys("Mine alone")
+
+    key = "cs-note-draft:#{users(:one).id}:new-Page-#{@page.id}-"
+    assert_eventually { page.evaluate_script("Object.keys(window.sessionStorage).filter((name) => name.startsWith('cs-note-draft:'))") == [ key ] }
+
+    # Another person on the same tab reads another key: nothing is put back.
+    page.execute_script("window.sessionStorage.setItem(arguments[0], JSON.stringify({ body: 'Someone else', names: {} }))", "cs-note-draft:424242:new-Page-#{@page.id}-")
+    page.execute_script("window.sessionStorage.removeItem(arguments[0])", key)
+    open_notes
+    assert_equal "", field.value
+  end
+
   test "the submit is disabled while the field is empty" do
     open_notes
     assert_selector "#notes-new button[type=submit][disabled]", text: "Add note"

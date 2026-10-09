@@ -40,10 +40,14 @@ module Admin
 
       def field_id = "note-field-#{key}"
 
+      # `user`: the draft is the signed-in person's own. `sessionStorage`
+      # belongs to the tab, not to the session, so without it the next person
+      # to sign in on the same tab would be handed the last one's unsent text.
       def form_data
         { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
           "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          action: "turbo:submit-end->admin--note-composer#sent", messages: script_messages }
+          "admin--note-composer-user-value": Current.user&.id,
+          action: "turbo:submit-start->admin--note-composer#sending turbo:submit-end->admin--note-composer#sent", messages: script_messages }
       end
 
       # On a line of its own, ending the line: `test/lib/script_messages_test.rb`
