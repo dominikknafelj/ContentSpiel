@@ -19,6 +19,14 @@ class Notes::MessageTest < ActiveSupport::TestCase
     assert_equal [], message.reload.mentioned_user_ids
   end
 
+  # Review Focus 2: a token typed by hand, with a number no bigint holds.
+  test "a hand-typed token with a number too long to be an id is saved as text and mentions nobody" do
+    message = @thread.messages.create!(author: users(:one), body: "Hi @[99999999999999999999]")
+
+    assert_equal [], message.reload.mentioned_user_ids
+    assert_equal "Hi @[99999999999999999999]", message.body
+  end
+
   test "an emoji and a line break are kept as typed" do
     message = @thread.messages.create!(author: users(:one), body: "Looks good 👍\nShip it")
 

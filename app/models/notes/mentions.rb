@@ -10,7 +10,11 @@ module Notes
   # the browser and is not trusted for anything but this substitution: who
   # may be mentioned is checked by the service on the ids that result.
   module Mentions
-    TOKEN = /@\[(\d+)\]/
+    # At most 18 digits: every such number fits a bigint (19 digits at most).
+    # A longer one, typed by hand, is nobody's id; unbounded, it would pass
+    # validation and raise a RangeError when `mentioned_user_ids` is saved.
+    # It stays text.
+    TOKEN = /@\[(\d{1,18})\]/
 
     def self.ids(body) = body.to_s.scan(TOKEN).flatten.map(&:to_i).uniq
 

@@ -22,13 +22,20 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   # path => why it may name `Notes::Remove`.
   ALLOWED = {}.freeze
 
-  REFERENCE = /(?<![A-Za-z0-9_:])(?:::)?Notes::(?<name>[A-Z]\w*)/
+  # A constant under it (`Notes::Thread`) or a method of the module itself
+  # (`Notes.key(page)`, reported as ".key"): either is content code knowing
+  # notes. The look-behind keeps out a name that only ends in "Notes"
+  # (`ReleaseNotes`) and a `Notes` of another namespace (`Admin::Notes`).
+  REFERENCE = /(?<![A-Za-z0-9_:])(?:::)?Notes(?:::(?<constant>[A-Z]\w*)|\.(?<method>[a-z_]\w*))/
 
   def self.references(source)
     source.lines.each_with_index.flat_map do |line, index|
       next [] if line.lstrip.start_with?("#")
 
-      line.sub(/\s#\s.*$/, "").to_enum(:scan, REFERENCE).map { [ index + 1, Regexp.last_match[:name] ] }
+      line.sub(/\s#\s.*$/, "").to_enum(:scan, REFERENCE).map do
+        match = Regexp.last_match
+        [ index + 1, match[:constant] || ".#{match[:method]}" ]
+      end
     end
   end
 
@@ -47,7 +54,7 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       self.class.references(File.read(path)).filter_map do |line, name|
         next if ALLOWED.key?(relative(path)) && name == "Remove"
 
-        "#{relative(path)}:#{line}: Notes::#{name}"
+        "#{relative(path)}:#{line}: Notes#{"::" unless name.start_with?(".")}#{name}"
       end
     end
 
@@ -73,8 +80,13 @@ class NotesBoundaryTest < ActiveSupport::TestCase
       ::Notes::Thread.where(subject: page)
       ReleaseNotes::Entry.new
       footnotes = "Notes: none"
+      Notes.container_for(block)
+      key = ::Notes.key(page)
+      ReleaseNotes.latest
+      page.notes.count
+      Admin::Notes.key(page)
     RUBY
 
-    assert_equal %w[Remove Thread], found
+    assert_equal %w[Remove Thread .container_for .key], found
   end
 end

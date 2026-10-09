@@ -7,6 +7,13 @@ class Notes::MentionsTest < ActiveSupport::TestCase
     assert_equal [], Notes::Mentions.ids(nil)
   end
 
+  # A bigint holds 19 digits; a longer number is nobody's id, and one that
+  # reached `mentioned_user_ids` would raise on save instead of being refused.
+  test "a number too long to be an id is not a mention" do
+    assert_equal [], Notes::Mentions.ids("@[99999999999999999999]")
+    assert_equal [ 999_999_999_999_999_999 ], Notes::Mentions.ids("@[999999999999999999]")
+  end
+
   test "tokenize turns the names the picker inserted into tokens, the longest name first" do
     names = { "Dana" => 4, "Dana Smith" => 9 }
 
