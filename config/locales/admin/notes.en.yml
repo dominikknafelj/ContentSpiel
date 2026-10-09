@@ -59,8 +59,8 @@ en:
         delete_warning:
           one: "This block has %{count} open note. It will be deleted with it."
           other: "This block has %{count} open notes. They will be deleted with it."
-        # In the dialog of "Delete section and its blocks…": the section's
-        # own open notes and its blocks', in one number.
+        # In the dialog of "Delete section and its blocks…": the open notes
+        # on the blocks inside it (a section takes none of its own).
         delete_section_warning:
           one: "This section and its blocks have %{count} open note. It will be deleted too."
           other: "This section and its blocks have %{count} open notes. They will be deleted too."

@@ -58,8 +58,8 @@ module Admin
       # `kind:` picks the sentence: a block's ("This block has 2 open notes.
       # They will be deleted with it."), or `:section` for a section deleted
       # with its blocks ("This section and its blocks have 3 open notes. They
-      # will be deleted too."), whose number is the section's own open notes
-      # and its blocks' together.
+      # will be deleted too."), whose number is the open notes on the blocks
+      # inside it: a section takes none of its own (the handoff's decision 10).
       def self.notes_warning_attributes(within, spacing: nil, alone: false, kind: :block)
         { hidden: true, class: [ NOTES_WARNING_CLASS, spacing ],
           data: { "admin--notes-target": "warning", notes_within: within, notes_warning: kind, **(alone ? { notes_alone: "" } : {}) } }

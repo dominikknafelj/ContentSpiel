@@ -458,19 +458,21 @@ export default class extends Controller {
         : count > 0 ? text.t("notes.script.marker.open", { count, name }) : text.t("notes.script.marker.add", { name }))
     })
 
-    // A delete dialog's warning: the open notes on everything inside the card
-    // or tile it names (a section's own and its blocks'). The block's own key
-    // is read from that element's id, the markers' from the markers: a card
-    // without a marker (a block whose type is gone) still warns.
+    // A delete dialog's warning. A block's: its own open notes; its key is
+    // read from the card's or tile's id, so a card without a marker (a block
+    // whose type is gone) still warns. A section's
+    // (`data-notes-warning="section"`): the open notes on the blocks inside
+    // it, by the markers of its tiles, in a sentence of its own. A section
+    // takes no notes itself (the handoff's decision 10: it has no marker and
+    // no "Add note"), so its own key is not counted.
     this.warningTargets.forEach((warning) => {
       const within = document.getElementById(warning.dataset.notesWithin)
+      const section = warning.dataset.notesWarning === "section"
       const keys = new Set([ ...(within?.querySelectorAll("[data-admin--notes-target~='marker']") || []) ].map((marker) => marker.dataset.notesKey))
-      const own = within ? this.blockKey(within) : null
+      const own = within && !section ? this.blockKey(within) : null
       if (own) keys.add(own)
       const count = [ ...keys ].reduce((sum, key) => sum + (subjects[key] || 0), 0)
-      // A section deleted with its blocks has a sentence of its own, that
-      // names both (`data-notes-warning="section"`).
-      const key = warning.dataset.notesWarning === "section" ? "notes.script.delete_section_warning" : "notes.script.delete_warning"
+      const key = section ? "notes.script.delete_section_warning" : "notes.script.delete_warning"
       warning.hidden = count === 0
       warning.textContent = count === 0 ? "" : text.t(key, { count })
     })

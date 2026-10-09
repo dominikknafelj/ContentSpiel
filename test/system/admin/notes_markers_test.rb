@@ -129,13 +129,14 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal "block", holder_display.call("delete-block-#{@inside.id}")
   end
 
-  # The handoff's decision 7. The number is the section's own open notes and
-  # its blocks' together.
-  test "a section's delete warning adds its own open notes to its blocks', in the plural, and is gone when none is left" do
+  # The handoff's decisions 7 and 10: the number is the notes on the blocks
+  # inside. A section takes none of its own, and one written around the UI
+  # (a service call) is not counted here.
+  test "a section's delete warning counts its blocks' open notes, in the plural, and not a note on the section itself" do
     second = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 2, position: 0)
     as(users(:two)) do
       Notes::Start.call(@section, body: "Is this band needed?")
-      Notes::Start.call(@inside, body: "Wrong picture")
+      2.times { Notes::Start.call(@inside, body: "Wrong picture") }
       Notes::Start.call(second, body: "Too long")
     end
     open_editor
@@ -153,6 +154,26 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_no_selector card(@section)
     assert_no_selector "#notes-open-count"
     assert_equal 0, Notes::Thread.count
+  end
+
+  # The handoff's decision 10.
+  test "a section's card offers no way to add a note, and Remove section, keep blocks acts at once and says nothing about notes" do
+    as(users(:two)) { Notes::Start.call(@inside, body: "Wrong picture") }
+    open_editor
+
+    # No marker of the section's own: the only markers in its card are its tiles'.
+    assert_no_selector "#notes-marker-ContentBlock-#{@section.id}", visible: :all
+    assert_equal [ "notes-marker-ContentBlock-#{@inside.id}" ], all("#{card(@section)} [data-admin--notes-target=marker]", visible: :all).map { |marker| marker[:id] }
+    within(card(@section)) do
+      find("button[aria-label='Section actions']").click
+      assert_no_selector "button[aria-label='Section actions'] + [role=menu] button", text: "Add note"
+      press "Remove section, keep blocks"
+    end
+
+    assert_no_selector "dialog[open]"
+    assert_no_selector card(@section)
+    assert_selector "#{card(@inside)}.admin-block-card #{marker(@inside)}[data-has-notes]"
+    assert_equal 1, Notes::Thread.count
   end
 
   # Duplicate streams the copy's card in after its source and redraws nothing
