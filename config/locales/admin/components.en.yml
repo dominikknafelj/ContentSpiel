@@ -149,6 +149,11 @@ en:
         panel_title: "%{type} · column %{column}"
         close: "Close"
 
+      # The "+" at the end of a section's lane (sections spec §4.2): the
+      # name of a button whose label is the glyph.
+      block_picker:
+        add_to_column: "Add a block to column %{number}"
+
       editor_screen:
         # One line of a block's content on its tile in a section (sections
         # spec §4.2), and what marks a tile that needs attention.
@@ -163,6 +168,8 @@ en:
         section_card:
           name: "Section"
           move: "Move section"
+        # "3 columns · 5 blocks" in a section's header.
+        section_summary:
           columns:
             one: "%{count} column"
             other: "%{count} columns"

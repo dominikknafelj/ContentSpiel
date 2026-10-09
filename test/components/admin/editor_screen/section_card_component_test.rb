@@ -32,6 +32,38 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_selector "#block-#{@text.id}-panel form[data-controller~='admin--autosave']", visible: :all
   end
 
+  # The "+" at the end of each lane (spec §4.2) is in the lane's wrapper,
+  # after the lane and never in it: a lane's children are exactly its tiles.
+  test "each lane ends with its picker, outside the lane element, for a viewer who can edit" do
+    as(users(:one), channel: :admin) { render_card }
+
+    (1..3).each do |column|
+      assert_selector "#section-#{@section.id}-lanes > .admin-section-lane > [data-admin--blocks-target='lane'] + #block-picker-#{@section.id}-#{column}"
+      assert_no_selector "#section-#{@section.id}-lane-#{column} #block-picker-#{@section.id}-#{column}", visible: :all
+    end
+    assert_selector "#section-#{@section.id}-lane-1 > *", count: 1
+    assert_selector "#section-#{@section.id}-lane-2 > *", count: 0, visible: :all
+  end
+
+  test "a viewer who can't edit gets no picker in a lane" do
+    as(users(:reader), channel: :admin) { render_card }
+
+    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 3
+    assert_no_selector "[id^='block-picker-']", visible: :all
+  end
+
+  # The header's count is drawn by the one method a stream redraws it with
+  # (`Admin::ContentBlocksController#section_count_streams`).
+  test "the summary a stream replaces is the one the card draws" do
+    render_card
+    card = Capybara.string(rendered_content).find("#section-#{@section.id}-summary")
+
+    alone = Capybara.string(render_inline(Admin::EditorScreen::SectionCardComponent.summary(section: @section, count: 2)).to_html).find("#section-#{@section.id}-summary")
+
+    assert_equal [ card.text, card[:class] ], [ alone.text, alone[:class] ]
+    assert_equal "3 columns · 2 blocks", alone.text
+  end
+
   test "the header names the section and counts its columns and blocks" do
     render_card
 

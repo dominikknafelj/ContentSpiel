@@ -9,6 +9,10 @@
           <%= render tile(block) %>
         <% end %>
       </div>
+      <%# The lane's "+": after the lane, in its wrapper, never in the lane. %>
+      <% if editable %>
+        <%= render picker(column) %>
+      <% end %>
     </div>
   <% end %>
 </div>

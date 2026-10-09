@@ -14,27 +14,51 @@ module Admin
   # only the drag/move-up-down side of the block list needs a real Stimulus
   # controller (`admin--blocks`). The controller still honours an `after_id`
   # param on `create`, but nothing here sends one.
+  #
+  # THE SAME PICKER AT THE END OF A LANE (sections spec §4.2), with
+  # `section:` and `column:`. A lane is a column wide, so there it is not a
+  # row of buttons but a "+" that opens an `Admin::MenuComponent` of them;
+  # each item is the same plain `button_to`, which also posts `section_id`
+  # and `column` -- the controller's own instruction for where the block
+  # goes, beside `block[...]`, as `after_id` is. Two things differ:
+  # - it offers no container type. A section never holds a section (spec
+  #   §2.2), and a button whose only answer is a refusal is no offer. Asked
+  #   of the capability, never of the type's name, so a container type a
+  #   plugin registers is left out too. The end-of-list row lists every
+  #   type: it is where a section is made;
+  # - the menu closes on the pick (`close_on_select`): its answer puts a
+  #   tile into the lane above it and opens the block's form under the lanes,
+  #   and a menu left open would lie over both.
+  # Both submissions are inside the Blocks section, so `admin--blocks` holds
+  # them in the write queue like every add (`holdTurboRequest`).
+
   class BlockPickerComponent < AdminComponent
     BUTTON_CLASS = [ Admin::ButtonComponent::SMALL_CLASS, Admin::ButtonComponent::VARIANT_CLASSES[:secondary] ].join(" ").freeze
+    # A menu item's look, the string `Admin::BlockCardComponent
+    # #menu_item_class` gives a card's "⋯" items (the menu's panel does the
+    # width, padding and hover).
+    MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
 
-    def initialize(page:, locale:, url_options: {})
+    def initialize(page:, locale:, url_options: {}, section: nil, column: nil)
       @page = page
       @locale = locale
       @url_options = url_options
+      @section = section
+      @column = column
     end
 
-    # Container types are left out until the editor can show a section
-    # (sections plan, Task 5).
-    def types = BlockTypes.all.reject { |type| type.capability?(:container) }
+    def types = section ? BlockTypes.all.reject { |type| type.capability?(:container) } : BlockTypes.all
 
     def create_path = helpers.admin_page_content_blocks_path(page, **url_options)
 
-    def id = "block-picker-end"
+    def id = section ? "block-picker-#{section.id}-#{column}" : "block-picker-end"
 
     def button_class = BUTTON_CLASS
 
+    def menu_item_class = MENU_ITEM_CLASS
+
     private
 
-    attr_reader :page, :locale, :url_options
+    attr_reader :page, :locale, :url_options, :section, :column
   end
 end

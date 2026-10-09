@@ -9,7 +9,11 @@ module Admin
     # which is what a move reads and a drag sorts (later tasks of the sections
     # plan; `data-section-id` and `data-column` say which container it is).
     # So the column's label is the lane's sibling inside a wrapper, never its
-    # child, and nothing else is ever put into a lane.
+    # child, and nothing else is ever put into a lane. The "+" that ends each
+    # lane (spec §4.2: `Admin::BlockPickerComponent` with the section and the
+    # column) is the same: it follows the lane inside the wrapper, so to the
+    # eye it is the lane's last line and to a move it is not there. Only for
+    # a viewer who may edit, as the "Add block" row is.
     #
     # The label is for the eye and is shown where the lanes are stacked (spec
     # §4.6: a narrow card), where nothing else says which column a tile is in.
@@ -41,6 +45,10 @@ module Admin
 
       def tile(block)
         Admin::EditorScreen::BlockTileComponent.new(page: page, block: block, locale: locale, url_options: url_options, editable: editable)
+      end
+
+      def picker(column)
+        Admin::BlockPickerComponent.new(page: page, locale: locale, url_options: url_options, section: section, column: column)
       end
 
       private

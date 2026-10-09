@@ -91,6 +91,149 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(outside)}']"
   end
 
+  # A section's header counts its blocks, and a delete is the one write that
+  # changes the count without redrawing anything else of the card.
+  test "deleting a block in a section streams the section's new count, and a block outside one streams none" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    delete "#{blocks_path}/#{inside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
+      assert_select "#section-#{section.id}-summary", text: "2 columns · 1 block"
+    end
+
+    delete "#{blocks_path}/#{outside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[target$='-summary']", count: 0
+  end
+
+  test "adding into a column streams the panel, then the tile, marked to open, and the section's count" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+
+    post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 2 }, as: :turbo_stream
+
+    assert_response :created
+    block = section.section_blocks.sole
+    assert_equal 2, block.section_column
+    panel = response.body.index(%(id="block-#{block.id}-panel"))
+    tile = response.body.index(%(id="#{ActionView::RecordIdentifier.dom_id(block)}"))
+    assert panel && tile && panel < tile, "the panel must arrive before its tile"
+    assert_includes response.body, %(target="section-#{section.id}-panels")
+    assert_includes response.body, %(target="section-#{section.id}-lane-2")
+    assert_includes response.body, "data-open"
+    assert_includes response.body, "1 block"
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-panels'] template" do
+      assert_select "#block-#{block.id}-panel[hidden][data-open][data-admin--section-target='panel']"
+    end
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-lane-2'] template" do
+      assert_select "##{ActionView::RecordIdentifier.dom_id(block)}.admin-block-tile .admin-block-tile__face[aria-expanded='true']"
+    end
+    assert_select "turbo-stream[target='content-blocks-list']", count: 0
+  end
+
+  test "a second block added to a column lands after the first, and the count follows" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    first = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+
+    post blocks_path, params: { block: { block_type: "rich_text" }, section_id: section.id, column: 2 }, as: :turbo_stream
+
+    assert_response :created
+    assert_equal [ first.id, section.section_blocks.where.not(id: first.id).sole.id ], ContentBlock.in_column(section.id, 2).reorder(:position).ids
+    assert_includes response.body, "2 blocks"
+  end
+
+  test "adding into a column the section no longer has is refused with a message and the lanes as they are" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 4 }, as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+    assert_includes response.body, "content-blocks-alert"
+    assert_includes response.body, "isn&#39;t a column of this section"
+    assert_includes response.body, %(target="section-#{section.id}-lanes")
+  end
+
+  # Review Focus of the sections plan: two tabs. One was loaded while the
+  # section had four columns and still shows the "+" of the fourth; the other
+  # has since folded the section to two. The first tab's add is refused, no
+  # block ends in a column that isn't there, and the answer redraws the lanes
+  # as they are now -- two, the folded block at the end of the second.
+  test "an add into a column another tab folded away is refused, and the answer draws the lanes as they are now" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "four" })
+    kept = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+    folded = @page.content_blocks.create!(block_type: "image", section: section, section_column: 4, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ 2, 1 ], folded.reload.values_at(:section_column, :position)
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 4 }, as: :turbo_stream
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target='content-blocks-alert'] template", text: /isn't a column of this section/
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-lanes'] template" do
+      assert_select "#section-#{section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+      assert_equal [ kept.id, folded.id ], css_select("#section-#{section.id}-lane-2 > .admin-block-tile").map { |tile| tile["data-block-id"].to_i }
+      assert_select "#section-#{section.id}-lane-4", count: 0
+    end
+    assert_equal [], ContentBlock.where(section_id: section.id, section_column: 3..).ids
+  end
+
+  test "adding into a section that is gone is refused, and a section can't be added into a section" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+
+    post blocks_path, params: { block: { block_type: "image" }, section_id: 0, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "That section or column no longer exists"
+    post blocks_path, params: { block: { block_type: "section" }, section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_equal [ section ], @page.content_blocks.reload.to_a
+  end
+
+  # `section_id` is looked up among this page's blocks, like every block id
+  # here: another page's section is "gone" to this request, and a block that
+  # is no section holds nothing (the answer has no lanes to redraw).
+  test "an add can't name another page's section, or a block that is no section" do
+    other = create_page(title: "Elsewhere").content_blocks.create!(block_type: "section", position: 0)
+    plain = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: other.id, column: 1 }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_includes response.body, "That section or column no longer exists"
+
+      post blocks_path, params: { block: { block_type: "image" }, section_id: plain.id, column: 1 }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[target$='-lanes']", count: 0
+    end
+  end
+
+  test "a viewer who can't edit the page is refused an add into a column, with no lanes in the answer" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    sign_in_as(users(:reader))
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 1 }, as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_select "turbo-stream[target$='-lanes']", count: 0
+  end
+
+  test "adding a section streams its card with empty lanes" do
+    post blocks_path, params: { block: { block_type: "section" } }, as: :turbo_stream
+
+    assert_response :created
+    section = @page.content_blocks.sole
+    assert_includes response.body, "admin-section-card"
+    assert_includes response.body, "section-#{section.id}-lane-2"
+  end
+
   test "the page editor draws a section as a card of lanes with every block's form under them, and only on the default language's tab" do
     section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
     inside = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)

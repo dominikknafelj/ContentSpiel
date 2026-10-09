@@ -42,6 +42,11 @@ module Admin
 
       def self.summary_id(section) = "section-#{section.id}-summary"
 
+      # The header's "3 columns · 5 blocks", for the card and for a stream
+      # that replaces it after an add or a delete: one place, so the two
+      # cannot drift (`SectionSummaryComponent`).
+      def self.summary(section:, count:) = Admin::EditorScreen::SectionSummaryComponent.new(section: section, count: count)
+
       # Whether a top-level block is drawn as a section card: a container, on
       # the default language's tab. The page view and `Admin
       # ::ContentBlocksController#card_for` both ask here, so a card streamed
@@ -62,8 +67,6 @@ module Admin
       def dom_id = ActionView::RecordIdentifier.dom_id(section)
 
       def panels_id = self.class.panels_id(section)
-
-      def summary_id = self.class.summary_id(section)
 
       def body_id = "section-#{section.id}-body"
 

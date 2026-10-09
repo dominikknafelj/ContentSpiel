@@ -37,7 +37,18 @@ export default class extends Controller {
   // A block added to a column opens at once: the server marks its panel
   // `data-open`. Tile and panel arrive in one answer but as two streams, so
   // whichever connects second finds the other.
-  tileTargetConnected(tile) { this.openIfNew(tile.dataset.blockId) }
+  //
+  // A tile that arrives also takes its `aria-expanded` from the page, like
+  // everything else here: a refused add redraws the lanes (a column this
+  // screen still offered was removed elsewhere), and the tiles it brings
+  // are drawn closed, as a page load draws them -- while one of their forms
+  // may be showing under the lanes. Its tile says so again as it connects.
+  tileTargetConnected(tile) {
+    const id = tile.dataset.blockId
+    const panel = this.panelFor(id)
+    if (panel && !panel.hasAttribute("data-open")) this.faceFor(id)?.setAttribute("aria-expanded", String(!panel.hidden))
+    this.openIfNew(id)
+  }
   panelTargetConnected(panel) { this.openIfNew(panel.dataset.blockId) }
 
   openIfNew(id) {

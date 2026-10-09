@@ -45,15 +45,46 @@ module Admin
     # ::Save` assigns. No view sends it any more (the between-cards pickers
     # are gone; Duplicate has its own route), but it stays honoured so a
     # client that wants "insert below" has one.
+    #
+    # The "+" at the end of a section's lane (sections spec §4.2) posts here
+    # too, with `section_id` and `column` -- read beside `params[:block]` for
+    # the same reason `after_id` is. The section is looked up among this
+    # page's blocks, so another page's is as gone as a deleted one: both are
+    # refused before the service is asked, with the words a move into a
+    # missing section gets (`ContentBlocks::Reorder::NO_COLUMN`). Everything
+    # else is the service's and the model's to say (`ContentBlocks::Save`,
+    # `ContentBlock#section_rules`): the block lands at the end of that
+    # column, and a column the section doesn't have, or a section added into
+    # a section, fails the save.
+    #
+    # What the answer is:
+    # - the block's form and its tile (`tile_streams`), the form marked to
+    #   open at once (spec §4.3), and the section's new count. Not the card:
+    #   re-rendering the section would replace every other form in it, an
+    #   unsaved edit included;
+    # - for a refusal, the message, and the lanes as they are now (spec §6).
+    #   The column this tab offered may be gone because another tab gave the
+    #   section fewer columns: the save under the page's lock saw the layout
+    #   that tab committed, and what is drawn here is read after it. The
+    #   lanes only -- the forms under them are the same blocks' and may hold
+    #   an edit. Not after a denial, which is no fault of the screen's.
     def create
-      block = @page.content_blocks.new
-      result = ContentBlocks::Save.call(block, attributes: { block_type: params.dig(:block, :block_type) })
+      section = @page.content_blocks.find_by(id: params[:section_id]) if params[:section_id].present?
+      return render(turbo_stream: picker_error_stream([ ContentBlocks::Reorder::NO_COLUMN ]), status: :unprocessable_entity) if params[:section_id].present? && section.nil?
 
-      if result.ok?
+      attributes = { block_type: params.dig(:block, :block_type) }
+      attributes.merge!(section_id: section.id, section_column: params[:column]) if section
+      result = ContentBlocks::Save.call(@page.content_blocks.new, attributes: attributes)
+
+      if !result.ok?
+        streams = [ picker_error_stream(result.errors) ]
+        streams << section_lanes_stream(section) if section && !result.denied?
+        render turbo_stream: streams.compact, status: failure_status(result)
+      elsif section
+        render turbo_stream: [ *tile_streams(result.record, open: true), *section_count_streams(section), *page_base_streams ], status: :created
+      else
         reposition_after(result.record, params[:after_id])
         render turbo_stream: [ *insertion_stream(result.record, params[:after_id]), *page_base_streams ], status: :created
-      else
-        render turbo_stream: picker_error_stream(result.errors), status: failure_status(result)
       end
     end
 
@@ -117,7 +148,8 @@ module Admin
       result = ContentBlocks::Destroy.call(block)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), *panel_removal_streams(block), *page_base_streams ]
+      render turbo_stream: [ turbo_stream.remove(ActionView::RecordIdentifier.dom_id(block)), *panel_removal_streams(block),
+        *(block.section ? section_count_streams(block.section) : []), *page_base_streams ]
     end
 
     # Drag reorder or Move up/down (spec §6.1): the client already knows
@@ -291,6 +323,49 @@ module Admin
     # telling: the open form is whichever panel is showing, and none is.
     def panel_removal_streams(block)
       block.section_id ? [ turbo_stream.remove(Admin::BlockCardComponent.panel_id(block)) ] : []
+    end
+
+    # A block's two halves inside a section, in the order `admin--section`
+    # needs them: the panel (its form) first, then the tile that opens it.
+    # Either order would open the form -- whichever target connects second
+    # finds the other (`openIfNew`) -- but with the form already there the
+    # tile is never on screen with nothing to open.
+    #
+    # `open:` marks both for a block just added: the panel `data-open`, which
+    # is what the script acts on, and the tile's button as expanded, so it
+    # does not say "collapsed" for the moment in between. `editable: true`:
+    # the service has just allowed this actor the write.
+    def tile_streams(block, open: false)
+      section = block.section
+      panel = Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, placement: :panel, open: open)
+      tile = Admin::EditorScreen::BlockTileComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, editable: true, open: open)
+      [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel),
+        turbo_stream.append(Admin::EditorScreen::SectionLanesComponent.lane_id(section, block.section_column), tile) ]
+    end
+
+    # A section's lanes as the database has them now, for an answer that
+    # must put right what this tab shows: its columns and the tiles in them.
+    # `editable: true` because only a request that was not denied gets one.
+    #
+    # Nil when there are no lanes to draw -- the block named is no container
+    # (the model has said so), or it was deleted while the request ran -- so
+    # a caller `compact`s its streams.
+    def section_lanes_stream(section)
+      outline = fresh_outline
+      fresh = outline.top_level.find { |block| block.id == section.id }
+      return unless fresh&.container?
+
+      turbo_stream.replace(Admin::EditorScreen::SectionCardComponent.lanes_id(fresh),
+        Admin::EditorScreen::SectionLanesComponent.new(page: @page, section: fresh, outline: outline, locale: admin_locale, url_options: admin_url_options, editable: true))
+    end
+
+    # The count in a section's header ("2 columns · 3 blocks"), after a
+    # write that changed how many blocks it holds: an add into a column, a
+    # delete out of one. Counted after the write, and only that line is
+    # replaced (`SectionCardComponent.summary`, the line the card draws).
+    def section_count_streams(section)
+      [ turbo_stream.replace(Admin::EditorScreen::SectionCardComponent.summary_id(section),
+        Admin::EditorScreen::SectionCardComponent.summary(section: section, count: section.section_blocks.reset.size)) ]
     end
 
     # The page's own list (sections spec §3.1): the blocks outside any

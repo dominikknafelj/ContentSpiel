@@ -61,7 +61,12 @@ module Admin
   #   is no `card` of `admin--blocks` -- the section is the card -- and has no
   #   handle and no "⋯" menu: a block in a column is moved by its tile. Its
   #   header is a heading that says which column the form belongs to, and
-  #   Close;
+  #   Close. `open: true` is for the panel of a block just added to a column
+  #   (spec §4.3: it opens at once). The panel is still rendered `hidden`,
+  #   with `data-open` beside it: showing a form is `admin--section`'s alone
+  #   -- it closes the one that was open first, sending what that one holds
+  #   -- so the server only asks, and the script takes the mark off as it
+  #   opens. A panel shown by the markup would be a second open form;
   # - `:group` is a plain card with neither handle nor menu, for a block
   #   listed under a section's heading in the translation view (spec §4.5).
   class BlockCardComponent < AdminComponent
@@ -79,10 +84,11 @@ module Admin
 
     def self.panel_title_id(block) = "#{error_prefix(block)}-panel-title"
 
-    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list)
+    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false)
       raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
 
       @placement = placement
+      @open = open
       @editable = editable
       @page = page
       @block = block
@@ -104,7 +110,7 @@ module Admin
     # card of the list is a `card` (dragged, moved, counted for Move up and
     # Move down); only a panel is hidden, and it is its section's to show.
     def wrapper_attributes
-      return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel" } } if panel?
+      return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
 
       { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}) } }
     end
