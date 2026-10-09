@@ -15,8 +15,8 @@
 - Work only in `/Users/dknafelj/src/ContentSpiel-notes` on branch `notes-on-content`. Never push, merge or skip a hook. One PR for the whole plan (spec §8).
 - Prefix every test command with `PGGSSENCMODE=disable`. System tests: `bin/rails tailwindcss:build` first, then `PARALLEL_WORKERS=6 PGGSSENCMODE=disable bin/rails test:system ...`. **Never two test runners at once**: another checkout shares the test databases.
 - Tests are Minitest with fixtures (`users(:one)` the owner, `users(:two)` Admin group, `users(:reader)` Read only, `users(:author)`) and `ContentHelper` (`create_page`, `create_post`, `create_media_asset`); no factories, no RSpec. TDD order in every task: failing test, run, implement, run, commit.
-- System tests: no fixed `sleep` without `# sleep: <reason>`; wait with `assert_eventually`, `await_js`, `assert_writes_settled`, `await_frames`, `click_frame_link`; a click is `press` or a native `.click`; a JavaScript error fails the test; a control shown only by `hover:` is clicked with `visible: :all`; a resized window is put back in `ensure`.
-- **The look is the handoff's.** Every UI task follows `docs/superpowers/specs/2026-10-09-notes-on-content-handoff.md` for markup, tokens, sizes and states, and reuses an existing admin component wherever one draws the part already; where the handoff and the spec differ on behaviour, the spec wins (the handoff's own last section lists the known cases). The classes in this plan's templates are a working baseline from the existing tokens: the handoff's replace them where it names its own, and every id and `data-` attribute named in an Interfaces block stays. Accent means one thing: unread and addressed to the viewer.
+- System tests: no fixed `sleep` without `# sleep: <reason>`; wait with `assert_eventually`, `await_js`, `assert_writes_settled`, `await_frames`, `click_frame_link`; a click is `press` or a native `.click`; a JavaScript error fails the test; a control shown only by `hover:` is clicked with `visible: :all`; a resized window is put back in `ensure`. `click_frame_link` is for a link into `#content` only: it waits for the `turbo:load` of the visit Turbo promotes that navigation to, and a link inside `turbo-frame#notes` is never promoted, so it is clicked plainly and followed by an `assert_selector`. `press(label)` finds a button by its text, never by an `aria-label`: an icon-only control (a card's "⋯" menu, a chosen file's "×") is `find("button[aria-label='…']").click`.
+- **The look is the handoff's.** Every UI task follows `docs/superpowers/specs/2026-10-09-notes-on-content-handoff.md` for markup, tokens, sizes and states, and reuses an existing admin component wherever one draws the part already; where the handoff and the spec differ on behaviour, the spec wins (the handoff's own last section lists the known cases). The classes in this plan's templates are a working baseline from the existing tokens: the handoff's replace them where it names its own, and every id and `data-` attribute named in an Interfaces block stays. Accent means one thing: unread and addressed to the viewer. An icon the handoff names is drawn from `app/views/admin/shared/_icon.html.erb`: the first task that needs one adds its `when :name` branch there (Task 6 shows how), and a glyph in this plan's templates (`✎`, `←`, `×`) is the baseline's stand-in for it.
 - **Names.** Models and services are `Notes::` (`app/models/notes/`, `app/models/notes.rb`, `app/services/notes/`, `app/queries/notes/`); components are `Admin::NotesScreen::`. **`Admin::Notes` and `Admin::Note` are never defined** (`test/lib/admin_namespace_shadow_test.rb`); the controllers are `Admin::NotesController`, `Admin::NoteThreadsController`, `Admin::NoteMessagesController`, `Admin::NoteMentionsController`, `Admin::NoteInboxController`, `Admin::NoteReactionsController`, `Admin::NoteFilesController`; the channels are `Notes::PersonChannel` and `Notes::RecordChannel`. `Notes::Follow` is the RECORD (`note_follows`); the service that follows and unfollows is `Notes::SetFollowing`. Inside `module Notes` Ruby's own thread class is `::Thread`.
 - **A note never writes the record it is on**: no `touch`, no `updated_at`, no `PublicSite.bump_version!`, no `X-Page-Base-Updated-At`. Note forms are ordinary Turbo forms inside `<turbo-frame id="notes">`; none is an `admin--autosave` form and none sits inside one.
 - **The content side does not know notes.** `Page`, `Post`, `ContentBlock`, `Media::` and their services never reference `Notes::`, except `Trash::Purge` and `ContentBlocks::Destroy`, which call `Notes::Remove` (`test/lib/notes_boundary_test.rb`, Task 1).
@@ -1218,6 +1218,16 @@ class Notes::ReplyTest < ActiveSupport::TestCase
     assert_equal %w[note.replied note.reopened], Audit::Event.order(:id).last(2).map(&:action)
   end
 
+  # Spec §7, "A message deleted while someone replies": the reply still lands.
+  test "a reply lands in a thread one of whose messages was deleted meanwhile" do
+    gone = as(users(:two)) { Notes::Reply.call(@thread, body: "Never mind") }.record
+    stale = Notes::Thread.find(@thread.id)
+    as(users(:two)) { Notes::DeleteMessage.call(gone) }
+
+    assert as(users(:reader)) { Notes::Reply.call(stale, body: "Still answering") }.ok?
+    assert_equal [ "Is this right?", "Still answering" ], @thread.reload.messages.map(&:body)
+  end
+
   # Review Focus 3.
   test "a reply to a thread that was removed meanwhile is an ordinary failure" do
     stale = Notes::Thread.find(@thread.id)
@@ -1828,7 +1838,7 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 **Files:**
 - Create: `app/services/notes/resolve.rb`, `reopen.rb`, `pin.rb`, `unpin.rb`, `set_following.rb`, `mark_read.rb`
 - Modify: `app/services/notes/authorization.rb` (two helpers), `app/models/audit/sentence.rb` (`NOTE_VERBS`), `app/queries/dashboard/activity.rb`, `config/locales/admin/notes.en.yml`, `test/support/service_calls.rb`, `test/services/service_behaviour_contract_test.rb`, `test/services/service_contract_test.rb` (floor `43`)
-- Test: `test/services/notes/thread_state_test.rb`, `test/services/notes/set_following_test.rb`, `test/services/notes/mark_read_test.rb` (new), `test/models/audit/sentence_test.rb`
+- Test: `test/services/notes/thread_state_test.rb`, `test/services/notes/set_following_test.rb`, `test/services/notes/mark_read_test.rb` (new), `test/models/audit/sentence_test.rb`, `test/queries/dashboard/activity_test.rb`
 
 **Interfaces:**
 - Consumes: `Notes::Authorization`, `Notes::Deliveries.for_state`, `Notes::Follow`, `Notes::Delivery`.
@@ -2040,7 +2050,26 @@ Append to `test/models/audit/sentence_test.rb`, inside the test Task 2 added, th
     assert_equal "You unpinned a note on “Pricing”", read(sentence_for(event("note.unpinned", subject_type: "Page", subject_id: page.id, subject_label: "Pricing")))
 ```
 
-- [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/services/notes test/models/audit/sentence_test.rb`
+Append to `test/queries/dashboard/activity_test.rb` (spec §3.5: the feed gains a note started and a note resolved only, so replies don't flood it):
+
+```ruby
+  test "the feed lists a note started and a note resolved, on a page and on a block, and never a reply" do
+    page = create_page(title: "Pricing")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    as(users(:two)) do
+      thread = Notes::Start.call(block, body: "A question").record
+      Notes::Reply.call(thread, body: "More")
+      Notes::Resolve.call(thread)
+    end
+
+    rows = Dashboard::Activity.new(actor: users(:one), channel: :admin).rows.select { |row| row.event.action.start_with?("note.") }
+
+    assert_equal %w[note.resolved note.started], rows.map { |row| row.event.action }
+    assert_equal [ page, page ], rows.map(&:record) # a block's note is listed under its page
+  end
+```
+
+- [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/services/notes test/models/audit/sentence_test.rb test/queries/dashboard/activity_test.rb`
 
 - [ ] **Step 3: Two helpers.** Add to `Notes::Authorization` (private):
 
@@ -2364,7 +2393,7 @@ A trashed record keeps its threads (nothing here touches `Trash::Move` or `Trash
 
 **Interfaces:**
 - Consumes: `Trash::ItemPermissions#item_refusal(record) { |key| ... }`, `Notes::Thread`.
-- Produces: `Notes::Remove.call(record, with: [], actor: Current.actor) -> Result(record: record)`. `record` is the page, post, image or block being deleted for good and is what is authorized; `with:` are the records that go with it (a page's blocks, a branch's other pages and their blocks, a section's blocks). Deletes every thread whose **subject** is one of them, in a constant number of statements, and records one `notes.removed` on `record` (metadata `thread_ids`) only when there was something to remove. Called inside the caller's transaction, after the records are destroyed.
+- Produces: `Notes::Remove.call(record, with: [], actor: Current.actor) -> Result(record: record)`. `record` is the page, post, image or block being deleted for good and is what is authorized; `with:` are the records that go with it (a page's blocks, a branch's other pages and their blocks, a section's blocks). Deletes every thread whose **subject** is one of them, in a constant number of statements, and records one `notes.removed` on `record` (metadata `thread_ids`) only when there was something to remove. Called inside the caller's transaction and under its lock: by `Trash::Purge` BEFORE it destroys anything (the purge's own right is checked here again, and a `pages.delete` scoped to a branch is matched against the page's closure rows, which the page's destroy deletes), by `ContentBlocks::Destroy` after the block is destroyed (a block's right is its page's, and the page is still there).
 
 - [ ] **Step 1: Write the failing tests.** `test/services/notes/remove_test.rb`:
 
@@ -2458,6 +2487,22 @@ Append to `test/services/trash/purge_test.rb`:
     assert_equal 0, Notes::Thread.count
   end
 
+  # `Notes::Remove` checks the purge's own right again. A `pages.delete`
+  # scoped to a branch is matched against the page's closure rows, which the
+  # page's destroy deletes: checked after the destroy it would refuse the
+  # very person the purge had just allowed, and roll the purge back.
+  test "someone whose delete right reaches one branch only purges a page of it, notes and all" do
+    page = create_page(title: "Branch", published: false)
+    as(users(:two)) { Notes::Start.call(page, body: "A note") }
+    assert Trash::Move.call(page).ok?
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.delete", scope: { "page_ids" => [ page.id ] })
+
+    result = as(users(:editor_branch)) { Trash::Purge.call(page.reload) }
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal [ 0, 0 ], [ Notes::Thread.count, Page.where(id: page.id).count ]
+  end
+
   test "a purge that is refused keeps the notes" do
     page = create_page(title: "Noted", published: false)
     as(users(:two)) { Notes::Start.call(page, body: "A note") }
@@ -2532,13 +2577,14 @@ Append to `test/services/content_blocks/destroy_test.rb`:
     block = page.content_blocks.create!(block_type: "rich_text", position: 1)
     thread = as(users(:two)) { Notes::Start.call(block, body: "A note") }.record
 
-    assert ContentBlocks::Reorder.call(page, [ block.id ], section: section, column: 1, moved_from: { block.id.to_s => { section_id: nil, column: nil } }).ok?
+    assert ContentBlocks::Reorder.call(page, [ block.id ], section: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } }).ok?
 
     assert_equal [ block, page ], [ thread.reload.subject, thread.container ]
+    assert_equal section.id, block.reload.section_id
   end
 ```
 
-(If `ContentBlocks::Reorder`'s `moved_from` is keyed differently, follow `test/services/content_blocks/reorder_test.rb`'s own calls.)
+(`ContentBlocks::Reorder.new(page, ordered_ids, section: nil, column: nil, moved_from: {}, actor:)` takes the section's id and the column's new order, and `moved_from` keyed by block id with the container the block left, blank for the top level: the call above is `test/services/content_blocks/reorder_test.rb`'s own shape for a move into a column.)
 
 Append to `test/services/content_blocks/duplicate_test.rb`:
 
@@ -2570,11 +2616,19 @@ module Notes
   # key could do this -- the same reason `Media::UsageIndex.refresh` is called
   # beside it.
   #
-  # It runs INSIDE the caller's transaction, after the records are destroyed
-  # and under the lock the caller already holds (the page's row), which is the
-  # first lock `Notes::Start` takes: a note being written beside the delete
-  # either committed before and is removed here, or waits and finds its
-  # subject gone.
+  # It runs INSIDE the caller's transaction and under the lock the caller
+  # already holds (the page's row), which is the first lock `Notes::Start`
+  # takes: a note being written beside the delete either committed before and
+  # is removed here, or waits and finds its subject gone. A post and an image
+  # have no such lock and need none: they are purged from the trash, and
+  # `Notes::Start` and `Notes::Reply` refuse a container that is not kept.
+  #
+  # `Trash::Purge` calls it BEFORE it destroys anything: the check below asks
+  # the purge's own right again, and a `pages.delete` scoped to a branch is
+  # matched against the page's closure rows, which the destroy deletes --
+  # asked afterwards it would refuse the person the purge had just allowed.
+  # `ContentBlocks::Destroy` calls it after the block is gone: a block's right
+  # is its page's, and the page is still there.
   #
   # Constant in statements whatever the number of threads: one read of the
   # thread ids, one audit insert, one DELETE; messages, deliveries, follows
@@ -2631,15 +2685,20 @@ end
 
 - [ ] **Step 4: The callers.** In `app/services/trash/purge.rb`:
 
-`#purge_branch`: before the `pages.each` loop add `removed = []`; inside the loop, after `Translations::StateIndex.remove(page)`, add `removed.push(page, *blocks)`; and after the loop, before `true`:
+`#purge_branch`: after the `Page.where(id: pages.map(&:id)).order(:id).lock.pluck(:id)` line and BEFORE the `pages.each` loop:
 
 ```ruby
-      # The threads on these pages and blocks (notes spec D12): polymorphic
-      # like the usage rows above, so removed by hand, once for the branch.
-      remove_notes(with: removed - [ @record ])
+      # The threads on these pages and their blocks (notes spec D12):
+      # polymorphic like the usage rows below, so removed by hand, once for
+      # the branch. Before any page is destroyed: `Notes::Remove` asks this
+      # purge's own right again, and a `pages.delete` scoped to a branch is
+      # matched against the page's closure rows, which its destroy deletes.
+      # (`content_blocks.to_a` loads the very objects the loop below reads
+      # again and the destroy goes on to destroy.)
+      remove_notes(with: (pages - [ @record ]) + pages.flat_map { |page| page.content_blocks.to_a })
 ```
 
-`#purge_post` and `#purge_asset`: `remove_notes` as the last statement before `true`. And the private method:
+`#purge_post`: `remove_notes` as the first statement, before `@record.destroy`. `#purge_asset`: `remove_notes` after the `used?` check and before `@record.destroy`. (A refusal further down rolls the removal back with everything else.) And the private method:
 
 ```ruby
     def remove_notes(with: [])
@@ -2678,7 +2737,7 @@ Add a sentence to each class comment naming the call. In `Audit::Sentence::NOTE_
     },
 ```
 
-- [ ] **Step 6: Run**, expect green: `PGGSSENCMODE=disable bin/rails test test/services test/models/audit test/lib`. The existing purge and destroy tests that count statements (`grep -n capture_sql test/services/trash test/services/content_blocks`) each gain exactly one statement, the read of the thread ids; raise such a number by one and say so in the task report.
+- [ ] **Step 6: Run**, expect green: `PGGSSENCMODE=disable bin/rails test test/services test/models/audit test/lib`. No existing purge or destroy test pins a total number of statements (checked: `purge_test.rb` "the branch's pages are locked, in id order, before the first block is deleted" and `destroy_test.rb`'s three `capture_sql` tests assert the ORDER of statements and count only `FROM "pages" … FOR UPDATE` and `UPDATE "content_blocks"`; `content_blocks_test.rb` counts `SELECT "content_blocks".*`), and `Notes::Remove` issues none of those: it takes no lock of its own and reads no block. So none needs a number raised; if one of them fails, `Notes::Remove` is locking or reading what its caller already holds.
 
 - [ ] **Step 7: Commit.**
 
@@ -2916,6 +2975,22 @@ class Admin::NotesTest < ActionDispatch::IntegrationTest
       assert_select "a[href='https://example.com']"
     end
     assert_select "span[data-admin--notes-target=counts]"
+  end
+
+  test "a long thread folds its middle, and a thread started on another language tab says so" do
+    as(users(:two)) { 4.times { |index| Notes::Reply.call(@thread, body: "Reply #{index}") } }
+    @thread.update!(origin_locale: "de")
+    sign_in_as(users(:reader))
+
+    get "#{@base}/threads/#{@thread.id}", headers: frame
+
+    assert_select "#note-thread-#{@thread.id}-messages details summary", text: "Show 2 more"
+    assert_select "#note-thread-#{@thread.id}-messages details [data-note-message]", count: 2
+    assert_select "#note-thread-#{@thread.id}-messages [data-note-message]", count: 5
+    assert_select "[data-note-badge=origin]", text: /Written on/
+
+    get "#{@base}/threads/#{@thread.id}", params: { locale: "de" }, headers: frame
+    assert_select "[data-note-badge=origin]", count: Locales.enabled?("de") ? 0 : 1
   end
 
   test "opening a thread marks the viewer's deliveries of that thread read, and no other" do
@@ -3177,7 +3252,7 @@ module Admin
   # of record, and which one. Route segments are a controller's and a
   # component's business, so this lives here and not on `Notes`.
   module NotePathsHelper
-    TYPES = { "Page" => "page", "Post" => "post", "Media::Asset" => "media" }.freeze
+    TYPES = { "Page" => "page", "Post" => "post", "Media::Asset" => "media" }.freeze # i18n-ok: class names keyed to route segments, not copy
 
     def note_args(container) = [ TYPES.fetch(container.class.polymorphic_name), container.id ]
   end
@@ -3215,7 +3290,11 @@ module Admin
   module NoteContainer
     extend ActiveSupport::Concern
 
-    included { before_action :set_container }
+    included do
+      before_action :set_container
+      # The three notes views ask which surface they are drawn for.
+      helper_method :note_view
+    end
 
     private
 
@@ -4098,6 +4177,16 @@ class Admin::NoteComposerSystemTest < ApplicationSystemTestCase
 
     assert_equal "Good👍", field.value
   end
+
+  test "the at-sign button opens the picker like a typed @, on its first row" do
+    open_notes
+    field.send_keys("Ask")
+    find("#notes-new [data-note-toolbar] button[data-action='admin--note-composer#mention']").click
+
+    assert_equal "Ask @", field.value
+    assert_selector "#notes-new [role=listbox] [role=option]", maximum: 6
+    assert_selector "#notes-new [role=listbox] [role=option][aria-selected=true]", count: 1
+  end
 end
 ```
 
@@ -4325,9 +4414,13 @@ module Admin
       def form_data
         { controller: "admin--note-composer", turbo_frame: "notes", note_composer: key,
           "admin--note-composer-key-value": key, "admin--note-composer-mentions-url-value": mentions_url,
-          action: "turbo:submit-end->admin--note-composer#sent",
-          messages: messages_data("notes.script.mentions.none", "notes.script.mentions.count") }
+          action: "turbo:submit-end->admin--note-composer#sent", messages: script_messages }
       end
+
+      # On a line of its own, ending the line: `test/lib/script_messages_test.rb`
+      # reads the literal keys of a `messages_data(...)` call only when the
+      # closing bracket is followed by a line end, a comma or another bracket.
+      def script_messages = messages_data("notes.script.mentions.none", "notes.script.mentions.count")
     end
   end
 end
@@ -4355,6 +4448,8 @@ end
     <p class="sr-only" role="status" aria-live="polite" data-admin--note-composer-target="status"></p>
   </div>
   <div class="flex items-center justify-between gap-2">
+    <%# The toolbar's controls, on the left (handoff "Composer"): emoji and the at-sign; Task 16 puts the paperclip before them, inside this group. %>
+    <div class="flex items-center gap-0.5" data-note-toolbar>
     <details class="relative" data-admin--note-composer-target="emoji">
       <summary class="flex cursor-pointer list-none items-center rounded-cs px-2 py-1 text-dim hover:bg-sunken hover:text-ink" aria-label="<%= t(".emoji") %>" title="<%= t(".emoji") %>"><%= helpers.render "admin/shared/icon", name: :smile %></summary>
       <div class="absolute bottom-full left-0 z-20 mb-1 grid w-56 grid-cols-6 gap-0.5 rounded-cs border border-line-strong bg-surface p-1 shadow-menu">
@@ -4363,6 +4458,9 @@ end
         <% end %>
       </div>
     </details>
+    <button type="button" class="flex cursor-pointer items-center rounded-cs px-2 py-1 text-dim hover:bg-sunken hover:text-ink" aria-label="<%= t(".mention") %>" title="<%= t(".mention") %>"
+            data-action="admin--note-composer#mention"><%= helpers.render "admin/shared/icon", name: :at_sign %></button>
+    </div>
     <div class="flex items-center gap-2">
       <span class="text-[11px] text-meta" aria-hidden="true"><%= t(".send_hint") %></span>
       <%= render Admin::ButtonComponent.new(label: submit, variant: :primary, size: :small, type: "submit") %>
@@ -4458,6 +4556,15 @@ export default class extends Controller {
     this.insert(event.currentTarget.dataset.emoji, this.fieldTarget.selectionStart, this.fieldTarget.selectionEnd)
     this.emojiTarget.open = false
     this.store()
+  }
+
+  // The toolbar's at-sign button (handoff "Mention picker"): the same as
+  // typing "@" at the caret, with a space before it when a word ends there.
+  mention() {
+    const field = this.fieldTarget
+    const at = /(?:^|\s)$/.test(field.value.slice(0, field.selectionStart)) ? "@" : " @"
+    this.insert(at, field.selectionStart, field.selectionEnd)
+    this.typed()
   }
 
   // `turbo:submit-end` on the form: a note that went through leaves no draft.
@@ -4599,13 +4706,9 @@ export default class extends Controller {
 
 - [ ] **Step 7: The thread's buttons, the reply, the message's own actions, the new note.**
 
-In `thread_component.rb` add (private):
+In `thread_component.rb` add (private; `args` and `frame_params` are already there from Task 5):
 
 ```ruby
-      def args = helpers.note_args(listing.container)
-
-      def frame_params = { view: (view unless view == "editor"), **helpers.admin_url_options }.compact
-
       def change_path(change) = helpers.admin_change_record_note_thread_path(*args, thread, change, **frame_params)
 
       def reply_path = helpers.admin_record_note_messages_path(*args, thread, **frame_params)
@@ -4729,9 +4832,12 @@ In `list_component.rb` add (private; the constructor does not change):
 
       def compose_title
         return t(".new_on.#{type}") if compose_subject == container
-        return t(".new_on_block", block: render(Admin::EditorScreen::PanelTitleComponent.new(block: compose_subject))) if compose_subject.section_id
 
-        t(".new_on_block", block: compose_subject.definition&.label || compose_subject.block_type)
+        # The block as its group's heading names it (Task 5's helper), column
+        # included: plain text, escaped once by the template. (A rendered
+        # `PanelTitleComponent` is escaped markup already, and would be
+        # escaped a second time inside this sentence.)
+        t(".new_on_block", block: helpers.note_subject_name(compose_subject, container, type))
       end
 
       def threads_path = helpers.admin_record_note_threads_path(*helpers.note_args(container), **frame_params)
@@ -4768,7 +4874,7 @@ Its quote is drawn as §4.5 says (a sunken block with a line on all sides): `cla
             other: "%{count} people. Use the arrow keys and Enter."
 ```
 
-and under `en.admin.components.notes_screen`: `composer: { people: "People you can mention", emoji: "Emoji", send_hint: "Ctrl+Enter to send" }`; in `thread`: `resolve: "Resolve"`, `reopen: "Reopen"`, `pin: "Pin"`, `unpin: "Unpin"`, `follow: "Notify me"`, `unfollow: "Stop notifying me"`, `reply: "Reply"`, `send_reply: "Reply"`; in `message`: `edit: "Edit"`, `edit_label: "Edit your note"`, `save: "Save"`, `delete: "Delete"`, `delete_question: "Delete this note?"`, `delete_confirm: "Delete"`; in `list`: `new_label: "Write a note"`, `add: "Add note"`, `new_on: { page: "New note on this page", post: "New note on this post", media: "New note on this image" }`, `new_on_block: "New note on %{block}"`. Add the composer's two files, the script and the two new controllers to `CONVERTED`. The emoji control is a Lucide icon, never a glyph (spec §4.5): add `smile` to `app/views/admin/shared/_icon.html.erb` the way its other icons are defined (the handoff names the icon).
+and under `en.admin.components.notes_screen`: `composer: { people: "People you can mention", emoji: "Emoji", mention: "Mention someone", send_hint: "Ctrl+Enter to send" }`; in `thread`: `resolve: "Resolve"`, `reopen: "Reopen"`, `pin: "Pin"`, `unpin: "Unpin"`, `follow: "Notify me"`, `unfollow: "Stop notifying me"`, `reply: "Reply"`, `send_reply: "Reply"`; in `message`: `edit: "Edit"`, `edit_label: "Edit your note"`, `save: "Save"`, `delete: "Delete"`, `delete_question: "Delete this note?"`, `delete_confirm: "Delete"`; in `list`: `new_label: "Write a note"`, `add: "Add note"`, `new_on: { page: "New note on this page", post: "New note on this post", media: "New note on this image" }`, `new_on_block: "New note on %{block}"`. Add the composer's two files, the script and the two new controllers to `CONVERTED`. The emoji control is a Lucide icon, never a glyph (spec §4.5). CS Studio draws every icon from one partial, `app/views/admin/shared/_icon.html.erb`: a `case name` with one inline `<svg>` per `when` (`viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-5 shrink-0" aria-hidden="true" focusable="false"`), rendered with `helpers.render "admin/shared/icon", name: :x`, and it raises on a name it does not know. None of the handoff's Lucide names is in it today (it holds the sidebar's own: `dashboard`, `pages`, `posts`, `tags`, `settings`, `users`, `assistant`, `groups`, `graph`, `status`, `audit`, `media`, `trash`, `menu`, `search`, `translations`). So add two branches before the `else`, `when :smile` and `when :at_sign`, each with the same `<svg>` attributes as its neighbours and Lucide's paths for `smile` and `at-sign` (round caps and joins, as the existing paths say them). The names are symbols with underscores; later tasks add their own branches the same way (`paperclip` in Task 16). The partial draws at `size-5`; where the handoff asks for a 16px or 12px icon, size the wrapper (`[&>svg]:size-4`), never a second copy of the path.
 
 - [ ] **Step 9: Run** the integration tests, then the system test:
 
@@ -4803,7 +4909,7 @@ The drawer follows the Media panel's pattern (surface background, a 1px line on 
 - Produces:
   - `Admin::NotesScreen::DrawerComponent.new(container:, counts:, title:, view: "editor", open: false, thread: nil, url_options: {})` (`title` is the record's title, for the sheet's "Back to <title>"): `aside#notes-drawer[data-admin--notes-target=drawer][data-src][data-key][hidden]` holding `turbo-frame#notes[data-admin--notes-target=frame]` and `span#notes-counts`.
   - `Admin::EditorScreen::HeaderComponent.new(record:, locale:, url_options: {}, open_notes: nil)`: with a number, the button `button#notes-open[data-admin--notes-target=opener]` with `span#notes-open-count[data-admin--notes-target=total]`, before Preview. `Admin::PostFormComponent.new(post:, locale:, url_options: {}, open_notes: nil)` passes it on.
-  - `admin--notes` on `<body>`. Actions: `toggle`, `open` (a marker: `data-notes-key`, used in Task 8), `hold`, `compose`, `close`, `loaded`, `selected`, `shellOpened`. Targets: `drawer`, `frame`, `opener`, `total`, `marker`, `counts`, `warning`. It dispatches `admin--notes:opened`. Public methods a later task calls: `refreshCounts(counts)`, `get isOpen`, `get containerKey`.
+  - `admin--notes` on `<body>`. Actions: `toggle`, `open` (a marker: `data-notes-key`, used in Task 8), `hold`, `compose`, `close`, `loaded`, `leaving` (both on the notes frame), `selected`, `shellOpened`. Targets: `drawer`, `frame`, `opener`, `total`, `marker`, `counts`, `warning`. It dispatches `admin--notes:opened`. Public methods a later task calls: `refreshCounts(counts)`, `get isOpen`, `get containerKey`.
   - `admin--drawer#standAside` and the event `admin--drawer:opened`.
   - URL parameters on an editor: `?notes=open` opens the drawer on load, `&thread=<id>` shows that thread.
   - Body-level messages: `notes.script.marker.add`, `notes.script.marker.open`, `notes.script.marker.selection`, `notes.script.total`, `notes.script.delete_warning`.
@@ -4911,7 +5017,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     assert_no_selector "#notes-list"
     assert_selector "#notes-open-count", text: "1"
     assert_equal @page, Notes::Thread.last.subject
-    click_frame_link { find("#notes-drawer a[data-note-back]").click }
+    find("#notes-drawer a[data-note-back]").click
     assert_selector "#notes-list a[data-note-row]", text: "Is this page ready?"
 
     find("#notes-list a[data-note-row]").send_keys(:escape)
@@ -4953,13 +5059,16 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
     open_editor
     find("#notes-open").click
     assert_selector "#notes-list a[data-note-row]", count: 30
-    page.execute_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop = 600")
+    # To the END of the list, so the last row is in view: a native click on a
+    # row out of view would scroll to it first, and "where it was left" would
+    # no longer be the number read here.
+    page.execute_script("const scroller = document.querySelector('#notes-drawer [data-notes-scroller]'); scroller.scrollTop = scroller.scrollHeight")
     at = page.evaluate_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop")
     assert_operator at, :>, 0
 
-    click_frame_link { all("#notes-list a[data-note-row]").last.click }
+    all("#notes-list a[data-note-row]").last.click
     assert_selector "#notes-drawer [data-notes-view=thread]"
-    click_frame_link { find("#notes-drawer a[data-note-back]").click }
+    find("#notes-drawer a[data-note-back]").click
 
     assert_selector "#notes-list"
     assert_eventually(message: "the list did not come back to where it was") { page.evaluate_script("document.querySelector('#notes-drawer [data-notes-scroller]').scrollTop") == at }
@@ -5008,7 +5117,7 @@ class Admin::NotesDrawerSystemTest < ApplicationSystemTestCase
 end
 ```
 
-(`click_frame_link` with a block is the shared helper for a link whose answer redraws a frame; a row and Back navigate `turbo-frame#notes`, which is not promoted to a visit, so if the helper waits for a `turbo:load` that never comes use a plain `.click` followed by the next `assert_selector`. If the top bar's sidebar button is not `button[aria-controls=sidebar]`, read `app/components/admin/shell/top_bar_component.html.erb` and use its selector. If ⌘K is bound to `meta` only in `admin--command-palette`, send that modifier.)
+(Checked against the code. A row and Back navigate `turbo-frame#notes`, which Turbo never promotes to a visit, and `click_frame_link` waits for the `turbo:load` of a promoted one (`test/application_system_test_case.rb`): so these are plain `.click`s followed by an `assert_selector`, never `click_frame_link`. The top bar's sidebar button is `button[aria-controls=sidebar]` (`Admin::Shell::TopBarComponent#drawer_button`), and the open panel is `#sidebar[data-open]`. `admin--command-palette` opens on `metaKey || ctrlKey` with "k", so Ctrl+K is right in the test browser.)
 
 - [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/integration/admin/notes_drawer_test.rb`
 
@@ -5116,7 +5225,8 @@ import { messages } from "i18n/messages"
 // `{ total, subjects: { "<key>": n } }`, written by the server into the page
 // and into every answer of the notes frame; whichever copy arrived last is
 // the truth. From it this fills the header's number (`total`), every marker
-// (`marker`: a count pill, or the faint "add a note" mark) and the warning in
+// (`marker`: a count pill; without notes nothing at rest, and the same control
+// as "add a note" on hover or focus of its card) and the warning in
 // a block's delete dialog (`warning`). A card drawn again by a stream
 // connects its marker and is filled like the rest, which is why the server
 // never renders a count into a card.
@@ -5508,7 +5618,7 @@ The look (spec §4.3, §4.5): with open threads the marker is a neutral count pi
 
 **Files:**
 - Create: `app/components/admin/notes_screen/marker_component.{rb,html.erb}`
-- Modify: `app/components/admin/block_card_component.{rb,html.erb}`, `app/components/admin/editor_screen/block_tile_component.{rb,html.erb}`, `app/components/admin/editor_screen/section_card_component.{rb,html.erb}`, `app/components/admin/editor_screen/delete_block_dialog_component.{rb,html.erb}`, `app/controllers/admin/content_blocks_controller.rb` (`destroy`), `config/locales/admin/notes.en.yml`, `test/lib/admin_i18n_test.rb`
+- Modify: `app/components/admin/block_card_component.{rb,html.erb}`, `app/components/admin/editor_screen/block_tile_component.{rb,html.erb}`, `app/components/admin/editor_screen/section_card_component.{rb,html.erb}`, `app/components/admin/editor_screen/delete_block_dialog_component.{rb,html.erb}`, `app/controllers/admin/content_blocks_controller.rb` (`destroy`), `app/components/admin/notes_screen/thread_component.html.erb` (one `data-` attribute, Step 7), `app/javascript/controllers/admin/notes_controller.js` (`markActive`, Step 7), `config/locales/admin/notes.en.yml`, `test/lib/admin_i18n_test.rb`
 - Test: `test/components/admin/notes_screen/marker_component_test.rb`, `test/system/admin/notes_markers_test.rb` (new), `test/components/admin/block_card_component_test.rb`, `test/integration/admin/content_blocks_test.rb`
 
 **Interfaces:**
@@ -5519,6 +5629,7 @@ The look (spec §4.3, §4.5): with open threads the marker is a neutral count pi
   - "Add note" in the ⋯ menu of a block card and of a tile: `button[data-notes-key=<key>][data-notes-compose]` with `data-action="admin--notes#open"`.
   - `p[data-admin--notes-target=warning][data-notes-within=<dom id>]` in the delete dialog of a block and of a section.
   - After a block's delete, the answer carries `turbo_stream.replace("notes-counts", …)` with the page's fresh counts.
+  - The thread view's root gains `data-notes-subject=<key of what the thread is on>`; while that thread is open in the drawer, the card or tile of its block carries `data-notes-active` (set and taken back by `admin--notes#markActive`).
 
 - [ ] **Step 1: Write the failing tests.** `test/components/admin/notes_screen/marker_component_test.rb`:
 
@@ -5601,7 +5712,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_equal "0", find(marker(@text), visible: :all).evaluate_script("getComputedStyle(this).opacity")
 
     within("##{ActionView::RecordIdentifier.dom_id(@text)}") do
-      press "Block actions"
+      find("button[aria-label='Block actions']").click
       press "Add note"
     end
 
@@ -5671,7 +5782,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#notes-open-count", text: "2"
 
     within("##{ActionView::RecordIdentifier.dom_id(@text)}") do
-      press "Block actions"
+      find("button[aria-label='Block actions']").click
       press "Delete block…"
     end
 
@@ -5697,7 +5808,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
     assert_selector "#{marker(@text)} [data-notes-count]", text: "1"
 
     within("##{ActionView::RecordIdentifier.dom_id(@text)}") do
-      press "Block actions"
+      find("button[aria-label='Block actions']").click
       press "Duplicate"
     end
 
@@ -5707,7 +5818,7 @@ class Admin::NotesMarkersSystemTest < ApplicationSystemTestCase
 end
 ```
 
-(The dialog's confirm label and the menu's name are the card's own: if `press "Delete block"` or `"Block actions"` does not match, read them from `config/locales/admin/components.en.yml` and `block_card_component.html.erb`.)
+(Checked against the code: the card's menu is `Admin::MenuComponent.new(label: "⋯", aria_label: "Block actions")`, a button whose text is "⋯", which is why it is found by its `aria-label` and not with `press`; its items read "Duplicate" and "Delete block…", and the dialog's confirm is `admin.components.editor_screen.delete_block_dialog.confirm`, "Delete block". A card and a tile are both `#content_block_<id>` (`dom_id`), and the dialogs are `#delete-block-<id>` and `#delete-section-<id>`.)
 
 - [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/components/admin/notes_screen test/components/admin/block_card_component_test.rb test/integration/admin/content_blocks_test.rb`
 
@@ -5877,19 +5988,19 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 
 **Spec:** §4.4 (Media library, Posts list, Page tree, Trash), §8 (trash visibility, Constant queries), §9 ("Counts on every list"). **Read first:** `docs/superpowers/specs/2026-10-09-notes-on-content-handoff.md` (follow the handoff for markup, tokens, sizes and states; where it and the spec differ on behaviour, the spec wins), `docs/reference/media.md` ("CS Studio's Media module"), `docs/reference/editors-and-translation-pair.md` ("The posts list"), `app/components/admin/tree_component.rb`.
 
-Each surface reads its counts in **one** grouped query over the rows it is about to draw (`Notes::Counts.by_container`), after those rows were narrowed by the read scope, so a count never exists for a record the viewer may not read or that is in the trash. These lists are not live (spec §6.1): their counts are fresh on load.
+Each surface reads its counts in **one** grouped query over the rows it is about to draw (`Notes::Counts.by_container`), with one more beside it for "unread for you" (`Notes::Counts.unread_among`, decision P27), after those rows were narrowed by the read scope, so a count never exists for a record the viewer may not read or that is in the trash. These lists are not live (spec §6.1): their counts are fresh on load.
 
 **Files:**
 - Modify: `app/components/admin/media_library/panel_component.{rb,html.erb}`, `tile_component.{rb,html.erb}`, `grid_component.{rb,html.erb}`, `app/controllers/admin/media_controller.rb` (`grid_streams`), `app/components/admin/posts_screen/table_component.{rb,html.erb}`, `app/controllers/admin/posts_controller.rb` (`index`), `app/views/admin/posts/index.html.erb`, `app/components/admin/tree_component.{rb,html.erb}`, `app/components/admin/tree_node_component.{rb,html.erb}`, `config/locales/admin/notes.en.yml`
 - Test: `test/integration/admin/note_counts_test.rb` (new), `test/integration/trash_visibility_test.rb`, `test/system/admin/media_library_test.rb`
 
 **Interfaces:**
-- Consumes: `Notes::Counts.by_container(type, ids)`, `turbo-frame#notes` (`GET admin_record_notes_path("media", id, view: "media")`), `?notes=open` on an editor (Task 7).
+- Consumes: `Notes::Counts.by_container(type, ids) -> { id => Integer }`, `Notes::Counts.unread_among(type, ids, user) -> Set<id>` (Task 5), `turbo-frame#notes` (`GET admin_record_notes_path("media", id, view: "media")`), `?notes=open` on an editor (Task 7).
 - Produces:
   - Media panel: `div#media-notes` holding `turbo-frame#notes[src][loading=lazy]`, after "Used on", outside the panel's autosave form. `?thread=<id>` on `/media?selected=<id>` makes the frame's `src` that thread's view.
-  - `Admin::MediaLibrary::TileComponent.new(..., open_notes: 0)`: the chip `span[data-notes-chip]` beside `NO ALT` and `UNUSED`. `GridComponent` reads the counts itself (not in the picker).
-  - `Admin::PostsScreen::TableComponent.new(..., note_counts: {})`: a "Notes" column; a row with open threads links `a[data-notes-count]` to `admin_post_path(post, notes: "open")`.
-  - `Admin::TreeNodeComponent.new(..., note_counts: {})`: `span[data-notes-marker]` beside the translation markers; `TreeComponent` reads the counts for the readable pages.
+  - `Admin::MediaLibrary::TileComponent.new(..., open_notes: 0, notes_unread: false)`: the chip `span[data-notes-chip]` (`[data-unread]` when the viewer has something unread there) beside `NO ALT` and `UNUSED`. `GridComponent` reads the counts itself (not in the picker).
+  - `Admin::PostsScreen::TableComponent.new(..., note_counts: {}, note_unread: Set.new)`: a "Notes" column; a row with open threads links `a[data-notes-count]` (`[data-unread]`) to `admin_post_path(post, notes: "open")`.
+  - `Admin::TreeNodeComponent.new(..., note_counts: {}, note_unread: Set.new)`: `span[data-notes-marker]` (`[data-unread]`) beside the translation markers; `TreeComponent` reads the counts for the readable pages.
 
 - [ ] **Step 1: Write the failing tests.** `test/integration/admin/note_counts_test.rb`:
 
@@ -5965,15 +6076,21 @@ class Admin::NoteCountsTest < ActionDispatch::IntegrationTest
 end
 ```
 
-Append to `test/integration/trash_visibility_test.rb`:
+Add to `test/integration/trash_visibility_test.rb`, above the file's `private` line (a test written under it would not be run):
 
 ```ruby
   # Notes follow their record into the trash (notes spec D12, §4.4): hidden
-  # with it, counted nowhere.
+  # with it, counted nowhere. The records are trashed AFTER their notes were
+  # written, as in life: `Notes::Start` refuses a record that is already in
+  # the trash (decision P6), so a note "on" the setup's trashed records would
+  # never exist and this test would pass with nothing hidden.
   test "note counts in the posts list, the page tree and the media grid are for kept records only" do
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: nil) }
     as(users(:one)) do
-      [ @kept_post, @gone_post, @kept_page, @gone_page, @kept_asset, @gone_asset ].each { |subject| Notes::Start.call(subject, body: "A note") }
+      [ @kept_post, @gone_post, @kept_page, @gone_page, @kept_asset, @gone_asset ].each { |subject| assert Notes::Start.call(subject, body: "A note").ok? }
     end
+    [ @gone_post, @gone_page, @gone_asset ].each { |record| record.update!(trashed_at: Time.current) }
+    assert_equal 6, Notes::Thread.count # the trashed records keep their threads
     sign_in_as users(:one)
 
     get admin_posts_path
@@ -6045,7 +6162,14 @@ Append to `test/system/admin/media_library_test.rb` (with the file's own setup a
   </div>
 ```
 
-- [ ] **Step 4: The media grid.** `tile_component.rb`: `def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0)`, `@open_notes = open_notes`, `def open_notes = @open_notes.to_i`. `tile_component.html.erb`: after the `UNUSED` chip, `<% if open_notes.positive? %><span data-notes-chip class="rounded-cs border border-line-strong px-1 font-cs-mono text-[10px] text-ink"><%= t(".notes", count: open_notes) %></span><% end %>`.
+- [ ] **Step 4: The media grid.** `tile_component.rb`: `def initialize(asset:, url: nil, unused:, selected: false, pick: false, locale: ::Locales.default, open_notes: 0)`, `@open_notes = open_notes`, `def open_notes = @open_notes.to_i`. `tile_component.html.erb`: after the `UNUSED` chip (a `tag.span`, so Step 7 can add to its `data:`):
+
+```erb
+      <% if open_notes.positive? %>
+        <%= tag.span t(".notes", count: open_notes), data: { notes_chip: true },
+              class: "rounded-cs border border-line-strong px-1 font-cs-mono text-[10px] text-ink" %>
+      <% end %>
+```
 
 `grid_component.rb`:
 
@@ -6087,12 +6211,12 @@ Pass `note_counts: note_counts` to `TreeNodeComponent.new` in `tree_component.ht
       <% end %>
 ```
 
-(`TreeNodeComponent`'s base class must be `Admin::AdminComponent` for `t(".key")`; if it is not, write the key in full: `t("admin.components.tree_node.open_notes", count: open_notes)`.)
+(`Admin::TreeNodeComponent` is an `Admin::AdminComponent` (checked: `class TreeNodeComponent < AdminComponent`), so `t(".open_notes")` reads `admin.components.tree_node.open_notes`. The "✎" before the number is the tree's own marker style, as "○" is for a missing translation.)
 
 - [ ] **Step 7: "Unread for you" turns a count accent** (spec §4.5, handoff "Where the spec wins"). One query beside each surface's count, `Notes::Counts.unread_among(type, ids, Current.user)`, over the same ids:
   - Posts list: `@note_unread = Notes::Counts.unread_among("Post", @posts.map(&:id), Current.user)` in the controller, `note_unread: @note_unread` to `TableComponent.new` (`note_unread: Set.new` in `initialize`, an `attr_reader`), and `unread: (true if note_unread.include?(post.id))` in the link's `data:`.
   - Page tree: `@note_unread = Notes::Counts.unread_among("Page", <the same ids>, Current.user)` in `TreeComponent#load_visible`, handed down as `note_unread:` exactly like `note_counts:`, and `unread: (true if note_unread.include?(page.id))` in the marker's `data:`.
-  - Media grid: `def note_unread = @note_unread ||= pick? ? Set.new : ::Notes::Counts.unread_among("Media::Asset", assets.map(&:id), Current.user)` in `GridComponent`, `notes_unread: note_unread.include?(asset.id)` to `TileComponent.new` (`notes_unread: false` in `initialize`), and `unread: (true if @notes_unread)` in the chip's `data:`.
+  - Media grid: `def note_unread = @note_unread ||= pick? ? Set.new : ::Notes::Counts.unread_among("Media::Asset", assets.map(&:id), Current.user)` in `GridComponent`, `notes_unread: note_unread.include?(asset.id)` to `TileComponent.new` (`notes_unread: false` in `initialize`, `@notes_unread = notes_unread`), and `unread: (true if @notes_unread)` in the chip's `data:`. The tile `Admin::MediaController#grid_streams` draws after an autosave gets it too, or the chip would lose its accent on the first keystroke in the panel: `notes_unread: Notes::Counts.unread_among("Media::Asset", [ asset.id ], Current.user).include?(asset.id)`.
 
   Each count's classes take the handoff's accent state from `data-unread` (`data-[unread]:bg-accent-tint data-[unread]:text-accent`). Add to `note_counts_test.rb`:
 
@@ -6144,7 +6268,7 @@ bin/rails tailwindcss:build
 PARALLEL_WORKERS=6 PGGSSENCMODE=disable bin/rails test:system test/system/admin/media_library_test.rb test/system/admin/posts_list_test.rb test/system/admin/tree_test.rb
 ```
 
-A test that pins the statement count of the posts list, the tree or the media grid (`grep -rn capture_sql test/integration/admin`) gains exactly two statements per surface (the count and the unread read beside it); raise that number and say so in the task report.
+No existing test pins an absolute statement count for these three screens (checked: `posts_list_test.rb` "the list costs the same number of queries for 5 posts as for 40", `media_test.rb`'s three `count_queries` tests, `access_control_test.rb` "rendering the tree as a branch editor costs the same queries however many pages it shows" and `new_record_dialogs_test.rb` each compare two runs of the same request over non-empty lists), so none needs a number raised: each surface costs exactly two statements more on both sides (the count and the unread read beside it). If one of them fails, a count is being read per row; fix the code, not the test.
 
 - [ ] **Step 10: Commit.**
 
@@ -6168,9 +6292,9 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 - Consumes: `Notes::Counts.by_container`, `Notes::Listing`, `Notes::Start` through `note_threads#create`.
 - Produces:
   - Every post node of the graph's JSON has `open_notes` (Integer), read by `PostGraph::Builder` in one grouped query.
-  - `GET admin_record_note_threads_path(type, id)` (JSON) → `{ "open": Integer, "threads": [ { "id", "text" (the first message, mentions as "@Name", at most 140 characters), "author" (String or null for a deleted user), "replies": Integer, "pinned": Boolean } ] }`.
+  - `GET admin_record_note_threads_path(type, id)` (JSON) → `{ "open": Integer, "threads": [ { "id", "text" (the first message, mentions as "@Name", at most 140 characters), "author" (String or null for a deleted user), "replies": Integer, "pinned": Boolean, "unread": Boolean (the viewer has an unread delivery on it) } ] }`.
   - `POST admin_record_note_threads_path(type, id)` with `Accept: application/json` → `201 { "id" }` or `403`/`422 { "errors": [...] }`.
-  - `cardNotes(node, { text, url, postUrl, onChange }) -> HTMLElement` (`section[data-mind-graph-card-notes]`); `createCard(..., { ..., onChange })`; `urls.postNotes` from `data-post-notes-url`.
+  - `cardNotes(node, { text, url, postUrl, onChange }) -> HTMLElement` (`section[data-mind-graph-card-notes]`, the card's fifth child, before Close; a row is `li[data-note-row]`, `[data-unread]` with an accent dot when unread for the viewer; three rows, then `a[data-note-more]`); `createCard(..., { ..., onChange })`; `urls.postNotes` from `data-post-notes-url`.
   - `theme.line`, `theme.countFont`.
 
 - [ ] **Step 1: Write the failing tests.** Append to `test/queries/post_graph/global_test.rb` (with the file's own `graph` and `relate` helpers):
@@ -6210,6 +6334,7 @@ Append to `test/integration/admin/note_writes_test.rb`:
     assert_equal 1, body["open"]
     row = body["threads"].first
     assert_equal [ thread.id, "Dana", 1, false ], row.values_at("id", "author", "replies", "pinned")
+    assert_equal true, row["unread"] # the first message mentions the reader, and reading a list marks nothing read (P10)
     assert row["text"].start_with?("Ask @reader@example.com <b>now</b> x")
     assert_operator row["text"].length, :<=, 140
   end
@@ -6228,37 +6353,95 @@ Append to `test/integration/admin/note_writes_test.rb`:
   end
 ```
 
-Append to `test/integration/admin/mind_graph_data_test.rb` an assertion, in the test that reads the nodes of a small graph, that every node has an `open_notes` key and that a post with one open thread reads `1`. Append to the mind graph test in `test/integration/trash_visibility_test.rb` (the one that asserts the trashed post is no node): `as(users(:one)) { Notes::Start.call(@gone_post, body: "A note") }` before the request, and after it `assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })` plus a `get "/cs-studio/notes/post/#{@gone_post.id}/threads"` that is `:not_found`.
+Append to `test/integration/admin/mind_graph_data_test.rb` an assertion, in the test that reads the nodes of a small graph, that every node has an `open_notes` key and that a post with one open thread reads `1`. In `test/integration/trash_visibility_test.rb`, in "the page tree, posts list, link targets and mind graph hide trashed pages and posts" (the one that asserts the trashed post is no node), give the trashed post a thread before the first request. `Notes::Start` refuses a record that is already in the trash (decision P6), so the thread is written first and the post trashed again after it:
 
-Append to `test/system/admin/mind_graph_test.rb` (select the node the way the file's card tests do; `select_in_list(title)` below stands for that helper, which presses the node's row in the list):
+```ruby
+    @gone_post.update!(trashed_at: nil)
+    as(users(:one)) { assert Notes::Start.call(@gone_post, body: "A note").ok? }
+    @gone_post.update!(trashed_at: Time.current)
+```
+
+and after `get "/cs-studio/mind_graph/data"`: `assert(response.parsed_body["nodes"].none? { |node| node["id"] == @gone_post.id })`, then `get "/cs-studio/notes/post/#{@gone_post.id}/threads"` with `assert_response :not_found`, and `get "/cs-studio/mind_graph/data", params: { post: @kept_post.id }` already there gains `assert_equal [ 0 ], response.parsed_body["nodes"].map { |node| node["open_notes"] }` (the kept post has no thread; the trashed one's is counted nowhere).
+
+Add to `test/system/admin/mind_graph_test.rb`, above its `private` helpers, with the file's own helpers as they are today (checked: `await_graph`, `click_node(id)`, `screen_position(id)`, `pixel_at(x, y)`, `graph`, the constants `GRAPH`, `CANVAS`, `LIST`; relations are made with `PostRelation.create!`, the screen is opened with `visit admin_mind_graph_path`; the file is signed in as `users(:one)`; there is no `relate`, `open_graph` or `select_in_list`, and `element.mindGraph` answers `screenPosition`, `labelBox` and `draws` only, no node data):
 
 ```ruby
   test "a post with open notes shows them in its card, and a note is started from the card" do
     a = create_post(title: "Alpha")
-    relate(a, create_post(title: "Beta"))
-    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
-    open_graph
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates, @[#{users(:one).id}]") }
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
 
-    assert_equal 1, page.evaluate_script("document.querySelector('[data-controller=\"admin--mind-graph\"]').mindGraph.nodes().find((node) => node.title === 'Alpha').open_notes")
-    select_in_list("Alpha")
-
-    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li", text: "Check the dates"
+    assert_selector "[data-mind-graph-card] [data-mind-graph-card-notes] li[data-note-row][data-unread]", text: "Check the dates"
+    # The heading is in the small upper-case label style: matched whatever the case, as the card's counts are.
+    assert_selector "[data-mind-graph-card-notes] h3", text: /1 open note/i
     within("[data-mind-graph-card-notes]") do
       find("textarea").send_keys("And the prices")
       press "Add note"
     end
 
-    assert_selector "[data-mind-graph-card-notes] li", count: 2
-    assert_selector "[data-mind-graph-card-notes] h3", text: "2 OPEN NOTES"
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 2
+    assert_selector "[data-mind-graph-card-notes] h3", text: /2 open notes/i
     assert_equal [ "mind_graph", a ], Notes::Thread.order(:id).last.then { |thread| [ thread.origin_view, thread.subject ] }
+  end
+
+  test "three notes in the card, then a link to the rest; a post without notes has only the field" do
+    a = create_post(title: "Alpha")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    as(users(:two)) { 5.times { |index| Notes::Start.call(a, body: "Note #{index}") } }
+    visit admin_mind_graph_path
+    await_graph
+
+    click_node(a.id)
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", count: 3
+    assert_selector "[data-mind-graph-card-notes] a[data-note-more][href$='/posts/#{a.id}?notes=open']", text: "+2 more"
+
+    escape_on_canvas # the open card may stand over the other node
+    click_node(b.id)
+    assert_selector "[data-mind-graph-card-notes] textarea"
+    assert_no_selector "[data-mind-graph-card-notes] li"
+    assert_no_selector "[data-mind-graph-card-notes] h3" # zero threads: only the field (handoff)
+  end
+
+  # The badge is canvas pixels: the corner opposite the pin's holds something
+  # else once the post has an open note.
+  test "a post with an open note carries a badge on its top-left corner" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    bare = notes_badge_pixel(a)
+
+    as(users(:two)) { Notes::Start.call(a, body: "Check the dates") }
+    visit admin_mind_graph_path
+    await_graph
+
+    assert_not_equal bare, notes_badge_pixel(a), "no notes badge at the node's top-left"
+    assert_selector "[data-legend='notes']", text: "Open notes"
   end
 ```
 
-(`element.mindGraph` is the handle `app.js` already exposes to the tests; if it has no `nodes()` reader, read the node's `open_notes` from the JSON the screen fetched, as the file's other tests do.)
+and beside `pin_pixel`, among the helpers:
+
+```ruby
+  # The canvas's colour where a node's notes badge is: up and to the LEFT of
+  # the centre of a 7 px dot (the pin's corner is up and to the right).
+  def notes_badge_pixel(post)
+    point = screen_position(post.id)
+    pixel_at(point["x"] - 5.04, point["y"] - 5.04)
+  end
+```
+
+(Each read asks the node's place afresh, so the two visits need not agree on it; if `notes_badge_pixel` reads the same colour both times because the badge's surface fill equals the canvas's own background at that point, sample one pixel further up and left, on the badge's line, and say so in the task report.)
+
+The card's children are pinned by the existing test "the card reads top to bottom: kind and status, the title, the two counts, then its actions as buttons" (`assert_equal %w[DIV H2 P DIV BUTTON], ...`): a post's card gains the notes section before Close, so that line becomes `%w[DIV H2 P DIV SECTION BUTTON]` and the test's name and comment gain "then its notes". Its `div:nth-child(4)` assertions stay as they are.
 
 - [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/queries/post_graph test/integration/admin/note_writes_test.rb test/integration/admin/mind_graph_data_test.rb`
 
-- [ ] **Step 3: The node's count.** In `PostGraph::Builder#nodes`, before the `Post.where` line: `notes = Notes::Counts.by_container("Post", post_ids.to_a)` with a comment (the posts' open threads, one grouped query; the ids were narrowed by the read scope by whoever built them, so no count is for a post the viewer can't read), and in the node hash `open_notes: notes.fetch(post.id, 0)`. Update the node shape in the class comment. A test in `test/queries/post_graph/` that pins an exact statement count gains one.
+- [ ] **Step 3: The node's count.** In `PostGraph::Builder#nodes`, before the `Post.where` line: `notes = Notes::Counts.by_container("Post", post_ids.to_a)` with a comment (the posts' open threads, one grouped query; the ids were narrowed by the read scope by whoever built them, so no count is for a post the viewer can't read), and in the node hash `open_notes: notes.fetch(post.id, 0)`. Update the node shape in the class comment. No test in `test/queries/post_graph/` pins an absolute statement count (checked: `global_test.rb` and `local_test.rb` compare two runs), so none needs a number raised.
 
 - [ ] **Step 4: The JSON.** In `config/routes.rb`, in the notes scope, above the `post "threads"` line: `get "threads", to: "note_threads#index", defaults: { format: :json }` (it shares the path and the helper `admin_record_note_threads_path`). In `Admin::NoteThreadsController`:
 
@@ -6276,7 +6459,10 @@ Append to `test/system/admin/mind_graph_test.rb` (select the node the way the fi
         threads: threads.map do |thread|
           first = thread.messages.first
           { id: thread.id, text: Notes::Mentions.display(first.body, listing.users).first.truncate(EXCERPT),
-            author: listing.users[first.author_id]&.display_name, replies: thread.messages.size - 1, pinned: thread.pinned }
+            author: listing.users[first.author_id]&.display_name, replies: thread.messages.size - 1, pinned: thread.pinned,
+            # What turns the row's dot accent in the card (spec §4.5): one
+            # query for the whole listing (`Notes::Listing#unread?`).
+            unread: listing.unread?(thread, Current.user) }
         end
       }
     end
@@ -6298,16 +6484,16 @@ and in `create`, answer a JSON client in kind: after `result = Notes::Start.call
 
 ```js
   // The notes count on a node: the small mono label style.
-  theme.countFont = `600 9px ${style.getPropertyValue("--font-cs-mono").trim() || style.fontFamily}`
+  theme.countFont = `10px ${read("--cs-mono") || style.fontFamily}`
 ```
 
-(Use the custom property the stylesheet really defines for `font-cs-mono`: `grep -n "cs-mono" app/assets/tailwind/*.css`.) `renderer.js`: raise `NODE_MARGIN` to `11` (its comment: a node's rings and its notes badge), add
+(`--cs-mono` is the property `app/assets/tailwind/content-spiel.css` defines for the mono face, and `read` is the function `readTheme` already has; 10px is the handoff's size for this badge, which does not scale with zoom.) `renderer.js`: raise `NODE_MARGIN` to `11` (its comment: a node's rings and its notes badge), add
 
 ```js
 // A post with open notes (notes spec §4.4): the count in a small badge on the
 // mark's top-left corner. Half its height, and how far it reaches sideways
 // per character.
-const NOTES_BADGE = 6.5
+const NOTES_BADGE = 7
 const NOTES_BADGE_PAD = 3
 ```
 
@@ -6357,6 +6543,7 @@ In `mind_graph_legend_component.html.erb`, after the `pinned` item, an item `dat
 //
 // `cardNotes(node, { text, url, postUrl, onChange })` answers the section.
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
+// Three rows, then "+N more" (handoff, "Node card thread list").
 const ROWS = 3
 
 function element(tag, className, content) {
@@ -6387,11 +6574,24 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   submit.type = "submit"
   form.append(field, submit)
 
-  const title = (count) => { heading.textContent = text.t("mind_graph.script.card.notes.title", { count }) }
+  // Zero threads: only the field, no heading (handoff, "Node card thread list").
+  const title = (count) => {
+    heading.textContent = text.t("mind_graph.script.card.notes.title", { count })
+    heading.hidden = count === 0
+  }
 
   function row(thread) {
-    const item = element("li", "flex flex-col")
-    const link = element("a", "break-words text-sm text-ink hover:underline", thread.text)
+    const item = element("li", "relative flex flex-col pr-3")
+    item.dataset.noteRow = ""
+    // Unread for the viewer (spec §4.5): ink instead of dim, and the accent
+    // dot, the one meaning accent has in notes.
+    if (thread.unread) {
+      item.dataset.unread = ""
+      const dot = element("span", "absolute right-0 top-1.5 size-[7px] rounded-full bg-accent")
+      dot.setAttribute("aria-hidden", "true")
+      item.append(dot)
+    }
+    const link = element("a", `break-words text-sm hover:underline ${thread.unread ? "text-ink" : "text-dim"}`, thread.text)
     const target = new URL(postUrl, window.location.origin)
     target.searchParams.set("notes", "open")
     target.searchParams.set("thread", thread.id)
@@ -6416,10 +6616,12 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
       // Three rows, then "+N more", which opens the post's notes (handoff,
       // "Node card thread list").
       list.replaceChildren(...data.threads.slice(0, ROWS).map(row))
-      const rest = data.threads.length - ROWS
+      // `open` is exact; `threads` is the listing's first page.
+      const rest = data.open - Math.min(ROWS, data.threads.length)
       if (rest > 0) {
         const more = element("li")
         const link = element("a", "text-[12px] text-accent hover:underline", text.t("mind_graph.script.card.notes.more", { count: rest }))
+        link.dataset.noteMore = ""
         const target = new URL(postUrl, window.location.origin)
         target.searchParams.set("notes", "open")
         link.href = target.pathname + target.search
@@ -6466,9 +6668,9 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
 }
 ```
 
-In `card.js`: `import { cardNotes } from "mind_graph/card_notes"`; `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange })`; at the end of the array `post(node)` returns, after `actions(...)`, add `cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", node.id), postUrl: node.url, onChange })`; extend the header comment (the fifth part of a post's card, and that `urls` has a fourth template). In `app.js`: `urls` gains `postNotes: element.dataset.postNotesUrl`, and `createCard` gets `onChange: () => { measureCard(); requestDraw() }` with a comment (the notes arrive after the card was measured, and a note started here changes the node's badge). In `show.html.erb`: `data-post-notes-url="<%= admin_record_note_threads_path("post", "__ID__", **admin_url_options) %>"` and, in the `messages_data(...)` list, the literals `"mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.replies", "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.failed"`; extend the comment above the element by one sentence.
+In `card.js`: `import { cardNotes } from "mind_graph/card_notes"`; `createCard(container, { text, urls, typeLabels, dotClasses, buttonClasses, onClose, onPin, onChange })`; at the end of the array `post(node)` returns, after `actions(...)`, add `cardNotes(node, { text, url: fill(urls.postNotes, "__ID__", node.id), postUrl: node.url, onChange })`; extend the header comment (the fifth part of a post's card, and that `urls` has a fourth template). In `app.js`: `urls` gains `postNotes: element.dataset.postNotesUrl`, and `createCard` gets `onChange: () => { measureCard(); requestDraw() }` with a comment (the notes arrive after the card was measured, and a note started here changes the node's badge). In `show.html.erb`: `data-post-notes-url="<%= admin_record_note_threads_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/") %>"` (why not `"__ID__"` directly: the paragraph below) and, in the `messages_data(...)` list, the literals `"mind_graph.script.card.notes.title", "mind_graph.script.card.notes.label", "mind_graph.script.card.notes.add", "mind_graph.script.card.notes.replies", "mind_graph.script.card.notes.more", "mind_graph.script.card.notes.deleted_user", "mind_graph.script.card.notes.failed"`; extend the comment above the element by one sentence.
 
-The route constraint `container_id: /\d+/` refuses `__ID__` when the helper builds the template: build it as `admin_record_note_threads_path("post", 0, **admin_url_options).sub("/0/", "/__ID__/")` and say why in the comment.
+The route constraint `container_id: /\d+/` refuses `__ID__` when the helper builds the template (`ActionController::UrlGenerationError`), which is why the attribute above builds the path for id 0 and swaps the segment; say so in the comment above the element. `fill` (`card.js`) URL-encodes the id it puts in.
 
 - [ ] **Step 7: The strings.** In `config/locales/admin/notes.en.yml` under `en.admin`:
 
@@ -6495,7 +6697,7 @@ The route constraint `container_id: /\d+/` refuses `__ID__` when the helper buil
         notes: "Open notes"
 ```
 
-(The heading is drawn in the small uppercase label style, which is why the system test reads "2 OPEN NOTES".) Add `app/javascript/mind_graph/card_notes.js` to `CONVERTED`.
+(The heading is drawn in the small uppercase label style, which is why the system test matches it whatever the case: `/2 open notes/i`.) Add `app/javascript/mind_graph/card_notes.js` to `CONVERTED`.
 
 - [ ] **Step 8: Run.**
 
@@ -6743,7 +6945,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
 end
 ```
 
-Append to `test/integration/trash_visibility_test.rb`:
+Add to `test/integration/trash_visibility_test.rb`, above the file's `private` line like Task 9's test (the helper `create_note_for_reader` goes below that line, with the file's other helpers):
 
 ```ruby
   test "the inbox, Open threads and the sidebar's count show notes on kept records and never on trashed ones" do
@@ -7210,7 +7412,7 @@ and under `en.admin.components.notes_screen`:
 
 Add the new components, views and controller to `CONVERTED`.
 
-- [ ] **Step 8: Run**, expect green: `PGGSSENCMODE=disable bin/rails test test/queries test/integration test/components test/lib`. A whole-page test that pins a statement count (`grep -rn "capture_sql" test/integration`) gains the sidebar's count on every page and the two cards' reads on the dashboard; raise those numbers and list each in the task report.
+- [ ] **Step 8: Run**, expect green: `PGGSSENCMODE=disable bin/rails test test/queries test/integration test/components test/lib`. No whole-page test pins an absolute statement count (checked: every `capture_sql` and `count_queries` test under `test/integration` compares two runs of the same request, and the two that count particular statements, `trash_screen_test.rb` and `language_settings_test.rb`, match `SELECT COUNT(*) FROM "pages"|"posts"|"media_assets"` and `jsonb_path_exists`, neither of which the sidebar's count is), so none needs a number raised: every CS Studio page costs one statement more, the sidebar's count, and the dashboard its two cards' reads, the same at any number of notes.
 
 - [ ] **Step 9: Commit.**
 
@@ -7482,7 +7684,7 @@ end
 
 `SetFollowing` and `MarkRead` signal nobody: they change only the actor's own rows. Add a sentence to each service's class comment naming its signal.
 
-- [ ] **Step 5: The tab's id.** `app/models/current.rb`: `attribute :notes_tab` with a comment (the opaque id of the browser tab a notes request came from; `Notes::Signals` puts it in a record's signal). In `Admin::NoteContainer`, `included { before_action :set_container; before_action :note_tab }` and
+- [ ] **Step 5: The tab's id.** `app/models/current.rb`: `attribute :notes_tab` with a comment (the opaque id of the browser tab a notes request came from; `Notes::Signals` puts it in a record's signal). In `Admin::NoteContainer`, add `before_action :note_tab` to the `included do` block Task 5 wrote, after `before_action :set_container` (the block keeps its `helper_method :note_view`), and
 
 ```ruby
     # Which tab this is (`X-Notes-Tab`, set by `admin--notes-live` on its
@@ -7616,9 +7818,11 @@ Append to `test/integration/public_javascript_test.rb`:
 require "application_system_test_case"
 
 # Live delivery (notes spec §6): a signal over the cable, then a scoped fetch.
-# The suite's cable adapter is `test`, which delivers nothing; these tests
-# switch to the in-process `async` adapter, which reaches the browsers because
-# the system-test server runs in this process.
+# These tests run on the in-process `async` adapter (plan decision C5), which
+# reaches the browsers because the system-test server runs in this process.
+# (The suite's `test` adapter is that same adapter with a record of what it
+# sent -- `ActionCable::SubscriptionAdapter::Test < Async` -- so it would
+# deliver too; the switch only makes these tests say which adapter they mean.)
 class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
   setup do
     @cable = ActionCable.server.config.cable
@@ -7677,13 +7881,16 @@ class Admin::NotesLiveSystemTest < ApplicationSystemTestCase
     reply = find("#note-thread-#{@thread.id}-reply textarea[name=body]")
     reply.send_keys("Half a thou")
 
-    as(users(:two)) { Notes::Reply.call(@thread, body: "One more thing") }
+    # Addressed to the viewer, so that there IS a delivery the two lines at the
+    # end are about: without the mention this person, who never wrote in the
+    # thread, would be told nothing and both would pass with nothing tested.
+    as(users(:two)) { Notes::Reply.call(@thread, body: "One more thing, @[#{users(:one).id}]") }
 
     assert_selector "#note-thread-#{@thread.id}-messages [data-note-new-divider] + [data-note-message]", text: "One more thing"
     assert_equal "Half a thou", find("#note-thread-#{@thread.id}-reply textarea[name=body]").value
     assert_equal true, page.evaluate_script("document.activeElement === document.querySelector('#note-thread-#{@thread.id}-reply textarea[name=body]')")
+    assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.where(user: users(:one)).pluck(:read_at).then { |read| read.any? && read.all? } }
     assert_no_selector "#toasts .admin-toast" # the thread is open in this tab: no toast, and the delivery is read
-    assert_eventually(message: "the delivery was not marked read") { Notes::Delivery.unread.where(user: users(:one)).none? }
   end
 
   test "the list and the count markers follow a note started elsewhere, and a new note's typed text is kept" do
@@ -7773,7 +7980,7 @@ end
 
 `SCRIPT_MESSAGES` gains `notes.script.toast.on notes.script.live.new_messages notes.script.live.new_divider notes.script.live.gone`. Extend `<body>`'s comment: the fifth controller, and that it is the only thing that opens a socket.
 
-- [ ] **Step 5: The record elements.** `drawer_component.html.erb`: add to the `<aside>`'s `data:` `"admin--notes-live-target": "record", notes_type: helpers.note_args(container).first, notes_id: container.id, notes_counts_url: helpers.admin_record_note_counts_path(*helpers.note_args(container))`. `panel_component.html.erb`: the same four on `#media-notes` (`"media"`, `asset.id`). `card_notes.js`: on the section, `section.dataset.adminNotesLiveTarget = "record"`, `section.dataset.notesType = "post"`, `section.dataset.notesId = node.id`, and `section.addEventListener("admin--notes-live:changed", load)`.
+- [ ] **Step 5: The record elements.** `drawer_component.html.erb`: add to the `<aside>`'s `data:` `"admin--notes-live-target": "record", notes_type: helpers.note_args(container).first, notes_id: container.id, notes_counts_url: helpers.admin_record_note_counts_path(*helpers.note_args(container))`. `panel_component.html.erb`: the same four on `#media-notes` (`"media"`, `asset.id`). `card_notes.js`: on the section, `section.setAttribute("data-admin--notes-live-target", "record")` (written out: the identifier's double dash can't be spelled through `dataset`, whose `adminNotesLiveTarget` is `data-admin-notes-live-target`, a target of nothing), `section.dataset.notesType = "post"`, `section.dataset.notesId = node.id`, and `section.addEventListener("admin--notes-live:changed", load)`.
 
 In `notes_controller.js` add the getter the live controller asks (it already calls `refreshCounts`):
 
@@ -8098,7 +8305,7 @@ export default class extends Controller {
 }
 ```
 
-(If `Admin::ToastComponent`'s `:undo` kind draws its action differently from the `button_to` read above, fill whatever it draws; the template is the component's own markup either way.)
+(Checked against `app/components/admin/toast_component.html.erb`: the toast is `div.admin-toast` holding one `<span>` with the message, then, with `action:`, a `button_to` whose form says `data-turbo-frame="_top"`, then the dismiss button; `:undo` is the 8-second kind, and the region is `#toasts`. So `querySelector("span")`, read before the dot is put in front of it, is the message, and `querySelector("form")` the action.)
 
 - [ ] **Step 7: The strings.** Under `en.admin.notes.script`:
 
@@ -8125,7 +8332,7 @@ bin/rails tailwindcss:build
 PARALLEL_WORKERS=6 PGGSSENCMODE=disable bin/rails test:system test/system/admin/notes_live_test.rb test/system/admin/notes_drawer_test.rb test/system/admin/autosave_test.rb test/system/admin/promotion_hold_test.rb
 ```
 
-`autosave_test.rb` and `promotion_hold_test.rb` are run because `<body>` gained a controller that listens to `turbo:before-fetch-request`; they must pass with no edited assertion. If the cable does not connect in the system tests (`document.body.dataset.notesLive` never set), check that `/cable` is mounted (`bin/rails routes -g cable`; `config.action_cable.mount_path` defaults to `/cable`) and that the test server allows the request origin (`config.action_cable.allowed_request_origins` / `disable_request_forgery_protection` in `config/environments/test.rb`), and report what was needed.
+`autosave_test.rb` and `promotion_hold_test.rb` are run because `<body>` gained a controller that listens to `turbo:before-fetch-request`; they must pass with no edited assertion. The cable needs nothing set up for these tests (checked): `config/application.rb` requires `action_cable/engine`, which mounts the server at `/cable` ahead of the app's own catch-all routes (an internal route: `bin/rails routes` does not list it, `Rails.application.routes.routes` does), the path turbo-rails' consumer asks for when the page has no `action-cable-url` meta tag; `ApplicationCable::Connection` already identifies `current_user` from the signed `session_id` cookie; and Action Cable allows an origin equal to the request's own host by default (`allow_same_origin_as_host`), which is what a system test's browser sends. If `document.body.dataset.notesLive` is never set all the same, say in the task report what was needed.
 
 - [ ] **Step 9: Commit.**
 
@@ -8142,7 +8349,7 @@ Claude-Session: https://claude.ai/code/session_01B1T44ndwnt9ofQCkDEUcKT"
 
 **Files:**
 - Create: `db/migrate/20261009120000_add_notes_settings_to_users.rb`, `app/services/users/update_notifications.rb`, `app/javascript/controllers/admin/notes_alert_controller.js`, `app/javascript/controllers/admin/notes_permission_controller.js`
-- Modify: `db/schema.rb`, `config/routes.rb`, `app/controllers/admin/accounts_controller.rb`, `app/views/admin/accounts/edit.html.erb`, `app/views/layouts/admin.html.erb` (`<body>`), `config/locales/admin/notes.en.yml`, `test/support/service_calls.rb`, `test/services/service_behaviour_contract_test.rb`, `test/services/service_contract_test.rb` (floor `45`), `test/lib/admin_i18n_test.rb`
+- Modify: `db/schema.rb`, `config/routes.rb`, `app/controllers/admin/accounts_controller.rb`, `app/views/admin/accounts/edit.html.erb`, `app/views/layouts/admin.html.erb` (`<body>`), `app/models/audit/snapshot.rb` (the user's two new fields), `config/locales/admin/notes.en.yml`, `test/support/service_calls.rb`, `test/services/service_behaviour_contract_test.rb`, `test/services/service_contract_test.rb` (floor `45`), `test/lib/admin_i18n_test.rb`
 - Test: `test/services/users/update_notifications_test.rb` (new), `test/integration/admin/accounts_test.rb`, `test/system/admin/notes_live_test.rb`
 
 **Interfaces:**
@@ -8236,7 +8443,7 @@ Append to `test/system/admin/notes_live_test.rb`:
 
     tones = -> { [ page.evaluate_script("window.__tones"), within_window(second) { page.evaluate_script("window.__tones") } ] }
     assert_eventually(message: "nobody chimed") { tones.call.sum == 2 } # two tones, one tab
-    await_js("true", wait: 1)
+    sleep 0.6 # sleep: a second tab's late claim would arrive within the agreement window (150 ms) and chime again by now
     assert_equal 2, tones.call.sum
     notified = page.evaluate_script("window.__notified") + within_window(second) { page.evaluate_script("window.__notified") }
     assert_operator notified.size, :<=, 1
@@ -8275,7 +8482,7 @@ Append to `test/system/admin/notes_live_test.rb`:
   end
 ```
 
-(`await_js("true", wait: 1)` cannot wait for "nothing more happens"; if the suite's helper returns at once, use `sleep 0.6 # sleep: a second tab's late claim would arrive within the agreement window` instead.)
+(The one fixed sleep is there because nothing can be waited FOR when the assertion is that nothing more happens: `await_js` returns as soon as its condition holds. It carries its reason on the line, as `test/lib/system_test_sleeps_test.rb` asks.)
 
 - [ ] **Step 2: Run, expect failure:** `PGGSSENCMODE=disable bin/rails test test/services/users test/integration/admin/accounts_test.rb`
 
@@ -8350,7 +8557,7 @@ Contract: add `Users::UpdateNotifications` to `EXPECTED_SERVICES`, the floor to 
     },
 ```
 
-(If `Audit::Snapshot`'s `User` serializer lists its fields by name, add the two columns to it so the event's snapshot and `field_changes` show them; neither is a secret.)
+`Audit::Snapshot`'s `User` serializer lists its fields by name (checked: `id`, `email_address`, `name`, `owner`, `group_ids`), so without a change the event would say nothing of what was switched: add `"notes_sound" => record.notes_sound, "notes_desktop" => record.notes_desktop` to it (neither is a secret), and where an existing test pins a user's whole snapshot hash (`grep -rn '"group_ids" =>' test`), add the two keys there and say so in the task report.
 
 - [ ] **Step 5: The account screen.** Route, beside `account/profile`: `patch "account/notifications", to: "accounts#update_notifications", as: :account_notifications`. `Admin::AccountsController`:
 
@@ -8374,7 +8581,7 @@ Contract: add `Users::UpdateNotifications` to `EXPECTED_SERVICES`, the floor to 
     end
 ```
 
-In `app/views/admin/accounts/edit.html.erb`, between the name form and the password form (and give the password form's `save_bar_form_data` no new `after:`; the switches are independent of it). The switch is the existing one (the handoff, "Account switches": find it with `grep -rn 'role="switch"\|role: "switch"' app`); if CS Studio has none yet, this markup is it:
+In `app/views/admin/accounts/edit.html.erb`, between the name form and the password form (and give the password form's `save_bar_form_data` no new `after:`; the switches are independent of it). The switch is the existing one (the handoff, "Account switches"; checked: `app/components/admin/fields/boolean_field.html.erb` draws it as a checkbox with `class: "cs-toggle", role: "switch"`, styled in `content-spiel.tailwind.css`), used here as it is:
 
 ```erb
   <%# Notes (notes spec §6.4): two per-person settings, saved with this form's
@@ -8392,7 +8599,7 @@ In `app/views/admin/accounts/edit.html.erb`, between the name form and the passw
         <label class="flex items-center justify-between gap-4 text-sm text-ink">
           <span><%= t("admin.accounts.notes.#{name}") %></span>
           <%= hidden_field_tag name, "0", id: nil %>
-          <%= check_box_tag name, "1", on, role: "switch", class: "admin-switch" %>
+          <%= check_box_tag name, "1", on, role: "switch", class: "cs-toggle" %>
         </label>
         <% if name == "notes_desktop" %>
           <div class="mt-2" data-controller="admin--notes-permission" data-state="unsupported" data-action="notes-permission:check->admin--notes-permission#render">
@@ -8571,7 +8778,7 @@ export default class extends Controller {
 }
 ```
 
-(`notification.onclick` is a property of an object the script made, not an inline handler in markup; `test/lib/inline_handlers_test.rb` looks for `on…=` inside a tag. If its scan flags the line, use `notification.addEventListener("click", …)`.)
+(`notification.onclick` is a property of an object the script made, not an inline handler in markup. Checked against `test/lib/inline_handlers_test.rb`: its pattern for scripts is an `on…=` in attribute position, after a tag's name and whitespace, which `notification.onclick =` is not; its own examples let `once = true` and `onStart:` through the same way.)
 
 - [ ] **Step 7: The strings.** Under `en.admin`:
 
@@ -9173,11 +9380,12 @@ Append to `test/system/admin/note_composer_test.rb`:
 ```ruby
   test "chosen files are listed above the field with their size, one can be removed, and a sixth is refused in place" do
     open_notes
-    input = find("#notes-new input[type=file]", visible: :all)
-    input.attach_file([ file_fixture("tiny.png").to_s, file_fixture("small.gif").to_s ])
+    # `set` on the field itself: `attach_file` called on an element looks for a file field INSIDE it.
+    find("#notes-new input[type=file]", visible: :all).set([ file_fixture("tiny.png").to_s, file_fixture("small.gif").to_s ])
 
     assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 2
-    within("#notes-new [data-admin--note-composer-target=chosen] li", text: "small.gif") { press "Remove small.gif" }
+    # The remove button's text is "×"; its name is its `aria-label`, which `press` does not read.
+    find("#notes-new [data-admin--note-composer-target=chosen] button[aria-label='Remove small.gif']").click
     assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 1
 
     field.send_keys("With a file")
@@ -9315,7 +9523,7 @@ and
   <% end %>
 ```
 
-and in the toolbar, before the emoji control:
+and in the toolbar, inside `[data-note-toolbar]` and before the emoji control (the place Task 6's comment there keeps for it):
 
 ```erb
     <% if files? %>
@@ -9326,7 +9534,7 @@ and in the toolbar, before the emoji control:
     <% end %>
 ```
 
-`form_data`'s `messages_data(...)` gains `"notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove"`. In `note_composer_controller.js`: targets gain `"files", "chosen", "fileError"`, and
+`script_messages`' `messages_data(...)` (Task 6 gave the call a method and a line of its own, so that `test/lib/script_messages_test.rb` reads its literal keys; `form_data` only names it) gains `"notes.script.files.too_many", "notes.script.files.too_big", "notes.script.files.remove"`, the call still ending its line. In `note_composer_controller.js`: targets gain `"files", "chosen", "fileError"`, and
 
 ```js
   // --- files --------------------------------------------------------------------
@@ -9373,7 +9581,7 @@ and in the toolbar, before the emoji control:
       name.textContent = file.name
       const size = document.createElement("span")
       size.className = "shrink-0 font-cs-mono text-[10px] text-meta"
-      size.textContent = `${(file.size / 1048576).toFixed(1)} MB`
+      size.textContent = `${(file.size / 1048576).toFixed(1)} MB` // i18n-ok: a unit symbol, written the same in every language CS Studio has
       const remove = document.createElement("button")
       remove.type = "button"
       remove.className = "shrink-0 cursor-pointer rounded-cs px-1.5 text-meta hover:bg-sunken hover:text-ink"
@@ -9420,7 +9628,7 @@ module Admin
       inline = Notes::Files.image?(blob.content_type)
 
       response.headers["X-Content-Type-Options"] = "nosniff"
-      response.headers["Cache-Control"] = "private, no-store"
+      response.headers["Cache-Control"] = "private, no-store" # i18n-ok: an HTTP header's name and its directives, not copy
       send_data blob.download, filename: blob.filename.to_s, type: (Notes::Files::ALLOWED.key?(blob.content_type) ? blob.content_type : "application/octet-stream"),
         disposition: inline ? "inline" : "attachment"
     end
@@ -9464,7 +9672,8 @@ module Admin
       def gif?(attachment) = attachment.blob.content_type == "image/gif"
 
       def facts(attachment)
-        [ ::Notes::Files::ALLOWED.fetch(attachment.blob.content_type, t(".file")), helpers.number_to_human_size(attachment.blob.byte_size) ].join(" · ")
+        size = helpers.number_to_human_size(attachment.blob.byte_size) # i18n-ok: a byte size ("1.2 MB"), its units from Rails' own locale data
+        [ ::Notes::Files::ALLOWED.fetch(attachment.blob.content_type, t(".file")), size ].join(" · ")
       end
     end
   end
@@ -9587,7 +9796,7 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     sign_in_via_form(users(:one))
     editor
     within("##{ActionView::RecordIdentifier.dom_id(@block)}") do
-      press "Block actions"
+      find("button[aria-label='Block actions']").click
       press "Add note"
     end
     field = find("#notes-new textarea[name=body]")
@@ -9681,6 +9890,28 @@ class Admin::NotesFlowSystemTest < ApplicationSystemTestCase
     find("##{ActionView::RecordIdentifier.dom_id(@block)} [contenteditable=true]").send_keys(" and one more")
     assert_writes_settled
     assert_equal 0, Audit::Event.where(action: "access.denied").count
+  end
+
+  # Spec §8, System: "attach an image and a PDF; react".
+  test "a note carries an image and a PDF, and takes a reaction" do
+    sign_in_via_form(users(:one))
+    editor
+    find("#notes-open").click
+    within("#notes-drawer") { press "New note" }
+    pdf = Tempfile.new([ "report", ".pdf" ], binmode: true).tap { |file| file.write("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n".b); file.close }
+    find("#notes-new input[type=file]", visible: :all).set([ file_fixture("tiny.png").to_s, pdf.path ])
+    assert_selector "#notes-new [data-admin--note-composer-target=chosen] li", count: 2
+    find("#notes-new textarea[name=body]").send_keys("Two files")
+    within("#notes-new") { press "Add note" }
+
+    assert_selector "#notes-drawer [data-note-files] a[data-note-image] img[alt='tiny.png']"
+    assert_selector "#notes-drawer [data-note-files] a[data-note-file]", text: /report.*\.pdf/
+    assert_equal %w[application/pdf image/png], Notes::Message.last.files.map(&:content_type).sort
+
+    find("#notes-drawer details[data-reaction-add] summary").click
+    find("#notes-drawer details[data-reaction-add] button[value='👍']").click
+    assert_selector "#notes-drawer button[data-reaction='👍'][data-mine]", text: "1"
+    assert_equal [ [ users(:one).id, "👍" ] ], Notes::Reaction.pluck(:user_id, :emoji)
   end
 
   test "a view-only reader writes a note and can change nothing else" do
@@ -9831,4 +10062,91 @@ Each is resolved by the reading that keeps the spec's intent; the owner can over
 
 **Names across tasks.** `Notes.key`, `read_key`, `moderate_key`, `readable?`, `moderator?`, `readable_threads` (Task 1) are used with those names throughout. `read_refusal`/`moderation_refusal` take a block that calls `authorize!` (Task 2) in every later service. `with_locked_thread`/`thread_answer` (Task 3) are used by Tasks 3 and 15. `Notes::Counts.for_container(container, user:)` returns `total`, `subjects`, `unread` (Task 5) and is what `admin--notes#refreshCounts` takes (Task 7) and `admin--notes-live` hands it (Task 13). `Notes::Listing.new(container, limit:, viewer:)` (Task 5) gains `moderator?`/`subject_by_key` (Task 6) and its preloads in Tasks 15 and 16. `render_list`/`render_thread`/`notes_path`/`thread_path`/`gone!`/`failed_form`/`failure_status` (Tasks 5, 6) are used by Tasks 10, 15, 16. The frame's views are `[data-notes-view=list|thread]`; the thread's parts `[data-note-part=messages|reply]` (Task 5) are what Task 13 replaces and keeps. `data-notes-key`, `data-has-notes`, `data-unread`, `data-notes-compose`, `data-notes-active` are set in Tasks 7 and 8 only. Route helpers are those of the "Stable ids" table plus `admin_change_record_note_thread_path`, `admin_record_note_messages_path`, `admin_record_note_message_path`, `admin_record_note_mentions_path`, `admin_record_note_threads_path` (Task 6), `admin_record_note_message_reactions_path` (15), `admin_record_note_file_path` (16), `admin_account_notifications_path` (14).
 
-**Not verified against a running app** (reading only, by the task's own rule; each is flagged where it is used): the labels of block types as the tests read them ("Rich text", "Image"); the helper names in `test/system/admin/mind_graph_test.rb` and the top bar's selector; `Admin::EmptyStateComponent`'s action slot; the icon partial's names; how `ActiveRecord.after_all_transactions_commit` behaves inside the tests' own transaction; that `/cable` is mounted and reachable from the system-test browser; exact statement counts that existing tests pin.
+**Not verified when the plan was written; resolved since by reading the code** (the cross-task check below; each answer is also written where the task uses it):
+
+- *Block-type labels.* "Rich text", "Image", "Post list", "Section" (`app/models/block_types/*.rb`, `t.label`); a block in a section's column is "%{type} · column %{column}" (`admin.components.editor_screen.panel_title.title`). The tests read them as written.
+- *Mind graph test helpers.* `test/system/admin/mind_graph_test.rb` has `await_graph`, `click_node(id)`, `escape_on_canvas`, `screen_position(id)`, `pixel_at(x, y)`, `pin_pixel(post)` and `graph`; `test/queries/post_graph/global_test.rb` has `graph` and `relate(a, b)`. Task 10 uses exactly these.
+- *The top bar's selector.* `button[aria-controls=sidebar]`, and the open panel is `#sidebar[data-open]` (Task 7).
+- *The empty state's action slot.* `Admin::EmptyStateComponent` has `renders_one :action` (`with_action`), as Task 5 uses it.
+- *Icons.* One partial, `app/views/admin/shared/_icon.html.erb`, a `case name` of inline SVGs that raises on an unknown name; none of the handoff's Lucide names is in it, so each is added as a `when :name` branch by the task that first draws it (Global Constraints; Task 6 adds `smile` and `at_sign`, Task 16 `paperclip`).
+- *`ActiveRecord.after_all_transactions_commit` inside a transactional test.* The test's own transaction is not joinable, so it does not count as open: a block registered inside a service's `transaction(requires_new: true)` runs when that savepoint is released, and is dropped when it, or a joinable transaction around it, rolls back; called with no service transaction open it runs at once. `Audit.record` already relies on this. The broadcast tests of Task 12 therefore need nothing beyond `ActionCable::TestHelper`, and "nothing is sent for an action that is rolled back" is a real test.
+- *`/cable` in system tests.* Mounted by `action_cable/engine` as an internal route ahead of the app's catch-alls; the connection identifies the user from the signed session cookie; an origin equal to the request's host is allowed by default. The suite's `test` adapter is `ActionCable::SubscriptionAdapter::Test < Async`: it delivers to in-process subscribers like `async` and also records what was sent. The switch to `async` that decision C5 makes in `notes_live_test.rb` is therefore harmless and not needed (see "Gaps left for the owner").
+- *Pinned statement counts.* No existing test pins an absolute number that a step here changes: the tests of the posts list, the tree, the media grid, the graph, the groups and audit screens compare two runs; the purge and destroy tests assert the order of statements and count only page locks and block updates. Tasks 4, 9, 10 and 11 say so where they used to say "raise the number".
+
+## Cross-task interface check
+
+Run after the plan was written, by one reader over all seventeen tasks, with the code of this branch open (commit `5c9aaf38`). For every pair of tasks that share a class, a method, a route helper, a DOM id, a `data-` attribute, a Stimulus name, a locale key or a column: what the producing task says against what the consuming task's code and tests use. Rows that agreed are counted per pair; every row that was changed is written out.
+
+**Agreed as written**
+
+| Producer → consumer | Shared things checked | Agreed |
+|---|---|---|
+| 1 → 2 | `Notes.container_for`/`read_key`/`moderate_key`/`readable?`, `Mentions.ids`, `Message::MAX_BODY`, `Thread::MAX_QUOTE`/`ORIGIN_VIEWS`, `Deliveries.for_new_message`/`for_edit`, `first_message` | 10 |
+| 1 → 3 | `Deliveries.for_state`, `Notes::Follow` (record), `Delivery.unread`, `open?`/`resolved?`/`pinned?` | 6 |
+| 2 → 3 | `read_refusal`, `moderation_refusal`, `lock_container`, `gone`, `note_metadata`, `NOTE_VERBS`, `Dashboard::Activity::ACTIONS`' `"note"` entry, `note_on`, `admin.notes.errors.*` | 9 |
+| 2, 3 → 4 | `NOTE_VERBS`, `note_on`, `trashed`, the contract floor (37, 43, 44, then 45 and 46 in Tasks 14 and 15), `Notes::Thread` | 5 |
+| 1–3 → 5 | `Notes.key`, the thread scopes, `messages` order, `Delivery.unread`, `Notes::Follow`, `MarkRead.call(thread:)`, `Mentions.display`, `Text.parts`, `Notes::Pin`/`Resolve` | 9 |
+| 5 → 6 | `note_args`, `note_view`, `note_frame_params`, `notes_path`, `thread_path`, `render_list`, `render_thread`, `container_threads`, `Listing#find`/`users`/`following?`, the `failed` keys, `#notes-new`, `a[data-note-new-link]`, the four route helpers | 14 |
+| 5, 6 → 7 | `turbo-frame#notes`, `data-notes-view`, `data-notes-group`, `#notes-new textarea`, `CountsComponent.new(counts:, id:)`, the `counts` target, the counts' three keys, `admin_record_notes_path`, `?compose=`, `<src>/threads/<id>`, `a[data-note-back]` | 11 |
+| 7 → 8 | the `marker` and `warning` targets, `hold`, `open`, `data-notes-key`, `data-notes-name`, `data-notes-compose`, `[data-notes-count]`, `[data-notes-selection]`, `#notes-counts`, the ids `blockKey` reads | 9 |
+| 5, 7 → 9 | `Counts.by_container`, `Counts.unread_among`, `view=media`, `?notes=open`, `?thread=` | 5 |
+| 5, 6 → 10 | `Listing#pinned`/`groups`/`open_count`/`users`/`unread?`, `admin_record_note_threads_path` (GET and POST), `failure_status`, `view=mind_graph`, `?notes=open&thread=` | 8 |
+| 1, 3, 5, 7, 9 → 11 | `Notes.readable_threads`, `MarkRead.call`, `Mentions.display`, `Audit::Sentence.route_for`, `?notes=open&thread=`, `?selected=&thread=`, `Notes::Delivery` | 7 |
+| 1–4 → 12 | `Deliveries.write`, the `record_event` line of each of the nine services, `Notes::Remove`'s read of the thread ids, `Current`, `Notes.key(type, id)` | 11 |
+| 12 → 13 | the two channel names, `type`/`id`, the payload's five keys, `X-Notes-Tab`, `origin` | 8 |
+| 5–11 → 13 | `[data-note-part]`, `data-note-message`, `#notes-new`, `[data-note-new-link]`, `#notes-resolved-section`, the `counts` target, `[data-notes-scroller]`, `refreshCounts`, `isOpen`, the frame's `src`, `#sidebar-badge-dashboard`, `#notes-for-you`, `#notes-open-threads`, `NotesForYou#find`, the `inbox_row` keys, the drawer's and `#media-notes`' attributes, `card_notes.js`' `load` | 17 |
+| 13 → 14 | `admin--notes-live:delivery` and its eight detail keys, `<body>`, `#toasts`, the toast's sentence | 4 |
+| 3, 5, 6, 12 → 15 | `with_locked_thread`, `thread_answer`, `control_unaudited`, `Signals.threads`, `Listing#load`, `Listing#users`, `gone!`, `failed_form`, `render_thread` | 9 |
+| 2, 4, 5, 6, 12, 15 → 16 | `Start`'s and `Reply`'s signatures and `errors` line, `Remove`'s `ids`, `Listing#load`, `[data-note-toolbar]`, `failed_form`, the message's body/files/reactions order, `field_id` | 8 |
+| all → 17 | `#notes-open`, `[data-note-actions]`, `[data-note-badge]`, `#notes-pinned`, `#note-thread-<id>-reply`, `#block-<id>-base-updated-at`, `[data-reaction]`, `details[data-reaction-add]`, `[data-note-files]`, `[data-delivery]`, `#sidebar-badge-dashboard`, `.admin-view-only` | 12 |
+
+**Changed: a name or a shape that two tasks spelled differently**
+
+| Tasks | The shared thing | The two spellings | What was done |
+|---|---|---|---|
+| 5, 12 | `Admin::NoteContainer`'s `included` block | Task 5: `included do … before_action :set_container; helper_method :note_view … end`. Task 12: "`included { before_action :set_container; before_action :note_tab }`", which read as a replacement drops `helper_method :note_view`, and the three notes views call `note_view`. | Task 12 Step 5 now adds one line to Task 5's block and says the helper stays. |
+| 6, 16 | Where the composer's `messages_data(...)` call lives | Task 6: `ComposerComponent#script_messages`, on a line of its own (so `script_messages_test.rb` reads its keys). Task 16: "`form_data`'s `messages_data(...)` gains …". | Task 16 names `script_messages` and keeps the call ending its line. |
+| 13, 10 | The Stimulus target on the mind graph card's section | Task 13's controller: target `record`, attribute `data-admin--notes-live-target`. Task 13's instruction for `card_notes.js`: `section.dataset.adminNotesLiveTarget = "record"`, which writes `data-admin-notes-live-target` (one dash): no target, so the card never subscribed. | `section.setAttribute("data-admin--notes-live-target", "record")`, with the reason beside it. |
+| 5, 6 | How a block is named in "New note on …" | Task 5: `note_subject_name(record, container, type)`, plain text. Task 6: a rendered `PanelTitleComponent` (escaped markup) put into `t(".new_on_block", block: …)`, which the template escapes again; and a second copy of the label rule. | Task 6's `compose_title` calls Task 5's helper. Task 8's test ("New note on Rich text") is unchanged. |
+| 7 (its own two halves) | The `admin--notes` actions | The drawer's template binds `turbo:before-fetch-request->admin--notes#leaving`; the Interfaces list of actions had no `leaving`. | Added to the list. |
+| 8, 5, 7 | Files Task 8 changes | Step 7 edits `thread_component.html.erb` (Task 5's) and `notes_controller.js` (Task 7's) and adds `data-notes-subject` and `data-notes-active`; neither file was in Task 8's Files, neither attribute in its Produces. | Both added. |
+| 10 (test and note) | The card heading's text in the system test | The test: `/2 open notes/i`. Step 7's note: "which is why the system test reads "2 OPEN NOTES"". | The note says what the test does. |
+| 9, 11 | Where a test goes in `trash_visibility_test.rb` | Task 9: above the file's `private` line. Task 11: "Append", which is below it. | Task 11 says the same as Task 9; its helper goes below the line. |
+| 7, 8, 13, 16, 17 against `test/application_system_test_case.rb` | `click_frame_link`, `press` | `click_frame_link` waits for the `turbo:load` of a visit promoted from `#content`; Task 7 used it for links inside `turbo-frame#notes`, which is never promoted (an 8-second failure). `press(label)` is `find(:link_or_button, label)`, by text; Tasks 8 and 17 pressed "Block actions" and Task 16 "Remove small.gif", which are `aria-label`s of buttons whose text is "⋯" and "×". | Plain clicks in Task 7; `find("button[aria-label='…']").click` in Tasks 8, 16 and 17; both rules are in Global Constraints now. |
+
+**Changed: a task against itself or against the code it edits**
+
+| Task | Defect | What was done |
+|---|---|---|
+| 4 | `Notes::Remove` was called after the pages were destroyed, and asks the purge's own right again. A `pages.delete` scoped to a branch is matched against the page's closure rows, which its destroy deletes: the check refused the person the purge had just allowed and rolled the purge back (closure_tree deletes the hierarchy rows in `before_destroy`, and `AccessControl::Checker.page_branch_ids` reads them). Read from the code, not run: no existing test purges as a branch-scoped user, so nothing would have caught it. | `Trash::Purge` calls it before it destroys anything (`ContentBlocks::Destroy` is unchanged: a block's right is its page's). A test with `users(:editor_branch)` pins it. |
+| 4 | `ContentBlocks::Reorder` was called with a section record and `moved_from` keyed by a string with nils. | The call is `reorder_test.rb`'s own shape: the section's id, `moved_from: { id => { section_id: "", column: "" } }`. |
+| 7 | "The list is where it was left": the test scrolled to 600, then clicked the LAST row natively, which scrolls it into view, so the position restored was not the one compared. | The list is scrolled to its end first, so the click moves nothing. |
+| 13 | "A reply arrives … while a half-typed reply is kept" ended with "no toast, and the delivery is read", for a viewer who had no delivery: both lines passed with nothing tested. | The reply mentions the viewer, and the assertion needs a delivery that exists and is read. |
+| 13 | The test's comment said the suite's `test` cable adapter "delivers nothing". It is `Test < Async` and delivers. | The comment says what is true and that the switch is decision C5's. |
+| 14 | `await_js("true", wait: 1)` as a wait for "nothing more happens" returns at once. | The plan's own fallback, a `sleep` with its reason on the line. |
+| 14 | The switch's class was `admin-switch`, which no stylesheet has. | `cs-toggle`, the class of the existing switch (`fields/boolean_field.html.erb`). |
+| 14 | "If the `User` serializer lists its fields by name": it does. | The step says to add the two fields, and `app/models/audit/snapshot.rb` is in the Files. |
+| 16 | `find(…).attach_file([ … ])` on the file field looks for a field inside it. | `find(…).set([ … ])`. |
+| 16 | Three lines `test/lib/admin_i18n_test.rb` refuses in files that join `CONVERTED`: `number_to_human_size` (an English-making call), the literal "MB" on a `textContent` line, and the header name `"Cache-Control"` (only `Content-Type`, `Turbo-Frame` and `X-…` are known as headers). | Each carries `i18n-ok:` with its reason. |
+| 7 | The controller's comment still described "the faint "add a note" mark" of the superseded design. | Reworded: nothing at rest, the control on hover or focus. |
+
+**Added: a spec line that had no test which would fail without it**
+
+| Task | Spec | Test added |
+|---|---|---|
+| 2 | §7, "A message deleted while someone replies" | `reply_test.rb`: the reply lands in a thread one of whose messages was deleted meanwhile. |
+| 3 | §3.5, the feed gains `note.started` and `note.resolved` only | `activity_test.rb`: started and resolved are listed, on a block under its page; a reply is not. |
+| 17 | §8, System: "attach an image and a PDF; react" | `notes_flow_test.rb`: one note with both files, then a reaction, in the drawer. |
+
+**The edits inherited from the earlier, interrupted check** (183 lines added, 48 removed, uncommitted, by reviewers of separate task ranges) were each read against the code and against the other tasks. All were correct and are kept: the fold and origin test and `helper_method :note_view` (Task 5); the `i18n-ok` marker on `NotePathsHelper::TYPES`; the at-sign button, `script_messages`, `[data-note-toolbar]`, the icon partial's description and the removal of two duplicated methods (Task 6); the trash test written before the records are trashed, the tile's `tag.span`, `grid_streams`' unread read and the statement-count paragraph (Task 9); the `unread` key, the helpers the mind graph test really has, the three-row card, the badge test, `--cs-mono` and the route template built for id 0 (Task 10). Three of them left another task behind, which the first table above records: Task 12 (the `included` block), Task 16 (`script_messages`) and Task 10's own Step 7 (the heading's case).
+
+## Gaps left for the owner
+
+Not fixed here, because each is a decision or more than a small step.
+
+1. **Decision C5 is not needed.** `ActionCable::SubscriptionAdapter::Test` is a subclass of `Async`: the suite's adapter already delivers to the system-test browsers. Swapping `ActionCable.server.config.cable` and restarting the server in `notes_live_test.rb`'s setup and teardown is harmless but is machinery with no effect, and the sentence Task 17 adds to `CLAUDE.md` about it would describe a rule nobody needs. Dropping the swap also removes the one place a notes test changes process-wide state under parallel workers.
+2. **The look is checked by eye only.** The templates are a baseline (a "✎" for the handoff's message-square icon, "This page" where the handoff has "WHOLE PAGE", a text "Notes" column head where it has an icon, the media tile's chip beside the other chips where it has it on the image, the delete warning's wording). The plan tells each task to follow the handoff and Task 17 to compare part by part in a browser; no test pins a class, a size or an icon, and no task but 6 and 16 says which icon branches to add.
+3. **The page tree's drawer.** Spec §7 names both shell drawers ("sidebar, page tree"); Task 7 tests the notes drawer against the sidebar only. Same mechanism (`admin--drawer:opened`), no test for the tree below 1024px.
+4. **The chime for a thread that is showing.** A mention that arrives for the thread open in this tab raises no toast (§6.4) but still chimes and, with the tab unfocused, still notifies: `admin--notes-alert` does not read the event's `shown`. The spec is silent; say which is meant.
+5. **A restored record's inbox rows.** Task 4 tests that threads survive the trash and a restore (D12); no test says that a delivery on a trashed record, hidden from the inbox meanwhile, is listed again after the restore. It follows from `Notes.readable_threads`, and nothing pins it.
+6. **A route without a name.** Task 10's `get "threads", to: "note_threads#index"` has no `as:` (it shares `admin_record_note_threads_path` with the POST); Rails may name such a route from its path on its own. Harmless today; give it `as: nil` if a later `threads` route in the admin scope collides.
