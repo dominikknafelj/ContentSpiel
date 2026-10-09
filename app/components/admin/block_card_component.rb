@@ -84,6 +84,30 @@ module Admin
 
     def self.panel_title_id(block) = "#{error_prefix(block)}-panel-title"
 
+    # The ids of a block's autosave form, and the wiring of the form itself,
+    # are the class's for the same reason again: a section's settings are a
+    # form in its card's header (`Admin::EditorScreen::SectionCardComponent`),
+    # not a block card, and `Admin::ContentBlocksController#update` answers a
+    # section's save into the same three ids it answers a card's into.
+    def self.status_id(block) = "#{error_prefix(block)}-save-status"
+
+    def self.base_updated_at_id(block) = "#{error_prefix(block)}-base-updated-at"
+
+    def self.autosave_form_data(block)
+      {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": status_id(block),
+        "admin--autosave-page-base-id-value": "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      }
+    end
+
+    # A menu item's look in every menu of the block list -- a card's "⋯", a
+    # section's, a lane's "+" (`Admin::BlockPickerComponent::MENU_ITEM_CLASS`
+    # is this constant): the panel already styles its buttons (width,
+    # padding, hover); a disabled one dims and drops the hover fill.
+    MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
+
     def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false)
       raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
 
@@ -119,9 +143,9 @@ module Admin
     # its own heading -- which an unavailable block's panel doesn't have.
     def panel_name = unavailable? ? {} : { role: "region", aria: { labelledby: self.class.panel_title_id(block) } }
 
-    # "Image · column 2" (spec §4.3): the open form is below the lanes, not
-    # in its column, so its heading says which column it belongs to.
-    def panel_title = t(".panel_title", type: label, column: block.section_column)
+    # "Image · column 2" (spec §4.3), drawn by the component a stream
+    # redraws it with when the block's column changes under the open form.
+    def panel_title = Admin::EditorScreen::PanelTitleComponent.new(block: block)
 
     def definition = block.definition
 
@@ -137,22 +161,13 @@ module Admin
 
     def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
-    def form_data
-      return {} unless editable?
-
-      {
-        controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-        "admin--autosave-status-id-value": status_id,
-        "admin--autosave-page-base-id-value": "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
-      }
-    end
+    def form_data = editable? ? self.class.autosave_form_data(block) : {}
 
     def error_prefix = self.class.error_prefix(block)
 
-    def status_id = "#{error_prefix}-save-status"
+    def status_id = self.class.status_id(block)
 
-    def base_updated_at_id = "#{error_prefix}-base-updated-at"
+    def base_updated_at_id = self.class.base_updated_at_id(block)
 
     def base_updated_at_value = block.updated_at.iso8601(6)
 
@@ -166,9 +181,7 @@ module Admin
 
     def body_id = "#{error_prefix}-body"
 
-    # The "⋯" menu's items: the panel already styles its buttons (width,
-    # padding, hover); a disabled one dims and drops the hover fill.
-    def menu_item_class = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+    def menu_item_class = MENU_ITEM_CLASS
 
     # The row-shaped settings of a post list (handoff B22): its three
     # settings side by side, in this order, whatever order the type declared

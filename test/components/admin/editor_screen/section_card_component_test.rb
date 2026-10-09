@@ -19,7 +19,7 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     render_card
 
     assert_selector "##{ActionView::RecordIdentifier.dom_id(@section)}.admin-section-card[data-admin--blocks-target='card'][data-container][data-controller~='admin--section']"
-    assert_selector "#section-#{@section.id}-lanes > .admin-section-lane > [data-admin--blocks-target='lane']", count: 3
+    assert_selector "#section-#{@section.id}-lanes[data-admin--section-target='lanes'] > .admin-section-lane > [data-admin--blocks-target='lane']", count: 3
     assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", text: "Hello from a column"
     assert_selector "#section-#{@section.id}-lane-2 > *", count: 0
     assert_selector "#section-#{@section.id}-lane-3 > .admin-block-tile", text: "No image chosen"
@@ -90,6 +90,127 @@ class Admin::EditorScreen::SectionCardComponentTest < ViewComponent::TestCase
     assert_no_selector ".admin-block-card__handle"
     assert_selector "#block-#{@text.id}-panel fieldset[disabled]", visible: :all
     assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+  end
+
+  test "the header carries the section's own autosaving form: layout, background, width" do
+    render_card
+
+    assert_selector "form#section-#{@section.id}-form[data-controller~='admin--autosave'][action$='/content_blocks/#{@section.id}']"
+    assert_selector "input[type=hidden][name='block[settings][layout]'][value='three']", visible: :all
+    assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
+    assert_selector "select[name='block[settings][width]'] option", count: 2
+    assert_selector "button[data-action='admin--section#chooseLayout'][data-admin--section-layout-param]", count: 6, visible: :all
+    assert_selector "button[data-admin--section-layout-param='three'][aria-current='true']", visible: :all
+    assert_selector "#block-#{@section.id}-save-status"
+  end
+
+  # What `Admin::ContentBlocksController#update` answers into: the base the
+  # stale-save guard compares, and one error slot per setting.
+  test "the form has the block's base field and an error slot for each of its three settings" do
+    render_card
+
+    form = "form#section-#{@section.id}-form"
+    assert_selector "#{form} input[type=hidden][name='base_updated_at']#block-#{@section.id}-base-updated-at[value='#{@section.reload.updated_at.iso8601(6)}']", visible: :all
+    assert_selector "#{form} input#block-#{@section.id}-layout[name='block[settings][layout]']", visible: :all
+    %w[layout background width].each do |name|
+      assert_selector "#{form} ##{Admin::FieldComponent.error_id("block-#{@section.id}", name)}", visible: :all
+    end
+    assert_selector "#{form} select#block-#{@section.id}-background[aria-label='Background']"
+    assert_selector "#{form} select#block-#{@section.id}-width[aria-label='Width']"
+  end
+
+  # A section just made stores no settings: the form shows, and sends, what
+  # the type reads for it -- or its first save would be refused for a layout
+  # it never had the chance to choose.
+  test "a section with no stored settings has the schema's defaults in its form" do
+    @image.destroy!
+    @section.update_column(:settings, {})
+    render_card
+
+    assert_selector "input[type=hidden][name='block[settings][layout]'][value='two']", visible: :all
+    assert_selector "button[data-admin--section-layout-param='two'][aria-current='true']", visible: :all
+    assert_selector "select[name='block[settings][background]'] option[selected][value='none']"
+    assert_selector "select[name='block[settings][width]'] option[selected][value='content']"
+  end
+
+  # The layout menu is replaced by a stream after a save, so it has its own
+  # wrapper; the hidden input the pick is written into is not in it.
+  test "the layout menu is its own element, named, each choice a diagram of its columns with its name for a screen reader" do
+    render_card
+
+    menu = "#section-#{@section.id}-layout-menu"
+    assert_selector "#{menu}[data-admin--section-target='layoutMenu'] button[aria-haspopup='menu'][aria-label='Layout']", text: "Layout"
+    assert_no_selector "#{menu} input", visible: :all
+    assert_selector "#{menu} button[data-admin--section-layout-param='one_two'] .admin-layout-diagram[aria-hidden='true'] > span", count: 2, visible: :all
+    assert_selector "#{menu} button[data-admin--section-layout-param='one_two'] .sr-only", text: "One third, two thirds", visible: :all
+    assert_selector "#{menu} button[aria-current='false']", count: 5, visible: :all
+    # The trigger shows the current layout: three equal columns.
+    assert_selector "#{menu} button[aria-haspopup='menu'] .admin-layout-diagram > span", count: 3
+  end
+
+  test "the menu moves, duplicates, removes keeping the blocks, and deletes behind a dialog that counts them" do
+    render_card
+
+    assert_selector "button[data-move='up']", text: "Move up", visible: :all
+    assert_selector "form[action$='/content_blocks/#{@section.id}/duplicate']", visible: :all
+    assert_selector "form[action$='/content_blocks/#{@section.id}'] input[name='keep_blocks'][value='1']", visible: :all
+    assert_selector "#section-#{@section.id}-delete-count", text: "This also deletes the 2 blocks in it.", visible: :all
+  end
+
+  test "the section's menu is named, its Move items follow the card's place, and Delete opens the section's own dialog" do
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", first: true, last: false)
+
+    header = ".admin-section-card > div:first-child"
+    assert_selector "#{header} button[aria-haspopup='menu'][aria-label='Section actions']", text: "⋯"
+    assert_selector "#{header} button[data-move='up'][disabled][data-action='click->admin--blocks#moveUp']", visible: :all
+    assert_selector "#{header} button[data-move='down']:not([disabled])[data-action='click->admin--blocks#moveDown']", text: "Move down", visible: :all
+    assert_selector "#{header} button[data-admin--dialog-id-param='delete-section-#{@section.id}']", text: "Delete section and its blocks…", visible: :all
+    assert_selector "dialog#delete-section-#{@section.id} form[action$='/content_blocks/#{@section.id}'] button[type=submit]", text: "Delete section", visible: :all
+    assert_no_selector "dialog#delete-section-#{@section.id} input[name='keep_blocks']", visible: :all
+    # No form inside the settings form: a nested form is dropped by the parser.
+    assert_no_selector "form#section-#{@section.id}-form form", visible: :all
+  end
+
+  test "the delete dialog counts one block in the singular and says nothing of blocks for an empty section" do
+    site_page = @page # `render_inline` takes `@page` for its own Capybara node
+    @image.destroy!
+    render_card
+    assert_selector "#section-#{@section.id}-delete-count", text: "This also deletes the 1 block in it.", exact_text: true, visible: :all
+
+    @page = site_page
+    @text.destroy!
+    render_card
+    assert_selector "p#section-#{@section.id}-delete-count", text: "", exact_text: true, visible: :all
+  end
+
+  # The line a delete or an add inside the section replaces
+  # (`Admin::ContentBlocksController#section_count_streams`).
+  test "the delete count a stream replaces is the one the card draws" do
+    render_card
+    card = Capybara.string(rendered_content).find("#section-#{@section.id}-delete-count", visible: :all)
+
+    alone = Capybara.string(render_inline(Admin::EditorScreen::SectionCardComponent.delete_count(section: @section, count: 2)).to_html).find("#section-#{@section.id}-delete-count", visible: :all)
+
+    assert_equal [ card.text(:all), card[:class] ], [ alone.text(:all), alone[:class] ]
+    assert_equal "section-#{@section.id}-delete-count", Admin::EditorScreen::SectionCardComponent.delete_count_id(@section)
+  end
+
+  test "a viewer who can't edit the page gets no form controls, no menu and no handle" do
+    outline = BlockOutline.new(@page.content_blocks.reload)
+    render_inline Admin::EditorScreen::SectionCardComponent.new(page: @page, section: outline.top_level.first, outline: outline, locale: "en", editable: false)
+
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "[aria-label='Section actions']"
+    assert_selector "fieldset[disabled] select[name='block[settings][background]']"
+    assert_selector "fieldset[disabled] button[aria-haspopup='menu'][aria-label='Layout']"
+    assert_no_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector "dialog#delete-section-#{@section.id}", visible: :all
+  end
+
+  # One string for a menu item's look, wherever a menu of the block list is drawn.
+  test "the lane picker's and the section menu's items use the block card's menu item class" do
+    assert_same Admin::BlockCardComponent::MENU_ITEM_CLASS, Admin::BlockPickerComponent::MENU_ITEM_CLASS
   end
 
   test "a tile is the block's element: its dom id, a button that names the panel it opens, collapsed" do

@@ -144,9 +144,9 @@ en:
         removed: "Removed %{label}."
 
       # A block's form drawn as the open panel of a section (sections spec
-      # §4.3). The rest of the block card is not converted yet.
+      # §4.3). The rest of the block card is not converted yet. The panel's
+      # heading is `editor_screen.panel_title`.
       block_card:
-        panel_title: "%{type} · column %{column}"
         close: "Close"
 
       # The "+" at the end of a section's lane (sections spec §4.2): the
@@ -165,9 +165,51 @@ en:
           tag: "tag %{name}"
           needs_fixing: "Needs fixing"
           attention: "Needs attention"
+        # The heading of a block's form under a section's lanes.
+        panel_title:
+          title: "%{type} · column %{column}"
         section_card:
           name: "Section"
           move: "Move section"
+          # The header's two selects (sections spec §4.1); the labels name
+          # controls that show only their value.
+          background: "Background"
+          backgrounds:
+            none: "No background"
+            tinted: "Tinted"
+            strong: "Strong"
+          width: "Width"
+          widths:
+            content: "Content width"
+            full: "Full width"
+          # The section's "⋯" menu and the dialog its last item opens.
+          actions: "Section actions"
+          move_up: "Move up"
+          move_down: "Move down"
+          duplicate: "Duplicate"
+          remove_keep: "Remove section, keep blocks"
+          delete: "Delete section and its blocks…"
+          delete_title: "Delete this section?"
+          delete_body: "Blocks don’t go to the trash. This can’t be undone."
+          delete_confirm: "Delete section"
+        # The layout menu in a section's header: `name` is the button's
+        # accessible name, `label` the word on it beside the diagram, and
+        # each layout's name is what a screen reader gets for its diagram.
+        section_layout_menu:
+          name: "Layout"
+          label: "Layout"
+          layouts:
+            one: "One column"
+            two: "Two columns"
+            three: "Three columns"
+            four: "Four columns"
+            one_two: "One third, two thirds"
+            two_one: "Two thirds, one third"
+        # Under the delete dialog's sentence, for a section that holds blocks.
+        section_delete_count:
+          blocks:
+            one: "This also deletes the %{count} block in it."
+            other: "This also deletes the %{count} blocks in it."
         # "3 columns · 5 blocks" in a section's header.
         section_summary:
           columns:

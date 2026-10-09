@@ -3,8 +3,9 @@ module Admin
     # A section in the page editor's block list (sections spec §4.1–§4.3): a
     # card like any other block's -- it is dragged, moved and collapsed by
     # `admin--blocks` exactly as one -- but framed and tinted, and holding the
-    # section's columns as lanes of tiles (`SectionLanesComponent`) instead of
-    # a form of its own.
+    # section's columns as lanes of tiles (`SectionLanesComponent`) in its
+    # body, where a block card has its fields. Its own three settings are a
+    # form in its header (below).
     #
     # EVERY BLOCK'S FORM IS RENDERED WITH THE PAGE (plan decision D3). Under
     # the lanes sits one `Admin::BlockCardComponent` per block of the section,
@@ -32,9 +33,38 @@ module Admin
     # an editor, until the translation view of the sections plan gives it its
     # own shape (spec §4.5).
     #
-    # `first:` and `last:` are the card's place in the list, as on a block
-    # card; the section has no menu yet to use them in. `editable:` as on a
-    # block card: handed down by the page view, asked here when left nil.
+    # THE SECTION'S OWN SETTINGS ARE A FORM IN THE HEADER (spec §4.1): layout,
+    # background and width, where a block card has its fields in its body. It
+    # is an autosave form like a card's, answered by the same action (`Admin
+    # ::ContentBlocksController#update`) into the same ids -- the wiring, the
+    # base field, the status line and one error slot per setting are all
+    # `Admin::BlockCardComponent`'s, asked of its class, so a section's save
+    # is refused as stale (409) and reported exactly as a block's is. Layout
+    # is a menu over a hidden input (`SectionLayoutMenuComponent`); the other
+    # two are plain selects. A viewer who can't edit sees the three as they
+    # are, disabled, in a form with no `admin--autosave` -- as a view-only
+    # block card shows its fields.
+    #
+    # The form holds no other form: the "⋯" menu's Duplicate and Remove are
+    # `button_to`s and the dialog's confirm is a form too, so the menu sits
+    # after the settings form in the header and the dialog after the body.
+    # (A form inside a form is dropped by the HTML parser, and its button
+    # would then submit the settings form.)
+    #
+    # THE "⋯" MENU (spec §4.1), for a viewer who may edit: Move up and Move
+    # down are the block card's own buttons (`data-move`, `admin--blocks
+    # #moveUp|moveDown`), since a section's card is moved as any card is;
+    # `first:` and `last:` are the card's place in the list and say which of
+    # the two starts disabled, and `admin--blocks#refreshMoveState` keeps
+    # them right afterwards. Duplicate copies the section with its blocks.
+    # Then the two deletes, which are the two explicit choices a section's
+    # removal is: "Remove section, keep blocks" is sent at once (`keep_blocks`
+    # beside the DELETE) -- it loses nothing, the blocks take the section's
+    # place as cards -- and "Delete section and its blocks…" opens a dialog
+    # that says how many blocks go with it (`SectionDeleteCountComponent`).
+    #
+    # `editable:` as on a block card: handed down by the page view, asked
+    # here when left nil.
     class SectionCardComponent < AdminComponent
       def self.lanes_id(section) = "section-#{section.id}-lanes"
 
@@ -46,6 +76,16 @@ module Admin
       # that replaces it after an add or a delete: one place, so the two
       # cannot drift (`SectionSummaryComponent`).
       def self.summary(section:, count:) = Admin::EditorScreen::SectionSummaryComponent.new(section: section, count: count)
+
+      def self.delete_count_id(section) = "section-#{section.id}-delete-count"
+
+      # The dialog's "This also deletes the 2 blocks in it.", for the card and
+      # for the stream that recounts it, as `summary` above.
+      def self.delete_count(section:, count:) = Admin::EditorScreen::SectionDeleteCountComponent.new(section: section, count: count)
+
+      # The layout menu, for the card and for the stream that follows a saved
+      # layout (`SectionLayoutMenuComponent`).
+      def self.layout_menu(section:) = Admin::EditorScreen::SectionLayoutMenuComponent.new(section: section)
 
       # Whether a top-level block is drawn as a section card: a container, on
       # the default language's tab. The page view and `Admin
@@ -71,6 +111,56 @@ module Admin
       def body_id = "section-#{section.id}-body"
 
       def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
+
+      def first? = @first
+
+      def last? = @last
+
+      # ---- The settings form: every id is the block card's (see the class comment).
+
+      def form_id = "section-#{section.id}-form"
+
+      def form_url = helpers.admin_page_content_block_path(page, section, **url_options)
+
+      def form_data = editable? ? Admin::BlockCardComponent.autosave_form_data(section) : {}
+
+      def error_prefix = Admin::BlockCardComponent.error_prefix(section)
+
+      def status_id = Admin::BlockCardComponent.status_id(section)
+
+      def base_updated_at_id = Admin::BlockCardComponent.base_updated_at_id(section)
+
+      def base_updated_at_value = section.updated_at.iso8601(6)
+
+      def field_id(name) = "#{error_prefix}-#{name}"
+
+      def error_id(name) = Admin::FieldComponent.error_id(error_prefix, name)
+
+      # One menu object for the card: it is drawn in the form, and the layout
+      # it shows as current is the value of the form's hidden input.
+      def layout_menu = @layout_menu ||= self.class.layout_menu(section: section)
+
+      # A setting as the type reads it: its schema's default where the
+      # section has stored none (a section just made holds no settings).
+      def setting(name) = section.settings_object(locale: ::Locales.default)&.public_send(name).to_s
+
+      def background_options = BlockTypes::Section::BACKGROUNDS.map { |value| [ t(".backgrounds.#{value}"), value ] }
+
+      def width_options = BlockTypes::Section::WIDTHS.map { |value| [ t(".widths.#{value}"), value ] }
+
+      # `.cs-select` without the full width `setup_select_class` gives it on
+      # a form's own line: these two stand side by side in a header.
+      def select_class = "cs-select py-1 text-sm"
+
+      # ---- The "⋯" menu and its dialog.
+
+      def duplicate_path = helpers.duplicate_admin_page_content_block_path(page, section, **url_options)
+
+      def destroy_path = helpers.admin_page_content_block_path(page, section, **url_options)
+
+      def delete_dialog_id = "delete-section-#{section.id}"
+
+      def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
 
       def blocks = outline.blocks_in(section)
 

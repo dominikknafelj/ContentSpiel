@@ -1,4 +1,4 @@
-<div id="<%= lanes_id %>" class="admin-section-lanes" data-columns="<%= lanes.size %>" style="--lanes: <%= lanes.size %>">
+<div id="<%= lanes_id %>" class="admin-section-lanes" data-admin--section-target="lanes" data-columns="<%= lanes.size %>" style="--lanes: <%= lanes.size %>">
   <% lanes.each do |column, blocks| %>
     <div class="admin-section-lane flex min-w-0 flex-col gap-1">
       <p class="admin-section-lane__label font-cs-mono text-label text-meta" aria-hidden="true"><%= column_label(column) %></p>

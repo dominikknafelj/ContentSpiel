@@ -34,10 +34,9 @@ module Admin
 
   class BlockPickerComponent < AdminComponent
     BUTTON_CLASS = [ Admin::ButtonComponent::SMALL_CLASS, Admin::ButtonComponent::VARIANT_CLASSES[:secondary] ].join(" ").freeze
-    # A menu item's look, the string `Admin::BlockCardComponent
-    # #menu_item_class` gives a card's "⋯" items (the menu's panel does the
-    # width, padding and hover).
-    MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
+    # A menu item's look: the block card's own constant, not a copy of it, so
+    # a lane's "+" items and a card's "⋯" items cannot drift apart.
+    MENU_ITEM_CLASS = Admin::BlockCardComponent::MENU_ITEM_CLASS
 
     def initialize(page:, locale:, url_options: {}, section: nil, column: nil)
       @page = page

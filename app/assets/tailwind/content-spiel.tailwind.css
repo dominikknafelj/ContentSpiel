@@ -321,6 +321,21 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
   .admin-section-lanes { grid-template-columns: repeat(var(--lanes), minmax(0, 1fr)); }
   .admin-section-lane__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 }
+/* A section's header controls (sections spec §4.1). A layout is shown as a
+   diagram of its columns, their widths in the layout's own proportions (each
+   bar's `flex` is the column's weight, `Admin::EditorScreen
+   ::SectionLayoutMenuComponent`); the layout the section has is the framed
+   choice, read from `aria-current` so the look cannot drift from what a
+   screen reader is told. The menu's panel styles its buttons as blocks, so
+   the choice is made a row again here, by a selector that outweighs it.
+   The three error slots of the settings form share one line that takes no
+   room while none of them holds a message. */
+.admin-layout-diagram { display: flex; gap: 2px; width: 3rem; height: 1.25rem; flex: none; }
+.admin-layout-diagram > span { background: var(--cs-line-strong); border-radius: 1px; }
+[role="menu"] button.admin-layout-choice { display: flex; align-items: center; }
+.admin-layout-choice[aria-current="true"] { outline: 2px solid var(--cs-accent); outline-offset: -2px; }
+.admin-layout-choice[aria-current="true"] .admin-layout-diagram > span { background: var(--cs-accent); }
+.admin-section-errors:not(:has(p)) { display: none; }
 .admin-block-tile { border: 1px solid var(--cs-line); border-radius: var(--cs-radius); background: var(--cs-surface); }
 .admin-block-tile:has(> .admin-block-tile__face[aria-expanded="true"]) { border-color: var(--cs-accent); }
 

@@ -370,6 +370,243 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_equal [ @left.id, @right.id, far.id ].sort, @section.section_blocks.reload.ids.sort
   end
 
+  # ---- The section's own controls (sections spec §4.1) ----
+
+  def section_card = "##{ActionView::RecordIdentifier.dom_id(@section)}"
+  def layout_button = "#{section_card} button[aria-label='Layout']"
+
+  def focus_is_on(selector) = page.evaluate_script("document.activeElement === document.querySelector(#{selector.to_json})")
+
+  test "choosing a narrower layout folds the second lane into the first without losing the open form" do
+    open_editor
+    find(face(@right)).click
+    fill_in id: caption(@right), with: "Typed before the fold"
+
+    find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Layout']").click
+    find("button[data-admin--section-layout-param='one']").click
+
+    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 1
+    assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
+    assert_selector panel(@right), text: "Image · column 1"
+    assert_selector "#section-#{@section.id}-summary", text: "1 column · 2 blocks"
+    assert_writes_settled
+    assert_equal [ 1, "Typed before the fold" ], @right.reload.then { |block| [ block.section_column, block.caption ] }
+    assert_field caption(@right), with: "Typed before the fold"
+  end
+
+  # The fold moved the block and wrote nothing else of it: the form that was
+  # open goes on saving on the base it had, with no "Changed elsewhere", and
+  # its tile -- redrawn with the lanes -- still says it is the open one.
+  test "after a fold the open form still saves, its tile says it is open, and the menu shows the new layout" do
+    open_editor
+    find(face(@right)).click
+    find(layout_button).click
+    find("button[data-admin--section-layout-param='one']").click
+    assert_selector "#section-#{@section.id}-lane-1 > .admin-block-tile", count: 2
+
+    assert_selector "#{face(@right)}[aria-expanded='true']"
+    assert_selector "#{face(@left)}[aria-expanded='false']"
+    fill_in id: caption(@right), with: "Typed after the fold"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#block-#{@right.id}-save-status", text: "SAVED"
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_equal "Typed after the fold", @right.reload.caption
+    find(layout_button).click
+    assert_selector "#{section_card} button[data-admin--section-layout-param='one'][aria-current='true']"
+    assert_selector "#{section_card} button[data-admin--section-layout-param][aria-current='true']", count: 1
+    assert_equal "one", @section.reload.settings["layout"]
+  end
+
+  # The item that was pressed is in a menu that closes on the pick, and the
+  # menu itself is replaced by the answer: without a rule the focus is on
+  # <body> twice over. It stays on the Layout button -- the old one at once,
+  # the one the answer brings afterwards.
+  test "the layout menu is worked by the keyboard, and the focus stays on its button through the answer" do
+    open_editor
+    # Focused by script and opened with the key alone: `send_keys` on an
+    # element clicks it first, which would be the pointer opening the menu.
+    page.execute_script("document.querySelector(#{layout_button.to_json}).focus()")
+    page.driver.browser.keyboard.type(:enter)
+    assert_selector "#{section_card} [role=menu] [role=menuitem][data-admin--section-layout-param]", count: 6
+    # Opening focuses the first choice; two steps down is "Three columns".
+    page.driver.browser.keyboard.type(:down, :down, :enter)
+
+    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 3
+    assert_no_selector "#{section_card} [role=menu]"
+    assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    assert_eventually(message: "the focus is not on the Layout button the answer brought") { focus_is_on(layout_button) }
+    assert_equal "three", @section.reload.settings["layout"]
+  end
+
+  test "choosing the layout the section already has sends nothing" do
+    open_editor
+    count_writes
+    find(layout_button).click
+    find("button[data-admin--section-layout-param='two']").click
+
+    assert_no_selector "#{section_card} [role=menu]"
+    await_frames
+    assert_writes_settled
+    assert_equal [], page.evaluate_script("window.__writes")
+    assert_equal true, focus_is_on(layout_button)
+  end
+
+  test "a layout chosen in a tab that is behind is refused as changed elsewhere, and nothing is folded" do
+    open_editor
+    backdate(@section, by: 1.minute)
+    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "background" => "tinted" } }).ok? }
+
+    find(layout_button).click
+    find("button[data-admin--section-layout-param='one']").click
+
+    assert_selector "#block-#{@section.id}-save-status", text: "CHANGED ELSEWHERE"
+    assert_selector "#section-#{@section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+    assert_equal 2, @right.reload.section_column
+    assert_equal "two", @section.reload.settings["layout"]
+  end
+
+  test "background and width are saved from the header" do
+    open_editor
+
+    select "Tinted", from: "block-#{@section.id}-background"
+    select "Full width", from: "block-#{@section.id}-width"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
+    assert_equal %w[tinted full], @section.reload.settings.values_at("background", "width")
+  end
+
+  # Only a save that changed the number of columns redraws the lanes: the
+  # tiles in them may be in use (an open menu, the focus, a drag).
+  test "saving the background leaves the lanes' elements in place" do
+    open_editor
+    page.execute_script("document.getElementById(#{"section-#{@section.id}-lanes".to_json}).dataset.mark = 'kept'")
+
+    select "Strong", from: "block-#{@section.id}-background"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#block-#{@section.id}-save-status", text: "SAVED"
+    assert_writes_settled
+    assert_selector "#section-#{@section.id}-lanes[data-mark='kept']"
+  end
+
+  test "Remove section, keep blocks turns the tiles into cards in reading order" do
+    open_editor
+    find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Section actions']").click
+    press "Remove section, keep blocks"
+
+    assert_no_selector ".admin-section-card"
+    assert_equal [ @left.id, @right.id ], page.all("#content-blocks-list > .admin-block-card").map { |card| card["data-block-id"].to_i }
+    assert_empty @page.content_blocks.where(block_type: "section")
+  end
+
+  # The cards that take the section's place are cards like any other: each
+  # autosaves on its own base, and the list's first and last are told so.
+  test "a block kept from a removed section is edited as a card, and the list's ends are marked" do
+    open_editor
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Remove section, keep blocks"
+    assert_selector "#content-blocks-list > .admin-block-card", count: 2
+
+    fill_in id: caption(@right), with: "Typed in the card"
+    page.execute_script("document.activeElement.blur()")
+
+    assert_selector "#block-#{@right.id}-save-status", text: "SAVED"
+    assert_no_text "CHANGED ELSEWHERE"
+    assert_equal "Typed in the card", @right.reload.caption
+    assert_selector "#{tile(@left)} button[data-move='up'][disabled]", visible: :all
+    assert_selector "#{tile(@right)} button[data-move='down'][disabled]", visible: :all
+    assert_selector "#{tile(@left)} button[data-move='down']:not([disabled])", visible: :all
+  end
+
+  test "Delete section and its blocks asks first, naming how many blocks go with it" do
+    open_editor
+    find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Section actions']").click
+    press "Delete section and its blocks…"
+
+    assert_selector "dialog[open]", text: "This also deletes the 2 blocks in it."
+    within("dialog[open]") { press "Delete section" }
+
+    assert_no_selector ".admin-section-card"
+    assert_empty @page.content_blocks.reload
+  end
+
+  test "Cancel in the delete dialog deletes nothing, and the dialog counts the blocks as they are after one was deleted" do
+    gone = @page.content_blocks.create!(block_type: "rich_text", section: @section, section_column: 1, position: 1)
+    gone.update_column(:block_type, "gone/thing")
+    open_editor
+    find(face(gone)).click
+    within(panel(gone)) { press "Delete block…" }
+    within("dialog[open]") { press "Delete block" }
+    assert_no_selector tile(gone)
+
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Delete section and its blocks…"
+
+    assert_selector "dialog[open]", text: "This also deletes the 2 blocks in it."
+    within("dialog[open]") { press "Cancel" }
+    assert_no_selector "dialog[open]"
+    assert_selector ".admin-section-card"
+    assert_equal 3, @page.content_blocks.reload.size
+  end
+
+  test "the section's menu moves it among the cards and duplicates it with its blocks" do
+    above = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    @section.update_column(:position, 1)
+    open_editor
+    assert_equal [ above.id, @section.id ], page.all("#content-blocks-list > .admin-block-card").map { |card| card["data-block-id"].to_i }
+
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Move up"
+
+    assert_selector "#content-blocks-status", text: "SAVED"
+    assert_equal [ @section.id, above.id ], @page.content_blocks.top_level.reorder(:position).ids
+
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Duplicate"
+
+    assert_selector ".admin-section-card", count: 2
+    copy = @page.content_blocks.top_level.reorder(:position).second
+    assert copy.container?
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(copy)} .admin-block-tile", count: 2
+    assert_equal 2, copy.section_blocks.size
+  end
+
+  test "the section's name collapses it to one line" do
+    open_editor
+    find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-expanded]", text: "Section").click
+
+    assert_no_selector "#section-#{@section.id}-lanes"
+    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 2 blocks"
+  end
+
+  # Carried from the lane picker's review. The form of a block another tab
+  # folded out of its column is open here; the refused add redraws the lanes,
+  # and with them what names a column: that form's heading and the header's
+  # count. The form itself is never replaced. And the "+" that was pressed is
+  # gone with its lane, so the focus goes to the "+" of the last lane there
+  # is -- the column the removed ones were folded into -- not to <body>.
+  test "a refused add brings the open form's heading and the count up to date, and the focus goes to the last lane's +" do
+    @section.update!(settings: @section.settings.merge("layout" => "four"))
+    far = @page.content_blocks.create!(block_type: "image", section: @section, section_column: 4, position: 0)
+    open_editor
+    find(face(far)).click
+    assert_selector panel(far), text: "Image · column 4"
+    page.execute_script("document.getElementById(#{"block-#{far.id}-panel".to_json}).dataset.mark = 'kept'")
+    as(users(:two), channel: :admin) { assert ContentBlocks::Save.call(ContentBlock.find(@section.id), attributes: { settings: { "layout" => "two" } }).ok? }
+
+    find("#block-picker-#{@section.id}-4 button[aria-haspopup=menu]").click
+    within("#block-picker-#{@section.id}-4") { press "Image" }
+
+    assert_selector "#content-blocks-alert", text: "isn't a column of this section"
+    assert_selector "#{panel(far)}[data-mark='kept']", text: "Image · column 2"
+    assert_selector "#section-#{@section.id}-summary", text: "2 columns · 3 blocks", exact_text: true
+    assert_selector "#{face(far)}[aria-expanded='true']"
+    assert_eventually(message: "the focus is not on the last lane's +") { focus_is_on("#block-picker-#{@section.id}-2 button[aria-haspopup=menu]") }
+  end
+
   test "a collapsed section is its one header line, and expands to its lanes again" do
     open_editor
     # Inside the card: the "Add block" row has a "Section" button of its own.

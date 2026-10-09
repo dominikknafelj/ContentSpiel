@@ -139,6 +139,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/section_card_component.rb
     app/components/admin/editor_screen/section_card_component.html.erb
     app/components/admin/editor_screen/section_summary_component.rb
+    app/components/admin/editor_screen/section_layout_menu_component.rb
+    app/components/admin/editor_screen/section_layout_menu_component.html.erb
+    app/components/admin/editor_screen/section_delete_count_component.rb
+    app/components/admin/editor_screen/panel_title_component.rb
     app/components/admin/editor_screen/section_lanes_component.rb
     app/components/admin/editor_screen/section_lanes_component.html.erb
     app/components/admin/editor_screen/block_tile_component.rb

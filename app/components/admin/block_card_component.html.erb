@@ -20,7 +20,7 @@
     <% elsif panel? %>
       <%# The open form of a block in a section (sections spec §4.3): a heading, not a
           collapse button -- the tile is what opens and closes it. %>
-      <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= panel_title %></h3>
+      <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
     <% elsif !list? %>
       <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
       <span class="flex-1 truncate text-sm font-semibold text-ink"><%= label %></span>

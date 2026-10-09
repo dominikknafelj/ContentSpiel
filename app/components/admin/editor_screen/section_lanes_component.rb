@@ -22,6 +22,12 @@ module Admin
     # and never read a second time. The width that decides is the card's, in
     # CSS (`.admin-section-lanes`), and the column count reaches the
     # stylesheet as the custom property `--lanes`.
+    #
+    # The element is `admin--section`'s `lanes` target: it is replaced as a
+    # whole when the section's columns change under this screen (`Admin
+    # ::ContentBlocksController#section_structure_streams`), and the script
+    # then has to say where the focus goes, since the control that was
+    # pressed may have been in the lanes that left.
     class SectionLanesComponent < AdminComponent
       def self.lane_id(section, column) = "section-#{section.id}-lane-#{column}"
 

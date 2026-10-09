@@ -31,18 +31,36 @@ import { Controller } from "@hotwired/stimulus"
 // with the form (`saveStates` in `admin--autosave`). For the same reason a
 // panel that really does leave (its block deleted or moved out) needs no
 // bookkeeping: with it gone, nothing is open.
+//
+// WHAT AN ANSWER REPLACES, AND WHERE THE FOCUS GOES THEN. Two parts of a
+// section are redrawn from the server while it is on screen, and each may be
+// holding the focus -- or have just lost it to a menu that closed on the pick
+// -- so each has a rule, or a keyboard user would be at the top of the page:
+// - the layout menu (`layoutMenu`), by the answer to a saved layout. The
+//   focus is put on the menu's button as the pick is made (`chooseLayout`)
+//   and again on the new button when the answer has brought it, unless the
+//   person has gone somewhere else meanwhile (`layoutMenuTargetConnected`);
+// - the lanes (`lanes`), by a save that changed the number of columns and by
+//   an add the server refused because its column is gone. After the first
+//   the focus is the layout button's, above. After the second the "+" that
+//   was pressed no longer exists, and the focus goes to the "+" of the last
+//   lane there is: the column the removed ones were folded into, so the
+//   nearest thing to what was pressed.
+// A panel is never replaced -- its form holds unsaved text and its place in
+// the write queue -- only its heading's text, which names the column.
 export default class extends Controller {
-  static targets = ["tile", "panel"]
+  static targets = ["tile", "panel", "lanes", "layoutMenu"]
 
   // A block added to a column opens at once: the server marks its panel
   // `data-open`. Tile and panel arrive in one answer but as two streams, so
   // whichever connects second finds the other.
   //
   // A tile that arrives also takes its `aria-expanded` from the page, like
-  // everything else here: a refused add redraws the lanes (a column this
-  // screen still offered was removed elsewhere), and the tiles it brings
-  // are drawn closed, as a page load draws them -- while one of their forms
-  // may be showing under the lanes. Its tile says so again as it connects.
+  // everything else here: the lanes are redrawn by a saved layout that
+  // changed the number of columns and by a refused add (a column this screen
+  // still offered was removed elsewhere), and the tiles either brings are
+  // drawn closed, as a page load draws them -- while one of their forms may
+  // be showing under the lanes. Its tile says so again as it connects.
   tileTargetConnected(tile) {
     const id = tile.dataset.blockId
     const panel = this.panelFor(id)
@@ -57,6 +75,64 @@ export default class extends Controller {
     panel.removeAttribute("data-open")
     this.open(id, { focus: true })
   }
+
+  // The layout menu's pick (sections spec §4.1). The menu is a widget over a
+  // hidden input of the section's own autosave form, so the pick is saved the
+  // way every field is -- with the section's `base_updated_at`, through the
+  // write queue -- and sent at once rather than after the debounce: a layout
+  // is one deliberate choice, and its answer redraws the lanes.
+  //
+  // The item pressed is in a menu that closes on the pick (`admin--menu
+  // #select`, which runs after this on the same click), and a hidden button
+  // cannot keep the focus: it goes to the menu's button here, whether or not
+  // anything is sent. A pick of the layout the section already has sends
+  // nothing and replaces nothing. One that is sent is answered with a new
+  // menu, so the menu the pick was made in is remembered (`pickedIn`) for
+  // `layoutMenuTargetConnected` to carry the focus over from. The element,
+  // not a flag: a save that is refused brings no menu, and a flag left set
+  // would claim the focus for a menu that never comes.
+  chooseLayout(event) {
+    const form = this.element.querySelector("form[id$='-form']")
+    const input = form?.querySelector("input[name='block[settings][layout]']")
+    const menu = event.currentTarget.closest("[data-admin--section-target='layoutMenu']")
+    menu?.querySelector("[aria-haspopup=menu]")?.focus()
+    if (!input || input.value === event.params.layout) return
+
+    input.value = event.params.layout
+    this.pickedIn = menu
+    this.application.getControllerForElementAndIdentifier(form, "admin--autosave")?.saveNow()
+  }
+
+  // Whether the menu a pick was made in has been replaced by its answer.
+  get menuReplaced() { return Boolean(this.pickedIn) && !this.pickedIn.isConnected }
+
+  // The menu a saved layout's answer brought (not the same menu coming back
+  // with a card that was moved). It takes the focus only when nothing has
+  // it: it was on the button this one replaced. A person who has moved on is
+  // left where they are.
+  layoutMenuTargetConnected(menu) {
+    if (!this.menuReplaced || this.pickedIn === menu) return
+    this.pickedIn = null
+    if (this.nothingFocused) menu.querySelector("[aria-haspopup=menu]")?.focus()
+  }
+
+  // The lanes, redrawn. Told from the same element coming back (the card was
+  // moved in the DOM, and every target disconnects and connects again) by
+  // its being another element than the one that left. The lanes a page load
+  // brings follow none, so a section never takes the focus as it appears.
+  // Not while a layout's answer is being drawn: then the focus belongs to
+  // the layout button, whichever of the two streams lands first.
+  lanesTargetDisconnected(lanes) { this.lanesGone = lanes }
+  lanesTargetConnected(lanes) {
+    const replaced = this.lanesGone && this.lanesGone !== lanes
+    this.lanesGone = null
+    if (!replaced || this.menuReplaced || !this.nothingFocused) return
+
+    const pickers = lanes.querySelectorAll("[id^='block-picker-'] [aria-haspopup=menu]")
+    pickers[pickers.length - 1]?.focus()
+  }
+
+  get nothingFocused() { return !document.activeElement || document.activeElement === document.body }
 
   // The block whose form is showing, or undefined.
   get openId() { return this.panelTargets.find((panel) => !panel.hidden)?.dataset.blockId }
