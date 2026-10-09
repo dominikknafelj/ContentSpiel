@@ -591,6 +591,70 @@ class Admin::SectionsSystemTest < ApplicationSystemTestCase
     assert_selector "#{tile(@left)} button[data-move='down']:not([disabled])", visible: :all
   end
 
+  # "Remove section, keep blocks" is the one action of a section that replaces
+  # the forms of blocks that STAY: its answer draws a card for each in the
+  # section's place. So it runs only on a settled screen (`admin--queue-hold`
+  # on its form): a form paused by a 409 holds text that is nowhere else, and
+  # the bar over it has promised that it is still there.
+  test "Remove section, keep blocks does not run while a form holds text that was refused, and says so" do
+    open_editor
+    find(face(@left)).click
+    travel 1.minute do
+      as(users(:two), channel: :admin) { ContentBlocks::Save.call(@left, translations: { "en" => { caption: "Theirs" } }) }
+    end
+    fill_in id: caption(@left), with: "Mine, refused"
+    page.execute_script("document.activeElement.blur()")
+    assert_selector "#block-#{@left.id}-save-status", text: "CHANGED ELSEWHERE", wait: 8
+    count_writes
+
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Remove section, keep blocks"
+
+    assert_selector "#toasts #toast-queue-hold[role=alert]", text: "Your last change wasn't saved, so this didn't run."
+    assert_selector section_card
+    assert_equal [ @left.id ], tiles_in(1)
+    assert_field caption(@left), with: "Mine, refused"
+    assert_selector "#block-#{@left.id}-save-status", text: "CHANGED ELSEWHERE"
+    assert_equal @section.id, @left.reload.section_id
+    assert_equal "Theirs", @left.caption
+    await_frames # a delete sent after all would have called fetch by now: the toast is shown after the drain that would have sent it
+    assert_equal [], page.evaluate_script("window.__writes"), "the section's removal was sent"
+  end
+
+  # The other half: nothing is unclean, but a save of a form in the section is
+  # on the wire and more was typed behind it. The removal waits for the queue
+  # to be EMPTY, not for its turn in it -- in its turn it would go before that
+  # save's follow-up, and its answer would take the form with the words.
+  test "Remove section, keep blocks waits for an edit typed while the block's save was on the wire" do
+    open_editor
+    find(face(@left)).click
+    script_writes("hold")
+    fill_in id: caption(@left), with: "First, on the wire"
+    page.execute_script("document.activeElement.blur()")
+    await_js "typeof window.__release[0] === 'function'"
+    page.execute_script(<<~JS)
+      const field = document.getElementById(#{caption(@left).to_json})
+      field.value = "Second, typed behind it"
+      field.dispatchEvent(new Event("input", { bubbles: true }))
+    JS
+
+    find("#{section_card} button[aria-label='Section actions']").click
+    press "Remove section, keep blocks"
+    page.execute_script("window.__release[0]()")
+
+    assert_no_selector ".admin-section-card"
+    assert_writes_settled
+    assert_equal [ @left.id, @right.id ], cards_in_list
+    assert_equal "Second, typed behind it", @left.reload.caption
+    assert_field caption(@left), with: "Second, typed behind it"
+    assert_nil @left.section_id
+    assert_empty @page.content_blocks.where(block_type: "section")
+    writes = page.evaluate_script("window.__writes")
+    assert_equal 3, writes.size, "the two saves and the removal"
+    assert writes.last.end_with?("/content_blocks/#{@section.id}"), "the removal went before the save it had to wait for: #{writes.inspect}"
+    assert_no_selector "#toasts #toast-queue-hold"
+  end
+
   test "Delete section and its blocks asks first, naming how many blocks go with it" do
     open_editor
     find("##{ActionView::RecordIdentifier.dom_id(@section)} button[aria-label='Section actions']").click

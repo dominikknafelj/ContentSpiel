@@ -77,7 +77,7 @@
           <%= tag.div role: "separator", class: "my-1 h-px bg-line" %>
         <% end %>
         <% menu.with_item do %>
-          <%= button_to t(".remove_keep"), destroy_path, method: :delete, params: { keep_blocks: 1 }, class: menu_item_class %>
+          <%= button_to t(".remove_keep"), destroy_path, method: :delete, params: { keep_blocks: 1 }, class: menu_item_class, form: { data: settled_screen_data } %>
         <% end %>
         <% menu.with_item do %>
           <%= tag.button t(".delete"), type: "button", class: "#{menu_item_class} text-danger-ink", data: dialog_trigger(delete_dialog_id) %>

@@ -499,9 +499,14 @@ module Admin
     # The cards are a block list's own (`card_for`): each a new form with the
     # block's base as it is now, registered with the write queue as it
     # connects. The forms they replace -- the section's panels -- go with the
-    # section's card; an edit one of them held inside its debounce was sent
-    # before the delete (the menu's press took the focus off the field, and
-    # the delete waits its turn in the queue behind that save). Each card is
+    # section's card, and none of them holds anything the database does not
+    # have: the request was not sent until the screen's write queue was empty
+    # and every form clean (`admin--queue-hold` on the "Remove section, keep
+    # blocks" form, `SectionCardComponent#settled_screen_data`). Waiting its
+    # turn in the queue would not be enough -- the delete would go ahead of
+    # the follow-up of a save still on the wire, and over a form paused by a
+    # 409 (`test/system/admin/sections_test.rb`, the two "Remove section,
+    # keep blocks" tests about unsaved text). Each card is
     # told whether it is the list's first or last, as on a page load; its
     # neighbours are corrected in the browser (`admin--blocks
     # #refreshMoveState`, on every change of the list's children).

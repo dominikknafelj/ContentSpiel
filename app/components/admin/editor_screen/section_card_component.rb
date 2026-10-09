@@ -75,10 +75,32 @@ module Admin
     # the two starts disabled, and `admin--blocks#refreshMoveState` keeps
     # them right afterwards. Duplicate copies the section with its blocks.
     # Then the two deletes, which are the two explicit choices a section's
-    # removal is: "Remove section, keep blocks" is sent at once (`keep_blocks`
-    # beside the DELETE) -- it loses nothing, the blocks take the section's
-    # place as cards -- and "Delete section and its blocks…" opens a dialog
-    # that says how many blocks go with it (`SectionDeleteCountComponent`).
+    # removal is: "Remove section, keep blocks" is sent without a question
+    # (`keep_blocks` beside the DELETE) -- the blocks take the section's place
+    # as cards -- and "Delete section and its blocks…" opens a dialog that
+    # says how many blocks go with it (`SectionDeleteCountComponent`).
+    #
+    # "REMOVE SECTION, KEEP BLOCKS" RUNS ONLY ON A SETTLED SCREEN
+    # (`settled_screen_data`). It is the one action of a section that replaces
+    # the forms of blocks that stay: its answer draws a new card for each
+    # block in the section's place (`Admin::ContentBlocksController
+    # #removal_streams`), and the panels' forms go with the section's card.
+    # A row is never lost by it; what a form holds and has not saved would
+    # be. So its `button_to` carries `admin--queue-hold`, as the editor
+    # header's actions do: the press first waits until the write queue is
+    # EMPTY (`drained()` -- an edit inside its debounce is sent, and so is one
+    # typed while the block's save was on the wire, whose follow-up the
+    # removal would otherwise go ahead of, since a held Turbo request waits
+    # only for its turn), and it does not run at all when a form ended
+    # unclean -- paused by a 409, refused as invalid, given up on offline --
+    # because that text is on this screen and nowhere else, possibly in a
+    # panel that is closed. One sentence in a toast says so. It asks the whole
+    # screen, not the section's forms alone: that is the rule the header's
+    # actions already follow, and one rule is easier to keep than two.
+    # "Delete section and its blocks…" needs none of it: its answer removes
+    # the section's card and replaces nothing, so no block that stays has a
+    # form in its way, and the text of a block that is deleted goes with it,
+    # which the dialog has said.
     #
     # `editable:` as on a block card: handed down by the page view, asked
     # here when left nil.
@@ -191,6 +213,9 @@ module Admin
       def destroy_path = helpers.admin_page_content_block_path(page, section, **url_options)
 
       def delete_dialog_id = "delete-section-#{section.id}"
+
+      # On the form of "Remove section, keep blocks": see the class comment.
+      def settled_screen_data = { controller: "admin--queue-hold", action: "submit->admin--queue-hold#submit" }
 
       def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
 
