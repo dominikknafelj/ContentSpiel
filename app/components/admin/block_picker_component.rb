@@ -23,7 +23,9 @@ module Admin
       @url_options = url_options
     end
 
-    def types = BlockTypes.all
+    # Container types are left out until the editor can show a section
+    # (sections plan, Task 5).
+    def types = BlockTypes.all.reject { |type| type.capability?(:container) }
 
     def create_path = helpers.admin_page_content_blocks_path(page, **url_options)
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_05_150100) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_08_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -127,9 +127,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_150100) do
     t.bigint "media_asset_id"
     t.jsonb "translation_sources", default: {}, null: false
     t.jsonb "translation_original_changed_at", default: {}, null: false
+    t.bigint "section_id"
+    t.integer "section_column"
     t.index ["block_type"], name: "index_content_blocks_on_block_type"
     t.index ["media_asset_id"], name: "index_content_blocks_on_media_asset_id"
     t.index ["owner_type", "owner_id", "position"], name: "index_content_blocks_on_owner_type_and_owner_id_and_position"
+    t.index ["section_id", "section_column", "position"], name: "index_content_blocks_on_section_and_column_and_position"
+    t.check_constraint "(section_id IS NULL) = (section_column IS NULL)", name: "content_blocks_section_and_column_together"
+    t.check_constraint "section_column IS NULL OR section_column >= 1", name: "content_blocks_section_column_from_one"
   end
 
   create_table "media_assets", force: :cascade do |t|
@@ -335,6 +340,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_05_150100) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "api_tokens", "access_control_groups", column: "group_id"
   add_foreign_key "api_tokens", "users"
+  add_foreign_key "content_blocks", "content_blocks", column: "section_id"
   add_foreign_key "content_blocks", "media_assets"
   add_foreign_key "media_assets", "users", column: "trashed_by_id", on_delete: :nullify
   add_foreign_key "media_usages", "media_assets"

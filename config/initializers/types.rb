@@ -10,6 +10,7 @@ Rails.application.config.to_prepare do
   BlockTypes::RichText.register
   BlockTypes::Image.register
   BlockTypes::PostList.register
+  BlockTypes::Section.register
 
   # Registration order matters: it defines `names` order and
   # `ContentTypes.default` (the first one registered -- `blog`).

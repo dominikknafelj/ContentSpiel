@@ -1,0 +1,7 @@
+<section class="content-section">
+  <% columns.each do |blocks| %>
+    <div class="content-section__column">
+      <% blocks.each do |inner| %><%= render_block(inner) %><% end %>
+    </div>
+  <% end %>
+</section>

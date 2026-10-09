@@ -41,6 +41,27 @@ class ContentBlock < ApplicationRecord
   # block picker adds an empty card first).
   belongs_to :media_asset, class_name: "Media::Asset", optional: true
 
+  # A block in a section (sections spec §3.1) names the section and its
+  # 1-based column; both are nil for a top-level block. The block still
+  # belongs to the page (`owner`): a section arranges, it owns nothing, which
+  # is why every per-block rule -- permissions, autosave, translation
+  # tracking, media usages -- reads the same for a block in a column.
+  # No `dependent:` on `section_blocks`: a section is emptied or lifted by
+  # `ContentBlocks::Destroy`, and the foreign key refuses anything else.
+  belongs_to :section, class_name: "ContentBlock", optional: true, inverse_of: :section_blocks
+  has_many :section_blocks, -> { order(:section_column, :position, :id) }, class_name: "ContentBlock",
+    foreign_key: :section_id, inverse_of: :section
+
+  # Only when the placement itself is new or changed (decision D15): a block
+  # inside a section whose type is no longer registered fails every one of
+  # these, and must still be editable until someone moves it out.
+  validate :section_rules, if: -> { new_record? || section_id_changed? || section_column_changed? || block_type_changed? }
+
+  # The blocks a page shows in its own list; `position` is counted among them.
+  scope :top_level, -> { where(section_id: nil) }
+  # The blocks of one container: a section's column, or (nil, nil) the top level.
+  scope :in_column, ->(section, column) { where(section_id: section, section_column: column) }
+
   validates :block_type, presence: true
 
   # `position` is NOT NULL with a database default, which covers a block
@@ -133,6 +154,14 @@ class ContentBlock < ApplicationRecord
   # to 500 (global constraints).
   def definition = BlockTypes.find(block_type)
 
+  # Whether this block holds other blocks: asked of the type's capability,
+  # never of its name. False for an unregistered type.
+  def container? = definition&.capability?(:container) || false
+
+  # How many columns this block's layout has; 0 for a block that holds none
+  # (and for a section whose type is gone, so its blocks all read as strays).
+  def column_count = container? ? definition.columns.call(settings) : 0
+
   # The type's `ContentModel::FieldSet` instance over this block's
   # `settings`/`translated_settings`, or nil when `block_type` isn't
   # registered (there is no schema to build one from).
@@ -216,6 +245,31 @@ class ContentBlock < ApplicationRecord
     object.assign(settings)
     self.settings = object.untranslated_hash
     self.translated_settings = object.all_translations.merge(Locales.default => object.translated_hash).compact_blank
+  end
+
+  # The rules of a placement (sections spec §3.2), in the order a person
+  # would be told them: a top-level block names no column; a container never
+  # sits in a container (one level deep, decision 2); the section exists, is
+  # a container and is on this block's own page (a block keeps the page as
+  # its `owner`, so a section of another page would split one block between
+  # two pages' permissions); and the column is one of the section's layout.
+  # `[ column_count, 1 ].max` lets column 1 through for a holder that isn't
+  # a container, which already has its own error above -- one message, not
+  # two, for the same mistake. The database's check constraints keep the
+  # pair together and the column from 1 for a write around this.
+  def section_rules
+    if section_id.nil?
+      errors.add(:section_column, "must be blank outside a section") unless section_column.nil?
+      return
+    end
+    return errors.add(:section, "can't hold another section") if container?
+
+    holder = section
+    return errors.add(:section, "doesn't exist") if holder.nil?
+
+    errors.add(:section, "isn't a section") unless holder.container?
+    errors.add(:section, "is on another page") unless holder.owner_type == owner_type && holder.owner_id == owner_id
+    errors.add(:section_column, "isn't a column of this section") unless section_column.is_a?(Integer) && section_column.between?(1, [ holder.column_count, 1 ].max)
   end
 
   def block_type_is_registered

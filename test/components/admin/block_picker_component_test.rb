@@ -8,8 +8,20 @@ class Admin::BlockPickerComponentTest < ViewComponent::TestCase
     render_inline Admin::BlockPickerComponent.new(page: page, locale: "en")
 
     assert_selector "#block-picker-end.border-dashed", text: "+ Add block"
-    assert_equal BlockTypes.all.map(&:label), Capybara.string(rendered_content).all("#block-picker-end button").map(&:text)
+    offered = BlockTypes.all.reject { |type| type.capability?(:container) }
+    assert_equal offered.map(&:label), Capybara.string(rendered_content).all("#block-picker-end button").map(&:text)
     assert_selector "#block-picker-end form[action$='/content_blocks'] input[name='block[block_type]'][value='post_list']", visible: :all
+  end
+
+  # Until the editor can show a section (sections plan, Task 5), nothing in
+  # CS Studio creates one: the picker leaves a container type out.
+  test "offers no container type: there is no Section button yet" do
+    page = create_page(title: "Picker test")
+    render_inline Admin::BlockPickerComponent.new(page: page, locale: "en")
+
+    assert_includes BlockTypes.all.map(&:label), "Section"
+    assert_no_selector "#block-picker-end button", text: "Section"
+    assert_no_selector "input[name='block[block_type]'][value='section']", visible: :all
   end
 
   test "sends no after_id: a new block is appended, and can be moved" do

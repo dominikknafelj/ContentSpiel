@@ -83,4 +83,35 @@ module ThemeHelper
   def rich_text(record)
     ::Locales.read(record, :body).to_html(locale: I18n.locale, urls: public_urls)
   end
+  # One block of a page, rendered: its registered type's ViewComponent
+  # (`Theme.current.component_for`, open-types spec §5), not a partial named
+  # after `block_type` -- the registry is what a plugin's block type or an
+  # alternate theme hooks into. A helper rather than a loop in
+  # `pages/show.html.erb` because a section draws the blocks in its columns
+  # the same way (`Blocks::SectionComponent`), and both must agree on the two
+  # exceptions below wherever a block sits.
+  #
+  # A post detail request (`/en/blog/my-post`): the block the controller
+  # matched the post under renders that single post, through its content
+  # type's `detail_component`, in place of its listing, while the page's
+  # other blocks still render around it. Compared against `@post_list_block`
+  # -- the block the controller resolved the post under -- rather than the
+  # block's type, so that a page carrying more than one listing swaps out
+  # only that block.
+  #
+  # A stored `block_type` that isn't (or is no longer) registered --
+  # `block.definition` is nil -- renders nothing rather than 500ing the
+  # public site (global constraints): a removed plugin's type must degrade
+  # gracefully for whoever already has it on a page.
+  def render_block(block)
+    if @post && block == @post_list_block
+      definition = @post.definition
+      render Theme.current.component_for(definition, :detail_component).new(post: @post) if definition
+    elsif (definition = block.definition)
+      render Theme.current.component_for(definition).new(block: block, page: @page)
+    else
+      Rails.logger.warn("Skipping block #{block.id}: unregistered block type #{block.block_type.inspect}")
+      nil
+    end
+  end
 end
