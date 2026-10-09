@@ -52,6 +52,11 @@ module Admin
 
       def open_notes = @open_notes.to_i
 
+      # The shared secondary style of the header (Preview's), as a flex row
+      # for the icon, the word and the count: the one class swapped is the
+      # display, which two utilities can't both set.
+      def notes_button_class = helpers.setup_secondary_link_class.sub("inline-block", "inline-flex")
+
       def page? = record.is_a?(::Page)
 
       # "page" / "post": the noun in copy, ids and route names.
