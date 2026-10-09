@@ -1,0 +1,7 @@
+<%= render Admin::ConfirmDialogComponent.new(destructive: true, id: dialog_id, title: t(".title"), body: t(".body")) do |dialog| %>
+  <% dialog.with_confirm_action do %>
+    <%= form_with url: destroy_path, method: :delete do %>
+      <%= render Admin::ButtonComponent.new(label: t(".confirm"), variant: :danger, type: "submit") %>
+    <% end %>
+  <% end %>
+<% end %>

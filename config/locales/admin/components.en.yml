@@ -145,9 +145,11 @@ en:
 
       # A block's form drawn as the open panel of a section (sections spec
       # §4.3). The rest of the block card is not converted yet. The panel's
-      # heading is `editor_screen.panel_title`.
+      # heading is `editor_screen.panel_title`. `move_into` is the one item
+      # of a top-level card's "⋯" menu that sections added (spec §4.4).
       block_card:
         close: "Close"
+        move_into: "Move into section…"
 
       # The "+" at the end of a section's lane (sections spec §4.2): the
       # name of a button whose label is the glyph.
@@ -165,6 +167,34 @@ en:
           tag: "tag %{name}"
           needs_fixing: "Needs fixing"
           attention: "Needs attention"
+        # A tile's "⋯" menu (sections spec §4.4): every move a drag makes,
+        # by name. `actions` names the button, whose label is the glyph.
+        block_tile:
+          actions: "Block actions"
+          move_up: "Move up"
+          move_down: "Move down"
+          move_to_column: "Move to column…"
+          move_out: "Move out of section"
+          duplicate: "Duplicate"
+          delete: "Delete block…"
+        # The one "Move block" dialog of the page editor. `column` and
+        # `section_column` are the choices `admin--blocks#askWhere` writes
+        # into its select: a tile is offered the other columns of its own
+        # section; a card every column of every section, the sections
+        # numbered as they stand in the page's list, top to bottom.
+        move_dialog:
+          title: "Move block"
+          destination: "Move to"
+          cancel: "Cancel"
+          move: "Move"
+          column: "Column %{column}"
+          section_column: "Section %{section} · column %{column}"
+        # The confirmation behind every "Delete block…", in a card and in a
+        # tile.
+        delete_block_dialog:
+          title: "Delete this block?"
+          body: "Blocks don’t go to the trash. This can’t be undone."
+          confirm: "Delete block"
         # The heading of a block's form under a section's lanes.
         panel_title:
           title: "%{type} · column %{column}"

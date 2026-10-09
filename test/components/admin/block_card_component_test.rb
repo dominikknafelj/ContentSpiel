@@ -32,14 +32,14 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "summary", visible: :all
   end
 
-  test "the menu lists Move up, Move down, Duplicate, a divider, then Delete block…, in that order" do
+  test "the menu lists Move up, Move down, Move into section…, Duplicate, a divider, then Delete block…, in that order" do
     page = create_page(title: "Menu test")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     render_card(block, page: page)
 
     items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all)
-    assert_equal [ "Move up", "Move down", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
+    assert_equal [ "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
     assert_selector "[role=menu] [role=separator]", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
     assert_selector "[role=menu] form[action$='/duplicate']", visible: :all
@@ -58,7 +58,47 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button[data-move='up'][disabled]", visible: :all
 
     render_card(block, page: page)
-    assert_no_selector "button[data-move][disabled]", visible: :all
+    assert_no_selector "button[data-move='up'][disabled], button[data-move='down'][disabled]", visible: :all
+  end
+
+  # Sections spec §4.4. Disabled as rendered: whether the page has a section
+  # is the screen's to say (`admin--blocks#refreshMoveState`), since sections
+  # come and go without this card being drawn again.
+  test "Move into section… fills the Move dialog and then opens it, and starts disabled" do
+    page = create_page(title: "Into test")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page)
+
+    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--blocks#askWhere admin--dialog#open'][data-admin--dialog-id-param='move-block-dialog']",
+      text: "Move into section…", visible: :all
+  end
+
+  # A section never holds a section: on a translation tab a section is drawn
+  # by this component (`SectionCardComponent.draws?`), and is not offered it.
+  test "a section's own card is not offered Move into section…" do
+    page = create_page(title: "Section as a card")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+
+    render_card(section, page: page)
+
+    assert_selector "[role=menu] button[data-move='up']", visible: :all
+    assert_no_selector "button[data-move='into']", visible: :all
+  end
+
+  # The form of a block in a column is hidden until its tile is pressed, and
+  # a dialog inside a hidden element can't be shown: the dialog is the
+  # tile's (`Admin::EditorScreen::BlockTileComponent`), and a second one here
+  # would be a second element with its id.
+  test "a panel does not hold the block's delete dialog" do
+    page = create_page(title: "Panel dialog")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel form[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "dialog", visible: :all
   end
 
   test "the menu's Move buttons keep calling admin--blocks#moveUp and #moveDown" do

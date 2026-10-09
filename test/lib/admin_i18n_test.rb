@@ -149,6 +149,10 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/components/admin/editor_screen/block_tile_component.html.erb
     app/components/admin/editor_screen/tile_summary_component.rb
     app/components/admin/editor_screen/tile_summary_component.html.erb
+    app/components/admin/editor_screen/move_dialog_component.rb
+    app/components/admin/editor_screen/move_dialog_component.html.erb
+    app/components/admin/editor_screen/delete_block_dialog_component.rb
+    app/components/admin/editor_screen/delete_block_dialog_component.html.erb
     app/javascript/controllers/admin/section_controller.js
   ].freeze
 

@@ -42,6 +42,14 @@
             <%= tag.button "Move down", type: "button", disabled: last?, class: menu_item_class,
                   data: { move: "down", action: "click->admin--blocks#moveDown" } %>
           <% end %>
+          <%# Disabled as it is drawn, and enabled by `admin--blocks#refreshMoveState` while the
+              page has a section: sections come and go without this card being drawn again,
+              so only the screen can say. %>
+          <% if move_into? %>
+            <% menu.with_item do %>
+              <%= tag.button t(".move_into"), type: "button", disabled: true, class: menu_item_class, data: move_into %>
+            <% end %>
+          <% end %>
           <% menu.with_item do %>
             <%= button_to "Duplicate", duplicate_path, method: :post, class: menu_item_class %>
           <% end %>
@@ -143,13 +151,8 @@
     </div>
   <% end %>
 
-  <% if editable? %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Delete this block?", body: "Blocks don’t go to the trash. This can’t be undone.") do |dialog| %>
-      <% dialog.with_confirm_action do %>
-        <%= form_with url: destroy_path, method: :delete do %>
-          <%= render Admin::ButtonComponent.new(label: "Delete block", variant: :danger, type: "submit") %>
-        <% end %>
-      <% end %>
-    <% end %>
+  <%# Not in a panel: see `delete_dialog`. %>
+  <% if delete_dialog? %>
+    <%= render delete_dialog %>
   <% end %>
 <% end %>

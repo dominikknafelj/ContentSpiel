@@ -25,7 +25,8 @@ module Admin
   #
   # The header (design pass round 2): drag handle, the type name -- a button
   # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::MenuComponent`
-  # (Move up, Move down, Duplicate, a divider, "Delete block…"). `first:` and
+  # (Move up, Move down, "Move into section…", Duplicate, a divider, "Delete
+  # block…"). `first:` and
   # `last:` only decide whether Move up / Move down start disabled; the page
   # view and the controller's list re-render work them out, and `admin
   # --blocks#refreshMoveState` keeps them right in the browser after every
@@ -59,7 +60,8 @@ module Admin
   #   start and `admin--section` only shows one, so a form is never fetched
   #   or removed and keeps its place in the write queue (see that script). It
   #   is no `card` of `admin--blocks` -- the section is the card -- and has no
-  #   handle and no "⋯" menu: a block in a column is moved by its tile. Its
+  #   handle, no "⋯" menu and no delete dialog: a block in a column is moved,
+  #   copied and deleted from its tile, which holds the dialog. Its
   #   header is a heading that says which column the form belongs to, and
   #   Close. `open: true` is for the panel of a block just added to a column
   #   (spec §4.3: it opens at once). The panel is still rendered `hidden`,
@@ -175,9 +177,21 @@ module Admin
 
     def duplicate_path = helpers.duplicate_admin_page_content_block_path(page, block, **url_options)
 
-    def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
+    # The block's "Delete this block?" (`DeleteBlockDialogComponent`): drawn
+    # in the card -- and for a block in a column in its TILE, never in its
+    # panel, which is hidden while its form is closed (`delete_dialog?`).
+    def delete_dialog = Admin::EditorScreen::DeleteBlockDialogComponent.new(page: page, block: block, url_options: url_options)
 
-    def delete_dialog_id = "delete-block-#{block.id}"
+    def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
+
+    def delete_dialog? = editable? && !panel?
+
+    # "Move into section…" (sections spec §4.4): for a card of the page's own
+    # list that is no container -- a section never holds a section. See the
+    # template for why it starts disabled.
+    def move_into? = list? && !block.container?
+
+    def move_into = Admin::EditorScreen::MoveDialogComponent.trigger("into")
 
     def body_id = "#{error_prefix}-body"
 

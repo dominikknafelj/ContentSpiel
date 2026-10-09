@@ -25,9 +25,29 @@ module Admin
     # second stop on every tile for a control the keyboard can't work. Only
     # for a viewer who can edit, as a card's handle is.
     #
-    # `page:` and `url_options:` are what the tile's menu will need (a later
-    # task of the sections plan). A viewer who can't edit may still open a
-    # tile: the form they get is the disabled one a view-only card shows.
+    # THE "⋯" MENU IS THE TILE'S KEYBOARD PATH (sections spec §4.4, plan D9),
+    # for a viewer who can edit: Move up and Move down along the lane (the
+    # card's own buttons, `data-move` and `admin--blocks#moveUp|moveDown`),
+    # "Move to column…" (the page's one Move dialog, `MoveDialogComponent`),
+    # "Move out of section" (`admin--blocks#moveOut`: to the page's list,
+    # directly after the section), Duplicate, and "Delete block…". Every move
+    # item is rendered enabled: which of them has nowhere to go -- the first
+    # tile's Move up, the last one's Move down, "Move to column…" in a section
+    # of one column -- depends on the tile's neighbours and its section's
+    # layout, which change without the tile being drawn again, so
+    # `admin--blocks#refreshMoveState` says it, as the tile connects and after
+    # every change of a lane.
+    #
+    # A tile of a type that is no longer registered has "Delete block…" as its
+    # only item (spec §6): nothing of it can be read, so it is not copied, and
+    # the one way out of the section it has is the grip.
+    #
+    # THE BLOCK'S DELETE DIALOG IS IN THE TILE (`DeleteBlockDialogComponent`,
+    # which says why it is not in the form's panel). It is a child of the
+    # tile and not of the lane: a lane's children are exactly its tiles.
+    #
+    # A viewer who can't edit may still open a tile: the form they get is the
+    # disabled one a view-only card shows. They get the face and nothing else.
     class BlockTileComponent < AdminComponent
       def initialize(page:, block:, locale:, url_options: {}, editable:, open: false)
         @page = page
@@ -47,6 +67,18 @@ module Admin
       def open? = @open
 
       def editable? = @editable
+
+      def unavailable? = block.definition.nil?
+
+      def duplicate_path = helpers.duplicate_admin_page_content_block_path(page, block, **url_options)
+
+      def delete_dialog = Admin::EditorScreen::DeleteBlockDialogComponent.new(page: page, block: block, url_options: url_options)
+
+      def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
+
+      def move_to_column = Admin::EditorScreen::MoveDialogComponent.trigger("column")
+
+      def menu_item_class = Admin::BlockCardComponent::MENU_ITEM_CLASS
 
       private
 

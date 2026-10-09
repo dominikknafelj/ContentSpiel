@@ -36,6 +36,19 @@ import { messages } from "i18n/messages"
 // renders the right state for the cards it sends, but a streamed insertion
 // or removal touches no neighbour, so it can only be corrected here.
 //
+// EVERY MOVE IS ALSO IN A MENU (sections spec §1, §4.4; plan D9, D10), which
+// is the keyboard's way to everything a drag does. A card keeps its handle's
+// keyboard path along the list; a TILE has no other: its grip is for the
+// pointer, so its "⋯" menu is where a keyboard user moves it -- Move up and
+// Move down along its lane (`moveUp`, `moveDown`), "Move to column…"
+// (`askWhere`, `moveTo`) and "Move out of section" (`moveOut`). A top-level
+// card's menu has "Move into section…" (`askWhere` again). All of them make
+// the DOM move a drop would have made and then call the one sender, `move`
+// (`relocate`): a menu move is queued, held still, refused and put back
+// exactly as a drag is. What a menu move adds is the FOCUS (`focusMoved`):
+// the item that was picked is hidden with its menu, so without a rule the
+// focus would be on <body>, the top of the page for a keyboard user.
+//
 // Duplicate and Delete need no controller action of their own -- both are
 // plain `button_to`/`form_with` submissions, and Turbo Drive already
 // appends `Accept: text/vnd.turbo-stream.html` to every non-GET form
@@ -49,7 +62,7 @@ import { messages } from "i18n/messages"
 // "fetch bypasses Turbo Drive, so nothing else applies this for us"
 // pattern `admin--tree`'s own drag handler already uses.
 export default class extends Controller {
-  static targets = ["card", "list", "lane", "tile", "announcer"]
+  static targets = ["card", "list", "lane", "tile", "announcer", "destination"]
   static values = { reorderUrl: String }
 
   // Every block request also carries the page settings form's current base
@@ -63,13 +76,15 @@ export default class extends Controller {
 
   // What the lanes need is made here, not in `connect`: Stimulus tells a
   // controller of the targets already in the page (`laneTargetConnected`)
-  // BEFORE it calls `connect`. The list's own children are the only place a
-  // Duplicate's copy arrives (`focusCopy`).
+  // BEFORE it calls `connect`. What is observed is every container's own
+  // children, the list's and each lane's, and those are the places a
+  // Duplicate's copy arrives in (`focusCopy`): a card's copy in the list, a
+  // tile's in its lane.
   initialize() {
     this.laneSortables = new Map()
     this.moveStateObserver = new MutationObserver((mutations) => {
       this.refreshMoveState()
-      this.focusCopy(mutations.filter((mutation) => mutation.target === this.listTarget))
+      this.focusCopy(mutations)
     })
   }
 
@@ -111,8 +126,10 @@ export default class extends Controller {
     // below. So a Duplicate that succeeded is remembered (`turbo:submit-end`
     // bubbles up from its form), and the card its answer's stream then adds
     // to the list gets focus on its handle (`focusCopy`, from the list's
-    // observer): the copy, where Space and the arrows move it on. The note is
-    // dropped after a moment in case no card follows.
+    // observer): the copy, where Space and the arrows move it on. The same
+    // for a tile's Duplicate, whose copy arrives in the tile's lane and takes
+    // the focus on its own "⋯" (`focusItem`). The note is dropped after a
+    // moment in case no copy follows.
     this.duplicated = (event) => {
       const action = event.detail.formSubmission?.formElement?.getAttribute("action") || ""
       if (!event.detail.success || !new URL(action, window.location.origin).pathname.endsWith("/duplicate")) return
@@ -307,32 +324,48 @@ export default class extends Controller {
     this.laneSortables.clear()
   }
 
-  // See `duplicated` in `connect`: the first card added to the list after a
-  // Duplicate is the copy.
+  // See `duplicated` in `connect`: the first card added to the list, or tile
+  // added to a lane, after a Duplicate is the copy.
   focusCopy(mutations) {
     if (!this.awaitingCopy) return
     const copy = mutations.flatMap((mutation) => Array.from(mutation.addedNodes))
-      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--blocks-target="card"]'))
+      .find((node) => node.nodeType === Node.ELEMENT_NODE && node.matches('[data-admin--blocks-target="card"], [data-admin--blocks-target="tile"]'))
     if (!copy) return
 
     this.awaitingCopy = false
-    this.focusHandle(copy)
+    this.focusItem(copy)
   }
 
-  // Move up is disabled on the first block of a container, Move down on the
-  // last. Only the attribute is touched, so it is idempotent and cheap to run
-  // on every child-list change. The button is the item's OWN: a section's
-  // card holds the blocks in it, and their Move items are not the section's.
+  // Which of a block's Move items have somewhere to go. Only the `disabled`
+  // attribute is touched, so it is idempotent and cheap to run on every
+  // child-list change. The button is the item's OWN: a section's card holds
+  // the blocks in it, and their Move items are not the section's.
+  // - Move up is disabled on the first block of a container, Move down on
+  //   the last.
+  // - "Move into section…" (a card's) needs a lane to go into: disabled
+  //   while the page has no section. The card is DRAWN with it disabled and
+  //   this is what enables it -- a section is added and removed without any
+  //   other card being drawn again, so only the screen can say.
+  // - "Move to column…" (a tile's) needs another column in its own section:
+  //   disabled in a section of one column.
+  // The lanes are asked of the page as it is (`laneTargets` is a query), so
+  // the answer is right whichever of a section's parts arrived first.
   refreshMoveState(containers = this.containers()) {
+    const lanes = this.laneTargets
     for (const container of containers) {
       const items = this.itemsOf(container)
+      const columns = lanes.filter((lane) => lane.dataset.sectionId === container.dataset.sectionId).length
       items.forEach((item, index) => {
-        const own = (direction) => Array.from(item.querySelectorAll(`[data-move="${direction}"]`))
+        const own = (move) => Array.from(item.querySelectorAll(`[data-move="${move}"]`))
           .find((button) => button.closest("[data-block-id]") === item)
-        const up = own("up")
-        const down = own("down")
-        if (up) up.disabled = index === 0
-        if (down) down.disabled = index === items.length - 1
+        const set = (move, disabled) => {
+          const button = own(move)
+          if (button) button.disabled = disabled
+        }
+        set("up", index === 0)
+        set("down", index === items.length - 1)
+        set("into", lanes.length === 0)
+        set("column", columns < 2)
       })
     }
   }
@@ -352,17 +385,14 @@ export default class extends Controller {
   // tile), then fires the exact same request a drag's `onEnd` does. A
   // disabled item (first card's Move up, last card's Move down) never gets
   // here; the index guards are a belt for a programmatic call. The menu has
-  // closed by the time the card moves, so focus goes to the card's handle
-  // rather than being lost with the DOM move (a tile has no handle to take
-  // it: its grip is for the pointer).
+  // closed by the time the block moves, so focus goes to the block itself
+  // rather than being lost with the DOM move (`relocate`).
   moveUp(event) {
     const item = this.itemFor(event)
     const items = this.itemsOf(item.parentElement)
     const index = items.indexOf(item)
     if (index <= 0) return
-    const before = this.snapshot()
-    item.parentElement.insertBefore(item, items[index - 1])
-    this.moved(item, before)
+    this.relocate(item, () => item.parentElement.insertBefore(item, items[index - 1]))
   }
 
   moveDown(event) {
@@ -370,14 +400,94 @@ export default class extends Controller {
     const items = this.itemsOf(item.parentElement)
     const index = items.indexOf(item)
     if (index < 0 || index >= items.length - 1) return
-    const before = this.snapshot()
-    item.parentElement.insertBefore(items[index + 1], item)
-    this.moved(item, before)
+    // The block itself is what moves, not the neighbour past it: its menu is
+    // closed by being moved (`admin--menu#disconnect`), and by nothing else
+    // here -- the menu's own close on a pick stands back from a disabled
+    // item, which is what Move down has just become on a block that is now
+    // the last.
+    this.relocate(item, () => items[index + 1].after(item))
   }
 
-  moved(item, before) {
-    this.focusHandle(item)
-    this.move(item, item.parentElement, before)
+  // "Move to column…" on a tile and "Move into section…" on a card open the
+  // one Move dialog (sections spec §4.4; `Admin::EditorScreen
+  // ::MoveDialogComponent`). Its choices are read from the screen as it is
+  // NOW -- sections are added, removed and given other layouts without the
+  // other cards being redrawn, so a list the server rendered would go stale:
+  // - for a tile, the other columns of its own section: "Column 2";
+  // - for a card, every column of every section: "Section 2 · column 3". A
+  //   section has no name of its own, so it is told from the others by its
+  //   place: the sections are numbered as they stand in the page's list, top
+  //   to bottom, which is what the person sees beside the dialog.
+  // A choice's value is its lane's id, looked up again when Move is pressed.
+  //
+  // This only FILLS the dialog and notes whose move it is. Showing it is
+  // `admin--dialog#open`, the next action of the same click (the item names
+  // both, in this order): the focus goes to the select, and comes back to
+  // the block's "⋯" when the dialog is closed without a move.
+  askWhere(event) {
+    const item = this.itemFor(event)
+    const own = item.closest('[data-admin--blocks-target="lane"]')
+    const lanes = own ? this.laneTargets.filter((lane) => lane.dataset.sectionId === own.dataset.sectionId && lane !== own) : this.laneTargets
+    const sections = this.cardTargets.filter((card) => card.hasAttribute("data-container")).map((card) => card.dataset.blockId)
+    const text = messages(this.element)
+
+    this.asking = item
+    this.destinationTarget.replaceChildren(...lanes.map((lane) => {
+      const option = document.createElement("option")
+      option.value = lane.id
+      option.textContent = own
+        ? text.t("components.editor_screen.move_dialog.column", { column: lane.dataset.column })
+        : text.t("components.editor_screen.move_dialog.section_column", { section: sections.indexOf(lane.dataset.sectionId) + 1, column: lane.dataset.column })
+      return option
+    }))
+  }
+
+  // The dialog's Move: to the END of the chosen lane, as a block added to a
+  // column goes. The lane is found by the id the choice holds, so one that
+  // was redrawn while the dialog was open is the lane that is there now, and
+  // one that is gone moves nothing. A section that is collapsed is opened
+  // first: the block would otherwise vanish into a card that shows one line,
+  // with nothing left on screen to take the focus.
+  moveTo() {
+    const item = this.asking
+    const lane = document.getElementById(this.destinationTarget.value)
+    this.asking = null
+    this.destinationTarget.closest("dialog").close()
+    if (!item?.isConnected || !this.laneTargets.includes(lane) || item.parentElement === lane) return
+
+    this.expand(lane.closest('[data-admin--blocks-target="card"]'))
+    this.relocate(item, () => lane.append(item))
+  }
+
+  // Out of its section: directly after the section's card in the page's list.
+  moveOut(event) {
+    const item = this.itemFor(event)
+    const section = item.closest('[data-admin--blocks-target="card"]')
+    this.relocate(item, () => section.after(item))
+  }
+
+  // A MENU'S MOVE: the DOM move a drop would have made, then the same request
+  // (`move`). The focus goes to the moved block at once -- the item that was
+  // picked is hidden with its menu, and a DOM move takes the focus off
+  // whatever it moves. For a move along one container that is where it
+  // stays. A block that changes containers is then held still by `move`
+  // (`hold`: inert until its answer is drawn), which takes the focus off
+  // again, and gets it back when its turn has ended (`focusMoved`).
+  relocate(item, place) {
+    const from = item.parentElement
+    const before = this.snapshot()
+    place()
+    this.focusItem(item)
+    this.move(item, from, before, { focus: true })
+  }
+
+  // Shows a card's body if `toggle` has hidden it.
+  expand(card) {
+    const body = card.querySelector("[data-block-body]")
+    if (!body.classList.contains("hidden")) return
+
+    body.classList.remove("hidden")
+    card.querySelector(`[aria-controls="${body.id}"]`)?.setAttribute("aria-expanded", "true")
   }
 
   // THE ONE SENDER of a block's move: a drop's `onEnd`, the menu's Move
@@ -454,6 +564,10 @@ export default class extends Controller {
   // A move within one container moves the element and nothing else, as it
   // always did, and never waits on a form.
   //
+  // `focus` is for a move made from a menu (`relocate`): when its turn has
+  // ended, however it ended, the block's element takes the focus if nothing
+  // has it (`focusMoved`). A drag is the pointer's and asks for none.
+  //
   // THE ANSWER IS DRAWN BEFORE THE NEXT WRITE GOES, for a move that names a
   // section or changes containers (`streamsApplied`). Its answer changes what
   // the next task reads: the moved block's new element and form, or -- for a
@@ -463,7 +577,7 @@ export default class extends Controller {
   // from the old elements (ledger b6, which `holdTurboRequest` settles for a
   // Turbo form). The page's own reorder draws a status line and a toast, and
   // releases its turn at once as before.
-  async move(item, from, before = null) {
+  async move(item, from, before = null, { focus = false } = {}) {
     this.refreshMoveState()
     const to = item ? item.parentElement : this.listTarget
     // An element that is in no container has no order to send: one the
@@ -480,7 +594,7 @@ export default class extends Controller {
     if (to !== this.listTarget || (from && from !== to)) this.sendHeldEdits()
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
-    await this.queueMove({ item, from, to, csrfToken, stoodBack: false, held: from && from !== to ? this.hold(item) : [] })
+    await this.queueMove({ item, from, to, csrfToken, focus, stoodBack: false, held: from && from !== to ? this.hold(item) : [] })
   }
 
   // A BLOCK ON ITS WAY TO ANOTHER CONTAINER IS HELD STILL, from its drop
@@ -521,7 +635,9 @@ export default class extends Controller {
   // queued itself again (`takeTurn` answers "again"), it is counted off and
   // what it held still is let go -- in a `finally`, so a turn that throws
   // leaves neither a count that never reaches zero (`restoreTo` would then
-  // be kept for good) nor a block nobody can touch.
+  // be kept for good) nor a block nobody can touch. A menu's move then says
+  // where the focus is (`focusMoved`) -- here, after the hold is let go: an
+  // inert element takes no focus.
   async sendMove(move, isCurrent) {
     let again = false
     try {
@@ -530,8 +646,38 @@ export default class extends Controller {
       if (!again) {
         this.settle(move)
         for (const element of move.held) element.inert = false
+        if (move.focus && move.item && isCurrent()) this.focusMoved(move.item)
       }
     }
+  }
+
+  // WHERE THE FOCUS IS AFTER A MENU'S MOVE (sections spec §1: the menu is
+  // the keyboard's path, so it must not end at the top of the page). When
+  // the move's turn has ended, the element that stands for the block NOW
+  // takes the focus, whatever the turn came to:
+  // - saved, between containers: the block was redrawn, a card for a tile or
+  //   a tile for a card (`move_streams`), and that new element is the one;
+  // - saved, to another lane of its section: the tile itself, free again;
+  // - refused, failed or not sent because its form was not saved: the block
+  //   was put back (`putBack`) -- or, where a refusal redrew the whole list,
+  //   is one of the new elements, found by the block's id.
+  // Only when nothing has the focus: a person who went somewhere else while
+  // the request was out is left there. "Nothing" includes an element that is
+  // no longer drawn, which is where Chrome leaves the focus for a moment
+  // after a dialog or a menu closes (`admin--dialog#returnFocus`).
+  focusMoved(item) {
+    const active = document.activeElement
+    if (active && active !== document.body && active.getClientRects().length > 0) return
+
+    const element = item.isConnected ? item : this.standingFor(item.dataset.blockId)
+    if (element) this.focusItem(element)
+  }
+
+  // The element that stands for a block in its container now: its card in
+  // the list or its tile in a lane (never its form's panel, which is no
+  // child of either).
+  standingFor(blockId) {
+    return this.containers().flatMap((container) => this.itemsOf(container)).find((element) => element.dataset.blockId === blockId)
   }
 
   // Counts a move off, once: `takeTurn` does it as soon as the answer is in,
@@ -718,8 +864,7 @@ export default class extends Controller {
   // that changed lanes inside its section was not redrawn, and is itself.)
   followRedraw(item) {
     if (item.isConnected || !this.restoreTo) return
-    const redrawn = this.containers().flatMap((container) => this.itemsOf(container))
-      .find((element) => element.dataset.blockId === item.dataset.blockId)
+    const redrawn = this.standingFor(item.dataset.blockId)
     if (!redrawn) return
 
     for (const [ container, items ] of this.restoreTo) {
@@ -873,6 +1018,17 @@ export default class extends Controller {
 
   focusHandle(card) {
     card.querySelector(".admin-block-card__handle")?.focus()
+  }
+
+  // Where the focus goes on a block that was moved or copied from a menu: a
+  // card's handle, as ever -- Space and the arrows move it on from there --
+  // and a tile's "⋯", its one control for moving (its grip is a `<span>` for
+  // the pointer, and its face would open the form). A tile holds one menu,
+  // its own; a card is asked for its handle first, so a menu inside its form
+  // (the rich-text toolbar's) is never taken for it.
+  focusItem(item) {
+    const control = item.querySelector(".admin-block-card__handle") || item.querySelector('[data-admin--menu-target="button"]')
+    control?.focus()
   }
 
   titleOf(card) {

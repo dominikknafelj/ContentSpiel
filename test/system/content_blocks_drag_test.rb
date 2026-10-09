@@ -148,7 +148,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
 
     assert_selector "#{card(@first)} button[data-move='up'][disabled]", visible: :all
     assert_selector "#{card(@third)} button[data-move='down'][disabled]", visible: :all
-    assert_no_selector "#{card(@second)} button[data-move][disabled]", visible: :all
+    assert_no_selector "#{card(@second)} button[data-move='up'][disabled], #{card(@second)} button[data-move='down'][disabled]", visible: :all
 
     find("#{card(@third)} .admin-block-card__handle").send_keys(:space, :up, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
