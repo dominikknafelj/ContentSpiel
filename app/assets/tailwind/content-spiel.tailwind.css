@@ -453,6 +453,14 @@ body:has(.admin-save-bar) #toasts { bottom: calc(var(--admin-save-bar-height, 4r
 .admin-notes-marker--on-image[data-has-notes],
 .admin-notes-marker--on-image[data-has-notes]:hover { background: var(--cs-surface); color: var(--cs-ink); }
 .admin-notes-marker--on-image[data-has-notes][data-unread] { border-color: var(--cs-line-strong); background: var(--cs-accent-tint); color: var(--cs-accent); }
+/* ONE "New note" in the drawer (the handoff's decision 4): its header's
+   button is the way in, so the list's own link -- above the groups, and the
+   empty state's action -- is not shown there, with the element that only
+   holds it. The same list in the media panel and on the notes page of a
+   record keeps its link: neither has a header with the button. By where the
+   list stands and not by a parameter: the drawer's frame and that page ask
+   for the same view. */
+.admin-notes-drawer :is(p, div):has(> [data-note-new-link]) { display: none; }
 /* The media panel shows the notes frame in the flow of a column, not in a
    drawer with a scroller of its own: a thread's reply stays under its
    messages instead of sticking to the bottom of whatever scrolls. */

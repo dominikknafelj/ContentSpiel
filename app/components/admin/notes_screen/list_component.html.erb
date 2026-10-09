@@ -19,6 +19,9 @@
             body: failed_new&.dig(:body).to_s, names: failed_new&.dig(:names) || {}, errors: failed_new&.dig(:errors)) %>
     </section>
   <% elsif !empty? %>
+    <%# Not shown inside the editors' drawer, whose header has the one "New
+        note" (`.admin-notes-drawer` in content-spiel.tailwind.css); the empty
+        state's action below follows the same rule. %>
     <p class="px-4 pt-3"><%= link_to t(".new"), new_note_path, class: setup_secondary_link_class, data: { note_new_link: true, turbo_frame: "notes" } %></p>
   <% end %>
 
