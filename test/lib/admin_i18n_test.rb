@@ -136,6 +136,26 @@ class AdminI18nTest < ActiveSupport::TestCase
     app/javascript/mind_graph/renderer.js
     app/javascript/mind_graph/search_box.js
     app/javascript/mind_graph/theme.js
+    app/components/admin/editor_screen/section_card_component.rb
+    app/components/admin/editor_screen/section_card_component.html.erb
+    app/components/admin/editor_screen/section_group_component.rb
+    app/components/admin/editor_screen/section_group_component.html.erb
+    app/components/admin/editor_screen/section_summary_component.rb
+    app/components/admin/editor_screen/section_layout_menu_component.rb
+    app/components/admin/editor_screen/section_layout_menu_component.html.erb
+    app/components/admin/editor_screen/section_delete_count_component.rb
+    app/components/admin/editor_screen/panel_title_component.rb
+    app/components/admin/editor_screen/section_lanes_component.rb
+    app/components/admin/editor_screen/section_lanes_component.html.erb
+    app/components/admin/editor_screen/block_tile_component.rb
+    app/components/admin/editor_screen/block_tile_component.html.erb
+    app/components/admin/editor_screen/tile_summary_component.rb
+    app/components/admin/editor_screen/tile_summary_component.html.erb
+    app/components/admin/editor_screen/move_dialog_component.rb
+    app/components/admin/editor_screen/move_dialog_component.html.erb
+    app/components/admin/editor_screen/delete_block_dialog_component.rb
+    app/components/admin/editor_screen/delete_block_dialog_component.html.erb
+    app/javascript/controllers/admin/section_controller.js
   ].freeze
 
   PLACEHOLDER = "".freeze

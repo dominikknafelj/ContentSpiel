@@ -119,6 +119,17 @@ module ServiceCalls
       [ page, blocks ]
     end
 
+    # A draft page with a three-column section holding `count` blocks in
+    # column 3: what a fold, a lift and a delete of a section all write.
+    def draft_page_with_section(count: 2)
+      page = create_page(title: "Section", published: false)
+      section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section", settings: { "layout" => "three" } }).record
+      blocks = Array.new(count) do
+        ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 3 }).record
+      end
+      [ page, section, blocks ]
+    end
+
     # A post tagged `name`, and a page whose `post_list` block names the tag:
     # what a tag service writes beyond the tag itself (the block's settings,
     # its page, the public paths of the listed posts).
@@ -189,6 +200,11 @@ module ServiceCalls
     "ContentBlocks::Destroy" => lambda {
       _page, (block,) = draft_page_with_blocks
       { call: -> { ContentBlocks::Destroy.call(block) }, permission: "pages.edit", on: block }
+    },
+
+    "ContentBlocks::Duplicate" => lambda {
+      _page, section, = draft_page_with_section
+      { call: -> { ContentBlocks::Duplicate.call(section) }, permission: "pages.edit", on: section }
     },
 
     "ContentBlocks::Reorder" => lambda {
@@ -418,6 +434,32 @@ module ServiceCalls
         page = create_page(title: "Blocks", published: false)
         { call: -> { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text" }) },
           permission: "pages.edit", on: ContentBlock }
+      },
+      "creating in a column" => lambda {
+        page, section, = draft_page_with_section
+        { call: -> { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 }) },
+          permission: "pages.edit", on: ContentBlock }
+      },
+      "folding a section's columns" => lambda {
+        _page, section, = draft_page_with_section
+        { call: -> { ContentBlocks::Save.call(section, attributes: { settings: { "layout" => "one" } }) }, permission: "pages.edit", on: section }
+      }
+    },
+    "ContentBlocks::Destroy" => {
+      "a section, keeping its blocks" => lambda {
+        _page, section, = draft_page_with_section
+        { call: -> { ContentBlocks::Destroy.call(section, keep_blocks: true) }, permission: "pages.edit", on: section }
+      },
+      "a section with its blocks" => lambda {
+        _page, section, = draft_page_with_section
+        { call: -> { ContentBlocks::Destroy.call(section) }, permission: "pages.edit", on: section }
+      }
+    },
+    "ContentBlocks::Reorder" => {
+      "moving a block out of a section" => lambda {
+        page, section, (block,) = draft_page_with_section
+        { call: -> { ContentBlocks::Reorder.call(page, [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 3 } }) },
+          permission: "pages.edit", on: page }
       }
     },
     "Groups::Save" => {

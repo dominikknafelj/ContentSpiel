@@ -14,6 +14,8 @@ module Blocks
     # width from 768px up, and the full viewport width below it -- unlike
     # the page hero (`app/views/pages/show.html.erb`, `sizes: "100vw"`),
     # which always spans the viewport regardless of the content column.
+    # An image in a column of a section is narrower than that, and asks for
+    # its column's width instead (`#sizes`).
     SIZES = "(min-width: 768px) 768px, 100vw"
 
     def initialize(block:, page:)
@@ -26,6 +28,18 @@ module Blocks
     attr_reader :block, :page
 
     def asset = block.media_asset
+
+    # The one thing a block's component knows about where it sits (sections
+    # spec §5.4): an image in a column asks for a picture as wide as its
+    # column, not as wide as the page. `block.section` is the object the
+    # page's outline handed over (`BlockOutline`), so reading it is no query.
+    # A section whose type is gone draws no columns -- its blocks are stacked
+    # at the content width (`ThemeHelper#render_block`) -- so its images ask
+    # for that.
+    def sizes
+      section = block.section if block.section_id
+      section&.container? ? Blocks::SectionComponent.image_sizes(section, block.section_column) : SIZES
+    end
 
     # The block's overrides go in whole, as their `{locale => value}` jsonb
     # (final fix wave, I1): `Media::Asset#alt_text` interleaves them with the

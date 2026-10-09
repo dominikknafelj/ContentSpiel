@@ -48,8 +48,8 @@ class ServiceBehaviourContractTest < ActiveSupport::TestCase
   # Every service, by name. Adding or deleting one is a deliberate edit here
   # (and a factory in test/support/service_calls.rb).
   EXPECTED_SERVICES = %w[
-    AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Reorder ContentBlocks::Save
-    Groups::Destroy Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
+    AI::Translate ApiTokens::Issue ApiTokens::Revoke ContentBlocks::Destroy ContentBlocks::Duplicate ContentBlocks::Reorder
+    ContentBlocks::Save Groups::Destroy Groups::Save Locales::Configure Locales::Disable Locales::Enable Locales::MakeDefault Media::Save
     Media::Upload Pages::Move Pages::Save Posts::Bulk Posts::BulkRestore Posts::Save Settings::Save
     StarterContents::Add StarterContents::EnsureHome Tags::Destroy Tags::Merge Tags::Rename Translations::Confirm
     Trash::Empty Trash::Move Trash::Purge Trash::Restore Users::Destroy Users::Save Users::UpdatePassword Users::UpdateProfile

@@ -85,6 +85,15 @@ class Page < ApplicationRecord
   # because `ContentBlock#owner` is polymorphic (open-types spec §4.1) --
   # only `Page` uses it today, but a future owner can hold blocks the same
   # way.
+  #
+  # Declared before the association on purpose: `dependent: :destroy` below
+  # destroys the blocks one statement at a time in `position` order, and a
+  # section deleted before the blocks in it is refused by the foreign key
+  # (`content_blocks.section_id`, NO ACTION). So the blocks that sit in a
+  # section go first. They are taken from the loaded association, so they are
+  # the very objects `Trash::Purge` holds and refreshes afterwards; the pass
+  # below meets them again already destroyed, which deletes nothing.
+  before_destroy { content_blocks.select(&:section_id).each(&:destroy!) }
   has_many :content_blocks, -> { order(:position) }, as: :owner, dependent: :destroy
 
   # The admin edits a page's blocks inside the page's own form (page-tree design

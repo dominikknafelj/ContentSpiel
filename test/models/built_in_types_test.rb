@@ -2,10 +2,30 @@ require "test_helper"
 
 class BuiltInTypesTest < ActiveSupport::TestCase
   test "built-ins are registered" do
-    assert_equal %w[rich_text image post_list], BlockTypes.names
+    assert_equal %w[rich_text image post_list section], BlockTypes.names
     assert_equal %w[blog resume_entry now_update], ContentTypes.names
     assert BlockTypes.fetch(:post_list).capability?(:lists_posts)
     assert_equal %w[image caption alt], BlockTypes.fetch(:image).uses_columns
+  end
+
+  test "section is the one container type, and its columns follow its layout" do
+    assert_equal [ "section" ], BlockTypes.with_capability(:container).map(&:name)
+    assert_equal 3, BlockTypes.fetch(:section).columns.call("layout" => "three")
+    assert_equal [ 1, 2 ], BlockTypes::Section.weights("one_two")
+    assert_equal [ 1, 1 ], BlockTypes::Section.weights("no such layout")
+  end
+
+  # `ContentBlock#column_count` calls the type's `columns` without a guard, so
+  # a container type that doesn't say how many it has is refused when it is
+  # registered, not when a page renders.
+  test "a container type registered without columns is refused" do
+    saved = BlockTypes.all.dup
+
+    error = assert_raises(ArgumentError) { BlockTypes.register(:test_band) { |t| t.label "Band"; t.capability :container } }
+    assert_equal "a container block type needs `columns`", error.message
+  ensure
+    BlockTypes.reset!
+    saved.each { |definition| BlockTypes.registry_put(definition) }
   end
 
   test "post_list settings are typed" do

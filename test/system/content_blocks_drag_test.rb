@@ -108,6 +108,23 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
     assert_equal [ @second.id, @first.id, @third.id ], order_on_screen
   end
 
+  # The pick moves the card in the DOM before its click has reached the
+  # menu's panel, which is what closes a menu on a pick: the menu went with
+  # the card and stayed open over it (`admin--menu#disconnect`).
+  test "the card's menu is closed after its Move up, and the focus is on the card's handle" do
+    sign_in_via_form(users(:one))
+    visit admin_page_path(@page)
+    await_admin_controllers
+
+    find("#{card(@second)} button[aria-label='Block actions']").click
+    within(card(@second)) { press "Move up" }
+    assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10
+
+    assert_no_selector "#{card(@second)} [role=menu]"
+    assert_selector "#{card(@second)} button[aria-label='Block actions'][aria-expanded='false']"
+    assert_equal true, page.evaluate_script("document.activeElement === document.querySelector(#{"#{card(@second)} .admin-block-card__handle".to_json})")
+  end
+
   test "Move down in the card menu reorders and offers Undo, which restores the order" do
     sign_in_via_form(users(:one))
     visit admin_page_path(@page)
@@ -131,7 +148,7 @@ class ContentBlocksDragSystemTest < ApplicationSystemTestCase
 
     assert_selector "#{card(@first)} button[data-move='up'][disabled]", visible: :all
     assert_selector "#{card(@third)} button[data-move='down'][disabled]", visible: :all
-    assert_no_selector "#{card(@second)} button[data-move][disabled]", visible: :all
+    assert_no_selector "#{card(@second)} button[data-move='up'][disabled], #{card(@second)} button[data-move='down'][disabled]", visible: :all
 
     find("#{card(@third)} .admin-block-card__handle").send_keys(:space, :up, :space)
     assert_selector "#toasts .admin-toast[data-kind=undo]", wait: 10

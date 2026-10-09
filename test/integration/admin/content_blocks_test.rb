@@ -37,6 +37,569 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.reload.settings_object.limit
   end
 
+  test "saving a block in a section streams its tile's summary, and a block outside one does not" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
+    outside = @page.content_blocks.create!(block_type: "post_list", position: 1)
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { limit: "0" } }, base_updated_at: inside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "block-#{inside.id}-tile-summary"
+    assert_includes response.body, "Needs fixing"
+
+    patch "#{blocks_path}/#{outside.id}", params: { block: { settings: { limit: "3" } }, base_updated_at: outside.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "tile-summary"
+  end
+
+  test "a saved block in a section streams the summary of what was saved, and a refused stale save streams none" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "post_list", section: section, section_column: 1, position: 0)
+    base = inside.updated_at.iso8601(6)
+
+    patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { tag: "rails" } }, base_updated_at: base }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='block-#{inside.id}-tile-summary']" do
+      assert_select "template", text: /All posts · tag rails/
+    end
+    assert_not_includes response.body, "Needs fixing"
+
+    travel 1.minute do
+      patch "#{blocks_path}/#{inside.id}", params: { block: { settings: { tag: "ruby" } }, base_updated_at: base }, as: :turbo_stream
+    end
+    assert_response :conflict
+    assert_not_includes response.body, "tile-summary"
+  end
+
+  # A block in a section is two elements, its tile and its form's panel
+  # (sections spec §4.3). An unavailable block's panel has "Delete block…",
+  # so the panel can be the very thing on screen when its block is deleted.
+  test "deleting a block in a section removes its tile and its panel, and a block outside one only its card" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    delete "#{blocks_path}/#{inside.id}", as: :turbo_stream
+    assert_response :success
+    assert_not ContentBlock.exists?(inside.id)
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(inside)}']"
+    assert_select "turbo-stream[action=remove][target='block-#{inside.id}-panel']"
+
+    delete "#{blocks_path}/#{outside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=remove]", count: 1
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(outside)}']"
+  end
+
+  # A section's header counts its blocks, and a delete is the one write that
+  # changes the count without redrawing anything else of the card.
+  test "deleting a block in a section streams the section's new count, and a block outside one streams none" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    delete "#{blocks_path}/#{inside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
+      assert_select "#section-#{section.id}-summary", text: "2 columns · 1 block"
+    end
+
+    delete "#{blocks_path}/#{outside.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[target$='-summary']", count: 0
+  end
+
+  test "adding into a column streams the panel, then the tile, marked to open, and the section's count" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+
+    post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 2 }, as: :turbo_stream
+
+    assert_response :created
+    block = section.section_blocks.sole
+    assert_equal 2, block.section_column
+    panel = response.body.index(%(id="block-#{block.id}-panel"))
+    tile = response.body.index(%(id="#{ActionView::RecordIdentifier.dom_id(block)}"))
+    assert panel && tile && panel < tile, "the panel must arrive before its tile"
+    assert_includes response.body, %(target="section-#{section.id}-panels")
+    assert_includes response.body, %(target="section-#{section.id}-lane-2")
+    assert_includes response.body, "data-open"
+    assert_includes response.body, "1 block"
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-panels'] template" do
+      assert_select "#block-#{block.id}-panel[hidden][data-open][data-admin--section-target='panel']"
+    end
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-lane-2'] template" do
+      assert_select "##{ActionView::RecordIdentifier.dom_id(block)}.admin-block-tile .admin-block-tile__face[aria-expanded='true']"
+    end
+    assert_select "turbo-stream[target='content-blocks-list']", count: 0
+  end
+
+  test "a second block added to a column lands after the first, and the count follows" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    first = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+
+    post blocks_path, params: { block: { block_type: "rich_text" }, section_id: section.id, column: 2 }, as: :turbo_stream
+
+    assert_response :created
+    assert_equal [ first.id, section.section_blocks.where.not(id: first.id).sole.id ], ContentBlock.in_column(section.id, 2).reorder(:position).ids
+    assert_includes response.body, "2 blocks"
+  end
+
+  test "adding into a column the section no longer has is refused with a message and the lanes as they are" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 4 }, as: :turbo_stream
+    end
+    assert_response :unprocessable_entity
+    assert_includes response.body, "content-blocks-alert"
+    assert_includes response.body, "isn&#39;t a column of this section"
+    assert_includes response.body, %(target="section-#{section.id}-lanes")
+  end
+
+  # Review Focus of the sections plan: two tabs. One was loaded while the
+  # section had four columns and still shows the "+" of the fourth; the other
+  # has since folded the section to two. The first tab's add is refused, no
+  # block ends in a column that isn't there, and the answer redraws the lanes
+  # as they are now -- two, the folded block at the end of the second.
+  test "an add into a column another tab folded away is refused, and the answer draws the lanes as they are now" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "four" })
+    kept = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+    folded = @page.content_blocks.create!(block_type: "image", section: section, section_column: 4, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ 2, 1 ], folded.reload.values_at(:section_column, :position)
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 4 }, as: :turbo_stream
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target='content-blocks-alert'] template", text: /isn't a column of this section/
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-lanes'] template" do
+      assert_select "#section-#{section.id}-lanes [data-admin--blocks-target='lane']", count: 2
+      assert_equal [ kept.id, folded.id ], css_select("#section-#{section.id}-lane-2 > .admin-block-tile").map { |tile| tile["data-block-id"].to_i }
+      assert_select "#section-#{section.id}-lane-4", count: 0
+    end
+    assert_equal [], ContentBlock.where(section_id: section.id, section_column: 3..).ids
+  end
+
+  test "a narrower layout answers with the lanes redrawn, the folded blocks' headings and the count" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    moved = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "none", width: "content" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal 2, moved.reload.section_column
+    assert_includes response.body, %(target="section-#{section.id}-lanes")
+    assert_includes response.body, %(target="block-#{moved.id}-panel-title")
+    assert_includes response.body, "Image · column 2"
+    assert_includes response.body, "2 columns"
+  end
+
+  # What that answer must not do: replace a panel. Its form may hold text
+  # that is not saved yet, and its registration with the write queue.
+  test "a layout save rewrites each heading and never a panel, and its layout menu follows the saved layout" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    stays = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    moved = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "one", background: "none", width: "content" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action=update][target='block-#{stays.id}-panel-title'] template", text: "Rich text · column 1"
+    assert_select "turbo-stream[action=update][target='block-#{moved.id}-panel-title'] template", text: "Image · column 1"
+    assert_select "turbo-stream[target='block-#{moved.id}-panel']", count: 0
+    assert_select "turbo-stream[target='block-#{stays.id}-panel']", count: 0
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "1 column · 2 blocks"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template" do
+      assert_select "button[data-admin--section-layout-param='one'][aria-current='true']"
+      assert_select "button[aria-current='true']", count: 1
+    end
+    assert_select "turbo-stream[action=replace][target='block-#{section.id}-base-updated-at']"
+    assert_select "turbo-stream[action=replace][target='block-#{section.id}-save-status']"
+  end
+
+  # The lanes are tiles a person may be dragging or have a menu open in:
+  # they are redrawn only by a save that changed how many columns there are.
+  test "a save of the background alone leaves the lanes as they are, and a layout of as many columns redraws only its menu" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "tinted", width: "full" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal %w[two tinted full], section.reload.settings.values_at("layout", "background", "width")
+    assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
+    assert_select "turbo-stream[target$='-panel-title']", count: 0
+    # Nor the layout menu: it may be open, or its button hold the focus.
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "one_two", background: "tinted", width: "full" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-layout-menu'] template button[data-admin--section-layout-param='one_two'][aria-current='true']"
+  end
+
+  test "the first save of a section that stores no settings yet is no change of layout" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    section.update_column(:settings, {})
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two", background: "tinted", width: "content" } }, base_updated_at: section.reload.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal "tinted", section.reload.settings["background"]
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
+    assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
+  end
+
+  test "a section's setting the registry doesn't know is refused into its own error slot, and nothing is redrawn" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    moved = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "five", background: "none", width: "content" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_equal 3, moved.reload.section_column
+    assert_select "turbo-stream[action=replace][target='block-#{section.id}-layout-errors'] template p"
+    assert_select "turbo-stream[target='section-#{section.id}-lanes']", count: 0
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
+  end
+
+  test "a stale save of a section is refused with a 409 and folds nothing" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    moved = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+    base = section.updated_at.iso8601(6)
+    travel(1.minute) { ContentBlocks::Save.call(section, attributes: { settings: { "background" => "tinted" } }, actor: nil) }
+
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "one" } }, base_updated_at: base }, as: :turbo_stream
+
+    assert_response :conflict
+    assert_equal 3, moved.reload.section_column
+  end
+
+  # Carried from the lane picker's review: the lanes an add was refused into
+  # are drawn as they are now, and so is everything that names a column --
+  # the headings of the forms under them and the header's count.
+  test "an add refused because the column is gone redraws the headings and the count with the lanes" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "four" })
+    folded = @page.content_blocks.create!(block_type: "image", section: section, section_column: 4, position: 0)
+    patch "#{blocks_path}/#{section.id}", params: { block: { settings: { layout: "two" } }, base_updated_at: section.updated_at.iso8601(6) }, as: :turbo_stream
+
+    post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 4 }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-lanes']"
+    assert_select "turbo-stream[action=update][target='block-#{folded.id}-panel-title'] template", text: "Image · column 2"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template", text: "2 columns · 1 block"
+    assert_select "turbo-stream[target='block-#{folded.id}-panel']", count: 0
+    # Not the layout menu: the form it belongs to holds the layout this tab
+    # loaded, and its next save is refused as stale and says so.
+    assert_select "turbo-stream[target='section-#{section.id}-layout-menu']", count: 0
+  end
+
+  test "removing a section and keeping its blocks puts their cards where the section was" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    kept = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+
+    assert_response :success
+    assert_nil kept.reload.section_id
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(section)}")
+    assert_includes response.body, %(id="#{ActionView::RecordIdentifier.dom_id(kept)}")
+    assert_includes response.body, "admin-block-card"
+  end
+
+  test "the kept blocks' cards come in reading order as cards of the list, first and last as they now are" do
+    before = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    section = @page.content_blocks.create!(block_type: "section", position: 1)
+    right = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+    left = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ before.id, left.id, right.id ], @page.content_blocks.top_level.reorder(:position).ids
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
+      assert_equal [ left.id, right.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
+      assert_select "[data-admin--section-target]", count: 0
+      assert_select "##{ActionView::RecordIdentifier.dom_id(left)} button[data-move='up']:not([disabled])"
+      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} button[data-move='down'][disabled]"
+    end
+  end
+
+  test "removing an empty section and keeping its blocks removes its card" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+
+    assert_response :success
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(section)}']"
+    assert_empty @page.content_blocks.reload
+  end
+
+  test "deleting a section removes its card, and deleting a block in a section removes its tile and panel and recounts" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    a = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 1)
+
+    delete "#{blocks_path}/#{a.id}", as: :turbo_stream
+    assert_response :success
+    assert_includes response.body, %(action="remove" target="#{ActionView::RecordIdentifier.dom_id(a)}")
+    assert_includes response.body, %(action="remove" target="block-#{a.id}-panel")
+    assert_includes response.body, "1 block"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count'] template", text: "This also deletes the 1 block in it."
+
+    delete "#{blocks_path}/#{section.id}", as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(section)}']"
+    assert_empty @page.content_blocks.reload
+  end
+
+  test "a reader's delete of a section, with or without its blocks, is refused and nothing leaves" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    sign_in_as(users(:reader))
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+    assert_response :forbidden
+    delete "#{blocks_path}/#{section.id}", as: :turbo_stream
+    assert_response :forbidden
+
+    assert_equal section.id, inside.reload.section_id
+    assert_select "turbo-stream[target='#{ActionView::RecordIdentifier.dom_id(section)}']", count: 0
+  end
+
+  test "adding into a section that is gone is refused, and a section can't be added into a section" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+
+    post blocks_path, params: { block: { block_type: "image" }, section_id: 0, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "That section or column no longer exists"
+    post blocks_path, params: { block: { block_type: "section" }, section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_equal [ section ], @page.content_blocks.reload.to_a
+  end
+
+  # `section_id` is looked up among this page's blocks, like every block id
+  # here: another page's section is "gone" to this request, and a block that
+  # is no section holds nothing (the answer has no lanes to redraw).
+  test "an add can't name another page's section, or a block that is no section" do
+    other = create_page(title: "Elsewhere").content_blocks.create!(block_type: "section", position: 0)
+    plain = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: other.id, column: 1 }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_includes response.body, "That section or column no longer exists"
+
+      post blocks_path, params: { block: { block_type: "image" }, section_id: plain.id, column: 1 }, as: :turbo_stream
+      assert_response :unprocessable_entity
+      assert_select "turbo-stream[target$='-lanes']", count: 0
+    end
+  end
+
+  test "a viewer who can't edit the page is refused an add into a column, with no lanes in the answer" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    sign_in_as(users(:reader))
+
+    assert_no_difference -> { ContentBlock.count } do
+      post blocks_path, params: { block: { block_type: "image" }, section_id: section.id, column: 1 }, as: :turbo_stream
+    end
+    assert_response :forbidden
+    assert_select "turbo-stream[target$='-lanes']", count: 0
+  end
+
+  test "adding a section streams its card with empty lanes" do
+    post blocks_path, params: { block: { block_type: "section" } }, as: :turbo_stream
+
+    assert_response :created
+    section = @page.content_blocks.sole
+    assert_includes response.body, "admin-section-card"
+    assert_includes response.body, "section-#{section.id}-lane-2"
+  end
+
+  test "the page editor draws a section as a card of lanes with every block's form under them, and only on the default language's tab" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    inside = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    get "/cs-studio/pages/#{@page.id}"
+    assert_response :success
+    assert_select "#content-blocks-list > .admin-block-card", count: 2
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card[data-controller~='admin--section']"
+    assert_select "#section-#{section.id}-lane-2 > ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
+    assert_select "#section-#{section.id}-panels > #block-#{inside.id}-panel[hidden] form[action$='/content_blocks/#{inside.id}']"
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card']"
+
+    get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+    assert_response :success
+    assert_select ".admin-section-card", count: 0
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}[data-admin--blocks-target='card']"
+  end
+
+  # Sections spec §4.5. Until the translation view was built a translation tab
+  # showed none of a section's blocks; now it lists them under a heading.
+  test "on a translation tab a section is a group: a heading and each block's card with its form, no lanes" do
+    with_locales(%w[en de], default: "en") do
+      section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+      right = @page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, caption: "Right original")
+      left = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+      outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+      get "/cs-studio/pages/#{@page.id}", params: { locale: "de" }
+
+      assert_response :success
+      assert_select "#content-blocks-list > *", count: 2
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-group[data-admin--blocks-target='card'] > h3", text: "Section"
+      assert_equal [ left.id, right.id ], css_select(".admin-section-group > .admin-block-card").map { |card| card["data-block-id"].to_i }
+      assert_select "##{ActionView::RecordIdentifier.dom_id(right)} form[action$='/content_blocks/#{right.id}?locale=de'][data-controller~='admin--autosave'] .admin-translation-pair", text: /Right original/
+      assert_select ".admin-block-tile, [data-admin--blocks-target='lane'], [data-admin--section-target]", count: 0
+      assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(outside)}[data-admin--blocks-target='card'] .admin-block-card__handle"
+    end
+  end
+
+  # What a stream draws on a translation tab is what the page load draws
+  # (`card_for`): a section added there, and the list an Undo re-renders.
+  test "a section streamed in on a translation tab is its group, on an add and in an Undo's list" do
+    with_locales(%w[en de], default: "en") do
+      section = @page.content_blocks.create!(block_type: "section", position: 0)
+      inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+      other = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+      patch "#{blocks_path}/reorder", params: { locale: "de", ids: [ section.id, other.id ], undo: 1 }, as: :turbo_stream
+      assert_response :success
+      assert_select "turbo-stream[action=update][target='content-blocks-list'] template" do
+        assert_select ".admin-section-group##{ActionView::RecordIdentifier.dom_id(section)} > ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-card"
+        assert_select ".admin-section-card, .admin-block-tile", count: 0
+      end
+
+      post blocks_path, params: { locale: "de", block: { block_type: "section" } }, as: :turbo_stream
+      assert_response :success
+      added = @page.content_blocks.top_level.reorder(:position).last
+      assert_select "turbo-stream[action=append][target='content-blocks-list'] template .admin-section-group##{ActionView::RecordIdentifier.dom_id(added)}"
+    end
+  end
+
+  # ---- A section whose type is gone (sections spec §6) ----------------------
+
+  def gone_section
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "three" })
+    first = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    third = @page.content_blocks.create!(block_type: "image", section: section, section_column: 3, position: 0)
+    section.update_columns(block_type: "gone/section")
+    [ section, first, third ]
+  end
+
+  test "a section whose type is gone is the Unavailable type card with its blocks as tiles in closed lanes" do
+    section, first, third = gone_section
+
+    get "/cs-studio/pages/#{@page.id}"
+
+    assert_response :success
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-section-card.border-danger", text: /Unavailable type — gone\/section/
+    assert_select "#section-#{section.id}-lane-1[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(first)}.admin-block-tile"
+    assert_select "#section-#{section.id}-lane-3[data-no-drop] > ##{ActionView::RecordIdentifier.dom_id(third)}.admin-block-tile"
+    assert_select "#section-#{section.id}-panels > #block-#{first.id}-panel form[data-controller~='admin--autosave']"
+    assert_select "[id^='block-picker-#{section.id}-']", count: 0
+  end
+
+  test "once it holds nothing, a section whose type is gone is the plain Unavailable type card" do
+    section, first, third = gone_section
+    [ first, third ].each(&:destroy!)
+
+    get "/cs-studio/pages/#{@page.id}"
+
+    assert_select ".admin-section-card", count: 0
+    assert_select "#content-blocks-list > ##{ActionView::RecordIdentifier.dom_id(section)}.admin-block-card.border-danger", text: /Unavailable type — gone\/section/
+  end
+
+  test "deleting a section whose type is gone deletes its blocks and removes its card" do
+    section, = gone_section
+
+    assert_difference -> { ContentBlock.count }, -3 do
+      delete "#{blocks_path}/#{section.id}", as: :turbo_stream
+    end
+
+    assert_response :success
+    assert_select "turbo-stream[action=remove][target='#{ActionView::RecordIdentifier.dom_id(section)}']"
+  end
+
+  # The card's "Remove section, keep blocks": honoured as for any section,
+  # and answered with the lifted blocks' cards.
+  test "removing a section whose type is gone with its blocks kept answers with their cards" do
+    section, first, third = gone_section
+
+    delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ first.id, third.id ], @page.content_blocks.top_level.reorder(:position).ids
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(section)}'] template" do
+      assert_equal [ first.id, third.id ], css_select(".admin-block-card[data-admin--blocks-target='card']").map { |card| card["data-block-id"].to_i }
+    end
+  end
+
+  # The lifted blocks' cards are drawn from ONE outline of the page
+  # (`removal_streams`): the page's blocks are read the same number of times
+  # however many blocks the section held.
+  test "removing a section with its blocks kept reads the page's blocks as often for four blocks as for two" do
+    reads = [ 2, 4 ].map do |size|
+      section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "one" })
+      size.times { |index| @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: index) }
+
+      statements = capture_sql { delete "#{blocks_path}/#{section.id}", params: { keep_blocks: 1 }, as: :turbo_stream }
+      assert_response :success
+      assert_select "turbo-stream[action=replace] template .admin-block-card[data-admin--blocks-target='card']", count: size
+      statements.count { |sql| sql.start_with?('SELECT "content_blocks".*') }
+    end
+
+    assert_equal reads.first, reads.last, "a read of content_blocks per lifted block"
+  end
+
+  test "a block is moved out of a section whose type is gone, and the section's delete dialog recounts" do
+    section, first, third = gone_section
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, third.id ], moved_from: { third.id => { section_id: section.id, column: 3 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_nil third.reload.section_id
+    assert_equal section.id, first.reload.section_id
+    assert_select "turbo-stream[action=replace][target='#{ActionView::RecordIdentifier.dom_id(third)}'] template .admin-block-card[data-admin--blocks-target='card']"
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count'] template", text: "This also deletes the 1 block in it."
+  end
+
+  # Why its lanes are closed in the browser (`data-no-drop`): the server has
+  # no column of it to put a block in, not even the one a block is in.
+  test "nothing is moved into or along a column of a section whose type is gone" do
+    section, first, = gone_section
+    outside = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id, outside.id ], section_id: section.id, column: 1, moved_from: { outside.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, "That section or column no longer exists"
+
+    patch "#{blocks_path}/reorder", params: { ids: [ first.id ], section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_nil outside.reload.section_id
+  end
+
+  test "an Undo of a reorder re-renders a section as its card, tiles and forms included" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    inside = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    other = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, other.id ], undo: 1 }, as: :turbo_stream
+    assert_response :success
+    assert_select "turbo-stream[action=update][target='content-blocks-list'] template" do
+      assert_select ".admin-section-card ##{ActionView::RecordIdentifier.dom_id(inside)}.admin-block-tile"
+      assert_select ".admin-section-card #block-#{inside.id}-panel[hidden]"
+    end
+  end
+
   # One "Add block" row at the end of the list (design pass round 2): the
   # between-cards pickers are gone, so an append only streams the new card in
   # before that row -- nothing about the previously-last card changes (its
@@ -89,6 +652,36 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal [ first, copy, second ], @page.content_blocks.to_a
     assert_select "turbo-stream[action='after'][target='#{ActionView::RecordIdentifier.dom_id(first)}']", count: 1
     assert_not_includes response.body, %(<turbo-stream action="replace")
+  end
+
+  # A copy stands directly after its source in the source's own container
+  # (`ContentBlocks::Duplicate`). In a column that is a tile after the
+  # source's tile, its form under the lanes, and the section's two counts --
+  # never a card in the page's list, where the block is not.
+  test "duplicating a block in a column streams its panel, its tile after the source's, and the section's count" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    source = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 0)
+    below = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 1)
+
+    post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    assert_response :created
+
+    copy = (section.section_blocks.reload.to_a - [ source, below ]).sole
+    assert_equal [ source.id, copy.id, below.id ], @page.content_blocks.in_column(section, 2).reorder(:position).ids
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-panels'] template" do
+      assert_select "#block-#{copy.id}-panel[hidden]:not([data-open])"
+    end
+    assert_select "turbo-stream[action=after][target='#{ActionView::RecordIdentifier.dom_id(source)}'] template" do
+      assert_select "##{ActionView::RecordIdentifier.dom_id(copy)}.admin-block-tile button.admin-block-tile__face[aria-expanded=false]"
+    end
+    assert_select "turbo-stream[target='content-blocks-list']", count: 0
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
+      assert_select "#section-#{section.id}-summary", text: "2 columns · 3 blocks"
+    end
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count']"
+    panel = response.body.index(%(id="block-#{copy.id}-panel"))
+    tile = response.body.index(%(id="#{ActionView::RecordIdentifier.dom_id(copy)}"))
+    assert panel < tile, "the panel must arrive before its tile"
   end
 
   test "typed-setting errors name their field in words in the block's error slot" do
@@ -604,5 +1197,203 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_equal 3, block.settings["limit"]
     assert_equal "blog", block.settings["content_type"]
     assert_not block.translated_settings.key?("de")
+  end
+
+  test "duplicating a section streams one card holding the copies of its blocks" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    assert_difference -> { @page.content_blocks.count }, 2 do
+      post "#{blocks_path}/#{section.id}/duplicate", as: :turbo_stream
+    end
+    assert_response :created
+    copy = @page.content_blocks.top_level.reorder(:position).last
+    assert_includes response.body, "section-#{copy.id}-lane-1"
+    assert_includes response.body, "block-#{copy.section_blocks.sole.id}-panel"
+  end
+
+  test "a reorder that names a column moves the block and a stale one is a 422" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 2, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :success
+    assert_equal [ section.id, 2 ], block.reload.then { |b| [ b.section_id, b.section_column ] }
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::STALE
+  end
+
+  # Sections plan, Q5: the Undo toast restores the page's own order, which
+  # can't undo a move between containers.
+  test "a move between containers offers no Undo, and one inside a column neither" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    first = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    second = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ second.id, first.id ], section_id: section.id, column: 1 }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "Undo"
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, first.id ], moved_from: { first.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+    assert_response :success
+    assert_not_includes response.body, "Undo"
+    assert_equal [ section, first ], @page.content_blocks.top_level.reorder(:position).to_a
+  end
+
+  test "a moved_from that is no hash is read as none, and a forged entry in one is a 422, never an error" do
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], moved_from: "x" }, as: :turbo_stream
+    assert_response :success
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], moved_from: { "0" => "x" } }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::STALE
+  end
+
+  # --- A move's answer (sections spec §4.4, decision D8) -----------------------
+
+  test "a move into a column answers with the tile and its panel in place of the card, and no Undo" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-tile"
+    assert_includes response.body, %(target="section-#{section.id}-panels")
+    assert_includes response.body, "1 block"
+    assert_not_includes response.body, "Undo"
+  end
+
+  test "a move out of a section answers with the card in place of the tile and removes the panel" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="remove" target="block-#{block.id}-panel")
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-card"
+    assert_includes response.body, "0 blocks"
+  end
+
+  # The card a block becomes is the list's own: told whether it is the first
+  # or the last, as on a page load.
+  test "the card of a block moved out to the end of the list has Move down disabled" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ section.id, block.id ], moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    card = Nokogiri::HTML5.fragment(response.body).at_css(%(turbo-stream[target="#{ActionView::RecordIdentifier.dom_id(block)}"] template))
+    assert card.at_css("button[data-move='down'][disabled]"), "Move down is not disabled on the last card"
+    assert card.at_css("button[data-move='up']:not([disabled])"), "Move up is disabled on a card that is not the first"
+  end
+
+  test "a move between lanes of one section rewrites only the panel's heading" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 2, moved_from: { block.id => { section_id: section.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, "Image · column 2"
+    assert_not_includes response.body, %(target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_not_includes response.body, %(target="block-#{block.id}-panel")
+  end
+
+  test "a move from one section to another takes the form along and recounts both" do
+    from = @page.content_blocks.create!(block_type: "section", position: 0)
+    to = @page.content_blocks.create!(block_type: "section", position: 1)
+    block = @page.content_blocks.create!(block_type: "image", section: from, section_column: 1, position: 0)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: to.id, column: 2, moved_from: { block.id => { section_id: from.id, column: 1 } } }, as: :turbo_stream
+
+    assert_response :success
+    assert_includes response.body, %(action="remove" target="block-#{block.id}-panel")
+    assert_includes response.body, %(action="append" target="section-#{to.id}-panels")
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, %(target="section-#{from.id}-summary")
+    assert_includes response.body, %(target="section-#{to.id}-summary")
+  end
+
+  test "a refused move answers 422 with the reason and the whole list as the server has it" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 3, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, ContentBlocks::Reorder::NO_COLUMN
+    assert_includes response.body, %(action="update" target="content-blocks-list")
+  end
+
+  # The page's own order refused (a block deleted elsewhere) is as it was:
+  # the reason, and the cards are put back by the browser. And a denial is
+  # no fault of the screen's, so it redraws nothing.
+  test "a refused order of the page's own list, and a denied move, answer without the list" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id, 0 ] }, as: :turbo_stream
+    assert_response :unprocessable_entity
+    assert_not_includes response.body, %(target="content-blocks-list")
+
+    sign_in_as(users(:reader))
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => { section_id: "", column: "" } } }, as: :turbo_stream
+    assert_response :forbidden
+    assert_not_includes response.body, %(target="content-blocks-list")
+  end
+
+  test "a top-level reorder still offers Undo" do
+    a = @page.content_blocks.create!(block_type: "rich_text", position: 0)
+    b = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ b.id, a.id ] }, as: :turbo_stream
+
+    assert_includes response.body, "Undo"
+  end
+
+  # `section_id[]=1` and its kind used to reach `to_i` as an array or a hash
+  # -- a 500. Whatever is not one value is read as none.
+  test "a forged reorder whose section, column, ids or origin is not one value is answered, never an error" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "rich_text", position: 1)
+    order = [ section.id, block.id ]
+
+    [
+      { ids: order, section_id: [ section.id ] },
+      { ids: order, section_id: { a: 1 } },
+      { ids: order, column: [ 1 ] },
+      { ids: order, column: { a: 1 } },
+      { ids: order, moved_from: { block.id => { section_id: [ section.id ], column: { a: 1 } } } },
+      { ids: { a: block.id } },
+      { ids: [ { a: block.id } ] }
+    ].each do |forged|
+      patch "#{blocks_path}/reorder", params: forged, as: :turbo_stream
+
+      assert_includes [ 200, 422 ], response.status, "#{forged.inspect} answered #{response.status}"
+    end
+    assert_equal order, @page.content_blocks.top_level.reorder(:position).ids
+    assert_nil block.reload.section_id
+  end
+
+  # The service reads an origin that is no hash as "the top level", and so
+  # must the answer that then draws the moved block.
+  test "a move whose origin is no hash is the move of a top-level block, drawn as one" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0)
+    block = @page.content_blocks.create!(block_type: "image", position: 1)
+
+    patch "#{blocks_path}/reorder", params: { ids: [ block.id ], section_id: section.id, column: 1, moved_from: { block.id => "x" } }, as: :turbo_stream
+
+    assert_response :success
+    assert_equal [ section.id, 1 ], block.reload.then { |b| [ b.section_id, b.section_column ] }
+    assert_includes response.body, %(action="replace" target="#{ActionView::RecordIdentifier.dom_id(block)}")
+    assert_includes response.body, "admin-block-tile"
   end
 end

@@ -124,6 +124,21 @@ class PreviewTest < ActionDispatch::IntegrationTest
     assert_select "header a[href^='/preview']"
   end
 
+  # Sections spec §5.7: the preview draws a section as the public page does.
+  test "a draft page's section previews as its band and grid" do
+    section = @draft.content_blocks.create!(block_type: :section, position: 0, settings: { "layout" => "three", "background" => "tinted" })
+    @draft.content_blocks.create!(block_type: :rich_text, section: section, section_column: 2, position: 0, body: rich_doc("In the middle"))
+    sign_in_as(users(:one))
+
+    get "/preview/draft"
+
+    assert_response :success
+    assert_select "section.content-section.content-section--tinted.content-section--content .content-section__grid--three" do
+      assert_select ".content-section__column", 3
+      assert_select ".content-section__column:nth-child(2) .cs-prose", text: /In the middle/
+    end
+  end
+
   test "the public URL of a draft still 404s" do
     get "/draft"
     assert_response :not_found

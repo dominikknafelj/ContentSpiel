@@ -1,0 +1,122 @@
+<%= tag.div id: dom_id, class: [ "admin-block-card admin-section-card rounded-cs border bg-sunken", (unavailable? ? "border-danger" : "border-line-strong") ],
+      data: { block_id: section.id, container: "", "admin--blocks-target": "card", controller: "admin--section", action: "keydown.esc->admin--section#escape" } do %>
+  <% if unavailable? %>
+    <%# A section whose type is gone (see the component): the unavailable block card's
+        header and a sentence, over the blocks it still holds, and a section's own two
+        removals under their own names -- the one that keeps the blocks first. The header
+        wraps: on a narrow card the two buttons go under the type's name. %>
+    <div class="flex flex-wrap items-center gap-2 p-3">
+      <span class="min-w-48 flex-1 truncate text-sm font-semibold text-danger-ink"><%= t(".unavailable", type: section.block_type) %></span>
+      <% if editable? %>
+        <%= form_with url: destroy_path, method: :delete, data: settled_screen_data do %>
+          <%= hidden_field_tag :keep_blocks, 1, id: nil %>
+          <%= render Admin::ButtonComponent.new(label: t(".remove_keep"), variant: :secondary, size: :small, type: "submit") %>
+        <% end %>
+        <%= render Admin::ButtonComponent.new(label: t(".delete"), variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
+      <% end %>
+    </div>
+    <p class="px-3 pb-3 text-xs text-meta"><%= t(".unavailable_hint") %></p>
+  <% else %>
+  <%# The header wraps: on a narrow card the three controls go under the name. The name
+      and the count keep a width of their own, so it is the controls that move and not
+      the count that is squeezed away. %>
+  <div class="flex flex-wrap items-center gap-2 p-3">
+    <div class="flex min-w-48 flex-1 items-center gap-2">
+      <% if editable? %>
+        <%# The block card's own handle, class and actions: `admin--blocks` drags and
+            moves a section's card as it does any card of the list. %>
+        <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label="<%= t(".move") %>" aria-describedby="block-drag-help"
+                data-action="keydown->admin--blocks#key focusout->admin--blocks#blur">⠿</button>
+      <% end %>
+
+      <%# The name collapses the card, as a block card's does. Collapsed, the lanes and the
+          forms are gone and the header is the whole card: "Section · 3 columns · 5 blocks"
+          (sections spec §4.1). %>
+      <button type="button" class="shrink-0 truncate text-left text-sm font-semibold text-ink"
+              aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--blocks#toggle">
+        <%= t(".name") %>
+      </button>
+      <span class="shrink-0 text-sm text-meta" aria-hidden="true">·</span>
+      <%= render self.class.summary(section: section, count: blocks.size) %>
+    </div>
+
+    <%# The section's own settings (see the component): an autosave form like a block
+        card's, with the same ids. No form may be nested in it. %>
+    <%= form_with url: form_url, method: :patch, id: form_id, class: "flex flex-wrap items-center gap-2", data: form_data do %>
+      <%= tag.fieldset disabled: !editable?, class: [ "contents", ("admin-view-only" unless editable?) ] do %>
+        <%= render partial: "admin/shared/base_updated_at_field", locals: { id: base_updated_at_id, value: base_updated_at_value } %>
+        <%# What the layout menu writes into. Beside the menu, not in it: the menu is
+            replaced after a save, and this input is the form's own. %>
+        <%= hidden_field_tag "block[settings][layout]", layout_menu.current, id: field_id("layout") %>
+        <%= render layout_menu %>
+        <%= select_tag "block[settings][background]", options_for_select(background_options, setting("background")),
+              id: field_id("background"), class: select_class, "aria-label": t(".background") %>
+        <%= select_tag "block[settings][width]", options_for_select(width_options, setting("width")),
+              id: field_id("width"), class: select_class, "aria-label": t(".width") %>
+        <%= render Admin::SaveStatusComponent.new(id: status_id, state: :idle, live: page.live?) %>
+        <%# One slot per setting, as every field of a block has: `update` replaces all three
+            with each answer. Together they take a line of their own, and no room at all
+            while none holds a message (`.admin-section-errors`). %>
+        <div class="admin-section-errors basis-full">
+          <% %w[layout background width].each do |name| %>
+            <%= helpers.render "admin/shared/field_errors", id: error_id(name), messages: [] %>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if editable? %>
+      <%= render Admin::MenuComponent.new(label: "⋯", aria_label: t(".actions"), close_on_select: true) do |menu| %>
+        <% menu.with_item do %>
+          <%= tag.button t(".move_up"), type: "button", disabled: first?, class: menu_item_class,
+                data: { move: "up", action: "click->admin--blocks#moveUp" } %>
+        <% end %>
+        <% menu.with_item do %>
+          <%= tag.button t(".move_down"), type: "button", disabled: last?, class: menu_item_class,
+                data: { move: "down", action: "click->admin--blocks#moveDown" } %>
+        <% end %>
+        <% menu.with_item do %>
+          <%= button_to t(".duplicate"), duplicate_path, method: :post, class: menu_item_class %>
+        <% end %>
+        <% menu.with_item do %>
+          <%= tag.div role: "separator", class: "my-1 h-px bg-line" %>
+        <% end %>
+        <% menu.with_item do %>
+          <%= button_to t(".remove_keep"), destroy_path, method: :delete, params: { keep_blocks: 1 }, class: menu_item_class, form: { data: settled_screen_data } %>
+        <% end %>
+        <% menu.with_item do %>
+          <%= tag.button t(".delete"), type: "button", class: "#{menu_item_class} text-danger-ink", data: dialog_trigger(delete_dialog_id) %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+  <% end %>
+
+  <div id="<%= body_id %>" data-block-body class="flex flex-col gap-3 px-3 pb-3">
+    <%= render lanes %>
+
+    <%# Every block's form, hidden, one shown at a time (see the component). No gap
+        between hidden panels: `hidden` takes them out of the flex layout. %>
+    <div id="<%= panels_id %>" class="flex flex-col">
+      <% blocks.each do |block| %>
+        <%= render panel(block) %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# "Delete section and its blocks…": after the body, outside the settings form. Its
+      count is kept current by every add and delete inside the section. %>
+  <% if editable? %>
+    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: t(".delete_title"), body: t(".delete_body")) do |dialog| %>
+      <% dialog.with_details do %>
+        <%= render self.class.delete_count(section: section, count: blocks.size) %>
+      <% end %>
+      <% dialog.with_confirm_action do %>
+        <%= form_with url: destroy_path, method: :delete do %>
+          <%= render Admin::ButtonComponent.new(label: t(".delete_confirm"), variant: :danger, type: "submit") %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

@@ -135,10 +135,35 @@ module Tags
     # match as `Listings#listing_blocks_naming`, asked again of the fresh row).
     # The lock holds until the commit, so a block save arriving after it sees
     # the new tag and the moved `updated_at`.
+    #
+    # The blocks' pages are locked BEFORE the blocks, in id order. The order
+    # of locks for a page's blocks is the page's row, then block rows
+    # (`ContentBlocks::Save#call`): a block save or delete holds its page and
+    # waits for the block. This method used to take the block rows and only
+    # then the pages (the `touch_all` at the end), so a merge and a save of
+    # one of these listing blocks could each hold what the other waited for,
+    # until Postgres ended one with `ActiveRecord::Deadlocked`. Id order, so
+    # two merges, or a merge and a branch purge (`Trash::Purge`), take these
+    # rows the same way round. A known gap is left on the purge's side: a
+    # page's destroy renumbers its siblings (closure_tree's
+    # `_ct_reorder_siblings`), page rows outside the purge's id-ordered
+    # lock, so a merge holding such a sibling and that purge can still
+    # deadlock.
+    #
+    # Which pages: the owners of `blocks`, the read made without any lock.
+    # That read can be behind, but not in a way that leaves a block locked
+    # without its page: the fresh rows below are asked for by these same ids,
+    # and a block never changes its owner, so every row locked there belongs
+    # to a page locked here. A block deleted since is simply not found; one
+    # pointed elsewhere since is locked, its page too, and left alone -- a
+    # page locked and not touched costs nothing. (A block that started
+    # naming the source after the read isn't in `blocks` at all, with or
+    # without these locks.)
     def repoint_blocks(blocks, source, into)
       return if blocks.empty?
 
       now = Time.current
+      Page.where(id: blocks.select { |block| block.owner_type == "Page" }.map(&:owner_id)).order(:id).lock.pluck(:id) # i18n-ok: a class name compared with owner_type
       fresh = ContentBlock.where(id: blocks.map(&:id)).order(:id).lock.select { |block| block_names_tag?(block, source.name) }
       fresh.each { |block| block.update_columns(settings: block.settings.merge("tag" => into.name), updated_at: now) }
       Page.where(id: fresh.select { |block| block.owner_type == "Page" }.map(&:owner_id)).touch_all # i18n-ok: a class name compared with owner_type

@@ -1,0 +1,12 @@
+<%# The column's tags are closed up against its blocks on purpose: a column
+    with no block is then `:empty` for `sections.css`, which hides it while
+    the section is stacked (whitespace alone would defeat the selector). %>
+<section class="content-section content-section--<%= background %> content-section--<%= width %>">
+  <div class="content-section__inner">
+    <div class="content-section__grid content-section__grid--<%= layout %>">
+      <% columns.each do |blocks| %>
+        <div class="content-section__column"><% blocks.each do |inner| %><%= render_block(inner) %><% end %></div>
+      <% end %>
+    </div>
+  </div>
+</section>

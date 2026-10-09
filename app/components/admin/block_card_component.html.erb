@@ -1,10 +1,9 @@
-<div id="<%= dom_id %>" data-block-id="<%= block.id %>" data-admin--blocks-target="card"
-     class="admin-block-card rounded-cs border bg-surface <%= unavailable? ? "border-danger" : "border-line" %>">
+<%= tag.div id: wrapper_id, class: [ "admin-block-card rounded-cs border bg-surface", (unavailable? ? "border-danger" : "border-line") ], **wrapper_attributes do %>
   <div class="flex items-center gap-2 p-3 <%= "border-b border-line hover:bg-sunken" unless unavailable? %>">
     <%# Not for an unavailable card: it has no body, no menu with Move up / Move
         down, and a handle that only moves a card nobody can read would be the one
         move a keyboard user couldn't undo with the menu. %>
-    <% if editable? && !unavailable? %>
+    <% if list? && editable? && !unavailable? %>
       <%# A real button for the keyboard path (`admin--blocks#key`); the mouse
           drag starts from it too (SortableJS `handle:`). %>
       <button type="button" class="admin-block-card__handle shrink-0 cursor-grab select-none rounded-cs px-0.5 text-meta hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
@@ -18,6 +17,13 @@
         <%# The only action an unavailable card has (it has no body to move, copy or edit). %>
         <%= render Admin::ButtonComponent.new(label: "Delete block…", variant: :danger_text, size: :small, data: dialog_trigger(delete_dialog_id)) %>
       <% end %>
+    <% elsif panel? %>
+      <%# The open form of a block in a section (sections spec §4.3): a heading, not a
+          collapse button -- the tile is what opens and closes it. %>
+      <h3 id="<%= self.class.panel_title_id(block) %>" class="flex-1 truncate text-sm font-semibold text-ink"><%= render panel_title %></h3>
+    <% elsif !list? %>
+      <%# `:group`: nothing to collapse, move or delete from here, only the type's name. %>
+      <span class="flex-1 truncate text-sm font-semibold text-ink"><%= label %></span>
     <% else %>
       <button type="button" class="flex-1 truncate text-left text-sm font-semibold text-ink"
               aria-expanded="true" aria-controls="<%= body_id %>" data-action="click->admin--blocks#toggle">
@@ -36,6 +42,14 @@
             <%= tag.button "Move down", type: "button", disabled: last?, class: menu_item_class,
                   data: { move: "down", action: "click->admin--blocks#moveDown" } %>
           <% end %>
+          <%# Disabled as it is drawn, and enabled by `admin--blocks#refreshMoveState` while the
+              page has a section: sections come and go without this card being drawn again,
+              so only the screen can say. %>
+          <% if move_into? %>
+            <% menu.with_item do %>
+              <%= tag.button t(".move_into"), type: "button", disabled: true, class: menu_item_class, data: move_into %>
+            <% end %>
+          <% end %>
           <% menu.with_item do %>
             <%= button_to "Duplicate", duplicate_path, method: :post, class: menu_item_class %>
           <% end %>
@@ -47,6 +61,12 @@
           <% end %>
         <% end %>
       <% end %>
+    <% end %>
+
+    <%# Every panel can be closed, an unavailable block's too: `admin--section#close`,
+        like Escape and a second press on the tile. %>
+    <% if panel? %>
+      <%= render Admin::ButtonComponent.new(label: t(".close"), variant: :ghost, size: :small, data: { action: "admin--section#close" }) %>
     <% end %>
   </div>
 
@@ -131,13 +151,8 @@
     </div>
   <% end %>
 
-  <% if editable? %>
-    <%= render Admin::ConfirmDialogComponent.new(destructive: true, id: delete_dialog_id, title: "Delete this block?", body: "Blocks don’t go to the trash. This can’t be undone.") do |dialog| %>
-      <% dialog.with_confirm_action do %>
-        <%= form_with url: destroy_path, method: :delete do %>
-          <%= render Admin::ButtonComponent.new(label: "Delete block", variant: :danger, type: "submit") %>
-        <% end %>
-      <% end %>
-    <% end %>
+  <%# Not in a panel: see `delete_dialog`. %>
+  <% if delete_dialog? %>
+    <%= render delete_dialog %>
   <% end %>
-</div>
+<% end %>

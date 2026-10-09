@@ -32,14 +32,14 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "summary", visible: :all
   end
 
-  test "the menu lists Move up, Move down, Duplicate, a divider, then Delete block…, in that order" do
+  test "the menu lists Move up, Move down, Move into section…, Duplicate, a divider, then Delete block…, in that order" do
     page = create_page(title: "Menu test")
     block = page.content_blocks.create!(block_type: "rich_text", position: 0)
 
     render_card(block, page: page)
 
     items = Capybara.string(rendered_content).all(".admin-block-card > div:first-child [role=menu] [role=none]", visible: :all)
-    assert_equal [ "Move up", "Move down", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
+    assert_equal [ "Move up", "Move down", "Move into section…", "Duplicate", "", "Delete block…" ], items.map { |item| item.text(:all).strip }
     assert_selector "[role=menu] [role=separator]", visible: :all
     assert_selector "[role=menu] button.text-danger-ink", text: "Delete block…", visible: :all
     assert_selector "[role=menu] form[action$='/duplicate']", visible: :all
@@ -58,7 +58,47 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     assert_no_selector "button[data-move='up'][disabled]", visible: :all
 
     render_card(block, page: page)
-    assert_no_selector "button[data-move][disabled]", visible: :all
+    assert_no_selector "button[data-move='up'][disabled], button[data-move='down'][disabled]", visible: :all
+  end
+
+  # Sections spec §4.4. Disabled as rendered: whether the page has a section
+  # is the screen's to say (`admin--blocks#refreshMoveState`), since sections
+  # come and go without this card being drawn again.
+  test "Move into section… fills the Move dialog and then opens it, and starts disabled" do
+    page = create_page(title: "Into test")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page)
+
+    assert_selector "[role=menu] button[disabled][data-move='into'][data-action='click->admin--blocks#askWhere admin--dialog#open'][data-admin--dialog-id-param='move-block-dialog']",
+      text: "Move into section…", visible: :all
+  end
+
+  # A section never holds a section: on a translation tab a section is drawn
+  # by this component (`SectionCardComponent.draws?`), and is not offered it.
+  test "a section's own card is not offered Move into section…" do
+    page = create_page(title: "Section as a card")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+
+    render_card(section, page: page)
+
+    assert_selector "[role=menu] button[data-move='up']", visible: :all
+    assert_no_selector "button[data-move='into']", visible: :all
+  end
+
+  # The form of a block in a column is hidden until its tile is pressed, and
+  # a dialog inside a hidden element can't be shown: the dialog is the
+  # tile's (`Admin::EditorScreen::BlockTileComponent`), and a second one here
+  # would be a second element with its id.
+  test "a panel does not hold the block's delete dialog" do
+    page = create_page(title: "Panel dialog")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel form[data-controller~='admin--autosave']", visible: :all
+    assert_no_selector "dialog", visible: :all
   end
 
   test "the menu's Move buttons keep calling admin--blocks#moveUp and #moveDown" do
@@ -172,5 +212,79 @@ class Admin::BlockCardComponentTest < ViewComponent::TestCase
     second = page.content_blocks.create!(block_type: "post_list", position: 1)
 
     assert_not_equal Admin::BlockCardComponent.error_prefix(first), Admin::BlockCardComponent.error_prefix(second)
+  end
+
+  test "as a panel it is the block's own form with a heading naming its column, hidden, and no card chrome" do
+    page = create_page(title: "Panel")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel[hidden][data-admin--section-target='panel'][data-block-id='#{block.id}']", visible: :all
+    assert_selector "#block-#{block.id}-panel-title", text: "Image · column 2", visible: :all
+    assert_selector "form[action$='/content_blocks/#{block.id}'][data-controller~='admin--autosave']", visible: :all
+    assert_selector "#block-#{block.id}-save-status", visible: :all
+    assert_no_selector ".admin-block-card__handle", visible: :all
+    assert_no_selector "[data-admin--blocks-target='card']", visible: :all
+    assert_selector "button[data-action='admin--section#close']", visible: :all
+  end
+
+  test "as a list card it is exactly what it was" do
+    page = create_page(title: "List")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page)
+
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}[data-admin--blocks-target='card']"
+    assert_no_selector "[data-admin--section-target]"
+  end
+
+  # The panel has the block's `dom_id` nowhere: in a section that id is the
+  # tile's, and two elements with it would make a stream's target ambiguous.
+  test "a panel has no menu, no collapse button and not the block's dom id, and is a region named by its heading" do
+    page = create_page(title: "Panel chrome")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :panel)
+
+    assert_no_selector "##{ActionView::RecordIdentifier.dom_id(block)}", visible: :all
+    assert_no_selector "button[aria-label='Block actions']", visible: :all
+    assert_no_selector "[data-action$='admin--blocks#toggle']", visible: :all
+    assert_selector "#block-#{block.id}-panel[role='region'][aria-labelledby='block-#{block.id}-panel-title']", visible: :all
+  end
+
+  test "an unavailable block's panel says so and can still be closed" do
+    page = create_page(title: "Unavailable panel")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    block = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    block.update_column(:block_type, "gone/thing")
+
+    render_inline Admin::BlockCardComponent.new(page: page, block: block.reload, locale: "en", placement: :panel)
+
+    assert_selector "#block-#{block.id}-panel", text: "Unavailable type — gone/thing", visible: :all
+    assert_selector "button[data-action='admin--section#close']", visible: :all
+    assert_no_selector "form[data-controller~='admin--autosave']", visible: :all
+  end
+
+  test "as a group card it has the type's name and neither handle, menu nor targets" do
+    page = create_page(title: "Group")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    render_card(block, page: page, placement: :group)
+
+    assert_selector "##{ActionView::RecordIdentifier.dom_id(block)}", text: "Rich text"
+    assert_selector "form[data-controller~='admin--autosave']"
+    assert_no_selector ".admin-block-card__handle"
+    assert_no_selector "button[aria-label='Block actions']"
+    assert_no_selector "[data-admin--blocks-target], [data-admin--section-target]"
+  end
+
+  test "an unknown placement is refused" do
+    page = create_page(title: "Placement")
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_raises(ArgumentError) { Admin::BlockCardComponent.new(page: page, block: block, locale: "en", placement: :tile) }
   end
 end

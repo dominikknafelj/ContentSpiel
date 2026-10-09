@@ -11,6 +11,18 @@ export default class extends Controller {
     this.items.forEach((item) => item.setAttribute("role", "menuitem"))
   }
 
+  // A menu that leaves the document, or is moved in it, is closed. A pick
+  // normally closes its menu from the panel's own click listener (`select`),
+  // but an item may move the very element the menu is in -- a block card's or
+  // a section's "Move up" puts the card before its neighbour -- and Stimulus
+  // then unbinds this controller's listeners before the click has bubbled
+  // from the item to the panel. Nothing closed the menu: it came back
+  // connected and still open, over the card it had moved. Closing here needs
+  // no listener, and a menu Turbo keeps in a snapshot is a closed one too.
+  disconnect() {
+    this.close()
+  }
+
   get items() { return Array.from(this.panelTarget.querySelectorAll("a, button")) }
 
   // What keyboard navigation can land on: `.focus()` on a disabled button is a

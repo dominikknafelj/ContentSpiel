@@ -2,7 +2,9 @@ import { Controller } from "@hotwired/stimulus"
 import { drained, settled } from "autosave/queue"
 
 // On a form in an editor's header whose submission REPLACES THE PAGE (Publish,
-// Unpublish, Schedule, Remove schedule, Move to trash: each redirects).
+// Unpublish, Schedule, Remove schedule, Move to trash: each redirects), and on
+// the one block action whose answer REPLACES FORMS OF BLOCKS THAT STAY: a
+// section's "Remove section, keep blocks" (below).
 // Nothing that replaces the page starts until the page's write queue is empty
 // (`autosave/queue.js`, "THE RULE"): the submit is intercepted, the button
 // shows it is waiting, `drained()` sends every edit still held by any form --
@@ -28,10 +30,25 @@ import { drained, settled } from "autosave/queue"
 // request itself once more if something became outstanding between this
 // controller's drain and the request going out.
 //
+// "REMOVE SECTION, KEEP BLOCKS" (`Admin::EditorScreen::SectionCardComponent`)
+// is no visit: its form is inside the blocks section and its answer is a
+// Turbo Stream that puts a new card where each of the section's blocks had a
+// form. For the text in those forms that is the same as a redirect, so the
+// same rule holds, and it composes with `admin--blocks` like this: the
+// `submit` is taken here first and nothing of Turbo's has started; after a
+// clean drain the form is submitted for real, ONCE (`passing`); only then
+// does Turbo build the request, whose `turbo:before-fetch-request` bubbles
+// to `admin--blocks`, which takes its turn in the -- now empty -- queue and
+// adds the page base (`holdTurboRequest`), exactly as for an unheld delete.
+// After an unclean drain no request is ever built. `holdTurboRequest` alone
+// was not enough: it waits for the queue's slot, so the delete went ahead of
+// the follow-up of a save still on the wire, and it never asks whether a
+// form is clean.
+//
 // With nothing outstanding and every form clean the submit is not touched at
-// all. Only the five header forms carry this controller; other forms get the
-// queue's general treatment, without the refusal. A double click while
-// waiting is ignored.
+// all. Only those forms carry this controller; other forms get the queue's
+// general treatment, without the refusal. A double click while waiting is
+// ignored.
 export default class extends Controller {
   static MESSAGE = "Your last change wasn't saved, so this didn't run. Fix it or reload, then try again."
 

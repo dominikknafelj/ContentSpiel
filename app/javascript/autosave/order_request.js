@@ -1,4 +1,4 @@
-// The request behind a drag: a block reorder (`admin--blocks#reorder`) and a
+// The request behind a drag: a block move (`admin--blocks#move`) and a
 // page tree move (`admin--tree#save`). Both are hand-built `fetch`es -- a drop
 // is no form submission, so Turbo Drive sends nothing -- that ask for a Turbo
 // Stream and render it themselves. This module is the part the two share:
@@ -70,13 +70,41 @@ export async function sendOrder(url, { headers, body }) {
 // `id` makes it one toast per cause: dropping again while still offline
 // replaces the toast instead of stacking three of the same sentence.
 export function orderErrorToast(outcome, id) {
+  errorToast(messages(document.body).t(ORDER_MESSAGES[outcome] || ORDER_MESSAGES.failed), id)
+}
+
+// The same toast with a caller's own sentence, for a drop that was never
+// sent at all (`admin--blocks#move`, a block whose form holds an edit that
+// was not saved): one copy of the cloning.
+export function errorToast(text, id) {
   const template = document.getElementById("toast-error-template")
   const region = document.getElementById("toasts")
   const toast = template?.content.firstElementChild?.cloneNode(true)
   if (!toast || !region) return
 
   toast.id = id
-  toast.querySelector("span").textContent = messages(document.body).t(ORDER_MESSAGES[outcome] || ORDER_MESSAGES.failed)
+  toast.querySelector("span").textContent = text
   document.getElementById(id)?.remove()
   region.append(toast)
+}
+
+// Resolves once the streams of an answer the caller has JUST handed to
+// `Turbo.renderStreamMessage` are in the page. Turbo appends the answer's
+// `<turbo-stream>` elements at once but performs each one's action after the
+// next repaint (`StreamElement#render`, turbo-rails 2.0.23; a timer instead
+// when the tab is hidden), so this waits for that repaint and the task after
+// it -- the end of `streamRenders().applied` in `autosave/queue_core.js`,
+// which has to recognise an answer Turbo renders; here the caller rendered
+// it, a line earlier, and Turbo's frame callback is ahead of this one.
+//
+// For a caller inside its `enqueue` task whose answer changes what the next
+// task reads from the page (ledger b6, for a drop): a block moved between
+// containers is redrawn by its answer, and a refused move's answer redraws
+// the list.
+export function streamsApplied() {
+  return new Promise((resolve) => {
+    const afterTask = () => setTimeout(resolve, 0)
+    if (document.visibilityState === "hidden") setTimeout(afterTask, 0)
+    else requestAnimationFrame(afterTask)
+  })
 }

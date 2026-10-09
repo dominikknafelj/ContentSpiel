@@ -730,6 +730,42 @@ class TrashVisibilityTest < ActionDispatch::IntegrationTest
     assert_equal "Gone post", @gone_post.reload.title
   end
 
+  test "a page with a filled section is trashed, restored and purged with its blocks" do
+    page = create_page(title: "Banded")
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: create_media_asset)
+    Media::UsageIndex.refresh(inside)
+
+    assert Trash::Move.call(page, actor: nil).ok?
+    assert Trash::Restore.call(page.reload, actor: nil).ok?
+    assert_equal [ section.id, 2 ], inside.reload.then { |block| [ block.section_id, block.section_column ] }
+
+    assert Trash::Move.call(page.reload, actor: nil).ok?
+    assert Trash::Purge.call(page.reload, actor: nil).ok?
+    assert_empty ContentBlock.where(id: [ section.id, inside.id ])
+    assert_empty Media::Usage.where(owner_type: "ContentBlock", owner_id: inside.id)
+  end
+
+  # A library image a kept page shows can't be moved to the trash at all
+  # (`Trash::Move`), so the public page never has a trashed image to hide:
+  # the refusal is what is pinned, for a block in a column as for one at the
+  # top level.
+  test "an image a block in a column shows can't be trashed, and the section keeps drawing it" do
+    page = create_page(title: "Banded")
+    asset = create_media_asset
+    section = page.content_blocks.create!(block_type: "section", position: 0)
+    inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 2, position: 0, media_asset: asset)
+    Media::UsageIndex.refresh(inside)
+
+    result = Trash::Move.call(asset, actor: nil)
+
+    assert_not result.ok?
+    assert_equal [ "This image is used on the page “Banded”" ], result.errors
+    assert_nil asset.reload.trashed_at
+    get "/banded"
+    assert_select "section.content-section .content-section__column:nth-child(2) img", 1
+  end
+
   private
 
   def call_tool(raw_token, name, arguments = {})

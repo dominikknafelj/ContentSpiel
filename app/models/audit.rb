@@ -33,7 +33,17 @@ module Audit
   # `filter_parameters` match. `metadata` is left alone: it's written by
   # the recording code itself, and `session.failed` carries the tried
   # email in it by design.
-  def self.record(action, subject: nil, field_changes: {}, snapshot: nil, metadata: {})
+  #
+  # `coalesce: false` makes an event of a coalescible action a row of its
+  # own. A coalesced extension writes `field_changes`, `snapshot`,
+  # `last_occurred_at` and `occurrences` and nothing else -- the log is
+  # append-only outside those four columns, in the model and in Postgres --
+  # so `metadata` given to an event that extends an open row is dropped. An
+  # event whose point IS its metadata (a section's fold and the ids of the
+  # blocks it moved, `ContentBlocks::Save`) therefore must not extend one.
+  # It can still be extended by a later event, which leaves its metadata as
+  # written. It never makes a non-coalescible action coalesce.
+  def self.record(action, subject: nil, field_changes: {}, snapshot: nil, metadata: {}, coalesce: true)
     action = action.to_s
     now = Time.current
     actor = Current.actor
@@ -58,7 +68,7 @@ module Audit
     }
 
     event = Event.transaction do
-      Coalescer.extend_existing(attributes, now:) || Event.create!(attributes.merge(occurred_at: now, last_occurred_at: now))
+      (coalesce && Coalescer.extend_existing(attributes, now:)) || Event.create!(attributes.merge(occurred_at: now, last_occurred_at: now))
     end
 
     # Runs immediately when there's no enclosing transaction, otherwise

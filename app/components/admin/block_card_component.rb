@@ -25,7 +25,8 @@ module Admin
   #
   # The header (design pass round 2): drag handle, the type name -- a button
   # that collapses the body (`aria-expanded`) -- and a "⋯" `Admin::MenuComponent`
-  # (Move up, Move down, Duplicate, a divider, "Delete block…"). `first:` and
+  # (Move up, Move down, "Move into section…", Duplicate, a divider, "Delete
+  # block…"). `first:` and
   # `last:` only decide whether Move up / Move down start disabled; the page
   # view and the controller's list re-render work them out, and `admin
   # --blocks#refreshMoveState` keeps them right in the browser after every
@@ -42,14 +43,84 @@ module Admin
   # hands it to every card; left nil, the card asks itself. A view-only
   # card has no drag handle, no "⋯" menu (Duplicate, Move, Delete) and its
   # form is disabled without `admin--autosave`.
+  #
+  # `placement:` is where the card is drawn (sections spec §4.3, D4):
+  # - `:list`, the default, is everything above: a card of the page's block
+  #   list;
+  # - `:panel` is the same form for a block that sits in a section's column,
+  #   drawn under the section's lanes and shown by pressing the block's tile
+  #   (`Admin::EditorScreen::SectionCardComponent`, `admin--section`). It is
+  #   this component and not a second form component on purpose: the form,
+  #   its ids, its `base_updated_at`, its status line and its error slots are
+  #   what `Admin::ContentBlocksController#update` answers into, and a block
+  #   moved between the list and a column must be answered the same way. What
+  #   differs is the frame around the form. The wrapper has its own id
+  #   (`panel_id`, because `dom_id(block)` is the TILE's in a section) and is
+  #   rendered `hidden`: every panel of a section is in the page from the
+  #   start and `admin--section` only shows one, so a form is never fetched
+  #   or removed and keeps its place in the write queue (see that script). It
+  #   is no `card` of `admin--blocks` -- the section is the card -- and has no
+  #   handle, no "⋯" menu and no delete dialog: a block in a column is moved,
+  #   copied and deleted from its tile, which holds the dialog. Its
+  #   header is a heading that says which column the form belongs to, and
+  #   Close. `open: true` is for the panel of a block just added to a column
+  #   (spec §4.3: it opens at once). The panel is still rendered `hidden`,
+  #   with `data-open` beside it: showing a form is `admin--section`'s alone
+  #   -- it closes the one that was open first, sending what that one holds
+  #   -- so the server only asks, and the script takes the mark off as it
+  #   opens. A panel shown by the markup would be a second open form;
+  # - `:group` is a plain card with neither handle nor menu, for a block
+  #   listed under a section's heading in the translation view (spec §4.5,
+  #   `Admin::EditorScreen::SectionGroupComponent`). It has the block's
+  #   `dom_id`, as there is no tile on that tab, and its form is the same
+  #   autosave form with the same ids. Nothing in it opens a delete dialog,
+  #   so it carries none -- except for a block whose type is gone, whose one
+  #   action is "Delete block…" wherever it is drawn (spec §6) and which has
+  #   no tile here to hold the dialog for it.
   class BlockCardComponent < AdminComponent
+    PLACEMENTS = %i[list panel group].freeze
+
     # `"block-<id>"` is public so `Admin::ContentBlocksController` can
     # recompute the exact same ids from a plain controller method (the
     # save status and error slots its autosave stream targets) without a
     # second, hand-kept copy of this string drifting out of sync with it.
     def self.error_prefix(block) = "block-#{block.id}"
 
-    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil)
+    # The panel's ids are public for the same reason: the block's tile names
+    # the panel it opens (`aria-controls`), and a later stream targets it.
+    def self.panel_id(block) = "#{error_prefix(block)}-panel"
+
+    def self.panel_title_id(block) = "#{error_prefix(block)}-panel-title"
+
+    # The ids of a block's autosave form, and the wiring of the form itself,
+    # are the class's for the same reason again: a section's settings are a
+    # form in its card's header (`Admin::EditorScreen::SectionCardComponent`),
+    # not a block card, and `Admin::ContentBlocksController#update` answers a
+    # section's save into the same three ids it answers a card's into.
+    def self.status_id(block) = "#{error_prefix(block)}-save-status"
+
+    def self.base_updated_at_id(block) = "#{error_prefix(block)}-base-updated-at"
+
+    def self.autosave_form_data(block)
+      {
+        controller: "admin--autosave",
+        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
+        "admin--autosave-status-id-value": status_id(block),
+        "admin--autosave-page-base-id-value": "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
+      }
+    end
+
+    # A menu item's look in every menu of the block list -- a card's "⋯", a
+    # section's, a lane's "+" (`Admin::BlockPickerComponent::MENU_ITEM_CLASS`
+    # is this constant): the panel already styles its buttons (width,
+    # padding, hover); a disabled one dims and drops the hover fill.
+    MENU_ITEM_CLASS = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent".freeze
+
+    def initialize(page:, block:, locale:, url_options: {}, first: false, last: false, editable: nil, placement: :list, open: false)
+      raise ArgumentError, "unknown block card placement #{placement.inspect}" unless PLACEMENTS.include?(placement)
+
+      @placement = placement
+      @open = open
       @editable = editable
       @page = page
       @block = block
@@ -60,6 +131,29 @@ module Admin
     end
 
     def dom_id = ActionView::RecordIdentifier.dom_id(block)
+
+    def panel? = @placement == :panel
+
+    def list? = @placement == :list
+
+    def wrapper_id = panel? ? self.class.panel_id(block) : dom_id
+
+    # What `admin--blocks` and `admin--section` find the wrapper by. Only a
+    # card of the list is a `card` (dragged, moved, counted for Move up and
+    # Move down); only a panel is hidden, and it is its section's to show.
+    def wrapper_attributes
+      return { hidden: true, **panel_name, data: { block_id: block.id, "admin--section-target": "panel", **(@open ? { open: true } : {}) } } if panel?
+
+      { data: { block_id: block.id, **(list? ? { "admin--blocks-target": "card" } : {}) } }
+    end
+
+    # The panel is the region its tile's `aria-controls` points at, named by
+    # its own heading -- which an unavailable block's panel doesn't have.
+    def panel_name = unavailable? ? {} : { role: "region", aria: { labelledby: self.class.panel_title_id(block) } }
+
+    # "Image · column 2" (spec §4.3), drawn by the component a stream
+    # redraws it with when the block's column changes under the open form.
+    def panel_title = Admin::EditorScreen::PanelTitleComponent.new(block: block)
 
     def definition = block.definition
 
@@ -75,22 +169,13 @@ module Admin
 
     def editable? = @editable.nil? ? (@editable = can_edit?(page)) : @editable
 
-    def form_data
-      return {} unless editable?
-
-      {
-        controller: "admin--autosave",
-        action: "input->admin--autosave#queue change->admin--autosave#queue focusout->admin--autosave#saveNow",
-        "admin--autosave-status-id-value": status_id,
-        "admin--autosave-page-base-id-value": "#{Admin::PageSettingsFormComponent::ID_PREFIX}-base-updated-at"
-      }
-    end
+    def form_data = editable? ? self.class.autosave_form_data(block) : {}
 
     def error_prefix = self.class.error_prefix(block)
 
-    def status_id = "#{error_prefix}-save-status"
+    def status_id = self.class.status_id(block)
 
-    def base_updated_at_id = "#{error_prefix}-base-updated-at"
+    def base_updated_at_id = self.class.base_updated_at_id(block)
 
     def base_updated_at_value = block.updated_at.iso8601(6)
 
@@ -98,15 +183,28 @@ module Admin
 
     def duplicate_path = helpers.duplicate_admin_page_content_block_path(page, block, **url_options)
 
-    def destroy_path = helpers.admin_page_content_block_path(page, block, **url_options)
+    # The block's "Delete this block?" (`DeleteBlockDialogComponent`): drawn
+    # in the card -- and for a block in a column in its TILE, never in its
+    # panel, which is hidden while its form is closed (`delete_dialog?`).
+    def delete_dialog = Admin::EditorScreen::DeleteBlockDialogComponent.new(page: page, block: block, url_options: url_options)
 
-    def delete_dialog_id = "delete-block-#{block.id}"
+    def delete_dialog_id = Admin::EditorScreen::DeleteBlockDialogComponent.dialog_id(block)
+
+    # A card of the list always has it (its menu opens it). A group card only
+    # when the block is unavailable: the header's "Delete block…" is then the
+    # one thing that opens it.
+    def delete_dialog? = editable? && (list? || (!panel? && unavailable?))
+
+    # "Move into section…" (sections spec §4.4): for a card of the page's own
+    # list that is no container -- a section never holds a section. See the
+    # template for why it starts disabled.
+    def move_into? = list? && !block.container?
+
+    def move_into = Admin::EditorScreen::MoveDialogComponent.trigger("into")
 
     def body_id = "#{error_prefix}-body"
 
-    # The "⋯" menu's items: the panel already styles its buttons (width,
-    # padding, hover); a disabled one dims and drops the hover fill.
-    def menu_item_class = "text-sm text-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+    def menu_item_class = MENU_ITEM_CLASS
 
     # The row-shaped settings of a post list (handoff B22): its three
     # settings side by side, in this order, whatever order the type declared

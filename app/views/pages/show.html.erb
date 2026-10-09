@@ -55,17 +55,14 @@
     `block.definition` is nil -- renders nothing rather than 500ing the public
     site (global constraints): a removed plugin's type must degrade
     gracefully for whoever already has it on a page, not take the whole
-    request down. %>
-<% @page.content_blocks.each do |block| %>
-  <% if @post && block == @post_list_block %>
-    <% definition = @post.definition %>
-    <%= render Theme.current.component_for(definition, :detail_component).new(post: @post) if definition %>
-  <% elsif (definition = block.definition) %>
-    <%= render Theme.current.component_for(definition).new(block: block, page: @page) %>
-  <% else %>
-    <% Rails.logger.warn("Skipping block #{block.id}: unregistered block type #{block.block_type.inspect}") %>
-  <% end %>
-<% end %>
+    request down.
+
+    The dispatch itself is `ThemeHelper#render_block`. Only the top-level
+    blocks are walked here: a section renders the blocks in it through the
+    same helper (`Blocks::SectionComponent`), so each block is drawn once.
+    The outline is the page's one (`ThemeHelper#block_outline`), which the
+    sections ask too. %>
+<% block_outline(@page).top_level.each do |block| %><%= render_block(block) %><% end %>
 <%# The tree is otherwise reachable only by typing an exact URL -- this is what
     makes clicking from a page down into its children possible at all.
     Published only, matching every other public listing on this site, and

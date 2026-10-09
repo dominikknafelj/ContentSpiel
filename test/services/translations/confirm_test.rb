@@ -208,4 +208,44 @@ class Translations::ConfirmTest < ActiveSupport::TestCase
     assert_equal "settings.manage", denied_permission
     assert_equal :outdated, site.reload.translation_state("title", "de")
   end
+
+  # -- the order of locks --
+
+  # A block's confirm writes the block's row and then the page's
+  # `translation_states` rows (`StateIndex.refresh` upserts them, changed or
+  # not). `ContentBlocks::Destroy` and `Duplicate` go the other way round
+  # under the page's lock: the state rows, then other blocks' rows (the
+  # renumbering of the siblings, the reorder that places a copy). A translator
+  # confirming a field of block B while another tab removed or copied a
+  # section on the same page would each hold what the other waits for, and
+  # Postgres ends one with `ActiveRecord::Deadlocked`. So a block's confirm
+  # takes the page's row first, as every other writer of a page's blocks
+  # does. Statement order only, as in `ContentBlocks::SaveTest`: no
+  # two-connection test.
+  test "confirming a block's field locks the page's row first, before the block's row and the page's state rows" do
+    block = outdated_block
+
+    statements = capture_sql { assert confirm(block, "body").ok? }
+
+    lock = statements.index { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    write = statements.index { |sql| sql.start_with?('UPDATE "content_blocks"') }
+    states = statements.index { |sql| sql.start_with?('INSERT INTO "translation_states"') }
+    assert lock, "no lock on the page's row:\n#{statements.join("\n")}"
+    assert_operator lock, :<, write
+    assert_operator write, :<, states
+    assert_equal 1, statements.count { |sql| sql.match?(/FROM "pages".*FOR UPDATE/m) }
+    first_in_transaction = statements.index { |sql| sql.match?(/SAVEPOINT|BEGIN/) } + 1
+    assert_equal first_in_transaction, lock, "the lock is the transaction's first statement"
+  end
+
+  # Their own row is the first they write, and nothing writes it after rows
+  # it shares: no lock is added where there is no second order to close.
+  test "confirming a page's own field, a post's or an image's takes no extra lock" do
+    [ [ outdated_page, "title" ], [ outdated_post, "title" ], [ outdated_asset, "alt" ] ].each do |record, field|
+      statements = capture_sql { assert confirm(record, field).ok? }
+
+      assert_empty statements.grep(/FOR UPDATE/), "#{record.class.name}: #{statements.grep(/FOR UPDATE/).join("\n")}"
+      assert_equal 1, statements.count { |sql| sql.start_with?(%(UPDATE "#{record.class.table_name}")) }
+    end
+  end
 end

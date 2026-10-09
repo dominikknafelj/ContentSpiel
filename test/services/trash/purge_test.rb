@@ -36,6 +36,27 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert Audit::Event.where(action: "page.purged", subject_id: parent.id).exists?
   end
 
+  # The order of locks for a page's blocks is the page's row, then block
+  # rows (`ContentBlocks::Save#call`). A page's destroy deletes its blocks
+  # and then its own row, so without a lock taken first it would hold a
+  # block and wait for the page while a block save holds the page and waits
+  # for the block. Every page of the branch is locked in one statement, in
+  # id order, before anything of it is deleted.
+  test "the branch's pages are locked, in id order, before the first block is deleted" do
+    parent = create_page(title: "Section")
+    child = create_page(title: "Child", parent: parent)
+    [ parent, child ].each { |page| ContentBlock.create!(owner: page, block_type: "rich_text", position: 0) }
+    assert Trash::Move.call(parent).ok?
+
+    statements = capture_sql { assert Trash::Purge.call(parent.reload).ok? }
+
+    locks = statements.each_index.select { |index| statements[index].match?(/FROM "pages".*FOR UPDATE/m) }
+    assert_equal 1, locks.size
+    assert_match(/ORDER BY "pages"."id" ASC/, statements[locks.first])
+    assert_operator locks.first, :<, statements.index { |sql| sql.start_with?('DELETE FROM "content_blocks"') }
+    assert_operator locks.first, :<, statements.index { |sql| sql.start_with?('DELETE FROM "pages"') }
+  end
+
   # Carried over from `Pages::Destroy`: the page's own hero row goes too,
   # not only its blocks'.
   test "a page's own hero usage goes with it" do

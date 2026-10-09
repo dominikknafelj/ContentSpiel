@@ -26,7 +26,7 @@ class ContentBlockTest < ActiveSupport::TestCase
   end
 
   test "block_type is a string checked against the BlockTypes registry" do
-    assert_equal %w[rich_text image post_list], BlockTypes.names
+    assert_equal %w[rich_text image post_list section], BlockTypes.names
   end
 
   test "a block belongs to an owner" do
@@ -285,5 +285,93 @@ class ContentBlockTest < ActiveSupport::TestCase
     assert_includes block.errors.full_messages, "Limit must be greater than or equal to 1"
     assert_equal "Limit", ContentBlock.human_attribute_name("settings.limit")
     assert_equal "Block type", ContentBlock.human_attribute_name("block_type")
+  end
+
+  def section_on(page, layout: "two", position: 0)
+    page.content_blocks.create!(block_type: "section", position: position, settings: { "layout" => layout })
+  end
+
+  test "a section's settings default to two columns, no background, content width" do
+    section = section_on(create_page(title: "Defaults"), layout: nil)
+
+    assert_equal %w[two none content], section.settings_object.then { |s| [ s.layout, s.background, s.width ] }
+    assert_predicate section, :container?
+    assert_equal 2, section.column_count
+  end
+
+  test "column_count follows the layout, and is 0 for a block that holds nothing" do
+    page = create_page(title: "Counts")
+    counts = %w[one two three four one_two two_one].map { |layout| section_on(page, layout: layout).column_count }
+
+    assert_equal [ 1, 2, 3, 4, 2, 2 ], counts
+    assert_equal 0, page.content_blocks.create!(block_type: "rich_text", position: 9).column_count
+  end
+
+  test "a block in a section needs a column of that section's layout" do
+    page = create_page(title: "Columns")
+    section = section_on(page, layout: "two")
+
+    assert page.content_blocks.build(block_type: "rich_text", section: section, section_column: 2).valid?
+    assert_not page.content_blocks.build(block_type: "rich_text", section: section, section_column: 3).valid?
+    assert_not page.content_blocks.build(block_type: "rich_text", section: section, section_column: nil).valid?
+    assert_not page.content_blocks.build(block_type: "rich_text", section_column: 1).valid?
+  end
+
+  test "a section never sits in a section" do
+    page = create_page(title: "Nesting")
+    outer = section_on(page)
+    inner = page.content_blocks.build(block_type: "section", section: outer, section_column: 1)
+
+    assert_not inner.valid?
+    assert_includes inner.errors[:section], "can't hold another section"
+  end
+
+  test "a block's section is a section of the same page" do
+    page = create_page(title: "Here")
+    elsewhere = section_on(create_page(title: "There"))
+    text = page.content_blocks.create!(block_type: "rich_text", position: 0)
+
+    assert_not page.content_blocks.build(block_type: "rich_text", section: elsewhere, section_column: 1).valid?
+    assert_not page.content_blocks.build(block_type: "rich_text", section: text, section_column: 1).valid?
+  end
+
+  test "the database keeps section and column together and refuses to delete a section that holds a block" do
+    page = create_page(title: "Database")
+    section = section_on(page)
+    inside = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    assert_raises(ActiveRecord::StatementInvalid) { ContentBlock.transaction(requires_new: true) { inside.update_columns(section_column: nil) } }
+    assert_raises(ActiveRecord::InvalidForeignKey) { ContentBlock.transaction(requires_new: true) { section.destroy } }
+  end
+
+  test "a block in a section whose type is gone still saves" do
+    page = create_page(title: "Dormant")
+    section = section_on(page)
+    inside = page.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+    section.update_columns(block_type: "gone/section")
+
+    assert inside.reload.update(caption: "Still editable")
+  end
+
+  test "top_level and in_column narrow a page's blocks" do
+    page = create_page(title: "Scopes")
+    text = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    section = section_on(page, position: 1)
+    first = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+    second = page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 0)
+
+    assert_equal [ text, section ], page.content_blocks.top_level.to_a
+    assert_equal [ second ], page.content_blocks.in_column(section, 2).to_a
+    assert_equal [ first, second ], section.section_blocks.to_a
+  end
+
+  test "destroying a page destroys the blocks in its sections first" do
+    page = create_page(title: "Doomed")
+    section = section_on(page)
+    page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 1, position: 0)
+
+    assert_difference -> { ContentBlock.count }, -2 do
+      page.reload.destroy!
+    end
   end
 end

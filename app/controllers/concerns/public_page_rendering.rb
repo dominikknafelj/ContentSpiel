@@ -36,17 +36,40 @@ module PublicPageRendering
   # is no page to render the post inside, so it's "not found" rather than a
   # NoMethodError on a nil page.
   #
-  # Loads no more than deciding that takes: the images a rendered page reads
-  # are `preload_page_images`, which each controller calls once it knows it
-  # will render (`PagesController` only after `stale?`, so a 304 never pays
-  # for them).
+  # WHICH LISTING THE POST STANDS IN FOR, on a page with more than one that
+  # lists it: the first in READING ORDER (`BlockOutline#reading_order`: the
+  # top level by position, each section followed by its blocks column by
+  # column). Not the first by `position`, which is what the association's
+  # own order gives: a position is counted per container, so a listing at
+  # position 5 of a column in the page's first section is read before a
+  # top-level listing at position 1, and a top-level listing and one in a
+  # column can share a position, where the database may return either
+  # first -- the detail then moved between two places from one request to
+  # the next.
+  #
+  # The outline built for that is THE PAGE'S ONE for this render: it is
+  # handed to the view in `@block_outlines`, the very variable
+  # `ThemeHelper#block_outline` memoises in, so the view draws from this
+  # outline and builds no second one (an outline sorts and groups every
+  # block of the page). A controller's instance variables are copied to its
+  # view; the helper is not called from here, because a controller does not
+  # run view helpers, and the variable is the hand-over both sides name.
+  #
+  # Loads no more than deciding that takes: the page's blocks, in the one
+  # query the render would make for them anyway (it used to be a query for
+  # the listing blocks alone here, and the render's own for all of them
+  # afterwards). The images a rendered page reads are `preload_page_images`,
+  # which each controller calls once it knows it will render
+  # (`PagesController` only after `stale?`, so a 304 never pays for them).
   def assign_record(record)
     if record.is_a?(Post)
       @page = PublicSite::Paths.canonical_page(record)
       return false if @page.nil?
 
       @post = record
-      @post_list_block = @page.content_blocks.listing.find { |block| block.lists?(record) }
+      outline = BlockOutline.new(@page.content_blocks)
+      @block_outlines = { @page => outline }
+      @post_list_block = outline.reading_order.find { |block| block.lists?(record) }
     else
       @page = record
     end

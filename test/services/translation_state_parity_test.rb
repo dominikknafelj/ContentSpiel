@@ -107,6 +107,89 @@ class TranslationStateParityTest < ActiveSupport::TestCase
     end
   end
 
+  # A block in a section's column counts towards its page's state like any
+  # other (sections spec §7): the section itself has nothing to translate.
+  # A rich-text body is optional, so what a block can do to its page is make
+  # a language outdated: a German body whose English original then changed.
+  test "a block in a section's column rolls up into its page like a block outside one, lifted or deleted with its section" do
+    with_locales(%w[en de], default: "en")
+    state = ->(page) { Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale, :state).to_h }
+    outdated_block = lambda do |page, **placement|
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", **placement },
+        translations: { "en" => { body: rich_doc("Text") } }).record
+      assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Text DE") } }).ok?
+      assert ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("Text changed") } }).ok?
+      block
+    end
+    new_section = ->(page) { ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" }).record }
+
+    as_owner do
+      plain = create_page(title: "Plain", translations: { "de" => { title: "Einfach" } })
+      outdated_block.call(plain)
+      assert_equal({ "de" => "outdated" }, state.call(plain))
+
+      page = create_page(title: "Columns", translations: { "de" => { title: "Spalten" } })
+      section = new_section.call(page)
+      assert_equal({ "de" => "complete" }, state.call(page))
+
+      block = outdated_block.call(page, section_id: section.id, section_column: 2)
+      assert_equal section.id, block.section_id
+      assert_equal state.call(plain), state.call(page)
+      assert_parity page, plain
+
+      assert ContentBlocks::Destroy.call(section, keep_blocks: true).ok?
+      assert_nil block.reload.section_id
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      assert_parity page
+
+      # The lifted block goes, a second one in a new section keeps the state;
+      # only deleting that section with its block clears it.
+      section = new_section.call(page)
+      outdated_block.call(page, section_id: section.id, section_column: 1)
+      assert ContentBlocks::Destroy.call(block).ok?
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      assert_parity page
+
+      assert ContentBlocks::Destroy.call(section).ok?
+      assert_equal({ "de" => "complete" }, state.call(page))
+      assert_parity page
+    end
+  end
+
+  # A duplicate writes blocks with every locale's text (`ContentBlocks::
+  # Duplicate`, through `ContentBlocks::Save`), and a move changes nothing a
+  # state is computed from: the page's rows agree with a fresh computation
+  # after each, for a block, for a section with its blocks, and when the
+  # source is outdated.
+  test "duplicating a block or a section, and moving a block between containers, keep the page's state in step" do
+    with_locales(%w[en de], default: "en")
+    state = ->(page) { Translations::State.where(record_type: "Page", record_id: page.id).pluck(:locale, :state).to_h }
+
+    as_owner do
+      page = create_page(title: "Copies", translations: { "de" => { title: "Kopien" } })
+      section = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "section" }).record
+      block = ContentBlocks::Save.call(ContentBlock.new(owner: page), attributes: { block_type: "rich_text", section_id: section.id, section_column: 1 },
+        translations: { "en" => { body: rich_doc("Text") } }).record
+      assert ContentBlocks::Save.call(block, translations: { "de" => { body: rich_doc("Text DE") } }).ok?
+
+      assert ContentBlocks::Duplicate.call(block).ok?
+      assert_parity page
+      assert ContentBlocks::Duplicate.call(section.reload).ok?
+      assert_parity page
+
+      assert ContentBlocks::Save.call(block, translations: { "en" => { body: rich_doc("Text changed") } }).ok?
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      copy = ContentBlocks::Duplicate.call(block.reload).record
+      assert_parity page
+
+      assert ContentBlocks::Reorder.call(page, [ *page.content_blocks.top_level.reorder(:position).ids, copy.id ],
+        moved_from: { copy.id => { section_id: section.id, column: 1 } }).ok?
+      assert_nil copy.reload.section_id
+      assert_equal({ "de" => "outdated" }, state.call(page))
+      assert_parity page
+    end
+  end
+
   test "purging a post removes its rows" do
     as_owner do
       post = create_post(title: "Hello")

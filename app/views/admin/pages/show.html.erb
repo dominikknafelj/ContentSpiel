@@ -41,8 +41,18 @@
     `Admin::ContentBlocksController#render_gone`/`#picker_error_stream`. %>
 <div id="content-blocks-alert"></div>
 
+<%# `data-messages`: the two sentences `admin--blocks` says itself (a block not
+    moved because its form holds an unsaved edit; a refused move whose list was
+    not redrawn over unsaved text), the two choices it writes into the Move
+    dialog and what it announces after a move made from a menu. Here and not on
+    <body>: only this screen's script asks for them. %>
 <section class="admin-content-blocks mt-6" data-controller="admin--blocks"
-     data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>">
+     data-admin--blocks-reorder-url-value="<%= reorder_admin_page_content_blocks_path(@page, **admin_url_options) %>"
+     data-messages="<%= messages_data("components.editor_screen.section_card.unsaved_move", "components.editor_screen.section_card.reload_later",
+                                      "components.editor_screen.move_dialog.column", "components.editor_screen.move_dialog.section_column",
+                                      "components.editor_screen.block_moves.up", "components.editor_screen.block_moves.down",
+                                      "components.editor_screen.block_moves.column", "components.editor_screen.block_moves.into",
+                                      "components.editor_screen.block_moves.out", "components.editor_screen.block_moves.back") %>">
   <div class="mb-3 flex items-center justify-between">
     <h2 class="text-h2 text-ink">Blocks</h2>
     <%= render Admin::SaveStatusComponent.new(id: "content-blocks-status", state: :idle) %>
@@ -57,13 +67,30 @@
   <p id="block-drag-help" class="sr-only">Press Space to pick up, arrow keys to move, Space to drop, Escape to cancel.</p>
   <p data-admin--blocks-target="announcer" aria-live="assertive" class="sr-only"></p>
   <div id="content-blocks-list" data-admin--blocks-target="list" class="flex flex-col gap-3">
-    <% blocks = @page.content_blocks.to_a %>
+    <%# The page's own list is its top-level blocks (sections spec §3.1); a
+        block in a section's column is not a card of this list but a tile of
+        its section's card, which draws it and its form (spec §4.1-§4.3) -- or,
+        on a translation tab, a card in its section's group (spec §4.5):
+        `SectionCardComponent.for` picks. A section is whatever holds blocks
+        (`draws?`), so one whose type is gone still shows them (spec §6). The
+        outline is built once, from the blocks the controller preloaded, and
+        handed to every section. `Admin::ContentBlocksController#card_for`
+        draws the same card for a stream. %>
+    <% outline = BlockOutline.new(@page.content_blocks) %>
+    <% blocks = outline.top_level %>
     <% blocks.each_with_index do |block, index| %>
-      <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <% if Admin::EditorScreen::SectionCardComponent.draws?(block, outline: outline) %>
+        <%= render Admin::EditorScreen::SectionCardComponent.for(page: @page, section: block, outline: outline, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <% else %>
+        <%= render Admin::BlockCardComponent.new(page: @page, block: block, locale: admin_locale, url_options: admin_url_options, first: index.zero?, last: index == blocks.size - 1, editable: blocks_editable) %>
+      <% end %>
     <% end %>
   </div>
 
   <% if blocks_editable %>
     <%= render Admin::BlockPickerComponent.new(page: @page, locale: admin_locale, url_options: admin_url_options) %>
+    <%# "Move to column…" and "Move into section…" (sections spec §4.4): one dialog for the
+        page, inside this section because `admin--blocks` fills and reads it. %>
+    <%= render Admin::EditorScreen::MoveDialogComponent.new %>
   <% end %>
 </section>

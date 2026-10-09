@@ -97,4 +97,58 @@ class Admin::ViewOnlySystemTest < ApplicationSystemTestCase
     assert_selector ".admin-view-only"
     assert find_field("Title", disabled: true).disabled?
   end
+
+  # Sections spec §1: view only stays view only inside a section too. A tile
+  # can still be opened -- reading a block's fields changes nothing -- and
+  # the form it shows is the disabled one, with no autosave.
+  test "a read-only user sees a section's tiles and can open a form, with nothing to change and nothing sent" do
+    page_record = create_page(title: "Banded, hands off")
+    section = page_record.content_blocks.create!(block_type: "section", position: 0)
+    block = page_record.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_admin_controllers
+
+    assert_selector ".admin-block-tile", count: 1
+    assert_no_selector ".admin-block-tile__grip"
+    assert_no_selector "[id^='block-picker-#{section.id}-']"
+    assert_no_selector ".admin-section-card button[aria-label='Section actions']"
+    assert_no_selector ".admin-section-card button[aria-label='Block actions']"
+    assert_no_selector ".admin-section-card dialog", visible: :all
+    find("##{ActionView::RecordIdentifier.dom_id(block)} .admin-block-tile__face").click
+    assert_selector "#block-#{block.id}-panel fieldset[disabled]"
+    assert_no_selector "#block-#{block.id}-panel form[data-controller~='admin--autosave']"
+    assert_no_selector "[data-controller~='admin--autosave']", visible: :all
+  end
+
+  test "a read-only user's translation tab lists a section's blocks disabled, with nothing that writes" do
+    with_locales(%w[en de], default: "en") do
+      page_record = create_page(title: "Banded, hands off")
+      section = page_record.content_blocks.create!(block_type: "section", position: 0)
+      block = page_record.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0, caption: "Original caption")
+      visit "/cs-studio/pages/#{page_record.id}?locale=de"
+      await_admin_controllers
+
+      assert_selector ".admin-section-group > .admin-block-card[data-block-id='#{block.id}'] fieldset[disabled]"
+      assert_selector ".admin-section-group .admin-translation-pair", text: "Original caption"
+      assert find_field("block-#{block.id}-caption", disabled: true).disabled?
+      assert_no_selector "[data-controller~='admin--autosave']", visible: :all
+      assert_no_selector ".admin-section-group button[aria-label='Block actions'], .admin-block-card__handle", visible: :all
+      assert_no_selector ".admin-section-group dialog", visible: :all
+    end
+  end
+
+  test "a read-only user sees a section whose type is gone with its tiles and nothing that deletes" do
+    page_record = create_page(title: "Banded, hands off")
+    section = page_record.content_blocks.create!(block_type: "section", position: 0)
+    page_record.content_blocks.create!(block_type: "image", section: section, section_column: 1, position: 0)
+    section.update_columns(block_type: "gone/section")
+    visit "/cs-studio/pages/#{page_record.id}"
+    await_admin_controllers
+
+    assert_selector ".admin-section-card.border-danger", text: "Unavailable type — gone/section"
+    assert_selector ".admin-block-tile", count: 1
+    assert_no_button "Delete block…"
+    assert_no_selector ".admin-section-card dialog", visible: :all
+    assert_no_selector ".admin-block-tile__grip"
+  end
 end
