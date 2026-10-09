@@ -509,6 +509,36 @@ class Admin::ContentBlocksTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, %(<turbo-stream action="replace")
   end
 
+  # A copy stands directly after its source in the source's own container
+  # (`ContentBlocks::Duplicate`). In a column that is a tile after the
+  # source's tile, its form under the lanes, and the section's two counts --
+  # never a card in the page's list, where the block is not.
+  test "duplicating a block in a column streams its panel, its tile after the source's, and the section's count" do
+    section = @page.content_blocks.create!(block_type: "section", position: 0, settings: { "layout" => "two" })
+    source = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 0)
+    below = @page.content_blocks.create!(block_type: "rich_text", section: section, section_column: 2, position: 1)
+
+    post "#{blocks_path}/#{source.id}/duplicate", as: :turbo_stream
+    assert_response :created
+
+    copy = (section.section_blocks.reload.to_a - [ source, below ]).sole
+    assert_equal [ source.id, copy.id, below.id ], @page.content_blocks.in_column(section, 2).reorder(:position).ids
+    assert_select "turbo-stream[action=append][target='section-#{section.id}-panels'] template" do
+      assert_select "#block-#{copy.id}-panel[hidden]:not([data-open])"
+    end
+    assert_select "turbo-stream[action=after][target='#{ActionView::RecordIdentifier.dom_id(source)}'] template" do
+      assert_select "##{ActionView::RecordIdentifier.dom_id(copy)}.admin-block-tile button.admin-block-tile__face[aria-expanded=false]"
+    end
+    assert_select "turbo-stream[target='content-blocks-list']", count: 0
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-summary'] template" do
+      assert_select "#section-#{section.id}-summary", text: "2 columns · 3 blocks"
+    end
+    assert_select "turbo-stream[action=replace][target='section-#{section.id}-delete-count']"
+    panel = response.body.index(%(id="block-#{copy.id}-panel"))
+    tile = response.body.index(%(id="#{ActionView::RecordIdentifier.dom_id(copy)}"))
+    assert panel < tile, "the panel must arrive before its tile"
+  end
+
   test "typed-setting errors name their field in words in the block's error slot" do
     block = @page.content_blocks.create!(block_type: "post_list", position: 0)
     prefix = Admin::BlockCardComponent.error_prefix(block)

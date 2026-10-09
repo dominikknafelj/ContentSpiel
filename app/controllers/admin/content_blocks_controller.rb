@@ -269,6 +269,9 @@ module Admin
     # unlike `create`'s (which is only sometimes given), so this never
     # falls back to appending at the end. A section's card comes with its
     # lanes, tiles and forms (`card_for`).
+    #
+    # The copy of a block in a column is in that column, and is drawn there
+    # (`copy_tile_streams`): the page's list is not where it is.
     def duplicate
       source = @page.content_blocks.find_by(id: params[:id])
       return render_gone unless source
@@ -276,7 +279,9 @@ module Admin
       result = ContentBlocks::Duplicate.call(source)
       return render(turbo_stream: picker_error_stream(result.errors), status: failure_status(result)) unless result.ok?
 
-      render turbo_stream: [ *insertion_stream(result.record, source.id), *page_base_streams ], status: :created
+      copy = result.record
+      streams = copy.section_id ? copy_tile_streams(copy, source) : insertion_stream(copy, source.id)
+      render turbo_stream: [ *streams, *page_base_streams ], status: :created
     end
 
     private
@@ -393,6 +398,26 @@ module Admin
       section = block.section
       [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel_component(block, open: open)),
         turbo_stream.append(Admin::EditorScreen::SectionLanesComponent.lane_id(section, block.section_column), tile_component(block, open: open)) ]
+    end
+
+    # The copy of a block that sits in a column (Duplicate, from its tile's
+    # menu): its form under the section's lanes, then its tile directly after
+    # the source's -- where `ContentBlocks::Duplicate` put it, which is not
+    # the end of the lane `tile_streams` appends to -- and the section's two
+    # counts, which a copy raises as an add does.
+    #
+    # NOT OPENED, unlike a block just added (sections spec §4.3, "a block
+    # just added opens at once"): an added block is empty and its form is what
+    # the person came for; a copy already holds what its source holds, and
+    # what follows a Duplicate is as often moving the copy as editing it.
+    # Opening it would also close the form that is open in the section, which
+    # may be the source's, mid-edit. The focus goes to the copy's menu
+    # (`admin--blocks#focusCopy`), from where it is opened, moved or copied on.
+    def copy_tile_streams(copy, source)
+      section = copy.section
+      [ turbo_stream.append(Admin::EditorScreen::SectionCardComponent.panels_id(section), panel_component(copy)),
+        turbo_stream.after(ActionView::RecordIdentifier.dom_id(source), tile_component(copy)),
+        *section_count_streams(section) ]
     end
 
     def panel_component(block, open: false)
