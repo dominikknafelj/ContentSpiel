@@ -112,12 +112,19 @@ en:
     # one footer, whose button is "Save" and whose toast is the app's own
     # "Settings saved" (no full stop, as on the Settings screen).
     accounts:
+      # The screen's heading, its title in the browser's tab and the
+      # sidebar's entry that leads to it (the handoff's decision 25).
       title: "Your account"
       save: "Save"
       saved: "Settings saved"
       profile:
         title: "Profile"
         name: "Your name"
+      # The third card: the password form, with what a change does to the
+      # person's sessions under its title.
+      password:
+        title: "Password"
+        sessions: "You'll stay signed in here. Other sessions are signed out."
       notes:
         title: "Notes"
         description: "What happens in this browser when someone mentions you in a note."

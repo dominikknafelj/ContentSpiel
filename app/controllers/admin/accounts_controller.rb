@@ -1,4 +1,6 @@
 module Admin
+  # "Your account", the screen (the notes handoff's decision 25): the
+  # person's name and notes settings, and, as its third card,
   # "Change my password" (access-control design spec §3.3 "Any user may
   # change their own password", §5): open to every signed-in user, from the
   # account menu -- the Users module, where an admin changes *other*
@@ -72,7 +74,7 @@ module Admin
         # the redirect.
         if request.accepts.any? { |type| type.symbol == :turbo_stream }
           render turbo_stream: [
-            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user)),
+            turbo_stream.replace("account-identity", Admin::Shell::AccountIdentityComponent.new(user: Current.user, url_options: admin_url_options)),
             toast_stream(t("admin.accounts.saved"))
           ]
         else

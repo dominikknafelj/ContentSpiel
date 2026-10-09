@@ -1,4 +1,8 @@
-<%# "Change my password" (access-control design spec §5; round 3, handoff
+<%# "Your account" (the notes handoff's decision 25): the h1, then three
+    cards -- Profile and Notes in one form with one footer, and Password, a
+    form of its own with its own "Change password" footer and the promise
+    about sessions directly under the card's title. The screen began as
+    "Change my password" (access-control design spec §5; round 3, handoff
     "Studio Change Password"): every signed-in user's own password, behind
     their current one, plus the one profile field, their name (design pass
     spec §5.1). A deliberate submit, never autosave, like the Users module's
@@ -18,9 +22,9 @@
     The current password alone is nothing to save and is what a password
     manager fills in on load: it is not counted (`data-save-bar-ignore`), or
     every visit here would end in "Leave without saving?".
-    The first form is headed "Your account" and is two cards of one width
-    (560px), Profile (the name) and Notes, with the one footer under both
-    (notes handoff, decisions 19 and 20); the password form is 560px too.
+    The first form is two cards of one width (560px), Profile (the name) and
+    Notes, with the one footer under both (notes handoff, decisions 19 and
+    20); the Password card is 560px too, its footer under it the same way.
     Every string of the first form is a key (`admin.accounts`); the password
     form's are still literals, which is why this file is not in the i18n
     test's `CONVERTED` list. The password form is the 560px card of the mock, its footer carrying the "Forgot your
@@ -28,11 +32,10 @@
     service's own rule (`Users::OwnerProtection#end_sessions_after_password_
     change`: the acting session stays, the user's other sessions go). No
     typed password is ever rendered back: the inputs have no `value`. %>
-<% content_for :title, "Change password" %>
+<% content_for :title, t("admin.accounts.title") %>
 <% field_errors = @field_errors || {} %>
 <div class="max-w-[560px]">
-  <h1 class="mb-1 text-h1 text-ink">Change password</h1>
-  <p class="mb-4 text-meta">You'll stay signed in here. Other sessions are signed out.</p>
+  <h1 class="mb-4 text-h1 text-ink"><%= t("admin.accounts.title") %></h1>
 
   <%# One summary at a time: only one of the two forms was submitted. The
       password form's messages link to their fields; the service's own
@@ -46,8 +49,6 @@
   <% profile = @profile_values || { name: Current.user.name, notes_sound: Current.user.notes_sound, notes_desktop: Current.user.notes_desktop } %>
   <%= form_with url: admin_account_profile_path(**admin_url_options), method: :patch, id: "profile-form", class: "mb-8",
         data: save_bar_form_data(dirty: Array(@profile_errors).any?) do %>
-    <h2 class="mb-3 text-h2 text-ink"><%= t("admin.accounts.title") %></h2>
-
     <section class="mb-4 max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-profile">
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-profile" class="text-base font-semibold text-ink"><%= t("admin.accounts.profile.title") %></h3>
@@ -113,19 +114,27 @@
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
-    <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
-            autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>
-    </div>
+    <section class="max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-password">
+      <div class="border-b border-line px-[18px] py-3.5">
+        <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
+        <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>
+      </div>
+      <div class="px-[18px] pt-3.5">
+        <div class="mb-4">
+          <%= render Admin::PasswordFieldComponent.new(name: "current_password", id: "current_password", label: "Current password",
+                autocomplete: "current-password", autofocus: true, errors: field_errors[:current_password], "data-save-bar-ignore": true) %>
+        </div>
 
-    <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, errors: field_errors[:password]) %>
-    </div>
+        <div class="mb-4">
+          <%= render Admin::PasswordFieldComponent.new(name: "password", id: "password", label: "New password", meter: true, errors: field_errors[:password]) %>
+        </div>
 
-    <div class="mb-4">
-      <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password",
-            errors: field_errors[:password_confirmation]) %>
-    </div>
+        <div class="mb-4">
+          <%= render Admin::PasswordFieldComponent.new(name: "password_confirmation", id: "password_confirmation", label: "Confirm new password",
+                errors: field_errors[:password_confirmation]) %>
+        </div>
+      </div>
+    </section>
 
     <%= render Admin::SaveBarComponent.new(form_id: "password-form", cancel_url: admin_root_path(**admin_url_options), save_label: "Change password", save_data: { password_submit: true }) do %>
       <%# The reset flow is public and signs nobody out by being visited; it

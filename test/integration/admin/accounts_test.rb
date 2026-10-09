@@ -1,6 +1,7 @@
 require "test_helper"
 
-# "Change my password" (access-control design spec §3.3 "Any user may change
+# "Your account", the screen (the notes handoff's decision 25), whose third
+# card is "Change my password" (access-control design spec §3.3 "Any user may change
 # their own password", §5 "reachable by every user from the account menu").
 class Admin::AccountsTest < ActionDispatch::IntegrationTest
   setup do
@@ -11,7 +12,8 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
 
     get "/cs-studio/api_tokens"
-    assert_select "a[href='/cs-studio/account/password']", text: /Change password/
+    assert_select ".admin-account a[href='/cs-studio/account/password']", text: "Your account"
+    assert_select ".admin-account a#account-identity[href='/cs-studio/account/password']"
 
     get "/cs-studio/account/password"
     assert_response :success
@@ -50,7 +52,20 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     get "/cs-studio/account/password"
 
-    assert_select "h1 + p", text: "You'll stay signed in here. Other sessions are signed out."
+    # The handoff's decision 25: the page is "Your account"; its cards are
+    # Profile, Notes and Password, in that order; and the promise about
+    # sessions stands directly under the Password card's title.
+    assert_select "title", text: "Your account"
+    assert_select "h1", text: "Your account", count: 1
+    assert_select "turbo-frame#content h2", count: 0
+    assert_equal %w[Profile Notes Password], css_select("turbo-frame#content section h3").map { |heading| heading.text.strip }
+    assert_select "form#profile-form section", count: 2
+    assert_select "form#password-form section[aria-labelledby=account-password]" do
+      assert_select "h3#account-password + p", text: "You'll stay signed in here. Other sessions are signed out."
+      assert_select "input[type=password]", count: 3
+    end
+    assert_select "form#password-form section ~ .admin-save-bar button[type=submit]", text: "Change password"
+    assert_select "h1 + p", count: 0
     assert_select "#password-form .admin-save-bar a[href='/cs-studio/password/new']", text: "Forgot your current password?"
     assert_select "#profile-form .admin-save-bar a", text: "Forgot your current password?", count: 0
     assert_select ".admin-save-bar", count: 2
@@ -160,7 +175,6 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--save-bar']" do
       # Decisions 19 and 20: "Your account", then two cards of one width,
       # Profile and Notes, and one footer under both, whose button is "Save".
-      assert_select "h2", text: "Your account"
       assert_select "section.max-w-\\[560px\\]", count: 2
       assert_select "section[aria-labelledby=account-profile] h3#account-profile", text: "Profile"
       assert_select "section[aria-labelledby=account-profile] label[for=name]", text: "Your name"

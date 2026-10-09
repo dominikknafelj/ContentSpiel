@@ -74,7 +74,11 @@ class Admin::Shell::SidebarComponentTest < ViewComponent::TestCase
     render_sidebar(labels: %w[Dashboard], user: user)
     assert_selector ".admin-account", text: "Ada Lovelace"
     assert_selector ".admin-account", text: user.email_address
-    assert_selector ".admin-account a", text: "Change password"
+    # The entry reads "Your account" (the handoff's decision 25), and the
+    # name block above it leads to the same screen.
+    assert_selector ".admin-account a[href='/cs-studio/account/password']", text: /\AYour account\z/
+    assert_selector ".admin-account a#account-identity[href='/cs-studio/account/password']", text: "Ada Lovelace"
+    assert_no_selector ".admin-account a", text: "Change password"
     assert_selector ".admin-account button", text: "Sign out"
     # Email and role share one line (review C, M9).
     assert_selector ".admin-account span", text: "#{user.email_address} · Owner", count: 1

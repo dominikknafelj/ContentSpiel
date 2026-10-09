@@ -103,4 +103,29 @@ class ShellTest < ApplicationSystemTestCase
       assert_equal metrics["chrome"], metrics["cellBackground"]
     end
   end
+
+  # The notes handoff's decision 25: the sidebar's entry reads "Your account",
+  # and the person's name block above it is a link to the same screen, whose
+  # cards are Profile, Notes and Password. A name saved there is drawn again
+  # in the block (a stream), which is still the link.
+  test "the sidebar's name block and its Your account entry both lead to the account screen" do
+    sign_in_via_form users(:one)
+    await_admin_controllers
+
+    within("#sidebar .admin-account") { click_link "Your account" }
+    assert_selector "h1", text: "Your account"
+    assert_equal %w[Profile Notes Password], all("turbo-frame#content section h3").map(&:text)
+    assert_selector "#password-form section h3 + p", text: "You'll stay signed in here. Other sessions are signed out."
+    assert_title "Your account"
+
+    visit admin_tags_path
+    assert_selector "h1", text: "Tags"
+    find("#sidebar a#account-identity").click
+    assert_selector "h1", text: "Your account"
+    assert_current_path admin_account_password_path
+
+    fill_in "Your name", with: "Ada"
+    within("#profile-form") { press "Save" }
+    assert_selector "#sidebar a#account-identity[href='#{admin_account_password_path}'] span[title='Ada']"
+  end
 end

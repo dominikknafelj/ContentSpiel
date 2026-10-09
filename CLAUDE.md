@@ -80,7 +80,7 @@ Each rule names the test that guards it where there is one; the reference file i
 - No inline event handlers in a view, a component, a helper or a script's markup: wire behaviour through `data-action` (`test/lib/inline_handlers_test.rb`).
 - CS Studio sources use tokens, not colour literals: no hex or `rgb()`/`hsl()` value, no `dark:` variant other than `dark:scheme-dark`, no `danger` in a translation chip or language tab, and no `mx-auto` in the shell except the 403 and 404 messages (`test/lib/admin_design_rules_test.rb`).
 - Every autosave, block reorder, block form and tree move of a CS Studio screen is sent through `app/javascript/autosave/queue.js`, never from a hand-built request beside it, and an autosave carries the record's `base_updated_at` so a stale one is refused with a 409 and nothing is written.
-- Content screens autosave; configuration screens (Settings, Groups, Users, Change password) save explicitly through `Admin::SaveBarComponent`.
+- Content screens autosave; configuration screens (Settings, Groups, Users, Your account) save explicitly through `Admin::SaveBarComponent`.
 - Choosing a library image for a hero or an image block goes through `Media::Choosing`, and the database's own foreign key is what keeps an image in use from being deleted.
 - Editing an already-published record needs `publish`, not just `edit`, because autosave writes the live record; a save that changes only the publish state needs only `publish` (`Posts::Save` / `Pages::Save#publish_only?`).
 - `Pages::Save` and `Posts::Save` take only the keys in their `ATTRIBUTES` lists; moving and trashing belong to `Pages::Move` and `Trash::Move`.
