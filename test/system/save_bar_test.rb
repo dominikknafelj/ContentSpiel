@@ -539,7 +539,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   test "the two account forms each keep their own footer and share one Leave prompt" do
     sign_in_via_form(@owner)
-    visit admin_account_password_path
+    visit admin_account_path
     await_admin_controllers
 
     assert_selector ".admin-save-bar", count: 2
@@ -571,7 +571,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   test "saving one account form is not blocked by the other being pristine" do
     sign_in_via_form(@owner)
-    visit admin_account_password_path
+    visit admin_account_path
     await_admin_controllers
 
     fill_in "Your name", with: "Saved Name"
@@ -590,7 +590,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
   # form holds.
   test "Save on the profile form keeps what the password form holds, and asks nothing" do
     sign_in_via_form(@owner)
-    visit admin_account_password_path
+    visit admin_account_path
     await_admin_controllers
 
     fill_in "Current password", with: "password"
@@ -615,7 +615,7 @@ class SaveBarSystemTest < ApplicationSystemTestCase
 
   test "Change password is locked while the name is unsaved, and unlocks when it is saved" do
     sign_in_via_form(@owner)
-    visit admin_account_password_path
+    visit admin_account_path
     await_admin_controllers
 
     fill_in "Current password", with: "password"

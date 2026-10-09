@@ -34,7 +34,7 @@ module Jump
       { title: "New page", path: :new_admin_page_path, permission: "pages.create", dialog: "new-page-dialog" },
       { title: "New post", path: :new_admin_post_path, permission: "posts.create", dialog: "new-post-dialog" },
       { title: "Upload image", path: :admin_media_path, permission: "media.upload" },
-      { title: "Your account", path: :admin_account_password_path, permission: nil }
+      { title: "Your account", path: :admin_account_path, permission: nil }
     ].freeze
 
     # The Settings group (spec §7, round 1 second review): destinations

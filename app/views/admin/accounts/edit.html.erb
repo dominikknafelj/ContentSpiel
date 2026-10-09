@@ -116,7 +116,10 @@
   <% end %>
 
   <%= form_with url: admin_account_password_path(**admin_url_options), method: :patch, id: "password-form", data: save_bar_form_data(dirty: Array(@errors).any?, after: "profile-form") do %>
-    <section class="max-w-[560px] rounded-cs border border-line bg-surface" aria-labelledby="account-password">
+    <%# `#password` is the card's anchor (the handoff's decision 38): what a
+        link to "change your password" names, and where the form's own
+        answer comes back to. `scroll-mt`: clear of whatever is stuck to the top. %>
+    <section id="password" class="max-w-[560px] scroll-mt-6 rounded-cs border border-line bg-surface" aria-labelledby="account-password">
       <div class="border-b border-line px-[18px] py-3.5">
         <h3 id="account-password" class="text-base font-semibold text-ink"><%= t("admin.accounts.password.title") %></h3>
         <p class="text-[13px] text-dim"><%= t("admin.accounts.password.sessions") %></p>

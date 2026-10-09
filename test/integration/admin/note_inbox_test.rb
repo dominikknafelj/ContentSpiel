@@ -185,7 +185,7 @@ class Admin::NoteInboxTest < ActionDispatch::IntegrationTest
   # page load: one COUNT on `note_deliveries`, narrowed by the read scope, and
   # nothing else of notes on a screen that shows none.
   test "a page load pays exactly one statement for the sidebar's unread count, whatever the number of notes" do
-    paths = [ "/cs-studio/tags", "/cs-studio/api_tokens", "/cs-studio/account/password" ]
+    paths = [ "/cs-studio/tags", "/cs-studio/api_tokens", "/cs-studio/account" ]
     sign_in_as(users(:two))
     as(users(:one)) { Notes::Start.call(@page, body: "For @[#{users(:two).id}]") }
     paths.each { |path| get path } # warm-up

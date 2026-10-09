@@ -24,9 +24,9 @@ class Admin::Shell::AccountIdentityComponentTest < ViewComponent::TestCase
   # with the address parameters of the page it is drawn on.
   test "the block is a link to the account screen" do
     render_inline(Admin::Shell::AccountIdentityComponent.new(user: users(:one)))
-    assert_selector "a#account-identity[href='/cs-studio/account/password']"
+    assert_selector "a#account-identity[href='/cs-studio/account']"
 
     render_inline(Admin::Shell::AccountIdentityComponent.new(user: users(:one), url_options: { locale: "de" }))
-    assert_selector "a#account-identity[href='/cs-studio/account/password?locale=de']"
+    assert_selector "a#account-identity[href='/cs-studio/account?locale=de']"
   end
 end

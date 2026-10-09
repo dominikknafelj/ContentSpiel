@@ -19,10 +19,18 @@ module Admin
     # The current-password check is a password oracle; throttled like
     # sign-in and the reset flow.
     rate_limit to: 10, within: 3.minutes, only: :update, with: -> {
-      redirect_to admin_account_password_path(**admin_url_options), status: :see_other, alert: "Try again later."
+      redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, alert: "Try again later."
     }
 
     def edit
+    end
+
+    # The page's first address, `account/password` (the handoff's decision
+    # 38): moved for good to `account`, in the language it was asked in.
+    # Behind the sign-in like the page itself, so the old address tells
+    # someone signed out nothing new.
+    def moved
+      redirect_to admin_account_path(**admin_url_options), status: :moved_permanently
     end
 
     def update
@@ -31,7 +39,8 @@ module Admin
         password: params[:password], password_confirmation: params[:password_confirmation])
 
       if result.ok?
-        redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: "Password changed. Your other sessions were signed out."
+        # Back to the card the form is in (`#password`), not the top of the page.
+        redirect_to admin_account_path(**admin_url_options, anchor: "password"), status: :see_other, notice: "Password changed. Your other sessions were signed out."
       else
         @errors = result.errors
         # By field too, so the current-password message can sit under its own
@@ -78,7 +87,7 @@ module Admin
             toast_stream(t("admin.accounts.saved"))
           ]
         else
-          redirect_to admin_account_password_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.saved")
+          redirect_to admin_account_path(**admin_url_options), status: :see_other, notice: t("admin.accounts.saved")
         end
       else
         @profile_errors = result.errors

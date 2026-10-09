@@ -428,7 +428,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   end
 
   test "the permission line stands only while the desktop switch is on, as it is in the page" do
-    visit "/cs-studio/account/password"
+    visit "/cs-studio/account"
     await_admin_controllers
     browser_says("default")
     # Off, as stored: the browser's state is known, and nothing is said.
@@ -453,7 +453,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   end
 
   test "Allow in this browser asks at once, and a browser that refuses says so" do
-    visit "/cs-studio/account/password"
+    visit "/cs-studio/account"
     await_admin_controllers
     browser_says("default", asked: "denied")
     find("#notes_desktop").click
@@ -470,7 +470,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
   end
 
   test "a browser that allows it shows no line at all, and one without notifications neither" do
-    visit "/cs-studio/account/password"
+    visit "/cs-studio/account"
     await_admin_controllers
     browser_says("default", asked: "granted")
     find("#notes_desktop").click
@@ -488,7 +488,7 @@ class Admin::NotesAlertSystemTest < ApplicationSystemTestCase
 
   # The handoff's decision 13: the name and the switches are one form.
   test "the name and the two switches are saved by one footer, keep what the password form holds, and reach the next page" do
-    visit "/cs-studio/account/password"
+    visit "/cs-studio/account"
     await_admin_controllers
     assert_selector ".admin-save-bar", count: 2
     fill_in "Current password", with: "password"

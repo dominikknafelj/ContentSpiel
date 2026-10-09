@@ -21,7 +21,7 @@ module Admin
       ROLE_LINE_GROUPS = 2
 
       erb_template <<~ERB
-        <%= link_to helpers.admin_account_password_path(**url_options), id: "account-identity",
+        <%= link_to helpers.admin_account_path(**url_options), id: "account-identity",
               class: "group flex min-w-0 flex-col gap-0.5 rounded-cs no-underline focus-visible:outline-2 focus-visible:outline-accent" do %>
           <span class="truncate text-sm font-medium text-ink underline-offset-2 group-hover:underline" title="<%= user.display_name %>"><%= user.display_name %></span>
           <span class="truncate text-xs text-meta" title="<%= line %>"><%= line %></span>

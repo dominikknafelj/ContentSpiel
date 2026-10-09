@@ -149,7 +149,7 @@ class Admin::ShellTest < ActionDispatch::IntegrationTest
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
     get "/cs-studio/users/#{users(:two).id}/edit", headers: { "Turbo-Frame" => "content" }
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_select "form[data-controller~='admin--save-bar']", count: 2
     assert_select "head meta[name='turbo-cache-control'][content='no-cache']", count: 1
     get "/cs-studio/users"

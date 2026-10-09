@@ -12,16 +12,16 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:reader))
 
     get "/cs-studio/api_tokens"
-    assert_select ".admin-account a[href='/cs-studio/account/password']", text: "Your account"
-    assert_select ".admin-account a#account-identity[href='/cs-studio/account/password']"
+    assert_select ".admin-account a[href='/cs-studio/account']", text: "Your account"
+    assert_select ".admin-account a#account-identity[href='/cs-studio/account']"
 
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_response :success
     assert_select "input[type=password][name=current_password]"
   end
 
   test "signed out, it redirects to sign-in" do
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_redirected_to "/cs-studio/sign-in"
   end
 
@@ -50,7 +50,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
   test "the screen promises what the code does, and links the reset flow from the card's footer" do
     sign_in_as(users(:reader))
 
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
 
     # The handoff's decision 25: the page is "Your account"; its cards are
     # Profile, Notes and Password, in that order; and the promise about
@@ -86,7 +86,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert Session.exists?(session_id)
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_response :success
   end
 
@@ -117,14 +117,14 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/account/password", params: { current_password: "password", password: "new-password-1", password_confirmation: "new-password-1" }
 
-    assert_redirected_to "/cs-studio/account/password"
+    assert_redirected_to "/cs-studio/account#password"
     follow_redirect!
     assert_select "[role=status]", text: /Password changed/
     assert user.reload.authenticate("new-password-1")
     assert_not Session.exists?(other_session.id)
     assert Session.exists?(current_session.id)
     # Still signed in here: the next request is served, not sent to sign-in.
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_response :success
 
     event = Audit::Event.find_by!(action: "user.updated", subject: user)
@@ -138,7 +138,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/account/profile", params: { name: "Ada" }
 
-    assert_redirected_to "/cs-studio/account/password"
+    assert_redirected_to "/cs-studio/account"
     assert_equal "Ada", user.reload.name
   end
 
@@ -163,7 +163,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     sign_in_as(users(:one))
     patch admin_account_profile_path, params: { name: "Json Client" }, headers: { "Accept" => "application/json" }
 
-    assert_redirected_to "/cs-studio/account/password"
+    assert_redirected_to "/cs-studio/account"
     assert_equal "Json Client", users(:one).reload.name
   end
 
@@ -176,7 +176,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
   test "the name and the two Notes switches are one form with one footer, and saving keeps the screen" do
     sign_in_as(users(:reader))
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
 
     assert_select "form#profile-form[action='/cs-studio/account/profile'][data-controller='admin--save-bar']" do
       # Decisions 19 and 20: "Your account", then two cards of one width,
@@ -212,7 +212,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
     # One press, one write, one event.
     assert_equal 1, Audit::Event.where(action: "user.updated", subject: users(:reader)).count
 
-    get "/cs-studio/account/password"
+    get "/cs-studio/account"
     assert_select "input[name=notes_sound]:not([checked])"
     assert_select "input[name=notes_desktop][checked]"
     assert_select "body[data-admin--notes-alert-sound-value=false][data-admin--notes-alert-desktop-value=true]"
@@ -224,7 +224,7 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     patch "/cs-studio/account/profile", params: { name: "Ada" }
 
-    assert_redirected_to "/cs-studio/account/password"
+    assert_redirected_to "/cs-studio/account"
     assert_equal [ "Ada", false, true ], users(:reader).reload.then { |user| [ user.name, user.notes_sound, user.notes_desktop ] }
   end
 
@@ -259,5 +259,51 @@ class Admin::AccountsTest < ActionDispatch::IntegrationTest
 
     assert_redirected_to "/cs-studio/sign-in"
     assert User.where(notes_sound: false).or(User.where(notes_desktop: true)).none?
+  end
+
+  # The handoff's decision 38: the page is "Your account", and its address
+  # says so. The old one, which named the password alone, leads there.
+  test "the account page is at /account; the old address moves there for good, with the language it was asked in" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/account"
+    assert_response :success
+    assert_select "h1", text: "Your account"
+
+    get "/cs-studio/account/password"
+    assert_response :moved_permanently
+    assert_redirected_to "/cs-studio/account"
+
+    get "/cs-studio/account/password", params: { locale: "de" }
+    assert_response :moved_permanently
+    assert_redirected_to "/cs-studio/account?locale=de"
+  end
+
+  test "the old address still asks for a sign-in first, and names no account page to someone signed out" do
+    get "/cs-studio/account/password"
+
+    assert_redirected_to "/cs-studio/sign-in"
+  end
+
+  test "the Password card is #password, and the password form still posts to its own address" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/account"
+
+    assert_select "section#password[aria-labelledby=account-password]" do
+      assert_select "h3#account-password", text: "Password"
+      assert_select "input[name=current_password]"
+    end
+    assert_select "form#password-form[action='/cs-studio/account/password'] input[name=_method][value=patch]"
+    assert_select "form#profile-form[action='/cs-studio/account/profile']"
+  end
+
+  test "⌘K's Your account leads to /account" do
+    sign_in_as(users(:reader))
+
+    get "/cs-studio/jump", params: { q: "your account" }
+
+    assert_includes response.body, "/cs-studio/account"
+    assert_not_includes response.body, "/cs-studio/account/password"
   end
 end

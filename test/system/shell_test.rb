@@ -122,10 +122,10 @@ class ShellTest < ApplicationSystemTestCase
     assert_selector "h1", text: "Tags"
     find("#sidebar a#account-identity").click
     assert_selector "h1", text: "Your account"
-    assert_current_path admin_account_password_path
+    assert_current_path admin_account_path
 
     fill_in "Your name", with: "Ada"
     within("#profile-form") { press "Save" }
-    assert_selector "#sidebar a#account-identity[href='#{admin_account_password_path}'] span[title='Ada']"
+    assert_selector "#sidebar a#account-identity[href='#{admin_account_path}'] span[title='Ada']"
   end
 end

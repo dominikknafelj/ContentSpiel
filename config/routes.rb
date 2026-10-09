@@ -232,11 +232,19 @@ Rails.application.routes.draw do
     # `:show` -- the editor is the group's page.
     resources :groups, only: %i[index new create edit update destroy]
 
-    # "Change my password" (access-control design spec §5): the signed-in
-    # user's own account, open to every user -- unlike the Users module,
-    # which needs `users.manage`. Singular: it's always *your* account.
-    get "account/password", to: "accounts#edit", as: :account_password
-    patch "account/password", to: "accounts#update"
+    # "Your account" (access-control design spec §5; the notes handoff's
+    # decisions 25 and 38): the signed-in user's own account, open to every
+    # user -- unlike the Users module, which needs `users.manage`. Singular:
+    # it's always *your* account. The page is `account`. It began as "Change
+    # my password" at `account/password`, an address that named one of its
+    # three cards: a GET of that one now moves to the page for good (a 301,
+    # `accounts#moved`), and the Password card is `#password` there. The two
+    # forms post where they always did -- `account/password` (which keeps
+    # the name `admin_account_password_path`) and `account/profile` -- so a
+    # non-GET is never redirected.
+    get "account", to: "accounts#edit", as: :account
+    get "account/password", to: "accounts#moved", as: nil
+    patch "account/password", to: "accounts#update", as: :account_password
     patch "account/profile", to: "accounts#update_profile", as: :account_profile
 
     # "Connect an AI assistant" (design spec §6.1, Task 9): the MCP bearer
