@@ -117,21 +117,42 @@ module Admin
     # says to choose them again, whatever the note was refused for (the
     # handoff's decision 33). They go into the page the person who chose
     # them is looking at, and nowhere else.
-    def failed_form(key, result, **extra)
-      { key: key, body: params[:body].to_s, names: mention_names, errors: result.errors, files_lost: note_files.map { |file| Notes::Files.stored_name(file.original_filename).truncate(Notes::Files::NAME_SHOWN) }, **extra }
+    def failed_form(key, result, **extra) = kept_form(key, result.errors, **extra)
+
+    def kept_form(key, errors, **extra)
+      { key: key, body: params[:body].to_s, names: mention_names, errors: errors, files_lost: note_files.map { |file| Notes::Files.stored_name(file.original_filename).truncate(Notes::Files::NAME_SHOWN) }, **extra }
     end
 
     # The thread (or what it was on) is no longer there: back to the list,
     # which says so. Never a 404 inside the drawer.
     def gone! = redirect_to(notes_path(notice: "gone"), status: :see_other)
 
+    # The thread a REPLY was sent to is no longer there, and the reply held
+    # text or files. `gone!`'s 303 lost them: the list was drawn over the
+    # field, and the composer took the redirect for a note that went through
+    # and forgot its draft. (The live refresh keeps typed text when a thread
+    # goes, but a reply can be sent before that signal has been acted on, or
+    # with the cable down.) So this answer is the list itself, with the
+    # sentence, and what was typed in the field for a NEW note on the record
+    # -- the one form the list has -- where the person can send it as one or
+    # copy it; the files are named to be chosen again, as after any refusal.
+    # Not a redirect, because a note's text never travels in a URL; and 422,
+    # so the composer keeps its draft and Turbo draws the answer. The field
+    # carries no error of its own: the sentence above it is the reason.
+    def reply_gone!
+      return gone! if params[:body].blank? && note_files.empty?
+
+      render_list(status: :unprocessable_entity, notice: "gone", failed: kept_form("new", [], subject: "", quote: ""))
+    end
+
     # A refused or failed write on a thread (Review Focus 3). The thread is
     # looked up again first: when the failure is that it went a moment ago
     # (its block deleted, its last message deleted in another tab), there is
-    # no thread view left to draw the sentence in, and the list says it.
+    # no thread view left to draw the sentence in, and the list says it
+    # (`gone`: a reply's text is kept there, `reply_gone!`).
     # Otherwise the thread again, with the reason in the form `key` names.
-    def answer_thread_failure(thread, result, key:, **extra)
-      return gone! unless container_threads.exists?(id: thread.id)
+    def answer_thread_failure(thread, result, key:, gone: :gone!, **extra)
+      return send(gone) unless container_threads.exists?(id: thread.id)
 
       render_thread(thread, status: failure_status(result), failed: failed_form(key, result, **extra))
     end

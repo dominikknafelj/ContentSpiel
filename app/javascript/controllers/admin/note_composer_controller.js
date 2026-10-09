@@ -7,7 +7,9 @@ import { messages } from "i18n/messages"
 // - Enter adds a line; Ctrl/⌘+Enter sends the form.
 // - Ctrl/⌘+Enter sends ONCE: a held key (`event.repeat`) and a second press
 //   while the first submit is still out are ignored, and the submit button is
-//   disabled for as long, or the same note would be saved twice.
+//   disabled for as long, or the same note would be saved twice. The field
+//   is read-only for as long too, so nothing typed after Send is lost
+//   (`sending`).
 // - What is typed is kept per person and per form (`user`, `key`) in
 //   `sessionStorage` -- which belongs to the tab, so without the person in the
 //   key the next one to sign in there would get this one's unsent text -- and put back
@@ -123,6 +125,13 @@ export default class extends Controller {
       this.names = { ...draft.names, ...this.names }
       this.namesTarget.value = JSON.stringify(this.names)
       if (draft.files.length > 0) this.lost = draft.files
+    } else if (!this.editValue && untouched && this.drawn && !draft) {
+      // A new note or a reply the server drew WITH text and that has no
+      // draft: the reply to a thread that went, handed back in the list's
+      // new-note field (`Admin::NoteContainer#reply_gone!`), whose draft is
+      // under the thread's key. It is this form's draft from now on, or
+      // closing the drawer would lose it.
+      this.store()
     }
     this.sayLost()
     if (this.hasSubmitTarget && APPLE.test(navigator.userAgentData?.platform || navigator.platform || "")) {
@@ -150,7 +159,10 @@ export default class extends Controller {
   key(event) {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault()
-      if (event.repeat || this.out) return
+      // No button to send with, no send: the form of a thread that is gone
+      // has its submit taken away (`admin--notes-live#gone`), and a note
+      // marked "out" that nothing sends would leave its field read-only.
+      if (event.repeat || this.out || !this.hasSubmitTarget) return
 
       this.closeSuggestions()
       // Marked out here, not only on `turbo:submit-start`: a second press in
@@ -192,6 +204,7 @@ export default class extends Controller {
   }
 
   emoji(event) {
+    if (this.out) return
     this.insert(event.currentTarget.dataset.emoji, this.fieldTarget.selectionStart, this.fieldTarget.selectionEnd)
     this.emojiTarget.open = false
     this.store()
@@ -201,22 +214,35 @@ export default class extends Controller {
   // The toolbar's at-sign button (handoff "Mention picker"): the same as
   // typing "@" at the caret, with a space before it when a word ends there.
   mention() {
+    if (this.out) return
     const field = this.fieldTarget
     const at = /(?:^|\s)$/.test(field.value.slice(0, field.selectionStart)) ? "@" : " @"
     this.insert(at, field.selectionStart, field.selectionEnd)
     this.typed()
   }
 
-  // `turbo:submit-start` on the form (a press on the button comes this way):
-  // a submit is out until its `turbo:submit-end`.
+  // `submit` and `turbo:submit-start` on the form (a press on the button
+  // comes this way): a submit is out until its `turbo:submit-end`.
+  //
+  // THE FIELD IS READ-ONLY FOR AS LONG. Turbo took the form's data at the
+  // press, and the answer replaces the form with an empty one and forgets
+  // the draft: whatever was typed in between was in neither, and was lost.
+  // That window is as long as a file's upload, and as long as the write
+  // queue holds the note behind an autosave -- which is BEFORE Turbo says
+  // `turbo:submit-start`, hence `submit` too. The text stays in view; the
+  // emoji, the at-sign and the paperclip do nothing meanwhile. (Read-only,
+  // not disabled: a disabled field is left out of the form's data when Turbo
+  // builds the request, and loses the focus.)
   sending() {
     this.out = true
+    this.fieldTarget.readOnly = true
     this.refresh()
   }
 
   // `turbo:submit-end` on the form: a note that went through leaves no draft.
   sent(event) {
     this.out = false
+    this.fieldTarget.readOnly = false
     this.refresh()
     if (event.detail.success) this.forget()
   }
@@ -224,6 +250,7 @@ export default class extends Controller {
   // --- files --------------------------------------------------------------------
 
   browse() {
+    if (this.out) return
     this.filesTarget.click()
   }
 
@@ -387,6 +414,7 @@ export default class extends Controller {
 
   // "@que" before the caret becomes "@Label ", and the name is remembered.
   pick(option) {
+    if (this.out) return
     // Read again from the field, not kept from the lookup: a letter typed
     // while the list was on its way is part of what the name replaces.
     const caret = this.fieldTarget.selectionStart

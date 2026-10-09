@@ -143,6 +143,97 @@ class Admin::NoteThreadAnswersSystemTest < ApplicationSystemTestCase
     assert_eventually(message: "the focus did not go to the reply field") { focused?("#note-thread-#{@thread.id}-reply textarea[name=body]") }
   end
 
+  # Turbo takes the form's data at the press; the answer then replaces the
+  # reply part with the empty one and the draft is forgotten. Anything typed
+  # in between was in neither -- for as long as a file's upload takes. So
+  # while a note is on its way its field is read-only: the text stays in
+  # view, and nothing can be typed that would be thrown away.
+  test "while a reply is on its way its field is read-only, so nothing typed after Send can be lost" do
+    open_in_drawer
+    reply_field.send_keys("First thought")
+    hold_request("/messages")
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_eventually(message: "the reply was never sent") { page.evaluate_script("window.__held === true && typeof window.__release === 'function'") }
+
+    assert reply_field.readonly?, "the field can be typed in while its note is on the wire"
+    reply_field.send_keys(" and one more")
+    find("#note-thread-#{@thread.id}-reply [data-admin--note-composer-target=emoji] summary").click
+    find("#note-thread-#{@thread.id}-reply button[data-emoji='👍']", visible: :all).click
+    assert_equal "First thought", reply_field.value
+    release
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "First thought"
+    assert_equal "", reply_field.value
+    assert_not reply_field.readonly?
+    assert_equal "First thought", @thread.messages.order(:id).last.body
+  end
+
+  # The same before the request has left at all: a non-GET is held by the
+  # write queue while an autosave is out (`autosave/frame_hold.js`), which is
+  # before Turbo says `turbo:submit-start`. The hold is played here by a
+  # listener that keeps the request back the way the queue does.
+  test "the field is read-only from the press, also while the request is still held back before it is sent" do
+    open_in_drawer
+    reply_field.send_keys("Held back")
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:before-fetch-request", (event) => {
+        if (window.__paused || String(event.detail.fetchOptions.method).toUpperCase() === "GET" || !event.detail.url.pathname.includes("/messages")) return
+        window.__paused = true
+        event.preventDefault()
+        window.__resume = event.detail.resume
+      })
+    JS
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_eventually(message: "the reply was never held") { page.evaluate_script("window.__paused === true") }
+
+    assert reply_field.readonly?, "the field can be typed in while its note waits to be sent"
+    page.execute_script("window.__resume()")
+
+    assert_selector "#note-thread-#{@thread.id}-messages [data-note-message]", text: "Held back"
+    assert_equal "", reply_field.value
+    assert_not reply_field.readonly?
+  end
+
+  # A refused note is drawn again with its text, to be put right: editable.
+  test "a reply that was refused can be typed in again" do
+    open_in_drawer
+    reply_field.send_keys("For @[999999]")
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+    assert_selector "#note-thread-#{@thread.id}-reply [role=alert]", text: "Someone you mentioned can't see this page."
+
+    assert_not reply_field.readonly?
+    reply_field.send_keys(" or not")
+    assert_equal "For @[999999] or not", reply_field.value
+  end
+
+  # The thread went a moment ago and this tab has not been told yet (the
+  # signal's half second, a cable that is down): the reply's answer is the
+  # list. Its text must not go with the thread.
+  test "a reply sent to a thread deleted a moment before is kept: the list says the note is gone and holds the text as a new note" do
+    open_in_drawer
+    reply_field.send_keys("Too late for this one")
+    # Deleted with no signal: what a tab sees that has not heard yet.
+    Notes::Thread.find(@thread.id).destroy!
+
+    within("#note-thread-#{@thread.id}-reply") { press "Reply" }
+
+    assert_selector "#notes-drawer #notes-list [role=status]", text: "This note is gone: it was deleted, or what it was on was."
+    assert_equal "Too late for this one", find("#notes-new textarea[name=body]").value
+    assert_equal 0, Notes::Message.count
+    # It is the new note's draft from here on: closing the drawer keeps it.
+    key = "cs-note-draft:#{users(:one).id}:new-Page-#{@page.id}-"
+    assert_eventually(message: "the kept text is not the new note's draft") { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').body") == "Too late for this one" }
+
+    within("#notes-new") { press "Add note" }
+
+    assert_selector "#notes-drawer [data-notes-view=thread] [data-note-message]", text: "Too late for this one"
+    assert_equal [ "Too late for this one" ], Notes::Message.pluck(:body)
+  ensure
+    page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
+  end
+
   test "a reaction on another message leaves an open edit and a half-typed reply as they are" do
     open_in_drawer
     start_editing

@@ -27,7 +27,19 @@
 // the id that controller wrote on <body>), so this tab is not told about its
 // own note: it has read the list again already.
 //
-// Nothing here outlives the card: the section is a child of the card's
+// THE FIELD'S DRAFT. The card is built anew every time a node is selected,
+// and Escape in the field, a click on the canvas and another node all close
+// it: a half-typed note went with it. So what is typed is kept like a
+// composer's (`admin--note-composer`), per person and per post, under
+// `cs-note-draft:<user id>:graph-Post-<id>` in `sessionStorage`; put back
+// when that post's card is built again; removed when the note is saved or
+// the field emptied, and with every other draft when the person signs out
+// (`forgetDrafts`). The person is the one `admin--notes-live` was given on
+// <body>. While a note is on its way the field is read-only, so nothing is
+// typed that the emptied field would throw away. A draft is a convenience:
+// storage that is absent or full is the same as having none.
+//
+// Nothing else here outlives the card: the section is a child of the card's
 // container, which `card.js` empties on `hide()` and the controller's
 // `reset()` empties on a page Turbo restored. An answer that arrives after
 // that fills a section nobody sees.
@@ -39,6 +51,8 @@
 // dim, the accent dot (spec §4.5: the one meaning accent has in notes) and
 // the word "new" for a screen reader, so it is never colour alone -- and the
 // link to the rest is `a[data-note-more]`.
+import { draftKey } from "controllers/admin/note_composer_controller"
+
 const LABEL = "m-0 font-cs-mono text-label uppercase tracking-mono text-meta"
 // Three rows, then "+N more" (handoff, "Node card thread list").
 const ROWS = 3
@@ -82,6 +96,28 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   const submit = element("button", "cursor-pointer rounded-cs border border-line-strong bg-surface px-2.5 py-[5px] text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50", text.t("mind_graph.script.card.notes.add"))
   submit.type = "submit"
   form.append(field, submit)
+
+  const key = draftKey(document.body.getAttribute("data-admin--notes-live-person-value") || "", `graph-Post-${node.id}`)
+  const draft = {
+    read() {
+      try {
+        const body = JSON.parse(window.sessionStorage.getItem(key) || "null")?.body
+        return typeof body === "string" ? body : ""
+      } catch {
+        return ""
+      }
+    },
+    write() {
+      try {
+        if (field.value) window.sessionStorage.setItem(key, JSON.stringify({ body: field.value, names: {}, files: [] }))
+        else window.sessionStorage.removeItem(key)
+      } catch {
+        // The text is still in the field.
+      }
+    }
+  }
+  field.value = draft.read()
+  field.addEventListener("input", () => draft.write())
 
   // The post's editor with the drawer open, at one thread or at the list.
   // The editor's URL arrives with the node; only the two parameters are
@@ -163,6 +199,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault()
     submit.disabled = true
+    field.readOnly = true
     try {
       const body = new FormData(form)
       body.set("view", "mind_graph")
@@ -179,6 +216,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
       // and must not empty the field.
       if (response.status === 201 && answer.id != null) {
         field.value = ""
+        draft.write()
         await load()
       } else {
         fail(Array.isArray(answer.errors) && answer.errors.length > 0 ? answer.errors.join(" ") : text.t("mind_graph.script.card.notes.failed"))
@@ -187,6 +225,7 @@ export function cardNotes(node, { text, url, postUrl, onChange }) {
       fail(text.t("mind_graph.script.card.notes.failed"))
     } finally {
       submit.disabled = false
+      field.readOnly = false
     }
   })
 

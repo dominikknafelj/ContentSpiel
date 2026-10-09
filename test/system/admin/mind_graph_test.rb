@@ -1792,6 +1792,78 @@ class Admin::MindGraphSystemTest < ApplicationSystemTestCase
     assert_equal 0, Notes::Thread.count
   end
 
+  # Escape in the field, a click on the canvas and another node all close the
+  # card, and the card is built anew each time: a half-typed note went with
+  # it. The field keeps a draft like the composers do, per person and per
+  # post (`cs-note-draft:<user id>:graph-Post-<id>`).
+  test "a note half typed in the card is back when that post's card opens again, is no other post's, and is gone once sent" do
+    a = create_post(title: "Alpha")
+    b = create_post(title: "Beta")
+    PostRelation.create!(post: a, related_post: b)
+    visit admin_mind_graph_path
+    await_graph
+    key = "cs-note-draft:#{users(:one).id}:graph-Post-#{a.id}"
+
+    click_node(a.id)
+    find("[data-mind-graph-card-notes] textarea").send_keys("Half a thought")
+    assert_eventually { page.evaluate_script("JSON.parse(window.sessionStorage.getItem(#{key.to_json}) || '{}').body") == "Half a thought" }
+    find("[data-mind-graph-card-notes] textarea").send_keys(:escape)
+    assert_no_selector "[data-mind-graph-card]"
+
+    # By the list: a card may stand over the other node on the canvas.
+    find("#{LIST} button", text: "Beta").click
+    assert_selector "[data-mind-graph-card-notes][data-notes-id='#{b.id}']"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+
+    find("#{LIST} button", text: "Alpha").click
+    assert_selector "[data-mind-graph-card-notes][data-notes-id='#{a.id}']"
+    assert_equal "Half a thought", find("[data-mind-graph-card-notes] textarea").value
+
+    within("[data-mind-graph-card-notes]") { press "Add note" }
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "Half a thought"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_nil page.evaluate_script("window.sessionStorage.getItem(#{key.to_json})")
+
+    # Emptied by hand, there is no draft either.
+    find("[data-mind-graph-card-notes] textarea").send_keys("x", :backspace)
+    assert_nil page.evaluate_script("window.sessionStorage.getItem(#{key.to_json})")
+  ensure
+    page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
+  end
+
+  # What is typed after "Add note", while the note is on its way, would be
+  # wiped with the field: the field is read-only for as long.
+  test "the card's field is read-only while its note is on the way" do
+    a = create_post(title: "Alpha")
+    PostRelation.create!(post: a, related_post: create_post(title: "Beta"))
+    visit admin_mind_graph_path
+    await_graph
+    click_node(a.id)
+    find("[data-mind-graph-card-notes] textarea").send_keys("On its way")
+    page.execute_script(<<~JS)
+      const original = window.fetch
+      window.fetch = (...args) => {
+        if (String(args[1]?.method || "GET").toUpperCase() !== "POST" || window.__held) return original(...args)
+        window.__held = true
+        return new Promise((resolve) => { window.__release = () => resolve(original(...args)) })
+      }
+    JS
+
+    within("[data-mind-graph-card-notes]") { press "Add note" }
+    assert_eventually(message: "the note was never sent") { page.evaluate_script("window.__held === true && typeof window.__release === 'function'") }
+
+    field = find("[data-mind-graph-card-notes] textarea")
+    assert field.readonly?, "the card's field can be typed in while its note is on the wire"
+    assert_equal "On its way", field.value
+    page.execute_script("window.__release()")
+
+    assert_selector "[data-mind-graph-card-notes] li[data-note-row]", text: "On its way"
+    assert_equal "", find("[data-mind-graph-card-notes] textarea").value
+    assert_not find("[data-mind-graph-card-notes] textarea").readonly?
+  ensure
+    page.execute_script("try { window.sessionStorage.clear() } catch (error) {}")
+  end
+
   # The badge is canvas pixels: the corner opposite the pin's holds something
   # else once the post has an open note.
   test "a post with an open note carries a badge on its top-left corner" do

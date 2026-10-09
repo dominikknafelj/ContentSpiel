@@ -4,7 +4,8 @@ module Admin
   # deleted, its last message deleted in another tab) answers the frame with
   # a sentence, never a 404 inside the drawer -- whether it was already gone
   # when the request arrived (`set_thread`) or went while the service ran
-  # (`NoteContainer#answer_thread_failure`).
+  # (`NoteContainer#answer_thread_failure`). A reply's text is not lost with
+  # its thread: the list that says so holds it (`NoteContainer#reply_gone!`).
   class NoteMessagesController < BaseController
     include NoteContainer
 
@@ -16,7 +17,7 @@ module Admin
       if result.ok?
         redirect_to thread_path(@thread), status: :see_other
       else
-        answer_thread_failure(@thread, result, key: "thread-#{@thread.id}")
+        answer_thread_failure(@thread, result, key: "thread-#{@thread.id}", gone: :reply_gone!)
       end
     end
 
@@ -45,8 +46,9 @@ module Admin
 
     private
 
+    # A reply to a thread that is gone keeps what was typed (`reply_gone!`).
     def set_thread
-      @thread = container_threads.find_by(id: params[:thread_id]) or gone!
+      @thread = container_threads.find_by(id: params[:thread_id]) or (action_name == "create" ? reply_gone! : gone!)
     end
   end
 end

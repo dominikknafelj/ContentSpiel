@@ -162,11 +162,50 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     assert ContentBlocks::Destroy.call(@block).ok?
     sign_in_as(users(:reader))
 
-    post "#{@base}/threads/#{on_block.id}/messages", params: { body: "Too late" }
+    post "#{@base}/threads/#{on_block.id}/messages"
 
     assert_redirected_to "#{@base}?notice=gone"
     follow_redirect!
     assert_select "[role=status]", text: /This note is gone/
+  end
+
+  # The reply had TEXT: a 303 to the list would be drawn over the field and
+  # the composer would take the answer for a note that went through and
+  # forget its draft -- the words were lost with nothing to bring them back.
+  # So that answer is the list itself, saying the note is gone, with what was
+  # typed in the field for a new note on the record: the person can send it
+  # as one, or copy it.
+  test "a reply with text to a thread that is gone is the list saying so, with the text in the new-note field and nothing written" do
+    on_block = as(users(:two)) { Notes::Start.call(@block, body: "About this block") }.record
+    assert ContentBlocks::Destroy.call(@block).ok?
+    sign_in_as(users(:reader))
+
+    assert_no_difference -> { Notes::Message.count } do
+      post "#{@base}/threads/#{on_block.id}/messages", params: { body: "Too late, ask @Dana", mention_names: { "Dana" => users(:two).id }.to_json }, headers: frame
+    end
+
+    assert_response :unprocessable_entity
+    assert_select "#notes-list [role=status]", text: /This note is gone/
+    assert_select "#notes-new form[data-note-composer='new-Page-#{@page.id}-']" do
+      assert_select "textarea[name=body]", text: "Too late, ask @Dana"
+      assert_select "input[name=subject][value='']"
+      assert_select "ul[role=alert]", count: 0
+      assert_select "input[name=mention_names]" do |inputs|
+        assert_equal({ "Dana" => users(:two).id }, JSON.parse(inputs.first["value"]))
+      end
+    end
+  end
+
+  test "a reply of chosen files and no text to a thread that is gone names the files to choose again" do
+    thread = as(users(:two)) { Notes::Start.call(@page, body: "Going") }.record
+    thread.destroy!
+    sign_in_as(users(:reader))
+
+    post "#{@base}/threads/#{thread.id}/messages", params: { body: "", files: [ fixture_file_upload("tiny.png", "image/png") ] }, headers: frame
+
+    assert_response :unprocessable_entity
+    assert_select "#notes-list [role=status]", text: /This note is gone/
+    assert_select "#notes-new [data-note-files-lost]", text: /tiny\.png/
   end
 
   test "every write is not found outside the read scope, and a thread of another record is gone, not written" do
@@ -183,7 +222,10 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
 
     sign_in_as(users(:reader))
     post "#{@base}/threads/#{elsewhere.id}/messages", params: { body: "Hi" }
-    assert_redirected_to "#{@base}?notice=gone"
+    # Gone among this record's threads: the list says so and keeps the text.
+    assert_response :unprocessable_entity
+    assert_select "#notes-list [role=status]", text: /This note is gone/
+    assert_select "#notes-new textarea[name=body]", text: "Hi"
     assert_equal 1, elsewhere.messages.count
   end
 
@@ -325,7 +367,9 @@ class Admin::NoteWritesTest < ActionDispatch::IntegrationTest
     thread = @thread
 
     answering(Notes::Reply, -> { thread.destroy! && gone }) { post "#{@base}/threads/#{thread.id}/messages", params: { body: "Too late" } }
-    assert_redirected_to "#{@base}?notice=gone"
+    assert_response :unprocessable_entity
+    assert_select "#notes-list [role=status]", text: /This note is gone/
+    assert_select "#notes-new textarea[name=body]", text: "Too late"
 
     other = as(users(:two)) { Notes::Start.call(@page, body: "Still here") }.record
     answering(Notes::Reply, -> { gone }) { post "#{@base}/threads/#{other.id}/messages", params: { body: "Kept" }, headers: frame }
