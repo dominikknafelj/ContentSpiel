@@ -26,7 +26,9 @@ module ContentBlocks
   # a delete around the service is refused rather than cascading. A
   # section's delete takes the page's row lock first (`Structure#lock_owner`,
   # decision D14): a block added to it by another tab meanwhile is either in
-  # the list read below or waits and is refused its vanished section.
+  # the list read below or waits and is refused its vanished section. What a
+  # block holds is read from the rows, so a section whose type is gone
+  # (sections spec §6) is deleted, or removed with its blocks kept, as any.
   #
   # So does every other delete (fix rounds 1 and 2), for the order of
   # locks: every write to a page's blocks takes the page's row and then
@@ -56,7 +58,13 @@ module ContentBlocks
       destroyed = ContentBlock.transaction do
         lock_owner(@block.owner)
         # `reload`: read under the lock, whatever the caller had loaded.
-        inside = @block.container? ? @block.section_blocks.reload.to_a : []
+        # Asked of the rows, not of the type (`container?`): a section whose
+        # type is no longer registered is no container and still has to
+        # take its blocks with it, or leave them behind lifted -- its own
+        # delete would otherwise run into the foreign key from them and
+        # raise. A block that holds nothing has none, at the cost of one
+        # short read.
+        inside = @block.section_blocks.reload.to_a
         metadata = {}
         if inside.any?
           metadata = { (@keep_blocks ? "kept_block_ids" : "deleted_block_ids") => inside.map(&:id) }

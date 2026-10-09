@@ -104,4 +104,30 @@ class ContentBlocks::DestroyTest < ActiveSupport::TestCase
     end
     assert_equal 3, @section.section_blocks.reload.size
   end
+
+  # A section whose type is no longer registered is no `container?`, and still
+  # holds its blocks (sections spec §6): what a delete takes along, or lifts,
+  # is decided from the rows. Before, its blocks were not looked for and the
+  # section's own delete ran into the foreign key.
+  test "a section whose type is gone is still deleted with its blocks" do
+    @section.update_columns(block_type: "gone/section")
+
+    assert_difference -> { ContentBlock.count } => -4, -> { Audit::Event.where(action: "block.deleted").count } => 1 do
+      assert ContentBlocks::Destroy.call(@section.reload, actor: nil).ok?
+    end
+    assert_equal [ @left_a.id, @left_b.id, @right.id ], Audit::Event.where(action: "block.deleted").last.metadata["deleted_block_ids"]
+    assert_equal [ [ @before.id, 0 ], [ @after.id, 1 ] ], @page.content_blocks.reload.reorder(:position).pluck(:id, :position)
+  end
+
+  test "a section whose type is gone is removed with its blocks kept, lifted to its place" do
+    @section.update_columns(block_type: "gone/section")
+
+    assert_difference -> { ContentBlock.count }, -1 do
+      assert ContentBlocks::Destroy.call(@section.reload, keep_blocks: true, actor: nil).ok?
+    end
+    top = @page.content_blocks.top_level.reorder(:position).to_a
+    assert_equal [ @before, @left_a, @left_b, @right, @after ], top
+    assert_equal [ 0, 1, 2, 3, 4 ], top.map(&:position)
+    assert_equal [ @left_a.id, @left_b.id, @right.id ], Audit::Event.where(action: "block.deleted").last.metadata["kept_block_ids"]
+  end
 end
