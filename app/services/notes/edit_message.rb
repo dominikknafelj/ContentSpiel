@@ -18,8 +18,10 @@ module Notes
     end
 
     def call
+      # `&.`: a message loaded before its thread was removed has none
+      # (`Authorization`, "A container that is nil").
       thread = @message.thread
-      container = thread.container
+      container = thread&.container
       refused = read_refusal(container) { |key| authorize!(key, container) }
       return denied(refused, container) if refused
       return denied(Notes.read_key(container), container, message: I18n.t("admin.notes.errors.not_yours")) unless own?(@message)

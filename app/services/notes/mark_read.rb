@@ -21,18 +21,21 @@ module Notes
     def initialize(thread: nil, container: nil, actor: Current.actor)
       @thread = thread
       @container = thread ? thread.container : container
+      # A thread whose record is gone names a record all the same: it must
+      # not read as "Mark all read", which names none and checks nothing.
+      @names_record = thread.present? || container.present?
       @actor = actor
     end
 
     def call
-      if @container
+      if @names_record
         refused = read_refusal(@container) { |key| authorize!(key, @container) }
         return denied(refused, @container) if refused
       end
       return success(nil) unless actor_user
 
       marked = Delivery.transaction(requires_new: true) do
-        next false if @container && !lock_container(@container)
+        next false if @names_record && !lock_container(@container)
 
         now = Time.current
         unread_rows.update_all(read_at: now, updated_at: now) # version: none (note_deliveries is a person's inbox; no public page reads it)

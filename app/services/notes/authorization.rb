@@ -13,21 +13,59 @@ module Notes
   # row, then block rows), so a note and a block's delete run one after the
   # other, never interleaved, and `Notes::Remove` can't miss a thread written
   # beside it.
+  #
+  # A CONTAINER THAT IS NIL. No thread outlives its record (`Notes::Remove`),
+  # but a request can still carry one that was loaded a moment before the
+  # purge committed: its `container` then reads nil, and so does the `thread`
+  # of a message loaded that way and the `owner` of a block whose page went.
+  # There is no record left to ask a right of, and none to lock. Both
+  # refusal checks below raise `ContainerGone` for it, before anything is
+  # read or written, and `AnswersGone` -- prepended to every service that
+  # includes this module, so it is said once here and not in each `#call` --
+  # turns that into the ordinary failure the drawer shows ("This note is
+  # gone…"; `Notes::Start` names its subject instead). It is the answer the
+  # same call gets a moment later from `lock_container`, when the record is
+  # found in the trash or not at all; before this it was a `NoMethodError`
+  # out of the permission lookup, a 500. Nothing is logged as a denial:
+  # nobody was refused a right.
   module Authorization
     include Media::Ownership
 
+    ContainerGone = Class.new(StandardError)
+
+    module AnswersGone
+      def call
+        super
+      rescue ContainerGone
+        failure(nil, [ gone(gone_kind) ])
+      end
+    end
+
+    def self.included(service)
+      super
+      service.prepend(AnswersGone)
+    end
+
     private
+
+    # What the "gone" sentence names when the container is nil: the note,
+    # for every service that acts on an existing thread.
+    def gone_kind = "note"
 
     # Both yield the key to check and answer the refused key, or nil, like
     # `ContentBlocks::OwnerPermissions#owner_refusal`: the service itself
     # writes `authorize!(key, container)` in the block, which is what
     # `test/services/service_contract_test.rb` looks for in its class body.
     def read_refusal(container)
+      raise ContainerGone if container.nil?
+
       key = Notes.read_key(container)
       key unless yield(key)
     end
 
     def moderation_refusal(container)
+      raise ContainerGone if container.nil?
+
       key = Notes.moderate_key(container)
       return if yield(key)
       return if container.is_a?(Media::Asset) && uploader_may_manage?(container)

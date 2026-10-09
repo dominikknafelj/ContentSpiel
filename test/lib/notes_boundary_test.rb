@@ -20,7 +20,10 @@ class NotesBoundaryTest < ActiveSupport::TestCase
   ].freeze
 
   # path => why it may name `Notes::Remove`.
-  ALLOWED = {}.freeze
+  ALLOWED = {
+    "app/services/trash/purge.rb" => "a purge deletes a page, a post or an image for good, and their threads have no foreign key to go by",
+    "app/services/content_blocks/destroy.rb" => "a block's delete is permanent, and its threads have no foreign key to go by"
+  }.freeze
 
   # A constant under it (`Notes::Thread`) or a method of the module itself
   # (`Notes.key(page)`, reported as ".key"): either is content code knowing

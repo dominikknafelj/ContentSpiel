@@ -43,6 +43,14 @@ module Trash
   # `page.purged` per page it destroys: the root's lists the rest in
   # `metadata["descendant_ids"]` (mirroring `page.trashed`), and each
   # descendant's names the root in `metadata["purged_with"]`.
+  #
+  # The notes on what is purged go with it (notes spec D12): `Notes::Remove`
+  # is called once, for the page with its branch and all their blocks, for
+  # the post or for the image, in this transaction and BEFORE anything is
+  # destroyed (`#purge_branch` says why), under the row lock of every
+  # container whose threads go -- the branch's pages, or the post's or the
+  # image's own row (`#lock_record`). A trashed record keeps its notes;
+  # only this removes them.
   class Purge < ApplicationService
     include ItemPermissions
 
@@ -126,6 +134,15 @@ module Trash
       # already gone is not found, and skipped as before.
       Page.where(id: pages.map(&:id)).order(:id).lock.pluck(:id)
 
+      # The threads on these pages and their blocks (notes spec D12):
+      # polymorphic like the usage rows below, so removed by hand, once for
+      # the branch. Before any page is destroyed: `Notes::Remove` asks this
+      # purge's own right again, and a `pages.delete` scoped to a branch is
+      # matched against the page's closure rows, which its destroy deletes.
+      # (`content_blocks.to_a` loads the very objects the loop below reads
+      # again and the destroy goes on to destroy.)
+      remove_notes(with: (pages - [ @record ]) + pages.flat_map { |page| page.content_blocks.to_a })
+
       pages.each do |page|
         # Loaded *before* the destroy, so these are the very objects the
         # page's `dependent: :destroy` goes on to destroy (it destroys the
@@ -168,6 +185,8 @@ module Trash
     end
 
     def purge_post
+      lock_record
+      remove_notes
       @record.destroy || raise(ActiveRecord::Rollback)
       # A destroyed owner's `media_usages` rows go with it (media library
       # design spec §5.1) -- `refresh` computes none for a destroyed record.
@@ -181,9 +200,32 @@ module Trash
         @record.errors.add(:base, @record.in_use_message(actor:))
         raise ActiveRecord::Rollback
       end
+      lock_record
+      remove_notes
       @record.destroy || raise(ActiveRecord::Rollback)
       Translations::StateIndex.remove(@record)
       true
+    end
+
+    # The post's or the image's own row, held from here to the commit. It is
+    # the first lock every notes service takes (`Notes::Authorization#
+    # lock_container`), so a note written beside this purge has committed
+    # and is found by `Notes::Remove`, or waits here and finds the record
+    # gone. A trashed record takes no note, which keeps most of them out
+    # anyway; this closes what is left -- a record restored in another tab
+    # after this purge loaded it, and a note started on it at once, whose
+    # thread would otherwise be written between `Notes::Remove`'s read and
+    # the destroy and outlive the record. Row first, then what hangs on it
+    # (the destroy deletes a post's join rows before the post), which is
+    # the way round `Tags::Merge` takes them too: it touches a carrying post
+    # before it deletes that post's `post_tags` row. A page needs none of
+    # its own: `#purge_branch` holds the branch.
+    def lock_record = @record.class.where(id: @record.id).lock.pick(:id)
+
+    # A refusal there (none is expected: it asks the right this purge was
+    # just given) rolls the whole purge back, like any refusal further down.
+    def remove_notes(with: [])
+      Notes::Remove.call(@record, with: with, actor: actor).ok? || raise(ActiveRecord::Rollback)
     end
 
     def event_prefix = { Page => "page", Post => "post", Media::Asset => "media" }.fetch(@record.class)

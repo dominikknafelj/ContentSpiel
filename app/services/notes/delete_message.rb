@@ -19,7 +19,9 @@ module Notes
     end
 
     def call
-      container = @message.thread.container
+      # `&.`: a message loaded before its thread was removed has none
+      # (`Authorization`, "A container that is nil").
+      container = @message.thread&.container
       refused = read_refusal(container) { |key| authorize!(key, container) }
       return denied(refused, container) if refused
 

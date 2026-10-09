@@ -308,6 +308,13 @@ module ServiceCalls
       { call: -> { Notes::Pin.call(thread) }, permission: "pages.edit", on: page }
     },
 
+    "Notes::Remove" => lambda {
+      page = create_page(title: "Noted", published: false)
+      note_on(page)
+      trashed(page)
+      { call: -> { Notes::Remove.call(page) }, permission: "pages.delete", on: page }
+    },
+
     "Notes::Reopen" => lambda {
       page = create_page(title: "Noted", published: false)
       thread = note_on(page)

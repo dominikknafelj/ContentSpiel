@@ -342,4 +342,135 @@ class Trash::PurgeTest < ActiveSupport::TestCase
     assert moved.denied?
     assert_not kept.reload.trashed?
   end
+
+  test "a purged page takes its notes and its blocks' notes; a child's go with the branch" do
+    page = create_page(title: "Noted", published: false)
+    child = create_page(title: "Child", parent: page, published: false)
+    block = page.content_blocks.create!(block_type: "rich_text", position: 0)
+    keep = create_page(title: "Keep")
+    as(users(:two)) do
+      [ page, child, block, keep ].each { |subject| Notes::Start.call(subject, body: "A note, @[#{users(:reader).id}]") }
+    end
+    assert Trash::Move.call(page).ok?
+
+    assert Trash::Purge.call(page.reload).ok?
+
+    assert_equal [ keep ], Notes::Thread.all.map(&:subject)
+    assert_equal [ 1, 1, 2 ], [ Notes::Message.count, Notes::Delivery.count, Notes::Follow.count ]
+    assert_equal 1, Audit::Event.where(action: "notes.removed").count
+  end
+
+  test "a purged post and a purged image take their notes" do
+    post = create_post(title: "Noted", published: false)
+    asset = create_media_asset
+    as(users(:two)) { [ post, asset ].each { |subject| Notes::Start.call(subject, body: "A note") } }
+
+    [ post, asset ].each do |record|
+      assert Trash::Move.call(record).ok?
+      assert Trash::Purge.call(record.reload).ok?
+    end
+
+    assert_equal 0, Notes::Thread.count
+  end
+
+  # `Notes::Remove` checks the purge's own right again. A `pages.delete`
+  # scoped to a branch is matched against the page's closure rows, which the
+  # page's destroy deletes: checked after the destroy it would refuse the
+  # very person the purge had just allowed, and roll the purge back.
+  test "someone whose delete right reaches one branch only purges a page of it, notes and all" do
+    page = create_page(title: "Branch", published: false)
+    as(users(:two)) { Notes::Start.call(page, body: "A note") }
+    assert Trash::Move.call(page).ok?
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.delete", scope: { "page_ids" => [ page.id ] })
+
+    result = as(users(:editor_branch)) { Trash::Purge.call(page.reload) }
+
+    assert result.ok?, result.errors.to_sentence
+    assert_equal [ 0, 0 ], [ Notes::Thread.count, Page.where(id: page.id).count ]
+  end
+
+  # The test above passes wherever the call stands: `Trash::Purge` asks the
+  # right of the object it was handed, and Rails keeps that object's
+  # `self_and_ancestor_ids` from the first time it is read (the purge's own
+  # check), so the second answer does not come from the closure rows. That
+  # is a detail of Active Record, not a rule of this app, and anything that
+  # hands `Notes::Remove` a fresh copy of the page would lose it. So the
+  # order itself is pinned here, and what a fresh read answers is shown.
+  test "the notes are removed before the first page of the branch is deleted" do
+    page = create_page(title: "Branch", published: false)
+    child = create_page(title: "Leaf", parent: page, published: false)
+    as(users(:two)) { [ page, child ].each { |subject| Notes::Start.call(subject, body: "A note") } }
+    assert Trash::Move.call(page).ok?
+    page.reload
+
+    statements = capture_sql { assert Trash::Purge.call(page).ok? }
+
+    locked = statements.index { |sql| sql.include?('FROM "pages"') && sql.include?("FOR UPDATE") }
+    notes = statements.index { |sql| sql.start_with?('DELETE FROM "note_threads"') }
+    first_page = statements.index { |sql| sql.start_with?('DELETE FROM "pages"') }
+    assert_operator locked, :<, notes
+    assert_operator notes, :<, first_page
+    assert_equal 1, statements.count { |sql| sql.start_with?('DELETE FROM "note_threads"') }
+  end
+
+  # A post and an image have no lock of their own in a purge but this one:
+  # the row every notes service takes first (`Notes::Authorization#
+  # lock_container`), held before the threads are read.
+  test "a post's and an image's row is locked before their notes are removed, and those before the record" do
+    { create_post(title: "Noted", published: false) => "posts", create_media_asset => "media_assets" }.each do |record, table|
+      as(users(:two)) { Notes::Start.call(record, body: "A note") }
+      assert Trash::Move.call(record).ok?
+      record.reload
+
+      statements = capture_sql { assert Trash::Purge.call(record).ok? }
+
+      order = [
+        statements.index { |sql| sql.include?(%(FROM "#{table}")) && sql.include?("FOR UPDATE") },
+        statements.index { |sql| sql.include?('FROM "note_threads"') },
+        statements.index { |sql| sql.start_with?('DELETE FROM "note_threads"') },
+        statements.index { |sql| sql.start_with?(%(DELETE FROM "#{table}")) }
+      ]
+      assert_equal order.compact.sort, order, "#{table}: #{order.inspect}"
+    end
+  end
+
+  test "asked once the page is deleted, a right that reaches one branch only is not found" do
+    page = create_page(title: "Branch", published: false)
+    AccessControl::Grant.create!(group: access_control_groups(:branch_editors), permission: "pages.delete", scope: { "page_ids" => [ page.id ] })
+    assert Trash::Move.call(page).ok?
+    before = Page.find(page.id)
+    assert Trash::Purge.call(page.reload).ok?
+
+    assert_predicate as(users(:editor_branch)) { Notes::Remove.call(before) }, :denied?
+  end
+
+  test "a purge that is refused keeps the notes" do
+    page = create_page(title: "Noted", published: false)
+    as(users(:two)) { Notes::Start.call(page, body: "A note") }
+
+    assert_not Trash::Purge.call(page).ok? # not in the trash
+    assert_equal 1, Notes::Thread.count
+  end
+
+  test "moving to the trash and restoring keep the notes" do
+    page = create_page(title: "Noted", published: false)
+    as(users(:two)) { Notes::Start.call(page, body: "A note") }
+
+    assert Trash::Move.call(page).ok?
+    assert_equal 1, Notes::Thread.count
+    assert Trash::Restore.call(page.reload).ok?
+    assert_equal 1, Notes::Thread.count
+  end
+
+  test "a purge costs the same statements with one note as with many" do
+    counts = [ 1, 6 ].map do |notes|
+      page = create_page(title: "Noted #{notes}", published: false)
+      as(users(:two)) { notes.times { Notes::Start.call(page, body: "A note") } }
+      assert Trash::Move.call(page).ok?
+      page.reload
+      capture_sql { assert Trash::Purge.call(page).ok? }.size
+    end
+
+    assert_equal counts.first, counts.last
+  end
 end

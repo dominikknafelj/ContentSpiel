@@ -48,6 +48,10 @@ module Notes
 
     private
 
+    # A block whose page is gone has no container (`Authorization`, "A
+    # container that is nil"): the sentence names the subject, as below.
+    def gone_kind = kind_of(@subject)
+
     def subject_still_there?(container)
       return false unless lock_container(container)
 
